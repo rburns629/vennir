@@ -98,16 +98,6 @@ Samples and catalog CI:
   (a long Cloud Build) isn't caught: the container ends with no
   result.json. And a failed Cloud Build ends UNKNOWN (no code), so it's
   still retried, as `BUILD_FAILED` always is.
-- [ ] **A product can't say which installs it's for**: one catalog serves
-  installs on several clouds, so an aws product on a GKE install shows
-  "not ready" (its check can't sign in by EKS Pod Identity) when it was
-  never meant to run there. A product (or team) could declare its targets
-  (`targets: [aws]`, catalog format, both schemas: `tools/` and
-  `cli/internal/catalogtool/schemas/`); the console would list it as "not
-  for this install" on the catalog, Every product and the run form, skip
-  its readiness checks, and refuse to run it there, instead of "not
-  ready". Readiness proves only the identity path on this install; whether
-  a product works stays the platform team's tests and catalog CI's.
 
 ## Installing and operating
 
