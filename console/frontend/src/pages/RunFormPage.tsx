@@ -302,14 +302,16 @@ function RunForm({
           ))}
           {schedule ? (
             <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Button variant="contained" size="large" disabled={savingSchedule} onClick={() => void saveToSchedule()}>
+              <Button variant="contained" size="large" disabled={savingSchedule || !runnable.runsHere} onClick={() => void saveToSchedule()}>
                 {savingSchedule ? "Saving…" : "Save to schedule"}
               </Button>
               <Button size="large" component={RouterLink} to={`/teams/${encodeURIComponent(schedule.team)}?tab=schedules`}>
                 Cancel
               </Button>
               <Typography variant="body2" color="text.secondary">
-                Checked against its schema; nothing runs until the schedule next starts it.
+                {runnable.runsHere
+                  ? "Checked against its schema; nothing runs until the schedule next starts it."
+                  : notHereReason(runnable.clouds, install, cloud)}
               </Typography>
             </Box>
           ) : (
@@ -323,7 +325,7 @@ function RunForm({
                 </Button>
               )}
               {scheduleTeams.length > 0 && (
-                <Button size="large" onClick={() => { setScheduling(true); }}>
+                <Button size="large" disabled={!runnable.runsHere} onClick={() => { setScheduling(true); }}>
                   Schedule…
                 </Button>
               )}

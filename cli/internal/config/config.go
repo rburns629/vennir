@@ -117,6 +117,19 @@ type Cluster struct {
 	Name   string `yaml:"name,omitempty"`
 	// Context is the kubectl context for an existing cluster.
 	Context string `yaml:"context,omitempty"`
+	// Cloud is the cloud an existing cluster is on (gcp, aws, azure), for
+	// the catalog's products made for that cloud (InstallCloud).
+	Cloud string `yaml:"cloud,omitempty"`
+}
+
+// InstallCloud is the cloud the console says this install is on, which
+// decides which catalog products are for it: the target's, or for an
+// existing cluster the cloud it's on when cluster.cloud says.
+func (c *Config) InstallCloud() string {
+	if c.Target == "existing" && c.Cluster.Cloud != "" {
+		return c.Cluster.Cloud
+	}
+	return c.Target
 }
 
 // Kind holds kind (local)'s own settings.
@@ -576,6 +589,9 @@ func (c *Config) Validate() error {
 	case "existing":
 		if c.Cluster.Context == "" {
 			add("cluster.context: the kubectl context of the existing cluster is needed")
+		}
+		if c.Cluster.Cloud != "" && c.Cluster.Cloud != "gcp" && c.Cluster.Cloud != "aws" && c.Cluster.Cloud != "azure" {
+			add("cluster.cloud: %q: gcp, aws or azure, the cloud the cluster is on (or empty)", c.Cluster.Cloud)
 		}
 		if c.Vertra == "source" && c.PlatformImages.Registry == "" {
 			add("platformImages.registry: building from source onto an existing cluster needs a registry to push the images to")

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -128,6 +129,30 @@ func (p *Product) ReleaseActions(reference string) ([]*catalogv1.ProductAction, 
 	return out, nil
 }
 
+// cloudsOf is a team.yaml's or product.yaml's clouds: a list of the clouds
+// installs are on; nil when it says none.
+func cloudsOf(v any) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	list, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf("clouds is a list, such as [aws]")
+	}
+	var out []string
+	for _, x := range list {
+		cloud := fmt.Sprint(x)
+		if !slices.Contains(Clouds, cloud) {
+			return nil, fmt.Errorf("clouds: %q isn't one of %s", cloud, strings.Join(Clouds, ", "))
+		}
+		out = append(out, cloud)
+	}
+	return out, nil
+}
+
+// Clouds are the clouds a catalog's clouds may name: those installs are on.
+var Clouds = []string{"gcp", "aws", "azure", "kind", "existing"}
+
 func or(value, fallback string) string {
 	if value != "" {
 		return value
@@ -175,7 +200,12 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 		help, _ := spec["help"].(map[string]any)
 		t.Contact, t.HelpChat, t.HelpUrl = text(spec, "contact"), text(help, "chat"), text(help, "url")
 		t.Owner, t.Description = text(spec, "owner"), text(spec, "description")
-		teamClouds[team] = stringList(spec["clouds"])
+		// Not schema-checked here, as product.yaml is: a cloud nobody runs
+		// would keep its products from running anywhere.
+		if teamClouds[team], err = cloudsOf(spec["clouds"]); err != nil {
+			problems = append(problems, fmt.Sprintf("teams/%s/team.yaml: %v", team, err))
+			continue
+		}
 		if len(c.secretStoreFiles(team)) > 0 {
 			documents, found := c.secretStoreDocuments(team)
 			if len(found) == 0 {

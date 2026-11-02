@@ -202,7 +202,12 @@ installs on several. A team.yaml's `clouds` is the default for all its
 products; a product.yaml's replaces it. On an install on another cloud,
 the product is still listed, marked "For aws installs", but its readiness
 check isn't run there and a run naming it is refused (`NOT_FOR_THIS_INSTALL`)
-before anything starts. Left out on both, it's for every install.
+before anything starts. Left out on both, it's for every install. An
+install vertra made knows its cloud; one on a cluster you already had says
+it (`vertra config set -e <env> cluster.cloud aws`), or runs only the
+products for every install. `clouds` says where a product is meant to run,
+not who may run what: that's still each team's sharing and the platform's
+image and identity policies.
 
 `resources` (`cpu`, `memory`, and optionally `memoryLimit`, as Kubernetes
 quantities) is what each of the product's steps asks the cluster for; a

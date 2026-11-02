@@ -459,3 +459,24 @@ func TestChangedSinceApplied(t *testing.T) {
 		t.Errorf("changed: %s", got)
 	}
 }
+
+// An existing cluster says its cloud when it's on one, for the catalog's
+// products made for it; otherwise the install's cloud is its target.
+func TestInstallCloud(t *testing.T) {
+	c := Default("existing")
+	if c.InstallCloud() != "existing" {
+		t.Errorf("unsaid: %q", c.InstallCloud())
+	}
+	c.Cluster.Cloud = "aws"
+	if c.InstallCloud() != "aws" {
+		t.Errorf("on EKS: %q", c.InstallCloud())
+	}
+	c.Cluster.Context = "ctx"
+	c.Cluster.Cloud = "eks"
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), `cluster.cloud: "eks"`) {
+		t.Errorf("an unknown cloud: %v", err)
+	}
+	if g := Default("gcp"); g.InstallCloud() != "gcp" {
+		t.Errorf("gcp: %q", g.InstallCloud())
+	}
+}

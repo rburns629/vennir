@@ -201,10 +201,12 @@ type Runnable struct {
 	// action's; a template has none yet): a name, inputs to fill the form
 	// with, and what it gave.
 	Examples []*RunExample `protobuf:"bytes,18,rep,name=examples,proto3" json:"examples,omitempty"`
-	// An action's product's clouds (Product.clouds); empty for a template.
+	// An action's product's clouds (Product.clouds); for a template, those of
+	// its steps that aren't for this install.
 	Clouds []string `protobuf:"bytes,19,rep,name=clouds,proto3" json:"clouds,omitempty"`
 	// Whether an action's product is for this install (Product.runs_here);
-	// always set for a template, whose steps are checked when it's run.
+	// for a template, whether every step's is. Run, a schedule or an order
+	// of one that isn't is refused (NOT_FOR_THIS_INSTALL).
 	RunsHere bool `protobuf:"varint,20,opt,name=runs_here,json=runsHere,proto3" json:"runs_here,omitempty"`
 	// Where an action's clouds are set (Product.clouds_from).
 	CloudsFrom    string `protobuf:"bytes,21,opt,name=clouds_from,json=cloudsFrom,proto3" json:"clouds_from,omitempty"`

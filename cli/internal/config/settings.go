@@ -23,6 +23,7 @@ var Settings = []Setting{
 	{"cluster.mode", "gcp, aws: auto (GKE Autopilot, EKS Auto Mode) or standard (node groups vertra sizes); existing."},
 	{"cluster.name", "The cluster's name (kind, gcp, aws)."},
 	{"cluster.context", "existing: the kubectl context of the cluster to install into."},
+	{"cluster.cloud", "existing: the cloud the cluster is on (gcp, aws or azure), so the catalog's products made for that cloud run on it; empty, only those for every install."},
 	{"kind.registryName", "kind: the local registry container's name (shared by kind clusters)."},
 	{"kind.registryPort", "kind: the local registry's port on this machine (default 5001)."},
 	{"gcp.project", "gcp: the Google Cloud project."},

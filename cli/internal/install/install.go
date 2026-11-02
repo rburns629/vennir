@@ -417,7 +417,7 @@ func ConsoleValues(c *config.Config, env string, img Images, cloud *Cloud) map[s
 		"tls":              map[string]any{"kernelCaSecret": KernelRelease + "-execution-kernel-tls-ca"},
 		"environmentLabel": env,
 		// Which of the catalog's products are for this install (their clouds).
-		"installCloud": c.Target,
+		"installCloud": c.InstallCloud(),
 		// Its database lives on the kernel's Postgres, whose chart makes this Secret.
 		"postgres":          map[string]any{"enabled": false},
 		"existingSecret":    KernelRelease + "-execution-kernel-console-db",

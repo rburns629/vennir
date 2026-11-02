@@ -1031,6 +1031,9 @@ export async function retry(caller: AuthUser | undefined, executionId: string, t
   if (ownTemplateRun) await ensureStillRunnable(caller, submitted);
   await authorizeTasks(tasksInfo, caller, { maintainers: !ownTemplateRun });
   await ensureRetryTargetsAllowed(caller, submitted, taskId);
+  // Its product may since have been made for other clouds' installs.
+  const retriedProduct = await productOfTask(productLookup(), payloadTask(submitted.payload, taskId));
+  if (retriedProduct) ensureRunsHere(retriedProduct);
   const images = taskImages(submitted.payload, taskId);
   const context: RunContext = { action: "retry", teams: submitted.teams, executionId, caller, log };
   await refuseBlockedImages(images, context);

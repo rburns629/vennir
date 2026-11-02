@@ -167,6 +167,14 @@ steps:
 		t.Errorf("its own clouds: %v %q", got.GetClouds(), got.GetCloudsFrom())
 	}
 
+	// A team.yaml's clouds aren't schema-checked by a release: checked here.
+	files["teams/a/team.yaml"] = strings.Replace(files["teams/a/team.yaml"], "clouds: [aws]", "clouds: [eks]", 1)
+	c = catalogWith(t, files)
+	c.Stdout, c.Stderr = &out, &out
+	if _, err := c.BuildRelease(context.Background(), s, "c1", ""); err == nil || !strings.Contains(err.Error(), `clouds: "eks" isn't one of gcp, aws, azure, kind, existing`) {
+		t.Errorf("an unknown cloud: %v", err)
+	}
+
 	files = product("mine", "[]")
 	for path, content := range product("never", "[]") {
 		files[path] = content

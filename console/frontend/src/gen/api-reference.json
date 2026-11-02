@@ -10991,14 +10991,14 @@
      "type": "string",
      "repeated": true,
      "optional": false,
-     "comment": "An action's product's clouds (Product.clouds); empty for a template."
+     "comment": "An action's product's clouds (Product.clouds); for a template, those of\nits steps that aren't for this install."
     },
     {
      "name": "runsHere",
      "type": "boolean",
      "repeated": false,
      "optional": false,
-     "comment": "Whether an action's product is for this install (Product.runs_here);\nalways set for a template, whose steps are checked when it's run."
+     "comment": "Whether an action's product is for this install (Product.runs_here);\nfor a template, whether every step's is. Run, a schedule or an order\nof one that isn't is refused (NOT_FOR_THIS_INSTALL)."
     },
     {
      "name": "cloudsFrom",

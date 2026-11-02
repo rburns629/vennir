@@ -7,14 +7,14 @@
  * stubbed; the rest is the real console on the real test database.
  */
 import { randomUUID } from "node:crypto";
-import { like } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
-import { addTeamMember, createTeam, upsertProduct } from "../src/db/queries.js";
-import { products, teams } from "../src/db/schema.js";
+import { addTeamMember, createTeam, upsertProduct, upsertTemplate } from "../src/db/queries.js";
+import { productReadiness, products, teams, users as usersTable } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { submitExecution, type KernelExecution } from "../src/kernel/client.js";
 import { checkDue } from "../src/readiness.js";
@@ -79,6 +79,12 @@ beforeAll(async () => {
   await register("bucket", "ready", ["aws"], "team");
   await register("everywhere", "create", [], "");
   await register("everywhere", "ready", [], "");
+  // A template with a step for aws installs and one for every install.
+  await upsertTemplate({
+    teamId, name: "exports", displayName: "Exports", description: "", parameters: { type: "object" },
+    steps: [{ id: "copy", action: `${team}/bucket.create`, inputs: {} }, { id: "note", action: `${team}/everywhere.create`, inputs: {} }],
+    shareWith: ["*"], deprecated: null,
+  });
   const member = await users.makeUser();
   await addTeamMember(member.id, teamId, "maintainer");
   token = await users.signIn(member.email);
@@ -91,6 +97,7 @@ beforeEach(() => {
 
 afterAll(async () => {
   config.installCloud = "";
+  await db.delete(productReadiness).where(like(productReadiness.product, `${prefix}%`));
   await db.delete(products).where(like(products.name, `${prefix}%`));
   await db.delete(teams).where(like(teams.name, `${prefix}%`));
   await users.cleanUp();
@@ -125,6 +132,30 @@ describe("a product for other clouds' installs", () => {
     const ran = await submit("everywhere");
     expect(ran.message ?? "").toBe("");
     expect(ran.body.executionId).toBeTruthy();
+  });
+
+  it("makes a template with a step for it not runnable here, with no readiness, and refuses its run", async () => {
+    type Runnables = { runnables?: { team: string; name: string; clouds?: string[]; runsHere?: boolean; readiness?: unknown }[] };
+    const all = (await call<Runnables>(token, "TemplateService/ListTemplates")).body.runnables ?? [];
+    const exports = all.find((r) => r.team === team && r.name === "exports");
+    expect(exports).toMatchObject({ clouds: ["aws"] });
+    expect(exports?.runsHere ?? false).toBe(false);
+    expect(exports?.readiness).toBeUndefined();
+    const run = await call(token, "TemplateService/RunTemplate", { team, name: "exports", parameters: {} });
+    expect(run.failure).toBe("NOT_FOR_THIS_INSTALL");
+    const action = await call(token, "TemplateService/RunAction", { product: `${team}-bucket-create`, inputs: {} });
+    expect(action.failure).toBe("NOT_FOR_THIS_INSTALL");
+    expect(vi.mocked(submitExecution)).not.toHaveBeenCalled();
+  });
+
+  it("can't be put on a schedule, which would be refused at every start", async () => {
+    const bot = await users.makeUser();
+    await db.update(usersTable).set({ isBot: true }).where(eq(usersTable.id, bot.id));
+    await addTeamMember(bot.id, teamId, "maintainer");
+    const made = await call(token, "ScheduleService/CreateSchedule", {
+      team, name: "nightly", kind: "action", runnableTeam: team, runnableName: `${team}-bucket-create`, parameters: {}, cron: "0 2 * * *", botId: bot.id,
+    });
+    expect(made.failure).toBe("NOT_FOR_THIS_INSTALL");
   });
 
   it("runs on an install on its cloud, and on one whose cloud isn't known", async () => {
