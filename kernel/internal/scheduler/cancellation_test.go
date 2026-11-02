@@ -88,9 +88,8 @@ func TestRetryRevivesCancelledSiblingsAndExecutionCanStillSucceed(t *testing.T) 
 	k.tick(t0.Add(2 * time.Second))
 	exec.Complete(tasksByKey(t, tx, id)["create-project"].ExecutorHandle, map[string]any{"projectId": "demo-project-123"})
 	k.tick(t0.Add(3 * time.Second))
-	equal(t, "deploy", tasksByKey(t, tx, id)["deploy-application"].State, domain.TaskReady)
-	k.tick(t0.Add(4 * time.Second))
 	deploy := tasksByKey(t, tx, id)["deploy-application"]
+	equal(t, "deploy", deploy.State, domain.TaskRunning)
 	equal(t, "resolved", deploy.ResolvedInputs, map[string]any{"projectId": "demo-project-123"})
 	exec.Complete(deploy.ExecutorHandle, map[string]any{"applicationUrl": "https://demo.example"})
 	k.tick(t0.Add(5 * time.Second))
@@ -125,13 +124,20 @@ func TestACancelDuringDispatchLeavesTheTaskForTheSchedulerToStop(t *testing.T) {
 	}
 	committedTick() // create-project dispatched as "1"
 	exec.Complete(executor.Handle{"fakeId": "1"}, map[string]any{"projectId": "p-1"})
-	committedTick() // create-project done, deploy-application READY
 
 	scheduler, err := testPool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := RunTick(ctx, scheduler, exec, opts, time.Now(), quietLog); err != nil { // dispatched, uncommitted
+	// As the loop does: create-project recorded done and deploy-application
+	// released, committed; then deploy-application dispatched as "2", uncommitted.
+	if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+		_, err := RecordPass(ctx, tx, exec, opts, time.Now(), quietLog)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DispatchPass(ctx, scheduler, exec, opts, time.Now(), quietLog); err != nil {
 		t.Fatal(err)
 	}
 	cancelled := make(chan struct{})

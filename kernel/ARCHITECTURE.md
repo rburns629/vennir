@@ -44,7 +44,7 @@ internal/          Its packages (one Go module: go.mod here).
 ├── api/           kernel-api: KernelService over Connect, the caller check, health, metrics.
 ├── executor/      The Executor interface and its one real implementation, Kubernetes.
 │   └── executortest/  Fake: an in-memory Executor for the scheduler's tests.
-├── scheduler/     The pass (claim → dispatch → poll → settle), the loop around it,
+├── scheduler/     The pass (poll → settle, then claim → dispatch), the loop around it,
 │                  retention, the orphan sweep.
 ├── migrate/       The schema: sql/NNNN_name.sql, applied in order, each once.
 ├── dbauth/        A managed database's sign-in: the workload's own token as the password.
@@ -134,7 +134,8 @@ cmd/kernel/main.go : main() → runScheduler()      [`kernel scheduler`]
   → internal/scheduler : (*Loop).Run(ctx)
       → migrate.Wait()                            [until schema_migrations is at migrate.Latest()]
       loop until SIGTERM/SIGINT:
-        → (*Loop).pass() : pgx.BeginFunc → RunTick()   [one transaction per pass]
+        → (*Loop).pass() : pgx.BeginFunc → RecordPass()   [phase C, committed first]
+                           pgx.BeginFunc → DispatchPass() [phases A and B, their own transaction]
         [committed?] → count its events (metrics)
                      → ReleaseFinished(outcome.Finished)  [only now: see below]
                      → housekeeping: DeleteFinishedExecutions hourly,
@@ -147,10 +148,16 @@ cmd/kernel/main.go : main() → runScheduler()      [`kernel scheduler`]
       → ReleaseLeases(owner)                      [another scheduler adopts these tasks at once]
 ```
 
-`RunTick()` (`internal/scheduler/tick.go`) is three phases, every pass.
-Only the executor calls overlap (up to `SCHEDULER_EXECUTOR_CONCURRENCY` at
-once, `gather`): every row read and write is in order, in the one
-transaction.
+A pass (`internal/scheduler/tick.go`) is three phases. The loop runs
+phase C first, `RecordPass()`, and commits it; then phases A and B,
+`DispatchPass()`, in a transaction of their own: a dispatch held up by the
+API server (an admission webhook waiting out its timeout, seen on GKE)
+never holds what this scheduler finished (another scheduler's can, on a
+row they both need), and a task finishing releases its dependents
+to be claimed in the same pass. `RunTick()` runs both in the caller's one
+transaction, for tests. Only the executor calls overlap (up to
+`SCHEDULER_EXECUTOR_CONCURRENCY` at once, `gather`): every row read and
+write is in order, in its transaction.
 
 **Phase A — Claim** (`claiming.go : claimReadyTasks()`)
 ```

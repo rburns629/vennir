@@ -96,8 +96,9 @@ Kernel and alerts:
 - [ ] **Completion lag on GKE is policy-controller's webhook** (the r7 run,
   `perf/README.md`, "On GKE again"): with 40 at once, Job creations waited
   out its 10 s and were retried, and a pass that dispatches records
-  nothing that finished until it's done. Worth doing: record what finished
-  before dispatching in a pass (the kernel), and size policy-controller for
+  nothing that finished until it's done. Recorded first now, in a
+  transaction of its own (2026-11-02, the kernel's `RecordPass`, then
+  `DispatchPass`; to see on GKE). Left: size policy-controller for
   the install (more CPU on Autopilot, two replicas: `helm/values/gke/policy-controller.yaml`
   already sets `webhook.replicaCount: 2`, vertra's install doesn't), and check
   whether it need verify Jobs as well as their Pods. Also to see on the next

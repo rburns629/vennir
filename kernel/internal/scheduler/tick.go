@@ -115,22 +115,41 @@ type pendingEvent struct {
 }
 
 // RunTick runs one scheduling pass on db (a transaction the caller commits):
-// claim, dispatch, poll. A pass that fails leaves nothing behind once its
-// transaction rolls back, so running the next from scratch is always safe.
-// Only executor calls overlap; every row read and write is in order.
+// RecordPass, then DispatchPass. The scheduler's loop commits each on its own
+// (Loop.pass), so a dispatch held up by the API server (an admission webhook
+// waiting out its timeout, seen on GKE) never holds what finished; tests run
+// both in one. A pass that fails leaves nothing behind once its transaction
+// rolls back, so running the next from scratch is always safe. Only
+// executor calls overlap; every row read and write is in order.
 func RunTick(ctx context.Context, db DB, exec executor.Executor, opts Options, now time.Time, log *slog.Logger) (Outcome, error) {
+	recorded, err := RecordPass(ctx, db, exec, opts, now, log)
+	if err != nil {
+		return Outcome{}, err
+	}
+	dispatched, err := DispatchPass(ctx, db, exec, opts, now, log)
+	if err != nil {
+		return Outcome{}, err
+	}
+	return recorded.and(dispatched), nil
+}
+
+// and is two passes' outcomes as one.
+func (o Outcome) and(other Outcome) Outcome {
+	return Outcome{
+		Progressed: o.Progressed || other.Progressed,
+		Finished:   append(o.Finished, other.Finished...),
+		Events:     append(o.Events, other.Events...),
+	}
+}
+
+// RecordPass expires approvals and polls this scheduler's running tasks:
+// what finished is recorded (its dependents released), the rest's leases
+// renewed.
+func RecordPass(ctx context.Context, db DB, exec executor.Executor, opts Options, now time.Time, log *slog.Logger) (Outcome, error) {
 	p := &pass{ctx: ctx, db: db, exec: exec, opts: opts, now: now, began: time.Now(), log: log, pendingEvents: &[]pendingEvent{}}
 	if err := p.expireApprovals(); err != nil {
 		return Outcome{}, fmt.Errorf("expiring approvals: %w", err)
 	}
-	claimed, err := p.claimReadyTasks()
-	if err != nil {
-		return Outcome{}, fmt.Errorf("claiming: %w", err)
-	}
-	if err := p.dispatch(claimed); err != nil {
-		return Outcome{}, fmt.Errorf("dispatching: %w", err)
-	}
-
 	rows, err := db.Query(ctx, `SELECT `+taskColumns+` FROM execution_tasks
 		WHERE state = 'RUNNING' AND lease_owner = $1 FOR UPDATE SKIP LOCKED`, opts.Owner)
 	if err != nil {
@@ -167,7 +186,23 @@ func RunTick(ctx context.Context, db DB, exec executor.Executor, opts Options, n
 	if err := p.flushEvents(); err != nil {
 		return Outcome{}, fmt.Errorf("recording events: %w", err)
 	}
-	return Outcome{Progressed: len(claimed) > 0 || len(finished) > 0, Finished: finished, Events: p.events}, nil
+	return Outcome{Progressed: len(finished) > 0, Finished: finished, Events: p.events}, nil
+}
+
+// DispatchPass claims the ready tasks there's room for and starts them.
+func DispatchPass(ctx context.Context, db DB, exec executor.Executor, opts Options, now time.Time, log *slog.Logger) (Outcome, error) {
+	p := &pass{ctx: ctx, db: db, exec: exec, opts: opts, now: now, began: time.Now(), log: log, pendingEvents: &[]pendingEvent{}}
+	claimed, err := p.claimReadyTasks()
+	if err != nil {
+		return Outcome{}, fmt.Errorf("claiming: %w", err)
+	}
+	if err := p.dispatch(claimed); err != nil {
+		return Outcome{}, fmt.Errorf("dispatching: %w", err)
+	}
+	if err := p.flushEvents(); err != nil {
+		return Outcome{}, fmt.Errorf("recording events: %w", err)
+	}
+	return Outcome{Progressed: len(claimed) > 0, Events: p.events}, nil
 }
 
 // gather runs call for each item, at most limit at once; results in order.
