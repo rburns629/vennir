@@ -27,8 +27,10 @@ webhook:
       - key: kubernetes.io/metadata.name
         operator: NotIn
         values: ["default"]
-  configData:
-    no-match-policy: allow
+  # no-match-policy stays its default, deny: in team namespaces only images
+  # a policy covers run (the kernel chart's: signed ones from the source
+  # registry, on Pods; its workloads-pass policy lets Jobs and the like make
+  # them). See templates/image-signature.yaml.
   serviceAccount:
     annotations:
       iam.gke.io/gcp-service-account: vertra-signature-verifier@my-gcp-project.iam.gserviceaccount.com

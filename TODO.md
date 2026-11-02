@@ -100,10 +100,10 @@ Kernel and alerts:
   transaction of its own (2026-11-02, the kernel's `RecordPass`, then
   `DispatchPass`; to see on GKE). And policy-controller checks Pods only
   now (the kernel chart's policy `match`; a refused Pod read as
-  `IMAGE_NOT_SIGNED`), so a Job's creation never waits on it, with
-  `no-match-policy: allow` set by vertra (its default refused what no policy
-  matched: admin-added sources too; seen on kind, 2026-11-02). To see on GKE.
-  Left, maybe: a second replica on resilient and scaled, for availability. Also to see on the next
+  `IMAGE_NOT_SIGNED`), with a second policy passing Jobs and other workloads,
+  so a Job's creation never waits on it; `no-match-policy` stays `deny`, so
+  only signed source-registry images run in team namespaces (seen on kind,
+  2026-11-02). To see on GKE. Left, maybe: a second replica on resilient and scaled, for availability. Also to see on the next
   GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
 
 ## Installing and operating

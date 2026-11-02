@@ -1183,10 +1183,6 @@ func PolicyController(ctx context.Context, r *run.Runner, c *config.Config, clou
 		"--kube-context", cluster.Context(c), "--namespace", "cosign-system", "--create-namespace",
 		"--set", "webhook.serviceAccount.name=" + PolicyControllerServiceAccount,
 		"--set-json", `webhook.namespaceSelector={"matchExpressions":[{"key":"vertra/team","operator":"Exists"}]}`,
-		// What no policy matches runs: the Jobs (the kernel chart's policy
-		// checks Pods), and images from sources an admin allowed as they
-		// are. Its default, deny, refused both (seen on kind, 2026-11-02).
-		"--set", "webhook.configData.no-match-policy=allow",
 		// Its webhook rewrites its own namespaceSelector, so Helm's server-side
 		// apply would conflict with it on every upgrade after the first.
 		"--force-conflicts",

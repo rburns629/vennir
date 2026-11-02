@@ -23,10 +23,13 @@ So its identity must be able to read every registry used there, and a
 namespace the platform's own components run in must stay out of its scope
 (see helm/values/gke/policy-controller.yaml).
 
-Images from the other allowed sources (imagePolicy.additionalSources, or
-added on the Admin page) aren't covered: an admin allowed them as they are.
-That, and Pods only (below), need policy-controller's no-match-policy: allow
-(its default, deny, refuses whatever no policy matches); vertra sets it.
+Under policy-controller's default no-match-policy, deny, which vertra keeps,
+a Pod whose image no policy covers is refused too: in team namespaces only
+signed images from the source registry run, whoever makes the Pod, a bound
+even a compromised console can't move. So images from the other allowed
+sources (imagePolicy.additionalSources, or added on the Admin page) don't
+run where signing is required. Only Pods are checked (below); a second
+policy passes the workloads that make them.
 */}}
 {{- if .Values.imageSignature.enabled }}
 {{- if not (.Capabilities.APIVersions.Has "policy.sigstore.dev/v1beta1/ClusterImagePolicy") }}
@@ -61,9 +64,7 @@ spec:
   # Pods only, not the Jobs that make them: each image is checked once, and
   # the scheduler's Job creation never waits on the webhook (on GKE it waited
   # out its 10 s timeout, holding a pass). A refused Pod is its Job's
-  # FailedCreate event, which the kernel reads as IMAGE_NOT_SIGNED. Needs
-  # policy-controller's no-match-policy: allow, or the Job, matching no
-  # policy, is refused instead.
+  # FailedCreate event, which the kernel reads as IMAGE_NOT_SIGNED.
   match:
     - group: ""
       version: v1
@@ -90,4 +91,28 @@ spec:
       ctlog:
         url: {{ $keyless.rekorUrl | quote }}
     {{- end }}
+---
+# The workloads that make Pods pass at once, unchecked: their Pods are what
+# the policy above checks. Without this, under no-match-policy deny, a Job
+# (and an API backend's Deployment) would match no policy and be refused.
+# Never Pods: a policy passing them would let any image through.
+apiVersion: policy.sigstore.dev/v1beta1
+kind: ClusterImagePolicy
+metadata:
+  name: {{ include "execution-kernel.fullname" . }}-workloads-pass
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  images:
+    - glob: "**"
+  match:
+    - {group: batch, version: v1, resource: jobs}
+    - {group: batch, version: v1, resource: cronjobs}
+    - {group: apps, version: v1, resource: deployments}
+    - {group: apps, version: v1, resource: replicasets}
+    - {group: apps, version: v1, resource: statefulsets}
+    - {group: apps, version: v1, resource: daemonsets}
+  authorities:
+    - static:
+        action: pass
 {{- end }}
