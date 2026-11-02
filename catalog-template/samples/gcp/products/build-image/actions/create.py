@@ -70,7 +70,9 @@ UNFINISHED_BUILD_STATUSES = (
 )
 
 # Waiting on a build an earlier attempt started: at most this long here, as
-# for its own (google-cloud's 15 minutes), checking this often.
+# for its own (google-cloud's 15 minutes), checking this often. A step's own
+# timeout (600 s in the sample DAG) usually ends the wait first; the next
+# attempt then waits on the same build.
 WAIT_SECONDS = 900
 POLL_SECONDS = 10
 
@@ -119,17 +121,17 @@ def _signed_in() -> google.auth.credentials.Credentials:
     return credentials
 
 
-def _build_tag(image_uri: str, source_archive_url: str) -> str:
-    """The tag every build of this image from this source carries, so a
-    later attempt can find one an earlier attempt left running."""
-    digest = hashlib.sha256(f"{image_uri}\n{source_archive_url}".encode()).hexdigest()
+def _build_tag(execution_id: str, task_id: str, image_uri: str, source_archive_url: str) -> str:
+    """The tag every build this step starts carries, so its later attempts
+    find what an earlier one started: this step's only, not another run's."""
+    digest = hashlib.sha256(f"{execution_id}\n{task_id}\n{image_uri}\n{source_archive_url}".encode()).hexdigest()
     return f"vertra-{digest[:40]}"
 
 
-def _running_build(client: cloudbuild_v1.CloudBuildClient, project_id: str, tag: str) -> cloudbuild_v1.Build | None:
-    """A build with this tag still queued or running, if there is one."""
-    builds = client.list_builds(project_id=project_id, filter=f'tags="{tag}" AND (status="QUEUED" OR status="WORKING")')
-    return next(iter(builds), None)
+def _latest_build(client: cloudbuild_v1.CloudBuildClient, project_id: str, tag: str) -> cloudbuild_v1.Build | None:
+    """The latest build with this tag (one per attempt, at most), if any."""
+    builds = list(client.list_builds(project_id=project_id, filter=f'tags="{tag}"'))
+    return max(builds, key=lambda b: b.create_time) if builds else None
 
 
 def _finished(client: cloudbuild_v1.CloudBuildClient, project_id: str, build_id: str) -> cloudbuild_v1.Build:
@@ -237,19 +239,23 @@ def _run() -> int:
             return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     client = cloudbuild_v1.CloudBuildClient(credentials=credentials)
-    tag = _build_tag(image_uri, source_archive_url)
+    tag = _build_tag(request.get("executionId", ""), request.get("taskId", ""), image_uri, source_archive_url)
 
-    # An earlier attempt's build, still running (its step ran out of time,
-    # or stopped waiting): waited on, not started again.
+    # An earlier attempt's build (its step ran out of time, or stopped
+    # waiting): waited on if it's still running, and its failure is this
+    # one's, not paid for again. Cloud Build's own trouble builds again.
+    result = None
     try:
-        running = _running_build(client, project_id, tag)
-        if running is not None:
-            print(f"Cloud Build {running.id} is already building '{image_uri}', waiting on it")
-            result = _finished(client, project_id, running.id)
+        earlier = _latest_build(client, project_id, tag)
+        if earlier is not None and earlier.status in UNFINISHED_BUILD_STATUSES:
+            print(f"Cloud Build {earlier.id} is already building '{image_uri}', waiting on it")
+            result = _finished(client, project_id, earlier.id)
+        elif earlier is not None and earlier.status in FAILED_BUILD_STATUSES and earlier.status not in RETRIED_BUILD_STATUSES:
+            result = earlier
     except GoogleAPIError as error:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
-    if running is None:
+    if result is None:
         bucket, object_name = _parse_gcs_url(source_archive_url)
         build = cloudbuild_v1.Build(
             source=cloudbuild_v1.Source(
