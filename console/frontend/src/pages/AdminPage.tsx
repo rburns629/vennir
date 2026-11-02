@@ -194,7 +194,7 @@ const GROUPS: { name: string; sections: Section[] }[] = [
         install: (i) => [
           <>Their first value, when the kernel is installed: {mono("taskImages.registry")} in vertra.yaml.</>,
           <>
-            Whether catalog images must be signed: the kernel chart&apos;s {mono("imageSignature")}
+            Whether images must be signed: the kernel chart&apos;s {mono("imageSignature")}
             {thisInstall(i, (x) =>
               x.imageSignaturesRequired === null
                 ? "couldn't be read from the cluster"

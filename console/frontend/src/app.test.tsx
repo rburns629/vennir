@@ -1225,6 +1225,9 @@ describe("admin", () => {
     cleanup();
     await renderAt("/admin/images", ADMIN, { "AdminService/GetInstall": install });
     expect(await screen.findByText(/this install: required/)).toBeTruthy();
+    // Where signed images are required, added sources don't run: said where they're added.
+    expect((await screen.findByRole("note")).textContent).toMatch(/Images from the sources below pass this check, then are refused at the signature check/);
+    expect(screen.getByText("Is signed, and from the source registry")).toBeTruthy();
     cleanup();
     await renderAt("/admin/scans", ADMIN, { "AdminService/GetInstall": install });
     expect(await screen.findByText(/every 24 h/)).toBeTruthy();
@@ -1239,9 +1242,13 @@ describe("admin", () => {
     cleanup();
     await renderAt("/admin/images", ADMIN, { "AdminService/GetInstall": { ...install, imageSignaturesRequired: undefined } });
     expect(await screen.findByText(/couldn't be read from the cluster/)).toBeTruthy();
+    // Not read: no note, and check 4 claims no state.
+    expect(screen.queryByRole("note")).toBeNull();
     cleanup();
     await renderAt("/admin/images", ADMIN, { "AdminService/GetInstall": { ...install, imageSignaturesRequired: false } });
     expect(await screen.findByText(/not required, no signature policy in the cluster/)).toBeTruthy();
+    expect(await screen.findByText(/Off here: any image from an allowed source runs/)).toBeTruthy();
+    expect(screen.queryByRole("note")).toBeNull();
     cleanup();
 
     // No catalog: nothing said about how often it's read, or who signs it.
