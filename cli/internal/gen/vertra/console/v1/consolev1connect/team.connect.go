@@ -42,6 +42,9 @@ const (
 	// TeamServiceGetTeamProfileProcedure is the fully-qualified name of the TeamService's
 	// GetTeamProfile RPC.
 	TeamServiceGetTeamProfileProcedure = "/vertra.console.v1.TeamService/GetTeamProfile"
+	// TeamServiceListTeamSummariesProcedure is the fully-qualified name of the TeamService's
+	// ListTeamSummaries RPC.
+	TeamServiceListTeamSummariesProcedure = "/vertra.console.v1.TeamService/ListTeamSummaries"
 	// TeamServiceCreateTeamProcedure is the fully-qualified name of the TeamService's CreateTeam RPC.
 	TeamServiceCreateTeamProcedure = "/vertra.console.v1.TeamService/CreateTeam"
 	// TeamServiceEnsureTeamProcedure is the fully-qualified name of the TeamService's EnsureTeam RPC.
@@ -92,6 +95,10 @@ type TeamServiceClient interface {
 	// retired, and how many people are in it. Never its members, secrets or
 	// runs. not_found for no such team, or a purged one.
 	GetTeamProfile(context.Context, *connect.Request[v1.GetTeamProfileRequest]) (*connect.Response[v1.GetTeamProfileResponse], error)
+	// Every team's owner, description, people and Pods running now, for an
+	// admin's list of teams: one call, not a profile and a Pod list for each.
+	// Admins only.
+	ListTeamSummaries(context.Context, *connect.Request[v1.ListTeamSummariesRequest]) (*connect.Response[v1.ListTeamSummariesResponse], error)
 	// Creates a team and its namespace. Admins, or a token with teams:create.
 	CreateTeam(context.Context, *connect.Request[v1.CreateTeamRequest]) (*connect.Response[v1.CreateTeamResponse], error)
 	// Makes sure a team exists and is active, with its namespace: creates
@@ -167,6 +174,13 @@ func NewTeamServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+TeamServiceGetTeamProfileProcedure,
 			connect.WithSchema(teamServiceMethods.ByName("GetTeamProfile")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listTeamSummaries: connect.NewClient[v1.ListTeamSummariesRequest, v1.ListTeamSummariesResponse](
+			httpClient,
+			baseURL+TeamServiceListTeamSummariesProcedure,
+			connect.WithSchema(teamServiceMethods.ByName("ListTeamSummaries")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
@@ -274,6 +288,7 @@ type teamServiceClient struct {
 	listTeams                *connect.Client[v1.ListTeamsRequest, v1.ListTeamsResponse]
 	getTeam                  *connect.Client[v1.GetTeamRequest, v1.GetTeamResponse]
 	getTeamProfile           *connect.Client[v1.GetTeamProfileRequest, v1.GetTeamProfileResponse]
+	listTeamSummaries        *connect.Client[v1.ListTeamSummariesRequest, v1.ListTeamSummariesResponse]
 	createTeam               *connect.Client[v1.CreateTeamRequest, v1.CreateTeamResponse]
 	ensureTeam               *connect.Client[v1.EnsureTeamRequest, v1.EnsureTeamResponse]
 	retireTeam               *connect.Client[v1.RetireTeamRequest, v1.RetireTeamResponse]
@@ -303,6 +318,11 @@ func (c *teamServiceClient) GetTeam(ctx context.Context, req *connect.Request[v1
 // GetTeamProfile calls vertra.console.v1.TeamService.GetTeamProfile.
 func (c *teamServiceClient) GetTeamProfile(ctx context.Context, req *connect.Request[v1.GetTeamProfileRequest]) (*connect.Response[v1.GetTeamProfileResponse], error) {
 	return c.getTeamProfile.CallUnary(ctx, req)
+}
+
+// ListTeamSummaries calls vertra.console.v1.TeamService.ListTeamSummaries.
+func (c *teamServiceClient) ListTeamSummaries(ctx context.Context, req *connect.Request[v1.ListTeamSummariesRequest]) (*connect.Response[v1.ListTeamSummariesResponse], error) {
+	return c.listTeamSummaries.CallUnary(ctx, req)
 }
 
 // CreateTeam calls vertra.console.v1.TeamService.CreateTeam.
@@ -388,6 +408,10 @@ type TeamServiceHandler interface {
 	// retired, and how many people are in it. Never its members, secrets or
 	// runs. not_found for no such team, or a purged one.
 	GetTeamProfile(context.Context, *connect.Request[v1.GetTeamProfileRequest]) (*connect.Response[v1.GetTeamProfileResponse], error)
+	// Every team's owner, description, people and Pods running now, for an
+	// admin's list of teams: one call, not a profile and a Pod list for each.
+	// Admins only.
+	ListTeamSummaries(context.Context, *connect.Request[v1.ListTeamSummariesRequest]) (*connect.Response[v1.ListTeamSummariesResponse], error)
 	// Creates a team and its namespace. Admins, or a token with teams:create.
 	CreateTeam(context.Context, *connect.Request[v1.CreateTeamRequest]) (*connect.Response[v1.CreateTeamResponse], error)
 	// Makes sure a team exists and is active, with its namespace: creates
@@ -459,6 +483,13 @@ func NewTeamServiceHandler(svc TeamServiceHandler, opts ...connect.HandlerOption
 		TeamServiceGetTeamProfileProcedure,
 		svc.GetTeamProfile,
 		connect.WithSchema(teamServiceMethods.ByName("GetTeamProfile")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	teamServiceListTeamSummariesHandler := connect.NewUnaryHandler(
+		TeamServiceListTeamSummariesProcedure,
+		svc.ListTeamSummaries,
+		connect.WithSchema(teamServiceMethods.ByName("ListTeamSummaries")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -566,6 +597,8 @@ func NewTeamServiceHandler(svc TeamServiceHandler, opts ...connect.HandlerOption
 			teamServiceGetTeamHandler.ServeHTTP(w, r)
 		case TeamServiceGetTeamProfileProcedure:
 			teamServiceGetTeamProfileHandler.ServeHTTP(w, r)
+		case TeamServiceListTeamSummariesProcedure:
+			teamServiceListTeamSummariesHandler.ServeHTTP(w, r)
 		case TeamServiceCreateTeamProcedure:
 			teamServiceCreateTeamHandler.ServeHTTP(w, r)
 		case TeamServiceEnsureTeamProcedure:
@@ -613,6 +646,10 @@ func (UnimplementedTeamServiceHandler) GetTeam(context.Context, *connect.Request
 
 func (UnimplementedTeamServiceHandler) GetTeamProfile(context.Context, *connect.Request[v1.GetTeamProfileRequest]) (*connect.Response[v1.GetTeamProfileResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vertra.console.v1.TeamService.GetTeamProfile is not implemented"))
+}
+
+func (UnimplementedTeamServiceHandler) ListTeamSummaries(context.Context, *connect.Request[v1.ListTeamSummariesRequest]) (*connect.Response[v1.ListTeamSummariesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vertra.console.v1.TeamService.ListTeamSummaries is not implemented"))
 }
 
 func (UnimplementedTeamServiceHandler) CreateTeam(context.Context, *connect.Request[v1.CreateTeamRequest]) (*connect.Response[v1.CreateTeamResponse], error) {

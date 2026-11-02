@@ -1793,10 +1793,10 @@ describe("the Teams page", () => {
   it("sums up your teams, what needs them, and every other team for an admin", async () => {
     await renderAt("/teams", { ...ADMIN, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TeamService/GetTeam": { team: { id: "t1", name: "payments", fromCatalog: true } },
-      "TeamService/GetTeamProfile": (request: Record<string, unknown>) =>
-        request["name"] === "payments"
-          ? { name: "payments", people: 7, description: "Takes card payments." }
-          : { name: String(request["name"]), owner: "@acme/growth", people: 14, description: `What ${String(request["name"])} does.` },
+      "TeamService/GetTeamProfile": { name: "payments", people: 7, description: "Takes card payments." },
+      "TeamService/ListTeamSummaries": {
+        teams: ["payments", "growth", "sandbox", "legacy"].map((name) => ({ name, owner: "@acme/growth", people: 14, running: 3, description: `What ${name} does.` })),
+      },
       "TeamService/ListPods": { pods: [{ podName: "ek-1", state: "TASK_POD_STATE_RUNNING" }] },
       "SecretService/ListSecrets": { secrets: [{ id: "s1", secretName: "stripe-webhook", external: { status: "error" } }, { id: "s2", secretName: "db" }] },
       "TokenService/ListBots": { bots: [{ id: "b1", email: "payments-ci@bots.vertra.local" }] },
@@ -1883,15 +1883,16 @@ describe("a team's members", () => {
 });
 
 describe("the Teams pages' requests", () => {
-  it("ask for other teams' facts a few at a time, and a tab's count again only when it's left", async () => {
-    // Every other team's pod list hangs: no more than four are asked for at once.
+  it("ask for every other team's facts in one call, and a tab's count again only when it's left", async () => {
     await renderAt("/teams", { ...ADMIN, teamNames: [], maintainerOf: [] }, {
       "TeamService/ListTeams": { teams: Array.from({ length: 10 }, (_, i) => ({ id: `t${String(i)}`, name: `team-${String(i)}` })) },
-      "TeamService/ListPods": () => new Promise(() => {}),
+      "TeamService/ListTeamSummaries": { teams: [{ name: "team-3", people: 2, running: 5 }] },
     });
-    await waitFor(() => { expect(calls.filter((c) => c === "TeamService/ListPods").length).toBeGreaterThan(0); });
+    const row = (await screen.findByRole("link", { name: "team-3" })).closest("tr") as HTMLElement;
+    expect(await within(row).findByText("5")).toBeTruthy();
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 200)); });
-    expect(calls.filter((c) => c === "TeamService/ListPods").length).toBe(4);
+    expect(calls.filter((c) => c === "TeamService/ListTeamSummaries").length).toBe(1);
+    expect(calls.filter((c) => c === "TeamService/ListPods" || c === "TeamService/GetTeamProfile")).toEqual([]);
     cleanup();
     calls.length = 0;
 

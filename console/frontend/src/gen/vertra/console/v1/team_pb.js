@@ -11,7 +11,7 @@ import { file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bu
  * Describes the file vertra/console/v1/team.proto.
  */
 export const file_vertra_console_v1_team = /*@__PURE__*/
-  fileDesc("Chx2ZXJ0cmEvY29uc29sZS92MS90ZWFtLnByb3RvEhF2ZXJ0cmEuY29uc29sZS52MSLrAgoEVGVhbRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEi4KCmNyZWF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnJldGlyZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmRlbGV0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC3JlcXVpcmVfc3NvGAYgASgIEhQKDGZyb21fY2F0YWxvZxgHIAEoCBIrCgVxdW90YRgIIAEoCzIcLnZlcnRyYS5jb25zb2xlLnYxLlRlYW1RdW90YRIYChBxdW90YV9pc19kZWZhdWx0GAkgASgIEjMKDWluc3RhbGxfcXVvdGEYCiABKAsyHC52ZXJ0cmEuY29uc29sZS52MS5UZWFtUXVvdGESEgoKcmV0aXJlZF9ieRgLIAEoCSJLCglUZWFtUXVvdGESCwoDY3B1GAEgASgJEg4KBm1lbW9yeRgCIAEoCRIMCgRwb2RzGAMgASgJEhMKC3N0ZXBfbWVtb3J5GAQgASgJIvIBCgZNZW1iZXISCgoCaWQYASABKAkSDQoFZW1haWwYAiABKAkSDgoGaXNfYm90GAMgASgIEhAKCGlzX2FkbWluGAQgASgIEiwKCGFkZGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIpCgRyb2xlGAYgASgOMhsudmVydHJhLmNvbnNvbGUudjEuVGVhbVJvbGUSFAoMaGFzX3Bhc3N3b3JkGAcgASgIEhAKCHVzZXNfc3NvGAggASgIEhYKDmZvbGxvd3NfZ3JvdXBzGAkgASgIEhIKCnZpYV9ncm91cHMYCiADKAkiEgoQTGlzdFRlYW1zUmVxdWVzdCI7ChFMaXN0VGVhbXNSZXNwb25zZRImCgV0ZWFtcxgBIAMoCzIXLnZlcnRyYS5jb25zb2xlLnYxLlRlYW0iHgoOR2V0VGVhbVJlcXVlc3QSDAoEbmFtZRgBIAEoCSI4Cg9HZXRUZWFtUmVzcG9uc2USJQoEdGVhbRgBIAEoCzIXLnZlcnRyYS5jb25zb2xlLnYxLlRlYW0iIQoRQ3JlYXRlVGVhbVJlcXVlc3QSDAoEbmFtZRgBIAEoCSI7ChJDcmVhdGVUZWFtUmVzcG9uc2USJQoEdGVhbRgBIAEoCzIXLnZlcnRyYS5jb25zb2xlLnYxLlRlYW0iIQoRRW5zdXJlVGVhbVJlcXVlc3QSDAoEbmFtZRgBIAEoCSJMChJFbnN1cmVUZWFtUmVzcG9uc2USJQoEdGVhbRgBIAEoCzIXLnZlcnRyYS5jb25zb2xlLnYxLlRlYW0SDwoHY3JlYXRlZBgCIAEoCCIhChFSZXRpcmVUZWFtUmVxdWVzdBIMCgRuYW1lGAEgASgJIjMKElJldGlyZVRlYW1SZXNwb25zZRIdChV1bnJlZ2lzdGVyZWRfcHJvZHVjdHMYASABKAUiIwoTVW5yZXRpcmVUZWFtUmVxdWVzdBIMCgRuYW1lGAEgASgJIhYKFFVucmV0aXJlVGVhbVJlc3BvbnNlIiAKEFB1cmdlVGVhbVJlcXVlc3QSDAoEbmFtZRgBIAEoCSJiChFQdXJnZVRlYW1SZXNwb25zZRIWCg5hbHJlYWR5X3B1cmdlZBgBIAEoCBIaChJyZXZva2VkX2JvdF90b2tlbnMYAiABKAUSGQoRbmFtZXNwYWNlX2RlbGV0ZWQYAyABKAgiIgoSTGlzdE1lbWJlcnNSZXF1ZXN0EgwKBHRlYW0YASABKAkiQQoTTGlzdE1lbWJlcnNSZXNwb25zZRIqCgdtZW1iZXJzGAEgAygLMhkudmVydHJhLmNvbnNvbGUudjEuTWVtYmVyIloKEEFkZE1lbWJlclJlcXVlc3QSDAoEdGVhbRgBIAEoCRINCgVlbWFpbBgCIAEoCRIpCgRyb2xlGAMgASgOMhsudmVydHJhLmNvbnNvbGUudjEuVGVhbVJvbGUiEwoRQWRkTWVtYmVyUmVzcG9uc2UiNAoTUmVtb3ZlTWVtYmVyUmVxdWVzdBIMCgR0ZWFtGAEgASgJEg8KB3VzZXJfaWQYAiABKAkiFgoUUmVtb3ZlTWVtYmVyUmVzcG9uc2UiYAoUU2V0TWVtYmVyUm9sZVJlcXVlc3QSDAoEdGVhbRgBIAEoCRIPCgd1c2VyX2lkGAIgASgJEikKBHJvbGUYAyABKA4yGy52ZXJ0cmEuY29uc29sZS52MS5UZWFtUm9sZSIXChVTZXRNZW1iZXJSb2xlUmVzcG9uc2UiOQoUU2V0VGVhbVNpZ25JblJlcXVlc3QSDAoEdGVhbRgBIAEoCRITCgtyZXF1aXJlX3NzbxgCIAEoCCIXChVTZXRUZWFtU2lnbkluUmVzcG9uc2UiZQoTU2V0VGVhbVF1b3RhUmVxdWVzdBIMCgR0ZWFtGAEgASgJEisKBXF1b3RhGAIgASgLMhwudmVydHJhLmNvbnNvbGUudjEuVGVhbVF1b3RhEhMKC3VzZV9kZWZhdWx0GAMgASgIIj0KFFNldFRlYW1RdW90YVJlc3BvbnNlEiUKBHRlYW0YASABKAsyFy52ZXJ0cmEuY29uc29sZS52MS5UZWFtInsKF0FwcGx5U2VjcmV0U3RvcmVSZXF1ZXN0EgwKBHRlYW0YASABKAkSKgoJZG9jdW1lbnRzGAIgAygLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIXCgpjcmVkZW50aWFsGAMgASgJSACIAQFCDQoLX2NyZWRlbnRpYWwiGgoYQXBwbHlTZWNyZXRTdG9yZVJlc3BvbnNlIkMKH1NldFNlY3JldFN0b3JlQ3JlZGVudGlhbFJlcXVlc3QSDAoEdGVhbRgBIAEoCRISCgpjcmVkZW50aWFsGAIgASgJIiIKIFNldFNlY3JldFN0b3JlQ3JlZGVudGlhbFJlc3BvbnNlIh8KD0xpc3RQb2RzUmVxdWVzdBIMCgR0ZWFtGAEgASgJIjwKEExpc3RQb2RzUmVzcG9uc2USKAoEcG9kcxgBIAMoCzIaLnZlcnRyYS5jb25zb2xlLnYxLlRhc2tQb2QihgQKB1Rhc2tQb2QSEAoIcG9kX25hbWUYASABKAkSGQoMZXhlY3V0aW9uX2lkGAIgASgJSACIAQESFAoHdGFza19pZBgDIAEoCUgBiAEBEhQKB2F0dGVtcHQYBCABKAVIAogBARISCgVpbWFnZRgFIAEoCUgDiAEBEhwKD3NlcnZpY2VfYWNjb3VudBgGIAEoCUgEiAEBEi4KBXN0YXRlGAcgASgOMh8udmVydHJhLmNvbnNvbGUudjEuVGFza1BvZFN0YXRlEjMKB3Byb2JsZW0YCCABKAsyHS52ZXJ0cmEuY29uc29sZS52MS5Qb2RQcm9ibGVtSAWIAQESEAoIcmVzdGFydHMYCSABKAUSLgoKc3RhcnRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLZmluaXNoZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjcKCWV4ZWN1dGlvbhgMIAEoCzIfLnZlcnRyYS5jb25zb2xlLnYxLlBvZEV4ZWN1dGlvbkgGiAEBQg8KDV9leGVjdXRpb25faWRCCgoIX3Rhc2tfaWRCCgoIX2F0dGVtcHRCCAoGX2ltYWdlQhIKEF9zZXJ2aWNlX2FjY291bnRCCgoIX3Byb2JsZW1CDAoKX2V4ZWN1dGlvbiIrCgpQb2RQcm9ibGVtEg0KBXRpdGxlGAEgASgJEg4KBmRldGFpbBgCIAEoCSJuCgxQb2RFeGVjdXRpb24SDAoEbmFtZRgBIAEoCRIYCgt0YXNrX251bWJlchgCIAEoBUgAiAEBEhcKCnRhc2tfY291bnQYAyABKAVIAYgBAUIOCgxfdGFza19udW1iZXJCDQoLX3Rhc2tfY291bnQiJQoVR2V0VGVhbVByb2ZpbGVSZXF1ZXN0EgwKBG5hbWUYASABKAkitwEKFkdldFRlYW1Qcm9maWxlUmVzcG9uc2USDAoEbmFtZRgBIAEoCRIUCgxmcm9tX2NhdGFsb2cYAiABKAgSDwoHcmV0aXJlZBgDIAEoCBIPCgdjb250YWN0GAQgASgJEhEKCWhlbHBfY2hhdBgFIAEoCRIQCghoZWxwX3VybBgGIAEoCRIOCgZwZW9wbGUYByABKAUSDQoFb3duZXIYCCABKAkSEwoLZGVzY3JpcHRpb24YCSABKAkqVQoIVGVhbVJvbGUSGQoVVEVBTV9ST0xFX1VOU1BFQ0lGSUVEEAASGAoUVEVBTV9ST0xFX01BSU5UQUlORVIQARIUChBURUFNX1JPTEVfTUVNQkVSEAIqvgEKDFRhc2tQb2RTdGF0ZRIeChpUQVNLX1BPRF9TVEFURV9VTlNQRUNJRklFRBAAEhsKF1RBU0tfUE9EX1NUQVRFX1NUQVJUSU5HEAESGgoWVEFTS19QT0RfU1RBVEVfUlVOTklORxACEh0KGVRBU0tfUE9EX1NUQVRFX0NBTlRfU1RBUlQQAxIbChdUQVNLX1BPRF9TVEFURV9GSU5JU0hFRBAEEhkKFVRBU0tfUE9EX1NUQVRFX0ZBSUxFRBAFMrsNCgtUZWFtU2VydmljZRJbCglMaXN0VGVhbXMSIy52ZXJ0cmEuY29uc29sZS52MS5MaXN0VGVhbXNSZXF1ZXN0GiQudmVydHJhLmNvbnNvbGUudjEuTGlzdFRlYW1zUmVzcG9uc2UiA5ACARJVCgdHZXRUZWFtEiEudmVydHJhLmNvbnNvbGUudjEuR2V0VGVhbVJlcXVlc3QaIi52ZXJ0cmEuY29uc29sZS52MS5HZXRUZWFtUmVzcG9uc2UiA5ACARJqCg5HZXRUZWFtUHJvZmlsZRIoLnZlcnRyYS5jb25zb2xlLnYxLkdldFRlYW1Qcm9maWxlUmVxdWVzdBopLnZlcnRyYS5jb25zb2xlLnYxLkdldFRlYW1Qcm9maWxlUmVzcG9uc2UiA5ACARJZCgpDcmVhdGVUZWFtEiQudmVydHJhLmNvbnNvbGUudjEuQ3JlYXRlVGVhbVJlcXVlc3QaJS52ZXJ0cmEuY29uc29sZS52MS5DcmVhdGVUZWFtUmVzcG9uc2USXgoKRW5zdXJlVGVhbRIkLnZlcnRyYS5jb25zb2xlLnYxLkVuc3VyZVRlYW1SZXF1ZXN0GiUudmVydHJhLmNvbnNvbGUudjEuRW5zdXJlVGVhbVJlc3BvbnNlIgOQAgISXgoKUmV0aXJlVGVhbRIkLnZlcnRyYS5jb25zb2xlLnYxLlJldGlyZVRlYW1SZXF1ZXN0GiUudmVydHJhLmNvbnNvbGUudjEuUmV0aXJlVGVhbVJlc3BvbnNlIgOQAgISZAoMVW5yZXRpcmVUZWFtEiYudmVydHJhLmNvbnNvbGUudjEuVW5yZXRpcmVUZWFtUmVxdWVzdBonLnZlcnRyYS5jb25zb2xlLnYxLlVucmV0aXJlVGVhbVJlc3BvbnNlIgOQAgISWwoJUHVyZ2VUZWFtEiMudmVydHJhLmNvbnNvbGUudjEuUHVyZ2VUZWFtUmVxdWVzdBokLnZlcnRyYS5jb25zb2xlLnYxLlB1cmdlVGVhbVJlc3BvbnNlIgOQAgISYQoLTGlzdE1lbWJlcnMSJS52ZXJ0cmEuY29uc29sZS52MS5MaXN0TWVtYmVyc1JlcXVlc3QaJi52ZXJ0cmEuY29uc29sZS52MS5MaXN0TWVtYmVyc1Jlc3BvbnNlIgOQAgESVgoJQWRkTWVtYmVyEiMudmVydHJhLmNvbnNvbGUudjEuQWRkTWVtYmVyUmVxdWVzdBokLnZlcnRyYS5jb25zb2xlLnYxLkFkZE1lbWJlclJlc3BvbnNlEmQKDFJlbW92ZU1lbWJlchImLnZlcnRyYS5jb25zb2xlLnYxLlJlbW92ZU1lbWJlclJlcXVlc3QaJy52ZXJ0cmEuY29uc29sZS52MS5SZW1vdmVNZW1iZXJSZXNwb25zZSIDkAICEmcKDVNldE1lbWJlclJvbGUSJy52ZXJ0cmEuY29uc29sZS52MS5TZXRNZW1iZXJSb2xlUmVxdWVzdBooLnZlcnRyYS5jb25zb2xlLnYxLlNldE1lbWJlclJvbGVSZXNwb25zZSIDkAICEmcKDVNldFRlYW1TaWduSW4SJy52ZXJ0cmEuY29uc29sZS52MS5TZXRUZWFtU2lnbkluUmVxdWVzdBooLnZlcnRyYS5jb25zb2xlLnYxLlNldFRlYW1TaWduSW5SZXNwb25zZSIDkAICEmQKDFNldFRlYW1RdW90YRImLnZlcnRyYS5jb25zb2xlLnYxLlNldFRlYW1RdW90YVJlcXVlc3QaJy52ZXJ0cmEuY29uc29sZS52MS5TZXRUZWFtUXVvdGFSZXNwb25zZSIDkAICEnAKEEFwcGx5U2VjcmV0U3RvcmUSKi52ZXJ0cmEuY29uc29sZS52MS5BcHBseVNlY3JldFN0b3JlUmVxdWVzdBorLnZlcnRyYS5jb25zb2xlLnYxLkFwcGx5U2VjcmV0U3RvcmVSZXNwb25zZSIDkAICEogBChhTZXRTZWNyZXRTdG9yZUNyZWRlbnRpYWwSMi52ZXJ0cmEuY29uc29sZS52MS5TZXRTZWNyZXRTdG9yZUNyZWRlbnRpYWxSZXF1ZXN0GjMudmVydHJhLmNvbnNvbGUudjEuU2V0U2VjcmV0U3RvcmVDcmVkZW50aWFsUmVzcG9uc2UiA5ACAhJYCghMaXN0UG9kcxIiLnZlcnRyYS5jb25zb2xlLnYxLkxpc3RQb2RzUmVxdWVzdBojLnZlcnRyYS5jb25zb2xlLnYxLkxpc3RQb2RzUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("Chx2ZXJ0cmEvY29uc29sZS92MS90ZWFtLnByb3RvEhF2ZXJ0cmEuY29uc29sZS52MSLrAgoEVGVhbRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEi4KCmNyZWF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnJldGlyZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmRlbGV0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC3JlcXVpcmVfc3NvGAYgASgIEhQKDGZyb21fY2F0YWxvZxgHIAEoCBIrCgVxdW90YRgIIAEoCzIcLnZlcnRyYS5jb25zb2xlLnYxLlRlYW1RdW90YRIYChBxdW90YV9pc19kZWZhdWx0GAkgASgIEjMKDWluc3RhbGxfcXVvdGEYCiABKAsyHC52ZXJ0cmEuY29uc29sZS52MS5UZWFtUXVvdGESEgoKcmV0aXJlZF9ieRgLIAEoCSJLCglUZWFtUXVvdGESCwoDY3B1GAEgASgJEg4KBm1lbW9yeRgCIAEoCRIMCgRwb2RzGAMgASgJEhMKC3N0ZXBfbWVtb3J5GAQgASgJIvIBCgZNZW1iZXISCgoCaWQYASABKAkSDQoFZW1haWwYAiABKAkSDgoGaXNfYm90GAMgASgIEhAKCGlzX2FkbWluGAQgASgIEiwKCGFkZGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIpCgRyb2xlGAYgASgOMhsudmVydHJhLmNvbnNvbGUudjEuVGVhbVJvbGUSFAoMaGFzX3Bhc3N3b3JkGAcgASgIEhAKCHVzZXNfc3NvGAggASgIEhYKDmZvbGxvd3NfZ3JvdXBzGAkgASgIEhIKCnZpYV9ncm91cHMYCiADKAkiEgoQTGlzdFRlYW1zUmVxdWVzdCI7ChFMaXN0VGVhbXNSZXNwb25zZRImCgV0ZWFtcxgBIAMoCzIXLnZlcnRyYS5jb25zb2xlLnYxLlRlYW0iGgoYTGlzdFRlYW1TdW1tYXJpZXNSZXF1ZXN0IkoKGUxpc3RUZWFtU3VtbWFyaWVzUmVzcG9uc2USLQoFdGVhbXMYASADKAsyHi52ZXJ0cmEuY29uc29sZS52MS5UZWFtU3VtbWFyeSJgCgtUZWFtU3VtbWFyeRIMCgRuYW1lGAEgASgJEg0KBW93bmVyGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEg4KBnBlb3BsZRgEIAEoBRIPCgdydW5uaW5nGAUgASgFIh4KDkdldFRlYW1SZXF1ZXN0EgwKBG5hbWUYASABKAkiOAoPR2V0VGVhbVJlc3BvbnNlEiUKBHRlYW0YASABKAsyFy52ZXJ0cmEuY29uc29sZS52MS5UZWFtIiEKEUNyZWF0ZVRlYW1SZXF1ZXN0EgwKBG5hbWUYASABKAkiOwoSQ3JlYXRlVGVhbVJlc3BvbnNlEiUKBHRlYW0YASABKAsyFy52ZXJ0cmEuY29uc29sZS52MS5UZWFtIiEKEUVuc3VyZVRlYW1SZXF1ZXN0EgwKBG5hbWUYASABKAkiTAoSRW5zdXJlVGVhbVJlc3BvbnNlEiUKBHRlYW0YASABKAsyFy52ZXJ0cmEuY29uc29sZS52MS5UZWFtEg8KB2NyZWF0ZWQYAiABKAgiIQoRUmV0aXJlVGVhbVJlcXVlc3QSDAoEbmFtZRgBIAEoCSIzChJSZXRpcmVUZWFtUmVzcG9uc2USHQoVdW5yZWdpc3RlcmVkX3Byb2R1Y3RzGAEgASgFIiMKE1VucmV0aXJlVGVhbVJlcXVlc3QSDAoEbmFtZRgBIAEoCSIWChRVbnJldGlyZVRlYW1SZXNwb25zZSIgChBQdXJnZVRlYW1SZXF1ZXN0EgwKBG5hbWUYASABKAkiYgoRUHVyZ2VUZWFtUmVzcG9uc2USFgoOYWxyZWFkeV9wdXJnZWQYASABKAgSGgoScmV2b2tlZF9ib3RfdG9rZW5zGAIgASgFEhkKEW5hbWVzcGFjZV9kZWxldGVkGAMgASgIIiIKEkxpc3RNZW1iZXJzUmVxdWVzdBIMCgR0ZWFtGAEgASgJIkEKE0xpc3RNZW1iZXJzUmVzcG9uc2USKgoHbWVtYmVycxgBIAMoCzIZLnZlcnRyYS5jb25zb2xlLnYxLk1lbWJlciJaChBBZGRNZW1iZXJSZXF1ZXN0EgwKBHRlYW0YASABKAkSDQoFZW1haWwYAiABKAkSKQoEcm9sZRgDIAEoDjIbLnZlcnRyYS5jb25zb2xlLnYxLlRlYW1Sb2xlIhMKEUFkZE1lbWJlclJlc3BvbnNlIjQKE1JlbW92ZU1lbWJlclJlcXVlc3QSDAoEdGVhbRgBIAEoCRIPCgd1c2VyX2lkGAIgASgJIhYKFFJlbW92ZU1lbWJlclJlc3BvbnNlImAKFFNldE1lbWJlclJvbGVSZXF1ZXN0EgwKBHRlYW0YASABKAkSDwoHdXNlcl9pZBgCIAEoCRIpCgRyb2xlGAMgASgOMhsudmVydHJhLmNvbnNvbGUudjEuVGVhbVJvbGUiFwoVU2V0TWVtYmVyUm9sZVJlc3BvbnNlIjkKFFNldFRlYW1TaWduSW5SZXF1ZXN0EgwKBHRlYW0YASABKAkSEwoLcmVxdWlyZV9zc28YAiABKAgiFwoVU2V0VGVhbVNpZ25JblJlc3BvbnNlImUKE1NldFRlYW1RdW90YVJlcXVlc3QSDAoEdGVhbRgBIAEoCRIrCgVxdW90YRgCIAEoCzIcLnZlcnRyYS5jb25zb2xlLnYxLlRlYW1RdW90YRITCgt1c2VfZGVmYXVsdBgDIAEoCCI9ChRTZXRUZWFtUXVvdGFSZXNwb25zZRIlCgR0ZWFtGAEgASgLMhcudmVydHJhLmNvbnNvbGUudjEuVGVhbSJ7ChdBcHBseVNlY3JldFN0b3JlUmVxdWVzdBIMCgR0ZWFtGAEgASgJEioKCWRvY3VtZW50cxgCIAMoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSFwoKY3JlZGVudGlhbBgDIAEoCUgAiAEBQg0KC19jcmVkZW50aWFsIhoKGEFwcGx5U2VjcmV0U3RvcmVSZXNwb25zZSJDCh9TZXRTZWNyZXRTdG9yZUNyZWRlbnRpYWxSZXF1ZXN0EgwKBHRlYW0YASABKAkSEgoKY3JlZGVudGlhbBgCIAEoCSIiCiBTZXRTZWNyZXRTdG9yZUNyZWRlbnRpYWxSZXNwb25zZSIfCg9MaXN0UG9kc1JlcXVlc3QSDAoEdGVhbRgBIAEoCSI8ChBMaXN0UG9kc1Jlc3BvbnNlEigKBHBvZHMYASADKAsyGi52ZXJ0cmEuY29uc29sZS52MS5UYXNrUG9kIoYECgdUYXNrUG9kEhAKCHBvZF9uYW1lGAEgASgJEhkKDGV4ZWN1dGlvbl9pZBgCIAEoCUgAiAEBEhQKB3Rhc2tfaWQYAyABKAlIAYgBARIUCgdhdHRlbXB0GAQgASgFSAKIAQESEgoFaW1hZ2UYBSABKAlIA4gBARIcCg9zZXJ2aWNlX2FjY291bnQYBiABKAlIBIgBARIuCgVzdGF0ZRgHIAEoDjIfLnZlcnRyYS5jb25zb2xlLnYxLlRhc2tQb2RTdGF0ZRIzCgdwcm9ibGVtGAggASgLMh0udmVydHJhLmNvbnNvbGUudjEuUG9kUHJvYmxlbUgFiAEBEhAKCHJlc3RhcnRzGAkgASgFEi4KCnN0YXJ0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC2ZpbmlzaGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI3CglleGVjdXRpb24YDCABKAsyHy52ZXJ0cmEuY29uc29sZS52MS5Qb2RFeGVjdXRpb25IBogBAUIPCg1fZXhlY3V0aW9uX2lkQgoKCF90YXNrX2lkQgoKCF9hdHRlbXB0QggKBl9pbWFnZUISChBfc2VydmljZV9hY2NvdW50QgoKCF9wcm9ibGVtQgwKCl9leGVjdXRpb24iKwoKUG9kUHJvYmxlbRINCgV0aXRsZRgBIAEoCRIOCgZkZXRhaWwYAiABKAkibgoMUG9kRXhlY3V0aW9uEgwKBG5hbWUYASABKAkSGAoLdGFza19udW1iZXIYAiABKAVIAIgBARIXCgp0YXNrX2NvdW50GAMgASgFSAGIAQFCDgoMX3Rhc2tfbnVtYmVyQg0KC190YXNrX2NvdW50IiUKFUdldFRlYW1Qcm9maWxlUmVxdWVzdBIMCgRuYW1lGAEgASgJIrcBChZHZXRUZWFtUHJvZmlsZVJlc3BvbnNlEgwKBG5hbWUYASABKAkSFAoMZnJvbV9jYXRhbG9nGAIgASgIEg8KB3JldGlyZWQYAyABKAgSDwoHY29udGFjdBgEIAEoCRIRCgloZWxwX2NoYXQYBSABKAkSEAoIaGVscF91cmwYBiABKAkSDgoGcGVvcGxlGAcgASgFEg0KBW93bmVyGAggASgJEhMKC2Rlc2NyaXB0aW9uGAkgASgJKlUKCFRlYW1Sb2xlEhkKFVRFQU1fUk9MRV9VTlNQRUNJRklFRBAAEhgKFFRFQU1fUk9MRV9NQUlOVEFJTkVSEAESFAoQVEVBTV9ST0xFX01FTUJFUhACKr4BCgxUYXNrUG9kU3RhdGUSHgoaVEFTS19QT0RfU1RBVEVfVU5TUEVDSUZJRUQQABIbChdUQVNLX1BPRF9TVEFURV9TVEFSVElORxABEhoKFlRBU0tfUE9EX1NUQVRFX1JVTk5JTkcQAhIdChlUQVNLX1BPRF9TVEFURV9DQU5UX1NUQVJUEAMSGwoXVEFTS19QT0RfU1RBVEVfRklOSVNIRUQQBBIZChVUQVNLX1BPRF9TVEFURV9GQUlMRUQQBTKwDgoLVGVhbVNlcnZpY2USWwoJTGlzdFRlYW1zEiMudmVydHJhLmNvbnNvbGUudjEuTGlzdFRlYW1zUmVxdWVzdBokLnZlcnRyYS5jb25zb2xlLnYxLkxpc3RUZWFtc1Jlc3BvbnNlIgOQAgESVQoHR2V0VGVhbRIhLnZlcnRyYS5jb25zb2xlLnYxLkdldFRlYW1SZXF1ZXN0GiIudmVydHJhLmNvbnNvbGUudjEuR2V0VGVhbVJlc3BvbnNlIgOQAgESagoOR2V0VGVhbVByb2ZpbGUSKC52ZXJ0cmEuY29uc29sZS52MS5HZXRUZWFtUHJvZmlsZVJlcXVlc3QaKS52ZXJ0cmEuY29uc29sZS52MS5HZXRUZWFtUHJvZmlsZVJlc3BvbnNlIgOQAgEScwoRTGlzdFRlYW1TdW1tYXJpZXMSKy52ZXJ0cmEuY29uc29sZS52MS5MaXN0VGVhbVN1bW1hcmllc1JlcXVlc3QaLC52ZXJ0cmEuY29uc29sZS52MS5MaXN0VGVhbVN1bW1hcmllc1Jlc3BvbnNlIgOQAgESWQoKQ3JlYXRlVGVhbRIkLnZlcnRyYS5jb25zb2xlLnYxLkNyZWF0ZVRlYW1SZXF1ZXN0GiUudmVydHJhLmNvbnNvbGUudjEuQ3JlYXRlVGVhbVJlc3BvbnNlEl4KCkVuc3VyZVRlYW0SJC52ZXJ0cmEuY29uc29sZS52MS5FbnN1cmVUZWFtUmVxdWVzdBolLnZlcnRyYS5jb25zb2xlLnYxLkVuc3VyZVRlYW1SZXNwb25zZSIDkAICEl4KClJldGlyZVRlYW0SJC52ZXJ0cmEuY29uc29sZS52MS5SZXRpcmVUZWFtUmVxdWVzdBolLnZlcnRyYS5jb25zb2xlLnYxLlJldGlyZVRlYW1SZXNwb25zZSIDkAICEmQKDFVucmV0aXJlVGVhbRImLnZlcnRyYS5jb25zb2xlLnYxLlVucmV0aXJlVGVhbVJlcXVlc3QaJy52ZXJ0cmEuY29uc29sZS52MS5VbnJldGlyZVRlYW1SZXNwb25zZSIDkAICElsKCVB1cmdlVGVhbRIjLnZlcnRyYS5jb25zb2xlLnYxLlB1cmdlVGVhbVJlcXVlc3QaJC52ZXJ0cmEuY29uc29sZS52MS5QdXJnZVRlYW1SZXNwb25zZSIDkAICEmEKC0xpc3RNZW1iZXJzEiUudmVydHJhLmNvbnNvbGUudjEuTGlzdE1lbWJlcnNSZXF1ZXN0GiYudmVydHJhLmNvbnNvbGUudjEuTGlzdE1lbWJlcnNSZXNwb25zZSIDkAIBElYKCUFkZE1lbWJlchIjLnZlcnRyYS5jb25zb2xlLnYxLkFkZE1lbWJlclJlcXVlc3QaJC52ZXJ0cmEuY29uc29sZS52MS5BZGRNZW1iZXJSZXNwb25zZRJkCgxSZW1vdmVNZW1iZXISJi52ZXJ0cmEuY29uc29sZS52MS5SZW1vdmVNZW1iZXJSZXF1ZXN0GicudmVydHJhLmNvbnNvbGUudjEuUmVtb3ZlTWVtYmVyUmVzcG9uc2UiA5ACAhJnCg1TZXRNZW1iZXJSb2xlEicudmVydHJhLmNvbnNvbGUudjEuU2V0TWVtYmVyUm9sZVJlcXVlc3QaKC52ZXJ0cmEuY29uc29sZS52MS5TZXRNZW1iZXJSb2xlUmVzcG9uc2UiA5ACAhJnCg1TZXRUZWFtU2lnbkluEicudmVydHJhLmNvbnNvbGUudjEuU2V0VGVhbVNpZ25JblJlcXVlc3QaKC52ZXJ0cmEuY29uc29sZS52MS5TZXRUZWFtU2lnbkluUmVzcG9uc2UiA5ACAhJkCgxTZXRUZWFtUXVvdGESJi52ZXJ0cmEuY29uc29sZS52MS5TZXRUZWFtUXVvdGFSZXF1ZXN0GicudmVydHJhLmNvbnNvbGUudjEuU2V0VGVhbVF1b3RhUmVzcG9uc2UiA5ACAhJwChBBcHBseVNlY3JldFN0b3JlEioudmVydHJhLmNvbnNvbGUudjEuQXBwbHlTZWNyZXRTdG9yZVJlcXVlc3QaKy52ZXJ0cmEuY29uc29sZS52MS5BcHBseVNlY3JldFN0b3JlUmVzcG9uc2UiA5ACAhKIAQoYU2V0U2VjcmV0U3RvcmVDcmVkZW50aWFsEjIudmVydHJhLmNvbnNvbGUudjEuU2V0U2VjcmV0U3RvcmVDcmVkZW50aWFsUmVxdWVzdBozLnZlcnRyYS5jb25zb2xlLnYxLlNldFNlY3JldFN0b3JlQ3JlZGVudGlhbFJlc3BvbnNlIgOQAgISWAoITGlzdFBvZHMSIi52ZXJ0cmEuY29uc29sZS52MS5MaXN0UG9kc1JlcXVlc3QaIy52ZXJ0cmEuY29uc29sZS52MS5MaXN0UG9kc1Jlc3BvbnNlIgOQAgFiBnByb3RvMw", [file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * Describes the message vertra.console.v1.Team.
@@ -49,249 +49,270 @@ export const ListTeamsResponseSchema = /*@__PURE__*/
   messageDesc(file_vertra_console_v1_team, 4);
 
 /**
+ * Describes the message vertra.console.v1.ListTeamSummariesRequest.
+ * Use `create(ListTeamSummariesRequestSchema)` to create a new message.
+ */
+export const ListTeamSummariesRequestSchema = /*@__PURE__*/
+  messageDesc(file_vertra_console_v1_team, 5);
+
+/**
+ * Describes the message vertra.console.v1.ListTeamSummariesResponse.
+ * Use `create(ListTeamSummariesResponseSchema)` to create a new message.
+ */
+export const ListTeamSummariesResponseSchema = /*@__PURE__*/
+  messageDesc(file_vertra_console_v1_team, 6);
+
+/**
+ * Describes the message vertra.console.v1.TeamSummary.
+ * Use `create(TeamSummarySchema)` to create a new message.
+ */
+export const TeamSummarySchema = /*@__PURE__*/
+  messageDesc(file_vertra_console_v1_team, 7);
+
+/**
  * Describes the message vertra.console.v1.GetTeamRequest.
  * Use `create(GetTeamRequestSchema)` to create a new message.
  */
 export const GetTeamRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 5);
+  messageDesc(file_vertra_console_v1_team, 8);
 
 /**
  * Describes the message vertra.console.v1.GetTeamResponse.
  * Use `create(GetTeamResponseSchema)` to create a new message.
  */
 export const GetTeamResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 6);
+  messageDesc(file_vertra_console_v1_team, 9);
 
 /**
  * Describes the message vertra.console.v1.CreateTeamRequest.
  * Use `create(CreateTeamRequestSchema)` to create a new message.
  */
 export const CreateTeamRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 7);
+  messageDesc(file_vertra_console_v1_team, 10);
 
 /**
  * Describes the message vertra.console.v1.CreateTeamResponse.
  * Use `create(CreateTeamResponseSchema)` to create a new message.
  */
 export const CreateTeamResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 8);
+  messageDesc(file_vertra_console_v1_team, 11);
 
 /**
  * Describes the message vertra.console.v1.EnsureTeamRequest.
  * Use `create(EnsureTeamRequestSchema)` to create a new message.
  */
 export const EnsureTeamRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 9);
+  messageDesc(file_vertra_console_v1_team, 12);
 
 /**
  * Describes the message vertra.console.v1.EnsureTeamResponse.
  * Use `create(EnsureTeamResponseSchema)` to create a new message.
  */
 export const EnsureTeamResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 10);
+  messageDesc(file_vertra_console_v1_team, 13);
 
 /**
  * Describes the message vertra.console.v1.RetireTeamRequest.
  * Use `create(RetireTeamRequestSchema)` to create a new message.
  */
 export const RetireTeamRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 11);
+  messageDesc(file_vertra_console_v1_team, 14);
 
 /**
  * Describes the message vertra.console.v1.RetireTeamResponse.
  * Use `create(RetireTeamResponseSchema)` to create a new message.
  */
 export const RetireTeamResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 12);
+  messageDesc(file_vertra_console_v1_team, 15);
 
 /**
  * Describes the message vertra.console.v1.UnretireTeamRequest.
  * Use `create(UnretireTeamRequestSchema)` to create a new message.
  */
 export const UnretireTeamRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 13);
+  messageDesc(file_vertra_console_v1_team, 16);
 
 /**
  * Describes the message vertra.console.v1.UnretireTeamResponse.
  * Use `create(UnretireTeamResponseSchema)` to create a new message.
  */
 export const UnretireTeamResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 14);
+  messageDesc(file_vertra_console_v1_team, 17);
 
 /**
  * Describes the message vertra.console.v1.PurgeTeamRequest.
  * Use `create(PurgeTeamRequestSchema)` to create a new message.
  */
 export const PurgeTeamRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 15);
+  messageDesc(file_vertra_console_v1_team, 18);
 
 /**
  * Describes the message vertra.console.v1.PurgeTeamResponse.
  * Use `create(PurgeTeamResponseSchema)` to create a new message.
  */
 export const PurgeTeamResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 16);
+  messageDesc(file_vertra_console_v1_team, 19);
 
 /**
  * Describes the message vertra.console.v1.ListMembersRequest.
  * Use `create(ListMembersRequestSchema)` to create a new message.
  */
 export const ListMembersRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 17);
+  messageDesc(file_vertra_console_v1_team, 20);
 
 /**
  * Describes the message vertra.console.v1.ListMembersResponse.
  * Use `create(ListMembersResponseSchema)` to create a new message.
  */
 export const ListMembersResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 18);
+  messageDesc(file_vertra_console_v1_team, 21);
 
 /**
  * Describes the message vertra.console.v1.AddMemberRequest.
  * Use `create(AddMemberRequestSchema)` to create a new message.
  */
 export const AddMemberRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 19);
+  messageDesc(file_vertra_console_v1_team, 22);
 
 /**
  * Describes the message vertra.console.v1.AddMemberResponse.
  * Use `create(AddMemberResponseSchema)` to create a new message.
  */
 export const AddMemberResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 20);
+  messageDesc(file_vertra_console_v1_team, 23);
 
 /**
  * Describes the message vertra.console.v1.RemoveMemberRequest.
  * Use `create(RemoveMemberRequestSchema)` to create a new message.
  */
 export const RemoveMemberRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 21);
+  messageDesc(file_vertra_console_v1_team, 24);
 
 /**
  * Describes the message vertra.console.v1.RemoveMemberResponse.
  * Use `create(RemoveMemberResponseSchema)` to create a new message.
  */
 export const RemoveMemberResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 22);
+  messageDesc(file_vertra_console_v1_team, 25);
 
 /**
  * Describes the message vertra.console.v1.SetMemberRoleRequest.
  * Use `create(SetMemberRoleRequestSchema)` to create a new message.
  */
 export const SetMemberRoleRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 23);
+  messageDesc(file_vertra_console_v1_team, 26);
 
 /**
  * Describes the message vertra.console.v1.SetMemberRoleResponse.
  * Use `create(SetMemberRoleResponseSchema)` to create a new message.
  */
 export const SetMemberRoleResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 24);
+  messageDesc(file_vertra_console_v1_team, 27);
 
 /**
  * Describes the message vertra.console.v1.SetTeamSignInRequest.
  * Use `create(SetTeamSignInRequestSchema)` to create a new message.
  */
 export const SetTeamSignInRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 25);
+  messageDesc(file_vertra_console_v1_team, 28);
 
 /**
  * Describes the message vertra.console.v1.SetTeamSignInResponse.
  * Use `create(SetTeamSignInResponseSchema)` to create a new message.
  */
 export const SetTeamSignInResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 26);
+  messageDesc(file_vertra_console_v1_team, 29);
 
 /**
  * Describes the message vertra.console.v1.SetTeamQuotaRequest.
  * Use `create(SetTeamQuotaRequestSchema)` to create a new message.
  */
 export const SetTeamQuotaRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 27);
+  messageDesc(file_vertra_console_v1_team, 30);
 
 /**
  * Describes the message vertra.console.v1.SetTeamQuotaResponse.
  * Use `create(SetTeamQuotaResponseSchema)` to create a new message.
  */
 export const SetTeamQuotaResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 28);
+  messageDesc(file_vertra_console_v1_team, 31);
 
 /**
  * Describes the message vertra.console.v1.ApplySecretStoreRequest.
  * Use `create(ApplySecretStoreRequestSchema)` to create a new message.
  */
 export const ApplySecretStoreRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 29);
+  messageDesc(file_vertra_console_v1_team, 32);
 
 /**
  * Describes the message vertra.console.v1.ApplySecretStoreResponse.
  * Use `create(ApplySecretStoreResponseSchema)` to create a new message.
  */
 export const ApplySecretStoreResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 30);
+  messageDesc(file_vertra_console_v1_team, 33);
 
 /**
  * Describes the message vertra.console.v1.SetSecretStoreCredentialRequest.
  * Use `create(SetSecretStoreCredentialRequestSchema)` to create a new message.
  */
 export const SetSecretStoreCredentialRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 31);
+  messageDesc(file_vertra_console_v1_team, 34);
 
 /**
  * Describes the message vertra.console.v1.SetSecretStoreCredentialResponse.
  * Use `create(SetSecretStoreCredentialResponseSchema)` to create a new message.
  */
 export const SetSecretStoreCredentialResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 32);
+  messageDesc(file_vertra_console_v1_team, 35);
 
 /**
  * Describes the message vertra.console.v1.ListPodsRequest.
  * Use `create(ListPodsRequestSchema)` to create a new message.
  */
 export const ListPodsRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 33);
+  messageDesc(file_vertra_console_v1_team, 36);
 
 /**
  * Describes the message vertra.console.v1.ListPodsResponse.
  * Use `create(ListPodsResponseSchema)` to create a new message.
  */
 export const ListPodsResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 34);
+  messageDesc(file_vertra_console_v1_team, 37);
 
 /**
  * Describes the message vertra.console.v1.TaskPod.
  * Use `create(TaskPodSchema)` to create a new message.
  */
 export const TaskPodSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 35);
+  messageDesc(file_vertra_console_v1_team, 38);
 
 /**
  * Describes the message vertra.console.v1.PodProblem.
  * Use `create(PodProblemSchema)` to create a new message.
  */
 export const PodProblemSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 36);
+  messageDesc(file_vertra_console_v1_team, 39);
 
 /**
  * Describes the message vertra.console.v1.PodExecution.
  * Use `create(PodExecutionSchema)` to create a new message.
  */
 export const PodExecutionSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 37);
+  messageDesc(file_vertra_console_v1_team, 40);
 
 /**
  * Describes the message vertra.console.v1.GetTeamProfileRequest.
  * Use `create(GetTeamProfileRequestSchema)` to create a new message.
  */
 export const GetTeamProfileRequestSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 38);
+  messageDesc(file_vertra_console_v1_team, 41);
 
 /**
  * Describes the message vertra.console.v1.GetTeamProfileResponse.
  * Use `create(GetTeamProfileResponseSchema)` to create a new message.
  */
 export const GetTeamProfileResponseSchema = /*@__PURE__*/
-  messageDesc(file_vertra_console_v1_team, 39);
+  messageDesc(file_vertra_console_v1_team, 42);
 
 /**
  * Describes the enum vertra.console.v1.TeamRole.

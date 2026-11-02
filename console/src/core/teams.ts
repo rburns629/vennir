@@ -55,6 +55,7 @@ import {
   ProtectedNamespaceError,
   setTeamNamespace,
   type TeamNamespaceState,
+  unfinishedPodsByNamespace,
 } from "../k8s.js";
 import { getExecutionStates } from "../kernel/client.js";
 import { syncIdentityPolicy } from "../productPolicy.js";
@@ -527,6 +528,29 @@ export async function teamPods(caller: AuthUser | undefined, teamName: string) {
         : null,
     };
   });
+}
+
+/** Every team's owner, description, people and Pods running now, for an
+ * admin's Teams page: one query and one Pod list, not two requests a team. */
+export async function teamSummaries(caller: AuthUser | undefined) {
+  forbiddenUnlessAdmin(caller);
+  const [rows, running] = await Promise.all([
+    db
+      .select({ name: teams.name, owner: teams.owner, description: teams.description, people: sql<number>`count(${teamMemberships.userId})::int` })
+      .from(teams)
+      .leftJoin(teamMemberships, eq(teamMemberships.teamId, teams.id))
+      .where(isNull(teams.deletedAt))
+      .groupBy(teams.id),
+    unfinishedPodsByNamespace(),
+  ]);
+  return rows.map((row) => ({
+    name: row.name,
+    owner: row.owner ?? "",
+    description: row.description ?? "",
+    people: row.people,
+    // teams.name is its namespace's name.
+    running: running.get(row.name) ?? 0,
+  }));
 }
 
 /** What anyone signed in may know of a team: where to ask it, whether it's retired, its size. */

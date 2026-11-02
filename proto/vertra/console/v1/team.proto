@@ -28,6 +28,12 @@ service TeamService {
   rpc GetTeamProfile(GetTeamProfileRequest) returns (GetTeamProfileResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  // Every team's owner, description, people and Pods running now, for an
+  // admin's list of teams: one call, not a profile and a Pod list for each.
+  // Admins only.
+  rpc ListTeamSummaries(ListTeamSummariesRequest) returns (ListTeamSummariesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
   // Creates a team and its namespace. Admins, or a token with teams:create.
   rpc CreateTeam(CreateTeamRequest) returns (CreateTeamResponse);
   // Makes sure a team exists and is active, with its namespace: creates
@@ -171,6 +177,24 @@ message ListTeamsRequest {}
 
 message ListTeamsResponse {
   repeated Team teams = 1;
+}
+
+message ListTeamSummariesRequest {}
+
+message ListTeamSummariesResponse {
+  repeated TeamSummary teams = 1;
+}
+
+// What an admin's list of teams shows of one.
+message TeamSummary {
+  string name = 1;
+  // team.yaml's owner in the catalog and its description; empty for a team
+  // made here.
+  string owner = 2;
+  string description = 3;
+  int32 people = 4;
+  // Its namespace's Pods not finished: starting, running, or unable to start.
+  int32 running = 5;
 }
 
 message GetTeamRequest {
