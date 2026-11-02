@@ -93,7 +93,8 @@ type Kubernetes struct {
 	// Captured once a Job finishes, so a pass that rolls back can read the
 	// result again after the Job's release. Pruned to terminalRetention.
 	terminal map[string]terminalRecord
-	// When each running Job was last read with its Pod ready: while the
+	// When each running Job was last read with its Pod ready, or waiting
+	// for a node or its container (not pulling, not missing): while the
 	// watch is healthy, a Job isn't re-read until it changes or WatchResync
 	// passes.
 	quietSince map[string]time.Time
@@ -532,6 +533,11 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 				// are events, not watched).
 				k.mu.Lock()
 				k.quietSince[name] = time.Now()
+				k.mu.Unlock()
+			} else {
+				// No longer resting, if it was before it began pulling.
+				k.mu.Lock()
+				delete(k.quietSince, name)
 				k.mu.Unlock()
 			}
 			return Status{State: Running}, nil

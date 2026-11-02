@@ -854,6 +854,21 @@ func TestAStepPullingItsImageIsAlwaysRead(t *testing.T) {
 	check(t, "reads", reads(), 2)
 }
 
+func TestAStepThatStartsPullingIsReadEveryPassFromThen(t *testing.T) {
+	w := healthyWatch()
+	c, handle, reads := runningJob(0, w)
+	unreadyPod(c, "ContainerCreating")
+	_, _ = c.k.Status(context.Background(), handle)
+	pod, _ := c.CoreV1().Pods("team-a").Get(context.Background(), "ek-step-1-x", metav1.GetOptions{})
+	pod.Status.ContainerStatuses[0].State.Waiting.Reason = "ImagePullBackOff"
+	if _, err := c.CoreV1().Pods("team-a").UpdateStatus(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	w.markChanged("pods", "ek-step-1")
+	twice(t, c, handle)
+	check(t, "reads", reads(), 3)
+}
+
 func TestAStepWaitingForANodeIsReadWhenItsPodChanges(t *testing.T) {
 	w := healthyWatch()
 	c, handle, reads := runningJob(0, w)
