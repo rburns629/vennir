@@ -82,6 +82,21 @@
       "minimum": 1,
       "maximum": 100
     },
+    "clouds": {
+      "description": "Optional. The clouds of the installs it's for (gcp, aws, azure, kind, existing), in place of its team.yaml's. On an install on another cloud it's listed, marked, not checked and not run. Left out: its team's, else every install.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "gcp",
+          "aws",
+          "azure",
+          "kind",
+          "existing"
+        ]
+      }
+    },
     "capacity": {
       "description": "Optional. The capacity its steps run on, where the install offers a choice: spot (cheaper, may be reclaimed: a reclaimed step fails as retryable, so make its actions idempotent) or onDemand (not reclaimed, for steps that mustn't be cut short). Left out: the install's own (usually Spot).",
       "enum": [

@@ -49,6 +49,7 @@ import { readinessOf, type ReadinessView } from "../readiness.js";
 import { catalogLinks, githubBase } from "./catalogLinks.js";
 import { submitChecked } from "./executions.js";
 import { ensureOrderRate } from "./orderRate.js";
+import { runsHere } from "./clouds.js";
 
 export type TeamProduct = Product & { teamName: string };
 
@@ -295,6 +296,10 @@ export interface Runnable {
   readiness: ReadinessView | null;
   /** Examples of running it: an action's passing contract tests, a template's own. */
   examples: ProductExample[];
+  /** An action's product's clouds (empty for a template), and whether it's for this install. */
+  clouds: string[];
+  cloudsFrom: string;
+  runsHere: boolean;
 }
 
 const READINESS_ORDER: (ReadinessView["state"])[] = ["not_ready", "failed", "checking", "unchecked", "ready"];
@@ -363,6 +368,10 @@ export async function runnables(caller: AuthUser | undefined): Promise<Runnable[
         const view = ready.get(byRef.get(step.action)?.name ?? "");
         return view ? [view] : [];
       })),
+      // Its steps' clouds are checked when it's run (core/clouds.ts).
+      clouds: [],
+      cloudsFrom: "",
+      runsHere: true,
     });
   }
   for (const p of products) {
@@ -386,6 +395,9 @@ export async function runnables(caller: AuthUser | undefined): Promise<Runnable[
       previewable: hasPlan(p),
       readiness: ready.get(p.name) ?? null,
       examples: p.examples,
+      clouds: p.clouds,
+      cloudsFrom: p.cloudsFrom,
+      runsHere: runsHere(p.clouds),
     });
   }
   return out;

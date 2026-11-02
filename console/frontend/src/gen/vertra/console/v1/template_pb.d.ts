@@ -177,6 +177,28 @@ export declare type Runnable = Message<"vertra.console.v1.Runnable"> & {
    * @generated from field: repeated vertra.console.v1.RunExample examples = 18;
    */
   examples: RunExample[];
+
+  /**
+   * An action's product's clouds (Product.clouds); empty for a template.
+   *
+   * @generated from field: repeated string clouds = 19;
+   */
+  clouds: string[];
+
+  /**
+   * Whether an action's product is for this install (Product.runs_here);
+   * always set for a template, whose steps are checked when it's run.
+   *
+   * @generated from field: bool runs_here = 20;
+   */
+  runsHere: boolean;
+
+  /**
+   * Where an action's clouds are set (Product.clouds_from).
+   *
+   * @generated from field: string clouds_from = 21;
+   */
+  cloudsFrom: string;
 };
 
 /**

@@ -156,6 +156,7 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 	release := &catalogv1.Release{Commit: commit, Repository: repository, CreatedAt: timestamppb.Now()}
 	var problems []string
 	dirs := map[string]string{}
+	teamClouds := map[string][]string{}
 	for _, d := range c.TeamDirs() {
 		dirs[filepath.Base(d)] = d
 	}
@@ -174,6 +175,7 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 		help, _ := spec["help"].(map[string]any)
 		t.Contact, t.HelpChat, t.HelpUrl = text(spec, "contact"), text(help, "chat"), text(help, "url")
 		t.Owner, t.Description = text(spec, "owner"), text(spec, "description")
+		teamClouds[team] = stringList(spec["clouds"])
 		if len(c.secretStoreFiles(team)) > 0 {
 			documents, found := c.secretStoreDocuments(team)
 			if len(found) == 0 {
@@ -216,6 +218,17 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", p.Label(), err))
 			continue
+		}
+		// The clouds it's for: its own, else its team's.
+		clouds, from := stringList(p.Spec["clouds"]), "product"
+		if len(clouds) == 0 {
+			clouds, from = teamClouds[p.Team()], "team"
+		}
+		if len(clouds) == 0 {
+			from = ""
+		}
+		for _, a := range actions {
+			a.Clouds, a.CloudsFrom = clouds, from
 		}
 		release.Products = append(release.Products, actions...)
 	}

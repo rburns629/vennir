@@ -200,7 +200,14 @@ type Runnable struct {
 	// Examples of running it, from its product's passing contract tests (an
 	// action's; a template has none yet): a name, inputs to fill the form
 	// with, and what it gave.
-	Examples      []*RunExample `protobuf:"bytes,18,rep,name=examples,proto3" json:"examples,omitempty"`
+	Examples []*RunExample `protobuf:"bytes,18,rep,name=examples,proto3" json:"examples,omitempty"`
+	// An action's product's clouds (Product.clouds); empty for a template.
+	Clouds []string `protobuf:"bytes,19,rep,name=clouds,proto3" json:"clouds,omitempty"`
+	// Whether an action's product is for this install (Product.runs_here);
+	// always set for a template, whose steps are checked when it's run.
+	RunsHere bool `protobuf:"varint,20,opt,name=runs_here,json=runsHere,proto3" json:"runs_here,omitempty"`
+	// Where an action's clouds are set (Product.clouds_from).
+	CloudsFrom    string `protobuf:"bytes,21,opt,name=clouds_from,json=cloudsFrom,proto3" json:"clouds_from,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -359,6 +366,27 @@ func (x *Runnable) GetExamples() []*RunExample {
 		return x.Examples
 	}
 	return nil
+}
+
+func (x *Runnable) GetClouds() []string {
+	if x != nil {
+		return x.Clouds
+	}
+	return nil
+}
+
+func (x *Runnable) GetRunsHere() bool {
+	if x != nil {
+		return x.RunsHere
+	}
+	return false
+}
+
+func (x *Runnable) GetCloudsFrom() string {
+	if x != nil {
+		return x.CloudsFrom
+	}
+	return ""
 }
 
 type RunExample struct {
@@ -1024,7 +1052,7 @@ const file_vertra_console_v1_template_proto_rawDesc = "" +
 	" vertra/console/v1/template.proto\x12\x11vertra.console.v1\x1a!vertra/console/v1/execution.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fvertra/console/v1/product.proto\"\x16\n" +
 	"\x14ListTemplatesRequest\"R\n" +
 	"\x15ListTemplatesResponse\x129\n" +
-	"\trunnables\x18\x01 \x03(\v2\x1b.vertra.console.v1.RunnableR\trunnables\"\x8e\x06\n" +
+	"\trunnables\x18\x01 \x03(\v2\x1b.vertra.console.v1.RunnableR\trunnables\"\xe4\x06\n" +
 	"\bRunnable\x124\n" +
 	"\x04kind\x18\x01 \x01(\x0e2 .vertra.console.v1.Runnable.KindR\x04kind\x12\x12\n" +
 	"\x04team\x18\x02 \x01(\tR\x04team\x12\x12\n" +
@@ -1051,7 +1079,11 @@ const file_vertra_console_v1_template_proto_rawDesc = "" +
 	"\atargets\x18\x0f \x03(\v2\x1f.vertra.console.v1.TargetChoiceR\atargets\x12 \n" +
 	"\vpreviewable\x18\x10 \x01(\bR\vpreviewable\x12:\n" +
 	"\treadiness\x18\x11 \x01(\v2\x1c.vertra.console.v1.ReadinessR\treadiness\x129\n" +
-	"\bexamples\x18\x12 \x03(\v2\x1d.vertra.console.v1.RunExampleR\bexamples\"@\n" +
+	"\bexamples\x18\x12 \x03(\v2\x1d.vertra.console.v1.RunExampleR\bexamples\x12\x16\n" +
+	"\x06clouds\x18\x13 \x03(\tR\x06clouds\x12\x1b\n" +
+	"\truns_here\x18\x14 \x01(\bR\brunsHere\x12\x1f\n" +
+	"\vclouds_from\x18\x15 \x01(\tR\n" +
+	"cloudsFrom\"@\n" +
 	"\x04Kind\x12\x14\n" +
 	"\x10KIND_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rKIND_TEMPLATE\x10\x01\x12\x0f\n" +

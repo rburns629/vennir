@@ -21,6 +21,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useCart } from "../cart";
 import { CheckStrip, type Check } from "../components/CheckStrip";
 import { CodeBlock } from "../components/CodeBlock";
+import { NotForThisInstall, isNotForThisInstall, refusedProduct } from "../components/Clouds";
 import { HelpLink } from "../components/HelpLink";
 import { OrderChoice, sameInput } from "../components/OrderChoice";
 import { Pill } from "../components/Pill";
@@ -498,6 +499,8 @@ export function ComposePage() {
   const stored = useComposeDrafts(draft);
   const [moved, setMoved] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  // Run now refused: a step is for installs on another cloud.
+  const [refusal, setRefusal] = useState<ApiError | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
   // The teams it can be for: yours, or any for an admin.
@@ -563,10 +566,12 @@ export function ComposePage() {
     if (!dag) return;
     setRunning(true);
     setError(null);
+    setRefusal(null);
     try {
       navigate(`/runs/${(await submitExecution(dag)).executionId}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't run it.");
+      if (isNotForThisInstall(err)) setRefusal(err);
+      else setError(err instanceof ApiError ? err.message : "Couldn't run it.");
       setRunning(false);
     }
   }
@@ -636,6 +641,16 @@ export function ComposePage() {
       </Box>
 
       {error && <Alert severity="error">{error}</Alert>}
+      {refusal && (
+        <NotForThisInstall
+          error={refusal}
+          what="order"
+          product={(() => {
+            const p = byName.get(refusedProduct(refusal) ?? "");
+            return p ? { name: p.displayName || p.name, team: p.teamName, clouds: p.clouds, cloudsFrom: p.cloudsFrom } : null;
+          })()}
+        />
+      )}
 
       <BuildFromCart
         team={draft.team}

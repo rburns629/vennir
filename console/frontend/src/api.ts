@@ -158,12 +158,14 @@ export interface Environment {
   selfRegistration: boolean;
   /** Single sign-on's provider ("Google") when it's on. Passwords still work, except for teams that require it. */
   ssoLabel: string;
+  /** The cloud this install is on (gcp, aws, azure, kind, existing), as vertra set it; empty when it isn't known. */
+  cloud: string;
 }
 
 /** Unauthenticated -- see ../../src/index.ts's /environment route. */
 export async function getEnvironment(): Promise<Environment> {
   const environment = await call(() => auth.getEnvironment({}));
-  return { label: environment.label, selfRegistration: environment.selfRegistration, ssoLabel: environment.ssoLabel };
+  return { label: environment.label, selfRegistration: environment.selfRegistration, ssoLabel: environment.ssoLabel, cloud: environment.cloud };
 }
 
 /** Where a browser goes to sign in with single sign-on (../../src/auth/oidc.ts). */
@@ -831,8 +833,19 @@ export interface Product {
   /** Every image this product has been registered with, newest first.
    * `image` above is the current one, which the UI marks "latest". */
   releases: ProductRelease[];
-  /** Whether it's ready on this install, by its check; null when it has none. */
+  /** Whether it's ready on this install, by its check; null when it has none (always, when it doesn't run here). */
   readiness: Readiness | null;
+  /** The clouds of the installs it's for (product.yaml's clouds, else its team.yaml's); empty, every install. */
+  clouds: string[];
+  /** Which file set clouds: its product.yaml, its team's team.yaml, or neither. */
+  cloudsFrom: "product" | "team" | "";
+  /** Whether it's for this install: one that isn't is listed, never checked or run (NOT_FOR_THIS_INSTALL). */
+  runsHere: boolean;
+}
+
+/** "aws", "aws and azure", "aws, azure and gcp": the clouds a product is for, in words. */
+export function cloudList(clouds: readonly string[]): string {
+  return clouds.length <= 1 ? (clouds[0] ?? "") : `${clouds.slice(0, -1).join(", ")} and ${clouds.at(-1) ?? ""}`;
 }
 
 /** A product's check's last answer on this install (proto/vertra/console/v1/product.proto). */
@@ -892,6 +905,10 @@ export async function listProducts(): Promise<Product[]> {
     createdAt: iso(p.createdAt) ?? "",
     releases: p.releases.map((r) => ({ image: r.image, registeredAt: iso(r.registeredAt) ?? "" })),
     readiness: readinessOf(p.readiness),
+    clouds: p.clouds,
+    cloudsFrom: p.cloudsFrom === "product" || p.cloudsFrom === "team" ? p.cloudsFrom : "",
+    // Only a product for some clouds can be for other installs (../../src/core/clouds.ts).
+    runsHere: p.runsHere || p.clouds.length === 0,
   }));
 }
 
@@ -1707,6 +1724,12 @@ export interface Runnable {
   readiness: Readiness | null;
   /** Examples of running it: an action's passing contract tests. */
   examples: { name: string; inputs: Record<string, unknown>; outputs: Record<string, unknown> }[];
+  /** An action's product's clouds (Product.clouds); empty for a template, or a product for every install. */
+  clouds: string[];
+  /** Whether an action's product is for this install; always true for a template, whose steps are checked when it's run. */
+  runsHere: boolean;
+  /** Where an action's clouds are set: "product", "team", or "". */
+  cloudsFrom: string;
 }
 
 export async function listRunnables(): Promise<Runnable[]> {
@@ -1730,6 +1753,9 @@ export async function listRunnables(): Promise<Runnable[]> {
     previewable: r.previewable,
     readiness: readinessOf(r.readiness),
     examples: r.examples.map((e) => ({ name: e.name, inputs: (e.inputs ?? {}) as Record<string, unknown>, outputs: (e.outputs ?? {}) as Record<string, unknown> })),
+    clouds: r.clouds,
+    runsHere: r.runsHere || r.clouds.length === 0,
+    cloudsFrom: r.cloudsFrom,
   }));
 }
 

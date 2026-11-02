@@ -14,6 +14,9 @@ image:
 backup:
   enabled: false
 kernelApiUrl: https://kernel-execution-kernel-api.default.svc.cluster.local:8000
+# The cloud this install is on: products whose catalog clouds leave it out
+# are listed but not checked or run here.
+installCloud: gcp
 # kernel-api's HTTPS, and the kernel's Postgres, are checked against the
 # kernel chart's own CA.
 tls:

@@ -49,6 +49,14 @@ export declare type GetEnvironmentResponse = Message<"vertra.console.v1.GetEnvir
    * @generated from field: string sso_label = 3;
    */
   ssoLabel: string;
+
+  /**
+   * The cloud this install is on (gcp, aws, azure, kind, existing), as
+   * vertra set it; empty when it isn't known, and every product runs here.
+   *
+   * @generated from field: string cloud = 4;
+   */
+  cloud: string;
 };
 
 /**

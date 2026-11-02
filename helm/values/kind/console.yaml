@@ -8,6 +8,9 @@ kernelApiUrl: https://kernel-execution-kernel-api.vertra-system.svc.cluster.loca
 tls:
   kernelCaSecret: kernel-execution-kernel-tls-ca
 environmentLabel: Kubernetes
+# The cloud this install is on: products whose catalog clouds leave it out
+# are listed but not checked or run here.
+installCloud: kind
 # Links in chat webhook posts: `make up`'s port-forward.
 notifications:
   consoleUrl: http://localhost:18080

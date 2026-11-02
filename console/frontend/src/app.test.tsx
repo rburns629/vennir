@@ -21,7 +21,7 @@ let answers: Record<string, Answer> = {};
 
 /** A Connect error, as the console sends one: its Connect code, and the
  * console's stable code in a Failure detail. */
-const refused = (status: number, code: string, message: string, failure?: string) => ({ refused: { status, code, message, failure } });
+const refused = (status: number, code: string, message: string, failure?: string, detail?: Record<string, string>) => ({ refused: { status, code, message, failure, detail } });
 
 async function connectResponse(key: string, request: Record<string, unknown>, streaming: boolean): Promise<Response> {
   const answer = answers[key];
@@ -29,9 +29,9 @@ async function connectResponse(key: string, request: Record<string, unknown>, st
   const value: unknown = await (typeof answer === "function" ? (answer as (r: Record<string, unknown>) => unknown)(request) : (answer ?? {}));
   // (An array named refused is a message's field: the gateway's refusals.)
   if (value && typeof value === "object" && "refused" in value && !Array.isArray(value.refused)) {
-    const { status, code, message, failure } = (value as ReturnType<typeof refused>).refused;
+    const { status, code, message, failure, detail } = (value as ReturnType<typeof refused>).refused;
     const details = failure
-      ? [{ type: "vertra.console.v1.Failure", value: btoa(String.fromCharCode(...toBinary(FailureSchema, create(FailureSchema, { code: failure, message })))) }]
+      ? [{ type: "vertra.console.v1.Failure", value: btoa(String.fromCharCode(...toBinary(FailureSchema, create(FailureSchema, { code: failure, message, detail })))) }]
       : undefined;
     // A stream that fails says so in its end, as the console's does.
     if (streaming) return streamOf([], { error: { code, message, details } });
@@ -2626,5 +2626,134 @@ describe("a cart Ask proposes", () => {
     expect(await within(proposed).findByText("gcp-platform/app-hosting")).toBeTruthy();
     expect(within(proposed).getByText("data-platform/postgres-db")).toBeTruthy();
     expect(within(proposed).getByText(/· deploy, its database from step 1/)).toBeTruthy();
+  });
+});
+
+describe("products for other installs", () => {
+  // A gcp install's catalog with an aws-only action, shared with you.
+  const GCP = { label: "gke-prod", cloud: "gcp" };
+  const S3 = {
+    kind: "KIND_ACTION",
+    team: "aws-platform",
+    name: "aws-platform-s3-bucket-create",
+    displayName: "S3 bucket",
+    actions: ["aws-platform/s3-bucket.create"],
+    parameters: { type: "object", properties: { name: { type: "string" }, region: { type: "string" } } },
+    shared: true,
+    clouds: ["aws"],
+    sourceUrl: "https://github.com/acme/vertra-catalog/blob/main/teams/aws-platform/s3-bucket/product.yaml",
+  };
+  const BUCKET = { kind: "KIND_ACTION", team: "data-platform", name: "data-platform-object-bucket-create", displayName: "Object bucket", actions: ["data-platform/object-bucket.create"], shared: true, runsHere: true };
+
+  it("are listed last in the catalog, in a group of their own, with Run and Add to cart off and why", async () => {
+    await renderAt("/catalog", MEMBER, { "AuthService/GetEnvironment": GCP, "TemplateService/ListTemplates": { runnables: [S3, BUCKET] } });
+    const group = await screen.findByRole("region", { name: /For other installs/ });
+    expect(within(group).getByText(/gke-prod is on gcp\. These are for installs on other clouds/)).toBeTruthy();
+    expect(within(group).getByRole("heading", { name: "S3 bucket" })).toBeTruthy();
+    expect(within(group).getByText("For aws installs")).toBeTruthy();
+    const why = "Can't run here: it's for aws installs, and gke-prod is on gcp.";
+    expect(within(group).getByText(why)).toBeTruthy();
+    for (const name of ["Run", "Add to cart"]) {
+      const button = within(group).getByRole("button", { name }) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      expect(button.getAttribute("aria-describedby")).toBe("not-here-aws-platform-s3-bucket-create");
+    }
+    expect(screen.getByText(/the 1 for other installs last/)).toBeTruthy();
+    // What runs here stays where it was.
+    expect(within(group).queryByRole("heading", { name: "Object bucket" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Object bucket" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /only what i can run/i }));
+    expect(screen.queryByRole("region", { name: /For other installs/ })).toBeNull();
+  });
+
+  it("say on Every product where their clouds are set, in place of a check, with Run off", async () => {
+    await renderAt("/products", MEMBER, {
+      "AuthService/GetEnvironment": GCP,
+      "TemplateService/ListTemplates": { runnables: [S3] },
+      "ProductService/ListProducts": {
+        products: [
+          {
+            id: "p1",
+            name: "aws-platform-s3-bucket-create",
+            displayName: "S3 bucket",
+            image: "registry.example/aws-platform/s3-bucket:1.0.2@sha256:aa",
+            action: "create",
+            teamName: "aws-platform",
+            shareWith: ["*"],
+            serviceAccount: "aws-s3-bucket",
+            releases: [{ image: "registry.example/aws-platform/s3-bucket:1.0.2@sha256:aa" }],
+            clouds: ["aws"],
+            cloudsFrom: "team",
+          },
+        ],
+      },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "S3 bucket" }));
+    expect(await screen.findByText("This install is on gcp, so it isn't checked or run here.")).toBeTruthy();
+    expect(screen.getByText(/for all its products; its/)).toBeTruthy();
+    expect(screen.getByText("clouds: [aws]")).toBeTruthy();
+    expect(screen.getByText("Runs only on aws installs.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Run on its own" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Add to cart" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: /^For other installs/ })).toBeTruthy();
+  });
+
+  it("stop an order in the cart, saying so at the top with Remove, and Place order is off until it's gone", async () => {
+    const { cart } = await import("./cart");
+    cart.add(BUCKET.name);
+    cart.add(S3.name);
+    await renderAt("/catalog/cart", MEMBER, {
+      "AuthService/GetEnvironment": GCP,
+      "TemplateService/ListTemplates": { runnables: [BUCKET, S3] },
+      "OrderService/PreviewOrder": (request: Record<string, unknown>) => ({
+        steps: (request["actions"] as string[]).map((product) => ({ id: product, product, inputs: {} })),
+      }),
+    });
+    const alert = await screen.findByText("S3 bucket is for aws installs, so this order can't run here.");
+    expect(alert.closest("[role=alert]")?.textContent).toContain("gke-prod is on gcp. Remove it to order the rest.");
+    expect(screen.getByText("1 step for aws installs: can't run on gke-prod")).toBeTruthy();
+    const place = screen.getByRole("button", { name: "Place order" }) as HTMLButtonElement;
+    expect(place.disabled).toBe(true);
+    expect(screen.getByText("Remove S3 bucket first: it's for aws installs, and gke-prod is on gcp.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove S3 bucket" }));
+    await waitFor(() => { expect((screen.getByRole("button", { name: "Place order" }) as HTMLButtonElement).disabled).toBe(false); });
+    expect(screen.queryByText(/so this order can't run here/)).toBeNull();
+    cart.clear();
+  });
+
+  it("refuse a template with a step for them when it's run: what it means, what to do, and that nothing ran", async () => {
+    await renderAt("/catalog/run?template=payments%2Forders-exports", MEMBER, {
+      "AuthService/GetEnvironment": GCP,
+      "TemplateService/ListTemplates": {
+        runnables: [
+          { kind: "KIND_TEMPLATE", team: "payments", name: "orders-exports", displayName: "Orders exports", shared: true, runsHere: true, actions: ["data-platform/object-bucket.create", "aws-platform/s3-bucket.create"] },
+          S3,
+        ],
+      },
+      "TemplateService/RunTemplate": () =>
+        refused(400, "failed_precondition", "aws-platform-s3-bucket-create is for aws installs; this install is on gcp.", "NOT_FOR_THIS_INSTALL", { product: "aws-platform-s3-bucket-create" }),
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Run" }));
+    expect(await screen.findByRole("heading", { name: "Not run: S3 bucket is for aws installs" })).toBeTruthy();
+    expect(screen.getByText("NOT_FOR_THIS_INSTALL · nothing ran")).toBeTruthy();
+    expect(screen.getByText("aws-platform-s3-bucket-create is for aws installs; this install is on gcp.")).toBeTruthy();
+    expect(screen.getByText(/aws-platform says S3 bucket is for aws installs, and gke-prod is on gcp\. The run was refused before any step started\./)).toBeTruthy();
+    expect(screen.getByText("Run it on an aws install, or ask payments to leave S3 bucket out of this template on gcp installs.")).toBeTruthy();
+    expect(screen.getByText("Nothing was made. It's refused the same way until the template changes.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Ask payments" }).getAttribute("href")).toBe("/teams/payments");
+    expect(screen.getByText("Refused: not for this install")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Run" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("are why the Admin page's Console card names the install's cloud, and it's left out when not known", async () => {
+    const install = { "AdminService/GetInstall": { version: "0.4.0", environmentLabel: "Kubernetes on GKE, us-central1", scanning: true, runRetentionDays: 90 } };
+    await renderAt("/admin", ADMIN, { "AuthService/GetEnvironment": GCP, ...install });
+    expect(await screen.findByText("Cloud: gcp (set by vertra)")).toBeTruthy();
+    cleanup();
+    await renderAt("/admin", ADMIN, install);
+    expect(await screen.findByText("0.4.0")).toBeTruthy();
+    expect(screen.queryByText(/^Cloud:/)).toBeNull();
   });
 });

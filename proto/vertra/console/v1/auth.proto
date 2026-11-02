@@ -51,6 +51,9 @@ message GetEnvironmentResponse {
   // Sign in at /api/auth/oidc/start. Passwords still work, except for the
   // members of a team that requires single sign-on (Team.require_sso).
   string sso_label = 3;
+  // The cloud this install is on (gcp, aws, azure, kind, existing), as
+  // vertra set it; empty when it isn't known, and every product runs here.
+  string cloud = 4;
 }
 
 message RegisterRequest {

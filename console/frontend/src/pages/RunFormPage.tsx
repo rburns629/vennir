@@ -11,6 +11,7 @@ import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { ApiError, listRunnables, previewRunnable, runRunnable, updateSchedule, type NotPreviewed, type Runnable } from "../api";
+import { CloudPill, NotForThisInstall, isNotForThisInstall, notHereReason, refusedProduct, useInstall } from "../components/Clouds";
 import { CodeBlock } from "../components/CodeBlock";
 import { Pill } from "../components/Pill";
 import { PreviewResult } from "../components/PreviewResult";
@@ -78,7 +79,18 @@ function stepOf(action: string): { team: string; product: string; action: string
 }
 
 /** The form for one runnable, once it's found. */
-function RunForm({ runnable, from, schedule }: { runnable: Runnable; from: RunFrom | undefined; schedule: ScheduleEdit | undefined }) {
+function RunForm({
+  runnable,
+  from,
+  schedule,
+  actionNamed,
+}: {
+  runnable: Runnable;
+  from: RunFrom | undefined;
+  schedule: ScheduleEdit | undefined;
+  /** An action in the catalog, by its product's registered name: to say which step a refusal names. */
+  actionNamed: (name: string) => Runnable | undefined;
+}) {
   const navigate = useNavigate();
   const fields = useMemo(() => withTargets(fieldsOf(runnable.parameters), runnable.targets), [runnable]);
   const [values, setValues] = useState<Values>(() => (fields ? initialValues(runnable.parameters, fields, from?.parameters) : {}));
@@ -99,6 +111,9 @@ function RunForm({ runnable, from, schedule }: { runnable: Runnable; from: RunFr
   const [previewed, setPreviewed] = useState<{ executionId: string; notPreviewed: NotPreviewed[] } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<string[]>([]);
+  // Refused because a step is for installs on another cloud: it's refused the same way until the catalog changes.
+  const [refusal, setRefusal] = useState<ApiError | null>(null);
+  const { install, cloud } = useInstall();
   const [running, setRunning] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
 
@@ -152,7 +167,10 @@ function RunForm({ runnable, from, schedule }: { runnable: Runnable; from: RunFr
 
   /** A refusal, on its fields where it names them. */
   function refused(err: unknown): void {
-    if (err instanceof ApiError && err.code === "INVALID_PARAMETERS") {
+    if (isNotForThisInstall(err)) {
+      setRefusal(err);
+      setErrors([]);
+    } else if (err instanceof ApiError && err.code === "INVALID_PARAMETERS") {
       const problems = serverProblems(err.problems);
       setFieldErrors(problems.fields);
       setErrors(problems.general.length > 0 || !fields ? [err.message] : []);
@@ -216,190 +234,217 @@ function RunForm({ runnable, from, schedule }: { runnable: Runnable; from: RunFr
   const parameters = showCall ? current() : null;
 
   const steps = runnable.actions.map(stepOf);
+  const refusedAction = refusal ? actionNamed(refusedProduct(refusal) ?? "") : undefined;
+  // Why Run is off, said beside it.
+  const runWhy = !runnable.runsHere ? notHereReason(runnable.clouds, install, cloud) : refusal ? "Refused for this install: see why above." : null;
   return (
-    <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "minmax(0, 3fr) minmax(0, 2fr)" }, alignItems: "start" }}>
-      <Card component="form" noValidate onSubmit={(event: FormEvent) => void submit(event)} sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2.5 }}>
-        <Typography variant="h6" component="h2">
-          Inputs
-        </Typography>
-        {from && !schedule && <Alert severity="info">Filled in from {from.name}. Change what you need, then run it.</Alert>}
-        {fields ? (
-          groupsOf(fields).map(({ group, fields: shown }) => (
-            <Box key={group ?? "-"} component={group ? "fieldset" : "div"} sx={{ border: 0, m: 0, p: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: 2.5 }}>
-              {group && (
-                <Typography component="legend" variant="subtitle2" color="text.secondary" sx={{ mb: 1.5, textTransform: "uppercase", letterSpacing: 0.6, fontSize: 12 }}>
-                  {group}
-                </Typography>
-              )}
-              {shown.map((field) => (
-                <FieldInput key={field.name} field={field} value={values[field.name]} error={fieldErrors[field.name]} onChange={set} />
-              ))}
-            </Box>
-          ))
-        ) : (
-          <TextField
-            label="Inputs (JSON)"
-            value={json}
-            onChange={(e) => { setJson(e.target.value); }}
-            multiline
-            minRows={4}
-            slotProps={{ htmlInput: { spellCheck: false, style: { fontFamily: "monospace" } } }}
-            helperText="A JSON object: its schema names no fields."
+    <>
+      {refusal && (
+        <Box sx={{ mb: 2 }}>
+          <NotForThisInstall
+            error={refusal}
+            what={runnable.kind === "template" ? { template: runnable.team } : "action"}
+            product={refusedAction ? { name: refusedAction.displayName || refusedAction.name, team: refusedAction.team, clouds: refusedAction.clouds, cloudsFrom: refusedAction.cloudsFrom } : null}
           />
-        )}
-        {(runnable.onBehalfOfRequired || runnable.onBehalfOf.length > 0) && (
-          <TextField
-            select
-            label="Run for"
-            value={team}
-            onChange={(e) => { setTeam(e.target.value); }}
-            required={runnable.onBehalfOfRequired}
-            helperText={runnable.onBehalfOfRequired ? "It's shared with specific teams: which of yours is this run for?" : "Optional: which of your teams this run is for."}
-          >
-            {!runnable.onBehalfOfRequired && <MenuItem value="">Just me</MenuItem>}
-            {runnable.onBehalfOf.map((name) => (
-              <MenuItem key={name} value={name}>
-                {name}
-              </MenuItem>
-            ))}
-          </TextField>
-        )}
-        {errors.map((message) => (
-          <Alert key={message} severity="error">
-            {message}
-          </Alert>
-        ))}
-        {schedule ? (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Button variant="contained" size="large" disabled={savingSchedule} onClick={() => void saveToSchedule()}>
-              {savingSchedule ? "Saving…" : "Save to schedule"}
-            </Button>
-            <Button size="large" component={RouterLink} to={`/teams/${encodeURIComponent(schedule.team)}?tab=schedules`}>
-              Cancel
-            </Button>
-            <Typography variant="body2" color="text.secondary">
-              Checked against its schema; nothing runs until the schedule next starts it.
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Button type="submit" variant="contained" size="large" disabled={running}>
-              {running ? "Starting…" : "Run"}
-            </Button>
-            {runnable.previewable && (
-              <Button variant="outlined" size="large" disabled={previewing || running} onClick={() => void preview()}>
-                {previewing ? "Asking…" : "Preview"}
-              </Button>
-            )}
-            {scheduleTeams.length > 0 && (
-              <Button size="large" onClick={() => { setScheduling(true); }}>
-                Schedule…
-              </Button>
-            )}
-            <Typography variant="body2" color="text.secondary">
-              Checked against its schema before anything runs.{runnable.previewable && " Preview says what it would change, first."}
-            </Typography>
-          </Box>
-        )}
-        {scheduling && (
-          <ScheduleDialog open onClose={() => { setScheduling(false); }} runnable={runnable} teams={scheduleTeams} parameters={() => checkedParameters(false)} />
-        )}
-        {previewed && (
-          <Box sx={{ borderTop: 1, borderColor: "divider", pt: 2 }}>
-            <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 600, mb: 1 }}>
-              What it would do
-            </Typography>
-            <PreviewResult key={previewed.executionId} executionId={previewed.executionId} notPreviewed={previewed.notPreviewed} />
-          </Box>
-        )}
-      </Card>
-
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <Card sx={{ p: 3, display: "flex", flexDirection: "column", gap: 1.5 }}>
+        </Box>
+      )}
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "minmax(0, 3fr) minmax(0, 2fr)" }, alignItems: "start" }}>
+        <Card component="form" noValidate onSubmit={(event: FormEvent) => void submit(event)} sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2.5 }}>
           <Typography variant="h6" component="h2">
-            What will run
+            Inputs
           </Typography>
-          <Box component="ol" sx={{ m: 0, p: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 1.25 }}>
-            {steps.map((step, i) => (
-              <Box component="li" key={`${String(i)}-${step.product}`} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
-                <Box sx={{ flex: "0 0 26px", height: 26, borderRadius: "50%", bgcolor: "info.light", color: "info.main", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {i + 1}
-                </Box>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {step.product}
-                    {step.action && ` · ${step.action}`}
+          {from && !schedule && <Alert severity="info">Filled in from {from.name}. Change what you need, then run it.</Alert>}
+          {fields ? (
+            groupsOf(fields).map(({ group, fields: shown }) => (
+              <Box key={group ?? "-"} component={group ? "fieldset" : "div"} sx={{ border: 0, m: 0, p: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: 2.5 }}>
+                {group && (
+                  <Typography component="legend" variant="subtitle2" color="text.secondary" sx={{ mb: 1.5, textTransform: "uppercase", letterSpacing: 0.6, fontSize: 12 }}>
+                    {group}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {step.team || runnable.team}&apos;s product, as its own identity
-                  </Typography>
-                </Box>
+                )}
+                {shown.map((field) => (
+                  <FieldInput key={field.name} field={field} value={values[field.name]} error={fieldErrors[field.name]} onChange={set} />
+                ))}
               </Box>
-            ))}
-          </Box>
+            ))
+          ) : (
+            <TextField
+              label="Inputs (JSON)"
+              value={json}
+              onChange={(e) => { setJson(e.target.value); }}
+              multiline
+              minRows={4}
+              slotProps={{ htmlInput: { spellCheck: false, style: { fontFamily: "monospace" } } }}
+              helperText="A JSON object: its schema names no fields."
+            />
+          )}
+          {(runnable.onBehalfOfRequired || runnable.onBehalfOf.length > 0) && (
+            <TextField
+              select
+              label="Run for"
+              value={team}
+              onChange={(e) => { setTeam(e.target.value); }}
+              required={runnable.onBehalfOfRequired}
+              helperText={runnable.onBehalfOfRequired ? "It's shared with specific teams: which of yours is this run for?" : "Optional: which of your teams this run is for."}
+            >
+              {!runnable.onBehalfOfRequired && <MenuItem value="">Just me</MenuItem>}
+              {runnable.onBehalfOf.map((name) => (
+                <MenuItem key={name} value={name}>
+                  {name}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+          {errors.map((message) => (
+            <Alert key={message} severity="error">
+              {message}
+            </Alert>
+          ))}
+          {schedule ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <Button variant="contained" size="large" disabled={savingSchedule} onClick={() => void saveToSchedule()}>
+                {savingSchedule ? "Saving…" : "Save to schedule"}
+              </Button>
+              <Button size="large" component={RouterLink} to={`/teams/${encodeURIComponent(schedule.team)}?tab=schedules`}>
+                Cancel
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                Checked against its schema; nothing runs until the schedule next starts it.
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <Button type="submit" variant="contained" size="large" disabled={running || runWhy !== null} aria-describedby={runWhy ? "run-why" : undefined}>
+                {running ? "Starting…" : "Run"}
+              </Button>
+              {runnable.previewable && (
+                <Button variant="outlined" size="large" disabled={previewing || running || !runnable.runsHere} onClick={() => void preview()}>
+                  {previewing ? "Asking…" : "Preview"}
+                </Button>
+              )}
+              {scheduleTeams.length > 0 && (
+                <Button size="large" onClick={() => { setScheduling(true); }}>
+                  Schedule…
+                </Button>
+              )}
+              <Typography id="run-why" variant="body2" color="text.secondary">
+                {runWhy ?? <>Checked against its schema, and this install, before anything runs.{runnable.previewable && " Preview says what it would change, first."}</>}
+              </Typography>
+            </Box>
+          )}
+          {scheduling && (
+            <ScheduleDialog open onClose={() => { setScheduling(false); }} runnable={runnable} teams={scheduleTeams} parameters={() => checkedParameters(false)} />
+          )}
+          {previewed && (
+            <Box sx={{ borderTop: 1, borderColor: "divider", pt: 2 }}>
+              <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 600, mb: 1 }}>
+                What it would do
+              </Typography>
+              <PreviewResult key={previewed.executionId} executionId={previewed.executionId} notPreviewed={previewed.notPreviewed} />
+            </Box>
+          )}
         </Card>
-        {runnable.examples.length > 0 && (
+
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <Card sx={{ p: 3, display: "flex", flexDirection: "column", gap: 1.5 }}>
             <Typography variant="h6" component="h2">
-              Examples
+              What will run
+            </Typography>
+            <Box component="ol" sx={{ m: 0, p: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 1.25 }}>
+              {steps.map((step, i) => {
+                const notHere = refusedAction !== undefined && refusedAction.actions[0] === runnable.actions[i];
+                return (
+                  <Box component="li" key={`${String(i)}-${step.product}`} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
+                    <Box sx={{ flex: "0 0 26px", height: 26, borderRadius: "50%", bgcolor: "info.light", color: "info.main", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {i + 1}
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {step.product}
+                        {step.action && ` · ${step.action}`}
+                      </Typography>
+                      <Typography variant="caption" color={notHere ? "error.dark" : "text.secondary"}>
+                        {notHere ? "Refused: not for this install" : <>{step.team || runnable.team}&apos;s product, as its own identity</>}
+                      </Typography>
+                    </Box>
+                    {notHere && (
+                      <Box sx={{ ml: "auto", flexShrink: 0 }}>
+                        <CloudPill clouds={refusedAction.clouds} />
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+            {refusal && (
+              <Typography variant="caption" color="text.secondary">
+                A bot, a schedule or the API gets the same answer: the same code and message, and no run.
+              </Typography>
+            )}
+          </Card>
+          {runnable.examples.length > 0 && (
+            <Card sx={{ p: 3, display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Typography variant="h6" component="h2">
+                Examples
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {runnable.kind === "template"
+                  ? <>From {runnable.team}: ways it&apos;s meant to be run.</>
+                  : <>From {runnable.team}&apos;s tests: inputs it&apos;s known to work with, and what it gave.</>}
+              </Typography>
+              {runnable.examples.map((example) => (
+                <Box key={example.name} sx={{ display: "flex", flexDirection: "column", gap: 0.5, borderTop: 1, borderColor: "divider", pt: 1.25 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {example.name}
+                    </Typography>
+                    <Button size="small" onClick={() => { fillWith(example.inputs); }}>
+                      Use this
+                    </Button>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "fontFamilyMono", overflowWrap: "anywhere" }}>
+                    {JSON.stringify(example.inputs)}
+                    {runnable.kind === "action" && <> → {JSON.stringify(example.outputs)}</>}
+                  </Typography>
+                </Box>
+              ))}
+            </Card>
+          )}
+          <Card sx={{ p: 3, display: "flex", flexDirection: "column", gap: 1 }}>
+            <Typography variant="h6" component="h2">
+              Good to know
+            </Typography>
+            <Typography variant="body2">
+              {runnable.team} sets which identity and secrets each step uses. You can&apos;t change them, and you never see their values.
+            </Typography>
+            {runnable.sourceUrl && (
+              <Link href={runnable.sourceUrl} target="_blank" rel="noopener noreferrer" variant="body2">
+                Its definition in the catalog ↗
+              </Link>
+            )}
+          </Card>
+          <Card sx={{ p: 3, display: "flex", flexDirection: "column", gap: 1.5, alignItems: "flex-start" }}>
+            <Typography variant="h6" component="h2">
+              From a pipeline
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {runnable.kind === "template"
-                ? <>From {runnable.team}: ways it&apos;s meant to be run.</>
-                : <>From {runnable.team}&apos;s tests: inputs it&apos;s known to work with, and what it gave.</>}
+              The same run with these inputs, as a call to the console&apos;s API with a bot&apos;s token (your team&apos;s Automation tab).
             </Typography>
-            {runnable.examples.map((example) => (
-              <Box key={example.name} sx={{ display: "flex", flexDirection: "column", gap: 0.5, borderTop: 1, borderColor: "divider", pt: 1.25 }}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {example.name}
-                  </Typography>
-                  <Button size="small" onClick={() => { fillWith(example.inputs); }}>
-                    Use this
-                  </Button>
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "fontFamilyMono", overflowWrap: "anywhere" }}>
-                  {JSON.stringify(example.inputs)}
-                  {runnable.kind === "action" && <> → {JSON.stringify(example.outputs)}</>}
-                </Typography>
-              </Box>
-            ))}
+            {!showCall ? (
+              <Button variant="outlined" size="small" onClick={() => { setShowCall(true); }}>
+                Show as an API call
+              </Button>
+            ) : parameters ? (
+              <CodeBlock code={apiCall(runnable, parameters, team, window.location.origin)} copyLabel="Copy the call" />
+            ) : (
+              <Typography variant="body2" color="error">
+                Fix the inputs to see the call.
+              </Typography>
+            )}
           </Card>
-        )}
-        <Card sx={{ p: 3, display: "flex", flexDirection: "column", gap: 1 }}>
-          <Typography variant="h6" component="h2">
-            Good to know
-          </Typography>
-          <Typography variant="body2">
-            {runnable.team} sets which identity and secrets each step uses. You can&apos;t change them, and you never see their values.
-          </Typography>
-          {runnable.sourceUrl && (
-            <Link href={runnable.sourceUrl} target="_blank" rel="noopener noreferrer" variant="body2">
-              Its definition in the catalog ↗
-            </Link>
-          )}
-        </Card>
-        <Card sx={{ p: 3, display: "flex", flexDirection: "column", gap: 1.5, alignItems: "flex-start" }}>
-          <Typography variant="h6" component="h2">
-            From a pipeline
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            The same run with these inputs, as a call to the console&apos;s API with a bot&apos;s token (your team&apos;s Automation tab).
-          </Typography>
-          {!showCall ? (
-            <Button variant="outlined" size="small" onClick={() => { setShowCall(true); }}>
-              Show as an API call
-            </Button>
-          ) : parameters ? (
-            <CodeBlock code={apiCall(runnable, parameters, team, window.location.origin)} copyLabel="Copy the call" />
-          ) : (
-            <Typography variant="body2" color="error">
-              Fix the inputs to see the call.
-            </Typography>
-          )}
-        </Card>
+        </Box>
       </Box>
-    </Box>
+    </>
   );
 }
 
@@ -457,6 +502,14 @@ export function RunFormPage() {
             {runnable.team} · {runnable.kind}
             {runnable.description && ` · ${runnable.description}`}
           </Typography>
+          {!runnable.runsHere && (
+            <Alert severity="info" icon={false} sx={{ mb: 2, display: "flex", alignItems: "center" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                <CloudPill clouds={runnable.clouds} />
+                Listed so you know it exists: it isn&apos;t checked or run on this install.
+              </Box>
+            </Alert>
+          )}
           {runnable.deprecated && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               Deprecated: {runnable.deprecated}
@@ -485,7 +538,15 @@ export function RunFormPage() {
           Changing the inputs of the schedule <strong>{schedule.name}</strong> ({schedule.team}). Save to schedule keeps them; it runs with them from its next start.
         </Alert>
       )}
-      {runnable?.shared && <RunForm key={`${runnable.kind}:${runnable.team}/${runnable.name}`} runnable={runnable} from={from} schedule={schedule} />}
+      {runnable?.shared && (
+        <RunForm
+          key={`${runnable.kind}:${runnable.team}/${runnable.name}`}
+          runnable={runnable}
+          from={from}
+          schedule={schedule}
+          actionNamed={(name) => runnables?.find((r) => r.kind === "action" && r.name === name)}
+        />
+      )}
     </Box>
   );
 }

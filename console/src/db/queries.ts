@@ -553,6 +553,8 @@ export interface Product {
   maxAttempts: number;
   concurrencyKey: string[];
   maxRunning: number;
+  clouds: string[];
+  cloudsFrom: string;
   capacity: string | null;
   cleanup: ProductCleanup | null;
   plan: string | null;
@@ -601,6 +603,8 @@ export interface ProductInput {
   maxAttempts?: number | undefined;
   concurrencyKey?: string[] | undefined;
   maxRunning?: number | undefined;
+  clouds?: string[] | undefined;
+  cloudsFrom?: string | undefined;
   capacity?: string | null | undefined;
   cleanup?: ProductCleanup | null | undefined;
   plan?: string | null | undefined;
@@ -656,6 +660,8 @@ export async function upsertProduct(input: ProductInput): Promise<Product> {
       maxAttempts: input.maxAttempts,
       concurrencyKey: input.concurrencyKey,
       maxRunning: input.maxRunning,
+      clouds: input.clouds,
+      cloudsFrom: input.cloudsFrom,
       capacity: input.capacity,
       cleanup: input.cleanup,
       plan: input.plan,

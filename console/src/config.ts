@@ -346,6 +346,16 @@ function loadEmail() {
   return email;
 }
 
+/** INSTALL_CLOUD: one of the catalog's clouds, or "" when not known. */
+function installCloud(): string {
+  const value = process.env["INSTALL_CLOUD"] ?? "";
+  if (value !== "" && !CLOUDS.includes(value)) throw new Error(`INSTALL_CLOUD "${value}": one of ${CLOUDS.join(", ")}, or empty`);
+  return value;
+}
+
+/** The clouds a catalog's team.yaml or product.yaml may name (its schemas' enum). */
+export const CLOUDS = ["gcp", "aws", "azure", "kind", "existing"];
+
 /** MONITORING_PROVIDER: operator, google, bundled, or "" when monitoring is off. */
 function monitoringProvider(): "" | "operator" | "google" | "bundled" {
   const value = process.env["MONITORING_PROVIDER"] ?? "";
@@ -418,6 +428,10 @@ export const config = {
   // unset/wrong value is never a correctness bug, just a confusing badge
   // -- a sensible default is fine here, unlike the values above.
   environmentLabel: process.env["ENVIRONMENT_LABEL"] ?? "unlabeled environment",
+  // The cloud this install is on (INSTALL_CLOUD, which vertra sets): a
+  // product whose clouds leave it out is listed but never checked or run
+  // here (core/clouds.ts). Empty: not known, so every product runs.
+  installCloud: installCloud(),
   // Its image's tag (the chart's), shown on the Admin page.
   version: process.env["CONSOLE_VERSION"] || "development",
   // Where people reach the console (https://<host>), for links in what's

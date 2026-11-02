@@ -83,6 +83,15 @@ message Product {
   // Whether it's ready on this install, by its check (product.yaml's
   // check); unset when it has none.
   Readiness readiness = 19;
+  // The clouds of the installs it's for (product.yaml's clouds, else its
+  // team.yaml's); empty, every install.
+  repeated string clouds = 20;
+  // Where clouds is set: "product", "team", or "" when neither says.
+  string clouds_from = 21;
+  // Whether it's for this install (its clouds include this install's, or
+  // either is unset). One that isn't is listed but never checked or run:
+  // a run naming it is refused (failed_precondition, NOT_FOR_THIS_INSTALL).
+  bool runs_here = 22;
 }
 
 // A product's check's last answer on this install.

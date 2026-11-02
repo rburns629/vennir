@@ -6,8 +6,9 @@ const EnvironmentContext = createContext<Environment | null>(null);
 
 /**
  * This install's public settings (its label, whether registration is open,
- * single sign-on's provider), fetched once for the whole app: the sidebar,
- * the sign-in screens and the sign-in form all use them.
+ * single sign-on's provider, the cloud it's on), fetched once for the whole
+ * app: the sidebar, the sign-in screens and the sign-in form use them, and
+ * the catalog's pages say with the cloud why a product for others isn't run.
  */
 export function EnvironmentProvider({ children }: { children: ReactNode }) {
   const [environment, setEnvironment] = useState<Environment | null>(null);

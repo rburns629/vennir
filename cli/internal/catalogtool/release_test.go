@@ -144,6 +144,29 @@ steps:
 		t.Errorf("examples = %v", e)
 	}
 
+	if len(got.GetClouds()) != 0 || got.GetCloudsFrom() != "" {
+		t.Errorf("no clouds said: every install, %v %q", got.GetClouds(), got.GetCloudsFrom())
+	}
+	// A team's clouds are its products', unless a product says its own.
+	files["teams/a/team.yaml"] += "clouds: [aws]\n"
+	c = catalogWith(t, files)
+	c.Stdout, c.Stderr = &out, &out
+	if release, err = c.BuildRelease(context.Background(), s, "c1", ""); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if got := release.GetProducts()[0]; strings.Join(got.GetClouds(), ",") != "aws" || got.GetCloudsFrom() != "team" {
+		t.Errorf("the team's clouds: %v %q", got.GetClouds(), got.GetCloudsFrom())
+	}
+	files["teams/a/products/mine/product.yaml"] = strings.Replace(files["teams/a/products/mine/product.yaml"], "owner: x\n", "owner: x\nclouds: [gcp, aws]\n", 1)
+	c = catalogWith(t, files)
+	c.Stdout, c.Stderr = &out, &out
+	if release, err = c.BuildRelease(context.Background(), s, "c1", ""); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if got := release.GetProducts()[0]; strings.Join(got.GetClouds(), ",") != "gcp,aws" || got.GetCloudsFrom() != "product" {
+		t.Errorf("its own clouds: %v %q", got.GetClouds(), got.GetCloudsFrom())
+	}
+
 	files = product("mine", "[]")
 	for path, content := range product("never", "[]") {
 		files[path] = content

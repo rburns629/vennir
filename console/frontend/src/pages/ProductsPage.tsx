@@ -20,16 +20,17 @@ import AddIcon from "@mui/icons-material/Add";
 import ChevronIcon from "@mui/icons-material/ChevronRight";
 import CheckIcon from "@mui/icons-material/Check";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CloudIcon from "@mui/icons-material/CloudOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { EmptyState } from "../components/EmptyState";
 import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
 import { ReadinessPill } from "../components/ReadinessPill";
-import { ApiError, checkProduct, listProducts, listRunnables, type Product, type ProductRelease, type Runnable } from "../api";
+import { CloudPill, forInstalls, useInstall } from "../components/Clouds";
+import { ApiError, checkProduct, cloudList, listProducts, listRunnables, type Product, type ProductRelease, type Runnable } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { cart, useCart } from "../cart";
 import { actionRef } from "../compose";
-import { useEnvironment } from "../environment";
 import { when } from "../time";
 import { imageName, imageVersion } from "../imageRef";
 
@@ -40,7 +41,7 @@ const WEEK_MS = 7 * 86_400_000;
 /** Products no team owns are grouped under this heading, after the real platforms. */
 const UNOWNED_GROUP = "Platform-provided";
 
-type Filter = "all" | "not_ready" | "deprecated" | "shared" | "week";
+type Filter = "all" | "not_ready" | "deprecated" | "shared" | "week" | "elsewhere";
 
 function matches(product: Product, query: string): boolean {
   return (
@@ -62,8 +63,15 @@ const releasedThisWeek = (p: Product) => {
 };
 const sharedWith = (p: Product) => (p.shareWith.includes("*") ? "every team" : p.shareWith.length > 0 ? p.shareWith.join(", ") : "its own team only");
 
-/** A product's state here: deprecated, its check's answer, or that it has none. */
-function ProductState({ product }: { product: Product }) {
+/** "aws-platform's team.yaml", "its product.yaml": where a product's clouds are set. */
+const setIn = (p: Product) => (p.cloudsFrom === "team" ? `${p.teamName ?? "its team"}'s team.yaml` : "its product.yaml");
+
+/** A product's state here: for other installs, deprecated, its check's answer, or that it has none. */
+function ProductState({ product, install, cloud }: { product: Product; install: string; cloud: string }) {
+  if (!product.runsHere) {
+    const where = setIn(product);
+    return <CloudPill clouds={product.clouds} title={`Set in ${where.charAt(0).toUpperCase()}${where.slice(1)}. Not checked or run on ${install}${cloud ? `, which is on ${cloud}` : ""}.`} />;
+  }
   if (product.deprecated) return <Pill tone="warning" title={product.deprecated}>Deprecated</Pill>;
   if (product.readiness) return <ReadinessPill readiness={product.readiness} />;
   return <Pill tone="neutral">No check</Pill>;
@@ -95,7 +103,7 @@ function Tile({ label, value, note, tone }: { label: string; value: ReactNode; n
  * has been registered with, the current one marked latest) and Run.
  */
 export function ProductsPage() {
-  const install = useEnvironment()?.label || "this install";
+  const { install, cloud } = useInstall();
   const [products, setProducts] = useState<Product[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -124,6 +132,8 @@ export function ProductsPage() {
     ["deprecated", "Deprecated", (p) => Boolean(p.deprecated)],
     ["shared", "Shared with my teams", (p) => runnable.has(p.name)],
     ["week", "Released this week", releasedThisWeek],
+    // Only when there are some.
+    ...(all.some((p) => !p.runsHere) ? [["elsewhere", "For other installs", (p: Product) => !p.runsHere] satisfies [Filter, string, (p: Product) => boolean]] : []),
   ];
   const test = FILTERS.find(([id]) => id === filter)?.[2] ?? (() => true);
 
@@ -146,6 +156,8 @@ export function ProductsPage() {
 
   const teamCount = new Set(all.map((p) => p.teamName ?? UNOWNED_GROUP)).size;
   const ready = all.filter((p) => p.readiness?.state === "ready").length;
+  const elsewhere = all.filter((p) => !p.runsHere);
+  const elsewhereClouds = [...new Set(elsewhere.flatMap((p) => p.clouds))].sort();
   const problems = all.filter(notReady);
   const narrowed = query !== "" || filter !== "all";
 
@@ -174,8 +186,17 @@ export function ProductsPage() {
 
       {products && products.length > 0 && (
         <Box component="section" aria-label="Summary" sx={{ display: "grid", gap: 1.75, gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" }, mt: -1 }}>
-          <Tile label="Products" value={all.length} note={`from ${String(teamCount)} ${teamCount === 1 ? "team" : "teams"}`} />
-          <Tile label={`Ready on ${install}`} value={ready} note="by their own checks, at least daily" tone="success" />
+          <Tile
+            label="Products"
+            value={all.length}
+            note={`from ${String(teamCount)} ${teamCount === 1 ? "team" : "teams"}${elsewhere.length > 0 ? `; ${String(elsewhere.length)} ${forInstalls(elsewhereClouds).replace(/^F/, "f")}` : ""}`}
+          />
+          <Tile
+            label={`Ready on ${install}`}
+            value={ready}
+            note={elsewhere.length > 0 ? `of the ${String(all.length - elsewhere.length)} checked here, at least daily` : "by their own checks, at least daily"}
+            tone="success"
+          />
           <Tile
             label="Not ready, or check failed"
             value={problems.length}
@@ -262,6 +283,7 @@ export function ProductsPage() {
           runnable={runnable}
           runnables={runnables}
           install={install}
+          cloud={cloud}
         />
       ))}
     </Box>
@@ -275,6 +297,7 @@ function TeamSection({
   runnable,
   runnables,
   install,
+  cloud,
 }: {
   platform: string;
   products: Product[];
@@ -282,6 +305,7 @@ function TeamSection({
   runnable: Set<string>;
   runnables: Runnable[];
   install: string;
+  cloud: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [opened, setOpened] = useState<string | null>(null);
@@ -290,6 +314,8 @@ function TeamSection({
   const deprecated = products.filter((p) => p.deprecated).length;
   const checked = products.filter((p) => p.readiness).length;
   const sharedNote = products.some((p) => runnable.has(p.name)) ? "" : " · not shared with your teams";
+  // Every product of it for other installs: said once, for the team.
+  const allElsewhere = products.every((p) => !p.runsHere);
   return (
     <Card component="section" aria-label={platform} sx={{ overflow: "hidden" }}>
       <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 1.25, px: 2.5, py: 1 }}>
@@ -314,6 +340,7 @@ function TeamSection({
           {unready > 0 && <Pill tone="error">{unready} not ready</Pill>}
           {deprecated > 0 && <Pill tone="warning">{deprecated} deprecated</Pill>}
           {unready === 0 && deprecated === 0 && checked > 0 && checked === products.length && <Pill tone="success">All ready</Pill>}
+          {allElsewhere && <CloudPill clouds={[...new Set(products.flatMap((p) => p.clouds))].sort()} />}
           {platform !== UNOWNED_GROUP && (
             <Link component={RouterLink} to={`/teams/${encodeURIComponent(platform)}`} variant="body2" sx={{ fontSize: 13 }}>
               Its team page
@@ -366,7 +393,7 @@ function TeamSection({
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <ProductState product={product} />
+                        <ProductState product={product} install={install} cloud={cloud} />
                       </TableCell>
                       <TableCell>{sharedWith(product)}</TableCell>
                       <TableCell sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
@@ -377,7 +404,7 @@ function TeamSection({
                     {isOpen && (
                       <TableRow>
                         <TableCell colSpan={6} sx={{ bgcolor: "background.default", pl: { xs: 2, sm: 5.5 }, pr: 2, pt: 0.75, pb: 2.5 }}>
-                          <ProductDetail product={product} runnable={runnable.has(product.name)} runnables={runnables} install={install} />
+                          <ProductDetail product={product} runnable={runnable.has(product.name)} runnables={runnables} install={install} cloud={cloud} />
                         </TableCell>
                       </TableRow>
                     )}
@@ -471,9 +498,54 @@ function ReadinessDetail({ product, install }: { product: Product; install: stri
   );
 }
 
-function ProductDetail({ product, runnable, runnables, install }: { product: Product; runnable: boolean; runnables: Runnable[]; install: string }) {
+/**
+ * In place of its readiness, for a product for other installs: which
+ * installs it's for, that it isn't checked or run here, and the catalog
+ * file that says so (linked when the catalog gives its address).
+ */
+function CloudsDetail({ product, cloud, sourceUrl }: { product: Product; cloud: string; sourceUrl: string | null }) {
+  const mono = (text: string) => (
+    <Box component="span" sx={{ fontFamily: "fontFamilyMono", fontSize: 12 }}>
+      {text}
+    </Box>
+  );
+  const clouds = mono(`clouds: [${product.clouds.join(", ")}]`);
+  return (
+    <Box sx={{ bgcolor: "background.paper", border: 1, borderColor: "divider", borderRadius: 2, px: 2, py: 1.75, display: "flex", flexDirection: "column", gap: 0.75 }}>
+      <Typography sx={{ fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 0.75 }}>
+        <CloudIcon aria-hidden="true" sx={{ fontSize: 16, color: "text.secondary" }} />
+        {forInstalls(product.clouds)}
+      </Typography>
+      <Typography variant="body2" sx={{ fontSize: 13 }}>
+        This install is {cloud ? `on ${cloud}` : "on another cloud"}, so it isn&apos;t checked or run here.
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
+        {product.cloudsFrom === "team" ? (
+          <>
+            Set in {product.teamName ?? "its team"}&apos;s {mono("team.yaml")} ({clouds}), for all its products; its {mono("product.yaml")} doesn&apos;t change it.
+          </>
+        ) : (
+          <>
+            Set in its {mono("product.yaml")} ({clouds}).
+            {sourceUrl && (
+              <>
+                {" "}
+                <Link href={sourceUrl} target="_blank" rel="noopener noreferrer">
+                  product.yaml in the catalog ↗
+                </Link>
+              </>
+            )}
+          </>
+        )}
+      </Typography>
+    </Box>
+  );
+}
+
+function ProductDetail({ product, runnable, runnables, install, cloud }: { product: Product; runnable: boolean; runnables: Runnable[]; install: string; cloud: string }) {
   const [all, setAll] = useState(false);
   const inCart = useCart().actions.includes(product.name);
+  const notHereId = `not-here-${product.id}`;
   const ref = actionRef(product, "");
   const templates = runnables.filter((r) => r.kind === "template" && r.actions.includes(ref));
   const shown = all ? product.releases : product.releases.slice(0, RELEASES_SHOWN);
@@ -498,8 +570,22 @@ function ProductDetail({ product, runnable, runnables, install }: { product: Pro
         )}
         {product.deprecated && <Alert severity="warning">Deprecated: {product.deprecated}</Alert>}
         <ReadinessDetail product={product} install={install} />
+        {!product.runsHere && <CloudsDetail product={product} cloud={cloud} sourceUrl={runnables.find((r) => r.kind === "action" && r.name === product.name)?.sourceUrl ?? null} />}
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25, alignItems: "center" }}>
-          {runnable && (
+          {runnable && !product.runsHere && (
+            <>
+              <Button size="small" variant="contained" disabled aria-describedby={notHereId} sx={{ minHeight: 36 }}>
+                Run on its own
+              </Button>
+              <Button size="small" variant="outlined" startIcon={<AddIcon />} disabled aria-describedby={notHereId} sx={{ minHeight: 36 }}>
+                Add to cart
+              </Button>
+              <Typography id={notHereId} variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
+                Runs only on {cloudList(product.clouds)} installs.
+              </Typography>
+            </>
+          )}
+          {runnable && product.runsHere && (
             <>
               <Button component={RouterLink} to={`/catalog/run?action=${encodeURIComponent(product.name)}`} size="small" variant="contained" sx={{ minHeight: 36 }}>
                 Run on its own

@@ -288,6 +288,11 @@ export const products = pgTable(
     // product.yaml's maxRunning: at most this many of the product's steps
     // (all its actions) claimed or running at once; 0, no cap of its own.
     maxRunning: integer("max_running").notNull().default(0),
+    // The clouds of the installs it's for (product.yaml's clouds, else its
+    // team.yaml's), and which said so ("product", "team", or ""); empty,
+    // every install (core/clouds.ts).
+    clouds: text("clouds").array().notNull().default(sql`'{}'::text[]`),
+    cloudsFrom: text("clouds_from").notNull().default(""),
     // product.yaml's capacity: spot or onDemand; null, the install's own.
     capacity: text("capacity"),
     // What removes the resources its steps report (product.yaml's cleanup):

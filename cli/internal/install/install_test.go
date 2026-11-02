@@ -120,7 +120,7 @@ func TestValues(t *testing.T) {
 	if tls, _ := v["tls"].(map[string]any); tls["kernelCaSecret"] != "kernel-execution-kernel-tls-ca" {
 		t.Errorf("tls: %v", v["tls"])
 	}
-	if v["environmentLabel"] != "dev" || v["existingSecret"] != "kernel-execution-kernel-console-db" {
+	if v["environmentLabel"] != "dev" || v["existingSecret"] != "kernel-execution-kernel-console-db" || v["installCloud"] != c.Target {
 		t.Errorf("console: %v", v)
 	}
 	mirrors := v["registryCheck"].(map[string]any)["mirrors"].(map[string]any)

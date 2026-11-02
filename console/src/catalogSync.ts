@@ -347,6 +347,8 @@ export async function apply(release: Release, log: FastifyBaseLogger): Promise<C
         maxAttempts: p.maxAttempts > 0 ? p.maxAttempts : 1,
         concurrencyKey: p.concurrencyKey,
         maxRunning: p.maxRunning,
+        clouds: p.clouds,
+        cloudsFrom: p.cloudsFrom,
         capacity: p.capacity === "spot" || p.capacity === "onDemand" ? p.capacity : null,
         cleanup: p.cleanup ? { action: p.cleanup.action, inputs: p.cleanup.inputs ?? null } : null,
         plan: p.plan || null,

@@ -53,12 +53,28 @@ export function InstallStats({ summary }: { summary: AdminSummary }) {
       .catch(() => undefined);
   }, []);
   const { install, teams, people, catalog } = summary;
+  const cloud = useEnvironment()?.cloud;
   const live = teams ? liveTeams(teams) : null;
   const notMade = live?.filter((t) => !t.fromCatalog).length ?? 0;
   const admins = people?.filter((p) => p.isAdmin).length ?? 0;
   return (
     <Box component="section" aria-label="This install" sx={{ display: "grid", gap: 1.5, gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
-      {install && <Stat label="Console" value={install.version} note={install.environmentLabel} />}
+      {install && (
+        <Stat
+          label="Console"
+          value={install.version}
+          note={
+            <>
+              {install.environmentLabel}
+              {cloud && (
+                <Box component="span" title="Products whose catalog files list other clouds are shown here but not run" sx={{ display: "block" }}>
+                  Cloud: {cloud} (set by vertra)
+                </Box>
+              )}
+            </>
+          }
+        />
+      )}
       {live && <Stat label="Teams" value={live.length} note={catalog?.release && notMade > 0 ? `${String(notMade)} the catalog didn't make` : undefined} />}
       {people && <Stat label="People" value={people.length} note={plural(admins, "admin")} />}
       {products !== null && <Stat label="Products" value={products} note={catalog?.version ? `from catalog ${catalog.version}` : undefined} />}

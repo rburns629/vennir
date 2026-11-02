@@ -21,6 +21,7 @@ import { timestamp } from "../convert.js";
 import { readinessOf, type ReadinessView } from "../../readiness.js";
 import { callerOf, logOf } from "../context.js";
 import { check } from "../validate.js";
+import { runsHere } from "../../core/clouds.js";
 
 function product(row: Omit<ProductWithReleases, "teamName" | "releases"> & Partial<Pick<ProductWithReleases, "teamName" | "releases">>) {
   return {
@@ -40,6 +41,9 @@ function product(row: Omit<ProductWithReleases, "teamName" | "releases"> & Parti
     shareWith: row.shareWith,
     deprecated: row.deprecated ?? "",
     resources: row.resources ?? undefined,
+    clouds: row.clouds,
+    cloudsFrom: row.cloudsFrom,
+    runsHere: runsHere(row.clouds),
     createdAt: timestamp(row.createdAt),
     releases: (row.releases ?? []).map((release) => ({
       image: release.image,

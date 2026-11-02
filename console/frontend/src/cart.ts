@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ApiError, previewOrder, type OrderOption, type OrderProblem, type OrderSuggestion, type Runnable } from "./api";
+import { ApiError, cloudList, previewOrder, type OrderOption, type OrderProblem, type OrderSuggestion, type Runnable } from "./api";
 import type { Check } from "./components/CheckStrip";
 import type { BuiltStep } from "./compose";
 
@@ -134,8 +134,8 @@ export function useOrderPlan(team: string | null, actions: string[], choices: Or
 
 /**
  * A plan's account, for a strip of checks: how many steps and in what
- * order, what was added, choices made and left, and steps that aren't
- * ready here or are deprecated (by `action`, the step's action as the
+ * order, what was added, choices made and left, and steps that are for
+ * other installs, aren't ready here or are deprecated (by `action`, the step's action as the
  * catalog lists it).
  */
 export function planChecks(plan: Plan, choices: OrderOption[], action: (product: string) => Runnable | undefined, install: string): Check[] {
@@ -154,6 +154,11 @@ export function planChecks(plan: Plan, choices: OrderOption[], action: (product:
       tone: "warning",
       text: `${String(open.length)} ${open.length === 1 ? "choice" : "choices"}: what fills ${open.map((p) => `${name(plan.steps.find((s) => s.id === p.step)?.product ?? p.step)}'s ${p.input}`).join(", ")}`,
     });
+  const notHere = plan.steps.filter((s) => action(s.product)?.runsHere === false);
+  if (notHere.length > 0) {
+    const clouds = [...new Set(notHere.flatMap((s) => action(s.product)?.clouds ?? []))].sort();
+    checks.push({ tone: "error", text: `${String(notHere.length)} ${notHere.length === 1 ? "step" : "steps"} for ${cloudList(clouds)} installs: can't run on ${install}` });
+  }
   const unready = plan.steps.filter((s) => action(s.product)?.readiness?.state === "not_ready").length;
   if (unready > 0) checks.push({ tone: "warning", text: `${String(unready)} ${unready === 1 ? "step" : "steps"} not ready on ${install}` });
   const deprecated = plan.steps.filter((s) => action(s.product)?.deprecated).length;

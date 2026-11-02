@@ -15,7 +15,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { canMaintainTeam, ensureTeamMember } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { hasScope, SCOPES } from "../auth/scopes.js";
-import { config } from "../config.js";
+import { CLOUDS, config } from "../config.js";
 import type { Approval, ProductCleanup, ProductExample } from "../db/schema.js";
 import { tokenAudienceProblems } from "../tokenAudiences.js";
 import {
@@ -41,6 +41,7 @@ import { refreshProvides } from "../resourceRecorder.js";
 import { pinImages } from "../registry.js";
 import { ensureNotRetired } from "./retired.js";
 import { digestOf, requestScan } from "../scanning.js";
+import { ensureRunsHere } from "./clouds.js";
 
 const REQUIRES_ADMIN = "Requires admin access.";
 
@@ -96,6 +97,9 @@ export const RegisterProductBody = Type.Object({
   concurrencyKey: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 128 }), { maxItems: 8, uniqueItems: true })),
   // At most this many of the product's steps at once (0: no cap of its own).
   maxRunning: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 })),
+  // The clouds of the installs it's for, and which file said so.
+  clouds: Type.Optional(Type.Array(Type.Union(CLOUDS.map((c) => Type.Literal(c))), { maxItems: 5, uniqueItems: true })),
+  cloudsFrom: Type.Optional(Type.Union([Type.Literal("product"), Type.Literal("team"), Type.Literal("")])),
   // The capacity its steps run on; null, the install's own.
   capacity: Type.Optional(Type.Union([Type.Literal("spot"), Type.Literal("onDemand"), Type.Null()])),
   // What removes the resources its steps report: another action of it, and its inputs.
@@ -157,6 +161,9 @@ export type RegisterProductInput = {
   concurrencyKey?: string[];
   /** At most this many of the product's steps at once; 0, no cap of its own. */
   maxRunning?: number;
+  /** The clouds of the installs it's for (empty: every install), and which file said so. */
+  clouds?: string[];
+  cloudsFrom?: string;
   /** The capacity its steps run on (spot, onDemand); null, the install's own. */
   capacity?: "spot" | "onDemand" | null;
   /** What removes the resources its steps report; null: nothing does. */
@@ -312,6 +319,8 @@ export async function registerProduct(caller: AuthUser | undefined, input: Regis
       maxAttempts: input.maxAttempts,
       concurrencyKey: input.concurrencyKey,
       maxRunning: input.maxRunning,
+      clouds: input.clouds,
+      cloudsFrom: input.cloudsFrom,
       capacity: input.capacity,
       cleanup: input.cleanup,
       plan: input.plan,
@@ -411,5 +420,6 @@ export async function checkProductNow(caller: AuthUser | undefined, name: string
   if (!product) throw new ApiError(404, "NOT_FOUND", `No product "${name}".`);
   ensureTeamMember(caller, product.teamName);
   if (!product.check) throw new ApiError(409, "NO_CHECK", `${name} has no check: its product.yaml names none.`);
+  ensureRunsHere(product);
   return { started: await checkNow(product, log) };
 }

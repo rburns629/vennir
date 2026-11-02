@@ -99,6 +99,13 @@ message Runnable {
   // action's; a template has none yet): a name, inputs to fill the form
   // with, and what it gave.
   repeated RunExample examples = 18;
+  // An action's product's clouds (Product.clouds); empty for a template.
+  repeated string clouds = 19;
+  // Whether an action's product is for this install (Product.runs_here);
+  // always set for a template, whose steps are checked when it's run.
+  bool runs_here = 20;
+  // Where an action's clouds are set (Product.clouds_from).
+  string clouds_from = 21;
 }
 
 message RunExample {

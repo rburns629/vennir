@@ -133,6 +133,30 @@ export declare type Product = Message<"vertra.console.v1.Product"> & {
    * @generated from field: vertra.console.v1.Readiness readiness = 19;
    */
   readiness?: Readiness | undefined;
+
+  /**
+   * The clouds of the installs it's for (product.yaml's clouds, else its
+   * team.yaml's); empty, every install.
+   *
+   * @generated from field: repeated string clouds = 20;
+   */
+  clouds: string[];
+
+  /**
+   * Where clouds is set: "product", "team", or "" when neither says.
+   *
+   * @generated from field: string clouds_from = 21;
+   */
+  cloudsFrom: string;
+
+  /**
+   * Whether it's for this install (its clouds include this install's, or
+   * either is unset). One that isn't is listed but never checked or run:
+   * a run naming it is refused (failed_precondition, NOT_FOR_THIS_INSTALL).
+   *
+   * @generated from field: bool runs_here = 22;
+   */
+  runsHere: boolean;
 };
 
 /**

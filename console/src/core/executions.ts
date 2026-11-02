@@ -64,6 +64,7 @@ import { platformAlert } from "../notifier.js";
 import { scanBlocker } from "../scanning.js";
 import { narrowWiredTargets, targetProblems, targetsNeedApproval } from "../targets.js";
 import { CHECK_RUN } from "../readiness.js";
+import { ensureRunsHere } from "./clouds.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -576,6 +577,8 @@ async function withProductContract(submission: Record<string, unknown>, runner: 
       out.push(rest);
       continue;
     }
+    // Not for this install's cloud: nothing runs.
+    ensureRunsHere(product);
     // A target another step will fill: limited, for the kernel, to what the
     // product's team lets this run's team use (targets.ts), unless it's
     // the team's own run, or an admin's.
