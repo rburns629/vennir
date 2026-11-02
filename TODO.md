@@ -80,14 +80,28 @@ it was seen.
 
 Console and gateway:
 - [ ] **Observe's alerts with Google's managed Prometheus** said "not
-  configured": the console read `/api/v1/rules`, which GMP doesn't serve.
-  Built 2026-11-02 (board 11h): the charts' `Rules` from the cluster, which
-  fire from GMP's query API (`ALERTS`, `ALERTS_FOR_STATE`, this cluster's)
-  as the console's Google identity, granted `roles/monitoring.viewer` by
-  the gcp module; the state shown unknown, saying what's missing, without
-  it. Left: proving it in the coming GKE run, and seeing there whether GMP's
-  in-cluster rule evaluator's own `/api/v1/rules` (live, no 5-minute lag)
-  can be reached instead (found reviewing it).
+  configured": the console read `/api/v1/rules`, which GMP's query API
+  doesn't serve. Built (#72) and proven on GKE in the r7 run (2026-11-02):
+  the cluster's 8 Rules read, Google's query answered as the console
+  (`monitoring.viewer`), `VertraStepsUnschedulable` shown pending with
+  since when. Found there: GMP's in-cluster rule evaluator
+  (`rule-evaluator.gke-gmp-system.svc:19092`, `gmp-system` on a standard
+  cluster) serves `/api/v1/rules` itself, and the console reached it:
+  `prometheusUrl` set to it would give live states and each alert's own
+  text, with no grant, but it's an internal endpoint, not a published API.
+  To decide: keep #72's way, or have vertra set `prometheusUrl` to it
+  (keeping #72's as the fallback).
+
+Kernel and alerts:
+- [ ] **Completion lag on GKE is policy-controller's webhook** (the r7 run,
+  `perf/README.md`, "On GKE again"): with 40 at once, Job creations waited
+  out its 10 s and were retried, and a pass that dispatches records
+  nothing that finished until it's done. Worth doing: record what finished
+  before dispatching in a pass (the kernel), and size policy-controller for
+  the install (more CPU on Autopilot, two replicas: `helm/values/gke/policy-controller.yaml`
+  already sets `webhook.replicaCount: 2`, vertra's install doesn't), and check
+  whether it need verify Jobs as well as their Pods. Also to see on the next
+  GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
 
 Samples and catalog CI:
 - [ ] **The aws and azure samples' `clouds`** (`clouds: [aws]`, `[azure]` in

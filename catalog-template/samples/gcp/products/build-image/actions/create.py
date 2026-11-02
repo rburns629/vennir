@@ -169,11 +169,16 @@ def _artifact_registry_tag_name(image_uri: str) -> str | None:
     project, _, rest = rest.partition("/")
     repository, _, image_and_tag = rest.partition("/")
     image, separator, tag = image_and_tag.rpartition(":")
-    if not project or not repository or not image or not separator:
+    # By digest (image@sha256:...) there's no tag to look up: it builds.
+    if not project or not repository or not image or not separator or "@" in image:
         return None
+    # A package's name is the image's path in the repository, slashes and
+    # all; in a resource name they're encoded, or Artifact Registry refuses
+    # it as an invalid argument (seen on GKE, 2026-11-02, for proof/slow-build).
+    package = image.replace("/", "%2F")
     return (
         f"projects/{project}/locations/{location}/repositories/{repository}"
-        f"/packages/{image}/tags/{tag}"
+        f"/packages/{package}/tags/{tag}"
     )
 
 
