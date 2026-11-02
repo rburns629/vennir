@@ -46,6 +46,7 @@ TIMEOUT_SECONDS = 30
 PROJECT_PERMISSIONS = {
     "cloudbuild.builds.create": "roles/cloudbuild.builds.editor",
     "cloudbuild.builds.get": "roles/cloudbuild.builds.editor",
+    "cloudbuild.builds.list": "roles/cloudbuild.builds.editor",
 }
 
 
