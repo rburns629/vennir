@@ -2607,6 +2607,21 @@ export async function getTeamProfile(name: string): Promise<TeamProfile> {
   return { name: r.name, fromCatalog: r.fromCatalog, retired: r.retired, contact: r.contact || null, owner: r.owner || null, description: r.description || null, helpChat: r.helpChat || null, helpUrl: r.helpUrl || null, people: r.people };
 }
 
+/** What an admin's list of teams shows of each: owner and description (null when the catalog gives none), people, Pods running. */
+export interface TeamSummary {
+  name: string;
+  owner: string | null;
+  description: string | null;
+  people: number;
+  /** Null when the cluster couldn't be asked. */
+  running: number | null;
+}
+
+export async function listTeamSummaries(): Promise<TeamSummary[]> {
+  const r = await call(() => teams.listTeamSummaries({}));
+  return r.teams.map((t) => ({ name: t.name, owner: t.owner || null, description: t.description || null, people: t.people, running: t.running ?? null }));
+}
+
 export async function getEmailPreferences(): Promise<{ available: boolean; kinds: string[] }> {
   const r = await call(() => notificationsApi.getEmailPreferences({}));
   return { available: r.available, kinds: r.kinds };

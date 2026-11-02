@@ -242,6 +242,78 @@ export declare type ListTeamsResponse = Message<"vertra.console.v1.ListTeamsResp
 export declare const ListTeamsResponseSchema: GenMessage<ListTeamsResponse>;
 
 /**
+ * @generated from message vertra.console.v1.ListTeamSummariesRequest
+ */
+export declare type ListTeamSummariesRequest = Message<"vertra.console.v1.ListTeamSummariesRequest"> & {
+};
+
+/**
+ * Describes the message vertra.console.v1.ListTeamSummariesRequest.
+ * Use `create(ListTeamSummariesRequestSchema)` to create a new message.
+ */
+export declare const ListTeamSummariesRequestSchema: GenMessage<ListTeamSummariesRequest>;
+
+/**
+ * @generated from message vertra.console.v1.ListTeamSummariesResponse
+ */
+export declare type ListTeamSummariesResponse = Message<"vertra.console.v1.ListTeamSummariesResponse"> & {
+  /**
+   * @generated from field: repeated vertra.console.v1.TeamSummary teams = 1;
+   */
+  teams: TeamSummary[];
+};
+
+/**
+ * Describes the message vertra.console.v1.ListTeamSummariesResponse.
+ * Use `create(ListTeamSummariesResponseSchema)` to create a new message.
+ */
+export declare const ListTeamSummariesResponseSchema: GenMessage<ListTeamSummariesResponse>;
+
+/**
+ * What an admin's list of teams shows of one.
+ *
+ * @generated from message vertra.console.v1.TeamSummary
+ */
+export declare type TeamSummary = Message<"vertra.console.v1.TeamSummary"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * team.yaml's owner in the catalog and its description; empty for a team
+   * made here.
+   *
+   * @generated from field: string owner = 2;
+   */
+  owner: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: int32 people = 4;
+   */
+  people: number;
+
+  /**
+   * Its namespace's Pods not finished: starting, running, or unable to
+   * start. Unset when the cluster couldn't be asked.
+   *
+   * @generated from field: optional int32 running = 5;
+   */
+  running?: number | undefined;
+};
+
+/**
+ * Describes the message vertra.console.v1.TeamSummary.
+ * Use `create(TeamSummarySchema)` to create a new message.
+ */
+export declare const TeamSummarySchema: GenMessage<TeamSummary>;
+
+/**
  * @generated from message vertra.console.v1.GetTeamRequest
  */
 export declare type GetTeamRequest = Message<"vertra.console.v1.GetTeamRequest"> & {
@@ -1101,6 +1173,18 @@ export declare const TeamService: GenService<{
     methodKind: "unary";
     input: typeof GetTeamProfileRequestSchema;
     output: typeof GetTeamProfileResponseSchema;
+  },
+  /**
+   * Every team's owner, description, people and Pods running now, for an
+   * admin's list of teams: one call, not a profile and a Pod list for each.
+   * Admins only.
+   *
+   * @generated from rpc vertra.console.v1.TeamService.ListTeamSummaries
+   */
+  listTeamSummaries: {
+    methodKind: "unary";
+    input: typeof ListTeamSummariesRequestSchema;
+    output: typeof ListTeamSummariesResponseSchema;
   },
   /**
    * Creates a team and its namespace. Admins, or a token with teams:create.

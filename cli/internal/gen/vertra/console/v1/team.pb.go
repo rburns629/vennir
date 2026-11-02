@@ -549,6 +549,167 @@ func (x *ListTeamsResponse) GetTeams() []*Team {
 	return nil
 }
 
+type ListTeamSummariesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamSummariesRequest) Reset() {
+	*x = ListTeamSummariesRequest{}
+	mi := &file_vertra_console_v1_team_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamSummariesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamSummariesRequest) ProtoMessage() {}
+
+func (x *ListTeamSummariesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vertra_console_v1_team_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamSummariesRequest.ProtoReflect.Descriptor instead.
+func (*ListTeamSummariesRequest) Descriptor() ([]byte, []int) {
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{5}
+}
+
+type ListTeamSummariesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Teams         []*TeamSummary         `protobuf:"bytes,1,rep,name=teams,proto3" json:"teams,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamSummariesResponse) Reset() {
+	*x = ListTeamSummariesResponse{}
+	mi := &file_vertra_console_v1_team_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamSummariesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamSummariesResponse) ProtoMessage() {}
+
+func (x *ListTeamSummariesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vertra_console_v1_team_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamSummariesResponse.ProtoReflect.Descriptor instead.
+func (*ListTeamSummariesResponse) Descriptor() ([]byte, []int) {
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListTeamSummariesResponse) GetTeams() []*TeamSummary {
+	if x != nil {
+		return x.Teams
+	}
+	return nil
+}
+
+// What an admin's list of teams shows of one.
+type TeamSummary struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// team.yaml's owner in the catalog and its description; empty for a team
+	// made here.
+	Owner       string `protobuf:"bytes,2,opt,name=owner,proto3" json:"owner,omitempty"`
+	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	People      int32  `protobuf:"varint,4,opt,name=people,proto3" json:"people,omitempty"`
+	// Its namespace's Pods not finished: starting, running, or unable to
+	// start. Unset when the cluster couldn't be asked.
+	Running       *int32 `protobuf:"varint,5,opt,name=running,proto3,oneof" json:"running,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TeamSummary) Reset() {
+	*x = TeamSummary{}
+	mi := &file_vertra_console_v1_team_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TeamSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TeamSummary) ProtoMessage() {}
+
+func (x *TeamSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_vertra_console_v1_team_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TeamSummary.ProtoReflect.Descriptor instead.
+func (*TeamSummary) Descriptor() ([]byte, []int) {
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *TeamSummary) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TeamSummary) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *TeamSummary) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *TeamSummary) GetPeople() int32 {
+	if x != nil {
+		return x.People
+	}
+	return 0
+}
+
+func (x *TeamSummary) GetRunning() int32 {
+	if x != nil && x.Running != nil {
+		return *x.Running
+	}
+	return 0
+}
+
 type GetTeamRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -558,7 +719,7 @@ type GetTeamRequest struct {
 
 func (x *GetTeamRequest) Reset() {
 	*x = GetTeamRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[5]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +731,7 @@ func (x *GetTeamRequest) String() string {
 func (*GetTeamRequest) ProtoMessage() {}
 
 func (x *GetTeamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[5]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +744,7 @@ func (x *GetTeamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTeamRequest.ProtoReflect.Descriptor instead.
 func (*GetTeamRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{5}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetTeamRequest) GetName() string {
@@ -602,7 +763,7 @@ type GetTeamResponse struct {
 
 func (x *GetTeamResponse) Reset() {
 	*x = GetTeamResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[6]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -614,7 +775,7 @@ func (x *GetTeamResponse) String() string {
 func (*GetTeamResponse) ProtoMessage() {}
 
 func (x *GetTeamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[6]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -627,7 +788,7 @@ func (x *GetTeamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTeamResponse.ProtoReflect.Descriptor instead.
 func (*GetTeamResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{6}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetTeamResponse) GetTeam() *Team {
@@ -646,7 +807,7 @@ type CreateTeamRequest struct {
 
 func (x *CreateTeamRequest) Reset() {
 	*x = CreateTeamRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[7]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -658,7 +819,7 @@ func (x *CreateTeamRequest) String() string {
 func (*CreateTeamRequest) ProtoMessage() {}
 
 func (x *CreateTeamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[7]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -671,7 +832,7 @@ func (x *CreateTeamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTeamRequest.ProtoReflect.Descriptor instead.
 func (*CreateTeamRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{7}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreateTeamRequest) GetName() string {
@@ -690,7 +851,7 @@ type CreateTeamResponse struct {
 
 func (x *CreateTeamResponse) Reset() {
 	*x = CreateTeamResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[8]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -702,7 +863,7 @@ func (x *CreateTeamResponse) String() string {
 func (*CreateTeamResponse) ProtoMessage() {}
 
 func (x *CreateTeamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[8]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -715,7 +876,7 @@ func (x *CreateTeamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTeamResponse.ProtoReflect.Descriptor instead.
 func (*CreateTeamResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{8}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CreateTeamResponse) GetTeam() *Team {
@@ -734,7 +895,7 @@ type EnsureTeamRequest struct {
 
 func (x *EnsureTeamRequest) Reset() {
 	*x = EnsureTeamRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[9]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -746,7 +907,7 @@ func (x *EnsureTeamRequest) String() string {
 func (*EnsureTeamRequest) ProtoMessage() {}
 
 func (x *EnsureTeamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[9]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -759,7 +920,7 @@ func (x *EnsureTeamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnsureTeamRequest.ProtoReflect.Descriptor instead.
 func (*EnsureTeamRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{9}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *EnsureTeamRequest) GetName() string {
@@ -780,7 +941,7 @@ type EnsureTeamResponse struct {
 
 func (x *EnsureTeamResponse) Reset() {
 	*x = EnsureTeamResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[10]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -792,7 +953,7 @@ func (x *EnsureTeamResponse) String() string {
 func (*EnsureTeamResponse) ProtoMessage() {}
 
 func (x *EnsureTeamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[10]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -805,7 +966,7 @@ func (x *EnsureTeamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnsureTeamResponse.ProtoReflect.Descriptor instead.
 func (*EnsureTeamResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{10}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *EnsureTeamResponse) GetTeam() *Team {
@@ -831,7 +992,7 @@ type RetireTeamRequest struct {
 
 func (x *RetireTeamRequest) Reset() {
 	*x = RetireTeamRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[11]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -843,7 +1004,7 @@ func (x *RetireTeamRequest) String() string {
 func (*RetireTeamRequest) ProtoMessage() {}
 
 func (x *RetireTeamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[11]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -856,7 +1017,7 @@ func (x *RetireTeamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetireTeamRequest.ProtoReflect.Descriptor instead.
 func (*RetireTeamRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{11}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RetireTeamRequest) GetName() string {
@@ -877,7 +1038,7 @@ type RetireTeamResponse struct {
 
 func (x *RetireTeamResponse) Reset() {
 	*x = RetireTeamResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[12]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -889,7 +1050,7 @@ func (x *RetireTeamResponse) String() string {
 func (*RetireTeamResponse) ProtoMessage() {}
 
 func (x *RetireTeamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[12]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -902,7 +1063,7 @@ func (x *RetireTeamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetireTeamResponse.ProtoReflect.Descriptor instead.
 func (*RetireTeamResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{12}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RetireTeamResponse) GetUnregisteredProducts() int32 {
@@ -921,7 +1082,7 @@ type UnretireTeamRequest struct {
 
 func (x *UnretireTeamRequest) Reset() {
 	*x = UnretireTeamRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[13]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -933,7 +1094,7 @@ func (x *UnretireTeamRequest) String() string {
 func (*UnretireTeamRequest) ProtoMessage() {}
 
 func (x *UnretireTeamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[13]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -946,7 +1107,7 @@ func (x *UnretireTeamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnretireTeamRequest.ProtoReflect.Descriptor instead.
 func (*UnretireTeamRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{13}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *UnretireTeamRequest) GetName() string {
@@ -964,7 +1125,7 @@ type UnretireTeamResponse struct {
 
 func (x *UnretireTeamResponse) Reset() {
 	*x = UnretireTeamResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[14]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -976,7 +1137,7 @@ func (x *UnretireTeamResponse) String() string {
 func (*UnretireTeamResponse) ProtoMessage() {}
 
 func (x *UnretireTeamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[14]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -989,7 +1150,7 @@ func (x *UnretireTeamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnretireTeamResponse.ProtoReflect.Descriptor instead.
 func (*UnretireTeamResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{14}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{17}
 }
 
 type PurgeTeamRequest struct {
@@ -1001,7 +1162,7 @@ type PurgeTeamRequest struct {
 
 func (x *PurgeTeamRequest) Reset() {
 	*x = PurgeTeamRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[15]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1013,7 +1174,7 @@ func (x *PurgeTeamRequest) String() string {
 func (*PurgeTeamRequest) ProtoMessage() {}
 
 func (x *PurgeTeamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[15]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1026,7 +1187,7 @@ func (x *PurgeTeamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PurgeTeamRequest.ProtoReflect.Descriptor instead.
 func (*PurgeTeamRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{15}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PurgeTeamRequest) GetName() string {
@@ -1050,7 +1211,7 @@ type PurgeTeamResponse struct {
 
 func (x *PurgeTeamResponse) Reset() {
 	*x = PurgeTeamResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[16]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1062,7 +1223,7 @@ func (x *PurgeTeamResponse) String() string {
 func (*PurgeTeamResponse) ProtoMessage() {}
 
 func (x *PurgeTeamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[16]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1075,7 +1236,7 @@ func (x *PurgeTeamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PurgeTeamResponse.ProtoReflect.Descriptor instead.
 func (*PurgeTeamResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{16}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PurgeTeamResponse) GetAlreadyPurged() bool {
@@ -1108,7 +1269,7 @@ type ListMembersRequest struct {
 
 func (x *ListMembersRequest) Reset() {
 	*x = ListMembersRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[17]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1120,7 +1281,7 @@ func (x *ListMembersRequest) String() string {
 func (*ListMembersRequest) ProtoMessage() {}
 
 func (x *ListMembersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[17]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1133,7 +1294,7 @@ func (x *ListMembersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMembersRequest.ProtoReflect.Descriptor instead.
 func (*ListMembersRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{17}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListMembersRequest) GetTeam() string {
@@ -1152,7 +1313,7 @@ type ListMembersResponse struct {
 
 func (x *ListMembersResponse) Reset() {
 	*x = ListMembersResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[18]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1164,7 +1325,7 @@ func (x *ListMembersResponse) String() string {
 func (*ListMembersResponse) ProtoMessage() {}
 
 func (x *ListMembersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[18]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1177,7 +1338,7 @@ func (x *ListMembersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMembersResponse.ProtoReflect.Descriptor instead.
 func (*ListMembersResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{18}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListMembersResponse) GetMembers() []*Member {
@@ -1199,7 +1360,7 @@ type AddMemberRequest struct {
 
 func (x *AddMemberRequest) Reset() {
 	*x = AddMemberRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[19]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1211,7 +1372,7 @@ func (x *AddMemberRequest) String() string {
 func (*AddMemberRequest) ProtoMessage() {}
 
 func (x *AddMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[19]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1224,7 +1385,7 @@ func (x *AddMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddMemberRequest.ProtoReflect.Descriptor instead.
 func (*AddMemberRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{19}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *AddMemberRequest) GetTeam() string {
@@ -1256,7 +1417,7 @@ type AddMemberResponse struct {
 
 func (x *AddMemberResponse) Reset() {
 	*x = AddMemberResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[20]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1268,7 +1429,7 @@ func (x *AddMemberResponse) String() string {
 func (*AddMemberResponse) ProtoMessage() {}
 
 func (x *AddMemberResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[20]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1281,7 +1442,7 @@ func (x *AddMemberResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddMemberResponse.ProtoReflect.Descriptor instead.
 func (*AddMemberResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{20}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{23}
 }
 
 type RemoveMemberRequest struct {
@@ -1294,7 +1455,7 @@ type RemoveMemberRequest struct {
 
 func (x *RemoveMemberRequest) Reset() {
 	*x = RemoveMemberRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[21]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1306,7 +1467,7 @@ func (x *RemoveMemberRequest) String() string {
 func (*RemoveMemberRequest) ProtoMessage() {}
 
 func (x *RemoveMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[21]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1319,7 +1480,7 @@ func (x *RemoveMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveMemberRequest.ProtoReflect.Descriptor instead.
 func (*RemoveMemberRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{21}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RemoveMemberRequest) GetTeam() string {
@@ -1344,7 +1505,7 @@ type RemoveMemberResponse struct {
 
 func (x *RemoveMemberResponse) Reset() {
 	*x = RemoveMemberResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[22]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1356,7 +1517,7 @@ func (x *RemoveMemberResponse) String() string {
 func (*RemoveMemberResponse) ProtoMessage() {}
 
 func (x *RemoveMemberResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[22]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1369,7 +1530,7 @@ func (x *RemoveMemberResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveMemberResponse.ProtoReflect.Descriptor instead.
 func (*RemoveMemberResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{22}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{25}
 }
 
 type SetMemberRoleRequest struct {
@@ -1384,7 +1545,7 @@ type SetMemberRoleRequest struct {
 
 func (x *SetMemberRoleRequest) Reset() {
 	*x = SetMemberRoleRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[23]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1396,7 +1557,7 @@ func (x *SetMemberRoleRequest) String() string {
 func (*SetMemberRoleRequest) ProtoMessage() {}
 
 func (x *SetMemberRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[23]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1409,7 +1570,7 @@ func (x *SetMemberRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetMemberRoleRequest.ProtoReflect.Descriptor instead.
 func (*SetMemberRoleRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{23}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SetMemberRoleRequest) GetTeam() string {
@@ -1441,7 +1602,7 @@ type SetMemberRoleResponse struct {
 
 func (x *SetMemberRoleResponse) Reset() {
 	*x = SetMemberRoleResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[24]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1453,7 +1614,7 @@ func (x *SetMemberRoleResponse) String() string {
 func (*SetMemberRoleResponse) ProtoMessage() {}
 
 func (x *SetMemberRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[24]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1466,7 +1627,7 @@ func (x *SetMemberRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetMemberRoleResponse.ProtoReflect.Descriptor instead.
 func (*SetMemberRoleResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{24}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{27}
 }
 
 type SetTeamSignInRequest struct {
@@ -1479,7 +1640,7 @@ type SetTeamSignInRequest struct {
 
 func (x *SetTeamSignInRequest) Reset() {
 	*x = SetTeamSignInRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[25]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1491,7 +1652,7 @@ func (x *SetTeamSignInRequest) String() string {
 func (*SetTeamSignInRequest) ProtoMessage() {}
 
 func (x *SetTeamSignInRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[25]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1504,7 +1665,7 @@ func (x *SetTeamSignInRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTeamSignInRequest.ProtoReflect.Descriptor instead.
 func (*SetTeamSignInRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{25}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *SetTeamSignInRequest) GetTeam() string {
@@ -1529,7 +1690,7 @@ type SetTeamSignInResponse struct {
 
 func (x *SetTeamSignInResponse) Reset() {
 	*x = SetTeamSignInResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[26]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1541,7 +1702,7 @@ func (x *SetTeamSignInResponse) String() string {
 func (*SetTeamSignInResponse) ProtoMessage() {}
 
 func (x *SetTeamSignInResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[26]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1554,7 +1715,7 @@ func (x *SetTeamSignInResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTeamSignInResponse.ProtoReflect.Descriptor instead.
 func (*SetTeamSignInResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{26}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{29}
 }
 
 type SetTeamQuotaRequest struct {
@@ -1569,7 +1730,7 @@ type SetTeamQuotaRequest struct {
 
 func (x *SetTeamQuotaRequest) Reset() {
 	*x = SetTeamQuotaRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[27]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1581,7 +1742,7 @@ func (x *SetTeamQuotaRequest) String() string {
 func (*SetTeamQuotaRequest) ProtoMessage() {}
 
 func (x *SetTeamQuotaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[27]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1594,7 +1755,7 @@ func (x *SetTeamQuotaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTeamQuotaRequest.ProtoReflect.Descriptor instead.
 func (*SetTeamQuotaRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{27}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *SetTeamQuotaRequest) GetTeam() string {
@@ -1627,7 +1788,7 @@ type SetTeamQuotaResponse struct {
 
 func (x *SetTeamQuotaResponse) Reset() {
 	*x = SetTeamQuotaResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[28]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1639,7 +1800,7 @@ func (x *SetTeamQuotaResponse) String() string {
 func (*SetTeamQuotaResponse) ProtoMessage() {}
 
 func (x *SetTeamQuotaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[28]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1652,7 +1813,7 @@ func (x *SetTeamQuotaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTeamQuotaResponse.ProtoReflect.Descriptor instead.
 func (*SetTeamQuotaResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{28}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SetTeamQuotaResponse) GetTeam() *Team {
@@ -1676,7 +1837,7 @@ type ApplySecretStoreRequest struct {
 
 func (x *ApplySecretStoreRequest) Reset() {
 	*x = ApplySecretStoreRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[29]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1688,7 +1849,7 @@ func (x *ApplySecretStoreRequest) String() string {
 func (*ApplySecretStoreRequest) ProtoMessage() {}
 
 func (x *ApplySecretStoreRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[29]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1701,7 +1862,7 @@ func (x *ApplySecretStoreRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplySecretStoreRequest.ProtoReflect.Descriptor instead.
 func (*ApplySecretStoreRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{29}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ApplySecretStoreRequest) GetTeam() string {
@@ -1733,7 +1894,7 @@ type ApplySecretStoreResponse struct {
 
 func (x *ApplySecretStoreResponse) Reset() {
 	*x = ApplySecretStoreResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[30]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1745,7 +1906,7 @@ func (x *ApplySecretStoreResponse) String() string {
 func (*ApplySecretStoreResponse) ProtoMessage() {}
 
 func (x *ApplySecretStoreResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[30]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1758,7 +1919,7 @@ func (x *ApplySecretStoreResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplySecretStoreResponse.ProtoReflect.Descriptor instead.
 func (*ApplySecretStoreResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{30}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{33}
 }
 
 type SetSecretStoreCredentialRequest struct {
@@ -1771,7 +1932,7 @@ type SetSecretStoreCredentialRequest struct {
 
 func (x *SetSecretStoreCredentialRequest) Reset() {
 	*x = SetSecretStoreCredentialRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[31]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1783,7 +1944,7 @@ func (x *SetSecretStoreCredentialRequest) String() string {
 func (*SetSecretStoreCredentialRequest) ProtoMessage() {}
 
 func (x *SetSecretStoreCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[31]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1796,7 +1957,7 @@ func (x *SetSecretStoreCredentialRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSecretStoreCredentialRequest.ProtoReflect.Descriptor instead.
 func (*SetSecretStoreCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{31}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SetSecretStoreCredentialRequest) GetTeam() string {
@@ -1821,7 +1982,7 @@ type SetSecretStoreCredentialResponse struct {
 
 func (x *SetSecretStoreCredentialResponse) Reset() {
 	*x = SetSecretStoreCredentialResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[32]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1833,7 +1994,7 @@ func (x *SetSecretStoreCredentialResponse) String() string {
 func (*SetSecretStoreCredentialResponse) ProtoMessage() {}
 
 func (x *SetSecretStoreCredentialResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[32]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1846,7 +2007,7 @@ func (x *SetSecretStoreCredentialResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSecretStoreCredentialResponse.ProtoReflect.Descriptor instead.
 func (*SetSecretStoreCredentialResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{32}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{35}
 }
 
 type ListPodsRequest struct {
@@ -1858,7 +2019,7 @@ type ListPodsRequest struct {
 
 func (x *ListPodsRequest) Reset() {
 	*x = ListPodsRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[33]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1870,7 +2031,7 @@ func (x *ListPodsRequest) String() string {
 func (*ListPodsRequest) ProtoMessage() {}
 
 func (x *ListPodsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[33]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1883,7 +2044,7 @@ func (x *ListPodsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPodsRequest.ProtoReflect.Descriptor instead.
 func (*ListPodsRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{33}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListPodsRequest) GetTeam() string {
@@ -1902,7 +2063,7 @@ type ListPodsResponse struct {
 
 func (x *ListPodsResponse) Reset() {
 	*x = ListPodsResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[34]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1914,7 +2075,7 @@ func (x *ListPodsResponse) String() string {
 func (*ListPodsResponse) ProtoMessage() {}
 
 func (x *ListPodsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[34]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1927,7 +2088,7 @@ func (x *ListPodsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPodsResponse.ProtoReflect.Descriptor instead.
 func (*ListPodsResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{34}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ListPodsResponse) GetPods() []*TaskPod {
@@ -1961,7 +2122,7 @@ type TaskPod struct {
 
 func (x *TaskPod) Reset() {
 	*x = TaskPod{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[35]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1973,7 +2134,7 @@ func (x *TaskPod) String() string {
 func (*TaskPod) ProtoMessage() {}
 
 func (x *TaskPod) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[35]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1986,7 +2147,7 @@ func (x *TaskPod) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskPod.ProtoReflect.Descriptor instead.
 func (*TaskPod) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{35}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *TaskPod) GetPodName() string {
@@ -2083,7 +2244,7 @@ type PodProblem struct {
 
 func (x *PodProblem) Reset() {
 	*x = PodProblem{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[36]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2095,7 +2256,7 @@ func (x *PodProblem) String() string {
 func (*PodProblem) ProtoMessage() {}
 
 func (x *PodProblem) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[36]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2108,7 +2269,7 @@ func (x *PodProblem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PodProblem.ProtoReflect.Descriptor instead.
 func (*PodProblem) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{36}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *PodProblem) GetTitle() string {
@@ -2137,7 +2298,7 @@ type PodExecution struct {
 
 func (x *PodExecution) Reset() {
 	*x = PodExecution{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[37]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2149,7 +2310,7 @@ func (x *PodExecution) String() string {
 func (*PodExecution) ProtoMessage() {}
 
 func (x *PodExecution) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[37]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2162,7 +2323,7 @@ func (x *PodExecution) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PodExecution.ProtoReflect.Descriptor instead.
 func (*PodExecution) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{37}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *PodExecution) GetName() string {
@@ -2195,7 +2356,7 @@ type GetTeamProfileRequest struct {
 
 func (x *GetTeamProfileRequest) Reset() {
 	*x = GetTeamProfileRequest{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[38]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2207,7 +2368,7 @@ func (x *GetTeamProfileRequest) String() string {
 func (*GetTeamProfileRequest) ProtoMessage() {}
 
 func (x *GetTeamProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[38]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2220,7 +2381,7 @@ func (x *GetTeamProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTeamProfileRequest.ProtoReflect.Descriptor instead.
 func (*GetTeamProfileRequest) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{38}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetTeamProfileRequest) GetName() string {
@@ -2251,7 +2412,7 @@ type GetTeamProfileResponse struct {
 
 func (x *GetTeamProfileResponse) Reset() {
 	*x = GetTeamProfileResponse{}
-	mi := &file_vertra_console_v1_team_proto_msgTypes[39]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2263,7 +2424,7 @@ func (x *GetTeamProfileResponse) String() string {
 func (*GetTeamProfileResponse) ProtoMessage() {}
 
 func (x *GetTeamProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vertra_console_v1_team_proto_msgTypes[39]
+	mi := &file_vertra_console_v1_team_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2276,7 +2437,7 @@ func (x *GetTeamProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTeamProfileResponse.ProtoReflect.Descriptor instead.
 func (*GetTeamProfileResponse) Descriptor() ([]byte, []int) {
-	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{39}
+	return file_vertra_console_v1_team_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GetTeamProfileResponse) GetName() string {
@@ -2386,7 +2547,18 @@ const file_vertra_console_v1_team_proto_rawDesc = "" +
 	" \x03(\tR\tviaGroups\"\x12\n" +
 	"\x10ListTeamsRequest\"B\n" +
 	"\x11ListTeamsResponse\x12-\n" +
-	"\x05teams\x18\x01 \x03(\v2\x17.vertra.console.v1.TeamR\x05teams\"$\n" +
+	"\x05teams\x18\x01 \x03(\v2\x17.vertra.console.v1.TeamR\x05teams\"\x1a\n" +
+	"\x18ListTeamSummariesRequest\"Q\n" +
+	"\x19ListTeamSummariesResponse\x124\n" +
+	"\x05teams\x18\x01 \x03(\v2\x1e.vertra.console.v1.TeamSummaryR\x05teams\"\x9c\x01\n" +
+	"\vTeamSummary\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05owner\x18\x02 \x01(\tR\x05owner\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x16\n" +
+	"\x06people\x18\x04 \x01(\x05R\x06people\x12\x1d\n" +
+	"\arunning\x18\x05 \x01(\x05H\x00R\arunning\x88\x01\x01B\n" +
+	"\n" +
+	"\b_running\"$\n" +
 	"\x0eGetTeamRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\">\n" +
 	"\x0fGetTeamResponse\x12+\n" +
@@ -2522,11 +2694,12 @@ const file_vertra_console_v1_team_proto_rawDesc = "" +
 	"\x16TASK_POD_STATE_RUNNING\x10\x02\x12\x1d\n" +
 	"\x19TASK_POD_STATE_CANT_START\x10\x03\x12\x1b\n" +
 	"\x17TASK_POD_STATE_FINISHED\x10\x04\x12\x19\n" +
-	"\x15TASK_POD_STATE_FAILED\x10\x052\xbb\r\n" +
+	"\x15TASK_POD_STATE_FAILED\x10\x052\xb0\x0e\n" +
 	"\vTeamService\x12[\n" +
 	"\tListTeams\x12#.vertra.console.v1.ListTeamsRequest\x1a$.vertra.console.v1.ListTeamsResponse\"\x03\x90\x02\x01\x12U\n" +
 	"\aGetTeam\x12!.vertra.console.v1.GetTeamRequest\x1a\".vertra.console.v1.GetTeamResponse\"\x03\x90\x02\x01\x12j\n" +
-	"\x0eGetTeamProfile\x12(.vertra.console.v1.GetTeamProfileRequest\x1a).vertra.console.v1.GetTeamProfileResponse\"\x03\x90\x02\x01\x12Y\n" +
+	"\x0eGetTeamProfile\x12(.vertra.console.v1.GetTeamProfileRequest\x1a).vertra.console.v1.GetTeamProfileResponse\"\x03\x90\x02\x01\x12s\n" +
+	"\x11ListTeamSummaries\x12+.vertra.console.v1.ListTeamSummariesRequest\x1a,.vertra.console.v1.ListTeamSummariesResponse\"\x03\x90\x02\x01\x12Y\n" +
 	"\n" +
 	"CreateTeam\x12$.vertra.console.v1.CreateTeamRequest\x1a%.vertra.console.v1.CreateTeamResponse\x12^\n" +
 	"\n" +
@@ -2559,7 +2732,7 @@ func file_vertra_console_v1_team_proto_rawDescGZIP() []byte {
 }
 
 var file_vertra_console_v1_team_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_vertra_console_v1_team_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_vertra_console_v1_team_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
 var file_vertra_console_v1_team_proto_goTypes = []any{
 	(TeamRole)(0),                            // 0: vertra.console.v1.TeamRole
 	(TaskPodState)(0),                        // 1: vertra.console.v1.TaskPodState
@@ -2568,107 +2741,113 @@ var file_vertra_console_v1_team_proto_goTypes = []any{
 	(*Member)(nil),                           // 4: vertra.console.v1.Member
 	(*ListTeamsRequest)(nil),                 // 5: vertra.console.v1.ListTeamsRequest
 	(*ListTeamsResponse)(nil),                // 6: vertra.console.v1.ListTeamsResponse
-	(*GetTeamRequest)(nil),                   // 7: vertra.console.v1.GetTeamRequest
-	(*GetTeamResponse)(nil),                  // 8: vertra.console.v1.GetTeamResponse
-	(*CreateTeamRequest)(nil),                // 9: vertra.console.v1.CreateTeamRequest
-	(*CreateTeamResponse)(nil),               // 10: vertra.console.v1.CreateTeamResponse
-	(*EnsureTeamRequest)(nil),                // 11: vertra.console.v1.EnsureTeamRequest
-	(*EnsureTeamResponse)(nil),               // 12: vertra.console.v1.EnsureTeamResponse
-	(*RetireTeamRequest)(nil),                // 13: vertra.console.v1.RetireTeamRequest
-	(*RetireTeamResponse)(nil),               // 14: vertra.console.v1.RetireTeamResponse
-	(*UnretireTeamRequest)(nil),              // 15: vertra.console.v1.UnretireTeamRequest
-	(*UnretireTeamResponse)(nil),             // 16: vertra.console.v1.UnretireTeamResponse
-	(*PurgeTeamRequest)(nil),                 // 17: vertra.console.v1.PurgeTeamRequest
-	(*PurgeTeamResponse)(nil),                // 18: vertra.console.v1.PurgeTeamResponse
-	(*ListMembersRequest)(nil),               // 19: vertra.console.v1.ListMembersRequest
-	(*ListMembersResponse)(nil),              // 20: vertra.console.v1.ListMembersResponse
-	(*AddMemberRequest)(nil),                 // 21: vertra.console.v1.AddMemberRequest
-	(*AddMemberResponse)(nil),                // 22: vertra.console.v1.AddMemberResponse
-	(*RemoveMemberRequest)(nil),              // 23: vertra.console.v1.RemoveMemberRequest
-	(*RemoveMemberResponse)(nil),             // 24: vertra.console.v1.RemoveMemberResponse
-	(*SetMemberRoleRequest)(nil),             // 25: vertra.console.v1.SetMemberRoleRequest
-	(*SetMemberRoleResponse)(nil),            // 26: vertra.console.v1.SetMemberRoleResponse
-	(*SetTeamSignInRequest)(nil),             // 27: vertra.console.v1.SetTeamSignInRequest
-	(*SetTeamSignInResponse)(nil),            // 28: vertra.console.v1.SetTeamSignInResponse
-	(*SetTeamQuotaRequest)(nil),              // 29: vertra.console.v1.SetTeamQuotaRequest
-	(*SetTeamQuotaResponse)(nil),             // 30: vertra.console.v1.SetTeamQuotaResponse
-	(*ApplySecretStoreRequest)(nil),          // 31: vertra.console.v1.ApplySecretStoreRequest
-	(*ApplySecretStoreResponse)(nil),         // 32: vertra.console.v1.ApplySecretStoreResponse
-	(*SetSecretStoreCredentialRequest)(nil),  // 33: vertra.console.v1.SetSecretStoreCredentialRequest
-	(*SetSecretStoreCredentialResponse)(nil), // 34: vertra.console.v1.SetSecretStoreCredentialResponse
-	(*ListPodsRequest)(nil),                  // 35: vertra.console.v1.ListPodsRequest
-	(*ListPodsResponse)(nil),                 // 36: vertra.console.v1.ListPodsResponse
-	(*TaskPod)(nil),                          // 37: vertra.console.v1.TaskPod
-	(*PodProblem)(nil),                       // 38: vertra.console.v1.PodProblem
-	(*PodExecution)(nil),                     // 39: vertra.console.v1.PodExecution
-	(*GetTeamProfileRequest)(nil),            // 40: vertra.console.v1.GetTeamProfileRequest
-	(*GetTeamProfileResponse)(nil),           // 41: vertra.console.v1.GetTeamProfileResponse
-	(*timestamppb.Timestamp)(nil),            // 42: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                  // 43: google.protobuf.Struct
+	(*ListTeamSummariesRequest)(nil),         // 7: vertra.console.v1.ListTeamSummariesRequest
+	(*ListTeamSummariesResponse)(nil),        // 8: vertra.console.v1.ListTeamSummariesResponse
+	(*TeamSummary)(nil),                      // 9: vertra.console.v1.TeamSummary
+	(*GetTeamRequest)(nil),                   // 10: vertra.console.v1.GetTeamRequest
+	(*GetTeamResponse)(nil),                  // 11: vertra.console.v1.GetTeamResponse
+	(*CreateTeamRequest)(nil),                // 12: vertra.console.v1.CreateTeamRequest
+	(*CreateTeamResponse)(nil),               // 13: vertra.console.v1.CreateTeamResponse
+	(*EnsureTeamRequest)(nil),                // 14: vertra.console.v1.EnsureTeamRequest
+	(*EnsureTeamResponse)(nil),               // 15: vertra.console.v1.EnsureTeamResponse
+	(*RetireTeamRequest)(nil),                // 16: vertra.console.v1.RetireTeamRequest
+	(*RetireTeamResponse)(nil),               // 17: vertra.console.v1.RetireTeamResponse
+	(*UnretireTeamRequest)(nil),              // 18: vertra.console.v1.UnretireTeamRequest
+	(*UnretireTeamResponse)(nil),             // 19: vertra.console.v1.UnretireTeamResponse
+	(*PurgeTeamRequest)(nil),                 // 20: vertra.console.v1.PurgeTeamRequest
+	(*PurgeTeamResponse)(nil),                // 21: vertra.console.v1.PurgeTeamResponse
+	(*ListMembersRequest)(nil),               // 22: vertra.console.v1.ListMembersRequest
+	(*ListMembersResponse)(nil),              // 23: vertra.console.v1.ListMembersResponse
+	(*AddMemberRequest)(nil),                 // 24: vertra.console.v1.AddMemberRequest
+	(*AddMemberResponse)(nil),                // 25: vertra.console.v1.AddMemberResponse
+	(*RemoveMemberRequest)(nil),              // 26: vertra.console.v1.RemoveMemberRequest
+	(*RemoveMemberResponse)(nil),             // 27: vertra.console.v1.RemoveMemberResponse
+	(*SetMemberRoleRequest)(nil),             // 28: vertra.console.v1.SetMemberRoleRequest
+	(*SetMemberRoleResponse)(nil),            // 29: vertra.console.v1.SetMemberRoleResponse
+	(*SetTeamSignInRequest)(nil),             // 30: vertra.console.v1.SetTeamSignInRequest
+	(*SetTeamSignInResponse)(nil),            // 31: vertra.console.v1.SetTeamSignInResponse
+	(*SetTeamQuotaRequest)(nil),              // 32: vertra.console.v1.SetTeamQuotaRequest
+	(*SetTeamQuotaResponse)(nil),             // 33: vertra.console.v1.SetTeamQuotaResponse
+	(*ApplySecretStoreRequest)(nil),          // 34: vertra.console.v1.ApplySecretStoreRequest
+	(*ApplySecretStoreResponse)(nil),         // 35: vertra.console.v1.ApplySecretStoreResponse
+	(*SetSecretStoreCredentialRequest)(nil),  // 36: vertra.console.v1.SetSecretStoreCredentialRequest
+	(*SetSecretStoreCredentialResponse)(nil), // 37: vertra.console.v1.SetSecretStoreCredentialResponse
+	(*ListPodsRequest)(nil),                  // 38: vertra.console.v1.ListPodsRequest
+	(*ListPodsResponse)(nil),                 // 39: vertra.console.v1.ListPodsResponse
+	(*TaskPod)(nil),                          // 40: vertra.console.v1.TaskPod
+	(*PodProblem)(nil),                       // 41: vertra.console.v1.PodProblem
+	(*PodExecution)(nil),                     // 42: vertra.console.v1.PodExecution
+	(*GetTeamProfileRequest)(nil),            // 43: vertra.console.v1.GetTeamProfileRequest
+	(*GetTeamProfileResponse)(nil),           // 44: vertra.console.v1.GetTeamProfileResponse
+	(*timestamppb.Timestamp)(nil),            // 45: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                  // 46: google.protobuf.Struct
 }
 var file_vertra_console_v1_team_proto_depIdxs = []int32{
-	42, // 0: vertra.console.v1.Team.created_at:type_name -> google.protobuf.Timestamp
-	42, // 1: vertra.console.v1.Team.retired_at:type_name -> google.protobuf.Timestamp
-	42, // 2: vertra.console.v1.Team.deleted_at:type_name -> google.protobuf.Timestamp
+	45, // 0: vertra.console.v1.Team.created_at:type_name -> google.protobuf.Timestamp
+	45, // 1: vertra.console.v1.Team.retired_at:type_name -> google.protobuf.Timestamp
+	45, // 2: vertra.console.v1.Team.deleted_at:type_name -> google.protobuf.Timestamp
 	3,  // 3: vertra.console.v1.Team.quota:type_name -> vertra.console.v1.TeamQuota
 	3,  // 4: vertra.console.v1.Team.install_quota:type_name -> vertra.console.v1.TeamQuota
-	42, // 5: vertra.console.v1.Member.added_at:type_name -> google.protobuf.Timestamp
+	45, // 5: vertra.console.v1.Member.added_at:type_name -> google.protobuf.Timestamp
 	0,  // 6: vertra.console.v1.Member.role:type_name -> vertra.console.v1.TeamRole
 	2,  // 7: vertra.console.v1.ListTeamsResponse.teams:type_name -> vertra.console.v1.Team
-	2,  // 8: vertra.console.v1.GetTeamResponse.team:type_name -> vertra.console.v1.Team
-	2,  // 9: vertra.console.v1.CreateTeamResponse.team:type_name -> vertra.console.v1.Team
-	2,  // 10: vertra.console.v1.EnsureTeamResponse.team:type_name -> vertra.console.v1.Team
-	4,  // 11: vertra.console.v1.ListMembersResponse.members:type_name -> vertra.console.v1.Member
-	0,  // 12: vertra.console.v1.AddMemberRequest.role:type_name -> vertra.console.v1.TeamRole
-	0,  // 13: vertra.console.v1.SetMemberRoleRequest.role:type_name -> vertra.console.v1.TeamRole
-	3,  // 14: vertra.console.v1.SetTeamQuotaRequest.quota:type_name -> vertra.console.v1.TeamQuota
-	2,  // 15: vertra.console.v1.SetTeamQuotaResponse.team:type_name -> vertra.console.v1.Team
-	43, // 16: vertra.console.v1.ApplySecretStoreRequest.documents:type_name -> google.protobuf.Struct
-	37, // 17: vertra.console.v1.ListPodsResponse.pods:type_name -> vertra.console.v1.TaskPod
-	1,  // 18: vertra.console.v1.TaskPod.state:type_name -> vertra.console.v1.TaskPodState
-	38, // 19: vertra.console.v1.TaskPod.problem:type_name -> vertra.console.v1.PodProblem
-	42, // 20: vertra.console.v1.TaskPod.started_at:type_name -> google.protobuf.Timestamp
-	42, // 21: vertra.console.v1.TaskPod.finished_at:type_name -> google.protobuf.Timestamp
-	39, // 22: vertra.console.v1.TaskPod.execution:type_name -> vertra.console.v1.PodExecution
-	5,  // 23: vertra.console.v1.TeamService.ListTeams:input_type -> vertra.console.v1.ListTeamsRequest
-	7,  // 24: vertra.console.v1.TeamService.GetTeam:input_type -> vertra.console.v1.GetTeamRequest
-	40, // 25: vertra.console.v1.TeamService.GetTeamProfile:input_type -> vertra.console.v1.GetTeamProfileRequest
-	9,  // 26: vertra.console.v1.TeamService.CreateTeam:input_type -> vertra.console.v1.CreateTeamRequest
-	11, // 27: vertra.console.v1.TeamService.EnsureTeam:input_type -> vertra.console.v1.EnsureTeamRequest
-	13, // 28: vertra.console.v1.TeamService.RetireTeam:input_type -> vertra.console.v1.RetireTeamRequest
-	15, // 29: vertra.console.v1.TeamService.UnretireTeam:input_type -> vertra.console.v1.UnretireTeamRequest
-	17, // 30: vertra.console.v1.TeamService.PurgeTeam:input_type -> vertra.console.v1.PurgeTeamRequest
-	19, // 31: vertra.console.v1.TeamService.ListMembers:input_type -> vertra.console.v1.ListMembersRequest
-	21, // 32: vertra.console.v1.TeamService.AddMember:input_type -> vertra.console.v1.AddMemberRequest
-	23, // 33: vertra.console.v1.TeamService.RemoveMember:input_type -> vertra.console.v1.RemoveMemberRequest
-	25, // 34: vertra.console.v1.TeamService.SetMemberRole:input_type -> vertra.console.v1.SetMemberRoleRequest
-	27, // 35: vertra.console.v1.TeamService.SetTeamSignIn:input_type -> vertra.console.v1.SetTeamSignInRequest
-	29, // 36: vertra.console.v1.TeamService.SetTeamQuota:input_type -> vertra.console.v1.SetTeamQuotaRequest
-	31, // 37: vertra.console.v1.TeamService.ApplySecretStore:input_type -> vertra.console.v1.ApplySecretStoreRequest
-	33, // 38: vertra.console.v1.TeamService.SetSecretStoreCredential:input_type -> vertra.console.v1.SetSecretStoreCredentialRequest
-	35, // 39: vertra.console.v1.TeamService.ListPods:input_type -> vertra.console.v1.ListPodsRequest
-	6,  // 40: vertra.console.v1.TeamService.ListTeams:output_type -> vertra.console.v1.ListTeamsResponse
-	8,  // 41: vertra.console.v1.TeamService.GetTeam:output_type -> vertra.console.v1.GetTeamResponse
-	41, // 42: vertra.console.v1.TeamService.GetTeamProfile:output_type -> vertra.console.v1.GetTeamProfileResponse
-	10, // 43: vertra.console.v1.TeamService.CreateTeam:output_type -> vertra.console.v1.CreateTeamResponse
-	12, // 44: vertra.console.v1.TeamService.EnsureTeam:output_type -> vertra.console.v1.EnsureTeamResponse
-	14, // 45: vertra.console.v1.TeamService.RetireTeam:output_type -> vertra.console.v1.RetireTeamResponse
-	16, // 46: vertra.console.v1.TeamService.UnretireTeam:output_type -> vertra.console.v1.UnretireTeamResponse
-	18, // 47: vertra.console.v1.TeamService.PurgeTeam:output_type -> vertra.console.v1.PurgeTeamResponse
-	20, // 48: vertra.console.v1.TeamService.ListMembers:output_type -> vertra.console.v1.ListMembersResponse
-	22, // 49: vertra.console.v1.TeamService.AddMember:output_type -> vertra.console.v1.AddMemberResponse
-	24, // 50: vertra.console.v1.TeamService.RemoveMember:output_type -> vertra.console.v1.RemoveMemberResponse
-	26, // 51: vertra.console.v1.TeamService.SetMemberRole:output_type -> vertra.console.v1.SetMemberRoleResponse
-	28, // 52: vertra.console.v1.TeamService.SetTeamSignIn:output_type -> vertra.console.v1.SetTeamSignInResponse
-	30, // 53: vertra.console.v1.TeamService.SetTeamQuota:output_type -> vertra.console.v1.SetTeamQuotaResponse
-	32, // 54: vertra.console.v1.TeamService.ApplySecretStore:output_type -> vertra.console.v1.ApplySecretStoreResponse
-	34, // 55: vertra.console.v1.TeamService.SetSecretStoreCredential:output_type -> vertra.console.v1.SetSecretStoreCredentialResponse
-	36, // 56: vertra.console.v1.TeamService.ListPods:output_type -> vertra.console.v1.ListPodsResponse
-	40, // [40:57] is the sub-list for method output_type
-	23, // [23:40] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	9,  // 8: vertra.console.v1.ListTeamSummariesResponse.teams:type_name -> vertra.console.v1.TeamSummary
+	2,  // 9: vertra.console.v1.GetTeamResponse.team:type_name -> vertra.console.v1.Team
+	2,  // 10: vertra.console.v1.CreateTeamResponse.team:type_name -> vertra.console.v1.Team
+	2,  // 11: vertra.console.v1.EnsureTeamResponse.team:type_name -> vertra.console.v1.Team
+	4,  // 12: vertra.console.v1.ListMembersResponse.members:type_name -> vertra.console.v1.Member
+	0,  // 13: vertra.console.v1.AddMemberRequest.role:type_name -> vertra.console.v1.TeamRole
+	0,  // 14: vertra.console.v1.SetMemberRoleRequest.role:type_name -> vertra.console.v1.TeamRole
+	3,  // 15: vertra.console.v1.SetTeamQuotaRequest.quota:type_name -> vertra.console.v1.TeamQuota
+	2,  // 16: vertra.console.v1.SetTeamQuotaResponse.team:type_name -> vertra.console.v1.Team
+	46, // 17: vertra.console.v1.ApplySecretStoreRequest.documents:type_name -> google.protobuf.Struct
+	40, // 18: vertra.console.v1.ListPodsResponse.pods:type_name -> vertra.console.v1.TaskPod
+	1,  // 19: vertra.console.v1.TaskPod.state:type_name -> vertra.console.v1.TaskPodState
+	41, // 20: vertra.console.v1.TaskPod.problem:type_name -> vertra.console.v1.PodProblem
+	45, // 21: vertra.console.v1.TaskPod.started_at:type_name -> google.protobuf.Timestamp
+	45, // 22: vertra.console.v1.TaskPod.finished_at:type_name -> google.protobuf.Timestamp
+	42, // 23: vertra.console.v1.TaskPod.execution:type_name -> vertra.console.v1.PodExecution
+	5,  // 24: vertra.console.v1.TeamService.ListTeams:input_type -> vertra.console.v1.ListTeamsRequest
+	10, // 25: vertra.console.v1.TeamService.GetTeam:input_type -> vertra.console.v1.GetTeamRequest
+	43, // 26: vertra.console.v1.TeamService.GetTeamProfile:input_type -> vertra.console.v1.GetTeamProfileRequest
+	7,  // 27: vertra.console.v1.TeamService.ListTeamSummaries:input_type -> vertra.console.v1.ListTeamSummariesRequest
+	12, // 28: vertra.console.v1.TeamService.CreateTeam:input_type -> vertra.console.v1.CreateTeamRequest
+	14, // 29: vertra.console.v1.TeamService.EnsureTeam:input_type -> vertra.console.v1.EnsureTeamRequest
+	16, // 30: vertra.console.v1.TeamService.RetireTeam:input_type -> vertra.console.v1.RetireTeamRequest
+	18, // 31: vertra.console.v1.TeamService.UnretireTeam:input_type -> vertra.console.v1.UnretireTeamRequest
+	20, // 32: vertra.console.v1.TeamService.PurgeTeam:input_type -> vertra.console.v1.PurgeTeamRequest
+	22, // 33: vertra.console.v1.TeamService.ListMembers:input_type -> vertra.console.v1.ListMembersRequest
+	24, // 34: vertra.console.v1.TeamService.AddMember:input_type -> vertra.console.v1.AddMemberRequest
+	26, // 35: vertra.console.v1.TeamService.RemoveMember:input_type -> vertra.console.v1.RemoveMemberRequest
+	28, // 36: vertra.console.v1.TeamService.SetMemberRole:input_type -> vertra.console.v1.SetMemberRoleRequest
+	30, // 37: vertra.console.v1.TeamService.SetTeamSignIn:input_type -> vertra.console.v1.SetTeamSignInRequest
+	32, // 38: vertra.console.v1.TeamService.SetTeamQuota:input_type -> vertra.console.v1.SetTeamQuotaRequest
+	34, // 39: vertra.console.v1.TeamService.ApplySecretStore:input_type -> vertra.console.v1.ApplySecretStoreRequest
+	36, // 40: vertra.console.v1.TeamService.SetSecretStoreCredential:input_type -> vertra.console.v1.SetSecretStoreCredentialRequest
+	38, // 41: vertra.console.v1.TeamService.ListPods:input_type -> vertra.console.v1.ListPodsRequest
+	6,  // 42: vertra.console.v1.TeamService.ListTeams:output_type -> vertra.console.v1.ListTeamsResponse
+	11, // 43: vertra.console.v1.TeamService.GetTeam:output_type -> vertra.console.v1.GetTeamResponse
+	44, // 44: vertra.console.v1.TeamService.GetTeamProfile:output_type -> vertra.console.v1.GetTeamProfileResponse
+	8,  // 45: vertra.console.v1.TeamService.ListTeamSummaries:output_type -> vertra.console.v1.ListTeamSummariesResponse
+	13, // 46: vertra.console.v1.TeamService.CreateTeam:output_type -> vertra.console.v1.CreateTeamResponse
+	15, // 47: vertra.console.v1.TeamService.EnsureTeam:output_type -> vertra.console.v1.EnsureTeamResponse
+	17, // 48: vertra.console.v1.TeamService.RetireTeam:output_type -> vertra.console.v1.RetireTeamResponse
+	19, // 49: vertra.console.v1.TeamService.UnretireTeam:output_type -> vertra.console.v1.UnretireTeamResponse
+	21, // 50: vertra.console.v1.TeamService.PurgeTeam:output_type -> vertra.console.v1.PurgeTeamResponse
+	23, // 51: vertra.console.v1.TeamService.ListMembers:output_type -> vertra.console.v1.ListMembersResponse
+	25, // 52: vertra.console.v1.TeamService.AddMember:output_type -> vertra.console.v1.AddMemberResponse
+	27, // 53: vertra.console.v1.TeamService.RemoveMember:output_type -> vertra.console.v1.RemoveMemberResponse
+	29, // 54: vertra.console.v1.TeamService.SetMemberRole:output_type -> vertra.console.v1.SetMemberRoleResponse
+	31, // 55: vertra.console.v1.TeamService.SetTeamSignIn:output_type -> vertra.console.v1.SetTeamSignInResponse
+	33, // 56: vertra.console.v1.TeamService.SetTeamQuota:output_type -> vertra.console.v1.SetTeamQuotaResponse
+	35, // 57: vertra.console.v1.TeamService.ApplySecretStore:output_type -> vertra.console.v1.ApplySecretStoreResponse
+	37, // 58: vertra.console.v1.TeamService.SetSecretStoreCredential:output_type -> vertra.console.v1.SetSecretStoreCredentialResponse
+	39, // 59: vertra.console.v1.TeamService.ListPods:output_type -> vertra.console.v1.ListPodsResponse
+	42, // [42:60] is the sub-list for method output_type
+	24, // [24:42] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_vertra_console_v1_team_proto_init() }
@@ -2676,16 +2855,17 @@ func file_vertra_console_v1_team_proto_init() {
 	if File_vertra_console_v1_team_proto != nil {
 		return
 	}
-	file_vertra_console_v1_team_proto_msgTypes[29].OneofWrappers = []any{}
-	file_vertra_console_v1_team_proto_msgTypes[35].OneofWrappers = []any{}
-	file_vertra_console_v1_team_proto_msgTypes[37].OneofWrappers = []any{}
+	file_vertra_console_v1_team_proto_msgTypes[7].OneofWrappers = []any{}
+	file_vertra_console_v1_team_proto_msgTypes[32].OneofWrappers = []any{}
+	file_vertra_console_v1_team_proto_msgTypes[38].OneofWrappers = []any{}
+	file_vertra_console_v1_team_proto_msgTypes[40].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vertra_console_v1_team_proto_rawDesc), len(file_vertra_console_v1_team_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   40,
+			NumMessages:   43,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

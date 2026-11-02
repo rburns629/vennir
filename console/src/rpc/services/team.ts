@@ -22,6 +22,7 @@ import {
   setTeamQuota,
   teamPods,
   teamProfile,
+  teamSummaries,
   teamRecord,
   TeamName,
   unretireTeam,
@@ -103,6 +104,10 @@ export function teamService(): ServiceImpl<typeof TeamService> {
     async getTeamProfile(req, ctx) {
       const { name } = check({ name: AnyTeam }, req);
       return teamProfile(callerOf(ctx), name);
+    },
+
+    async listTeamSummaries(_req, ctx) {
+      return { teams: await teamSummaries(callerOf(ctx), logOf(ctx)) };
     },
 
     async createTeam(req, ctx) {

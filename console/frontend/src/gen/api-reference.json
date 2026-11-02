@@ -1090,6 +1090,15 @@
      "public": false
     },
     {
+     "name": "ListTeamSummaries",
+     "comment": "Every team's owner, description, people and Pods running now, for an\nadmin's list of teams: one call, not a profile and a Pod list for each.\nAdmins only.",
+     "input": "vertra.console.v1.ListTeamSummariesRequest",
+     "output": "vertra.console.v1.ListTeamSummariesResponse",
+     "streaming": false,
+     "idempotency": "read",
+     "public": false
+    },
+    {
      "name": "CreateTeam",
      "comment": "Creates a team and its namespace. Admins, or a token with teams:create.",
      "input": "vertra.console.v1.CreateTeamRequest",
@@ -9854,6 +9863,66 @@
      "repeated": true,
      "optional": false,
      "comment": ""
+    }
+   ]
+  },
+  "vertra.console.v1.ListTeamSummariesRequest": {
+   "name": "ListTeamSummariesRequest",
+   "comment": "",
+   "fields": []
+  },
+  "vertra.console.v1.ListTeamSummariesResponse": {
+   "name": "ListTeamSummariesResponse",
+   "comment": "",
+   "fields": [
+    {
+     "name": "teams",
+     "type": "TeamSummary",
+     "ref": "vertra.console.v1.TeamSummary",
+     "repeated": true,
+     "optional": false,
+     "comment": ""
+    }
+   ]
+  },
+  "vertra.console.v1.TeamSummary": {
+   "name": "TeamSummary",
+   "comment": "What an admin's list of teams shows of one.",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "owner",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "team.yaml's owner in the catalog and its description; empty for a team\nmade here."
+    },
+    {
+     "name": "description",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "people",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "running",
+     "type": "integer",
+     "repeated": false,
+     "optional": true,
+     "comment": "Its namespace's Pods not finished: starting, running, or unable to\nstart. Unset when the cluster couldn't be asked."
     }
    ]
   },

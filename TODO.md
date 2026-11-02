@@ -1170,12 +1170,13 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
     mapping's member count. Per-team product usage and run counts moved to
     the performance work (item 5 there), not dropped.
 
-- [ ] **One read for the Teams page's other teams** (found reviewing #33,
-  2026-10-30): an admin's Teams page reads each other team's profile and
-  pods, a few at a time since #43, so 80 teams are still 160 requests and 80
-  pod lists per visit. A TeamService method returning each team's people,
-  owner and running count at once (one query, and running from the kernel's
-  states or one pod list by label) would make it one.
+- [x] **One read for the Teams page's other teams** (found reviewing #33,
+  2026-10-30; done 2026-11-02): an admin's Teams page read each other
+  team's profile and pods, a few at a time since #43, so 80 teams were 160
+  requests and 80 pod lists per visit. Now one: `TeamService/ListTeamSummaries`,
+  each team's owner, description, people and Pods not finished, from one
+  query and one Pod list across the cluster; on kind, the same figures as
+  the per-team calls for every team.
 
 - [x] **Gaps the 2026-10-30 guides found** (writing guides 10 to 16
   against the code; done 2026-10-30, #44): an API not shared with you now

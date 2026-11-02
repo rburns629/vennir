@@ -14,25 +14,24 @@ import { EmptyState } from "../components/EmptyState";
 import { Mono } from "../components/Mono";
 import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
-import { isRunningPod, TeamCard } from "../components/TeamCard";
+import { TeamCard } from "../components/TeamCard";
 import {
   ApiError,
   createTeam,
   getCatalogStatus,
-  getTeamProfile,
   getUsage,
   listAllTeams,
   listApis,
   listPendingApprovals,
   listRunnables,
   listSsoGroupMappings,
-  listTeamPods,
+  listTeamSummaries,
   type ApiProduct,
   type PendingApproval,
   type Runnable,
   type SsoGroupMapping,
   type Team,
-  type TeamProfile,
+  type TeamSummary,
   type UsageView,
 } from "../api";
 import { useAuth } from "../auth/AuthContext";
@@ -48,38 +47,25 @@ const ROLES: [string, "neutral" | "info" | "warning", string][] = [
   ["Vertra admin", "warning", "Reaches every team; only admins create, retire and purge teams and set their limits."],
 ];
 
-/** How many other teams' facts are asked for at once. */
-const AT_ONCE = 4;
-
-/** Each other team's owner, people and what's running: one profile and one
- * pod list each, AT_ONCE teams at a time. Display only: what fails shows as a dash. */
-function useOtherTeamFacts(teams: Team[]) {
-  const [facts, setFacts] = useState<Record<string, { profile?: TeamProfile; running?: number }>>({});
+/** Every team's owner, description, people and what's running, in one
+ * call, again when the teams change. Display only: if it fails, each shows a dash. */
+function useTeamSummaries(teams: Team[]) {
+  const [summaries, setSummaries] = useState<Record<string, TeamSummary>>({});
   const names = teams.map((t) => t.name).join(",");
   useEffect(() => {
+    if (!names) return;
     let cancelled = false;
-    // A few teams at a time, not every team at once: each is a pod list in the cluster.
-    const queue = names ? names.split(",") : [];
-    const next = async (): Promise<void> => {
-      for (let name = queue.shift(); name !== undefined && !cancelled; name = queue.shift()) {
-        const [profile, pods] = await Promise.allSettled([getTeamProfile(name), listTeamPods(name)]);
-        if (cancelled) return;
-        const team = name;
-        setFacts((current) => ({
-          ...current,
-          [team]: {
-            profile: profile.status === "fulfilled" ? profile.value : undefined,
-            running: pods.status === "fulfilled" ? pods.value.filter((p) => isRunningPod(p.state)).length : undefined,
-          },
-        }));
-      }
-    };
-    for (let i = 0; i < AT_ONCE; i++) void next();
+    listTeamSummaries().then(
+      (list) => {
+        if (!cancelled) setSummaries(Object.fromEntries(list.map((t) => [t.name, t])));
+      },
+      () => undefined,
+    );
     return () => {
       cancelled = true;
     };
   }, [names]);
-  return facts;
+  return summaries;
 }
 
 export function TeamsPage() {
@@ -121,7 +107,7 @@ export function TeamsPage() {
   }, [isAdmin]);
 
   const others = (allTeams ?? []).filter((team) => !user?.teamNames.includes(team.name));
-  const facts = useOtherTeamFacts(others);
+  const facts = useTeamSummaries(allTeams ?? []);
 
   async function handleCreateTeam(event: FormEvent): Promise<void> {
     event.preventDefault();
@@ -146,7 +132,7 @@ export function TeamsPage() {
       key: "team",
       header: "Team",
       render: (t) => {
-        const description = facts[t.name]?.profile?.description;
+        const description = facts[t.name]?.description;
         return (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25, minWidth: 0 }}>
             <Link component={RouterLink} to={teamHref(t.name)} sx={{ fontWeight: 500, overflowWrap: "anywhere" }}>
@@ -182,8 +168,8 @@ export function TeamsPage() {
         ),
     },
     { key: "made", header: "Made by", hideBelow: "md", render: (t) => (t.fromCatalog ? "the catalog" : "made here") },
-    { key: "owner", header: "Owner in the catalog", hideBelow: "md", render: (t) => <Mono>{facts[t.name]?.profile?.owner ?? "—"}</Mono> },
-    { key: "people", header: "People", hideBelow: "sm", render: (t) => facts[t.name]?.profile?.people ?? "–" },
+    { key: "owner", header: "Owner in the catalog", hideBelow: "md", render: (t) => <Mono>{facts[t.name]?.owner ?? "—"}</Mono> },
+    { key: "people", header: "People", hideBelow: "sm", render: (t) => facts[t.name]?.people ?? "–" },
     { key: "running", header: "Running now", hideBelow: "sm", render: (t) => facts[t.name]?.running ?? "–" },
     {
       key: "runs",
