@@ -27,6 +27,8 @@ type jobWatch struct {
 	changed map[string]bool
 	up      map[string]bool
 	wake    chan struct{}
+	// The watched Pods, for Unschedulable.
+	pods cache.Store
 }
 
 func newJobWatch() *jobWatch {
@@ -109,9 +111,11 @@ func (k *Kubernetes) Watch(ctx context.Context) {
 		UpdateFunc: func(_, obj any) { notify(obj) },
 		DeleteFunc: notify,
 	}
+	pods := factory.Core().V1().Pods().Informer()
+	w.pods = pods.GetStore()
 	for kind, informer := range map[string]cache.SharedIndexInformer{
 		"jobs": factory.Batch().V1().Jobs().Informer(),
-		"pods": factory.Core().V1().Pods().Informer(),
+		"pods": pods,
 	} {
 		_ = informer.SetWatchErrorHandlerWithContext(func(_ context.Context, _ *cache.Reflector, err error) {
 			k.log.Warn("watch failed; reading every status from the API until it's back", "kind", kind, "error", err.Error())
@@ -132,6 +136,38 @@ func (k *Kubernetes) Watch(ctx context.Context) {
 		}
 	}()
 	k.watch = w
+}
+
+// Unschedulable is how many step Pods no node has room for now, from the
+// watch (0 without one).
+func (k *Kubernetes) Unschedulable() int {
+	if k.watch == nil || k.watch.pods == nil {
+		return 0
+	}
+	var pods []*corev1.Pod
+	for _, obj := range k.watch.pods.List() {
+		if pod, ok := obj.(*corev1.Pod); ok {
+			pods = append(pods, pod)
+		}
+	}
+	return CountUnschedulable(pods)
+}
+
+// CountUnschedulable is how many of these Pods the scheduler found no node
+// with room for (the cluster full, or unable to grow).
+func CountUnschedulable(pods []*corev1.Pod) int {
+	n := 0
+	for _, pod := range pods {
+		if pod.Status.Phase != corev1.PodPending {
+			continue
+		}
+		for _, c := range pod.Status.Conditions {
+			if c.Type == corev1.PodScheduled && c.Status == corev1.ConditionFalse && c.Reason == corev1.PodReasonUnschedulable {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 func typesUID(uid string) types.UID { return types.UID(uid) }

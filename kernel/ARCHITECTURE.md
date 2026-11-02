@@ -466,7 +466,11 @@ kernel-scheduler, at the start of every pass : expireApprovals()
   `kernel_http_request_duration_seconds`,
   `kernel_scheduler_tick_duration_seconds`,
   `kernel_scheduler_status_read_errors_total`,
-  `kernel_scheduler_tick_errors_total`. Each process serves its own.
+  `kernel_scheduler_tick_errors_total`, `kernel_tasks`,
+  `kernel_oldest_ready_task_age_seconds`, and
+  `kernel_unschedulable_steps` (from the scheduler's
+  watch of its steps' Pods: `executor.Unschedulable`). Each process serves
+  its own.
 
 
 ## Tests

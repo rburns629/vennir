@@ -92,7 +92,7 @@ A failed step shows a code, a message, what the code means and what to do. When 
 | --- | --- | --- | --- |
 | `TASK_TIMEOUT` | It ran longer than its timeout (`timeoutSeconds`, 300 by default) and was stopped | Yes | Retry it; if it keeps happening, give the step a longer `timeoutSeconds` |
 | `TASK_NOT_STARTED` | It never started: the cluster had no room for it (no node could be added, or a quota was reached) | Yes | Retry it; if it keeps happening, an admin can check the cloud's quotas |
-| `POD_TERMINATED_UNEXPECTEDLY` | Its container stopped before reporting a result: a node went away or it ran out of memory | Yes | Retry it |
+| `POD_TERMINATED_UNEXPECTEDLY` | Its container stopped before reporting a result: its Pod was evicted (its node short of memory or disk), preempted, or lost with its node; the message says which | Yes | Retry it |
 | `JOB_NOT_FOUND` | Its Job disappeared from the cluster before it reported a result | Yes | Retry it |
 | `EXECUTOR_START_FAILED` | The cluster couldn't start it, after several tries | Yes | Retry it; if it keeps happening, tell an admin |
 | `IMAGE_PULL_FAILED` | The cluster couldn't download its image for 2 minutes (registry sign-in, network) | Yes | Retry it; if it keeps happening, tell an admin |

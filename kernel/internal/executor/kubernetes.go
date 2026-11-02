@@ -509,7 +509,7 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 		// backoffLimit 0, restartPolicy Never), so it's read now, not when the
 		// Job controller next marks the Job (about 2.5 s later).
 		if finished(pods) {
-			record, err := k.finalize(ctx, namespace, name)
+			record, err := k.finalize(ctx, namespace, name, nil)
 			if err != nil {
 				return Status{}, err
 			}
@@ -532,7 +532,7 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 		k.remember(name, record)
 		return record.status, nil
 	}
-	record, err := k.finalize(ctx, namespace, name)
+	record, err := k.finalize(ctx, namespace, name, job)
 	if err != nil {
 		return Status{}, err
 	}
@@ -706,30 +706,80 @@ func ImagePullFailure(reason, message, image string, podAge, grace time.Duration
 // finalize captures a finished Job's logs and result. The Job and ConfigMap
 // stay until Release: deleting them before the result was committed lost a
 // finished step's outputs whenever that commit failed.
-func (k *Kubernetes) finalize(ctx context.Context, namespace, job string) (terminalRecord, error) {
-	pod, terminated, err := k.terminatedContainer(ctx, namespace, job)
+// job is the Job as just read, or nil when its container ended before the
+// Job was marked.
+func (k *Kubernetes) finalize(ctx context.Context, namespace, name string, job *batchv1.Job) (terminalRecord, error) {
+	pod, terminated, err := k.terminatedContainer(ctx, namespace, name)
 	if err != nil {
 		return terminalRecord{}, err
 	}
 	var logs []string
-	if pod != "" {
-		logs = k.readLogs(ctx, namespace, pod)
+	if pod != nil {
+		logs = k.readLogs(ctx, namespace, pod.Name)
+	}
+	// No result: why, if the cluster stopped it, before what its exit code says.
+	if terminated == nil || terminated.Message == "" {
+		if e := unfinished(job, pod, terminated == nil); e != nil {
+			return terminalRecord{status: Status{State: Failed, Error: e}, logs: logs}, nil
+		}
 	}
 	return terminalRecord{status: buildStatus(terminated, logs), logs: logs}, nil
 }
 
-func (k *Kubernetes) terminatedContainer(ctx context.Context, namespace, job string) (string, *corev1.ContainerStateTerminated, error) {
+func (k *Kubernetes) terminatedContainer(ctx context.Context, namespace, job string) (*corev1.Pod, *corev1.ContainerStateTerminated, error) {
 	pods, err := k.pods(ctx, namespace, job)
 	if err != nil || len(pods) == 0 {
-		return "", nil, err
+		return nil, nil, err
 	}
-	pod := pods[0]
+	pod := &pods[0]
 	for _, cs := range pod.Status.ContainerStatuses {
 		if cs.Name == containerName && cs.State.Terminated != nil {
-			return pod.Name, cs.State.Terminated, nil
+			return pod, cs.State.Terminated, nil
 		}
 	}
-	return pod.Name, nil, nil
+	return pod, nil, nil
+}
+
+// unfinished is why a finished Job's container never wrote its result, if
+// the cluster stopped it: its Pod evicted (a node short of memory or disk),
+// disrupted (preempted, its node drained or removed: the DisruptionTarget
+// condition), past the Job's own deadline (no scheduler stopped it first),
+// or gone. Nil when none says so and the container ended (with its code).
+func unfinished(job *batchv1.Job, pod *corev1.Pod, notEnded bool) *domain.StructuredError {
+	stopped := func(message string) *domain.StructuredError {
+		return &domain.StructuredError{Code: "POD_TERMINATED_UNEXPECTEDLY", Retryable: true, Message: message}
+	}
+	if pod != nil && pod.Status.Reason == "Evicted" {
+		return stopped("Its Pod was evicted" + reasonText(pod.Status.Message))
+	}
+	if pod != nil {
+		for _, c := range pod.Status.Conditions {
+			if c.Type == corev1.DisruptionTarget && c.Status == corev1.ConditionTrue {
+				return stopped("Its Pod was stopped by the cluster (" + c.Reason + ")" + reasonText(c.Message))
+			}
+		}
+	}
+	if job != nil {
+		for _, c := range job.Status.Conditions {
+			if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue && c.Reason == batchv1.JobReasonDeadlineExceeded {
+				return stopped("It ran past its Job's deadline (its timeout, start timeout and grace) with no scheduler to stop it first.")
+			}
+		}
+	}
+	switch {
+	case pod == nil:
+		return stopped("Its Pod went away before its container finished: evicted, preempted, deleted, or lost with its node.")
+	case notEnded:
+		return stopped("Its Pod was stopped before its container finished, with no reason recorded (deleted by hand?).")
+	}
+	return nil
+}
+
+func reasonText(message string) string {
+	if message = strings.TrimSpace(message); message == "" {
+		return "."
+	}
+	return ": " + strings.TrimSuffix(truncate(message, kubeletMessageLimit), ".") + "."
 }
 
 // readLogs is the container's output: its last LogMaxLines lines, at most
@@ -779,10 +829,6 @@ func splitLines(lines []string) []string {
 }
 
 func buildStatus(terminated *corev1.ContainerStateTerminated, logs []string) Status {
-	if terminated == nil {
-		return Status{State: Failed, Error: &domain.StructuredError{Code: "POD_TERMINATED_UNEXPECTEDLY",
-			Message: "Job finished but no terminated container status was found.", Retryable: true}}
-	}
 	if terminated.Message == "" {
 		tail := logs
 		if len(tail) > 50 {
@@ -898,10 +944,10 @@ func (k *Kubernetes) Logs(ctx context.Context, handle Handle) ([]string, error) 
 		return record.logs, nil
 	}
 	pod, _, err := k.terminatedContainer(ctx, namespace, name)
-	if err != nil || pod == "" {
+	if err != nil || pod == nil {
 		return []string{}, err
 	}
-	return k.readLogs(ctx, namespace, pod), nil
+	return k.readLogs(ctx, namespace, pod.Name), nil
 }
 
 // WaitForChange waits for a watched Job or Pod to change, at most timeout.

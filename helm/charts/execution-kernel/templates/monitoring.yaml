@@ -167,4 +167,13 @@ groups:
         annotations:
           summary: A step has waited {{ "{{ $value | humanizeDuration }}" }} to start.
           description: Steps are ready but not starting. The cluster may be out of room, a team at its limit, or the scheduler behind.
+      - alert: VertraStepsUnschedulable
+        # A count over 5 minutes, not one Pod's age: the scheduler replaces a
+        # Pod that hasn't started (taskStartTimeoutSeconds), after a backoff.
+        expr: max(max_over_time(kernel_unschedulable_steps{ {{- $ns -}} }[5m])) > 0
+        for: {{ $mon.alerts.unschedulableMinutes }}m
+        labels: {severity: warning}
+        annotations:
+          summary: Steps have had no node to run on for {{ $mon.alerts.unschedulableMinutes }} minutes ({{ "{{ $value }}" }} now).
+          description: Steps were started but no node has room for them, and the cluster isn't making one (at its node limit, or out of a quota such as the region's SSD). kubectl get events -A --field-selector reason=FailedScheduling says why; so does the autoscaler's NotTriggerScaleUp.
 {{- end }}

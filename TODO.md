@@ -97,12 +97,8 @@ Console and gateway:
   (the gcp module) and a GKE run to prove. Card's text on the canvas first.
 
 Kernel and alerts:
-- [ ] **No alert for dispatched steps whose Pods can't be scheduled** (GKE
-  at 40 at once, the SSD quota refusing nodes): `VertraStepsWaiting` sees
-  READY tasks only. And completion lag rose from 3 s to 12 s p50 with them
-  (`perf/README.md`, "On GKE and EKS"): worth a look.
-- [ ] An evicted step's failure says "no terminated container status"; say
-  it was evicted or disrupted (the Pod's `DisruptionTarget` condition).
+- [ ] Completion lag rose from 3 s to 12 s p50 on GKE with steps waiting
+  for nodes (`perf/README.md`, "On GKE and EKS"): worth a look.
 
 Samples and catalog CI:
 - [ ] **A product can't say which installs it's for**: one catalog serves

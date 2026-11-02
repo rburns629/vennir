@@ -16,7 +16,7 @@ export const PLATFORM_ERRORS: Record<string, ErrorHelp> = {
   MISSING_UPSTREAM_OUTPUT: { means: "A step it depends on finished without the output this step takes.", do: "Ask the team of the step before it." },
   TASK_TIMEOUT: { means: "It ran longer than its timeout and was stopped." },
   TASK_NOT_STARTED: { means: "It never started: the cluster had no room for it (no node could be added, or a quota was reached).", do: "Retry it; if it keeps happening, an admin can check the cloud's quotas." },
-  POD_TERMINATED_UNEXPECTEDLY: { means: "Its container stopped before reporting a result: a node went away or it ran out of memory." },
+  POD_TERMINATED_UNEXPECTEDLY: { means: "Its container stopped before reporting a result: its Pod was evicted (its node short of memory or disk), preempted, or lost with its node. The message says which." },
   EXECUTOR_START_FAILED: { means: "The cluster couldn't start it." },
   JOB_NOT_FOUND: { means: "Its Job disappeared from the cluster before it reported a result." },
   IMAGE_NOT_FOUND: { means: "Its image isn't in the registry.", do: "Ask the product's team to publish it." },

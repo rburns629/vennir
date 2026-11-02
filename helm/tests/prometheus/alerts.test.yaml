@@ -81,6 +81,35 @@ tests:
               summary: A step has waited 16m 0s to start.
               description: Steps are ready but not starting. The cluster may be out of room, a team at its limit, or the scheduler behind.
 
+  # Steps with no node for unschedulableMinutes (15), though each Pod is
+  # replaced every 10 minutes with a gap between (a 0 for 2 minutes).
+  - interval: 1m
+    input_series:
+      - series: 'kernel_unschedulable_steps{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-a"}'
+        values: '2x9 0x1 2x9 0x1 2x9 0x1'
+      - series: 'kernel_unschedulable_steps{namespace="vertra-system", pod="kernel-execution-kernel-api-a"}'
+        values: '0x35'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: VertraStepsUnschedulable
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: VertraStepsUnschedulable
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: Steps have had no node to run on for 15 minutes (2 now).
+              description: Steps were started but no node has room for them, and the cluster isn't making one (at its node limit, or out of a quota such as the region's SSD). kubectl get events -A --field-selector reason=FailedScheduling says why; so does the autoscaler's NotTriggerScaleUp.
+  - interval: 1m
+    input_series:
+      # A new node within a few minutes: nothing.
+      - series: 'kernel_unschedulable_steps{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-a"}'
+        values: '3x3 0x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: VertraStepsUnschedulable
+        exp_alerts: []
+
   # The console failing more than 5% of its calls.
   - interval: 30s
     input_series:

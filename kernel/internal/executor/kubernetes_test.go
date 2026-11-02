@@ -578,6 +578,49 @@ func TestAMissingOrInvalidResultIsARetryableFailure(t *testing.T) {
 	}
 }
 
+// A container the cluster stopped says why, though the kubelet records an
+// exit code for it (137, or ContainerStatusUnknown for one still waiting).
+func TestAContainerTheClusterStoppedSaysWhy(t *testing.T) {
+	ns, name := "demo-3", "ek-greet-1"
+	failedJob := func(reason string) *batchv1.Job {
+		return &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns}, Status: batchv1.JobStatus{Failed: 1,
+			Conditions: []batchv1.JobCondition{{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Reason: reason}}}}
+	}
+	killed := []corev1.ContainerStatus{{Name: "product", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 137, Reason: "ContainerStatusUnknown"}}}}
+	running := []corev1.ContainerStatus{{Name: "product", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}}
+	pod := func(status corev1.PodStatus) *corev1.Pod {
+		return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-abcde", Namespace: ns, Labels: map[string]string{"job-name": name}}, Status: status}
+	}
+	for what, c := range map[string]struct {
+		objects    []runtime.Object
+		code, want string
+	}{
+		"evicted": {[]runtime.Object{failedJob("BackoffLimitExceeded"), pod(corev1.PodStatus{Phase: corev1.PodFailed, Reason: "Evicted",
+			Message: "The node was low on resource: memory. Threshold quantity: 100Mi, available: 80Mi.", ContainerStatuses: killed})},
+			"POD_TERMINATED_UNEXPECTEDLY", "Its Pod was evicted: The node was low on resource: memory. Threshold quantity: 100Mi, available: 80Mi."},
+		"preempted": {[]runtime.Object{failedJob("BackoffLimitExceeded"), pod(corev1.PodStatus{Phase: corev1.PodFailed, ContainerStatuses: killed,
+			Conditions: []corev1.PodCondition{{Type: corev1.DisruptionTarget, Status: corev1.ConditionTrue, Reason: "PreemptionByScheduler", Message: "Kubernetes Scheduler: preempting"}}})},
+			"POD_TERMINATED_UNEXPECTEDLY", "Its Pod was stopped by the cluster (PreemptionByScheduler): Kubernetes Scheduler: preempting."},
+		"past the Job's deadline": {[]runtime.Object{failedJob(batchv1.JobReasonDeadlineExceeded), pod(corev1.PodStatus{Phase: corev1.PodRunning, ContainerStatuses: running})},
+			"POD_TERMINATED_UNEXPECTEDLY", "It ran past its Job's deadline (its timeout, start timeout and grace) with no scheduler to stop it first."},
+		"gone": {[]runtime.Object{failedJob("BackoffLimitExceeded")},
+			"POD_TERMINATED_UNEXPECTEDLY", "Its Pod went away before its container finished: evicted, preempted, deleted, or lost with its node."},
+		// Killed with nothing to say why: its exit code and logs, as before.
+		"killed": {[]runtime.Object{failedJob("BackoffLimitExceeded"), pod(corev1.PodStatus{Phase: corev1.PodFailed, ContainerStatuses: killed})},
+			"PRODUCT_RESULT_MISSING", "Container exited with code 137 without writing /platform/output/result.json. Recent logs: fake logs"},
+	} {
+		cl := newCluster(options(), c.objects...)
+		s, err := cl.k.Status(context.Background(), Handle{"namespace": ns, "jobName": name})
+		if err != nil {
+			t.Fatal(what, err)
+		}
+		check(t, what+" state", s.State, Failed)
+		check(t, what+" code", s.Error.Code, c.code)
+		check(t, what+" retryable", s.Error.Retryable, true)
+		check(t, what+" message", s.Error.Message, c.want)
+	}
+}
+
 // --- an image that can't be pulled ---
 
 const image = "us-central1-docker.pkg.dev/p/catalog-products/demo-3-deploy-product:abc"
@@ -896,4 +939,21 @@ func TestAStepThatCanNeverFitItsTeamFailsAndOneWaitingForRoomDoesnt(t *testing.T
 	check(t, "too big", s.State, Failed)
 	check(t, "code", s.Error.Code, "RESOURCES_NOT_ALLOWED")
 	check(t, "retryable", s.Error.Retryable, false)
+}
+
+// --- Pods no node has room for ---
+
+func TestCountUnschedulableCountsPendingPodsWithNoNode(t *testing.T) {
+	pod := func(phase corev1.PodPhase, status corev1.ConditionStatus, reason string) *corev1.Pod {
+		return &corev1.Pod{Status: corev1.PodStatus{Phase: phase, Conditions: []corev1.PodCondition{{Type: corev1.PodScheduled, Status: status, Reason: reason}}}}
+	}
+	check(t, "none", CountUnschedulable(nil), 0)
+	check(t, "two", CountUnschedulable([]*corev1.Pod{
+		pod(corev1.PodPending, corev1.ConditionFalse, corev1.PodReasonUnschedulable),
+		pod(corev1.PodPending, corev1.ConditionFalse, corev1.PodReasonUnschedulable),
+		// Scheduled, or gated, or finished: not waiting for room.
+		pod(corev1.PodRunning, corev1.ConditionTrue, ""),
+		pod(corev1.PodPending, corev1.ConditionFalse, corev1.PodReasonSchedulingGated),
+		pod(corev1.PodFailed, corev1.ConditionFalse, corev1.PodReasonUnschedulable),
+	}), 2)
 }

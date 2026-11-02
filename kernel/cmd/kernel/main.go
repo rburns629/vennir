@@ -412,6 +412,7 @@ func runScheduler(ctx context.Context, s config.Settings, log *slog.Logger) erro
 		LogMaxLines: s.TaskLogMaxLines, LogMaxBytes: s.TaskLogMaxBytes,
 	}, logging.New("kernel-scheduler", "app.executors.kubernetes"))
 	exec.Watch(ctx)
+	metrics.SetUnschedulable(func() float64 { return float64(exec.Unschedulable()) })
 	owner, err := os.Hostname()
 	if err != nil {
 		return err
