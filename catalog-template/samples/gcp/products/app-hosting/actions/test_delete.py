@@ -62,6 +62,19 @@ class DeleteActionTest(unittest.TestCase):
         code, result, _ = self._run({"type": "gcp/cloud-run-service", "id": "projects/x/../../etc"})
         self.assertEqual((code, result["error"]["code"]), (1, "MISSING_INPUT"))
 
+    def test_impersonation_refused_writes_a_result(self) -> None:
+        code, result, _ = self._run({"type": "gcp/cloud-run-service", "id": PATH}, get_error=self.module.google.auth.exceptions.RefreshError("denied"))
+        self.assertEqual((code, result["error"]["code"], result["error"]["retryable"]), (1, "GCP_SIGN_IN_FAILED", False))
+
+    def test_a_delete_still_running_when_the_wait_ends_is_retried(self) -> None:
+        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"resource": {"type": "gcp/cloud-run-service", "id": PATH}}}))
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client_cls.return_value.get_service.return_value = MagicMock(labels={"vertra-made": "true"})
+            client_cls.return_value.delete_service.return_value.result.side_effect = TimeoutError()
+            self.assertEqual(self.module.main(), 1)
+        error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_TIMEOUT", True))
+
 
 if __name__ == "__main__":
     unittest.main()

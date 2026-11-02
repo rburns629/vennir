@@ -25,6 +25,7 @@ from typing import Any
 
 import google.auth
 import google.auth.credentials
+import google.auth.exceptions
 from google.api_core.exceptions import AlreadyExists, GoogleAPIError, NotFound, PermissionDenied
 from google.auth import impersonated_credentials
 from google.cloud import resourcemanager_v3
@@ -81,6 +82,14 @@ def _build_credentials() -> google.auth.credentials.Credentials | None:
     )
 
 
+def _link_billing(credentials: google.auth.credentials.Credentials | None, project_id: str, billing_account_id: str) -> None:
+    """Links the project to the billing account: the same again changes nothing."""
+    CloudBillingClient(credentials=credentials).update_project_billing_info(
+        name=f"projects/{project_id}",
+        project_billing_info=ProjectBillingInfo(billing_account_name=f"billingAccounts/{billing_account_id}"),
+    )
+
+
 def _outputs(project_id: str, made_here: bool) -> dict[str, Any]:
     """The projectId, and the project as a resource when this product made it."""
     outputs: dict[str, Any] = {"projectId": project_id}
@@ -96,6 +105,20 @@ def _outputs(project_id: str, made_here: bool) -> dict[str, Any]:
 
 
 def main() -> int:
+    try:
+        return _run()
+    except google.auth.exceptions.GoogleAuthError as error:
+        # Signing in, not the call: no Google credentials here, gcp-target
+        # refused to be impersonated, or Google unreachable to ask.
+        retryable = error.retryable or isinstance(error, google.auth.exceptions.TransportError)
+        return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
+    except TimeoutError as error:
+        # A call unanswered, or an operation still running when the client
+        # stopped waiting for it: the next attempt finds what it made.
+        return _failure("GCP_TIMEOUT", f"Google didn't finish in time: {error or 'no answer'}", retryable=True)
+
+
+def _run() -> int:
     request = json.loads(INPUT_PATH.read_text())
     inputs = request.get("inputs", {})
 
@@ -105,21 +128,29 @@ def main() -> int:
 
     credentials = _build_credentials()
     projects = resourcemanager_v3.ProjectsClient(credentials=credentials)
+    billing_account_id = inputs.get("billingAccountId")
 
     # Existing-user path: a project with this id already exists, so this
     # action is a no-op other than reporting it back.
     try:
         existing = projects.get_project(name=f"projects/{project_id}")
-        print(f"project '{project_id}' already exists, skipping creation")
-        made_here = dict(existing.labels).get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1]
-        _write_result({"status": "succeeded", "outputs": _outputs(project_id, made_here)})
-        return 0
     except (NotFound, PermissionDenied):
         # A project that doesn't exist is a 403 too, unless this identity
         # may see wherever it would be: creating it tells them apart.
-        pass
+        existing = None
     except GoogleAPIError as error:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
+    if existing is not None:
+        print(f"project '{project_id}' already exists, skipping creation")
+        made_here = dict(existing.labels).get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1]
+        if made_here and billing_account_id:
+            # The attempt that made it may have stopped before linking it.
+            try:
+                _link_billing(credentials, project_id, billing_account_id)
+            except GoogleAPIError as error:
+                return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
+        _write_result({"status": "succeeded", "outputs": _outputs(project_id, made_here)})
+        return 0
 
     # New-user path: create the project, then link billing if given --
     # without it the project exists but can't run billable services like
@@ -135,14 +166,8 @@ def main() -> int:
         )
         operation.result()  # blocks until the long-running create completes
 
-        billing_account_id = inputs.get("billingAccountId")
         if billing_account_id:
-            CloudBillingClient(credentials=credentials).update_project_billing_info(
-                name=f"projects/{project_id}",
-                project_billing_info=ProjectBillingInfo(
-                    billing_account_name=f"billingAccounts/{billing_account_id}"
-                ),
-            )
+            _link_billing(credentials, project_id, billing_account_id)
     except AlreadyExists:
         return _failure("PROJECT_ID_TAKEN", f"project id '{project_id}' is already taken, somewhere this product can't see")
     except GoogleAPIError as error:

@@ -72,6 +72,10 @@ class DeleteActionTest(unittest.TestCase):
         code, result, _ = self._run({"type": "gcp/bucket", "id": "x"})
         self.assertEqual((code, result["error"]["code"]), (1, "MISSING_INPUT"))
 
+    def test_impersonation_refused_writes_a_result(self) -> None:
+        code, result, _ = self._run({"type": "gcp/project", "id": "made-here"}, get_error=self.module.google.auth.exceptions.RefreshError("denied"))
+        self.assertEqual((code, result["error"]["code"], result["error"]["retryable"]), (1, "GCP_SIGN_IN_FAILED", False))
+
 
 if __name__ == "__main__":
     unittest.main()

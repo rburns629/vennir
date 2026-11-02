@@ -33,6 +33,7 @@ from urllib.parse import urlsplit
 
 import google.auth
 import google.auth.credentials
+import google.auth.exceptions
 from google.api_core.exceptions import GoogleAPIError, NotFound
 from google.auth import impersonated_credentials
 from google.cloud import artifactregistry_v1
@@ -46,6 +47,18 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 # secretRefs. See the gcp team's README.md.
 TARGET_SERVICE_ACCOUNT_FILE = Path("/platform/secrets/gcp-target/service-account")
 IMPERSONATION_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
+
+# How a build that didn't succeed ended. Cloud Build's own trouble, or a
+# build left queued too long, may pass; the build failing, running out of
+# time or being cancelled ends the same way again, so isn't retried.
+FAILED_BUILD_STATUSES = (
+    cloudbuild_v1.Build.Status.FAILURE,
+    cloudbuild_v1.Build.Status.INTERNAL_ERROR,
+    cloudbuild_v1.Build.Status.TIMEOUT,
+    cloudbuild_v1.Build.Status.CANCELLED,
+    cloudbuild_v1.Build.Status.EXPIRED,
+)
+RETRIED_BUILD_STATUSES = (cloudbuild_v1.Build.Status.INTERNAL_ERROR, cloudbuild_v1.Build.Status.EXPIRED)
 
 
 def _write_result(result: dict[str, Any]) -> None:
@@ -115,6 +128,20 @@ def _artifact_registry_tag_name(image_uri: str) -> str | None:
 
 
 def main() -> int:
+    try:
+        return _run()
+    except google.auth.exceptions.GoogleAuthError as error:
+        # Signing in, not the call: no Google credentials here, gcp-target
+        # refused to be impersonated, or Google unreachable to ask.
+        retryable = error.retryable or isinstance(error, google.auth.exceptions.TransportError)
+        return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
+    except TimeoutError as error:
+        # A call unanswered, or an operation still running when the client
+        # stopped waiting for it: the next attempt finds what it made.
+        return _failure("GCP_TIMEOUT", f"Google didn't finish in time: {error or 'no answer'}", retryable=True)
+
+
+def _run() -> int:
     request = json.loads(INPUT_PATH.read_text())
     inputs = request.get("inputs", {})
 
@@ -162,15 +189,24 @@ def main() -> int:
         operation = cloudbuild_v1.CloudBuildClient(credentials=credentials).create_build(
             project_id=project_id, build=build
         )
-        result = operation.result()  # blocks until the build finishes
     except GoogleAPIError as error:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
+    try:
+        result = operation.result()  # blocks until the build finishes
+    except GoogleAPIError as error:
+        # A build that ran and failed ends its operation with an error too
+        # (UNKNOWN, no HTTP code), which alone would be retried: the build
+        # itself says how it ended.
+        metadata = operation.metadata
+        result = metadata.build if metadata is not None else None
+        if result is None or result.status not in FAILED_BUILD_STATUSES:
+            return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     if result.status != cloudbuild_v1.Build.Status.SUCCESS:
         return _failure(
             "BUILD_FAILED",
-            f"Cloud Build finished with status {result.status.name}: {result.status_detail}",
-            retryable=True,
+            f"Cloud Build {result.id} finished with status {result.status.name}: {result.status_detail}",
+            retryable=result.status in RETRIED_BUILD_STATUSES,
         )
 
     print(f"built '{source_archive_url}' -> {image_uri}")

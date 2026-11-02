@@ -16,6 +16,7 @@ from typing import Any
 
 import google.auth
 import google.auth.credentials
+import google.auth.exceptions
 from google.api_core.exceptions import GoogleAPIError, NotFound, PermissionDenied
 from google.auth import impersonated_credentials
 from google.cloud import resourcemanager_v3
@@ -57,6 +58,20 @@ def _build_credentials() -> google.auth.credentials.Credentials | None:
 
 
 def main() -> int:
+    try:
+        return _run()
+    except google.auth.exceptions.GoogleAuthError as error:
+        # Signing in, not the call: no Google credentials here, gcp-target
+        # refused to be impersonated, or Google unreachable to ask.
+        retryable = error.retryable or isinstance(error, google.auth.exceptions.TransportError)
+        return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
+    except TimeoutError as error:
+        # A call unanswered, or an operation still running when the client
+        # stopped waiting for it: the next attempt finds what it made.
+        return _failure("GCP_TIMEOUT", f"Google didn't finish in time: {error or 'no answer'}", retryable=True)
+
+
+def _run() -> int:
     resource = json.loads(INPUT_PATH.read_text()).get("inputs", {}).get("resource") or {}
     project_id = resource.get("id") if isinstance(resource, dict) else None
     if not project_id or resource.get("type") != "gcp/project":

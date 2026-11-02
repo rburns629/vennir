@@ -193,6 +193,25 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(result["error"]["code"], "GCP_API_ERROR")
         self.assertFalse(result["error"]["retryable"])
 
+    def test_a_deploy_still_running_when_the_wait_ends_is_retried(self) -> None:
+        self._write_request({"projectId": "p", "serviceName": "hello", "image": "us-docker.pkg.dev/p/r/hello:1"})
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client = client_cls.return_value
+            client.get_service.side_effect = self.module.NotFound("no such service")
+            client.create_service.return_value.result.side_effect = TimeoutError()
+            self.assertEqual(self.module.main(), 1)
+        error = self._result()["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_TIMEOUT", True))
+
+    def test_google_unreachable_to_sign_in_is_retried(self) -> None:
+        self._write_request({"projectId": "p", "serviceName": "hello", "image": "us-docker.pkg.dev/p/r/hello:1"})
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client_cls.return_value.get_service.side_effect = self.module.google.auth.exceptions.TransportError("reset")
+            self.assertEqual(self.module.main(), 1)
+        error = self._result()["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", True))
+
+
 class BuildCredentialsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.module = _load_create_module()

@@ -26,6 +26,7 @@ from typing import Any
 
 import google.auth
 import google.auth.credentials
+import google.auth.exceptions
 from google.api_core.exceptions import GoogleAPIError, NotFound
 from google.auth import impersonated_credentials
 from google.cloud import run_v2
@@ -97,6 +98,20 @@ def _outputs(service: Any, project_id: str, region: str, service_name: str, made
 
 
 def main() -> int:
+    try:
+        return _run()
+    except google.auth.exceptions.GoogleAuthError as error:
+        # Signing in, not the call: no Google credentials here, gcp-target
+        # refused to be impersonated, or Google unreachable to ask.
+        retryable = error.retryable or isinstance(error, google.auth.exceptions.TransportError)
+        return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
+    except TimeoutError as error:
+        # A call unanswered, or an operation still running when the client
+        # stopped waiting for it: the next attempt finds what it made.
+        return _failure("GCP_TIMEOUT", f"Google didn't finish in time: {error or 'no answer'}", retryable=True)
+
+
+def _run() -> int:
     request = json.loads(INPUT_PATH.read_text())
     inputs = request.get("inputs", {})
 

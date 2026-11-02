@@ -16,6 +16,7 @@ from typing import Any
 
 import google.auth
 import google.auth.credentials
+import google.auth.exceptions
 from google.auth import impersonated_credentials
 from googleapiclient import discovery
 from googleapiclient.errors import HttpError
@@ -75,6 +76,20 @@ def _wait_for_operation(service, project_id: str, operation_name: str) -> tuple[
 
 
 def main() -> int:
+    try:
+        return _run()
+    except google.auth.exceptions.GoogleAuthError as error:
+        # Signing in, not the call: no Google credentials here, gcp-target
+        # refused to be impersonated, or Google unreachable to ask.
+        retryable = error.retryable or isinstance(error, google.auth.exceptions.TransportError)
+        return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
+    except TimeoutError as error:
+        # A call unanswered, or an operation still running when the client
+        # stopped waiting for it: the next attempt finds what it made.
+        return _failure("GCP_TIMEOUT", f"Google didn't finish in time: {error or 'no answer'}", retryable=True)
+
+
+def _run() -> int:
     resource = json.loads(INPUT_PATH.read_text()).get("inputs", {}).get("resource") or {}
     connection = resource.get("id") if isinstance(resource, dict) else None
     match = CONNECTION_NAME.match(connection) if isinstance(connection, str) else None
