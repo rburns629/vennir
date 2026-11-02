@@ -173,7 +173,7 @@ Admins are alerted when the catalog hasn't been pulled for 30 minutes.
 `/admin/images`. The registry paths task images may come from. The cluster refuses any other image when a step starts, however it was submitted (`IMAGE_NOT_ALLOWED`). A save takes effect for every team at once.
 
 - **Source registry**: where catalog CI publishes product images, such as `us-central1-docker.pkg.dev/my-project/catalog-products`. Required.
-- **Add a source**: more allowed paths, such as `docker.io/library`. Base images a Dockerfile builds from don't need listing: they're part of the published image.
+- **Add a source**: more allowed paths, such as `docker.io/library`. Base images a Dockerfile builds from don't need listing: they're part of the published image. Where the install requires signed images (below), an added source's images still don't run: only images catalog CI signed, from the source registry, do.
 - **Save image sources** saves both; **Discard changes** puts back what's saved. Under them: who last saved them here, and when (from the audit log).
 
 Each entry is a path prefix. Saving a whole registry host, such as `docker.io`, asks you to confirm: any image anyone has published there could run. Prefer a specific path.
@@ -184,7 +184,7 @@ Set by the install: the first value only. `taskImages.registry` in vertra.yaml (
 
 Admins are alerted when the image sources change.
 
-**What an image passes before it runs** lists the four checks the cluster makes when a step starts: it comes from an allowed source (`IMAGE_NOT_ALLOWED`), it's pinned to a digest (`IMAGE_NOT_PINNED`), it passed its scan (`IMAGE_SCAN_FAILED`), and, when the install requires it (the kernel chart's `imageSignature`), a catalog image is signed (`IMAGE_NOT_SIGNED`). Whether it's required is read from the cluster: the kernel chart's signature policy is there or not; if the console can't read it, the page says so.
+**What an image passes before it runs** lists the four checks the cluster makes when a step starts: it comes from an allowed source (`IMAGE_NOT_ALLOWED`), it's pinned to a digest (`IMAGE_NOT_PINNED`), it passed its scan (`IMAGE_SCAN_FAILED`), and, when the install requires it (the kernel chart's `imageSignature`), it's signed by catalog CI and from the source registry, which images from added sources aren't (`IMAGE_NOT_SIGNED`). Whether it's required is read from the cluster: the kernel chart's signature policy is there or not; if the console can't read it, the page says so.
 
 ### Image scans
 

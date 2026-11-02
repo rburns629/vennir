@@ -98,10 +98,16 @@ Kernel and alerts:
   out its 10 s and were retried, and a pass that dispatches records
   nothing that finished until it's done. Recorded first now, in a
   transaction of its own (2026-11-02, the kernel's `RecordPass`, then
-  `DispatchPass`; to see on GKE). Left: size policy-controller for
-  the install (more CPU on Autopilot, two replicas: `helm/values/gke/policy-controller.yaml`
-  already sets `webhook.replicaCount: 2`, vertra's install doesn't), and check
-  whether it need verify Jobs as well as their Pods. Also to see on the next
+  `DispatchPass`; to see on GKE). And policy-controller checks Pods only
+  now (the kernel chart's policy `match`; a refused Pod read as
+  `IMAGE_NOT_SIGNED`), with a second policy passing Jobs and other workloads,
+  so a Job's creation never waits on it; `no-match-policy` stays `deny`, so
+  only signed source-registry images run in team namespaces (seen on kind,
+  2026-11-02). To see on GKE: the webhook still admits each Job (no
+  signature fetched), so if Job creation is still slow there, size
+  policy-controller for the install (CPU on Autopilot, a second replica on
+  resilient and scaled). And the Admin page's image sources card could say
+  that added sources don't run where signing is required (canvas first). Also to see on the next
   GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
 
 ## Installing and operating

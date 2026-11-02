@@ -994,6 +994,28 @@ func TestAStepThatCanNeverFitItsTeamFailsAndOneWaitingForRoomDoesnt(t *testing.T
 	check(t, "too big", s.State, Failed)
 	check(t, "code", s.Error.Code, "RESOURCES_NOT_ALLOWED")
 	check(t, "retryable", s.Error.Retryable, false)
+
+	// policy-controller checks the Pod, not the Job: its refusal, as kind's
+	// showed it (2026-11-02), fails the step at once, not at the start timeout.
+	refused := "Error creating: admission webhook \"policy.sigstore.dev\" denied the request: validation failed: failed policy: pc-test-signed: spec.containers[0].image\n" +
+		"docker.io/library/busybox@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec signature key validation failed for authority authority-0 for index.docker.io/library/busybox@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec: no signatures found"
+	c = newCluster(options(), job, event(refused))
+	s, err = c.k.Status(context.Background(), Handle{"namespace": ns, "jobName": name})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check(t, "unsigned", s.State, Failed)
+	check(t, "code", s.Error.Code, "IMAGE_NOT_SIGNED")
+	check(t, "retryable", s.Error.Retryable, false)
+	check(t, "why", strings.HasSuffix(s.Error.Message, "no signatures found. The cluster only runs images from the source registry that catalog CI signed after they passed its security scans."), true)
+
+	// Its webhook not answering is no verdict: the Job controller tries again.
+	c = newCluster(options(), job, event(`Error creating: Internal error occurred: failed calling webhook "policy.sigstore.dev": failed to call webhook: context deadline exceeded`))
+	s, err = c.k.Status(context.Background(), Handle{"namespace": ns, "jobName": name})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check(t, "webhook slow", s.State, Running)
 }
 
 // --- Pods no node has room for ---

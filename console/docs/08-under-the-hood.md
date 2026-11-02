@@ -89,7 +89,7 @@ flowchart TB
 
 ### Signed images
 - **Normally:** images are trusted because they're in your registry.
-- **Here:** the catalog's CI signs each product image only after it passes its security scans: with a generated key pair, a cloud KMS key, or keyless (its own OIDC identity, no key anywhere). When an install turns on `imageSignature`, Sigstore's policy-controller, an admission webhook, refuses unsigned catalog images with `IMAGE_NOT_SIGNED`, on any cluster it's installed on (the GKE and EKS values turn it on; it isn't installed on kind, which can't reach its local registry).
+- **Here:** the catalog's CI signs each product image only after it passes its security scans: with a generated key pair, a cloud KMS key, or keyless (its own OIDC identity, no key anywhere). When an install turns on `imageSignature`, Sigstore's policy-controller, an admission webhook, refuses any image in a team namespace that isn't signed and from the source registry (an admin-added source's too) with `IMAGE_NOT_SIGNED`, on any cluster it's installed on (the GKE and EKS values turn it on; it isn't installed on kind, which can't reach its local registry).
 - **Code:** `helm/charts/execution-kernel/templates/image-signature.yaml`, `helm/values/{gke,eks}/policy-controller.yaml`, the catalog's `ci.yml`.
 
 ### Cloud access without keys
