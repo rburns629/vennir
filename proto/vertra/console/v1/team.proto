@@ -193,8 +193,9 @@ message TeamSummary {
   string owner = 2;
   string description = 3;
   int32 people = 4;
-  // Its namespace's Pods not finished: starting, running, or unable to start.
-  int32 running = 5;
+  // Its namespace's Pods not finished: starting, running, or unable to
+  // start. Unset when the cluster couldn't be asked.
+  optional int32 running = 5;
 }
 
 message GetTeamRequest {

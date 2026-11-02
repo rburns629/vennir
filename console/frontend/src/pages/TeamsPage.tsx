@@ -107,7 +107,7 @@ export function TeamsPage() {
   }, [isAdmin]);
 
   const others = (allTeams ?? []).filter((team) => !user?.teamNames.includes(team.name));
-  const facts = useTeamSummaries(others);
+  const facts = useTeamSummaries(allTeams ?? []);
 
   async function handleCreateTeam(event: FormEvent): Promise<void> {
     event.preventDefault();

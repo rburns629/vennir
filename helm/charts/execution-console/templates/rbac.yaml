@@ -87,8 +87,10 @@ rules:
   {{- end }}
   # listTaskPods -- read-only visibility into a team's own
   # running work (core/teams.ts, teamPods), no different in kind from `kubectl
-  # get pods -n <team>`. Deliberately no "watch" -- this is a plain,
-  # on-demand list, not a live stream held open server-side.
+  # get pods -n <team>`; and unfinishedPodsByNamespace, an admin's count of
+  # every namespace's unfinished Pods (teamSummaries), across the cluster.
+  # Deliberately no "watch" -- these are plain, on-demand lists, not a live
+  # stream held open server-side.
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list"]

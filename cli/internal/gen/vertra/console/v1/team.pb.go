@@ -638,8 +638,9 @@ type TeamSummary struct {
 	Owner       string `protobuf:"bytes,2,opt,name=owner,proto3" json:"owner,omitempty"`
 	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	People      int32  `protobuf:"varint,4,opt,name=people,proto3" json:"people,omitempty"`
-	// Its namespace's Pods not finished: starting, running, or unable to start.
-	Running       int32 `protobuf:"varint,5,opt,name=running,proto3" json:"running,omitempty"`
+	// Its namespace's Pods not finished: starting, running, or unable to
+	// start. Unset when the cluster couldn't be asked.
+	Running       *int32 `protobuf:"varint,5,opt,name=running,proto3,oneof" json:"running,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -703,8 +704,8 @@ func (x *TeamSummary) GetPeople() int32 {
 }
 
 func (x *TeamSummary) GetRunning() int32 {
-	if x != nil {
-		return x.Running
+	if x != nil && x.Running != nil {
+		return *x.Running
 	}
 	return 0
 }
@@ -2549,13 +2550,15 @@ const file_vertra_console_v1_team_proto_rawDesc = "" +
 	"\x05teams\x18\x01 \x03(\v2\x17.vertra.console.v1.TeamR\x05teams\"\x1a\n" +
 	"\x18ListTeamSummariesRequest\"Q\n" +
 	"\x19ListTeamSummariesResponse\x124\n" +
-	"\x05teams\x18\x01 \x03(\v2\x1e.vertra.console.v1.TeamSummaryR\x05teams\"\x8b\x01\n" +
+	"\x05teams\x18\x01 \x03(\v2\x1e.vertra.console.v1.TeamSummaryR\x05teams\"\x9c\x01\n" +
 	"\vTeamSummary\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05owner\x18\x02 \x01(\tR\x05owner\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x16\n" +
-	"\x06people\x18\x04 \x01(\x05R\x06people\x12\x18\n" +
-	"\arunning\x18\x05 \x01(\x05R\arunning\"$\n" +
+	"\x06people\x18\x04 \x01(\x05R\x06people\x12\x1d\n" +
+	"\arunning\x18\x05 \x01(\x05H\x00R\arunning\x88\x01\x01B\n" +
+	"\n" +
+	"\b_running\"$\n" +
 	"\x0eGetTeamRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\">\n" +
 	"\x0fGetTeamResponse\x12+\n" +
@@ -2852,6 +2855,7 @@ func file_vertra_console_v1_team_proto_init() {
 	if File_vertra_console_v1_team_proto != nil {
 		return
 	}
+	file_vertra_console_v1_team_proto_msgTypes[7].OneofWrappers = []any{}
 	file_vertra_console_v1_team_proto_msgTypes[32].OneofWrappers = []any{}
 	file_vertra_console_v1_team_proto_msgTypes[38].OneofWrappers = []any{}
 	file_vertra_console_v1_team_proto_msgTypes[40].OneofWrappers = []any{}

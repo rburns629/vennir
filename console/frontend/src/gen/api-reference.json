@@ -9921,8 +9921,8 @@
      "name": "running",
      "type": "integer",
      "repeated": false,
-     "optional": false,
-     "comment": "Its namespace's Pods not finished: starting, running, or unable to start."
+     "optional": true,
+     "comment": "Its namespace's Pods not finished: starting, running, or unable to\nstart. Unset when the cluster couldn't be asked."
     }
    ]
   },

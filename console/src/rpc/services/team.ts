@@ -107,7 +107,7 @@ export function teamService(): ServiceImpl<typeof TeamService> {
     },
 
     async listTeamSummaries(_req, ctx) {
-      return { teams: await teamSummaries(callerOf(ctx)) };
+      return { teams: await teamSummaries(callerOf(ctx), logOf(ctx)) };
     },
 
     async createTeam(req, ctx) {

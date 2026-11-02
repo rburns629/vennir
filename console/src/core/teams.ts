@@ -532,7 +532,7 @@ export async function teamPods(caller: AuthUser | undefined, teamName: string) {
 
 /** Every team's owner, description, people and Pods running now, for an
  * admin's Teams page: one query and one Pod list, not two requests a team. */
-export async function teamSummaries(caller: AuthUser | undefined) {
+export async function teamSummaries(caller: AuthUser | undefined, log: FastifyBaseLogger) {
   forbiddenUnlessAdmin(caller);
   const [rows, running] = await Promise.all([
     db
@@ -541,7 +541,11 @@ export async function teamSummaries(caller: AuthUser | undefined) {
       .leftJoin(teamMemberships, eq(teamMemberships.teamId, teams.id))
       .where(isNull(teams.deletedAt))
       .groupBy(teams.id),
-    unfinishedPodsByNamespace(),
+    // Only the running figure needs the cluster: without it, the rest still shows.
+    unfinishedPodsByNamespace().catch((error: unknown) => {
+      log.error({ err: error }, "couldn't list the cluster's Pods for the teams' running figures");
+      return null;
+    }),
   ]);
   return rows.map((row) => ({
     name: row.name,
@@ -549,7 +553,7 @@ export async function teamSummaries(caller: AuthUser | undefined) {
     description: row.description ?? "",
     people: row.people,
     // teams.name is its namespace's name.
-    running: running.get(row.name) ?? 0,
+    running: running ? (running.get(row.name) ?? 0) : undefined,
   }));
 }
 

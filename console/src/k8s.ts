@@ -1080,12 +1080,28 @@ export async function listTaskPods(namespace: string): Promise<TaskPodSummary[]>
   });
 }
 
+/** Pods listed across the cluster a page at a time, so a big cluster's
+ * aren't all held at once. */
+const POD_PAGE = 500;
+
 /** How many Pods in each namespace aren't finished (starting, running or
  * unable to start): one list across the cluster, for an admin's list of
- * teams, rather than one a team. */
+ * teams, rather than one a team. Finished Pods (most, in a team's
+ * namespace) aren't fetched at all. */
 export async function unfinishedPodsByNamespace(): Promise<Map<string, number>> {
   const { core } = getApis();
-  return countUnfinishedPods((await core.listPodForAllNamespaces({})).items);
+  const counts = new Map<string, number>();
+  let next: string | undefined;
+  do {
+    const page = await core.listPodForAllNamespaces({
+      fieldSelector: "status.phase!=Succeeded,status.phase!=Failed",
+      limit: POD_PAGE,
+      ...(next ? { _continue: next } : {}),
+    });
+    for (const [namespace, n] of countUnfinishedPods(page.items)) counts.set(namespace, (counts.get(namespace) ?? 0) + n);
+    next = page.metadata?._continue || undefined;
+  } while (next);
+  return counts;
 }
 
 /** unfinishedPodsByNamespace's count, of Pods already listed. */

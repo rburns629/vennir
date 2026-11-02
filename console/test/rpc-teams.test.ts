@@ -24,7 +24,7 @@ vi.mock("../src/productPolicy.js", async (importOriginal) => ({
 }));
 vi.mock("../src/k8s.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/k8s.js")>()),
-  unfinishedPodsByNamespace: vi.fn(() => Promise.resolve(running)),
+  unfinishedPodsByNamespace: vi.fn(() => (running ? Promise.resolve(running) : Promise.reject(new Error("pods is forbidden")))),
 }));
 vi.mock("../src/kernel/client.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/kernel/client.js")>()),
@@ -33,7 +33,7 @@ vi.mock("../src/kernel/client.js", async (importOriginal) => ({
 
 let app: FastifyInstance;
 // What the cluster has running, by namespace, as the stand-in Pod list says.
-let running = new Map<string, number>();
+let running: Map<string, number> | null = new Map<string, number>();
 const { rpc, makeUser, signIn, cleanUp } = rpcClient(() => app);
 const prefix = `rpc-team-${randomUUID().slice(0, 6)}`;
 let admin: string;
@@ -208,6 +208,17 @@ describe("an admin's list of every team", () => {
 
     const member = await signIn((await makeUser()).email);
     expect((await rpc("TeamService", "ListTeamSummaries", {}, { token: member })).statusCode).toBe(403);
+  });
+
+  it("still gives the rest when the cluster can't be asked, without a running figure", async () => {
+    const name = `${prefix}-summarized-unasked`;
+    const team = await createTeam(name);
+    await addTeamMember((await makeUser()).id, team.id, "member");
+    running = null;
+    const response = await rpc("TeamService", "ListTeamSummaries", {}, { token: admin });
+    running = new Map();
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ teams: { name: string }[] }>().teams.find((t) => t.name === name)).toEqual({ name, owner: "", description: "", people: 1 });
   });
 
   it("counts a namespace's Pods not finished: starting, running, or unable to start", () => {

@@ -2613,12 +2613,13 @@ export interface TeamSummary {
   owner: string | null;
   description: string | null;
   people: number;
-  running: number;
+  /** Null when the cluster couldn't be asked. */
+  running: number | null;
 }
 
 export async function listTeamSummaries(): Promise<TeamSummary[]> {
   const r = await call(() => teams.listTeamSummaries({}));
-  return r.teams.map((t) => ({ name: t.name, owner: t.owner || null, description: t.description || null, people: t.people, running: t.running }));
+  return r.teams.map((t) => ({ name: t.name, owner: t.owner || null, description: t.description || null, people: t.people, running: t.running ?? null }));
 }
 
 export async function getEmailPreferences(): Promise<{ available: boolean; kinds: string[] }> {

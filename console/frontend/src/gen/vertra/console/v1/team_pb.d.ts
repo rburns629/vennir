@@ -299,11 +299,12 @@ export declare type TeamSummary = Message<"vertra.console.v1.TeamSummary"> & {
   people: number;
 
   /**
-   * Its namespace's Pods not finished: starting, running, or unable to start.
+   * Its namespace's Pods not finished: starting, running, or unable to
+   * start. Unset when the cluster couldn't be asked.
    *
-   * @generated from field: int32 running = 5;
+   * @generated from field: optional int32 running = 5;
    */
-  running: number;
+  running?: number | undefined;
 };
 
 /**
