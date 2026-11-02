@@ -383,15 +383,42 @@ Autopilot couldn't add nodes (`SSD_TOTAL_GB`, 500 in the project): 0.41
 steps a second, container start p95 146 s, completion lag p50 11.7 s and
 p95 31 s, as Pods waited to be scheduled. `vertra apply` had warned of the
 quota. Nothing alerts on dispatched steps whose Pods can't be scheduled
-(TODO.md), and completion lag rising with them is worth a look.
+(TODO.md), and completion lag rising with them is worth a look (it was:
+below).
 
 **4. Losing a Pod retries the step.** A step's Pod evicted through the
 Eviction API (as a Spot reclaim or a drain does) failed its attempt
 `POD_TERMINATED_UNEXPECTEDLY`, retryable; the second attempt succeeded.
 
+## Steps waiting for nodes (2026-11-02)
+
+Why completion lag rose on GKE with Pods waiting for nodes (point 3
+above): every pass read each dispatched Job whose Pod wasn't ready, a Job
+GET and a Pod LIST, about once a second. 35 waiting wanted about 70 calls
+a second, over the client's 50, so every call waited its turn, a finished
+step's reads too. A Job whose Pod waits for a node (or for its container)
+now rests until the watch reports a change, as a ready one did; one
+pulling its image, or with no Pod, is still read every pass.
+
+Reproduced on `vertra-perf` at GKE's proportions: 15 steps of a temporary
+product whose Spot capacity was placed on a node label nothing has (so
+they waited for good), the client's limit lowered to 20 a second (15
+waiting want about 30), and a light load (40 one-step DAGs of a 1 s step,
+0.5 a second), so the reads, not the load's own calls, filled the budget:
+
+| | before | after |
+| --- | ---: | ---: |
+| Job GETs and Pod LISTs a minute, the 15 waiting alone | 1,148 | 112 |
+| completion lag, p50 / p95 | 3.7 s / 5.7 s | 0.64 s / 1.7 s |
+| queue wait, p50 | 1.0 s | 0.28 s |
+
+At the usual limit (50) with 15 waiting, `burst` didn't change (2.6 s
+p50 both): about 30 reads a second fit. With the limit at 20 and `burst`,
+its own calls filled the budget whatever the waiting did (6.8 s and 6.2 s
+p50). Not proven on GKE itself.
+
 ## Next (TODO.md)
 
-Completion lag when dispatched Pods can't be scheduled (point 3 above).
 Here: nothing left; the `perf` workflow (`.github/workflows/perf.yml`)
 compares each weekly run with its last. `perf/`'s own tests run in CI
 (2026-10-29).
