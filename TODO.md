@@ -98,8 +98,10 @@ Kernel and alerts:
   out its 10 s and were retried, and a pass that dispatches records
   nothing that finished until it's done. Worth doing: record what finished
   before dispatching in a pass (the kernel), and size policy-controller for
-  the install (more CPU on Autopilot, two replicas; vertra sets its
-  values), and check whether it need verify Jobs as well as their Pods.
+  the install (more CPU on Autopilot, two replicas: `helm/values/gke/policy-controller.yaml`
+  already sets `webhook.replicaCount: 2`, vertra's install doesn't), and check
+  whether it need verify Jobs as well as their Pods. Also to see on the next
+  GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
 
 Samples and catalog CI:
 - [ ] **The aws and azure samples' `clouds`** (`clouds: [aws]`, `[azure]` in

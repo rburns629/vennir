@@ -143,6 +143,9 @@ class CreateActionTest(unittest.TestCase):
         # The same source fails the same way again.
         self.assertFalse(result["error"]["retryable"])
 
+    def test_an_image_by_digest_has_no_tag_to_look_up(self) -> None:
+        self.assertIsNone(self.module._artifact_registry_tag_name("us-central1-docker.pkg.dev/my-project/demo/api@sha256:" + "a" * 64))
+
     def test_an_image_in_a_folder_is_looked_up_by_its_encoded_package(self) -> None:
         self._write_request(dict(_VALID_INPUTS, imageUri="us-central1-docker.pkg.dev/my-project/demo/payments/api:v2"))
         with (
