@@ -101,17 +101,21 @@ func TestStoppingCutsTheWaitShortAndReleasesLeases(t *testing.T) {
 	equal(t, "lease handed back", tk.LeaseExpiresAt != nil && !tk.LeaseExpiresAt.After(time.Now()), true)
 }
 
-// blockingStart holds every Start until release is closed, as an admission
-// webhook waiting out its timeout does a Job's creation.
+// blockingStart holds the Start of this test's tasks until release is
+// closed, as an admission webhook waiting out its timeout does a Job's
+// creation; any other ready task in the shared database passes straight on.
 type blockingStart struct {
 	*executortest.Fake
+	ours     map[string]bool
 	starting chan struct{}
 	release  chan struct{}
 }
 
 func (b *blockingStart) Start(ctx context.Context, task executor.ResolvedTask) (executor.Handle, error) {
-	b.starting <- struct{}{}
-	<-b.release
+	if b.ours[task.ExecutionID] {
+		b.starting <- struct{}{}
+		<-b.release
+	}
 	return b.Fake.Start(ctx, task)
 }
 
@@ -119,6 +123,7 @@ func (b *blockingStart) Start(ctx context.Context, task executor.ResolvedTask) (
 // until its dispatches were done. Now what finished commits first.
 func TestWhatFinishedIsCommittedBeforeASlowDispatch(t *testing.T) {
 	ctx := context.Background()
+	exec := &blockingStart{Fake: fake(), ours: map[string]bool{}, starting: make(chan struct{}, 1), release: make(chan struct{})}
 	submitted := func(name string) string {
 		var id string
 		if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
@@ -128,9 +133,9 @@ func TestWhatFinishedIsCommittedBeforeASlowDispatch(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _, _ = testPool.Exec(ctx, `DELETE FROM executions WHERE id = $1`, id) })
+		exec.ours[id] = true
 		return id
 	}
-	exec := &blockingStart{Fake: fake(), starting: make(chan struct{}, 1), release: make(chan struct{})}
 	loop := &Loop{Pool: testPool, Executor: exec, Options: DefaultOptions(fmt.Sprintf("loop-slow-%d", time.Now().UnixNano())), Log: quietLog}
 
 	first := submitted("loop-first")

@@ -152,7 +152,8 @@ A pass (`internal/scheduler/tick.go`) is three phases. The loop runs
 phase C first, `RecordPass()`, and commits it; then phases A and B,
 `DispatchPass()`, in a transaction of their own: a dispatch held up by the
 API server (an admission webhook waiting out its timeout, seen on GKE)
-never holds what finished, and a task finishing releases its dependents
+never holds what this scheduler finished (another scheduler's can, on a
+row they both need), and a task finishing releases its dependents
 to be claimed in the same pass. `RunTick()` runs both in the caller's one
 transaction, for tests. Only the executor calls overlap (up to
 `SCHEDULER_EXECUTOR_CONCURRENCY` at once, `gather`): every row read and

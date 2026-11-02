@@ -129,8 +129,15 @@ func TestACancelDuringDispatchLeavesTheTaskForTheSchedulerToStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// create-project recorded done, deploy-application released and dispatched as "2": uncommitted.
-	if _, err := RunTick(ctx, scheduler, exec, opts, time.Now(), quietLog); err != nil {
+	// As the loop does: create-project recorded done and deploy-application
+	// released, committed; then deploy-application dispatched as "2", uncommitted.
+	if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+		_, err := RecordPass(ctx, tx, exec, opts, time.Now(), quietLog)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DispatchPass(ctx, scheduler, exec, opts, time.Now(), quietLog); err != nil {
 		t.Fatal(err)
 	}
 	cancelled := make(chan struct{})

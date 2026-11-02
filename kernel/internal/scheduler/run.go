@@ -151,8 +151,9 @@ func (l *Loop) Run(ctx context.Context) error {
 }
 
 // pass runs one tick: what finished is recorded and committed, then ready
-// tasks claimed and dispatched in a transaction of their own, so a slow
-// dispatch never holds a finished task's record. A recorded half stands
+// tasks claimed and dispatched in a transaction of their own, so this
+// scheduler's slow dispatch never holds a finished task's record (another
+// scheduler's can, on a row they both need). A recorded half stands
 // even if the dispatch half fails: its handles are still released.
 func (l *Loop) pass(ctx context.Context) (Outcome, error) {
 	var recorded, dispatched Outcome
