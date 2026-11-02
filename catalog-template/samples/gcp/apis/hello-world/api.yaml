@@ -12,7 +12,10 @@
 #   gcloud iam service-accounts add-iam-policy-binding \
 #     hello-invoker@sandbox-web-1.iam.gserviceaccount.com \
 #     --role roles/iam.serviceAccountOpenIdTokenCreator \
-#     --member "principal://iam.googleapis.com/projects/$NUMBER/locations/global/workloadIdentityPools/$POOL/subject/system:serviceaccount:gcp:hello-world-api"
+#     --member "principal://iam.googleapis.com/projects/$NUMBER/locations/global/workloadIdentityPools/$PROJECT.svc.id.goog/subject/ns/gcp/sa/hello-world-api"
+# That's a GKE cluster's own pool ($PROJECT and $NUMBER: the cluster's
+# project). From another cluster (EKS, kind) through a pool you made, the
+# subject is the token's: .../workloadIdentityPools/$POOL/subject/system:serviceaccount:gcp:hello-world-api
 # Replace the URL, project and account with yours.
 apiVersion: vertra.dev/v2
 kind: Api

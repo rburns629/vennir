@@ -33,6 +33,9 @@ type Floor struct {
 	StepCap             int
 	Spot                bool
 	VolumeGiB           float64
+	// The optional parts' volumes (log search's, the bundled
+	// Prometheus's), awake or asleep; FloorOf adds them.
+	OptionalVolumeGiB float64
 }
 
 // Floors per size.
@@ -63,9 +66,11 @@ func FloorOf(c *config.Config) Floor {
 	}
 	if c.Logs.Enabled {
 		parts = append(parts, [2]float64{0.15, 0.375})
+		f.OptionalVolumeGiB += 2 // Loki's, beside its bucket (install.go)
 	}
 	if p := c.Monitoring.ProviderName(); c.Monitoring.Enabled && (p == "bundled" || p == "amazon") {
 		parts = append(parts, [2]float64{0.05, 0.25})
+		f.OptionalVolumeGiB += 2 // the console chart's monitoring.prometheus.size
 	}
 	if len(parts) == 0 {
 		return f

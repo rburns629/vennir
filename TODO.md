@@ -78,15 +78,6 @@ masking Secret values in logs (suggested: leave it, documented).
 Released 0.6.0 on GKE Autopilot and EKS standard. Each item names where
 it was seen.
 
-`vertra`:
-- [ ] **`catalog-template/vertra` in git pins the previous release** until
-  `pin-vertra.sh` is run after a release (0.6.0's pinned 0.5.2). `vertra
-  catalog create` now pins the release it is; a catalog made from the
-  template by hand needs `pin-vertra.sh`. Worth a release step that opens
-  the pin's pull request.
-- [ ] `apply`'s cost leaves out the optional parts' volumes (log search's
-  10 GiB, the bundled Prometheus's 2 GiB); their CPU and memory are counted.
-
 Console and gateway:
 - [ ] **Observe's alerts with Google's managed Prometheus** say "not
   configured": the console reads `/api/v1/rules`, which GMP doesn't serve.
@@ -111,14 +102,6 @@ Samples and catalog CI:
   its readiness checks, and refuse to run it there, instead of "not
   ready". Readiness proves only the identity path on this install; whether
   a product works stays the platform team's tests and catalog CI's.
-- [ ] **gcp `app-hosting`**: Cloud Run's create needs the deployer to read
-  the image's repository (`roles/artifactregistry.reader`), missing from
-  its README; its PERMISSION_DENIED was retried three times as
-  `GCP_API_ERROR` (should not be retryable); `hello-world`'s api.yaml gives
-  the Workload Identity principal in other clusters' form only (GKE's own
-  pool is `subject/ns/<ns>/sa/<sa>`).
-- [ ] The SBOM attestation's subject name is the scan's temporary tar path,
-  not the image.
 
 ## Installing and operating
 

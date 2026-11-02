@@ -57,8 +57,10 @@ gcloud resource-manager folders add-iam-policy-binding $FOLDER --role roles/reso
 gcloud projects add-iam-policy-binding $TARGET --role roles/cloudbuild.builds.editor --member "$(member build-image)"
 gcloud storage buckets add-iam-policy-binding gs://$SOURCES --role roles/storage.objectViewer --member "$(member build-image)"
 gcloud artifacts repositories add-iam-policy-binding $REPO --location $REGION --role roles/artifactregistry.reader --member "$(member build-image)"
-# app-hosting: Cloud Run services, run as the project's default compute account.
+# app-hosting: Cloud Run services, run as the project's default compute account,
+# from images it may read (Cloud Run checks the deployer can, not just itself).
 gcloud projects add-iam-policy-binding $TARGET --role roles/run.developer --member "$(member app-hosting)"
+gcloud artifacts repositories add-iam-policy-binding $REPO --location $REGION --role roles/artifactregistry.reader --member "$(member app-hosting)"
 TARGET_NUMBER=$(gcloud projects describe $TARGET --format='value(projectNumber)')
 gcloud iam service-accounts add-iam-policy-binding $TARGET_NUMBER-compute@developer.gserviceaccount.com --project $TARGET \
   --role roles/iam.serviceAccountUser --member "$(member app-hosting)"
@@ -101,7 +103,7 @@ through those its identity can see (at most 20) for one where it may:
 |---|---|---|
 | `project` | create, get and delete projects under a folder or organization, and link a billing account | `roles/browser`, `roles/resourcemanager.projectCreator`, `roles/resourcemanager.projectDeleter` on the folder; `roles/billing.user` |
 | `build-image` | create and get builds in a project | `roles/cloudbuild.builds.editor`. Its source bucket and image repository are per run: only a create finds out |
-| `app-hosting` | get, create and delete Cloud Run services in a project, and act as its default compute account | `roles/run.developer`; `roles/iam.serviceAccountUser` on that account |
+| `app-hosting` | get, create and delete Cloud Run services in a project, and act as its default compute account | `roles/run.developer`; `roles/iam.serviceAccountUser` on that account. Reading the image's repository (`roles/artifactregistry.reader`) is per run: only a create finds out |
 | `cloud-sql` | get, create and delete Cloud SQL instances in a project | `roles/cloudsql.admin` |
 
 With no Workload Identity it isn't ready, and says so. A project, folder or

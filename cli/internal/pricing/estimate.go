@@ -35,7 +35,7 @@ const nodeDiskGiB = 50
 func GCP(p *GCPPrices, c *config.Config, fetched string) []plan.Line {
 	f := plan.FloorOf(c)
 	standard := c.Cluster.Mode == "standard"
-	disks := f.VolumeGiB * p.BalancedDisk
+	disks := (f.VolumeGiB + f.OptionalVolumeGiB) * p.BalancedDisk
 	fee := p.ClusterFee * hoursPerMonth
 
 	var stepHour float64

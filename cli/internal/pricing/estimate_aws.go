@@ -50,6 +50,7 @@ func AWS(p *AWSPrices, c *config.Config, fetched string) []plan.Line {
 		always = fee + RDSMonth(p, c)
 		database = "the database (RDS)"
 	}
+	always += f.OptionalVolumeGiB * p.GP3
 	if c.Console.Public {
 		always += p.LoadBalancer*hoursPerMonth + p.HostedZone
 	}

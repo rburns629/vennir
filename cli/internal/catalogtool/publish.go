@@ -102,7 +102,7 @@ func (c *Catalog) attestSBOM(p *Product, reference string, s Settings) error {
 	}
 	defer cleanup()
 	predicate := filepath.Join(work, "sbom.json")
-	if err := os.WriteFile(predicate, p.SBOM, 0o644); err != nil {
+	if err := os.WriteFile(predicate, sbomOf(p.SBOM, reference), 0o644); err != nil {
 		return err
 	}
 	args := append([]string{"attest", "--yes", "--type", "cyclonedx", "--predicate", predicate}, signingArgs(s)...)
@@ -115,6 +115,27 @@ func (c *Catalog) attestSBOM(p *Product, reference string, s Settings) error {
 	}
 	c.info("  attached its SBOM to %s", reference)
 	return nil
+}
+
+// sbomOf is a CycloneDX SBOM with its subject named after the image it's
+// attached to: Trivy, reading the scan's saved archive, names it after the
+// archive's temporary path. Unchanged if it isn't CycloneDX JSON.
+func sbomOf(sbom []byte, reference string) []byte {
+	var doc map[string]any
+	if json.Unmarshal(sbom, &doc) != nil {
+		return sbom
+	}
+	metadata, _ := doc["metadata"].(map[string]any)
+	component, _ := metadata["component"].(map[string]any)
+	if component == nil {
+		return sbom
+	}
+	component["name"] = reference
+	out, err := json.Marshal(doc)
+	if err != nil {
+		return sbom
+	}
+	return out
 }
 
 func text(m map[string]any, key string) string {

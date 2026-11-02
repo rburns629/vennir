@@ -172,6 +172,15 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(result["error"]["code"], "GCP_API_ERROR")
         self.assertTrue(result["error"]["retryable"])
 
+    def test_a_refusal_is_not_retried(self) -> None:
+        self._write_request({"projectId": "demo-project", "instanceName": "whatever"})
+        self.service.instances.return_value.get.return_value.execute.side_effect = _http_error(403)
+
+        self.assertEqual(self.module.main(), 1)
+        result = self._result()
+        self.assertEqual(result["error"]["code"], "GCP_API_ERROR")
+        self.assertFalse(result["error"]["retryable"])
+
     def test_custom_database_version_tier_and_region_are_passed_through(self) -> None:
         self._write_request(
             {

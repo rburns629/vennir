@@ -76,6 +76,11 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
     return 1
 
 
+def _retryable(error: HttpError) -> bool:
+    """Whether trying again may help: Google busy, throttled or unreachable,
+    not a refusal (a missing permission, a bad input) that fails the same way."""
+    return error.resp.status in (408, 429) or error.resp.status >= 500
+
 def _build_credentials() -> google.auth.credentials.Credentials | None:
     """Impersonated credentials for the gcp-target service account, or None
     to leave each client's own ADC discovery in charge, unimpersonated, when
@@ -155,7 +160,7 @@ def main() -> int:
         return 0
     except HttpError as error:
         if error.resp.status != 404:
-            return _failure("GCP_API_ERROR", str(error), retryable=True)
+            return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     # New-instance path: create it, then block until the real,
     # long-running provisioning operation actually finishes -- an instance
@@ -193,7 +198,7 @@ def main() -> int:
             return _failure("GCP_OPERATION_FAILED", operation_error, retryable=True)
         instance = service.instances().get(project=project_id, instance=instance_name).execute()
     except HttpError as error:
-        return _failure("GCP_API_ERROR", str(error), retryable=True)
+        return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     print(f"created Cloud SQL instance '{instance_name}' in '{project_id}'")
     _write_result({"status": "succeeded", "outputs": _outputs_from_instance(instance)})

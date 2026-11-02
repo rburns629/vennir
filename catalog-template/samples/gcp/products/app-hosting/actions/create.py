@@ -57,6 +57,12 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
     return 1
 
 
+def _retryable(error: GoogleAPIError) -> bool:
+    """Whether trying again may help: Google busy, throttled or unreachable,
+    not a refusal (a missing permission, a bad input) that fails the same way."""
+    code = getattr(error, "code", None)
+    return not isinstance(code, int) or code in (408, 429) or code >= 500
+
 def _build_credentials() -> google.auth.credentials.Credentials | None:
     """Impersonated credentials for the gcp-target service account, or None
     to leave each client's own ADC discovery in charge, unimpersonated, when
@@ -117,7 +123,7 @@ def main() -> int:
     except NotFound:
         pass
     except GoogleAPIError as error:
-        return _failure("GCP_API_ERROR", str(error), retryable=True)
+        return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     container = run_v2.Container(image=image)
     template = run_v2.RevisionTemplate()
@@ -148,7 +154,7 @@ def main() -> int:
         )
         service = operation.result()
     except GoogleAPIError as error:
-        return _failure("GCP_API_ERROR", str(error), retryable=True)
+        return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     print(f"deployed service '{service_name}' -> {service.uri}")
     _write_result({"status": "succeeded", "outputs": _outputs(service, project_id, region, service_name, True)})
