@@ -2398,6 +2398,43 @@ describe("Observe's alerts", () => {
     expect(within(card).getByText(/^1 firing · checked/)).toBeTruthy();
   });
 
+  it("on Google Cloud's managed Prometheus, say where they're from, and what's missing when Google refuses", async () => {
+    const rules = [
+      {
+        name: "VertraGatewayBackendUnreachable",
+        severity: "critical",
+        summary: "The gateway can't reach …'s backend.",
+        state: "firing",
+        instances: [{ state: "firing", activeAt: "2026-10-30T13:58:00Z", labels: { api: "payments/orders", namespace: "vertra-system" } }],
+      },
+      { name: "VertraSchedulerDown", severity: "critical", summary: "No scheduler has finished a pass in 10 minutes.", state: "inactive" },
+    ];
+    await renderAt("/observe?tab=metrics", MEMBER, {
+      "ObserveService/ListAlerts": { configured: true, source: "google", project: "acyclix-dev", checkedAt: "2026-10-30T14:29:00Z", rules },
+    });
+    let card = await screen.findByRole("region", { name: "Alerts" });
+    expect(await within(card).findByText(/^1 firing · from Google Cloud · checked/)).toBeTruthy();
+    expect(within(card).getByText("acyclix-dev")).toBeTruthy();
+    expect(within(card).getByText("api=payments/orders · namespace=vertra-system")).toBeTruthy();
+    expect(within(card).getByText(/^Since /)).toBeTruthy();
+    expect(within(card).getByText(/Google keeps which alerts fire and their labels/)).toBeTruthy();
+    cleanup();
+
+    const problem = "Google's managed Prometheus refused the console (403): its Google identity needs roles/monitoring.viewer on acyclix-dev, which vertra apply grants.";
+    await renderAt("/observe?tab=metrics", MEMBER, {
+      "ObserveService/ListAlerts": {
+        configured: true, source: "google", project: "acyclix-dev", checkedAt: "2026-10-30T14:29:00Z", stateUnknown: true, problem,
+        rules: rules.map((r) => ({ ...r, state: "unknown", instances: [] })),
+      },
+    });
+    card = await screen.findByRole("region", { name: "Alerts" });
+    expect(await within(card).findByText("Which ones fire can't be read")).toBeTruthy();
+    expect(within(card).getByText(/needs roles\/monitoring.viewer on acyclix-dev/)).toBeTruthy();
+    expect(within(card).getAllByText("Unknown")).toHaveLength(2);
+    expect(within(card).getByText(/^state unknown · checked/)).toBeTruthy();
+    expect(within(card).queryByText(/^Couldn't read the alerts/)).toBeNull();
+  });
+
   it("say when the console reads no Prometheus, or it isn't answering", async () => {
     await renderAt("/observe?tab=metrics", MEMBER, { "ObserveService/ListAlerts": { configured: false } });
     expect(await screen.findByText(/reads no Prometheus here/)).toBeTruthy();

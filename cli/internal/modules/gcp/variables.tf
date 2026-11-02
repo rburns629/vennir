@@ -157,6 +157,12 @@ variable "chat" {
   default     = false
 }
 
+variable "managed_prometheus" {
+  description = "GKE's managed Prometheus evaluates the charts' alerts: the console reads which fire, as its own service account."
+  type        = bool
+  default     = false
+}
+
 variable "signing" {
   description = "How the catalog is signed: none, kms (a key here only its CI signs with) or keyless; or verify: another install signs it, and policy-controller only checks it here."
   type        = string

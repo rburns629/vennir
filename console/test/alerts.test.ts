@@ -22,7 +22,20 @@ import { caller, rpcClient } from "./rpc.js";
 vi.mock("../src/k8s.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/k8s.js")>()),
   ensureServiceAccount: vi.fn(() => Promise.resolve()),
+  listGmpRuleGroups: vi.fn(() => Promise.resolve(gmpGroups)),
 }));
+vi.mock("../src/gcpMetadata.js", () => ({ gcpMetadataToken: vi.fn(() => Promise.resolve("the-consoles-google-token")) }));
+
+// The cluster's Rules objects, as GKE's managed Prometheus evaluates them.
+const gmpGroups = [
+  { name: "vertra-kernel", rules: [{ alert: "VertraSchedulerDown", labels: { severity: "critical" }, annotations: { summary: "No scheduler has finished a pass in 10 minutes." } }, { record: "x" }] },
+  { name: "vertra-console", rules: [{ alert: "VertraGatewayBackendUnreachable", labels: { severity: "critical" }, annotations: { summary: "The gateway can't reach {{ $labels.api }}'s backend." } }] },
+  { name: "someone-elses", rules: [{ alert: "DiskFull", annotations: { summary: "A disk is full." } }] },
+];
+// What GMP's query API answers, by query; and what it was asked.
+let gmp: (query: string) => Promise<Response>;
+const gmpAsked: { query: string; authorization: string | null }[] = [];
+const GMP = "https://monitoring.googleapis.com/v1/projects/acyclix-dev/location/global/prometheus/api/v1/query?query=";
 
 const prefix = `alr-${randomUUID().slice(0, 6)}`;
 const owner = `${prefix}-pay`;
@@ -69,9 +82,15 @@ beforeAll(async () => {
   tokens.admin = await users.signIn((await users.makeUser({ admin: true })).email);
 
   const realFetch = globalThis.fetch;
-  vi.stubGlobal("fetch", (input: string | URL, init?: RequestInit) =>
-    String(input) === `${PROMETHEUS}/api/v1/rules?type=alert` ? answer() : realFetch(input, init),
-  );
+  vi.stubGlobal("fetch", (input: string | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.startsWith(GMP)) {
+      const query = decodeURIComponent(url.slice(GMP.length));
+      gmpAsked.push({ query, authorization: new Headers(init?.headers).get("authorization") });
+      return gmp(query);
+    }
+    return url === `${PROMETHEUS}/api/v1/rules?type=alert` ? answer() : realFetch(input, init);
+  });
   answer = () =>
     Promise.resolve(
       Response.json({
@@ -99,6 +118,8 @@ beforeAll(async () => {
 afterAll(async () => {
   vi.unstubAllGlobals();
   config.monitoring.prometheusUrl = "";
+  config.monitoring.provider = "";
+  config.monitoring.google = { project: "", cluster: "" };
   await db.delete(teams).where(like(teams.name, `${prefix}%`));
   await users.cleanUp();
   await app.close();
@@ -107,6 +128,9 @@ afterAll(async () => {
 type Listed = {
   configured?: boolean;
   problem?: string;
+  source?: string;
+  project?: string;
+  stateUnknown?: boolean;
   rules?: { name: string; state: string; summary: string; hidden?: number; instances?: { summary: string; labels: Record<string, string>; activeAt?: string }[] }[];
 };
 const list = async (token: string) => (await call<Listed>(token, "ObserveService/ListAlerts", {})).body;
@@ -151,5 +175,61 @@ describe("alerts", () => {
     } finally {
       answer = was;
     }
+  });
+});
+
+describe("alerts on Google Cloud's managed Prometheus", () => {
+  const where = { project_id: "acyclix-dev", location: "us-central1", cluster: "vertra-dev", namespace: "vertra-system" };
+  const series = (name: string, metric: Record<string, string>, value: string) => ({ metric: { __name__: name, ...metric }, value: [1793600000, value] });
+  const success = (result: unknown[]) => Promise.resolve(Response.json({ status: "success", data: { resultType: "vector", result } }));
+  const onGoogle = () => {
+    config.monitoring.prometheusUrl = "";
+    config.monitoring.provider = "google";
+    config.monitoring.google = { project: "acyclix-dev", cluster: "vertra-dev" };
+  };
+
+  it("are the cluster's Rules, and which fire from Google, for this cluster", async () => {
+    onGoogle();
+    gmpAsked.length = 0;
+    const firing = { alertname: "VertraGatewayBackendUnreachable", severity: "critical", api: `${owner}/orders`, ...where };
+    gmp = (query) =>
+      query.startsWith("ALERTS_FOR_STATE")
+        ? success([series("ALERTS_FOR_STATE", firing, "1793598000")])
+        : success([series("ALERTS", { ...firing, alertstate: "firing" }, "1")]);
+    const found = await list(tokens.owner);
+    expect(found).toMatchObject({ configured: true, source: "google", project: "acyclix-dev", problem: "" });
+    expect(found.stateUnknown ?? false).toBe(false);
+    expect(found.rules?.map((r) => [r.name, r.state])).toEqual([
+      ["VertraGatewayBackendUnreachable", "firing"],
+      ["VertraSchedulerDown", "inactive"],
+    ]);
+    // Where it fires, not where Google keeps it; since when, from ALERTS_FOR_STATE; no text of its own.
+    expect(found.rules?.[0]?.instances).toEqual([
+      { state: "firing", activeAt: expect.any(String), summary: "", description: "", labels: { api: `${owner}/orders`, namespace: "vertra-system" } },
+    ]);
+    expect(Date.parse(found.rules?.[0]?.instances?.[0]?.activeAt ?? "")).toBe(1793598000 * 1000);
+    expect(gmpAsked.map((a) => a.query).sort()).toEqual([
+      'ALERTS_FOR_STATE{alertname=~"VertraSchedulerDown|VertraGatewayBackendUnreachable",cluster="vertra-dev"}',
+      'ALERTS{alertname=~"VertraSchedulerDown|VertraGatewayBackendUnreachable",cluster="vertra-dev"}',
+    ]);
+    expect(gmpAsked.every((a) => a.authorization === "Bearer the-consoles-google-token")).toBe(true);
+    // Another team's hidden API: counted, not described.
+    const theirs = (await list(tokens.other)).rules?.[0];
+    expect([theirs?.instances?.length, theirs?.hidden]).toEqual([1, 0]);
+  });
+
+  it("say what's missing when Google refuses the console, the rules' state unknown", async () => {
+    onGoogle();
+    gmp = () => Promise.resolve(new Response("denied", { status: 403 }));
+    const found = await list(tokens.owner);
+    expect(found).toMatchObject({ configured: true, source: "google", stateUnknown: true });
+    expect(found.problem).toContain("roles/monitoring.viewer on acyclix-dev");
+    expect(found.rules?.map((r) => r.state)).toEqual(["unknown", "unknown"]);
+  });
+
+  it("are none without a project to read", async () => {
+    onGoogle();
+    config.monitoring.google = { project: "", cluster: "" };
+    expect(await list(tokens.owner)).toMatchObject({ configured: false, rules: [] });
   });
 });

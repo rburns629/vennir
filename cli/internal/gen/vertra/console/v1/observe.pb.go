@@ -1073,9 +1073,18 @@ type ListAlertsResponse struct {
 	// Whether the console reads a Prometheus at all.
 	Configured bool `protobuf:"varint,1,opt,name=configured,proto3" json:"configured,omitempty"`
 	// Why it couldn't be read just now; empty when it was.
-	Problem       string                 `protobuf:"bytes,2,opt,name=problem,proto3" json:"problem,omitempty"`
-	CheckedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
-	Rules         []*AlertRule           `protobuf:"bytes,4,rep,name=rules,proto3" json:"rules,omitempty"`
+	Problem   string                 `protobuf:"bytes,2,opt,name=problem,proto3" json:"problem,omitempty"`
+	CheckedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
+	Rules     []*AlertRule           `protobuf:"bytes,4,rep,name=rules,proto3" json:"rules,omitempty"`
+	// Where they're read from: "prometheus" (its rules API), or "google": the
+	// charts' Rules in the cluster, and which fire from Google Cloud's
+	// managed Prometheus, which keeps no instance's own summary.
+	Source string `protobuf:"bytes,5,opt,name=source,proto3" json:"source,omitempty"`
+	// With google: the project whose managed Prometheus evaluates them.
+	Project string `protobuf:"bytes,6,opt,name=project,proto3" json:"project,omitempty"`
+	// With google: the rules were read but which fire couldn't be (problem
+	// says why); each rule's state is then unknown.
+	StateUnknown  bool `protobuf:"varint,7,opt,name=state_unknown,json=stateUnknown,proto3" json:"state_unknown,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1138,6 +1147,27 @@ func (x *ListAlertsResponse) GetRules() []*AlertRule {
 	return nil
 }
 
+func (x *ListAlertsResponse) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *ListAlertsResponse) GetProject() string {
+	if x != nil {
+		return x.Project
+	}
+	return ""
+}
+
+func (x *ListAlertsResponse) GetStateUnknown() bool {
+	if x != nil {
+		return x.StateUnknown
+	}
+	return false
+}
+
 type AlertRule struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -1145,7 +1175,7 @@ type AlertRule struct {
 	Severity string `protobuf:"bytes,2,opt,name=severity,proto3" json:"severity,omitempty"`
 	// Its summary, with what varies by instance left out.
 	Summary string `protobuf:"bytes,3,opt,name=summary,proto3" json:"summary,omitempty"`
-	// inactive, pending or firing.
+	// inactive, pending or firing; unknown when it couldn't be read.
 	State     string           `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
 	Instances []*AlertInstance `protobuf:"bytes,5,rep,name=instances,proto3" json:"instances,omitempty"`
 	// Pending or firing for something the caller can't see (another team's
@@ -2214,7 +2244,7 @@ const file_vertra_console_v1_observe_proto_rawDesc = "" +
 	"UsageCount\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x05R\x05count\"\x13\n" +
-	"\x11ListAlertsRequest\"\xbd\x01\n" +
+	"\x11ListAlertsRequest\"\x94\x02\n" +
 	"\x12ListAlertsResponse\x12\x1e\n" +
 	"\n" +
 	"configured\x18\x01 \x01(\bR\n" +
@@ -2222,7 +2252,10 @@ const file_vertra_console_v1_observe_proto_rawDesc = "" +
 	"\aproblem\x18\x02 \x01(\tR\aproblem\x129\n" +
 	"\n" +
 	"checked_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckedAt\x122\n" +
-	"\x05rules\x18\x04 \x03(\v2\x1c.vertra.console.v1.AlertRuleR\x05rules\"\xc3\x01\n" +
+	"\x05rules\x18\x04 \x03(\v2\x1c.vertra.console.v1.AlertRuleR\x05rules\x12\x16\n" +
+	"\x06source\x18\x05 \x01(\tR\x06source\x12\x18\n" +
+	"\aproject\x18\x06 \x01(\tR\aproject\x12#\n" +
+	"\rstate_unknown\x18\a \x01(\bR\fstateUnknown\"\xc3\x01\n" +
 	"\tAlertRule\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bseverity\x18\x02 \x01(\tR\bseverity\x12\x18\n" +

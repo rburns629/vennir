@@ -28,7 +28,8 @@ resource "google_project_service" "apis" {
     "iamcredentials.googleapis.com",
     "storage.googleapis.com",
     ], var.managed_database ? ["servicenetworking.googleapis.com", "sqladmin.googleapis.com"] : [],
-  var.google_groups ? ["cloudidentity.googleapis.com"] : [], var.signing == "kms" ? ["cloudkms.googleapis.com"] : [], var.chat ? ["aiplatform.googleapis.com"] : []))
+    var.google_groups ? ["cloudidentity.googleapis.com"] : [], var.signing == "kms" ? ["cloudkms.googleapis.com"] : [], var.chat ? ["aiplatform.googleapis.com"] : [],
+  var.managed_prometheus ? ["monitoring.googleapis.com"] : []))
   service = each.value
   # Other things in the project may use them.
   disable_on_destroy = false
@@ -236,6 +237,16 @@ resource "google_service_account_iam_member" "console_workload_identity" {
   role               = "roles/iam.workloadIdentityUser"
   member             = "${local.ksa}/console-execution-console]"
   depends_on         = [google_container_cluster.this]
+}
+
+# Observe's alerts: which of the charts' rules fire, read from the
+# project's managed Prometheus (its query API), as the console.
+resource "google_project_iam_member" "console_monitoring" {
+  count      = var.managed_prometheus ? 1 : 0
+  project    = var.project
+  role       = "roles/monitoring.viewer"
+  member     = google_service_account.console.member
+  depends_on = [google_project_service.apis]
 }
 
 # The chat agent's model: Gemini through Vertex AI, as the console. Vertex

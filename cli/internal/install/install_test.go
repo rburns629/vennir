@@ -517,4 +517,10 @@ func TestMonitoringValues(t *testing.T) {
 			t.Errorf("google on %s: %v %s", mode, m, metricsFrom(k))
 		}
 	}
+	// The console reads which alerts fire from this project's, for this cluster.
+	c.GCP.Project = "acyclix-dev"
+	v = ConsoleValues(c, "dev", img, &Cloud{Provider: "gcp", ClusterName: "vertra-dev"})
+	if g := v["monitoring"].(map[string]any)["google"].(map[string]any); g["project"] != "acyclix-dev" || g["cluster"] != "vertra-dev" {
+		t.Errorf("google console: %v", g)
+	}
 }

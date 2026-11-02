@@ -2006,7 +2006,8 @@ export interface AlertRuleView {
   severity: string;
   /** Its summary for no one instance, what varies left out. */
   summary: string;
-  state: "inactive" | "pending" | "firing";
+  /** unknown: which fire couldn't be read (AlertsView.stateUnknown). */
+  state: "inactive" | "pending" | "firing" | "unknown";
   instances: { state: string; activeAt: string | null; summary: string; description: string; labels: Record<string, string> }[];
   /** Pending or firing for something the caller can't see. */
   hidden: number;
@@ -2018,6 +2019,12 @@ export interface AlertsView {
   problem: string;
   checkedAt: string | null;
   rules: AlertRuleView[];
+  /** Where they're read from: a Prometheus's rules API, or the cluster's Rules and Google Cloud's managed Prometheus. */
+  source: "prometheus" | "google" | "";
+  /** With google: the project whose managed Prometheus evaluates them. */
+  project: string;
+  /** With google: the rules were read, which fire couldn't be (problem says why). */
+  stateUnknown: boolean;
 }
 
 /** The install's alerts: the charts' rules, firing first (ObserveService.ListAlerts). */
@@ -2027,11 +2034,14 @@ export async function listAlerts(): Promise<AlertsView> {
     configured: a.configured,
     problem: a.problem,
     checkedAt: iso(a.checkedAt),
+    source: a.source === "google" || a.source === "prometheus" ? a.source : "",
+    project: a.project,
+    stateUnknown: a.stateUnknown,
     rules: a.rules.map((r) => ({
       name: r.name,
       severity: r.severity,
       summary: r.summary,
-      state: r.state === "firing" || r.state === "pending" ? r.state : "inactive",
+      state: r.state === "firing" || r.state === "pending" || r.state === "unknown" ? r.state : "inactive",
       instances: r.instances.map((i) => ({ state: i.state, activeAt: iso(i.activeAt), summary: i.summary, description: i.description, labels: { ...i.labels } })),
       hidden: r.hidden,
     })),

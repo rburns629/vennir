@@ -76,6 +76,10 @@ data:
   # Which Prometheus scrapes it (empty: none), and where Grafana is: shown only.
   MONITORING_PROVIDER: {{ ternary .provider "" (or .podMonitor.enabled .alerts.enabled .dashboard.enabled .prometheus.enabled) | quote }}
   GRAFANA_URL: {{ .grafanaUrl | quote }}
+  # With provider google: whose managed Prometheus Observe reads which
+  # alerts fire from, for this cluster (core/alerts.ts).
+  MONITORING_GOOGLE_PROJECT: {{ .google.project | quote }}
+  MONITORING_GOOGLE_CLUSTER: {{ .google.cluster | quote }}
   {{- end }}
   # The Prometheus whose alerts Observe shows: monitoring.prometheusUrl, else
   # the bundled one.
