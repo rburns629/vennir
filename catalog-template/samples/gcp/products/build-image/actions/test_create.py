@@ -143,6 +143,18 @@ class CreateActionTest(unittest.TestCase):
         # The same source fails the same way again.
         self.assertFalse(result["error"]["retryable"])
 
+    def test_an_image_in_a_folder_is_looked_up_by_its_encoded_package(self) -> None:
+        self._write_request(dict(_VALID_INPUTS, imageUri="us-central1-docker.pkg.dev/my-project/demo/payments/api:v2"))
+        with (
+            patch.object(self.module.artifactregistry_v1, "ArtifactRegistryClient") as ar_cls,
+            patch.object(self.module.cloudbuild_v1, "CloudBuildClient"),
+        ):
+            ar_cls.return_value.get_tag.return_value = MagicMock()
+            self.assertEqual(self.module.main(), 0)
+        ar_cls.return_value.get_tag.assert_called_once_with(
+            name="projects/my-project/locations/us-central1/repositories/demo/packages/payments%2Fapi/tags/v2"
+        )
+
     def test_non_artifact_registry_image_always_builds(self) -> None:
         inputs = dict(_VALID_INPUTS, imageUri="gcr.io/my-project/legacy:v1")
         self._write_request(inputs)

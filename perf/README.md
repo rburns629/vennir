@@ -417,6 +417,28 @@ p50 both): about 30 reads a second fit. With the limit at 20 and `burst`,
 its own calls filled the budget whatever the waiting did (6.8 s and 6.2 s
 p50). Not proven on GKE itself.
 
+## On GKE again: 0.7.0 (2026-11-02)
+
+The r7 proof run: released 0.7.0, GKE Autopilot, size `minimal` with both
+caps raised to 40 (as 0.6.0's run), `burst` (100 steps). Correct, but
+completion lag barely moved: 10.4 s p50 and 45.6 s p95 (0.6.0: 11.7 s and
+31 s), queue wait 91 s p50, container start 52 s p50, 0.47 steps a second.
+So the reads above weren't what held it on GKE. Its scheduler said why:
+
+- most passes were quick (410 of 472 under 0.25 s), but 6 took over 10 s,
+  and 12 dispatches failed and were retried, each one
+  `failed calling webhook "policy.sigstore.dev" ... context deadline
+  exceeded`: policy-controller checking the step's image signature when
+  the scheduler made its Job, past the webhook's 10 s;
+- a pass dispatches before it records what finished, so a pass held up by
+  the webhook holds every finished step's record with it;
+- policy-controller ran one replica at 100m CPU (Autopilot: also its
+  limit), checks each step's image twice (its Job, then its Pod), keyless
+  (Fulcio and Rekor), and 11 of its checks failed outright under the load.
+  kind runs no policy-controller, which is why kind never showed this.
+
+What's left is in TODO.md.
+
 ## Next (TODO.md)
 
 Here: nothing left; the `perf` workflow (`.github/workflows/perf.yml`)
