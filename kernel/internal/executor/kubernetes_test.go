@@ -816,11 +816,51 @@ func TestTheResyncIntervalForcesARead(t *testing.T) {
 	check(t, "reads", reads(), 2)
 }
 
-// It may be stuck pulling its image, which the grace period catches by
-// reading, not by an event.
-func TestAStepWhosePodIsntReadyIsAlwaysRead(t *testing.T) {
+// Its Pod may be refused, which only an Event says, not watched.
+func TestAStepWithNoPodIsAlwaysRead(t *testing.T) {
 	c, handle, reads := runningJob(0, healthyWatch())
 	twice(t, c, handle)
+	check(t, "reads", reads(), 2)
+}
+
+func unreadyPod(c *cluster, waiting string) {
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ek-step-1-x", Namespace: "team-a", Labels: map[string]string{"job-name": "ek-step-1"},
+		CreationTimestamp: metav1.Now()}}
+	if waiting != "" {
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "product", State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: waiting}}}}
+	}
+	if _, err := c.CoreV1().Pods("team-a").Create(context.Background(), pod, metav1.CreateOptions{}); err != nil {
+		panic(err)
+	}
+}
+
+// Waiting for a node (seen on GKE: every pass read each such Job and its
+// Pods, and steps that finished waited behind them), or for its container.
+func TestAStepWaitingForANodeIsntReadAgain(t *testing.T) {
+	for _, waiting := range []string{"", "ContainerCreating"} {
+		c, handle, reads := runningJob(0, healthyWatch())
+		unreadyPod(c, waiting)
+		twice(t, c, handle)
+		check(t, waiting, reads(), 1)
+	}
+}
+
+// It may be stuck pulling its image, which the grace period catches by
+// reading, not by an event.
+func TestAStepPullingItsImageIsAlwaysRead(t *testing.T) {
+	c, handle, reads := runningJob(0, healthyWatch())
+	unreadyPod(c, "ImagePullBackOff")
+	twice(t, c, handle)
+	check(t, "reads", reads(), 2)
+}
+
+func TestAStepWaitingForANodeIsReadWhenItsPodChanges(t *testing.T) {
+	w := healthyWatch()
+	c, handle, reads := runningJob(0, w)
+	unreadyPod(c, "")
+	_, _ = c.k.Status(context.Background(), handle)
+	w.markChanged("pods", "ek-step-1")
+	_, _ = c.k.Status(context.Background(), handle)
 	check(t, "reads", reads(), 2)
 }
 
