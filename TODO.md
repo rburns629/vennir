@@ -103,7 +103,8 @@ Kernel and alerts:
   whether it need verify Jobs as well as their Pods. Also to see on the next
   GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
 
-Samples and catalog CI:
+## Installing and operating
+
 - [x] **A burst that starts a counter can't fire its alert** (found proving
   #45 on kind; fixed 2026-10-30, #46): a series born holding a burst has no
   lower sample, so `increase()` missed the 70 failed sign-ins that made
