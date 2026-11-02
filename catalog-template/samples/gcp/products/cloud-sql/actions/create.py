@@ -147,7 +147,10 @@ def main() -> int:
     except google.auth.exceptions.GoogleAuthError as error:
         # Signing in, not the call: no Google credentials here, gcp-target
         # refused to be impersonated, or Google unreachable to ask.
-        retryable = error.retryable or isinstance(error, google.auth.exceptions.TransportError)
+        # Unreachable often comes as a RefreshError caused by one (GKE's
+        # metadata server, the first seconds of a Pod).
+        unreachable = google.auth.exceptions.TransportError
+        retryable = error.retryable or isinstance(error, unreachable) or isinstance(error.__cause__, unreachable)
         return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
     except TimeoutError as error:
         # A call unanswered, or an operation still running when the client

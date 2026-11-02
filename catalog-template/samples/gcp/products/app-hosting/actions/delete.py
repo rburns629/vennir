@@ -16,6 +16,7 @@ from typing import Any
 import google.auth
 import google.auth.credentials
 import google.auth.exceptions
+import google.auth.transport.requests
 from google.api_core.exceptions import GoogleAPIError, NotFound
 from google.auth import impersonated_credentials
 from google.cloud import run_v2
@@ -57,13 +58,25 @@ def _build_credentials() -> google.auth.credentials.Credentials | None:
     )
 
 
+def _signed_in() -> google.auth.credentials.Credentials:
+    """The credentials every client is given, signed in before any call: a
+    gRPC client would report a refused sign-in as UNAVAILABLE, retried for
+    good, where here it's google.auth's error, which main answers."""
+    credentials = _build_credentials() or google.auth.default(scopes=IMPERSONATION_SCOPES)[0]
+    credentials.refresh(google.auth.transport.requests.Request())
+    return credentials
+
+
 def main() -> int:
     try:
         return _run()
     except google.auth.exceptions.GoogleAuthError as error:
         # Signing in, not the call: no Google credentials here, gcp-target
         # refused to be impersonated, or Google unreachable to ask.
-        retryable = error.retryable or isinstance(error, google.auth.exceptions.TransportError)
+        # Unreachable often comes as a RefreshError caused by one (GKE's
+        # metadata server, the first seconds of a Pod).
+        unreachable = google.auth.exceptions.TransportError
+        retryable = error.retryable or isinstance(error, unreachable) or isinstance(error.__cause__, unreachable)
         return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
     except TimeoutError as error:
         # A call unanswered, or an operation still running when the client
@@ -77,7 +90,7 @@ def _run() -> int:
     if resource.get("type") != "gcp/cloud-run-service" or not isinstance(path, str) or not SERVICE_PATH.match(path):
         return _failure("MISSING_INPUT", "inputs.resource is the gcp/cloud-run-service to delete, as create reported it")
 
-    services = run_v2.ServicesClient(credentials=_build_credentials())
+    services = run_v2.ServicesClient(credentials=_signed_in())
     try:
         service = services.get_service(name=path)
     except NotFound:

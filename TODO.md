@@ -96,6 +96,12 @@ Samples and catalog CI:
   their team.yaml): once a release that knows `clouds` is pinned in the
   template (#67; the pinned vertra validates the samples), so a GKE install
   marks them for other installs instead of "not ready".
+- [ ] **gcp/build-image builds again on a retry while its build runs**
+  (found reviewing the fix for the samples' failures): a step that times
+  out (its own 600 s, or the client's 15 minutes) leaves Cloud Build
+  running, and the retry, finding no image yet, starts a second. It could
+  tag its build (a hash of the image and source) and wait on one still
+  QUEUED or WORKING instead; Cloud Build's filter wants a real run to prove.
 
 ## Installing and operating
 

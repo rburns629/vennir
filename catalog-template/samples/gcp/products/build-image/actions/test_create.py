@@ -34,6 +34,12 @@ class CreateActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.INPUT_PATH = Path(self.tmp_dir.name) / "request.json"
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
+        # Signed in as whatever ADC finds: a stand-in whose refresh passes,
+        # unless a test makes it fail.
+        self.adc = MagicMock()
+        default = patch.object(self.module.google.auth, "default", return_value=(self.adc, "some-project"))
+        default.start()
+        self.addCleanup(default.stop)
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
@@ -202,20 +208,28 @@ class CreateActionTest(unittest.TestCase):
         error = self._build(error=TimeoutError("Operation did not complete within the designated timeout."))
         self.assertEqual((error["code"], error["retryable"]), ("GCP_TIMEOUT", True))
 
-    def test_impersonation_refused_writes_a_result(self) -> None:
+    def _sign_in_failing(self, error: Exception) -> dict:
+        self.adc.refresh.side_effect = error
         self._write_request(_VALID_INPUTS)
         with patch.object(self.module.artifactregistry_v1, "ArtifactRegistryClient") as ar_cls:
-            ar_cls.return_value.get_tag.side_effect = self.module.google.auth.exceptions.RefreshError("permission denied")
             self.assertEqual(self.module.main(), 1)
-        error = self._result()["error"]
+        # Never left to a gRPC client, which would call it UNAVAILABLE.
+        ar_cls.return_value.get_tag.assert_not_called()
+        return self._result()["error"]
+
+    def test_a_refused_sign_in_is_not_retried(self) -> None:
+        error = self._sign_in_failing(self.module.google.auth.exceptions.RefreshError("permission denied"))
         self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", False))
 
     def test_google_unreachable_to_sign_in_is_retried(self) -> None:
-        self._write_request(_VALID_INPUTS)
-        with patch.object(self.module.artifactregistry_v1, "ArtifactRegistryClient") as ar_cls:
-            ar_cls.return_value.get_tag.side_effect = self.module.google.auth.exceptions.TransportError("connection reset")
-            self.assertEqual(self.module.main(), 1)
-        error = self._result()["error"]
+        error = self._sign_in_failing(self.module.google.auth.exceptions.TransportError("connection reset"))
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", True))
+
+    def test_a_metadata_server_unreachable_is_retried(self) -> None:
+        # GKE's credentials wrap the TransportError in a RefreshError.
+        refused = self.module.google.auth.exceptions.RefreshError("metadata server unreachable")
+        refused.__cause__ = self.module.google.auth.exceptions.TransportError("connection refused")
+        error = self._sign_in_failing(refused)
         self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", True))
 
 

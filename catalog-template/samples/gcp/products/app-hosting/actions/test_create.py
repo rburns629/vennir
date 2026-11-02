@@ -32,6 +32,12 @@ class CreateActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.INPUT_PATH = Path(self.tmp_dir.name) / "request.json"
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
+        # Signed in as whatever ADC finds: a stand-in whose refresh passes,
+        # unless a test makes it fail.
+        self.adc = MagicMock()
+        default = patch.object(self.module.google.auth, "default", return_value=(self.adc, "some-project"))
+        default.start()
+        self.addCleanup(default.stop)
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
@@ -206,8 +212,9 @@ class CreateActionTest(unittest.TestCase):
     def test_google_unreachable_to_sign_in_is_retried(self) -> None:
         self._write_request({"projectId": "p", "serviceName": "hello", "image": "us-docker.pkg.dev/p/r/hello:1"})
         with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
-            client_cls.return_value.get_service.side_effect = self.module.google.auth.exceptions.TransportError("reset")
+            self.adc.refresh.side_effect = self.module.google.auth.exceptions.TransportError("reset")
             self.assertEqual(self.module.main(), 1)
+        client_cls.return_value.get_service.assert_not_called()
         error = self._result()["error"]
         self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", True))
 

@@ -26,6 +26,12 @@ class CreateActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.INPUT_PATH = Path(self.tmp_dir.name) / "request.json"
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
+        # Signed in as whatever ADC finds: a stand-in whose refresh passes,
+        # unless a test makes it fail.
+        self.adc = MagicMock()
+        default = patch.object(self.module.google.auth, "default", return_value=(self.adc, "some-project"))
+        default.start()
+        self.addCleanup(default.stop)
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
@@ -189,9 +195,23 @@ class CreateActionTest(unittest.TestCase):
             patch.object(self.module, "CloudBillingClient") as billing_cls,
         ):
             client_cls.return_value.get_project.return_value = MagicMock(labels={"vertra-made": "true"})
+            billing_cls.return_value.get_project_billing_info.return_value = MagicMock(billing_account_name="")
             self.assertEqual(self.module.main(), 0)
         client_cls.return_value.create_project.assert_not_called()
         billing_cls.return_value.update_project_billing_info.assert_called_once()
+
+    def test_billing_already_linked_is_only_read(self) -> None:
+        self._write_request({"projectId": "made-before", "billingAccountId": "AAAAAA-BBBBBB-CCCCCC"})
+        with (
+            patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls,
+            patch.object(self.module, "CloudBillingClient") as billing_cls,
+        ):
+            client_cls.return_value.get_project.return_value = MagicMock(labels={"vertra-made": "true"})
+            billing_cls.return_value.get_project_billing_info.return_value = MagicMock(
+                billing_account_name="billingAccounts/AAAAAA-BBBBBB-CCCCCC"
+            )
+            self.assertEqual(self.module.main(), 0)
+        billing_cls.return_value.update_project_billing_info.assert_not_called()
 
     def test_a_project_made_some_other_way_keeps_its_billing(self) -> None:
         self._write_request({"projectId": "theirs", "billingAccountId": "AAAAAA-BBBBBB-CCCCCC"})

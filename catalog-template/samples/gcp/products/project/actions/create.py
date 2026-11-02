@@ -26,6 +26,7 @@ from typing import Any
 import google.auth
 import google.auth.credentials
 import google.auth.exceptions
+import google.auth.transport.requests
 from google.api_core.exceptions import AlreadyExists, GoogleAPIError, NotFound, PermissionDenied
 from google.auth import impersonated_credentials
 from google.cloud import resourcemanager_v3
@@ -82,12 +83,25 @@ def _build_credentials() -> google.auth.credentials.Credentials | None:
     )
 
 
+def _signed_in() -> google.auth.credentials.Credentials:
+    """The credentials every client is given, signed in before any call: a
+    gRPC client would report a refused sign-in as UNAVAILABLE, retried for
+    good, where here it's google.auth's error, which main answers."""
+    credentials = _build_credentials() or google.auth.default(scopes=IMPERSONATION_SCOPES)[0]
+    credentials.refresh(google.auth.transport.requests.Request())
+    return credentials
+
+
 def _link_billing(credentials: google.auth.credentials.Credentials | None, project_id: str, billing_account_id: str) -> None:
-    """Links the project to the billing account: the same again changes nothing."""
-    CloudBillingClient(credentials=credentials).update_project_billing_info(
-        name=f"projects/{project_id}",
-        project_billing_info=ProjectBillingInfo(billing_account_name=f"billingAccounts/{billing_account_id}"),
-    )
+    """Links the project to the billing account, unless it is already: a
+    later run asking for it again relinks one unlinked since (it's what the
+    run asks for), and otherwise only reads, needing no billing right."""
+    billing = CloudBillingClient(credentials=credentials)
+    name = f"projects/{project_id}"
+    account = f"billingAccounts/{billing_account_id}"
+    if billing.get_project_billing_info(name=name).billing_account_name == account:
+        return
+    billing.update_project_billing_info(name=name, project_billing_info=ProjectBillingInfo(billing_account_name=account))
 
 
 def _outputs(project_id: str, made_here: bool) -> dict[str, Any]:
@@ -110,7 +124,10 @@ def main() -> int:
     except google.auth.exceptions.GoogleAuthError as error:
         # Signing in, not the call: no Google credentials here, gcp-target
         # refused to be impersonated, or Google unreachable to ask.
-        retryable = error.retryable or isinstance(error, google.auth.exceptions.TransportError)
+        # Unreachable often comes as a RefreshError caused by one (GKE's
+        # metadata server, the first seconds of a Pod).
+        unreachable = google.auth.exceptions.TransportError
+        retryable = error.retryable or isinstance(error, unreachable) or isinstance(error.__cause__, unreachable)
         return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
     except TimeoutError as error:
         # A call unanswered, or an operation still running when the client
@@ -126,7 +143,7 @@ def _run() -> int:
     if not project_id:
         return _failure("MISSING_INPUT", "inputs.projectId is required")
 
-    credentials = _build_credentials()
+    credentials = _signed_in()
     projects = resourcemanager_v3.ProjectsClient(credentials=credentials)
     billing_account_id = inputs.get("billingAccountId")
 
