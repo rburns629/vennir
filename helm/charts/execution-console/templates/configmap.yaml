@@ -84,6 +84,7 @@ data:
   IMAGE_SIGNATURE_POLICY_NAME: {{ .Values.imageSignature.policyName | quote }}
   KERNEL_API_URL: {{ .Values.kernelApiUrl | quote }}
   ENVIRONMENT_LABEL: {{ .Values.environmentLabel | quote }}
+  INSTALL_CLOUD: {{ .Values.installCloud | quote }}
   # The console's own version: its image's tag, for the Admin page.
   CONSOLE_VERSION: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
   {{- $host := .Values.ingress.host | default .Values.gatewayApi.host }}

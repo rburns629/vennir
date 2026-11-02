@@ -45,6 +45,7 @@ export function authService(app: FastifyInstance): ServiceImpl<typeof AuthServic
         label: config.environmentLabel,
         selfRegistration: config.allowSelfRegistration,
         ssoLabel: currentSso()?.label ?? "",
+        cloud: config.installCloud,
       };
     },
 

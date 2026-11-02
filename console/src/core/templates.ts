@@ -49,6 +49,7 @@ import { readinessOf, type ReadinessView } from "../readiness.js";
 import { catalogLinks, githubBase } from "./catalogLinks.js";
 import { submitChecked } from "./executions.js";
 import { ensureOrderRate } from "./orderRate.js";
+import { ensureRunsHere, runsHere } from "./clouds.js";
 
 export type TeamProduct = Product & { teamName: string };
 
@@ -295,6 +296,20 @@ export interface Runnable {
   readiness: ReadinessView | null;
   /** Examples of running it: an action's passing contract tests, a template's own. */
   examples: ProductExample[];
+  /** An action's product's clouds (empty for a template), and whether it's for this install. */
+  clouds: string[];
+  cloudsFrom: string;
+  runsHere: boolean;
+}
+
+/** A template's clouds: those of its steps not for this install (none when every one is), and whether it runs here. */
+function stepClouds(steps: string[][]): { clouds: string[]; cloudsFrom: string; runsHere: boolean } {
+  const elsewhere = steps.filter((clouds) => !runsHere(clouds));
+  return { clouds: [...new Set(elsewhere.flat())].sort(), cloudsFrom: "", runsHere: elsewhere.length === 0 };
+}
+
+function withClouds(clouds: ReturnType<typeof stepClouds>, readiness: ReadinessView | null) {
+  return { ...clouds, readiness: clouds.runsHere ? readiness : null };
 }
 
 const READINESS_ORDER: (ReadinessView["state"])[] = ["not_ready", "failed", "checking", "unchecked", "ready"];
@@ -359,10 +374,16 @@ export async function runnables(caller: AuthUser | undefined): Promise<Runnable[
       ),
       previewable: t.steps.some((step) => hasPlan(byRef.get(step.action))),
       examples: t.examples,
-      readiness: together(t.steps.flatMap((step) => {
-        const view = ready.get(byRef.get(step.action)?.name ?? "");
-        return view ? [view] : [];
-      })),
+      // A step not for this install makes it not runnable here: the
+      // clouds that step is for, so it's marked as an action would be,
+      // with no readiness (its other steps' would say Ready).
+      ...withClouds(
+        stepClouds(t.steps.map((step) => byRef.get(step.action)?.clouds ?? [])),
+        together(t.steps.flatMap((step) => {
+          const view = ready.get(byRef.get(step.action)?.name ?? "");
+          return view ? [view] : [];
+        })),
+      ),
     });
   }
   for (const p of products) {
@@ -386,6 +407,9 @@ export async function runnables(caller: AuthUser | undefined): Promise<Runnable[
       previewable: hasPlan(p),
       readiness: ready.get(p.name) ?? null,
       examples: p.examples,
+      clouds: p.clouds,
+      cloudsFrom: p.cloudsFrom,
+      runsHere: runsHere(p.clouds),
     });
   }
   return out;
@@ -431,7 +455,10 @@ async function prepareTemplate(who: AuthUser, team: string, name: string, reques
   checkParameters(template.parameters, request.parameters, label);
   const steps: ResolvedStep[] = [];
   for (const step of template.steps) {
-    steps.push({ step, product: await stepProduct(step, template.teamName, label), inputs: bind(step.inputs, request.parameters) });
+    const product = await stepProduct(step, template.teamName, label);
+    // Before anything else is made for it (a schedule, a ServiceAccount).
+    ensureRunsHere(product);
+    steps.push({ step, product, inputs: bind(step.inputs, request.parameters) });
   }
   await ensureTargetsAllowed(who, forTeam, steps, label);
   return { template, forTeam, steps };
@@ -679,6 +706,7 @@ async function prepareAction(who: AuthUser, product: TeamProduct | undefined, re
   const ref = actionRef(product);
   const forTeam = onBehalfOf(allowed, request.onBehalfOf, `Action ${ref}`);
   checkParameters(product.inputSchema, request.parameters, `Action ${ref}`);
+  ensureRunsHere(product);
   const step: TemplateStep = { id: product.action, action: ref };
   await ensureTargetsAllowed(who, forTeam, [{ step, product, inputs: request.parameters }], `Action ${ref}`);
   return { found: product, ref, forTeam, step };

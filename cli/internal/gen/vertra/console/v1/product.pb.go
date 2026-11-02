@@ -57,7 +57,16 @@ type Product struct {
 	TokenAudiences []string `protobuf:"bytes,18,rep,name=token_audiences,json=tokenAudiences,proto3" json:"token_audiences,omitempty"`
 	// Whether it's ready on this install, by its check (product.yaml's
 	// check); unset when it has none.
-	Readiness     *Readiness `protobuf:"bytes,19,opt,name=readiness,proto3" json:"readiness,omitempty"`
+	Readiness *Readiness `protobuf:"bytes,19,opt,name=readiness,proto3" json:"readiness,omitempty"`
+	// The clouds of the installs it's for (product.yaml's clouds, else its
+	// team.yaml's); empty, every install.
+	Clouds []string `protobuf:"bytes,20,rep,name=clouds,proto3" json:"clouds,omitempty"`
+	// Where clouds is set: "product", "team", or "" when neither says.
+	CloudsFrom string `protobuf:"bytes,21,opt,name=clouds_from,json=cloudsFrom,proto3" json:"clouds_from,omitempty"`
+	// Whether it's for this install (its clouds include this install's, or
+	// either is unset). One that isn't is listed but never checked or run:
+	// a run naming it is refused (failed_precondition, NOT_FOR_THIS_INSTALL).
+	RunsHere      bool `protobuf:"varint,22,opt,name=runs_here,json=runsHere,proto3" json:"runs_here,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -223,6 +232,27 @@ func (x *Product) GetReadiness() *Readiness {
 		return x.Readiness
 	}
 	return nil
+}
+
+func (x *Product) GetClouds() []string {
+	if x != nil {
+		return x.Clouds
+	}
+	return nil
+}
+
+func (x *Product) GetCloudsFrom() string {
+	if x != nil {
+		return x.CloudsFrom
+	}
+	return ""
+}
+
+func (x *Product) GetRunsHere() bool {
+	if x != nil {
+		return x.RunsHere
+	}
+	return false
 }
 
 // A product's check's last answer on this install.
@@ -1384,7 +1414,7 @@ var File_vertra_console_v1_product_proto protoreflect.FileDescriptor
 
 const file_vertra_console_v1_product_proto_rawDesc = "" +
 	"\n" +
-	"\x1fvertra/console/v1/product.proto\x12\x11vertra.console.v1\x1a\x1evertra/console/v1/common.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf3\x06\n" +
+	"\x1fvertra/console/v1/product.proto\x12\x11vertra.console.v1\x1a\x1evertra/console/v1/common.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc9\a\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -1410,7 +1440,11 @@ const file_vertra_console_v1_product_proto_rawDesc = "" +
 	"deprecated\x18\x11 \x01(\tR\n" +
 	"deprecated\x12'\n" +
 	"\x0ftoken_audiences\x18\x12 \x03(\tR\x0etokenAudiences\x12:\n" +
-	"\treadiness\x18\x13 \x01(\v2\x1c.vertra.console.v1.ReadinessR\treadinessB\n" +
+	"\treadiness\x18\x13 \x01(\v2\x1c.vertra.console.v1.ReadinessR\treadiness\x12\x16\n" +
+	"\x06clouds\x18\x14 \x03(\tR\x06clouds\x12\x1f\n" +
+	"\vclouds_from\x18\x15 \x01(\tR\n" +
+	"cloudsFrom\x12\x1b\n" +
+	"\truns_here\x18\x16 \x01(\bR\brunsHereB\n" +
 	"\n" +
 	"\b_team_idB\f\n" +
 	"\n" +

@@ -68,7 +68,10 @@ type GetEnvironmentResponse struct {
 	// Single sign-on, when on: the provider's name for its button ("Google").
 	// Sign in at /api/auth/oidc/start. Passwords still work, except for the
 	// members of a team that requires single sign-on (Team.require_sso).
-	SsoLabel      string `protobuf:"bytes,3,opt,name=sso_label,json=ssoLabel,proto3" json:"sso_label,omitempty"`
+	SsoLabel string `protobuf:"bytes,3,opt,name=sso_label,json=ssoLabel,proto3" json:"sso_label,omitempty"`
+	// The cloud this install is on (gcp, aws, azure, kind, existing), as
+	// vertra set it; empty when it isn't known, and every product runs here.
+	Cloud         string `protobuf:"bytes,4,opt,name=cloud,proto3" json:"cloud,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -120,6 +123,13 @@ func (x *GetEnvironmentResponse) GetSelfRegistration() bool {
 func (x *GetEnvironmentResponse) GetSsoLabel() string {
 	if x != nil {
 		return x.SsoLabel
+	}
+	return ""
+}
+
+func (x *GetEnvironmentResponse) GetCloud() string {
+	if x != nil {
+		return x.Cloud
 	}
 	return ""
 }
@@ -747,11 +757,12 @@ var File_vertra_console_v1_auth_proto protoreflect.FileDescriptor
 const file_vertra_console_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"\x1cvertra/console/v1/auth.proto\x12\x11vertra.console.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x17\n" +
-	"\x15GetEnvironmentRequest\"x\n" +
+	"\x15GetEnvironmentRequest\"\x8e\x01\n" +
 	"\x16GetEnvironmentResponse\x12\x14\n" +
 	"\x05label\x18\x01 \x01(\tR\x05label\x12+\n" +
 	"\x11self_registration\x18\x02 \x01(\bR\x10selfRegistration\x12\x1b\n" +
-	"\tsso_label\x18\x03 \x01(\tR\bssoLabel\"C\n" +
+	"\tsso_label\x18\x03 \x01(\tR\bssoLabel\x12\x14\n" +
+	"\x05cloud\x18\x04 \x01(\tR\x05cloud\"C\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\"A\n" +

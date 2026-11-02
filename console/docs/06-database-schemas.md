@@ -405,6 +405,8 @@ What a DAG step can run: one row per image and action.
 | `max_attempts` | integer | no | product.yaml's `maxAttempts`: how many times a step of it may run in all. A step gets this, or fewer if its template or DAG asks; one if the product isn't idempotent. |
 | `concurrency_key` | text[] | no | product.yaml's `concurrencyKey`: the inputs naming what a step of it changes. The kernel runs one step per set of their values at a time. |
 | `max_running` | integer | no | product.yaml's `maxRunning`: at most this many of the product's steps (all its actions, sharing its catalog folder) claimed or running at once; 0, no cap of its own. |
+| `clouds` | text[] | no | The clouds of the installs it's for (product.yaml's `clouds`, else its team.yaml's); empty, every install. On an install on another cloud it's listed, not checked, and refused at submit (`NOT_FOR_THIS_INSTALL`). |
+| `clouds_from` | text | no | Which file set `clouds`: `product`, `team`, or empty when neither did. |
 | `capacity` | text | yes | product.yaml's `capacity`: `spot` or `onDemand`, where the install offers a choice; null, the install's own placement. |
 | `examples` | jsonb | no | Examples of running it, from its passing contract tests: `[{ name, inputs, outputs }]`, up to ten. The run form offers them. |
 | `check` | text | yes | product.yaml's `check` (the product's): the action that says whether it's ready on this install. Null: none. |

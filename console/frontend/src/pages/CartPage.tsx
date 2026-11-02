@@ -10,18 +10,18 @@ import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import ArrowIcon from "@mui/icons-material/ArrowForward";
-import { ApiError, listRunnables, placeOrder, type OrderOption, type Runnable } from "../api";
+import { ApiError, cloudList, listRunnables, placeOrder, type OrderOption, type Runnable } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { cart, planChecks, useCart, useOrderPlan } from "../cart";
 import type { BuiltStep } from "../compose";
 import { CheckStrip } from "../components/CheckStrip";
+import { CloudPill, NotForThisInstall, cloudsSource, isNotForThisInstall, refusedProduct, useInstall } from "../components/Clouds";
 import { EmptyState } from "../components/EmptyState";
 import { OrderChoice, optionKey, sameInput } from "../components/OrderChoice";
 import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
 import { ReadinessNote } from "../components/ReadinessNote";
 import { ReadinessPill } from "../components/ReadinessPill";
-import { useEnvironment } from "../environment";
 import { fieldsOf, initialValues, toParameters, type Field, type FieldValue, type Values } from "../schemaForm";
 import { FieldInput } from "./catalog/FieldInput";
 
@@ -54,8 +54,9 @@ function Wired({ input, choice, name }: { input: BuiltStep["inputs"][string]; ch
   return null;
 }
 
-/** The step's state here: deprecated, its readiness, or nothing when it has no check. */
+/** The step's state here: for other installs, deprecated, its readiness, or nothing when it has no check. */
 function StepState({ action }: { action: Runnable | undefined }) {
+  if (action && !action.runsHere) return <CloudPill clouds={action.clouds} />;
   if (action?.deprecated) return <Pill tone="warning" title={action.deprecated}>Deprecated</Pill>;
   if (action?.readiness) return <ReadinessPill readiness={action.readiness} />;
   return null;
@@ -72,7 +73,7 @@ function StepState({ action }: { action: Runnable | undefined }) {
 export function CartPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const install = useEnvironment()?.label || "this install";
+  const { install, cloud } = useInstall();
   const { team: chosenTeam, actions, choices: proposedChoices, values: proposedValues } = useCart();
   const teams = user?.teamNames ?? [];
   const team = chosenTeam && teams.includes(chosenTeam) ? chosenTeam : (teams[0] ?? null);
@@ -83,6 +84,7 @@ export function CartPage() {
   const [shared, setShared] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<ApiError | null>(null);
   const [placing, setPlacing] = useState(false);
   // One per visit: placing it again after a timeout is the same order.
   const [requestId] = useState(() => crypto.randomUUID());
@@ -131,6 +133,11 @@ export function CartPage() {
   // Choices still to make: the options problems, not a value you'll type.
   const unchosen = (plan?.problems ?? []).filter((p) => p.options.length > 0 && !choices.some((c) => sameInput(c, p)));
   const cycle = (plan?.problems ?? []).find((p) => p.code === "CYCLE");
+  // Steps for installs on other clouds: the order can't run here until they're removed.
+  const notHere = (plan?.steps ?? []).filter((s) => action(s.product)?.runsHere === false);
+  const notHereNames = [...new Set(notHere.map((s) => action(s.product)?.displayName || s.product))];
+  const notHereClouds = [...new Set(notHere.flatMap((s) => action(s.product)?.clouds ?? []))].sort();
+  const onCloud = cloud ? `${install} is on ${cloud}` : `${install} is on another cloud`;
   // Which steps use each parameter asked once.
   const usedBy = (parameter: string) => (plan?.steps ?? []).filter((s) => Object.values(s.inputs).some((i) => i.kind === "parameter" && i.parameter === parameter)).map((s) => stepName(s.id));
 
@@ -148,12 +155,14 @@ export function CartPage() {
     if (Object.keys(errors).length > 0) return;
     setPlacing(true);
     setError(null);
+    setRefusal(null);
     try {
       const id = await placeOrder({ team, actions, choices, values: typed, parameters: shared, requestId });
       cart.clear();
       navigate(`/runs/${id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't place the order.");
+      if (isNotForThisInstall(err)) setRefusal(err);
+      else setError(err instanceof ApiError ? err.message : "Couldn't place the order.");
       setPlacing(false);
     }
   }
@@ -206,6 +215,39 @@ export function CartPage() {
       {header}
       <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 340px" }, alignItems: "start" }}>
         <Box component="section" aria-label="The plan" sx={{ display: "flex", flexDirection: "column", gap: 1.75, minWidth: 0 }}>
+          {[...new Set(notHere.map((s) => s.product))].map((product) => {
+            const a = action(product);
+            const name = a?.displayName || product;
+            const index = actions.indexOf(product);
+            return (
+              <Alert
+                key={product}
+                severity="error"
+                action={
+                  index >= 0 && (
+                    <Button size="small" variant="outlined" color="inherit" onClick={() => { cart.removeAt(index); }} sx={{ bgcolor: "background.paper", whiteSpace: "nowrap" }}>
+                      Remove {name}
+                    </Button>
+                  )
+                }
+              >
+                <strong>
+                  {name} is for {cloudList(a?.clouds ?? [])} installs, so this order can&apos;t run here.
+                </strong>{" "}
+                {onCloud}. Remove it to order the rest.
+              </Alert>
+            );
+          })}
+          {refusal && (
+            <NotForThisInstall
+              error={refusal}
+              what="order"
+              product={(() => {
+                const a = action(refusedProduct(refusal) ?? "");
+                return a ? { name: a.displayName || a.name, team: a.team, clouds: a.clouds, cloudsFrom: a.cloudsFrom } : null;
+              })()}
+            />
+          )}
           {(error ?? planError) && <Alert severity="error">{error ?? planError}</Alert>}
           {plan && <CheckStrip label="The plan" checks={planChecks(plan, choices, action, install)} />}
 
@@ -235,6 +277,15 @@ export function CartPage() {
                   </Box>
                   <StepState action={a} />
                 </Box>
+                {a && !a.runsHere && (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
+                    Not run on {install}
+                    {cloud && `, which is on ${cloud}`}. {cloudsSource(a.team, a.cloudsFrom)} says it&apos;s for {cloudList(a.clouds)} installs.{" "}
+                    <Link component={RouterLink} to="/products">
+                      About it
+                    </Link>
+                  </Typography>
+                )}
                 <ReadinessNote readiness={a?.readiness} deprecated={a?.deprecated}>
                   {a?.readiness?.state === "not_ready" && (
                     <>
@@ -265,11 +316,17 @@ export function CartPage() {
                   </Box>
                 ))}
                 {stepFields.length > 0 && (
-                  <Box sx={{ display: "grid", gap: 1.75, gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))" } }}>
+                  // A step that can't run here can't be filled in either.
+                  <Box component="fieldset" disabled={a?.runsHere === false} sx={{ border: 0, m: 0, p: 0, minWidth: 0, display: "grid", gap: 1.75, gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))" } }}>
                     {stepFields.map((field) => (
                       <FieldInput key={field.name} field={field} value={valuesOf(step.id)[field.name]} error={fieldErrors[`${step.id}.${field.name}`]} onChange={set(step.id)} />
                     ))}
                   </Box>
+                )}
+                {a && !a.runsHere && actions.includes(step.product) && (
+                  <Button size="small" onClick={() => { cart.removeAt(actions.indexOf(step.product)); }} sx={{ alignSelf: "flex-start", minHeight: 36 }}>
+                    Remove from the cart
+                  </Button>
                 )}
                 {suggestions.map((s) => (
                   <Box
@@ -351,10 +408,21 @@ export function CartPage() {
                 })}
               </Box>
             )}
-            <Button variant="contained" size="large" fullWidth disabled={!plan || placing || unchosen.length > 0 || Boolean(cycle)} onClick={() => void place()}>
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              disabled={!plan || placing || unchosen.length > 0 || Boolean(cycle) || notHere.length > 0}
+              onClick={() => void place()}
+              aria-describedby={notHere.length > 0 ? "not-here-why" : undefined}
+            >
               {placing ? "Placing…" : "Place order"}
             </Button>
-            {unchosen.length > 0 ? (
+            {notHere.length > 0 ? (
+              <Typography id="not-here-why" variant="body2" color="error.dark" sx={{ fontSize: 13 }}>
+                Remove {notHereNames.join(" and ")} first: {notHereNames.length === 1 ? "it's" : "they're"} for {cloudList(notHereClouds)} installs, and {onCloud}.
+              </Typography>
+            ) : unchosen.length > 0 ? (
               <Typography variant="body2" color="warning.main" sx={{ fontSize: 13 }}>
                 Choose what fills {unchosen.map((p) => `${stepName(p.step)}'s ${p.input}`).join(", ")} first.
               </Typography>

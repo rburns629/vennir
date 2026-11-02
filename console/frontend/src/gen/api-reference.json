@@ -2836,6 +2836,13 @@
      "repeated": false,
      "optional": false,
      "comment": "Single sign-on, when on: the provider's name for its button (\"Google\").\nSign in at /api/auth/oidc/start. Passwords still work, except for the\nmembers of a team that requires single sign-on (Team.require_sso)."
+    },
+    {
+     "name": "cloud",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "The cloud this install is on (gcp, aws, azure, kind, existing), as\nvertra set it; empty when it isn't known, and every product runs here."
     }
    ]
   },
@@ -8022,6 +8029,27 @@
      "repeated": false,
      "optional": false,
      "comment": "Whether it's ready on this install, by its check (product.yaml's\ncheck); unset when it has none."
+    },
+    {
+     "name": "clouds",
+     "type": "string",
+     "repeated": true,
+     "optional": false,
+     "comment": "The clouds of the installs it's for (product.yaml's clouds, else its\nteam.yaml's); empty, every install."
+    },
+    {
+     "name": "cloudsFrom",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Where clouds is set: \"product\", \"team\", or \"\" when neither says."
+    },
+    {
+     "name": "runsHere",
+     "type": "boolean",
+     "repeated": false,
+     "optional": false,
+     "comment": "Whether it's for this install (its clouds include this install's, or\neither is unset). One that isn't is listed but never checked or run:\na run naming it is refused (failed_precondition, NOT_FOR_THIS_INSTALL)."
     }
    ]
   },
@@ -10957,6 +10985,27 @@
      "repeated": true,
      "optional": false,
      "comment": "Examples of running it, from its product's passing contract tests (an\naction's; a template has none yet): a name, inputs to fill the form\nwith, and what it gave."
+    },
+    {
+     "name": "clouds",
+     "type": "string",
+     "repeated": true,
+     "optional": false,
+     "comment": "An action's product's clouds (Product.clouds); for a template, those of\nits steps that aren't for this install."
+    },
+    {
+     "name": "runsHere",
+     "type": "boolean",
+     "repeated": false,
+     "optional": false,
+     "comment": "Whether an action's product is for this install (Product.runs_here);\nfor a template, whether every step's is. Run, a schedule or an order\nof one that isn't is refused (NOT_FOR_THIS_INSTALL)."
+    },
+    {
+     "name": "cloudsFrom",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Where an action's clouds are set (Product.clouds_from)."
     }
    ]
   },

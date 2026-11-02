@@ -15,6 +15,7 @@ What you can run comes first. The rest is listed too, so you know it exists:
 | **Not ready**, **Check failed**, **Checking**, **Not checked yet** | It's shared with you, and its product has a readiness check ([what they mean](#what-does-not-ready-mean-on-a-product)) | Run it anyway; it may fail |
 | **Deprecated** | Its team wants you to use something else; hover for what | It still runs |
 | **Not shared with you** | Its team hasn't shared it with any of your teams | **Ask for access ↗** |
+| **For aws installs** (under **For other installs**, last) | Its team made it for installs on another cloud than this one's | Nothing here: it isn't checked or run on this install. Run it on an install on its cloud |
 
 **Ask for access ↗** opens a new issue on the catalog repository, filled in, in your own browser, asking the owning team to share it with yours. The console never writes to the catalog itself. Something a team marked hidden never appears here at all.
 

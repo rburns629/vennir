@@ -467,6 +467,11 @@ kernelApiToken:
 # the specific cluster.
 environmentLabel: "Kubernetes"
 
+# -- The cloud this install is on: gcp, aws, azure, kind or existing (vertra
+# sets it). A catalog product whose `clouds` leave it out is listed but not
+# checked or run here. Empty: not known, so every product runs.
+installCloud: ""
+
 # -- Keyless bots: the OIDC issuers whose ID tokens a team's bot may sign in
 # with instead of a stored token (a CI job's own identity), and the audience
 # those tokens must name. Empty audience: the console's URL (see

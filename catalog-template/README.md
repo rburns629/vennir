@@ -37,7 +37,7 @@ templates/                    starters to copy (checked by CI, never published)
 samples/<team>/               example teams: local (five languages); gcp, aws (billed)
 teams/
   <team>/                    one team = one console team = one Kubernetes namespace
-    team.yaml                 who the team is: name, description, owner, contact, help; allowedTargets
+    team.yaml                 who the team is: name, description, owner, contact, help; allowedTargets; clouds
     README.md                 optional
     products/
       <product>/              its image is <registry>/<team>/<product>
@@ -106,6 +106,7 @@ tokenAudiences: [sts.amazonaws.com]  # optional: tokens for another cloud (below
 check: check                # optional: the action that says whether it's ready on an install (below)
 maxRunning: 5               # optional: at most 5 of its steps (all its actions) at once, per install
 capacity: onDemand          # optional: spot or onDemand, where the install offers both (below)
+clouds: [gcp]               # optional: the installs it's for, by cloud (below); else its team.yaml's
 resources: {cpu: 250m, memory: 512Mi}   # optional: what each step asks for (below)
 actions:
   - name: create
@@ -194,6 +195,19 @@ install offers a choice (GKE Autopilot, EKS): `spot` is cheaper but may be
 reclaimed (the step fails as retryable, so make the actions idempotent);
 `onDemand` isn't reclaimed, for a step that mustn't be cut short. Left out,
 the install's own, usually Spot.
+
+`clouds` says which installs a product is for, by the cloud they're on
+(`gcp`, `aws`, `azure`, `kind`, `existing`), when one catalog serves
+installs on several. A team.yaml's `clouds` is the default for all its
+products; a product.yaml's replaces it. On an install on another cloud,
+the product is still listed, marked "For aws installs", but its readiness
+check isn't run there and a run naming it is refused (`NOT_FOR_THIS_INSTALL`)
+before anything starts. Left out on both, it's for every install. An
+install vertra made knows its cloud; one on a cluster you already had says
+it (`vertra config set -e <env> cluster.cloud aws`), or runs only the
+products for every install. `clouds` says where a product is meant to run,
+not who may run what: that's still each team's sharing and the platform's
+image and identity policies.
 
 `resources` (`cpu`, `memory`, and optionally `memoryLimit`, as Kubernetes
 quantities) is what each of the product's steps asks the cluster for; a

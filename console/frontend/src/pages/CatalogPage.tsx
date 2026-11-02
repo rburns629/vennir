@@ -17,7 +17,9 @@ import AddIcon from "@mui/icons-material/Add";
 import CartIcon from "@mui/icons-material/ShoppingCartOutlined";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import CloudIcon from "@mui/icons-material/CloudOutlined";
 import { CheckStrip } from "../components/CheckStrip";
+import { CloudPill, notHereReason, useInstall } from "../components/Clouds";
 import { EmptyState } from "../components/EmptyState";
 import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
@@ -54,8 +56,9 @@ function repositoryOf(runnables: Runnable[]): string | null {
   return null;
 }
 
-/** Not shared with you, Deprecated (why, on hover), its readiness here when it has a check, or No check. */
-function State({ r }: { r: Runnable }) {
+/** For other installs, Not shared with you, Deprecated (why, on hover), its readiness here when it has a check, or No check. */
+function State({ r, why }: { r: Runnable; why: string }) {
+  if (!r.runsHere) return <CloudPill clouds={r.clouds} title={why} />;
   if (!r.shared) return <Pill tone="neutral">Not shared with you</Pill>;
   if (r.deprecated) return <Pill tone="warning" title={r.deprecated}>Deprecated</Pill>;
   if (r.readiness) return <ReadinessPill readiness={r.readiness} />;
@@ -86,7 +89,31 @@ function Foot({ r }: { r: Runnable }) {
   );
 }
 
+/** For other installs: why it can't run here, beneath its controls (not only on hover), and the controls off. */
+function NotHere({ r, why }: { r: Runnable; why: string }) {
+  const id = `not-here-${r.name}`;
+  return (
+    <>
+      <Typography id={id} variant="caption" color="text.secondary" sx={{ flex: "1 1 120px", fontSize: 12 }}>
+        {why}
+      </Typography>
+      <Box sx={{ display: "flex", gap: 1 }}>
+        {r.kind === "action" && (
+          <Button variant="outlined" startIcon={<AddIcon />} disabled aria-describedby={id}>
+            Add to cart
+          </Button>
+        )}
+        <Button variant="contained" disabled aria-describedby={id} sx={{ minWidth: 72 }}>
+          Run
+        </Button>
+      </Box>
+    </>
+  );
+}
+
 function CatalogCard({ r, inCart }: { r: Runnable; inCart: boolean }) {
+  const { install, cloud } = useInstall();
+  const why = r.runsHere ? "" : notHereReason(r.clouds, install, cloud);
   const inputs = inputsOf(r);
   const steps = r.actions.length;
   return (
@@ -100,7 +127,7 @@ function CatalogCard({ r, inCart }: { r: Runnable; inCart: boolean }) {
             {r.team} · {r.kind === "template" ? `template · ${String(steps)} step${steps === 1 ? "" : "s"}` : "action"}
           </Typography>
         </Box>
-        <State r={r} />
+        <State r={r} why={why} />
       </Box>
       {r.description && (
         <Typography variant="body2" sx={{ lineHeight: 1.5 }}>
@@ -115,12 +142,16 @@ function CatalogCard({ r, inCart }: { r: Runnable; inCart: boolean }) {
           {inputs.join(", ")}
         </Typography>
       )}
-      {r.shared && <ReadinessNote readiness={r.readiness} deprecated={r.deprecated} />}
+      {r.shared && r.runsHere && <ReadinessNote readiness={r.readiness} deprecated={r.deprecated} />}
       <Box sx={{ mt: "auto", pt: 1.5, borderTop: 1, borderColor: "tint.rule", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.25, flexWrap: "wrap" }}>
-        <Typography variant="caption" color="text.secondary" sx={{ flex: "1 1 120px", fontSize: 12 }}>
-          <Foot r={r} />
-        </Typography>
-        {r.shared ? (
+        {!r.runsHere ? (
+          <NotHere r={r} why={why} />
+        ) : (
+          <Typography variant="caption" color="text.secondary" sx={{ flex: "1 1 120px", fontSize: 12 }}>
+            <Foot r={r} />
+          </Typography>
+        )}
+        {!r.runsHere ? null : r.shared ? (
           <Box sx={{ display: "flex", gap: 1 }}>
             {r.kind === "action" &&
               (inCart ? (
@@ -274,7 +305,7 @@ export function CatalogPage() {
         .filter(
           (r) =>
             (!team || r.team === team) &&
-            (!runnableOnly || r.shared) &&
+            (!runnableOnly || (r.shared && r.runsHere)) &&
             (!readyOnly || r.readiness?.state === "ready") &&
             (!query || matches(r, query)),
         )
@@ -283,6 +314,10 @@ export function CatalogPage() {
   );
   const repository = runnables ? repositoryOf(runnables) : null;
   const templates = shown.filter((r) => r.kind === "template").length;
+  // Those for installs on other clouds, last, in a group of their own.
+  const here = shown.filter((r) => r.runsHere);
+  const others = shown.filter((r) => !r.runsHere);
+  const { cloud } = useInstall();
 
   // Links from before the run page (?template=, ?action=) open it.
   if (params.has("template") || params.has("action")) return <Navigate to={`/catalog/run?${params.toString()}`} replace />;
@@ -379,7 +414,7 @@ export function CatalogPage() {
           {runnables !== null && shown.length > 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
               {shown.length} shown: {templates} {templates === 1 ? "template" : "templates"}, {shown.length - templates} {shown.length - templates === 1 ? "action" : "actions"}. What you can run
-              first, templates before actions.
+              first, templates before actions{others.length > 0 && `; the ${String(others.length)} for other installs last`}.
             </Typography>
           )}
           {runnables !== null && shown.length === 0 && (
@@ -396,10 +431,31 @@ export function CatalogPage() {
             </Card>
           )}
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 330px), 1fr))", gap: 2 }}>
-            {shown.map((r) => (
+            {here.map((r) => (
               <CatalogCard key={linkKey(r)} r={r} inCart={r.kind === "action" && inCart.includes(r.name)} />
             ))}
           </Box>
+          {others.length > 0 && (
+            <Box component="section" aria-labelledby="other-installs" sx={{ display: "flex", flexDirection: "column", gap: 1.5, mt: 2 }}>
+              <Box>
+                <Typography id="other-installs" variant="h6" component="h2" sx={{ display: "flex", alignItems: "center", gap: 1, fontSize: 17, "& svg": { fontSize: 18, color: "text.secondary" } }}>
+                  <CloudIcon aria-hidden="true" />
+                  For other installs
+                  <Box component="span" sx={{ fontSize: 13, fontWeight: 400, color: "text.secondary" }}>
+                    {others.length}
+                  </Box>
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
+                  {cloud ? `${install} is on ${cloud}. ` : ""}These are for installs on other clouds: listed so you know they exist, but not checked or run here. Only what I can run hides them.
+                </Typography>
+              </Box>
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 330px), 1fr))", gap: 2 }}>
+                {others.map((r) => (
+                  <CatalogCard key={linkKey(r)} r={r} inCart={false} />
+                ))}
+              </Box>
+            </Box>
+          )}
         </Box>
         <CartAside runnables={runnables ?? []} />
       </Box>

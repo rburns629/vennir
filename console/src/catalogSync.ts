@@ -43,7 +43,7 @@ import { ApiError } from "./apiError.js";
 import { writeAuditEntry } from "./audit.js";
 import { SCOPES } from "./auth/scopes.js";
 import type { AuthUser } from "./auth/plugin.js";
-import { config } from "./config.js";
+import { CLOUDS, config } from "./config.js";
 import { deleteProduct, registerProduct } from "./core/products.js";
 import { applySecretStore, ensureTeam, retireTeam } from "./core/teams.js";
 import { parameterSchemaProblem, templateStepProblems } from "./core/templates.js";
@@ -328,6 +328,9 @@ export async function apply(release: Release, log: FastifyBaseLogger): Promise<C
     released.add(p.name);
     if (foreign.has(p.team)) continue;
     await attempt(`product ${p.name}`, async () => {
+      // A cloud this console doesn't know would keep it from running anywhere.
+      const unknown = p.clouds.filter((c) => !CLOUDS.includes(c));
+      if (unknown.length > 0) throw new ReleaseProblem(`its clouds name ${unknown.join(", ")}: not one of ${CLOUDS.join(", ")}`);
       await registerProduct(CATALOG, {
         name: p.name,
         image: p.image,
@@ -347,6 +350,8 @@ export async function apply(release: Release, log: FastifyBaseLogger): Promise<C
         maxAttempts: p.maxAttempts > 0 ? p.maxAttempts : 1,
         concurrencyKey: p.concurrencyKey,
         maxRunning: p.maxRunning,
+        clouds: p.clouds,
+        cloudsFrom: p.cloudsFrom,
         capacity: p.capacity === "spot" || p.capacity === "onDemand" ? p.capacity : null,
         cleanup: p.cleanup ? { action: p.cleanup.action, inputs: p.cleanup.inputs ?? null } : null,
         plan: p.plan || null,

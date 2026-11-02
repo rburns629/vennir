@@ -35,6 +35,21 @@
       "type": "string",
       "maxLength": 4000
     },
+    "clouds": {
+      "description": "Optional. The clouds of the installs its products are for (gcp, aws, azure, kind, existing), unless a product.yaml says its own. On an install on another cloud they're listed, marked, not checked and not run. Left out: every install.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "gcp",
+          "aws",
+          "azure",
+          "kind",
+          "existing"
+        ]
+      }
+    },
     "owner": {
       "type": "string",
       "minLength": 1

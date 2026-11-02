@@ -24,6 +24,7 @@ import { productReadiness, teamMemberships, teams, users, type ReadinessState } 
 import type { KernelExecution } from "./kernel/client.js";
 import { notify } from "./notifier.js";
 import { UNREGISTERED_SERVICE_ACCOUNT } from "./productPolicy.js";
+import { runsHere } from "./core/clouds.js";
 
 /** What submitted_executions.template says for a check run: never a template's <team>/<name>. */
 export const CHECK_RUN = "check";
@@ -38,7 +39,8 @@ function checkActions(products: TeamProduct[]): TeamProduct[] {
   for (const p of products) {
     const name = checkName(p);
     const check = name ? byName.get(name) : undefined;
-    if (check && check.teamName === p.teamName) out.set(check.name, check);
+    // Not for this install's cloud: never checked here (core/clouds.ts).
+    if (check && check.teamName === p.teamName && runsHere(check.clouds)) out.set(check.name, check);
   }
   return [...out.values()];
 }
@@ -135,12 +137,13 @@ export interface ReadinessView {
 }
 
 /** Each of these products' readiness, by its name; a product with no check isn't in it. */
-export async function readinessOf(products: { name: string; action: string; check: string | null }[]): Promise<Map<string, ReadinessView>> {
+export async function readinessOf(products: { name: string; action: string; check: string | null; clouds: string[] }[]): Promise<Map<string, ReadinessView>> {
   const rows = new Map((await db.select().from(productReadiness)).map((r) => [r.product, r]));
   const out = new Map<string, ReadinessView>();
   for (const p of products) {
     const name = checkName(p);
-    if (!name) continue;
+    // Not for this install: no readiness here, not even an old answer.
+    if (!name || !runsHere(p.clouds)) continue;
     const row = rows.get(name);
     out.set(p.name, {
       state: row?.state ?? "unchecked",

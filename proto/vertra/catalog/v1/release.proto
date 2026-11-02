@@ -165,6 +165,11 @@ message ProductAction {
   // product.yaml's approval as a list of teams: a step of it waits for an
   // approval when its run is for one of them (and not its own team's).
   repeated string approval_teams = 28;
+  // The clouds of the installs it's for (gcp, aws, azure, kind, existing):
+  // product.yaml's clouds, else its team.yaml's; empty, every install.
+  repeated string clouds = 29;
+  // Where clouds came from: "product", "team", or "" when neither says.
+  string clouds_from = 30;
 }
 
 message Example {

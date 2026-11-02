@@ -578,6 +578,11 @@ type ProductAction struct {
 	// product.yaml's approval as a list of teams: a step of it waits for an
 	// approval when its run is for one of them (and not its own team's).
 	ApprovalTeams []string `protobuf:"bytes,28,rep,name=approval_teams,json=approvalTeams,proto3" json:"approval_teams,omitempty"`
+	// The clouds of the installs it's for (gcp, aws, azure, kind, existing):
+	// product.yaml's clouds, else its team.yaml's; empty, every install.
+	Clouds []string `protobuf:"bytes,29,rep,name=clouds,proto3" json:"clouds,omitempty"`
+	// Where clouds came from: "product", "team", or "" when neither says.
+	CloudsFrom    string `protobuf:"bytes,30,opt,name=clouds_from,json=cloudsFrom,proto3" json:"clouds_from,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -806,6 +811,20 @@ func (x *ProductAction) GetApprovalTeams() []string {
 		return x.ApprovalTeams
 	}
 	return nil
+}
+
+func (x *ProductAction) GetClouds() []string {
+	if x != nil {
+		return x.Clouds
+	}
+	return nil
+}
+
+func (x *ProductAction) GetCloudsFrom() string {
+	if x != nil {
+		return x.CloudsFrom
+	}
+	return ""
 }
 
 type Example struct {
@@ -1752,7 +1771,7 @@ const file_vertra_catalog_v1_release_proto_rawDesc = "" +
 	"\bapproval\x18\x03 \x01(\bR\bapproval\"5\n" +
 	"\aTargets\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x16\n" +
-	"\x06values\x18\x02 \x03(\tR\x06values\"\xe1\b\n" +
+	"\x06values\x18\x02 \x03(\tR\x06values\"\x9a\t\n" +
 	"\rProductAction\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05image\x18\x02 \x01(\tR\x05image\x12\x16\n" +
@@ -1789,7 +1808,10 @@ const file_vertra_catalog_v1_release_proto_rawDesc = "" +
 	"\vmax_running\x18\x1a \x01(\x05R\n" +
 	"maxRunning\x12\x1a\n" +
 	"\bcapacity\x18\x1b \x01(\tR\bcapacity\x12%\n" +
-	"\x0eapproval_teams\x18\x1c \x03(\tR\rapprovalTeams\x1aW\n" +
+	"\x0eapproval_teams\x18\x1c \x03(\tR\rapprovalTeams\x12\x16\n" +
+	"\x06clouds\x18\x1d \x03(\tR\x06clouds\x12\x1f\n" +
+	"\vclouds_from\x18\x1e \x01(\tR\n" +
+	"cloudsFrom\x1aW\n" +
 	"\vErrorsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x122\n" +
 	"\x05value\x18\x02 \x01(\v2\x1c.vertra.catalog.v1.ErrorHelpR\x05value:\x028\x01\"\x81\x01\n" +

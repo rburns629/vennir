@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -128,6 +129,30 @@ func (p *Product) ReleaseActions(reference string) ([]*catalogv1.ProductAction, 
 	return out, nil
 }
 
+// cloudsOf is a team.yaml's or product.yaml's clouds: a list of the clouds
+// installs are on; nil when it says none.
+func cloudsOf(v any) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	list, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf("clouds is a list, such as [aws]")
+	}
+	var out []string
+	for _, x := range list {
+		cloud := fmt.Sprint(x)
+		if !slices.Contains(Clouds, cloud) {
+			return nil, fmt.Errorf("clouds: %q isn't one of %s", cloud, strings.Join(Clouds, ", "))
+		}
+		out = append(out, cloud)
+	}
+	return out, nil
+}
+
+// Clouds are the clouds a catalog's clouds may name: those installs are on.
+var Clouds = []string{"gcp", "aws", "azure", "kind", "existing"}
+
 func or(value, fallback string) string {
 	if value != "" {
 		return value
@@ -156,6 +181,7 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 	release := &catalogv1.Release{Commit: commit, Repository: repository, CreatedAt: timestamppb.Now()}
 	var problems []string
 	dirs := map[string]string{}
+	teamClouds := map[string][]string{}
 	for _, d := range c.TeamDirs() {
 		dirs[filepath.Base(d)] = d
 	}
@@ -174,6 +200,12 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 		help, _ := spec["help"].(map[string]any)
 		t.Contact, t.HelpChat, t.HelpUrl = text(spec, "contact"), text(help, "chat"), text(help, "url")
 		t.Owner, t.Description = text(spec, "owner"), text(spec, "description")
+		// Not schema-checked here, as product.yaml is: a cloud nobody runs
+		// would keep its products from running anywhere.
+		if teamClouds[team], err = cloudsOf(spec["clouds"]); err != nil {
+			problems = append(problems, fmt.Sprintf("teams/%s/team.yaml: %v", team, err))
+			continue
+		}
 		if len(c.secretStoreFiles(team)) > 0 {
 			documents, found := c.secretStoreDocuments(team)
 			if len(found) == 0 {
@@ -216,6 +248,17 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", p.Label(), err))
 			continue
+		}
+		// The clouds it's for: its own, else its team's.
+		clouds, from := stringList(p.Spec["clouds"]), "product"
+		if len(clouds) == 0 {
+			clouds, from = teamClouds[p.Team()], "team"
+		}
+		if len(clouds) == 0 {
+			from = ""
+		}
+		for _, a := range actions {
+			a.Clouds, a.CloudsFrom = clouds, from
 		}
 		release.Products = append(release.Products, actions...)
 	}

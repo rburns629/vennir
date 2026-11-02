@@ -177,6 +177,30 @@ export declare type Runnable = Message<"vertra.console.v1.Runnable"> & {
    * @generated from field: repeated vertra.console.v1.RunExample examples = 18;
    */
   examples: RunExample[];
+
+  /**
+   * An action's product's clouds (Product.clouds); for a template, those of
+   * its steps that aren't for this install.
+   *
+   * @generated from field: repeated string clouds = 19;
+   */
+  clouds: string[];
+
+  /**
+   * Whether an action's product is for this install (Product.runs_here);
+   * for a template, whether every step's is. Run, a schedule or an order
+   * of one that isn't is refused (NOT_FOR_THIS_INSTALL).
+   *
+   * @generated from field: bool runs_here = 20;
+   */
+  runsHere: boolean;
+
+  /**
+   * Where an action's clouds are set (Product.clouds_from).
+   *
+   * @generated from field: string clouds_from = 21;
+   */
+  cloudsFrom: string;
 };
 
 /**

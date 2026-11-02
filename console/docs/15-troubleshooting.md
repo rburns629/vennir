@@ -88,6 +88,14 @@ Images are scanned again daily while they're in use. So an image that ran yester
 
 **What to do:** check the secret's status on the team's **Secrets** tab, and that the task lists the exact name. If you submitted with a secret name the team doesn't have, the console refuses the submission instead, with `Secret "…" is not registered for team "…"`. If a step fails with `IDENTITY_NOT_ALLOWED`, the console and the cluster disagree about the product or secret, often because one changed after you submitted. Run it again. If it persists, tell an admin. See [Secrets, explained](04-secrets-explained.md) for how a secret reaches a step.
 
+## "Not run: it's for aws installs" (NOT_FOR_THIS_INSTALL)
+
+**What you see:** a product marked **For aws installs** (or another cloud) with **Run** and **Add to cart** off, or a run refused with `NOT_FOR_THIS_INSTALL`: "<product> is for aws installs; this install is on gcp."
+
+**Why:** its team said, in the catalog (`clouds` in its product.yaml, or its team.yaml for all its products), which installs it's for, and this install is on another cloud. It's listed so you know it exists, but it isn't checked or run here. Nothing was made: the refusal comes before anything starts.
+
+**What to do:** run it on an install on its cloud. If it should run here too, ask its team to add this install's cloud to its `clouds`. A template with such a step is refused the same way until the template changes.
+
 ## A product says it isn't ready here
 
 **What you see:** a **Not ready** or **Check failed** pill on the product in **Catalog** or **Products**, or a warning on its run form: "<team> says it isn't ready on this install".

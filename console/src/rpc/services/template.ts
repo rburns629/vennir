@@ -36,6 +36,9 @@ export function templateService(): ServiceImpl<typeof TemplateService> {
           previewable: r.previewable,
           readiness: readiness(r.readiness ?? undefined),
           examples: r.examples.map((e) => ({ name: e.name, inputs: e.inputs as JsonObject, outputs: e.outputs as JsonObject })),
+          clouds: r.clouds,
+          cloudsFrom: r.cloudsFrom,
+          runsHere: r.runsHere,
         })),
       };
     },

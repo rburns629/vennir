@@ -5,6 +5,9 @@
 # association (made outside the chart: no annotation), a role that may read
 # the products' ECR repositories; see docs/operations.md, Cloud identities.
 environmentLabel: eks-prod
+# The cloud this install is on: products whose catalog clouds leave it out
+# are listed but not checked or run here.
+installCloud: aws
 bootstrapAdmin:
   email: admin@example.com
 kernelApiUrl: https://kernel-execution-kernel-api.vertra-system.svc.cluster.local:8000
