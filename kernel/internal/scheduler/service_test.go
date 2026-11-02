@@ -41,13 +41,10 @@ func TestFullTwoTaskChainSucceedsWithOrderedEvents(t *testing.T) {
 	equal(t, "execution", executionState(t, tx, id), domain.ExecutionRunning)
 
 	exec.Complete(tasks["create-project"].ExecutorHandle, map[string]any{"projectId": "demo-project-123"})
+	// Recorded first, so the task it released starts in the same pass.
 	k.tick(t0.Add(time.Second))
 	tasks = tasksByKey(t, tx, id)
 	equal(t, "create-project", tasks["create-project"].State, domain.TaskSucceeded)
-	equal(t, "deploy-application", tasks["deploy-application"].State, domain.TaskReady)
-
-	k.tick(t0.Add(2 * time.Second))
-	tasks = tasksByKey(t, tx, id)
 	equal(t, "deploy-application", tasks["deploy-application"].State, domain.TaskRunning)
 	equal(t, "resolved inputs", tasks["deploy-application"].ResolvedInputs, map[string]any{"projectId": "demo-project-123"})
 
@@ -149,8 +146,6 @@ func TestMissingDeclaredOutputFailsTheDownstreamTask(t *testing.T) {
 	k.tick(t0)
 	exec.Complete(tasksByKey(t, tx, id)["create-project"].ExecutorHandle, map[string]any{"projectId": "demo-project-123"})
 	k.tick(t0.Add(time.Second))
-	equal(t, "deploy", tasksByKey(t, tx, id)["deploy-application"].State, domain.TaskReady)
-	k.tick(t0.Add(2 * time.Second))
 	deploy := tasksByKey(t, tx, id)["deploy-application"]
 	equal(t, "deploy", deploy.State, domain.TaskFailed)
 	equal(t, "code", deploy.Failure["code"], "MISSING_UPSTREAM_OUTPUT")
@@ -364,7 +359,8 @@ func TestRunningTasksAreStartedAndReadConcurrently(t *testing.T) {
 	exec := &slowExecutor{Fake: fake()}
 	k := newTicker(t, tx, exec)
 	k.opts.ExecutorConcurrency = 4
-	k.tick(time.Now())
+	k.tick(time.Now()) // started
+	k.tick(time.Now()) // read
 	equal(t, "most in flight", exec.most.Load(), 4)
 }
 

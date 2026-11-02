@@ -550,7 +550,7 @@ def system_page() -> Page:
     console_db = p.vertex(610, 360, 160, 90, "Postgres\nexecution_console", database(YELLOW))
     kernel_api = p.titled(830, 210, 200, 90, "kernel-api", "Go, Connect, ClusterIP only\naccepts only the console's token", ORANGE)
     kernel_db = p.vertex(850, 360, 160, 90, "Postgres\nexecution_kernel", database(YELLOW))
-    scheduler = p.titled(830, 500, 200, 90, "kernel-scheduler", "claim → dispatch → poll\nevery second", ORANGE)
+    scheduler = p.titled(830, 500, 200, 90, "kernel-scheduler", "poll, then claim → dispatch\nevery second", ORANGE)
     p.titled(590, 500, 200, 90, "pg-backup CronJobs", "daily pg_dump of both\ndatabases → Cloud Storage", GREY)
 
     p.vertex(1090, 160, 400, 500, "namespace <team>  (label vertra/team=true)", frame(GREEN))
@@ -781,7 +781,7 @@ def sequence_page() -> Page:
     y += 36
     message(
         6, 5,
-        "Loop.Run → pgx.BeginFunc → RunTick → claimReadyTasks:\n"
+        "Loop.Run → pgx.BeginFunc → DispatchPass (after RecordPass commits) → claimReadyTasks:\n"
         "recoverExpiredLeases; SELECT READY … FOR UPDATE SKIP LOCKED;\n"
         "→ CLAIMED, lease_owner, attempt_count+1, task_attempts row, TASK_CLAIMED",
     )

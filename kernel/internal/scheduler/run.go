@@ -107,15 +107,17 @@ func (l *Loop) Run(ctx context.Context) error {
 		started := time.Now()
 		outcome, err := l.pass(work)
 		metrics.TickDuration.Observe(time.Since(started).Seconds())
+		// What committed: all of it, or only the recorded half when the
+		// dispatch failed after it.
+		for _, event := range outcome.Events {
+			metrics.Events.WithLabelValues(string(event)).Inc()
+		}
+		// Committed: only now may what finished be removed, once held.
+		l.held.hold(outcome.Finished, time.Now().Add(l.ReleaseAfter))
 		if err != nil {
 			metrics.TickErrors.Inc()
 			l.Log.Error("scheduler tick failed; will retry next poll", "error", err.Error())
 		} else {
-			for _, event := range outcome.Events {
-				metrics.Events.WithLabelValues(string(event)).Inc()
-			}
-			// Committed: only now may what finished be removed, once held.
-			l.held.hold(outcome.Finished, time.Now().Add(l.ReleaseAfter))
 			l.housekeeping(work, &nextRetention, &nextOrphanSweep)
 		}
 		ReleaseFinished(work, l.Executor, l.held.take(time.Now()), l.Log)
@@ -148,18 +150,29 @@ func (l *Loop) Run(ctx context.Context) error {
 	return nil
 }
 
-// pass runs one tick in its own transaction.
+// pass runs one tick: what finished is recorded and committed, then ready
+// tasks claimed and dispatched in a transaction of their own, so a slow
+// dispatch never holds a finished task's record. A recorded half stands
+// even if the dispatch half fails: its handles are still released.
 func (l *Loop) pass(ctx context.Context) (Outcome, error) {
-	var outcome Outcome
+	var recorded, dispatched Outcome
 	err := pgx.BeginFunc(ctx, l.Pool, func(tx pgx.Tx) error {
 		var err error
-		outcome, err = RunTick(ctx, tx, l.Executor, l.Options, time.Now(), l.Log)
+		recorded, err = RecordPass(ctx, tx, l.Executor, l.Options, time.Now(), l.Log)
 		return err
 	})
 	if err != nil {
 		return Outcome{}, err
 	}
-	return outcome, nil
+	err = pgx.BeginFunc(ctx, l.Pool, func(tx pgx.Tx) error {
+		var err error
+		dispatched, err = DispatchPass(ctx, tx, l.Executor, l.Options, time.Now(), l.Log)
+		return err
+	})
+	if err != nil {
+		return recorded, err
+	}
+	return recorded.and(dispatched), nil
 }
 
 func (l *Loop) housekeeping(ctx context.Context, nextRetention, nextOrphanSweep *time.Time) {

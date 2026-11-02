@@ -15,6 +15,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/rburns629/vertra/kernel/internal/domain"
+	"github.com/rburns629/vertra/kernel/internal/executor"
+	"github.com/rburns629/vertra/kernel/internal/executor/executortest"
 )
 
 // Ported from the Python kernel's tests/unit/test_scheduler_{concurrency,shutdown}.py.
@@ -97,4 +99,59 @@ func TestStoppingCutsTheWaitShortAndReleasesLeases(t *testing.T) {
 	equal(t, "still running", tk.State, domain.TaskRunning)
 	// Expired, not cleared: the next scheduler adopts it at once.
 	equal(t, "lease handed back", tk.LeaseExpiresAt != nil && !tk.LeaseExpiresAt.After(time.Now()), true)
+}
+
+// blockingStart holds every Start until release is closed, as an admission
+// webhook waiting out its timeout does a Job's creation.
+type blockingStart struct {
+	*executortest.Fake
+	starting chan struct{}
+	release  chan struct{}
+}
+
+func (b *blockingStart) Start(ctx context.Context, task executor.ResolvedTask) (executor.Handle, error) {
+	b.starting <- struct{}{}
+	<-b.release
+	return b.Fake.Start(ctx, task)
+}
+
+// Seen on GKE: a pass that dispatched held every finished task's record
+// until its dispatches were done. Now what finished commits first.
+func TestWhatFinishedIsCommittedBeforeASlowDispatch(t *testing.T) {
+	ctx := context.Background()
+	submitted := func(name string) string {
+		var id string
+		if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+			id = submit(t, tx, fmt.Sprintf("%s-%d", name, time.Now().UnixNano()), task("only"))
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _, _ = testPool.Exec(ctx, `DELETE FROM executions WHERE id = $1`, id) })
+		return id
+	}
+	exec := &blockingStart{Fake: fake(), starting: make(chan struct{}, 1), release: make(chan struct{})}
+	loop := &Loop{Pool: testPool, Executor: exec, Options: DefaultOptions(fmt.Sprintf("loop-slow-%d", time.Now().UnixNano())), Log: quietLog}
+
+	first := submitted("loop-first")
+	close(exec.release) // the first dispatch goes through
+	if _, err := loop.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	<-exec.starting
+	exec.Complete(tasksByKey(t, testPool, first)["only"].ExecutorHandle, map[string]any{})
+
+	exec.release = make(chan struct{}) // the next one hangs
+	second := submitted("loop-second")
+	done := make(chan error, 1)
+	go func() { _, err := loop.pass(ctx); done <- err }()
+	<-exec.starting
+	// Mid-dispatch, from another connection: the first is already recorded.
+	equal(t, "first", tasksByKey(t, testPool, first)["only"].State, domain.TaskSucceeded)
+	equal(t, "first's execution", executionState(t, testPool, first), domain.ExecutionSucceeded)
+	close(exec.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	equal(t, "second", tasksByKey(t, testPool, second)["only"].State, domain.TaskRunning)
 }
