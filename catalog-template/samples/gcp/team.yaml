@@ -13,6 +13,8 @@ description: >-
   cloud account at all.
 owner: gcp-team
 contact: gcp-team@example.com
+# Its products run only on gcp installs: listed, marked, not run elsewhere.
+clouds: [gcp]
 # Where people running these products ask when a step fails.
 help:
   chat: "#gcp-team-help"
