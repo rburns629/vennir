@@ -85,6 +85,13 @@ rules:
     resources: ["resourcequotas", "limitranges"]
     verbs: ["create", "update", "delete"]
   {{- end }}
+  {{- if eq .Values.monitoring.provider "google" }}
+  # The charts' alerting rules, as GKE's managed Prometheus evaluates them
+  # (core/alerts.ts): read only, for Observe's alerts.
+  - apiGroups: ["monitoring.googleapis.com"]
+    resources: ["rules"]
+    verbs: ["list"]
+  {{- end }}
   # listTaskPods -- read-only visibility into a team's own
   # running work (core/teams.ts, teamPods), no different in kind from `kubectl
   # get pods -n <team>`; and unfinishedPodsByNamespace, an admin's count of

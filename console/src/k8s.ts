@@ -268,7 +268,7 @@ async function deleteRoleBindings(namespace: string, roleName: string): Promise<
   }
 }
 
-function isNotFound(error: unknown): boolean {
+export function isNotFound(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === 404;
 }
 
@@ -1078,6 +1078,21 @@ export async function listTaskPods(namespace: string): Promise<TaskPodSummary[]>
         : null,
     };
   });
+}
+
+/** A rule group as GKE's managed Prometheus's Rules objects hold it. */
+export interface GmpRuleGroup {
+  name: string;
+  rules?: { alert?: string; labels?: Record<string, string>; annotations?: Record<string, string> }[];
+}
+
+/** The rule groups of every Rules object in the cluster (monitoring.googleapis.com/v1): the charts' alerts, as GKE's managed Prometheus evaluates them (core/alerts.ts). Read only. */
+export async function listGmpRuleGroups(): Promise<GmpRuleGroup[]> {
+  const { custom } = getApis();
+  const list = (await custom.listClusterCustomObject({ group: "monitoring.googleapis.com", version: "v1", plural: "rules" })) as {
+    items?: { spec?: { groups?: GmpRuleGroup[] } }[];
+  };
+  return (list.items ?? []).flatMap((item) => item.spec?.groups ?? []);
 }
 
 /** Pods listed across the cluster a page at a time, so a big cluster's

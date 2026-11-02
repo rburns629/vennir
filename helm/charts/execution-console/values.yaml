@@ -899,6 +899,14 @@ monitoring:
     # -- Where GKE's managed collector runs: gmp-system, or gke-gmp-system on
     # Autopilot.
     collectorNamespace: gmp-system
+    # -- The project whose managed Prometheus evaluates the charts' Rules:
+    # Observe reads which alerts fire from its query API, as the console's
+    # Google identity, which needs roles/monitoring.viewer there (vertra
+    # grants it). Empty: Observe shows no alerts. vertra sets it.
+    project: ""
+    # -- The GKE cluster's name, so another cluster's alerts in the same
+    # project aren't shown. vertra sets it.
+    cluster: ""
   # -- With provider bundled: one Prometheus in this namespace, scraping
   # this release's Pods and the kernel release's (found through the
   # Kubernetes API, this namespace only), with both charts' alerts (the

@@ -567,6 +567,30 @@ export declare type ListAlertsResponse = Message<"vertra.console.v1.ListAlertsRe
    * @generated from field: repeated vertra.console.v1.AlertRule rules = 4;
    */
   rules: AlertRule[];
+
+  /**
+   * Where they're read from: "prometheus" (its rules API), or "google": the
+   * charts' Rules in the cluster, and which fire from Google Cloud's
+   * managed Prometheus, which keeps no instance's own summary.
+   *
+   * @generated from field: string source = 5;
+   */
+  source: string;
+
+  /**
+   * With google: the project whose managed Prometheus evaluates them.
+   *
+   * @generated from field: string project = 6;
+   */
+  project: string;
+
+  /**
+   * With google: the rules were read but which fire couldn't be (problem
+   * says why); each rule's state is then unknown.
+   *
+   * @generated from field: bool state_unknown = 7;
+   */
+  stateUnknown: boolean;
 };
 
 /**
@@ -599,7 +623,7 @@ export declare type AlertRule = Message<"vertra.console.v1.AlertRule"> & {
   summary: string;
 
   /**
-   * inactive, pending or firing.
+   * inactive, pending or firing; unknown when it couldn't be read.
    *
    * @generated from field: string state = 4;
    */

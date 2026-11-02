@@ -218,6 +218,7 @@ func Vars(c *config.Config, deleteData bool) map[string]any {
 		"catalog_repository":         c.Catalog.Repo(),
 		"google_groups":              c.SSO.GoogleGroups,
 		"chat":                       c.ChatOnVertex(),
+		"managed_prometheus":         c.Monitoring.Enabled && c.Monitoring.ProviderName() == "google",
 		"signing":                    orNone(c.ModuleSigning()),
 	}
 }

@@ -13,9 +13,12 @@
  */
 import { Code } from "@connectrpc/connect";
 import { ApiError } from "../apiError.js";
+import type { FastifyBaseLogger } from "fastify";
 import type { AuthUser } from "../auth/plugin.js";
 import { config } from "../config.js";
 import { listLiveTeamApis } from "../db/queries.js";
+import { gcpMetadataToken } from "../gcpMetadata.js";
+import { isNotFound, listGmpRuleGroups, type GmpRuleGroup } from "../k8s.js";
 import { sees } from "./apis.js";
 
 /** Prometheus's /api/v1/rules, as far as it's read here. */
@@ -63,26 +66,164 @@ function signedIn(caller: AuthUser | undefined): AuthUser {
   return caller;
 }
 
-export async function listAlerts(caller: AuthUser | undefined): Promise<{
+export interface AlertsView {
   configured: boolean;
   problem: string;
   checkedAt: Date | null;
   rules: AlertRuleView[];
-}> {
+  source: "prometheus" | "google" | "";
+  project: string;
+  stateUnknown: boolean;
+}
+
+/** One of GMP's query API's series. */
+interface Series {
+  metric: Record<string, string>;
+  value: [number, string];
+}
+
+/** Labels GKE's managed Prometheus adds to every series: where, not what. */
+const GMP_LABELS = ["project_id", "location", "cluster"];
+
+/** Why GMP's query API couldn't be read. */
+class GmpUnread extends Error {}
+
+/** A PromQL query against the project's managed Prometheus, as the console's Google identity. */
+async function gmpQuery(project: string, query: string): Promise<Series[]> {
+  let token: string;
+  try {
+    token = await gcpMetadataToken();
+  } catch {
+    throw new GmpUnread("The console has no Google token here (it signs in to Google with GKE's Workload Identity).");
+  }
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://monitoring.googleapis.com/v1/projects/${project}/location/global/prometheus/api/v1/query?query=${encodeURIComponent(query)}`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5_000) },
+    );
+  } catch {
+    throw new GmpUnread("Google's managed Prometheus isn't answering.");
+  }
+  if (response.status === 403) {
+    throw new GmpUnread(`Google's managed Prometheus refused the console (403): its Google identity needs roles/monitoring.viewer on ${project}, which vertra apply grants.`);
+  }
+  if (!response.ok) throw new GmpUnread(`Google's managed Prometheus answered ${String(response.status)}.`);
+  let body: { status: string; data?: { result?: Series[] } };
+  try {
+    body = (await response.json()) as typeof body;
+  } catch {
+    throw new GmpUnread("Google's managed Prometheus answered with something other than its JSON.");
+  }
+  if (body.status !== "success") throw new GmpUnread("Google's managed Prometheus couldn't run the query.");
+  return body.data?.result ?? [];
+}
+
+/**
+ * How fresh a series must be to count: Google's query API looks back 5
+ * minutes and keeps no stale markers, so one the rule evaluator stopped
+ * writing (resolved, or pending that has since fired) would linger. Two of
+ * its evaluations (a minute apart by default) and some.
+ */
+const FRESH_SECONDS = 150;
+
+/** An alert instance's identity: its labels but the series' name and state. */
+const instanceKey = (metric: Record<string, string>) =>
+  JSON.stringify(Object.entries(metric).filter(([k]) => k !== "__name__" && k !== "alertstate").sort(([a], [b]) => a.localeCompare(b)));
+
+/**
+ * The charts' rules from the cluster's Rules objects, and which fire from
+ * the project's managed Prometheus (ALERTS, and ALERTS_FOR_STATE for
+ * since when), in the shape Prometheus's rules API has. GMP keeps no
+ * instance's own annotations, so each shows its rule's summary.
+ */
+async function googleRules(project: string, cluster: string, groups: GmpRuleGroup[]): Promise<{ body: RulesResponse; unread: string }> {
+  const names = [...new Set(groups.flatMap((g) => (g.rules ?? []).flatMap((r) => (r.alert ? [r.alert] : []))))];
+  const firing = new Map<string, { labels: Record<string, string>; state: string; activeAt?: string }[]>();
+  let unread = "";
+  if (names.length > 0) {
+    // This project's, this cluster's: the query API answers for every project the project's metrics scope holds.
+    const selector = `{alertname=~"${names.join("|")}",project_id="${project}"${cluster ? `,cluster="${cluster}"` : ""}}`;
+    const fresh = (series: string) => `${series}${selector} and (time() - timestamp(${series}${selector})) < ${String(FRESH_SECONDS)}`;
+    try {
+      const [alerts, since] = await Promise.all([gmpQuery(project, fresh("ALERTS")), gmpQuery(project, fresh("ALERTS_FOR_STATE"))]);
+      const activeAt = new Map(since.map((s) => [instanceKey(s.metric), new Date(Number(s.value[1]) * 1000).toISOString()]));
+      // One instance, once: firing over pending, should both still be fresh.
+      const latest = new Map<string, Series>();
+      for (const a of alerts) {
+        const key = instanceKey(a.metric);
+        if (!latest.has(key) || a.metric["alertstate"] === "firing") latest.set(key, a);
+      }
+      for (const a of latest.values()) {
+        const name = a.metric["alertname"] ?? "";
+        const labels = Object.fromEntries(Object.entries(a.metric).filter(([k]) => k !== "__name__" && k !== "alertstate" && !GMP_LABELS.includes(k)));
+        const at = activeAt.get(instanceKey(a.metric));
+        firing.set(name, [...(firing.get(name) ?? []), { labels, state: a.metric["alertstate"] ?? "firing", ...(at ? { activeAt: at } : {}) }]);
+      }
+    } catch (error) {
+      if (!(error instanceof GmpUnread)) throw error;
+      unread = error.message;
+    }
+  }
+  return {
+    unread,
+    body: {
+      status: "success",
+      data: {
+        groups: groups.map((g) => ({
+          name: g.name,
+          rules: (g.rules ?? []).flatMap((r) =>
+            r.alert
+              ? [{
+                  type: "alerting",
+                  name: r.alert,
+                  ...(r.labels ? { labels: r.labels } : {}),
+                  ...(r.annotations ? { annotations: r.annotations } : {}),
+                  alerts: firing.get(r.alert) ?? [],
+                }]
+              : [],
+          ),
+        })),
+      },
+    },
+  };
+}
+
+export async function listAlerts(caller: AuthUser | undefined, log: FastifyBaseLogger): Promise<AlertsView> {
   const who = signedIn(caller);
   const base = config.monitoring.prometheusUrl;
-  if (!base) return { configured: false, problem: "", checkedAt: null, rules: [] };
+  const google = !base && config.monitoring.provider === "google" ? config.monitoring.google : null;
+  if (!base && !google?.project) return { configured: false, problem: "", checkedAt: null, rules: [], source: "", project: "", stateUnknown: false };
   const checkedAt = new Date();
+  const answer = (problem: string): AlertsView => ({
+    configured: true, problem, checkedAt, rules: [], source: google ? "google" : "prometheus", project: google?.project ?? "", stateUnknown: false,
+  });
   let body: RulesResponse;
-  try {
-    // Under the URL's own path, for a Prometheus served below one (https://host/prometheus).
-    const response = await fetch(`${base}/api/v1/rules?type=alert`, { signal: AbortSignal.timeout(5_000) });
-    if (!response.ok) return { configured: true, problem: `Prometheus answered ${String(response.status)}.`, checkedAt, rules: [] };
-    body = (await response.json()) as RulesResponse;
-  } catch {
-    return { configured: true, problem: "Prometheus isn't answering.", checkedAt, rules: [] };
+  let unread = "";
+  if (google) {
+    let groups: GmpRuleGroup[];
+    try {
+      groups = (await listGmpRuleGroups()).filter((g) => OURS.test(g.name));
+    } catch (error) {
+      log.error({ err: error }, "couldn't list the cluster's GMP Rules for Observe's alerts");
+      return answer(
+        isNotFound(error)
+          ? "The cluster has no Rules to read: GKE's managed Prometheus (managed collection) isn't on."
+          : "The cluster's Rules couldn't be read.",
+      );
+    }
+    ({ body, unread } = await googleRules(google.project, google.cluster, groups));
+  } else {
+    try {
+      // Under the URL's own path, for a Prometheus served below one (https://host/prometheus).
+      const response = await fetch(`${base}/api/v1/rules?type=alert`, { signal: AbortSignal.timeout(5_000) });
+      if (!response.ok) return answer(`Prometheus answered ${String(response.status)}.`);
+      body = (await response.json()) as RulesResponse;
+    } catch {
+      return answer("Prometheus isn't answering.");
+    }
+    if (body.status !== "success") return answer("Prometheus couldn't list its rules.");
   }
-  if (body.status !== "success") return { configured: true, problem: "Prometheus couldn't list its rules.", checkedAt, rules: [] };
 
   // The APIs the caller may see, for instances labelled with one.
   const visible = who.isAdmin ? null : new Set((await listLiveTeamApis()).filter((a) => sees(who, a)).map((a) => `${a.teamName}/${a.name}`));
@@ -97,7 +238,7 @@ export async function listAlerts(caller: AuthUser | undefined): Promise<{
         name: rule.name,
         severity: rule.labels?.["severity"] ?? "",
         summary: general(rule.annotations?.["summary"] ?? ""),
-        state: active.some((a) => a.state === "firing") ? "firing" : active.length > 0 ? "pending" : "inactive",
+        state: unread ? "unknown" : active.some((a) => a.state === "firing") ? "firing" : active.length > 0 ? "pending" : "inactive",
         instances: shown.map((a) => {
           const labels = Object.fromEntries(Object.entries(a.labels ?? {}).filter(([k]) => k !== "alertname" && k !== "severity"));
           return {
@@ -114,5 +255,5 @@ export async function listAlerts(caller: AuthUser | undefined): Promise<{
   }
   // Firing first, then pending; the rest as Prometheus lists them.
   rules.sort((a, b) => STATE_ORDER.indexOf(a.state) - STATE_ORDER.indexOf(b.state));
-  return { configured: true, problem: "", checkedAt, rules };
+  return { ...answer(unread), rules, stateUnknown: unread !== "" };
 }

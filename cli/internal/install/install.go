@@ -751,9 +751,16 @@ func monitoringValues(c *config.Config, cloud *Cloud, console bool) (monitoring 
 	switch m.ProviderName() {
 	case "google":
 		collector := GoogleCollectorNamespace(c)
+		google := map[string]any{"collectorNamespace": collector}
+		if console && cloud != nil && cloud.ClusterName != "" {
+			// Where Observe reads which alerts fire: this project's managed
+			// Prometheus, this cluster's (the module grants the console
+			// roles/monitoring.viewer).
+			google["project"], google["cluster"] = c.GCP.Project, cloud.ClusterName
+		}
 		monitoring = map[string]any{
 			"provider":   "google",
-			"google":     map[string]any{"collectorNamespace": collector},
+			"google":     google,
 			"podMonitor": map[string]any{"enabled": true},
 			"alerts":     map[string]any{"enabled": true},
 		}

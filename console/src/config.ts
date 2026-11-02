@@ -365,6 +365,19 @@ function monitoringProvider(): "" | "operator" | "google" | "bundled" {
   return value;
 }
 
+/** GKE's managed Prometheus: a project id (or "" for none) and its cluster. */
+function googleMonitoring(): { project: string; cluster: string } {
+  const project = (process.env["MONITORING_GOOGLE_PROJECT"] ?? "").trim();
+  const cluster = (process.env["MONITORING_GOOGLE_CLUSTER"] ?? "").trim();
+  if (project !== "" && !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project)) {
+    throw new Error(`Invalid MONITORING_GOOGLE_PROJECT "${project}": a Google Cloud project id.`);
+  }
+  if (cluster !== "" && !/^[a-z]([a-z0-9-]{0,38}[a-z0-9])?$/.test(cluster)) {
+    throw new Error(`Invalid MONITORING_GOOGLE_CLUSTER "${cluster}": a GKE cluster's name.`);
+  }
+  return { project, cluster };
+}
+
 /** An http(s) address from the environment, or "" for none. */
 function httpUrl(name: string): string {
   const value = (process.env[name] ?? "").trim().replace(/\/+$/, "");
@@ -630,6 +643,9 @@ export const config = {
     provider: monitoringProvider(),
     grafanaUrl: httpUrl("GRAFANA_URL"),
     prometheusUrl: httpUrl("PROMETHEUS_URL"),
+    // With provider google and no prometheusUrl: the project and cluster
+    // whose managed Prometheus says which alerts fire.
+    google: googleMonitoring(),
   },
   // The kernel chart's signature policy (image-signature.yaml, a
   // policy-controller ClusterImagePolicy): catalog images must be signed

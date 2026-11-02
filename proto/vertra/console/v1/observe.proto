@@ -213,6 +213,15 @@ message ListAlertsResponse {
   string problem = 2;
   google.protobuf.Timestamp checked_at = 3;
   repeated AlertRule rules = 4;
+  // Where they're read from: "prometheus" (its rules API), or "google": the
+  // charts' Rules in the cluster, and which fire from Google Cloud's
+  // managed Prometheus, which keeps no instance's own summary.
+  string source = 5;
+  // With google: the project whose managed Prometheus evaluates them.
+  string project = 6;
+  // With google: the rules were read but which fire couldn't be (problem
+  // says why); each rule's state is then unknown.
+  bool state_unknown = 7;
 }
 
 message AlertRule {
@@ -221,7 +230,7 @@ message AlertRule {
   string severity = 2;
   // Its summary, with what varies by instance left out.
   string summary = 3;
-  // inactive, pending or firing.
+  // inactive, pending or firing; unknown when it couldn't be read.
   string state = 4;
   repeated AlertInstance instances = 5;
   // Pending or firing for something the caller can't see (another team's

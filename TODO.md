@@ -79,13 +79,15 @@ Released 0.6.0 on GKE Autopilot and EKS standard. Each item names where
 it was seen.
 
 Console and gateway:
-- [ ] **Observe's alerts with Google's managed Prometheus** say "not
-  configured": the console reads `/api/v1/rules`, which GMP doesn't serve.
-  It could list the charts' `Rules` from the cluster (a read on
-  `rules.monitoring.googleapis.com`) and which fire from GMP's query API
-  (`ALERTS`, at `monitoring.googleapis.com/v1/projects/<p>/location/global/prometheus`),
-  which needs the console's Google identity granted `roles/monitoring.viewer`
-  (the gcp module) and a GKE run to prove. Card's text on the canvas first.
+- [ ] **Observe's alerts with Google's managed Prometheus** said "not
+  configured": the console read `/api/v1/rules`, which GMP doesn't serve.
+  Built 2026-11-02 (board 11h): the charts' `Rules` from the cluster, which
+  fire from GMP's query API (`ALERTS`, `ALERTS_FOR_STATE`, this cluster's)
+  as the console's Google identity, granted `roles/monitoring.viewer` by
+  the gcp module; the state shown unknown, saying what's missing, without
+  it. Left: proving it in the coming GKE run, and seeing there whether GMP's
+  in-cluster rule evaluator's own `/api/v1/rules` (live, no 5-minute lag)
+  can be reached instead (found reviewing it).
 
 Samples and catalog CI:
 - [ ] **The aws and azure samples' `clouds`** (`clouds: [aws]`, `[azure]` in

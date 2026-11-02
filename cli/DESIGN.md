@@ -293,6 +293,7 @@ for teams that run OpenTofu or Terraform themselves.
 | Catalog CI | Workload Identity Federation limited to the catalog repository | GitHub OIDC provider and a role limited to the repository | Federated credential for the repository |
 | Database (managed) | Cloud SQL for PostgreSQL (HA optional) | RDS PostgreSQL (Multi-AZ optional) | Azure Database for PostgreSQL Flexible Server (zone-redundant optional) |
 | Backups (in-cluster database) | Bucket with a lifecycle rule | S3 bucket with a lifecycle rule | Storage container with a lifecycle rule |
+| Observe's alerts on GKE's managed Prometheus | Cloud Monitoring's API, and `roles/monitoring.viewer` for the console (`monitoring.provider: google`) | (the chart's monitoring values) | (the chart's monitoring values) |
 | The chat agent's model | Vertex AI's API, and `roles/aiplatform.user` for the console (Gemini; `chat.off` for none) | (the chart's chat values) | (the chart's chat values) |
 
 Outputs feed the generated Helm values (registry paths, identity

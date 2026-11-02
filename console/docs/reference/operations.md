@@ -252,7 +252,7 @@ of the values it writes):
 
 | | GKE (Workload Identity) | EKS |
 | --- | --- | --- |
-| The console, the scanner | Each its own Google service account with `roles/artifactregistry.reader` on the registry, bound to its ServiceAccount (`roles/iam.workloadIdentityUser`), named by its `iam.gke.io/gcp-service-account` annotation; the console's also `roles/aiplatform.user` on the project with the chat agent on Vertex (the scanner, reading images anyone can publish, gets nothing more) | Each its own role that may read the ECR repositories, bound by an EKS Pod Identity association (no annotation); the console's also `bedrock-mantle:CreateInference` on the chat model with the chat agent on Bedrock (the scanner gets nothing more); `registryCheck.ecrToken: true` |
+| The console, the scanner | Each its own Google service account with `roles/artifactregistry.reader` on the registry, bound to its ServiceAccount (`roles/iam.workloadIdentityUser`), named by its `iam.gke.io/gcp-service-account` annotation; the console's also `roles/aiplatform.user` on the project with the chat agent on Vertex, and `roles/monitoring.viewer` with GKE's managed Prometheus, for Observe's alerts (the scanner, reading images anyone can publish, gets nothing more) | Each its own role that may read the ECR repositories, bound by an EKS Pod Identity association (no annotation); the console's also `bedrock-mantle:CreateInference` on the chat model with the chat agent on Bedrock (the scanner gets nothing more); `registryCheck.ecrToken: true` |
 | policy-controller (`policy-controller-webhook`) | The same, read-only on the products' registry | The same, by Pod Identity |
 | A team's `eso-<cloud>` (its SecretStore) | Its Google service account, by the annotation in the store file | IRSA: the `eks.amazonaws.com/role-arn` annotation, a role trusting the cluster's OIDC issuer (registered in IAM once per cluster) for `system:serviceaccount:<team>:eso-aws` only. Pod Identity doesn't work for a store |
 | A product's own | Its Google service account, by the annotation an admin adds | A Pod Identity association for `<team>/<serviceAccount>`, which an admin adds |
@@ -567,6 +567,16 @@ Which Prometheus is `monitoring.provider`, the same in both charts:
   on, else none. A Prometheus with a NetworkPolicy of its own must admit
   the console's Pods. One Prometheus shared by several installs shows
   each install's Vertra alerts on every one of them.
+- `monitoring.google.project` and `monitoring.google.cluster` (console
+  chart, `""`): with `monitoring.provider: google` and no `prometheusUrl`,
+  where Observe's alerts come from, since GKE's managed Prometheus serves
+  no `/api/v1/rules`. The console lists the charts' `Rules` in the cluster
+  (a read its RBAC gets with `google`), and which fire from the project's
+  managed Prometheus (`ALERTS` and `ALERTS_FOR_STATE`, this cluster's), as
+  its own Google service account, which needs `roles/monitoring.viewer`
+  there. Google keeps no firing alert's own text, so each shows its rule's
+  summary and its labels. Without the role, the rules show with their state
+  unknown, saying what's missing. `vertra` sets both and grants the role.
 
 The metrics, for alerts and dashboards of your own:
 

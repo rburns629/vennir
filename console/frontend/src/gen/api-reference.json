@@ -7374,6 +7374,27 @@
      "repeated": true,
      "optional": false,
      "comment": ""
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Where they're read from: \"prometheus\" (its rules API), or \"google\": the\ncharts' Rules in the cluster, and which fire from Google Cloud's\nmanaged Prometheus, which keeps no instance's own summary."
+    },
+    {
+     "name": "project",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "With google: the project whose managed Prometheus evaluates them."
+    },
+    {
+     "name": "stateUnknown",
+     "type": "boolean",
+     "repeated": false,
+     "optional": false,
+     "comment": "With google: the rules were read but which fire couldn't be (problem\nsays why); each rule's state is then unknown."
     }
    ]
   },
@@ -7407,7 +7428,7 @@
      "type": "string",
      "repeated": false,
      "optional": false,
-     "comment": "inactive, pending or firing."
+     "comment": "inactive, pending or firing; unknown when it couldn't be read."
     },
     {
      "name": "instances",
