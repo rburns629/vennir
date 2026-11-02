@@ -214,6 +214,13 @@ class CreateActionTest(unittest.TestCase):
         # private-IP-only) -- must not crash, and reports an empty string.
         self.assertEqual(self._result()["outputs"]["ipAddress"], "")
 
+    def test_impersonation_refused_writes_a_result(self) -> None:
+        self._write_request({"projectId": "demo-project", "instanceName": "orders-db"})
+        self.service.instances.return_value.get.return_value.execute.side_effect = self.module.google.auth.exceptions.RefreshError("denied")
+        self.assertEqual(self.module.main(), 1)
+        error = self._result()["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", False))
+
 
 class BuildCredentialsTest(unittest.TestCase):
     def setUp(self) -> None:

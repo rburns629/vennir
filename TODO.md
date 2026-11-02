@@ -96,12 +96,12 @@ Samples and catalog CI:
   their team.yaml): once a release that knows `clouds` is pinned in the
   template (#67; the pinned vertra validates the samples), so a GKE install
   marks them for other installs instead of "not ready".
-- [ ] **The gcp samples' other failures** (found reviewing #66): google.auth's
-  `RefreshError`/`TransportError` (minting the impersonated token) aren't
-  `GoogleAPIError`, and `operation.result()`'s `TimeoutError` after 900 s
-  (a long Cloud Build) isn't caught: the container ends with no
-  result.json. And a failed Cloud Build ends UNKNOWN (no code), so it's
-  still retried, as `BUILD_FAILED` always is.
+- [ ] **gcp/build-image builds again on a retry while its build runs**
+  (found reviewing the fix for the samples' failures): a step that times
+  out (its own 600 s, or the client's 15 minutes) leaves Cloud Build
+  running, and the retry, finding no image yet, starts a second. It could
+  tag its build (a hash of the image and source) and wait on one still
+  QUEUED or WORKING instead; Cloud Build's filter wants a real run to prove.
 
 ## Installing and operating
 

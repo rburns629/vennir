@@ -26,6 +26,12 @@ class DeleteActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.INPUT_PATH = Path(self.tmp_dir.name) / "request.json"
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
+        # Signed in as whatever ADC finds: a stand-in whose refresh passes,
+        # unless a test makes it fail.
+        self.adc = MagicMock()
+        default = patch.object(self.module.google.auth, "default", return_value=(self.adc, "some-project"))
+        default.start()
+        self.addCleanup(default.stop)
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
@@ -71,6 +77,12 @@ class DeleteActionTest(unittest.TestCase):
     def test_needs_the_resource(self) -> None:
         code, result, _ = self._run({"type": "gcp/bucket", "id": "x"})
         self.assertEqual((code, result["error"]["code"]), (1, "MISSING_INPUT"))
+
+    def test_impersonation_refused_writes_a_result(self) -> None:
+        self.adc.refresh.side_effect = self.module.google.auth.exceptions.RefreshError("denied")
+        code, result, client = self._run({"type": "gcp/project", "id": "made-here"})
+        self.assertEqual(client.method_calls, [])
+        self.assertEqual((code, result["error"]["code"], result["error"]["retryable"]), (1, "GCP_SIGN_IN_FAILED", False))
 
 
 if __name__ == "__main__":

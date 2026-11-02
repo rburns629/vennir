@@ -79,6 +79,11 @@ class DeleteActionTest(unittest.TestCase):
         code, result = self._run({"type": "gcp/cloud-sql-instance", "id": "orders-db"})
         self.assertEqual((code, result["error"]["code"]), (1, "MISSING_INPUT"))
 
+    def test_a_call_unanswered_is_retried(self) -> None:
+        self.service.instances.return_value.get.return_value.execute.side_effect = TimeoutError("timed out")
+        code, result = self._run({"type": "gcp/cloud-sql-instance", "id": CONNECTION})
+        self.assertEqual((code, result["error"]["code"], result["error"]["retryable"]), (1, "GCP_TIMEOUT", True))
+
 
 if __name__ == "__main__":
     unittest.main()

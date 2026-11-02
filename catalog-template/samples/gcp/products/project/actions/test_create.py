@@ -26,6 +26,12 @@ class CreateActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.INPUT_PATH = Path(self.tmp_dir.name) / "request.json"
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
+        # Signed in as whatever ADC finds: a stand-in whose refresh passes,
+        # unless a test makes it fail.
+        self.adc = MagicMock()
+        default = patch.object(self.module.google.auth, "default", return_value=(self.adc, "some-project"))
+        default.start()
+        self.addCleanup(default.stop)
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
@@ -180,6 +186,59 @@ class CreateActionTest(unittest.TestCase):
         result = self._result()
         self.assertEqual(result["error"]["code"], "GCP_API_ERROR")
         self.assertTrue(result["error"]["retryable"])
+
+    def test_a_retry_that_finds_its_project_links_billing(self) -> None:
+        # The attempt that made it stopped before linking it (a timeout, say).
+        self._write_request({"projectId": "made-before", "billingAccountId": "AAAAAA-BBBBBB-CCCCCC"})
+        with (
+            patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls,
+            patch.object(self.module, "CloudBillingClient") as billing_cls,
+        ):
+            client_cls.return_value.get_project.return_value = MagicMock(labels={"vertra-made": "true"})
+            billing_cls.return_value.get_project_billing_info.return_value = MagicMock(billing_account_name="")
+            self.assertEqual(self.module.main(), 0)
+        client_cls.return_value.create_project.assert_not_called()
+        billing_cls.return_value.update_project_billing_info.assert_called_once()
+
+    def test_billing_already_linked_is_only_read(self) -> None:
+        self._write_request({"projectId": "made-before", "billingAccountId": "AAAAAA-BBBBBB-CCCCCC"})
+        with (
+            patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls,
+            patch.object(self.module, "CloudBillingClient") as billing_cls,
+        ):
+            client_cls.return_value.get_project.return_value = MagicMock(labels={"vertra-made": "true"})
+            billing_cls.return_value.get_project_billing_info.return_value = MagicMock(
+                billing_account_name="billingAccounts/AAAAAA-BBBBBB-CCCCCC"
+            )
+            self.assertEqual(self.module.main(), 0)
+        billing_cls.return_value.update_project_billing_info.assert_not_called()
+
+    def test_a_project_made_some_other_way_keeps_its_billing(self) -> None:
+        self._write_request({"projectId": "theirs", "billingAccountId": "AAAAAA-BBBBBB-CCCCCC"})
+        with (
+            patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls,
+            patch.object(self.module, "CloudBillingClient") as billing_cls,
+        ):
+            client_cls.return_value.get_project.return_value = MagicMock(labels={})
+            self.assertEqual(self.module.main(), 0)
+        billing_cls.assert_not_called()
+
+    def test_a_create_still_running_when_the_wait_ends_is_retried(self) -> None:
+        self._write_request({"projectId": "slow"})
+        with patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls:
+            client = client_cls.return_value
+            client.get_project.side_effect = self.module.NotFound("no such project")
+            client.create_project.return_value.result.side_effect = TimeoutError()
+            self.assertEqual(self.module.main(), 1)
+        error = self._result()["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_TIMEOUT", True))
+
+    def test_no_google_credentials_writes_a_result(self) -> None:
+        self._write_request({"projectId": "whatever"})
+        with patch.object(self.module, "_build_credentials", side_effect=self.module.google.auth.exceptions.DefaultCredentialsError("none")):
+            self.assertEqual(self.module.main(), 1)
+        error = self._result()["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", False))
 
 
 class BuildCredentialsTest(unittest.TestCase):

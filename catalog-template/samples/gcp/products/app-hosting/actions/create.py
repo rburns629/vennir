@@ -26,6 +26,8 @@ from typing import Any
 
 import google.auth
 import google.auth.credentials
+import google.auth.exceptions
+import google.auth.transport.requests
 from google.api_core.exceptions import GoogleAPIError, NotFound
 from google.auth import impersonated_credentials
 from google.cloud import run_v2
@@ -81,6 +83,15 @@ def _build_credentials() -> google.auth.credentials.Credentials | None:
     )
 
 
+def _signed_in() -> google.auth.credentials.Credentials:
+    """The credentials every client is given, signed in before any call: a
+    gRPC client would report a refused sign-in as UNAVAILABLE, retried for
+    good, where here it's google.auth's error, which main answers."""
+    credentials = _build_credentials() or google.auth.default(scopes=IMPERSONATION_SCOPES)[0]
+    credentials.refresh(google.auth.transport.requests.Request())
+    return credentials
+
+
 def _outputs(service: Any, project_id: str, region: str, service_name: str, made_here: bool) -> dict[str, Any]:
     """Its URL, and the service as a resource when this product made it."""
     outputs: dict[str, Any] = {"serviceUrl": service.uri}
@@ -96,7 +107,37 @@ def _outputs(service: Any, project_id: str, region: str, service_name: str, made
     return outputs
 
 
+def _iam_busy(error: Exception) -> bool:
+    """Whether IAM refused to impersonate gcp-target only for now: its
+    answer, a RefreshError's second argument, a 429 or 5xx, not a 401/403."""
+    try:
+        code = json.loads(error.args[1])["error"]["code"]
+    except (IndexError, KeyError, TypeError, ValueError):
+        return False
+    return isinstance(code, int) and (code == 429 or code >= 500)
+
+
 def main() -> int:
+    try:
+        return _run()
+    except google.auth.exceptions.GoogleAuthError as error:
+        # Signing in, not the call: no Google credentials here, gcp-target
+        # refused to be impersonated, or Google unreachable to ask.
+        # Unreachable often comes as a RefreshError caused by one (GKE's
+        # metadata server, the first seconds of a Pod).
+        unreachable = google.auth.exceptions.TransportError
+        retryable = (
+            error.retryable or isinstance(error, unreachable) or isinstance(error.__cause__, unreachable)
+            or _iam_busy(error)
+        )
+        return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
+    except TimeoutError as error:
+        # A call unanswered, or an operation still running when the client
+        # stopped waiting for it: the next attempt finds what it made.
+        return _failure("GCP_TIMEOUT", f"Google didn't finish in time: {error or 'no answer'}", retryable=True)
+
+
+def _run() -> int:
     request = json.loads(INPUT_PATH.read_text())
     inputs = request.get("inputs", {})
 
@@ -110,7 +151,7 @@ def main() -> int:
         )
     region = inputs.get("region", DEFAULT_REGION)
 
-    services = run_v2.ServicesClient(credentials=_build_credentials())
+    services = run_v2.ServicesClient(credentials=_signed_in())
     service_path = services.service_path(project_id, region, service_name)
 
     # Existing-user path: a service with this name already exists, so this

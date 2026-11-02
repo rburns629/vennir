@@ -33,6 +33,7 @@ from typing import Any
 
 import google.auth
 import google.auth.credentials
+import google.auth.exceptions
 from google.auth import impersonated_credentials
 from googleapiclient import discovery
 from googleapiclient.errors import HttpError
@@ -140,7 +141,37 @@ def _outputs_from_instance(instance: dict[str, Any]) -> dict[str, Any]:
     return outputs
 
 
+def _iam_busy(error: Exception) -> bool:
+    """Whether IAM refused to impersonate gcp-target only for now: its
+    answer, a RefreshError's second argument, a 429 or 5xx, not a 401/403."""
+    try:
+        code = json.loads(error.args[1])["error"]["code"]
+    except (IndexError, KeyError, TypeError, ValueError):
+        return False
+    return isinstance(code, int) and (code == 429 or code >= 500)
+
+
 def main() -> int:
+    try:
+        return _run()
+    except google.auth.exceptions.GoogleAuthError as error:
+        # Signing in, not the call: no Google credentials here, gcp-target
+        # refused to be impersonated, or Google unreachable to ask.
+        # Unreachable often comes as a RefreshError caused by one (GKE's
+        # metadata server, the first seconds of a Pod).
+        unreachable = google.auth.exceptions.TransportError
+        retryable = (
+            error.retryable or isinstance(error, unreachable) or isinstance(error.__cause__, unreachable)
+            or _iam_busy(error)
+        )
+        return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
+    except TimeoutError as error:
+        # A call unanswered, or an operation still running when the client
+        # stopped waiting for it: the next attempt finds what it made.
+        return _failure("GCP_TIMEOUT", f"Google didn't finish in time: {error or 'no answer'}", retryable=True)
+
+
+def _run() -> int:
     request = json.loads(INPUT_PATH.read_text())
     inputs = request.get("inputs", {})
 

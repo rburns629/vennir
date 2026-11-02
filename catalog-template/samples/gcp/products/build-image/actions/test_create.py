@@ -10,6 +10,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from google.api_core import exceptions as api_exceptions
+
 _MODULE_PATH = Path(__file__).parent / "create.py"
 
 _VALID_INPUTS = {
@@ -32,6 +34,12 @@ class CreateActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.INPUT_PATH = Path(self.tmp_dir.name) / "request.json"
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
+        # Signed in as whatever ADC finds: a stand-in whose refresh passes,
+        # unless a test makes it fail.
+        self.adc = MagicMock()
+        default = patch.object(self.module.google.auth, "default", return_value=(self.adc, "some-project"))
+        default.start()
+        self.addCleanup(default.stop)
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
@@ -132,7 +140,8 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         result = self._result()
         self.assertEqual(result["error"]["code"], "BUILD_FAILED")
-        self.assertTrue(result["error"]["retryable"])
+        # The same source fails the same way again.
+        self.assertFalse(result["error"]["retryable"])
 
     def test_non_artifact_registry_image_always_builds(self) -> None:
         inputs = dict(_VALID_INPUTS, imageUri="gcr.io/my-project/legacy:v1")
@@ -163,6 +172,77 @@ class CreateActionTest(unittest.TestCase):
         result = self._result()
         self.assertEqual(result["error"]["code"], "GCP_API_ERROR")
         self.assertTrue(result["error"]["retryable"])
+
+    def _build(self, status=None, *, error: Exception | None = None, metadata_status=None) -> dict:
+        """Runs a build of a new image that ends with status, or whose
+        operation raises error with metadata_status as the build's own."""
+        self._write_request(_VALID_INPUTS)
+        with (
+            patch.object(self.module.artifactregistry_v1, "ArtifactRegistryClient") as ar_cls,
+            patch.object(self.module.cloudbuild_v1, "CloudBuildClient") as build_cls,
+        ):
+            ar_cls.return_value.get_tag.side_effect = self.module.NotFound("no such tag")
+            operation = build_cls.return_value.create_build.return_value
+            if error is not None:
+                operation.result.side_effect = error
+                operation.metadata.build.status = metadata_status
+            else:
+                operation.result.return_value = MagicMock(status=status)
+            self.assertEqual(self.module.main(), 1)
+        return self._result()["error"]
+
+    def test_a_build_that_failed_is_not_retried(self) -> None:
+        # How Cloud Build ends a failed build's operation: an error with no HTTP code.
+        error = self._build(error=api_exceptions.Unknown("Build failed"), metadata_status=self.module.cloudbuild_v1.Build.Status.FAILURE)
+        self.assertEqual((error["code"], error["retryable"]), ("BUILD_FAILED", False))
+
+    def test_cloud_builds_own_trouble_is_retried(self) -> None:
+        error = self._build(self.module.cloudbuild_v1.Build.Status.INTERNAL_ERROR)
+        self.assertEqual((error["code"], error["retryable"]), ("BUILD_FAILED", True))
+
+    def test_an_operation_error_before_the_build_ran_is_googles(self) -> None:
+        error = self._build(error=api_exceptions.ServiceUnavailable("busy"), metadata_status=self.module.cloudbuild_v1.Build.Status.QUEUED)
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_API_ERROR", True))
+
+    def test_a_build_still_running_when_the_wait_ends_is_retried(self) -> None:
+        error = self._build(error=TimeoutError("Operation did not complete within the designated timeout."))
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_TIMEOUT", True))
+
+    def _sign_in_failing(self, error: Exception) -> dict:
+        self.adc.refresh.side_effect = error
+        self._write_request(_VALID_INPUTS)
+        with patch.object(self.module.artifactregistry_v1, "ArtifactRegistryClient") as ar_cls:
+            self.assertEqual(self.module.main(), 1)
+        # Never left to a gRPC client, which would call it UNAVAILABLE.
+        ar_cls.return_value.get_tag.assert_not_called()
+        return self._result()["error"]
+
+    def test_a_refused_sign_in_is_not_retried(self) -> None:
+        error = self._sign_in_failing(self.module.google.auth.exceptions.RefreshError("permission denied"))
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", False))
+
+    def test_google_unreachable_to_sign_in_is_retried(self) -> None:
+        error = self._sign_in_failing(self.module.google.auth.exceptions.TransportError("connection reset"))
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", True))
+
+    def test_iam_busy_is_retried(self) -> None:
+        error = self._sign_in_failing(self.module.google.auth.exceptions.RefreshError(
+            "Unable to acquire impersonated credentials", '{"error": {"code": 503, "status": "UNAVAILABLE"}}'
+        ))
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", True))
+
+    def test_iam_refusing_is_not_retried(self) -> None:
+        error = self._sign_in_failing(self.module.google.auth.exceptions.RefreshError(
+            "Unable to acquire impersonated credentials", '{"error": {"code": 403, "status": "PERMISSION_DENIED"}}'
+        ))
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", False))
+
+    def test_a_metadata_server_unreachable_is_retried(self) -> None:
+        # GKE's credentials wrap the TransportError in a RefreshError.
+        refused = self.module.google.auth.exceptions.RefreshError("metadata server unreachable")
+        refused.__cause__ = self.module.google.auth.exceptions.TransportError("connection refused")
+        error = self._sign_in_failing(refused)
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", True))
 
 
 class BuildCredentialsTest(unittest.TestCase):

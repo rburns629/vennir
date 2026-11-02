@@ -27,6 +27,12 @@ class DeleteActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.INPUT_PATH = Path(self.tmp_dir.name) / "request.json"
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
+        # Signed in as whatever ADC finds: a stand-in whose refresh passes,
+        # unless a test makes it fail.
+        self.adc = MagicMock()
+        default = patch.object(self.module.google.auth, "default", return_value=(self.adc, "some-project"))
+        default.start()
+        self.addCleanup(default.stop)
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
@@ -61,6 +67,21 @@ class DeleteActionTest(unittest.TestCase):
     def test_needs_a_service_path(self) -> None:
         code, result, _ = self._run({"type": "gcp/cloud-run-service", "id": "projects/x/../../etc"})
         self.assertEqual((code, result["error"]["code"]), (1, "MISSING_INPUT"))
+
+    def test_impersonation_refused_writes_a_result(self) -> None:
+        self.adc.refresh.side_effect = self.module.google.auth.exceptions.RefreshError("denied")
+        code, result, client = self._run({"type": "gcp/cloud-run-service", "id": PATH})
+        self.assertEqual(client.method_calls, [])
+        self.assertEqual((code, result["error"]["code"], result["error"]["retryable"]), (1, "GCP_SIGN_IN_FAILED", False))
+
+    def test_a_delete_still_running_when_the_wait_ends_is_retried(self) -> None:
+        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"resource": {"type": "gcp/cloud-run-service", "id": PATH}}}))
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client_cls.return_value.get_service.return_value = MagicMock(labels={"vertra-made": "true"})
+            client_cls.return_value.delete_service.return_value.result.side_effect = TimeoutError()
+            self.assertEqual(self.module.main(), 1)
+        error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_TIMEOUT", True))
 
 
 if __name__ == "__main__":
