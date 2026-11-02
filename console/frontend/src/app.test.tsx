@@ -1242,6 +1242,8 @@ describe("admin", () => {
     cleanup();
     await renderAt("/admin/images", ADMIN, { "AdminService/GetInstall": { ...install, imageSignaturesRequired: undefined } });
     expect(await screen.findByText(/couldn't be read from the cluster/)).toBeTruthy();
+    // Not read: no note, and check 4 claims no state.
+    expect(screen.queryByRole("note")).toBeNull();
     cleanup();
     await renderAt("/admin/images", ADMIN, { "AdminService/GetInstall": { ...install, imageSignaturesRequired: false } });
     expect(await screen.findByText(/not required, no signature policy in the cluster/)).toBeTruthy();
