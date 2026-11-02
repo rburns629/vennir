@@ -92,6 +92,10 @@ Kernel and alerts:
   for nodes (`perf/README.md`, "On GKE and EKS"): worth a look.
 
 Samples and catalog CI:
+- [ ] **The aws and azure samples' `clouds`** (`clouds: [aws]`, `[azure]` in
+  their team.yaml): once a release that knows `clouds` is pinned in the
+  template (#67; the pinned vertra validates the samples), so a GKE install
+  marks them for other installs instead of "not ready".
 - [ ] **The gcp samples' other failures** (found reviewing #66): google.auth's
   `RefreshError`/`TransportError` (minting the impersonated token) aren't
   `GoogleAPIError`, and `operation.result()`'s `TimeoutError` after 900 s

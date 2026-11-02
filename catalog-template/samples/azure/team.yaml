@@ -12,4 +12,3 @@ description: >-
   credentials.
 owner: azure-team
 contact: azure-team@example.com
-clouds: [azure]   # AKS Workload Identity: an install on AKS only
