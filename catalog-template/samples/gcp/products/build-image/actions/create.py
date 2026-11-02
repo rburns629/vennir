@@ -21,12 +21,14 @@ impersonate that service account instead (short-lived tokens, minted on
 demand; no static key for the target identity ever exists). The source
 identity must itself hold roles/iam.serviceAccountTokenCreator on the
 target service account, and the target service account needs its own IAM
-grants (cloudbuild.builds.{get,create}, storage.objects.get on the source
+grants (cloudbuild.builds.{get,create,list}, storage.objects.get on the source
 bucket, artifactregistry.tags.get) -- see the gcp team's README.md.
 """
 
+import hashlib
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -60,6 +62,17 @@ FAILED_BUILD_STATUSES = (
     cloudbuild_v1.Build.Status.EXPIRED,
 )
 RETRIED_BUILD_STATUSES = (cloudbuild_v1.Build.Status.INTERNAL_ERROR, cloudbuild_v1.Build.Status.EXPIRED)
+UNFINISHED_BUILD_STATUSES = (
+    cloudbuild_v1.Build.Status.STATUS_UNKNOWN,
+    cloudbuild_v1.Build.Status.PENDING,
+    cloudbuild_v1.Build.Status.QUEUED,
+    cloudbuild_v1.Build.Status.WORKING,
+)
+
+# Waiting on a build an earlier attempt started: at most this long here, as
+# for its own (google-cloud's 15 minutes), checking this often.
+WAIT_SECONDS = 900
+POLL_SECONDS = 10
 
 
 def _write_result(result: dict[str, Any]) -> None:
@@ -104,6 +117,31 @@ def _signed_in() -> google.auth.credentials.Credentials:
     credentials = _build_credentials() or google.auth.default(scopes=IMPERSONATION_SCOPES)[0]
     credentials.refresh(google.auth.transport.requests.Request())
     return credentials
+
+
+def _build_tag(image_uri: str, source_archive_url: str) -> str:
+    """The tag every build of this image from this source carries, so a
+    later attempt can find one an earlier attempt left running."""
+    digest = hashlib.sha256(f"{image_uri}\n{source_archive_url}".encode()).hexdigest()
+    return f"vertra-{digest[:40]}"
+
+
+def _running_build(client: cloudbuild_v1.CloudBuildClient, project_id: str, tag: str) -> cloudbuild_v1.Build | None:
+    """A build with this tag still queued or running, if there is one."""
+    builds = client.list_builds(project_id=project_id, filter=f'tags="{tag}" AND (status="QUEUED" OR status="WORKING")')
+    return next(iter(builds), None)
+
+
+def _finished(client: cloudbuild_v1.CloudBuildClient, project_id: str, build_id: str) -> cloudbuild_v1.Build:
+    """The build once it has finished; TimeoutError if it hasn't in WAIT_SECONDS."""
+    deadline = time.monotonic() + WAIT_SECONDS
+    while True:
+        build = client.get_build(project_id=project_id, id=build_id)
+        if build.status not in UNFINISHED_BUILD_STATUSES:
+            return build
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"Cloud Build {build_id} hadn't finished after {WAIT_SECONDS}s; it may still push the image")
+        time.sleep(POLL_SECONDS)
 
 
 def _parse_gcs_url(url: str) -> tuple[str, str]:
@@ -198,44 +236,55 @@ def _run() -> int:
         except GoogleAPIError as error:
             return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
-    bucket, object_name = _parse_gcs_url(source_archive_url)
-    build = cloudbuild_v1.Build(
-        source=cloudbuild_v1.Source(
-            storage_source=cloudbuild_v1.StorageSource(bucket=bucket, object_=object_name)
-        ),
-        steps=[
-            cloudbuild_v1.BuildStep(
-                name="gcr.io/cloud-builders/docker", args=["build", "-t", image_uri, "."]
-            )
-        ],
-        images=[image_uri],
-    )
+    client = cloudbuild_v1.CloudBuildClient(credentials=credentials)
+    tag = _build_tag(image_uri, source_archive_url)
 
+    # An earlier attempt's build, still running (its step ran out of time,
+    # or stopped waiting): waited on, not started again.
     try:
-        operation = cloudbuild_v1.CloudBuildClient(credentials=credentials).create_build(
-            project_id=project_id, build=build
-        )
+        running = _running_build(client, project_id, tag)
+        if running is not None:
+            print(f"Cloud Build {running.id} is already building '{image_uri}', waiting on it")
+            result = _finished(client, project_id, running.id)
     except GoogleAPIError as error:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
-    try:
-        result = operation.result()  # blocks until the build finishes
-    except GoogleAPIError as error:
-        # A build that ran and failed ends its operation with an error too
-        # (UNKNOWN, no HTTP code), which alone would be retried: the build
-        # itself says how it ended.
-        metadata = operation.metadata
-        result = metadata.build if metadata is not None else None
-        if result is None or result.status not in FAILED_BUILD_STATUSES:
-            return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
-    except TimeoutError:
-        # Retried, but the next attempt builds again unless this build has
-        # pushed the image by then: it doesn't look for a build running.
-        build_id = operation.metadata.build.id if operation.metadata is not None else "?"
-        return _failure(
-            "GCP_TIMEOUT",
-            f"Cloud Build {build_id} hadn't finished when this stopped waiting; it may still push {image_uri}",
-            retryable=True,
+
+    if running is None:
+        bucket, object_name = _parse_gcs_url(source_archive_url)
+        build = cloudbuild_v1.Build(
+            source=cloudbuild_v1.Source(
+                storage_source=cloudbuild_v1.StorageSource(bucket=bucket, object_=object_name)
+            ),
+            steps=[
+                cloudbuild_v1.BuildStep(
+                    name="gcr.io/cloud-builders/docker", args=["build", "-t", image_uri, "."]
+                )
+            ],
+            images=[image_uri],
+            tags=[tag],
         )
+        try:
+            operation = client.create_build(project_id=project_id, build=build)
+        except GoogleAPIError as error:
+            return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
+        try:
+            result = operation.result()  # blocks until the build finishes
+        except GoogleAPIError as error:
+            # A build that ran and failed ends its operation with an error too
+            # (UNKNOWN, no HTTP code), which alone would be retried: the build
+            # itself says how it ended.
+            metadata = operation.metadata
+            result = metadata.build if metadata is not None else None
+            if result is None or result.status not in FAILED_BUILD_STATUSES:
+                return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
+        except TimeoutError:
+            # Retried: the next attempt finds this build by its tag and waits on it.
+            build_id = operation.metadata.build.id if operation.metadata is not None else "?"
+            return _failure(
+                "GCP_TIMEOUT",
+                f"Cloud Build {build_id} hadn't finished when this stopped waiting; it may still push {image_uri}",
+                retryable=True,
+            )
 
     if result.status != cloudbuild_v1.Build.Status.SUCCESS:
         return _failure(

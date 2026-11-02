@@ -102,7 +102,7 @@ through those its identity can see (at most 20) for one where it may:
 | Product | Ready when it may | Missing names |
 |---|---|---|
 | `project` | create, get and delete projects under a folder or organization, and link a billing account | `roles/browser`, `roles/resourcemanager.projectCreator`, `roles/resourcemanager.projectDeleter` on the folder; `roles/billing.user` |
-| `build-image` | create and get builds in a project | `roles/cloudbuild.builds.editor`. Its source bucket and image repository are per run: only a create finds out |
+| `build-image` | create, get and list builds in a project (a retry waits on the build an earlier attempt left running) | `roles/cloudbuild.builds.editor`. Its source bucket and image repository are per run: only a create finds out |
 | `app-hosting` | get, create and delete Cloud Run services in a project, and act as its default compute account | `roles/run.developer`; `roles/iam.serviceAccountUser` on that account. Reading the image's repository (`roles/artifactregistry.reader`) is per run: only a create finds out |
 | `cloud-sql` | get, create and delete Cloud SQL instances in a project | `roles/cloudsql.admin` |
 
