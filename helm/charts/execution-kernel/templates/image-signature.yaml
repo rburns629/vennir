@@ -25,6 +25,8 @@ namespace the platform's own components run in must stay out of its scope
 
 Images from the other allowed sources (imagePolicy.additionalSources, or
 added on the Admin page) aren't covered: an admin allowed them as they are.
+That, and Pods only (below), need policy-controller's no-match-policy: allow
+(its default, deny, refuses whatever no policy matches); vertra sets it.
 */}}
 {{- if .Values.imageSignature.enabled }}
 {{- if not (.Capabilities.APIVersions.Has "policy.sigstore.dev/v1beta1/ClusterImagePolicy") }}
@@ -56,6 +58,16 @@ spec:
     {{- range $images }}
     - glob: {{ . | quote }}
     {{- end }}
+  # Pods only, not the Jobs that make them: each image is checked once, and
+  # the scheduler's Job creation never waits on the webhook (on GKE it waited
+  # out its 10 s timeout, holding a pass). A refused Pod is its Job's
+  # FailedCreate event, which the kernel reads as IMAGE_NOT_SIGNED. Needs
+  # policy-controller's no-match-policy: allow, or the Job, matching no
+  # policy, is refused instead.
+  match:
+    - group: ""
+      version: v1
+      resource: pods
   # Any one of these keys is enough, so a rotation lists the old and new key
   # until every published image is signed with the new one.
   authorities:

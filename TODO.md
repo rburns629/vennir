@@ -98,10 +98,12 @@ Kernel and alerts:
   out its 10 s and were retried, and a pass that dispatches records
   nothing that finished until it's done. Recorded first now, in a
   transaction of its own (2026-11-02, the kernel's `RecordPass`, then
-  `DispatchPass`; to see on GKE). Left: size policy-controller for
-  the install (more CPU on Autopilot, two replicas: `helm/values/gke/policy-controller.yaml`
-  already sets `webhook.replicaCount: 2`, vertra's install doesn't), and check
-  whether it need verify Jobs as well as their Pods. Also to see on the next
+  `DispatchPass`; to see on GKE). And policy-controller checks Pods only
+  now (the kernel chart's policy `match`; a refused Pod read as
+  `IMAGE_NOT_SIGNED`), so a Job's creation never waits on it, with
+  `no-match-policy: allow` set by vertra (its default refused what no policy
+  matched: admin-added sources too; seen on kind, 2026-11-02). To see on GKE.
+  Left, maybe: a second replica on resilient and scaled, for availability. Also to see on the next
   GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
 
 ## Installing and operating

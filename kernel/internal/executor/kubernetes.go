@@ -154,12 +154,18 @@ var policyCodes = []string{"IMAGE_NOT_ALLOWED", "IDENTITY_NOT_ALLOWED", "IMAGE_S
 // Sigstore's policy-controller refuses with a 400 and this in its message.
 const signatureWebhookMarker = `admission webhook "policy.sigstore.dev" denied the request`
 
+// unsigned is why policy-controller refused an image: its message's last
+// line, and what the cluster asks of images.
+func unsigned(message string) string {
+	lines := strings.Split(strings.TrimSpace(message), "\n")
+	detail := strings.TrimSpace(lines[len(lines)-1])
+	return detail + ". The cluster only runs images from the source registry that catalog CI signed after they passed its security scans."
+}
+
 func dispatchRejection(err error) *DispatchRejected {
 	message := apiMessage(err)
 	if strings.Contains(message, signatureWebhookMarker) {
-		lines := strings.Split(strings.TrimSpace(message), "\n")
-		detail := strings.TrimSpace(lines[len(lines)-1])
-		return &DispatchRejected{Code: "IMAGE_NOT_SIGNED", Message: detail + ". The cluster only runs images from the source registry that catalog CI signed after they passed its security scans."}
+		return &DispatchRejected{Code: "IMAGE_NOT_SIGNED", Message: unsigned(message)}
 	}
 	for _, code := range policyCodes {
 		if i := strings.Index(message, code+": "); i >= 0 {
@@ -644,8 +650,10 @@ func finished(pods []corev1.Pod) bool {
 
 // createRefusal is the failure for a Job whose Pod the cluster refuses and
 // always will: a step bigger than its team's LimitRange allows, or than its
-// whole ResourceQuota. A Pod refused only because the quota is in use waits
-// (nil), as for any capacity, until the team's other steps finish.
+// whole ResourceQuota, or an image policy-controller refuses (it checks
+// Pods, not the Job: the kernel chart's image-signature.yaml). A Pod refused
+// only because the quota is in use waits (nil), as for any capacity, until
+// the team's other steps finish; so does one whose webhook didn't answer.
 func (k *Kubernetes) createRefusal(ctx context.Context, namespace, job string) (*domain.StructuredError, error) {
 	callCtx, cancel := k.call(ctx)
 	defer cancel()
@@ -661,6 +669,9 @@ func (k *Kubernetes) createRefusal(ctx context.Context, namespace, job string) (
 		}
 		if never := NeverFits(event.Message); never != "" {
 			return &domain.StructuredError{Code: "RESOURCES_NOT_ALLOWED", Message: "The step asks for more than its team may ever use: " + never}, nil
+		}
+		if strings.Contains(event.Message, signatureWebhookMarker) {
+			return &domain.StructuredError{Code: "IMAGE_NOT_SIGNED", Message: unsigned(event.Message)}, nil
 		}
 	}
 	return nil, nil
