@@ -36,6 +36,8 @@ interface Check {
 function ImageChecks({ summary }: { summary: AdminSummary | null }) {
   const allowed = summary?.imagePolicy?.allowed.length;
   const scanning = summary?.install?.scanning;
+  // null: the cluster couldn't be read.
+  const signing = summary?.install?.imageSignaturesRequired;
   const failing = summary ? failingInUse(summary).length : 0;
   const checks: Check[] = [
     {
@@ -66,8 +68,20 @@ function ImageChecks({ summary }: { summary: AdminSummary | null }) {
         ),
     },
     {
-      title: "Is signed, for catalog images",
-      about: <>Signed by the catalog&apos;s CI after its security scans, when the install requires it. Refused as <Mono>IMAGE_NOT_SIGNED</Mono>.</>,
+      title: "Is signed, and from the source registry",
+      about:
+        signing === false ? (
+          <>
+            Off here: any image from an allowed source runs once it passes the checks above. With <Mono>imageSignature</Mono> on, only images
+            catalog CI signed in the source registry would. Refused as <Mono>IMAGE_NOT_SIGNED</Mono>.
+          </>
+        ) : (
+          <>
+            Signed by the catalog&apos;s CI after its security scans, and in the source registry: an image from another allowed source is refused
+            too. Refused as <Mono>IMAGE_NOT_SIGNED</Mono>.
+          </>
+        ),
+      state: signing === true ? { tone: "ok", text: "On" } : signing === false ? { tone: "off", text: "Off" } : undefined,
       where: (
         <>
           Set by the install: <Mono>imageSignature</Mono>
@@ -198,6 +212,12 @@ export function ImageSourcesCard({ summary = null }: { summary?: AdminSummary | 
         <Typography variant="body2" sx={{ fontWeight: 500, mt: 0.5 }}>
           More allowed sources
         </Typography>
+        {summary?.install?.imageSignaturesRequired === true && (
+          <Alert severity="info" role="note">
+            This install requires signed images, so a step runs only images catalog CI signed in the source registry. Images from the sources
+            below pass this check, then are refused at the signature check (<Mono>IMAGE_NOT_SIGNED</Mono>): they don&apos;t run here.
+          </Alert>
+        )}
         {additional.length === 0 && (
           <Typography variant="caption" color="text.secondary">
             None. Such as docker.io/library for official Docker Hub images.
