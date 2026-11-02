@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 _MODULE_PATH = Path(__file__).parent / "check.py"
-ALL = ["cloudbuild.builds.create", "cloudbuild.builds.get"]
+ALL = ["cloudbuild.builds.create", "cloudbuild.builds.get", "cloudbuild.builds.list"]
 
 
 def _load_check_module():

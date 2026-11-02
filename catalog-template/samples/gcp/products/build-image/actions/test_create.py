@@ -208,6 +208,91 @@ class CreateActionTest(unittest.TestCase):
         error = self._build(error=TimeoutError("Operation did not complete within the designated timeout."))
         self.assertEqual((error["code"], error["retryable"]), ("GCP_TIMEOUT", True))
 
+    def _with_an_earlier_build(self, status, *later) -> tuple[int, MagicMock]:
+        """Runs create after an earlier attempt's build, last seen with status,
+        which then reports each of later in turn."""
+        self._write_request(_VALID_INPUTS)
+        with (
+            patch.object(self.module.artifactregistry_v1, "ArtifactRegistryClient") as ar_cls,
+            patch.object(self.module.cloudbuild_v1, "CloudBuildClient") as build_cls,
+            patch.object(self.module.time, "sleep"),
+        ):
+            ar_cls.return_value.get_tag.side_effect = self.module.NotFound("no such tag")
+            client = build_cls.return_value
+            older = MagicMock(id="b-0", status=self.module.cloudbuild_v1.Build.Status.INTERNAL_ERROR, create_time=1)
+            client.list_builds.return_value = iter([older, MagicMock(id="b-1", status=status, status_detail="", create_time=2)])
+            client.get_build.side_effect = [MagicMock(id="b-1", status=s, status_detail="") for s in later]
+            client.create_build.return_value.result.return_value = MagicMock(status=self.module.cloudbuild_v1.Build.Status.SUCCESS)
+            code = self.module.main()
+        return code, client
+
+    def _tag(self) -> str:
+        return self.module._build_tag("e", "t", _VALID_INPUTS["imageUri"], _VALID_INPUTS["sourceArchiveUrl"])
+
+    def test_a_build_an_earlier_attempt_left_running_is_waited_on(self) -> None:
+        status = self.module.cloudbuild_v1.Build.Status
+        code, client = self._with_an_earlier_build(status.WORKING, status.WORKING, status.SUCCESS)
+        self.assertEqual(code, 0)
+        client.create_build.assert_not_called()
+        client.get_build.assert_called_with(project_id="my-project", id="b-1")
+        self.assertEqual(client.list_builds.call_args.kwargs, {"project_id": "my-project", "filter": f'tags="{self._tag()}"'})
+
+    def test_an_earlier_attempts_build_that_failed_is_this_ones_failure(self) -> None:
+        # Its step was stopped; its build went on and failed: not paid for again.
+        code, client = self._with_an_earlier_build(self.module.cloudbuild_v1.Build.Status.FAILURE)
+        self.assertEqual(code, 1)
+        client.create_build.assert_not_called()
+        self.assertEqual((self._result()["error"]["code"], self._result()["error"]["retryable"]), ("BUILD_FAILED", False))
+
+    def test_an_earlier_attempts_build_that_cloud_build_lost_is_built_again(self) -> None:
+        code, client = self._with_an_earlier_build(self.module.cloudbuild_v1.Build.Status.INTERNAL_ERROR)
+        self.assertEqual(code, 0)
+        client.create_build.assert_called_once()
+
+    def test_a_running_build_that_fails_is_its_failure(self) -> None:
+        status = self.module.cloudbuild_v1.Build.Status
+        code, client = self._with_an_earlier_build(status.QUEUED, status.FAILURE)
+        self.assertEqual(code, 1)
+        client.create_build.assert_not_called()
+        self.assertEqual((self._result()["error"]["code"], self._result()["error"]["retryable"]), ("BUILD_FAILED", False))
+
+    def test_a_running_build_still_running_when_the_wait_ends_is_retried(self) -> None:
+        self.module.WAIT_SECONDS = 0
+        status = self.module.cloudbuild_v1.Build.Status
+        code, _ = self._with_an_earlier_build(status.WORKING, status.WORKING)
+        self.assertEqual(code, 1)
+        self.assertEqual((self._result()["error"]["code"], self._result()["error"]["retryable"]), ("GCP_TIMEOUT", True))
+
+    def test_cloud_build_failing_to_list_is_googles(self) -> None:
+        self._write_request(_VALID_INPUTS)
+        with (
+            patch.object(self.module.artifactregistry_v1, "ArtifactRegistryClient") as ar_cls,
+            patch.object(self.module.cloudbuild_v1, "CloudBuildClient") as build_cls,
+        ):
+            ar_cls.return_value.get_tag.side_effect = self.module.NotFound("no such tag")
+            build_cls.return_value.list_builds.side_effect = api_exceptions.ServiceUnavailable("busy")
+            self.assertEqual(self.module.main(), 1)
+        self.assertEqual((self._result()["error"]["code"], self._result()["error"]["retryable"]), ("GCP_API_ERROR", True))
+
+    def test_a_new_build_carries_its_image_and_sources_tag(self) -> None:
+        self._write_request(_VALID_INPUTS)
+        with (
+            patch.object(self.module.artifactregistry_v1, "ArtifactRegistryClient") as ar_cls,
+            patch.object(self.module.cloudbuild_v1, "CloudBuildClient") as build_cls,
+        ):
+            ar_cls.return_value.get_tag.side_effect = self.module.NotFound("no such tag")
+            client = build_cls.return_value
+            client.list_builds.return_value = iter([])
+            client.create_build.return_value.result.return_value = MagicMock(status=self.module.cloudbuild_v1.Build.Status.SUCCESS)
+            self.assertEqual(self.module.main(), 0)
+        tag = self._tag()
+        self.assertEqual(list(client.create_build.call_args.kwargs["build"].tags), [tag])
+        # A tag Cloud Build accepts: letters, digits, _ . -, at most 128.
+        self.assertRegex(tag, r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")
+        # This step's alone: another run's, or another source's, differs.
+        self.assertNotEqual(tag, self.module._build_tag("e2", "t", _VALID_INPUTS["imageUri"], _VALID_INPUTS["sourceArchiveUrl"]))
+        self.assertNotEqual(tag, self.module._build_tag("e", "t", _VALID_INPUTS["imageUri"], "gs://my-bucket/other.zip"))
+
     def _sign_in_failing(self, error: Exception) -> dict:
         self.adc.refresh.side_effect = error
         self._write_request(_VALID_INPUTS)
