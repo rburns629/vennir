@@ -192,8 +192,10 @@ jobs:
   # request against main (which is protected), for a release that isn't a
   # pre-release: until it merges, a catalog made from the template by hand
   # pins the previous release (`vertra catalog create` pins its own).
-  # Needs "Allow GitHub Actions to create and approve pull requests" on.
-  # A pull request this token opens doesn't start CI: close and reopen it.
+  # Needs "Allow GitHub Actions to create and approve pull requests" on,
+  # and the cli package public (pin-vertra.sh downloads as a catalog does):
+  # on a first release, make it public, then re-run this job. A pull
+  # request this token opens doesn't start CI: close and reopen it.
   pin:
     needs: cli   # the checksums it pins, and the public blobs it checks
     if: ${{ !contains(github.ref_name, '-') }}
@@ -221,6 +223,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
           git commit -am "chore: pin vertra $version in the catalog template"
-          git push origin "$branch"
+          # A re-run (the setting was off, say) replaces its own branch.
+          git push --force origin "$branch"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "Its pull request is already open"
+            exit 0
+          fi
           gh pr create --base main --head "$branch" --title "chore: pin vertra $version in the catalog template" \
             --body "The catalog template's \`./vertra\` pinned to the release just made, by \`.github/scripts/pin-vertra.sh $version\` (each platform's binary checked to download anonymously and match \`vertra-checksums.txt\`). Opened by the release workflow: close and reopen it to run CI."

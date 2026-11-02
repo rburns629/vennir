@@ -69,11 +69,11 @@ func TestFloorOf(t *testing.T) {
 		t.Fatalf("auto, with the gateway and logs: %s, %s", f.CPU, f.Memory)
 	}
 	c.Monitoring = config.Monitoring{Enabled: true, Provider: "operator"}
-	if f := FloorOf(c); f.CPU != "1–1.4 vCPU" || f.OptionalVolumeGiB != 2 {
-		t.Fatalf("the cluster's own Prometheus costs nothing here: %s, %v GiB", f.CPU, f.OptionalVolumeGiB)
+	if f := FloorOf(c); f.CPU != "1–1.4 vCPU" || len(f.OptionalVolumesGiB) != 1 {
+		t.Fatalf("the cluster's own Prometheus costs nothing here: %s, %v GiB", f.CPU, f.OptionalVolumesGiB)
 	}
 	c.Monitoring.Provider = "bundled"
-	if f := FloorOf(c); f.OptionalVolumeGiB != 4 || f.VolumeGiB != Floors["auto"].VolumeGiB {
-		t.Fatalf("log search's volume and the bundled Prometheus's: %v GiB (the database's %v)", f.OptionalVolumeGiB, f.VolumeGiB)
+	if f := FloorOf(c); len(f.OptionalVolumesGiB) != 2 || f.OptionalVolumesGiB[0]+f.OptionalVolumesGiB[1] != 4 || f.VolumeGiB != Floors["auto"].VolumeGiB {
+		t.Fatalf("log search's volume and the bundled Prometheus's: %v GiB (the database's %v)", f.OptionalVolumesGiB, f.VolumeGiB)
 	}
 }

@@ -39,10 +39,11 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
 
 
 def _retryable(error: GoogleAPIError) -> bool:
-    """Whether trying again may help: Google busy, throttled or unreachable,
-    not a refusal (a missing permission, a bad input) that fails the same way."""
+    """Whether trying again may help: Google busy, throttled, unreachable or
+    mid-change (409: aborted, or made by an attempt this one replaces, which
+    the next finds), not a refusal (a missing permission, a bad input)."""
     code = getattr(error, "code", None)
-    return not isinstance(code, int) or code in (408, 429) or code >= 500
+    return not isinstance(code, int) or code in (408, 409, 429) or code >= 500
 
 def _build_credentials() -> google.auth.credentials.Credentials | None:
     """As create's: the gcp-target service account if the team registered one, else ADC."""

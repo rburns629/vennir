@@ -90,6 +90,18 @@ func TestAutopilotEstimate(t *testing.T) {
 	}
 }
 
+// Log search's and the bundled Prometheus's 2Gi volumes are each billed as
+// GKE's smallest pd-balanced disk, 10 GB.
+func TestTheOptionalVolumesAreBilledAtGKEsSmallestDisk(t *testing.T) {
+	c := config.Default("gcp")
+	c.Console.Public = false
+	c.Logs.Enabled, c.Monitoring = true, config.Monitoring{Enabled: true, Provider: "bundled"}
+	// The database's 10 GiB and two 10 GB disks at $0.10.
+	if out := text(GCP(prices(), c, "fetched now")); !strings.Contains(out, "Always: $3.00: disks") {
+		t.Errorf("three disks:\n%s", out)
+	}
+}
+
 func TestStandardEstimateKeepsItsNode(t *testing.T) {
 	c := config.Default("gcp")
 	c.Cluster.Mode = "standard"

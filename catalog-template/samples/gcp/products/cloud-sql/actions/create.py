@@ -77,9 +77,10 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
 
 
 def _retryable(error: HttpError) -> bool:
-    """Whether trying again may help: Google busy, throttled or unreachable,
-    not a refusal (a missing permission, a bad input) that fails the same way."""
-    return error.resp.status in (408, 429) or error.resp.status >= 500
+    """Whether trying again may help: Google busy, throttled, unreachable or
+    mid-change (409: another operation in progress, a backup or the end of a
+    create), not a refusal (a missing permission, a bad input)."""
+    return error.resp.status in (408, 409, 429) or error.resp.status >= 500
 
 def _build_credentials() -> google.auth.credentials.Credentials | None:
     """Impersonated credentials for the gcp-target service account, or None
