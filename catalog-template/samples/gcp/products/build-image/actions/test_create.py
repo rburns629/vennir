@@ -225,6 +225,18 @@ class CreateActionTest(unittest.TestCase):
         error = self._sign_in_failing(self.module.google.auth.exceptions.TransportError("connection reset"))
         self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", True))
 
+    def test_iam_busy_is_retried(self) -> None:
+        error = self._sign_in_failing(self.module.google.auth.exceptions.RefreshError(
+            "Unable to acquire impersonated credentials", '{"error": {"code": 503, "status": "UNAVAILABLE"}}'
+        ))
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", True))
+
+    def test_iam_refusing_is_not_retried(self) -> None:
+        error = self._sign_in_failing(self.module.google.auth.exceptions.RefreshError(
+            "Unable to acquire impersonated credentials", '{"error": {"code": 403, "status": "PERMISSION_DENIED"}}'
+        ))
+        self.assertEqual((error["code"], error["retryable"]), ("GCP_SIGN_IN_FAILED", False))
+
     def test_a_metadata_server_unreachable_is_retried(self) -> None:
         # GKE's credentials wrap the TransportError in a RefreshError.
         refused = self.module.google.auth.exceptions.RefreshError("metadata server unreachable")

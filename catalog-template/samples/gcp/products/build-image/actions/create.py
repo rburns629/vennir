@@ -137,6 +137,16 @@ def _artifact_registry_tag_name(image_uri: str) -> str | None:
     )
 
 
+def _iam_busy(error: Exception) -> bool:
+    """Whether IAM refused to impersonate gcp-target only for now: its
+    answer, a RefreshError's second argument, a 429 or 5xx, not a 401/403."""
+    try:
+        code = json.loads(error.args[1])["error"]["code"]
+    except (IndexError, KeyError, TypeError, ValueError):
+        return False
+    return isinstance(code, int) and (code == 429 or code >= 500)
+
+
 def main() -> int:
     try:
         return _run()
@@ -146,7 +156,10 @@ def main() -> int:
         # Unreachable often comes as a RefreshError caused by one (GKE's
         # metadata server, the first seconds of a Pod).
         unreachable = google.auth.exceptions.TransportError
-        retryable = error.retryable or isinstance(error, unreachable) or isinstance(error.__cause__, unreachable)
+        retryable = (
+            error.retryable or isinstance(error, unreachable) or isinstance(error.__cause__, unreachable)
+            or _iam_busy(error)
+        )
         return _failure("GCP_SIGN_IN_FAILED", f"couldn't sign in to Google: {error}", retryable=retryable)
     except TimeoutError as error:
         # A call unanswered, or an operation still running when the client
