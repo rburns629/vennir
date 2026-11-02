@@ -9,7 +9,7 @@ import { getAuditCopy, getImageSbom, getMetrics, getSecurity, listAudit, ListAud
 import { getUsage } from "../../core/usage.js";
 import type { ObserveService } from "../../gen/vertra/console/v1/observe_pb.js";
 import { timestamp, unsetIfEmpty } from "../convert.js";
-import { callerOf } from "../context.js";
+import { callerOf, logOf } from "../context.js";
 import { check } from "../validate.js";
 import { auditEntryMessage } from "./admin.js";
 import { viaKernel } from "./execution.js";
@@ -46,7 +46,7 @@ export function observeService(): ServiceImpl<typeof ObserveService> {
     },
 
     async listAlerts(_req, ctx) {
-      const found = await listAlerts(callerOf(ctx));
+      const found = await listAlerts(callerOf(ctx), logOf(ctx));
       return {
         ...found,
         checkedAt: timestamp(found.checkedAt),

@@ -268,7 +268,7 @@ async function deleteRoleBindings(namespace: string, roleName: string): Promise<
   }
 }
 
-function isNotFound(error: unknown): boolean {
+export function isNotFound(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === 404;
 }
 

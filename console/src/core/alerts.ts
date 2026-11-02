@@ -13,11 +13,12 @@
  */
 import { Code } from "@connectrpc/connect";
 import { ApiError } from "../apiError.js";
+import type { FastifyBaseLogger } from "fastify";
 import type { AuthUser } from "../auth/plugin.js";
 import { config } from "../config.js";
 import { listLiveTeamApis } from "../db/queries.js";
 import { gcpMetadataToken } from "../gcpMetadata.js";
-import { listGmpRuleGroups } from "../k8s.js";
+import { isNotFound, listGmpRuleGroups, type GmpRuleGroup } from "../k8s.js";
 import { sees } from "./apis.js";
 
 /** Prometheus's /api/v1/rules, as far as it's read here. */
@@ -108,10 +109,23 @@ async function gmpQuery(project: string, query: string): Promise<Series[]> {
     throw new GmpUnread(`Google's managed Prometheus refused the console (403): its Google identity needs roles/monitoring.viewer on ${project}, which vertra apply grants.`);
   }
   if (!response.ok) throw new GmpUnread(`Google's managed Prometheus answered ${String(response.status)}.`);
-  const body = (await response.json()) as { status: string; data?: { result?: Series[] } };
+  let body: { status: string; data?: { result?: Series[] } };
+  try {
+    body = (await response.json()) as typeof body;
+  } catch {
+    throw new GmpUnread("Google's managed Prometheus answered with something other than its JSON.");
+  }
   if (body.status !== "success") throw new GmpUnread("Google's managed Prometheus couldn't run the query.");
   return body.data?.result ?? [];
 }
+
+/**
+ * How fresh a series must be to count: Google's query API looks back 5
+ * minutes and keeps no stale markers, so one the rule evaluator stopped
+ * writing (resolved, or pending that has since fired) would linger. Two of
+ * its evaluations (a minute apart by default) and some.
+ */
+const FRESH_SECONDS = 150;
 
 /** An alert instance's identity: its labels but the series' name and state. */
 const instanceKey = (metric: Record<string, string>) =>
@@ -123,17 +137,24 @@ const instanceKey = (metric: Record<string, string>) =>
  * since when), in the shape Prometheus's rules API has. GMP keeps no
  * instance's own annotations, so each shows its rule's summary.
  */
-async function googleRules(project: string, cluster: string): Promise<{ body: RulesResponse; unread: string }> {
-  const groups = (await listGmpRuleGroups()).filter((g) => OURS.test(g.name));
+async function googleRules(project: string, cluster: string, groups: GmpRuleGroup[]): Promise<{ body: RulesResponse; unread: string }> {
   const names = [...new Set(groups.flatMap((g) => (g.rules ?? []).flatMap((r) => (r.alert ? [r.alert] : []))))];
   const firing = new Map<string, { labels: Record<string, string>; state: string; activeAt?: string }[]>();
   let unread = "";
   if (names.length > 0) {
-    const selector = `{alertname=~"${names.join("|")}"${cluster ? `,cluster="${cluster}"` : ""}}`;
+    // This project's, this cluster's: the query API answers for every project the project's metrics scope holds.
+    const selector = `{alertname=~"${names.join("|")}",project_id="${project}"${cluster ? `,cluster="${cluster}"` : ""}}`;
+    const fresh = (series: string) => `${series}${selector} and (time() - timestamp(${series}${selector})) < ${String(FRESH_SECONDS)}`;
     try {
-      const [alerts, since] = await Promise.all([gmpQuery(project, `ALERTS${selector}`), gmpQuery(project, `ALERTS_FOR_STATE${selector}`)]);
+      const [alerts, since] = await Promise.all([gmpQuery(project, fresh("ALERTS")), gmpQuery(project, fresh("ALERTS_FOR_STATE"))]);
       const activeAt = new Map(since.map((s) => [instanceKey(s.metric), new Date(Number(s.value[1]) * 1000).toISOString()]));
+      // One instance, once: firing over pending, should both still be fresh.
+      const latest = new Map<string, Series>();
       for (const a of alerts) {
+        const key = instanceKey(a.metric);
+        if (!latest.has(key) || a.metric["alertstate"] === "firing") latest.set(key, a);
+      }
+      for (const a of latest.values()) {
         const name = a.metric["alertname"] ?? "";
         const labels = Object.fromEntries(Object.entries(a.metric).filter(([k]) => k !== "__name__" && k !== "alertstate" && !GMP_LABELS.includes(k)));
         const at = activeAt.get(instanceKey(a.metric));
@@ -168,7 +189,7 @@ async function googleRules(project: string, cluster: string): Promise<{ body: Ru
   };
 }
 
-export async function listAlerts(caller: AuthUser | undefined): Promise<AlertsView> {
+export async function listAlerts(caller: AuthUser | undefined, log: FastifyBaseLogger): Promise<AlertsView> {
   const who = signedIn(caller);
   const base = config.monitoring.prometheusUrl;
   const google = !base && config.monitoring.provider === "google" ? config.monitoring.google : null;
@@ -180,11 +201,18 @@ export async function listAlerts(caller: AuthUser | undefined): Promise<AlertsVi
   let body: RulesResponse;
   let unread = "";
   if (google) {
+    let groups: GmpRuleGroup[];
     try {
-      ({ body, unread } = await googleRules(google.project, google.cluster));
-    } catch {
-      return answer("The cluster's Rules couldn't be read.");
+      groups = (await listGmpRuleGroups()).filter((g) => OURS.test(g.name));
+    } catch (error) {
+      log.error({ err: error }, "couldn't list the cluster's GMP Rules for Observe's alerts");
+      return answer(
+        isNotFound(error)
+          ? "The cluster has no Rules to read: GKE's managed Prometheus (managed collection) isn't on."
+          : "The cluster's Rules couldn't be read.",
+      );
     }
+    ({ body, unread } = await googleRules(google.project, google.cluster, groups));
   } else {
     try {
       // Under the URL's own path, for a Prometheus served below one (https://host/prometheus).

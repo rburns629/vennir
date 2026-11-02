@@ -85,7 +85,9 @@ Console and gateway:
   fire from GMP's query API (`ALERTS`, `ALERTS_FOR_STATE`, this cluster's)
   as the console's Google identity, granted `roles/monitoring.viewer` by
   the gcp module; the state shown unknown, saying what's missing, without
-  it. Left: proving it in the coming GKE run.
+  it. Left: proving it in the coming GKE run, and seeing there whether GMP's
+  in-cluster rule evaluator's own `/api/v1/rules` (live, no 5-minute lag)
+  can be reached instead (found reviewing it).
 
 Samples and catalog CI:
 - [ ] **The aws and azure samples' `clouds`** (`clouds: [aws]`, `[azure]` in

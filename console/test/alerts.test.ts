@@ -22,8 +22,10 @@ import { caller, rpcClient } from "./rpc.js";
 vi.mock("../src/k8s.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/k8s.js")>()),
   ensureServiceAccount: vi.fn(() => Promise.resolve()),
-  listGmpRuleGroups: vi.fn(() => Promise.resolve(gmpGroups)),
+  listGmpRuleGroups: vi.fn(() => (rulesMissing ? Promise.reject(Object.assign(new Error("not found"), { code: 404 })) : Promise.resolve(gmpGroups))),
 }));
+// No Rules type in the cluster (managed collection off).
+let rulesMissing = false;
 vi.mock("../src/gcpMetadata.js", () => ({ gcpMetadataToken: vi.fn(() => Promise.resolve("the-consoles-google-token")) }));
 
 // The cluster's Rules objects, as GKE's managed Prometheus evaluates them.
@@ -192,10 +194,12 @@ describe("alerts on Google Cloud's managed Prometheus", () => {
     onGoogle();
     gmpAsked.length = 0;
     const firing = { alertname: "VertraGatewayBackendUnreachable", severity: "critical", api: `${owner}/orders`, ...where };
+    const hidden = { ...firing, api: `${owner}/ledger` };
     gmp = (query) =>
       query.startsWith("ALERTS_FOR_STATE")
         ? success([series("ALERTS_FOR_STATE", firing, "1793598000")])
-        : success([series("ALERTS", { ...firing, alertstate: "firing" }, "1")]);
+        : // Pending a minute ago, firing now: both still within the freshness window.
+          success([series("ALERTS", { ...firing, alertstate: "pending" }, "1"), series("ALERTS", { ...firing, alertstate: "firing" }, "1"), series("ALERTS", { ...hidden, alertstate: "firing" }, "1")]);
     const found = await list(tokens.owner);
     expect(found).toMatchObject({ configured: true, source: "google", project: "acyclix-dev", problem: "" });
     expect(found.stateUnknown ?? false).toBe(false);
@@ -206,16 +210,20 @@ describe("alerts on Google Cloud's managed Prometheus", () => {
     // Where it fires, not where Google keeps it; since when, from ALERTS_FOR_STATE; no text of its own.
     expect(found.rules?.[0]?.instances).toEqual([
       { state: "firing", activeAt: expect.any(String), summary: "", description: "", labels: { api: `${owner}/orders`, namespace: "vertra-system" } },
+      { state: "firing", summary: "", description: "", labels: { api: `${owner}/ledger`, namespace: "vertra-system" } },
     ]);
     expect(Date.parse(found.rules?.[0]?.instances?.[0]?.activeAt ?? "")).toBe(1793598000 * 1000);
+    // This project's and cluster's, and only what its rule evaluator still writes.
+    const selector = '{alertname=~"VertraSchedulerDown|VertraGatewayBackendUnreachable",project_id="acyclix-dev",cluster="vertra-dev"}';
     expect(gmpAsked.map((a) => a.query).sort()).toEqual([
-      'ALERTS_FOR_STATE{alertname=~"VertraSchedulerDown|VertraGatewayBackendUnreachable",cluster="vertra-dev"}',
-      'ALERTS{alertname=~"VertraSchedulerDown|VertraGatewayBackendUnreachable",cluster="vertra-dev"}',
+      `ALERTS_FOR_STATE${selector} and (time() - timestamp(ALERTS_FOR_STATE${selector})) < 150`,
+      `ALERTS${selector} and (time() - timestamp(ALERTS${selector})) < 150`,
     ]);
     expect(gmpAsked.every((a) => a.authorization === "Bearer the-consoles-google-token")).toBe(true);
     // Another team's hidden API: counted, not described.
     const theirs = (await list(tokens.other)).rules?.[0];
-    expect([theirs?.instances?.length, theirs?.hidden]).toEqual([1, 0]);
+    expect(theirs?.instances?.map((i) => i.labels["api"])).toEqual([`${owner}/orders`]);
+    expect(theirs?.hidden).toBe(1);
   });
 
   it("say what's missing when Google refuses the console, the rules' state unknown", async () => {
@@ -225,6 +233,16 @@ describe("alerts on Google Cloud's managed Prometheus", () => {
     expect(found).toMatchObject({ configured: true, source: "google", stateUnknown: true });
     expect(found.problem).toContain("roles/monitoring.viewer on acyclix-dev");
     expect(found.rules?.map((r) => r.state)).toEqual(["unknown", "unknown"]);
+  });
+
+  it("say when the cluster has no Rules to read", async () => {
+    onGoogle();
+    rulesMissing = true;
+    try {
+      expect(await list(tokens.owner)).toMatchObject({ configured: true, source: "google", problem: expect.stringContaining("managed collection") as unknown as string, rules: [] });
+    } finally {
+      rulesMissing = false;
+    }
   });
 
   it("are none without a project to read", async () => {
