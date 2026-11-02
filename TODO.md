@@ -104,13 +104,6 @@ Kernel and alerts:
   GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
 
 Samples and catalog CI:
-- [ ] **The aws and azure samples' `clouds`** (`clouds: [aws]`, `[azure]` in
-  their team.yaml): once a release that knows `clouds` is pinned in the
-  template (#67; the pinned vertra validates the samples), so a GKE install
-  marks them for other installs instead of "not ready".
-
-## Installing and operating
-
 - [x] **A burst that starts a counter can't fire its alert** (found proving
   #45 on kind; fixed 2026-10-30, #46): a series born holding a burst has no
   lower sample, so `increase()` missed the 70 failed sign-ins that made

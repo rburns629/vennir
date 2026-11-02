@@ -12,3 +12,5 @@ description: >-
   credentials.
 owner: azure-team
 contact: azure-team@example.com
+# Its products run only on azure installs: listed, marked, not run elsewhere.
+clouds: [azure]

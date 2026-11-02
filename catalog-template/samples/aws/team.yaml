@@ -10,3 +10,5 @@ description: >-
   Pod Identity or IRSA supplies each step's credentials.
 owner: aws-team
 contact: aws-team@example.com
+# Its products run only on aws installs: listed, marked, not run elsewhere.
+clouds: [aws]
