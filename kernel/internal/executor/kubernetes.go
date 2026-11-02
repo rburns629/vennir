@@ -93,7 +93,8 @@ type Kubernetes struct {
 	// Captured once a Job finishes, so a pass that rolls back can read the
 	// result again after the Job's release. Pruned to terminalRetention.
 	terminal map[string]terminalRecord
-	// When each running Job was last read with its Pod ready: while the
+	// When each running Job was last read with its Pod ready, or waiting
+	// for a node or its container (not pulling, not missing): while the
 	// watch is healthy, a Job isn't re-read until it changes or WatchResync
 	// passes.
 	quietSince map[string]time.Time
@@ -524,6 +525,21 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 			}
 		}
 		if failure == nil {
+			if !podless && !pullingImage(pods) {
+				// Waiting for a node, or for its container to be made: only an
+				// event changes that, so it rests until the watch reports one,
+				// as a ready one does. Read every pass were one pulling (its
+				// grace runs out with no event) and one with no Pod (refusals
+				// are events, not watched).
+				k.mu.Lock()
+				k.quietSince[name] = time.Now()
+				k.mu.Unlock()
+			} else {
+				// No longer resting, if it was before it began pulling.
+				k.mu.Lock()
+				delete(k.quietSince, name)
+				k.mu.Unlock()
+			}
 			return Status{State: Running}, nil
 		}
 		k.log.Warn("task can't start", "namespace", namespace, "job", name, "code", failure.Code)
@@ -599,6 +615,19 @@ func (k *Kubernetes) imagePullError(pods []corev1.Pod) (*domain.StructuredError,
 		}
 	}
 	return nil, len(pods) == 0
+}
+
+// pullingImage says a Job's Pod's step container is waiting on its image.
+func pullingImage(pods []corev1.Pod) bool {
+	for _, pod := range pods {
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.Name == containerName && cs.State.Waiting != nil &&
+				(cs.State.Waiting.Reason == "ErrImagePull" || cs.State.Waiting.Reason == "ImagePullBackOff") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // finished says a Job's Pod's step container has terminated.

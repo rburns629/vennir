@@ -87,10 +87,6 @@ Console and gateway:
   which needs the console's Google identity granted `roles/monitoring.viewer`
   (the gcp module) and a GKE run to prove. Card's text on the canvas first.
 
-Kernel and alerts:
-- [ ] Completion lag rose from 3 s to 12 s p50 on GKE with steps waiting
-  for nodes (`perf/README.md`, "On GKE and EKS"): worth a look.
-
 Samples and catalog CI:
 - [ ] **The aws and azure samples' `clouds`** (`clouds: [aws]`, `[azure]` in
   their team.yaml): once a release that knows `clouds` is pinned in the
