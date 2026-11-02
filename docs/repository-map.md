@@ -424,7 +424,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/rbac.yaml` | What the scheduler may do: create and delete Jobs and ConfigMaps, read Pods; and its logs-only ClusterRole, bound per team namespace by the console (or cluster-wide, `rbac.schedulerLogs: cluster`). |
 | `templates/dispatch-policy.yaml` | Admission policy: the scheduler may only create Jobs (hardened, with `taskPodHardening`) in namespaces labelled `vertra/team=true`, and delete only its own Jobs and ConfigMaps there. |
 | `templates/image-policy.yaml` | Admission policy: task images only from allowed sources (the console edits the list). |
-| `templates/image-signature.yaml` | On GKE: catalog images must be signed (Sigstore's ClusterImagePolicy). |
+| `templates/image-signature.yaml` | With Sigstore's policy-controller: only signed images from the source registry run in team namespaces, checked on Pods; a second policy passes the workloads that make them. |
 | `templates/purge-policy.yaml` | Admission policy: only the purge identity may delete a team's namespace. |
 | `templates/networkpolicy.yaml` | Only the release's Pods (and the console) may reach Postgres; only the console may reach kernel-api. |
 | `templates/identity-policy.yaml` | Admission policy: a step runs as `default` with no Secrets, or as its registered product's ServiceAccount with only its Secrets. The console keeps its product list current. |

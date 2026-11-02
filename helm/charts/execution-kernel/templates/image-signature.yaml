@@ -61,9 +61,10 @@ spec:
     {{- range $images }}
     - glob: {{ . | quote }}
     {{- end }}
-  # Pods only, not the Jobs that make them: each image is checked once, and
-  # the scheduler's Job creation never waits on the webhook (on GKE it waited
-  # out its 10 s timeout, holding a pass). A refused Pod is its Job's
+  # Pods only, not the Jobs that make them: each image is verified once, and
+  # the scheduler's Job creation no longer waits on a verification (on GKE it
+  # waited out the webhook's 10 s timeout, holding a pass); the webhook still
+  # admits the Job, without fetching a signature. A refused Pod is its Job's
   # FailedCreate event, which the kernel reads as IMAGE_NOT_SIGNED.
   match:
     - group: ""
@@ -92,8 +93,9 @@ spec:
         url: {{ $keyless.rekorUrl | quote }}
     {{- end }}
 ---
-# The workloads that make Pods pass at once, unchecked: their Pods are what
-# the policy above checks. Without this, under no-match-policy deny, a Job
+# The workloads that make Pods pass without being verified (the webhook still
+# admits them, with no signature fetched): their Pods are what the policy
+# above checks. Without this, under no-match-policy deny, a Job
 # (and an API backend's Deployment) would match no policy and be refused.
 # Never Pods: a policy passing them would let any image through.
 apiVersion: policy.sigstore.dev/v1beta1

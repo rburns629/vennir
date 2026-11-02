@@ -103,7 +103,11 @@ Kernel and alerts:
   `IMAGE_NOT_SIGNED`), with a second policy passing Jobs and other workloads,
   so a Job's creation never waits on it; `no-match-policy` stays `deny`, so
   only signed source-registry images run in team namespaces (seen on kind,
-  2026-11-02). To see on GKE. Left, maybe: a second replica on resilient and scaled, for availability. Also to see on the next
+  2026-11-02). To see on GKE: the webhook still admits each Job (no
+  signature fetched), so if Job creation is still slow there, size
+  policy-controller for the install (CPU on Autopilot, a second replica on
+  resilient and scaled). And the Admin page's image sources card could say
+  that added sources don't run where signing is required (canvas first). Also to see on the next
   GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
 
 ## Installing and operating
