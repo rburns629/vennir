@@ -9,6 +9,9 @@ displayName: AWS caller identity
 description: 'Signs in to AWS as a role, with this step''s own Kubernetes identity (no key), and says who AWS
   says it is: the pattern for a product that calls AWS from GKE, AKS or any cluster AWS trusts by OIDC.'
 owner: aws-team
+# AWS from any cluster AWS trusts by OIDC, not only EKS: its own clouds, over
+# the team's [aws].
+clouds: [gcp, aws, azure, kind, existing]
 runtime: python3.12
 serviceAccount: aws-caller-identity
 # A token for AWS's STS, an hour long, at /platform/tokens/sts.amazonaws.com:
