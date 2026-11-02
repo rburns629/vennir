@@ -36,6 +36,10 @@ func GCP(p *GCPPrices, c *config.Config, fetched string) []plan.Line {
 	f := plan.FloorOf(c)
 	standard := c.Cluster.Mode == "standard"
 	disks := f.VolumeGiB * p.BalancedDisk
+	for _, gib := range f.OptionalVolumesGiB {
+		// GKE provisions a pd-balanced disk at 10 GB at least.
+		disks += max(gib, 10) * p.BalancedDisk
+	}
 	fee := p.ClusterFee * hoursPerMonth
 
 	var stepHour float64

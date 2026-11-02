@@ -38,6 +38,13 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
     return 1
 
 
+def _retryable(error: GoogleAPIError) -> bool:
+    """Whether trying again may help: Google busy, throttled, unreachable or
+    mid-change (409: aborted, or made by an attempt this one replaces, which
+    the next finds), not a refusal (a missing permission, a bad input)."""
+    code = getattr(error, "code", None)
+    return not isinstance(code, int) or code in (408, 409, 429) or code >= 500
+
 def _build_credentials() -> google.auth.credentials.Credentials | None:
     """As create's: the gcp-target service account if the team registered one, else ADC."""
     target = TARGET_SERVICE_ACCOUNT_FILE.read_text().strip() if TARGET_SERVICE_ACCOUNT_FILE.exists() else ""
@@ -63,7 +70,7 @@ def main() -> int:
         _write_result({"status": "succeeded", "outputs": {"deleted": path}})
         return 0
     except GoogleAPIError as error:
-        return _failure("GCP_API_ERROR", str(error), retryable=True)
+        return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     if dict(service.labels).get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
         return _failure("NOT_MADE_BY_VERTRA", f"service '{path}' wasn't deployed by this product (it has no {MADE_BY_LABEL[0]} label), so it isn't deleted")
@@ -73,7 +80,7 @@ def main() -> int:
     except NotFound:
         pass
     except GoogleAPIError as error:
-        return _failure("GCP_API_ERROR", str(error), retryable=True)
+        return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     print(f"deleted service '{path}'")
     _write_result({"status": "succeeded", "outputs": {"deleted": path}})

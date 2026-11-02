@@ -179,6 +179,20 @@ class CreateActionTest(unittest.TestCase):
         self.assertTrue(result["error"]["retryable"])
 
 
+    def test_a_refusal_is_not_retried(self) -> None:
+        # Cloud Run's create without read access to the image's repository.
+        self._write_request(_VALID_INPUTS)
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client = client_cls.return_value
+            client.get_service.side_effect = self.module.NotFound("no such service")
+            client.create_service.side_effect = __import__("google.api_core.exceptions", fromlist=["PermissionDenied"]).PermissionDenied(
+                "Permission 'artifactregistry.repositories.downloadArtifacts' denied")
+            self.assertEqual(self.module.main(), 1)
+
+        result = self._result()
+        self.assertEqual(result["error"]["code"], "GCP_API_ERROR")
+        self.assertFalse(result["error"]["retryable"])
+
 class BuildCredentialsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.module = _load_create_module()

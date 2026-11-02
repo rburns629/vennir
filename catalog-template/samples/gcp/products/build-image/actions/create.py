@@ -59,6 +59,13 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
     return 1
 
 
+def _retryable(error: GoogleAPIError) -> bool:
+    """Whether trying again may help: Google busy, throttled, unreachable or
+    mid-change (409: aborted, or made by an attempt this one replaces, which
+    the next finds), not a refusal (a missing permission, a bad input)."""
+    code = getattr(error, "code", None)
+    return not isinstance(code, int) or code in (408, 409, 429) or code >= 500
+
 def _build_credentials() -> google.auth.credentials.Credentials | None:
     """Impersonated credentials for the gcp-target service account, or None
     to leave each client's own ADC discovery in charge, unimpersonated, when
@@ -136,7 +143,7 @@ def main() -> int:
         except NotFound:
             pass
         except GoogleAPIError as error:
-            return _failure("GCP_API_ERROR", str(error), retryable=True)
+            return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     bucket, object_name = _parse_gcs_url(source_archive_url)
     build = cloudbuild_v1.Build(
@@ -157,7 +164,7 @@ def main() -> int:
         )
         result = operation.result()  # blocks until the build finishes
     except GoogleAPIError as error:
-        return _failure("GCP_API_ERROR", str(error), retryable=True)
+        return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     if result.status != cloudbuild_v1.Build.Status.SUCCESS:
         return _failure(

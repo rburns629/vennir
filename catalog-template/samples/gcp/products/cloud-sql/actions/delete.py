@@ -45,6 +45,12 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
     return 1
 
 
+def _retryable(error: HttpError) -> bool:
+    """Whether trying again may help: Google busy, throttled, unreachable or
+    mid-change (409: another operation in progress, a backup or the end of a
+    create), not a refusal (a missing permission, a bad input)."""
+    return error.resp.status in (408, 409, 429) or error.resp.status >= 500
+
 def _build_credentials() -> google.auth.credentials.Credentials | None:
     """As create's: the gcp-target service account if the team registered one, else ADC."""
     target = TARGET_SERVICE_ACCOUNT_FILE.read_text().strip() if TARGET_SERVICE_ACCOUNT_FILE.exists() else ""
@@ -84,7 +90,7 @@ def main() -> int:
             print(f"Cloud SQL instance '{connection}' is already gone")
             _write_result({"status": "succeeded", "outputs": {"deleted": connection}})
             return 0
-        return _failure("GCP_API_ERROR", str(error), retryable=True)
+        return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     labels = (instance.get("settings") or {}).get("userLabels") or {}
     if labels.get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
@@ -98,7 +104,7 @@ def main() -> int:
             return _failure("GCP_OPERATION_FAILED", operation_error, retryable=True)
     except HttpError as error:
         if error.resp.status != 404:
-            return _failure("GCP_API_ERROR", str(error), retryable=True)
+            return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     print(f"deleted Cloud SQL instance '{connection}'" if done else f"Cloud SQL is still deleting '{connection}'; it can't be stopped now")
     _write_result({"status": "succeeded", "outputs": {"deleted": connection, **({} if done else {"finishing": True})}})

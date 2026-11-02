@@ -38,6 +38,13 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
     return 1
 
 
+def _retryable(error: GoogleAPIError) -> bool:
+    """Whether trying again may help: Google busy, throttled, unreachable or
+    mid-change (409: aborted, or made by an attempt this one replaces, which
+    the next finds), not a refusal (a missing permission, a bad input)."""
+    code = getattr(error, "code", None)
+    return not isinstance(code, int) or code in (408, 409, 429) or code >= 500
+
 def _build_credentials() -> google.auth.credentials.Credentials | None:
     """As create's: the gcp-target service account if the team registered one, else ADC."""
     target = TARGET_SERVICE_ACCOUNT_FILE.read_text().strip() if TARGET_SERVICE_ACCOUNT_FILE.exists() else ""
@@ -71,7 +78,7 @@ def main() -> int:
             f"project '{project_id}' can't be seen: purged already, or this product may no longer read it ({error})",
         )
     except GoogleAPIError as error:
-        return _failure("GCP_API_ERROR", str(error), retryable=True)
+        return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     if project.state == resourcemanager_v3.Project.State.DELETE_REQUESTED:
         print(f"project '{project_id}' is already shutting down")
@@ -88,7 +95,7 @@ def main() -> int:
     except NotFound:
         pass
     except GoogleAPIError as error:
-        return _failure("GCP_API_ERROR", str(error), retryable=True)
+        return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     print(f"shut down project '{project_id}'")
     _write_result({"status": "succeeded", "outputs": {"deleted": project_id}})
