@@ -547,7 +547,8 @@ export const TEAM_NO_METADATA = "vertra-no-metadata";
 /** The instance metadata server's address (EC2's). IPv4 only: the AWS VPC
  * CNI's policy agent on an IPv4 cluster can't hold an IPv6 block, and on
  * failing to it enforced none of the namespace's policies (proven on
- * standard-mode EKS, 2026-10-29); vertra's clusters are IPv4. */
+ * standard-mode EKS, 2026-10-29); vertra's clusters are IPv4. The console
+ * chart's write fence requires exactly this exception. */
 const METADATA_ADDRESS = "169.254.169.254/32";
 
 export function noMetadataPolicy(namespace: string): k8s.V1NetworkPolicy {

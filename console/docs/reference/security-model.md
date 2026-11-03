@@ -836,7 +836,8 @@ Auto Mode), off by default there.
   EKS 2026-10-29, and fixed). Steps that need AWS get their own role
   through EKS Pod Identity (`169.254.170.23`, still open) or a web-identity
   token. The write fence accepts that policy only in a shape that lets out
-  everything less what it excepts. Proven on EKS Auto Mode 2026-10-28: a
+  everything less `169.254.169.254`, and no egress rule in the console's
+  other policies (allows add up, so one would undo it). Proven on EKS Auto Mode 2026-10-28: a
   Pod in a team namespace gets no connection to the metadata server, while
   the internet answers; there, Auto Mode's nodes already refuse Pods the
   metadata server, so the policy is a second barrier. Proven on
