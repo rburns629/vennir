@@ -704,6 +704,27 @@ without going through the console:
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
 | Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own) | console chart, `templates/write-fence-policy.yaml` |
 
+An install whose platform namespace is also a team's (`allowReleaseNamespace`,
+as the GKE reference values' `default` is) loses more than the dispatch
+guardrail there:
+- the team's `vertra-default-deny` admits every Pod in the namespace to
+  every other, so that team's steps can reach the platform's Postgres and
+  kernel-api (passwords and TokenReview still hold; the network layer
+  doesn't);
+- a product of that team may declare one of the platform's own
+  ServiceAccounts, and the identity policy lets its steps run as it (with
+  its cloud identity, on Workload Identity);
+- the console's write fence counts the namespace as a team's, so it may
+  write the platform's own Secrets (the databases', the session key);
+- policy-controller has to exclude it, so that team's steps run unsigned
+  images;
+- the gateway's token fence matches kernel-api's ServiceAccount there;
+- the team's quota counts the platform's own Pods.
+
+`vertra` installs into `vertra-system` by default and always turns
+`allowReleaseNamespace` off; the GKE reference install moves on its next
+run (`TODO.md`).
+
 The dispatch, image, scan and identity policies check the scheduler's own
 requests and nobody else's (their `matchConditions`). Anyone else the
 cluster lets create Pods in a team namespace, such as a cluster
@@ -752,7 +773,7 @@ CronJobs, its own and the wake one, and an admission policy in
 `timeZone`, never the Job they run. A stolen token of either can stop the
 platform, not change it.
 
-And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api: a step's Pod can reach neither. Every team namespace also holds `vertra-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vertra-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vertra/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vertra-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vertra-team-quota`) and LimitRange (`vertra-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators. The bundled databases' passwords are generated on install.
+And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api: a step's Pod can reach neither. Every team namespace also holds `vertra-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vertra-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vertra/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vertra-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vertra-team-quota`) and LimitRange (`vertra-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators (and it mustn't also be a team's: see [Guardrails the cluster enforces](#guardrails-the-cluster-enforces)). The bundled databases' passwords are generated on install.
 
 ## What a step can reach
 

@@ -89,6 +89,19 @@ Console and gateway:
   decided to keep #72's way (`docs/operations.md`).
 
 Kernel and alerts:
+- [ ] **The GKE reference install runs the platform in `default`**, also an
+  admins' team namespace (`allowReleaseNamespace`; review H-9): there that
+  team's steps can reach the platform's Postgres and kernel-api, its
+  products can run as the platform's ServiceAccounts, the console's write
+  fence admits the platform's own Secrets, policy-controller excludes the
+  namespace, and the gateway's token fence matches kernel-api's
+  ServiceAccount (`docs/security-model.md`, "Guardrails the cluster
+  enforces"). The next billed GKE run installs fresh into `vertra-system`:
+  `GKE_NAMESPACE` in the Makefile, the values files' comments and
+  `kernelApiUrl` (`helm/values/gke/console.yaml`), `allowReleaseNamespace`
+  dropped, policy-controller's `NotIn default` dropped, and the Google
+  service accounts' Workload Identity bindings to the new namespace's
+  Kubernetes ServiceAccounts.
 - [ ] **Completion lag on GKE is policy-controller's webhook** (the r7 run,
   `perf/README.md`, "On GKE again"): with 40 at once, Job creations waited
   out its 10 s and were retried, and a pass that dispatches records
