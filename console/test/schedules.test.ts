@@ -215,14 +215,34 @@ describe("a due schedule", () => {
     expect(after).toMatchObject({ claimedRunAt: null, claimedAt: null, lastRunAt: due });
   });
 
-  it("paused, doesn't run", async () => {
+  it("paused, doesn't run, and resumed, doesn't start a time claimed before", async () => {
     await addTeamMember(bot.id, ownTeamId, "maintainer");
-    const [row] = await db.select().from(schedules).where(eq(schedules.teamId, ownTeamId));
+    // A time claimed and never started, long enough ago for another console to take it.
+    const [row] = await db
+      .update(schedules)
+      .set({ claimedRunAt: new Date(Date.now() - 3 * 86_400_000), claimedAt: new Date(Date.now() - 3 * 86_400_000) })
+      .where(eq(schedules.teamId, ownTeamId))
+      .returning();
     const paused = await call<{ schedule?: { enabled?: boolean; nextRunAt?: string } }>(maintainerToken, "ScheduleService/UpdateSchedule", { id: row?.id, enabled: false });
     expect(paused.body.schedule?.enabled ?? false).toBe(false);
     expect(paused.body.schedule?.nextRunAt).toBeUndefined();
     await startDueSchedules(silent);
     expect(ours()).toEqual([]);
+    expect((await call(maintainerToken, "ScheduleService/UpdateSchedule", { id: row?.id, enabled: true })).code).toBe("ok");
+    await startDueSchedules(silent);
+    expect(ours()).toEqual([]);
+    expect((await db.select().from(schedules).where(eq(schedules.id, row?.id ?? "")))[0]).toMatchObject({ claimedRunAt: null, claimedAt: null });
     expect((await call(maintainerToken, "ScheduleService/DeleteSchedule", { id: row?.id })).code).toBe("ok");
+  });
+
+  it("with a new timetable, doesn't start a time claimed under the old one", async () => {
+    const made = await call<{ schedule?: { id?: string } }>(maintainerToken, "ScheduleService/CreateSchedule", nightly({ name: "retimed" }));
+    const id = made.body.schedule?.id ?? "";
+    const long = new Date(Date.now() - 86_400_000);
+    await db.update(schedules).set({ claimedRunAt: long, claimedAt: long }).where(eq(schedules.id, id));
+    expect((await call(maintainerToken, "ScheduleService/UpdateSchedule", { id, cron: "0 3 * * *" })).code).toBe("ok");
+    await startDueSchedules(silent);
+    expect(ours()).toEqual([]);
+    expect((await call(maintainerToken, "ScheduleService/DeleteSchedule", { id })).code).toBe("ok");
   });
 });

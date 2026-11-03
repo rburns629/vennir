@@ -819,7 +819,7 @@ A team's schedules: a template or action run on a cron, with set parameters, for
 | `last_run_at` | timestamptz | yes | |
 | `last_execution_id` | uuid | yes | Its last run. |
 | `last_error` | text | yes | Why its last start was refused, or why it won't run again (its cron or time zone no longer reads). |
-| `claimed_run_at` | timestamptz | yes | A time a console claimed and hasn't started yet. Another console starts it once `claimed_at` is five minutes old (its request id keeps that to one run). |
+| `claimed_run_at` | timestamptz | yes | A time a console claimed and hasn't started yet. Another console starts it once `claimed_at` is five minutes old (its request id keeps that to one run). Cleared when the schedule is paused or its timetable or time zone changes. |
 | `claimed_at` | timestamptz | yes | When `claimed_run_at` was claimed. |
 | `created_by` | uuid | yes | |
 | `updated_by` | uuid | yes | Who last changed it. Its runs, as its bot, aren't theirs to approve. |

@@ -129,9 +129,18 @@ export async function updateSchedule(caller: AuthUser | undefined, id: string, c
   };
   const next = nextFor(merged.cron, merged.timeZone);
   if (merged.enabled) await checkedAsBot(team.name, merged);
+  // A time claimed and not started (scheduleRunner.ts) is dropped when it's
+  // paused or its timetable changes: resumed later, it'd start a stale time.
+  const dropClaim = !merged.enabled || merged.cron !== row.cron || merged.timeZone !== row.timeZone;
   const [updated] = await db
     .update(schedules)
-    .set({ ...merged, updatedBy: who.id, nextRunAt: merged.enabled ? next : null, ...(merged.enabled && !row.enabled ? { lastError: null } : {}) })
+    .set({
+      ...merged,
+      updatedBy: who.id,
+      nextRunAt: merged.enabled ? next : null,
+      ...(merged.enabled && !row.enabled ? { lastError: null } : {}),
+      ...(dropClaim ? { claimedRunAt: null, claimedAt: null } : {}),
+    })
     .where(eq(schedules.id, id))
     .returning();
   return (await views(updated ? [updated] : [], team.name))[0] as ScheduleView;
