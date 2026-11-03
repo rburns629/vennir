@@ -262,6 +262,11 @@ logs:
 gateway:
   backendHosts: []
   internetTeams: []
+  # -- Audiences the gateway may never mint a token for, besides the
+  # Kubernetes API's usual names and kernel-api's: this cluster's API
+  # server audience when it isn't one of those (a custom --api-audiences or
+  # service account issuer). GKE's is refused by its prefix already.
+  reservedAudiences: []
   url: ""
   publicUrl: ""
   # -- Run the gateway (gateway/): its Deployment and Service here, reading

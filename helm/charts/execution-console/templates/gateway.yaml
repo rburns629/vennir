@@ -102,7 +102,7 @@ spec:
     # minutes, gateway/internal/credentials).
     - expression: >-
         has(object.spec.audiences) && object.spec.audiences.size() > 0 &&
-        object.spec.audiences.all(a, !(a in {{ list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" .Values.kernelApiToken.audience | toJson }}) &&
+        object.spec.audiences.all(a, !(a in {{ concat (list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" .Values.kernelApiToken.audience) .Values.gateway.reservedAudiences | toJson }}) &&
           !a.startsWith("https://container.googleapis.com/"))
       message: "The gateway mints tokens only for a backend's own audience: never the Kubernetes API's or kernel-api's."
       reason: Forbidden
