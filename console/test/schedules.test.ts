@@ -3,7 +3,8 @@
  * Schedules (src/core/schedules.ts, src/scheduleRunner.ts): who makes them
  * and what's refused; a due schedule starts once, as its bot, for its team,
  * even with two consoles at once; a refused start is kept and told to the
- * team's maintainers; pausing. kernel-api and the registry are stubbed; the
+ * team's maintainers, as is one that can't run again; a time claimed and
+ * not started is started by another console; pausing. kernel-api and the registry are stubbed; the
  * rest is the real console on the real test database.
  */
 import { randomUUID } from "node:crypto";
@@ -175,6 +176,43 @@ describe("a due schedule", () => {
     } finally {
       Object.assign(config, { activityConfigMap: "", platformNamespace: "" });
     }
+  });
+
+  it("that can't run again (its time zone no longer reads) runs this once, and says why", async () => {
+    await addTeamMember(bot.id, ownTeamId, "maintainer");
+    const [row] = await db
+      .update(schedules)
+      .set({ nextRunAt: new Date(Date.now() - 60_000), timeZone: "Mars/Olympus" })
+      .where(eq(schedules.teamId, ownTeamId))
+      .returning();
+    try {
+      await startDueSchedules(silent);
+      expect(ours()).toHaveLength(1);
+      const [after] = await db.select().from(schedules).where(eq(schedules.id, row?.id ?? ""));
+      expect(after?.nextRunAt).toBeNull();
+      expect(after?.lastError).toMatch(/^It won't run again: "Mars\/Olympus" isn't a time zone/);
+      const events = await db.select().from(notificationEvents).where(like(notificationEvents.key, `schedule:${row?.id ?? ""}%:stopped`));
+      expect(events.map((e) => e.title)).toEqual(["Schedule nightly won't run again"]);
+    } finally {
+      await db.update(schedules).set({ timeZone: "Europe/Berlin", lastError: null }).where(eq(schedules.id, row?.id ?? ""));
+    }
+  });
+
+  it("claimed by a console that stopped before starting it, is started by another", async () => {
+    const due = new Date(Date.now() - 10 * 60_000);
+    const [row] = await db
+      .update(schedules)
+      .set({ nextRunAt: new Date(Date.now() + 3_600_000), claimedRunAt: due, claimedAt: new Date() })
+      .where(eq(schedules.teamId, ownTeamId))
+      .returning();
+    await startDueSchedules(silent);
+    expect(ours()).toEqual([]); // still the claiming console's to start
+    await db.update(schedules).set({ claimedAt: new Date(Date.now() - 6 * 60_000) }).where(eq(schedules.id, row?.id ?? ""));
+    await Promise.all([startDueSchedules(silent), startDueSchedules(silent)]);
+    expect(ours()).toHaveLength(1);
+    expect((ours()[0]?.[0] as { requestId?: string }).requestId).toMatch(new RegExp(`schedule:${row?.id ?? ""}:${due.toISOString()}$`));
+    const [after] = await db.select().from(schedules).where(eq(schedules.id, row?.id ?? ""));
+    expect(after).toMatchObject({ claimedRunAt: null, claimedAt: null, lastRunAt: due });
   });
 
   it("paused, doesn't run", async () => {
