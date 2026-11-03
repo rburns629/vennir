@@ -447,6 +447,10 @@ func (a *app) consoleCmd() *cobra.Command {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "The console is at http://localhost:%d (Ctrl-C to stop).\n", port)
+			if c.SSO.Provider == "google" && !c.Console.Public && port != 18080 {
+				// Its callback is registered at the default port.
+				fmt.Fprintln(cmd.OutOrStdout(), "Google sign-in returns to http://localhost:18080, so it works only on that port; passwords work on any.")
+			}
 			return platform.PortForward(cmd.Context(), a.runner, c, port)
 		},
 	}

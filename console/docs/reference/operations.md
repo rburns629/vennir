@@ -271,7 +271,9 @@ client's downloaded JSON (checking it's a web client with that URI), asks
 which Workspace domains may sign in, and saves the settings (the file's
 path, never its secret). `vertra apply` then writes the secret into a
 Kubernetes Secret through stdin and turns it on; `vertra sso off` turns it
-off. By hand, with Helm:
+off. If the console's address changes later (made public, a new hostname or
+address), `apply` stops until the new URI is added to the client and
+`vertra sso google` is rerun. By hand, with Helm:
 
 1. In the Google Cloud console for a project in your Workspace
    organization, set up the OAuth consent screen (Google Auth Platform) with

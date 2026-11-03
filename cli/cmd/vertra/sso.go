@@ -3,6 +3,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/rburns629/vertra/cli/internal/config"
 	"github.com/rburns629/vertra/cli/internal/install"
+	"github.com/rburns629/vertra/cli/internal/tofu"
 )
 
 // ssoCmd sets up signing in with Google: Google has no API for its OAuth
@@ -38,7 +41,7 @@ func (a *app) ssoCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			redirect, err := install.SSORedirect(ctx, a.runner, c)
+			redirect, err := install.SSORedirect(c, a.cloudConsoleHost(ctx, dir, c))
 			if err != nil {
 				return err
 			}
@@ -158,4 +161,37 @@ func (a *app) ssoCmd() *cobra.Command {
 	groups.Flags().BoolVar(&groupsOff, "off", false, "stop reading Google Workspace groups")
 	cmd.AddCommand(google, off, groups)
 	return cmd
+}
+
+// cloudConsoleHost is the public console's name as the cloud side made it,
+// from the module's outputs in its state (no call to the cloud): gcp's
+// nip.io name for its reserved address, aws's host in its zone. "" when
+// there's no cloud side or no public address yet; apply checks the same.
+func (a *app) cloudConsoleHost(ctx context.Context, dir string, c *config.Config) string {
+	if !c.Console.Public || (c.Target != "gcp" && c.Target != "aws") {
+		return ""
+	}
+	outputs, err := tofu.In(a.runner, dir).Outputs(ctx)
+	if err != nil {
+		return ""
+	}
+	return consoleHostOf(c, outputs["console_address"])
+}
+
+// consoleHostOf reads the module's console_address output.
+func consoleHostOf(c *config.Config, raw json.RawMessage) string {
+	var address struct {
+		Host string `json:"host"` // aws
+		IP   string `json:"ip"`   // gcp
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &address) != nil {
+		return ""
+	}
+	if address.Host != "" {
+		return address.Host
+	}
+	if address.IP != "" {
+		return install.ConsoleHostname(c, address.IP)
+	}
+	return ""
 }

@@ -49,6 +49,9 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 	if err := a.requireTools(ctx, out, c.Target, c.Vertra == "source"); err != nil {
 		return err
 	}
+	if err := install.CheckSSORedirect(c, ""); err != nil {
+		return err
+	}
 	// The release list (cached a day) is read while the rest is checked.
 	versions := make(chan []string, 1)
 	go func() {
@@ -154,6 +157,13 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 	case "aws":
 		var err error
 		if made, err = a.applyAWS(ctx, out, c, cloud, images); err != nil {
+			return err
+		}
+	}
+	// A public address only the cloud side knows (gcp's nip.io name, aws's
+	// zone), checked before the console is installed with the old one.
+	if made != nil && made.ConsoleHost != "" {
+		if err := install.CheckSSORedirect(c, made.ConsoleHost); err != nil {
 			return err
 		}
 	}
