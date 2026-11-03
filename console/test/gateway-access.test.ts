@@ -33,7 +33,8 @@ describe("the gateway's database role", () => {
     await gateway.connect();
     try {
       // What the gateway's own queries read (gateway/internal/auth, store).
-      await gateway.query("SELECT id, email, is_admin, is_bot, password_changed_at, must_change_password FROM users LIMIT 1");
+      await gateway.query("SELECT id, email, is_admin, is_bot, password_changed_at, must_change_password, order_templates IS NOT NULL FROM users LIMIT 1");
+      await gateway.query("SELECT EXISTS (SELECT 1 FROM sso_settings WHERE id = 1 AND enabled AND issuer <> '' AND client_id <> '' AND redirect_url <> '')");
       await gateway.query("SELECT user_id, token_hash, revoked_at, expires_at FROM api_tokens LIMIT 1");
       await gateway.query("SELECT t.name, t.require_sso FROM team_memberships m JOIN teams t ON t.id = m.team_id LIMIT 1");
       await gateway.query("SELECT a.id FROM apis a JOIN teams t ON t.id = a.team_id WHERE t.retired_at IS NULL AND t.deleted_at IS NULL LIMIT 1");
@@ -48,6 +49,7 @@ describe("the gateway's database role", () => {
         "SELECT * FROM secret_grants LIMIT 1",
         "SELECT * FROM audit_log LIMIT 1",
         "SELECT * FROM sso_settings LIMIT 1",
+        "SELECT client_secret_encrypted FROM sso_settings LIMIT 1",
         "UPDATE users SET is_admin = true WHERE false",
       ]) {
         await expect(gateway.query(refused), refused).rejects.toThrow(/permission denied/);

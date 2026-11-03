@@ -220,7 +220,50 @@ func TestATeamRequiringSingleSignOnRefusesPasswordSessions(t *testing.T) {
 	if _, err := on.Resolve(ctx, session(adminID, false)); err != nil {
 		t.Errorf("an admin's password session: %v", err)
 	}
+	// Off in the install's settings, on as an admin saved it in the console:
+	// refused the same (and allowed again once it's off there too).
+	// (In this test's transaction, rolled back after it.)
+	_, err := db.Exec(ctx, `INSERT INTO sso_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`)
+	must(err)
+	_, err = db.Exec(ctx, `UPDATE sso_settings SET enabled = false WHERE id = 1`)
+	must(err)
 	if _, err := off.Resolve(ctx, session(personID, false)); err != nil {
 		t.Errorf("a password session with single sign-on off: %v", err)
+	}
+	_, err = db.Exec(ctx, `UPDATE sso_settings SET enabled = true, issuer = 'https://accounts.example', client_id = 'c', redirect_url = 'https://console.example/cb' WHERE id = 1`)
+	must(err)
+	if _, err := off.Resolve(ctx, session(personID, false)); err != ErrUnauthenticated {
+		t.Errorf("a member's password session with single sign-on an admin turned on: %v", err)
+	}
+	if _, err := off.Resolve(ctx, session(personID, true)); err != nil {
+		t.Errorf("a member's single sign-on, an admin's on: %v", err)
+	}
+}
+
+// An ordering bot may only order its listed templates in the console, so
+// the gateway serves it nothing, by token or keyless session.
+func TestAnOrderingBotCallsNoAPI(t *testing.T) {
+	db := tx(t)
+	ctx := context.Background()
+	var botID string
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(db.QueryRow(ctx, `INSERT INTO users (email, is_bot, order_templates) VALUES ('gw-orderer@bots.vertra.local', true, '{shop/order}') RETURNING id::text`).Scan(&botID))
+	token := APITokenPrefix + "orderer-" + botID
+	sum := sha256.Sum256([]byte(token))
+	_, err := db.Exec(ctx, `INSERT INTO api_tokens (user_id, label, token_hash) VALUES ($1::uuid, 'orders', $2)`, botID, hex.EncodeToString(sum[:]))
+	must(err)
+	now := time.Now()
+	r := &Resolver{DB: db, Keys: keys, Now: func() time.Time { return now }}
+	if _, err := r.Resolve(ctx, "Bearer "+token); err != ErrOrdersOnly {
+		t.Errorf("its token: %v", err)
+	}
+	session := "Bearer " + jwt(t, secret, "EdDSA", map[string]any{"userId": botID, "iat": now.Unix(), "exp": now.Unix() + 60, "sso": true})
+	if _, err := r.Resolve(ctx, session); err != ErrOrdersOnly {
+		t.Errorf("its keyless session: %v", err)
 	}
 }
