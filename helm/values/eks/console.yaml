@@ -1,6 +1,6 @@
 # execution-console on EKS, as `vertra apply` writes it (see kernel.yaml):
 #   helm upgrade --install console oci://ghcr.io/rburns629/vertra/charts/execution-console --version <x.y.z> \
-#     -n vertra-system --kube-context <context> -f helm/values/eks/console.yaml
+#     -n vertra-system --reset-values --kube-context <context> -f helm/values/eks/console.yaml
 # Its ServiceAccount gets its AWS identity from an EKS Pod Identity
 # association (made outside the chart: no annotation), a role that may read
 # the products' ECR repositories; see docs/operations.md, Cloud identities.

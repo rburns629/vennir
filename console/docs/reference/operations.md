@@ -729,6 +729,19 @@ It leaves:
 - **The team namespaces**, with their Secrets, ServiceAccounts and anything
   steps made there. The console created them, not Helm. Delete them with
   `kubectl delete namespace -l vertra/team` (retired ones included).
+- **The migration hooks' leftovers.** Helm doesn't delete hook resources
+  on uninstall. The console's last migrate Job (kept for its log) and its
+  `<console>-execution-console-migrate-config` ConfigMap stay. The kernel's
+  `<kernel>-execution-kernel-db-migrate` Secret (the database superuser's
+  URL) is deleted once its hook succeeds, even if a later hook then fails;
+  it stays only if Helm was interrupted before that, or creating it
+  failed. An upgrade that times out while the migrate Job is still
+  retrying deletes the Secret under it, so the Job's later attempts can't
+  start: run the upgrade again. Delete what's left with
+  `kubectl -n <namespace> delete job/<console>-execution-console-migrate configmap/<console>-execution-console-migrate-config secret/<kernel>-execution-kernel-db-migrate --ignore-not-found`
+  (`<console>` and `<kernel>` are the release names, `console` and
+  `kernel`; `<namespace>` is the platform's, `vertra-system`, or `default`
+  on the GKE values' existing install).
 - Anything outside the charts: buckets, cloud identities, the registry, and
   the platform namespace itself.
 
