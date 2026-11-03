@@ -155,7 +155,10 @@ export function ExecutionsListPage() {
   const [schedules, setSchedules] = useState<Schedule[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // A Load more that failed; the first page's failure is listFailed.
   const [error, setError] = useState<string | null>(null);
+  const [listFailed, setListFailed] = useState<string | null>(null);
+  const [listTry, setListTry] = useState(0);
   const [whose, setWhose] = useState<Whose>("all");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -190,19 +193,20 @@ export function ExecutionsListPage() {
     setExecutions(null);
     setNextCursor(null);
     setLoadingMore(false);
+    setError(null);
+    setListFailed(null);
     listExecutions({ limit: PAGE_SIZE, search: query, team: teamFilter, mine: whose === "mine" })
       .then((page) => {
         if (cancelled) return;
-        setError(null);
         setExecutions(page.executions);
         setNextCursor(page.nextCursor);
         setRetentionDays(page.runRetentionDays);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Couldn't load the runs.");
+        if (!cancelled) setListFailed(loadFailure(err));
       });
     return () => { cancelled = true; };
-  }, [query, teamFilter, whose]);
+  }, [query, teamFilter, whose, listTry]);
 
   // The tiles: the week's runs, for whose and which team.
   useEffect(() => {
@@ -432,7 +436,7 @@ export function ExecutionsListPage() {
             </Alert>
           )}
 
-          {weekFailed && !error && <LoadFailed what="this week's runs" reason={weekFailed} onRetry={() => { setWeekTry((n) => n + 1); }} />}
+          {weekFailed && <LoadFailed what="this week's runs" reason={weekFailed} onRetry={() => { setWeekTry((n) => n + 1); }} />}
           <QuickTiles label="This week at a glance">
             <QuickTile
               label="Running"
@@ -535,19 +539,26 @@ export function ExecutionsListPage() {
                 </Typography>
               )}
             </Box>
-            <DataTable
-              columns={columns}
-              rows={filtered}
-              getRowKey={(e) => e.executionId}
-              onRowClick={(e) => { open(e.executionId); }}
-              emptyMessage={
-                executions && executions.length > 0
-                  ? "No runs match these filters."
-                  : whose === "mine"
-                    ? "You haven't started a run yet. Find something to run in the Catalog."
-                    : "No runs you can see yet: they're your own, your teams', and any that used your teams' steps."
-              }
-            />
+            {listFailed && (
+              <Box sx={{ px: 2.5, pb: 2.5, pt: 1 }}>
+                <LoadFailed what="the runs" reason={listFailed} note="Nothing is wrong with the runs themselves." onRetry={() => { setListTry((n) => n + 1); }} />
+              </Box>
+            )}
+            {!listFailed && (
+              <DataTable
+                columns={columns}
+                rows={filtered}
+                getRowKey={(e) => e.executionId}
+                onRowClick={(e) => { open(e.executionId); }}
+                emptyMessage={
+                  executions && executions.length > 0
+                    ? "No runs match these filters."
+                    : whose === "mine"
+                      ? "You haven't started a run yet. Find something to run in the Catalog."
+                      : "No runs you can see yet: they're your own, your teams', and any that used your teams' steps."
+                }
+              />
+            )}
           </Card>
           {(retentionDays !== null || nextCursor) && (
             <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 1.25, mt: -1.5 }}>

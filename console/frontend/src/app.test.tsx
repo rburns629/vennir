@@ -264,6 +264,20 @@ describe("runs", () => {
     expect(screen.getByText("sam@acme.com")).toBeTruthy();
   });
 
+  it("says when the runs couldn't be loaded, in their card, and tries again", async () => {
+    let asked = 0;
+    await renderAt("/runs", MEMBER, {
+      // The list's first page fails once; the week's tiles (since set) load.
+      "ExecutionService/ListExecutions": (request: Record<string, unknown>) =>
+        request["since"] ? { executions: [RUN] } : asked++ === 0 ? refused(503, "unavailable", "kernel-api didn't answer.") : { executions: [RUN] },
+    });
+    const failed = await screen.findByText(/Couldn't load the runs: kernel-api didn't answer\. Nothing is wrong with the runs themselves\./, {}, { timeout: 5000 });
+    expect(screen.queryByText(/No runs you can see yet/)).toBeNull();
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("orders-api first deploy")).toBeTruthy();
+    expect(screen.queryByText(/Couldn't load the runs/)).toBeNull();
+  });
+
   it("says when the steps to approve or the schedules couldn't be loaded, never that there are none, and tries again", async () => {
     let approvalsAsked = 0;
     let schedulesAsked = 0;
