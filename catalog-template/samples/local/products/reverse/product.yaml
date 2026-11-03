@@ -10,7 +10,7 @@ description: >-
   Writes the text backwards, keeping emoji and accented letters whole. A
   TypeScript sample of the product contract.
 owner: local
-runtime: node24
+runtime: node26
 # What the error codes its actions report mean: shown on the run page when a
 # step fails with one, with whether a retry is safe and where to ask.
 errors:

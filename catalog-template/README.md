@@ -21,9 +21,12 @@ example teams, never published from there:
   TypeScript, Go, PowerShell and Rust. Copy the products in your languages
   into your team as starters, or the whole folder to `teams/local/` to
   prove an install end to end.
-- `samples/gcp`, `samples/aws`: products that call real, billed cloud APIs
-  (a project or bucket, a container service, a PostgreSQL database),
-  keyless. Copy one into a team once its cloud identity is set up.
+- `samples/gcp`, `samples/aws`, `samples/azure`: products that call real,
+  billed cloud APIs (a project, bucket or resource group, a container
+  service, a PostgreSQL database), keyless. Copy one into a team once its
+  cloud identity is set up. The azure ones haven't called Azure yet.
+- `samples/perf`: the platform's benchmark product, only ever installed
+  on its own test cluster. Nothing needs it; delete it if you like.
 
 A copied product's `team:` must be changed to its new team's name.
 
@@ -34,7 +37,7 @@ vertra.yaml                  where products publish: registry, signing
 vertra                        runs the pinned vertra (downloaded into .vertra/)
 tools/                        the schemas of every catalog file (format v2), for editors
 templates/                    starters to copy (checked by CI, never published)
-samples/<team>/               example teams: local (five languages); gcp, aws (billed)
+samples/<team>/               example teams: local (five languages); gcp, aws, azure (billed); perf
 teams/
   <team>/                    one team = one console team = one Kubernetes namespace
     team.yaml                 who the team is: name, description, owner, contact, help; allowedTargets; clouds
@@ -653,7 +656,7 @@ that fail.
 requiring a code owner's review ([Protecting main](#protecting-main)): the catalog admins own everything by
 default, each team's owners own `/teams/<team>/`, and the admins
 own, last so nothing overrides them, `.github/`, `tools/`, `vertra.yaml`,
-`vertra catalog`, `templates/` and every `/teams/*/secret-stores/`. A
+`vertra` (the wrapper), `templates/` and every `/teams/*/secret-stores/`. A
 team ships its own products, but can't change how CI builds and
 publishes, take another team's folder, add a team, or change what
 vault its namespace can read. `./vertra catalog validate` checks this layout, and

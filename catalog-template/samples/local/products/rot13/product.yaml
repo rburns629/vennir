@@ -10,7 +10,7 @@ description: >-
   Moves each Latin letter 13 places along the alphabet; running it twice gives
   the original back. A Rust sample of the product contract.
 owner: local
-runtime: rust1.90
+runtime: rust1.98
 # What the error codes its actions report mean: shown on the run page when a
 # step fails with one, with whether a retry is safe and where to ask.
 errors:

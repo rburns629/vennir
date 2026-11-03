@@ -35,10 +35,18 @@ run as it). Then:
    ServiceAccount (an admin adds it; the console never changes a product's
    ServiceAccount).
 
-**Not possible yet:** Workload Identity also needs the label
-`azure.workload.identity/use: "true"` on the step's Pod, and the kernel
-doesn't let a deployment label step Pods (`TODO.md`). Until it does, these
-actions find no credentials and fail with `AZURE_AUTH_FAILED`.
+3. The label `azure.workload.identity/use: "true"` on every step's Pod,
+   which Workload Identity's webhook needs: the install sets it in the
+   kernel chart's values (`scheduler.taskPodLabels`). Without it these
+   actions find no credentials and fail with `AZURE_AUTH_FAILED`.
+
+On a cluster that isn't AKS, the other way is OIDC federation from the
+step's own token: `tokenAudiences: [api://AzureADTokenExchange]` in the
+product.yaml, a federated credential trusting the cluster's issuer for
+that ServiceAccount, and `AZURE_FEDERATED_TOKEN_FILE` pointed at
+`/platform/tokens/api___AzureADTokenExchange` (with `AZURE_CLIENT_ID` and
+`AZURE_TENANT_ID`), as the catalog's README describes. These samples don't
+declare it, and neither way has been tried against Azure yet.
 
 Grant each product's identity only what it needs, on the narrowest scope:
 
