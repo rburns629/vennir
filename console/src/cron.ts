@@ -6,7 +6,8 @@
  * are Sunday). As in cron, when both days are restricted, a time matching
  * either runs. Times are read in an IANA time zone ("Europe/Berlin"); a
  * minute that doesn't exist (clocks going forward) is skipped, one that
- * happens twice (going back) runs once.
+ * happens twice (going back) runs once, unless the minute or hour is `*` or
+ * a step of it (as cron does: those run through the repeated hour).
  */
 
 export interface Cron {
@@ -17,6 +18,8 @@ export interface Cron {
   weekdays: Set<number>;
   anyDay: boolean;
   anyWeekday: boolean;
+  /** Its minute or hour is `*` or `*\/n`: it runs through a repeated hour, as cron's do. */
+  everyHour: boolean;
 }
 
 const FIELDS = [
@@ -49,7 +52,16 @@ export function parseCron(expression: string): Cron {
   const [minutes, hours, days, months, weekdays] = parts.map((p, i) => field(p, FIELDS[i] ?? FIELDS[0]));
   if (!minutes || !hours || !days || !months || !weekdays) throw new Error("A schedule has five fields.");
   if (weekdays.has(7)) weekdays.add(0);
-  return { minutes, hours, days, months, weekdays, anyDay: parts[2] === "*", anyWeekday: parts[4] === "*" };
+  return {
+    minutes,
+    hours,
+    days,
+    months,
+    weekdays,
+    anyDay: parts[2] === "*",
+    anyWeekday: parts[4] === "*",
+    everyHour: Boolean(parts[0]?.startsWith("*") || parts[1]?.startsWith("*")),
+  };
 }
 
 /** Whether a time zone is one this runtime knows. */
@@ -103,11 +115,12 @@ function dayMatches(cron: Cron, t: ReturnType<typeof local>): boolean {
 const MINUTE = 60_000;
 
 /**
- * Whether this wall-clock minute already happened (the clocks went back,
- * by an hour or, in a few zones, half of one): only its first time runs.
+ * Whether this wall-clock minute already happened (the clocks went back:
+ * by an hour, or in a few zones half of one, or two): only its first time
+ * runs.
  */
 function repeated(at: Date, parts: ReturnType<typeof local>, timeZone: string): boolean {
-  return [30, 60].some((back) => {
+  return [30, 60, 120].some((back) => {
     const earlier = local(new Date(at.getTime() - back * MINUTE), timeZone);
     return (
       earlier.month === parts.month &&
@@ -127,14 +140,16 @@ export function nextRun(cron: Cron, after: Date, timeZone: string): Date | null 
     if (!dayMatches(cron, parts)) {
       // Towards the next local midnight: the day's remaining minutes, less an
       // hour, so a day the clocks change can't carry it past midnight.
-      t = new Date(t.getTime() + Math.max(1, (23 - parts.hour) * 60 + (60 - parts.minute) - 60) * MINUTE);
+      // In its last hour, to the next hour: not a minute at a time.
+      const towards = (23 - parts.hour) * 60 + (60 - parts.minute) - 60;
+      t = new Date(t.getTime() + (towards >= 1 ? towards : 60 - parts.minute) * MINUTE);
       continue;
     }
     if (!cron.hours.has(parts.hour)) {
       t = new Date(t.getTime() + (60 - parts.minute) * MINUTE);
       continue;
     }
-    if (cron.minutes.has(parts.minute) && !repeated(t, parts, timeZone)) return t;
+    if (cron.minutes.has(parts.minute) && (cron.everyHour || !repeated(t, parts, timeZone))) return t;
     t = new Date(t.getTime() + MINUTE);
   }
   return null;

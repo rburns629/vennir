@@ -38,8 +38,19 @@ describe("a schedule's next run", () => {
     // Lord Howe goes back half an hour (02:00 to 01:30 on 5 April 2026).
     const howe = nextRun(parseCron("45 1 * * *"), at("2026-04-04T12:00:00Z"), "Australia/Lord_Howe");
     expect(nextRun(parseCron("45 1 * * *"), howe!, "Australia/Lord_Howe")!.getTime() - howe!.getTime()).toBeGreaterThan(23 * 3_600_000);
-    // Every 15 minutes still runs through the repeated hour's new minutes only.
-    expect(nextRun(parseCron("*/15 * * * *"), at("2026-11-01T05:50:00Z"), "America/New_York")?.toISOString()).toBe("2026-11-01T07:00:00.000Z");
+    // Antarctica/Troll goes back two hours (02:00 to 00:00 on 25 October 2026).
+    const troll = nextRun(nightly, at("2026-10-24T12:00:00Z"), "Antarctica/Troll");
+    expect(troll?.toISOString()).toBe("2026-10-24T23:30:00.000Z");
+    expect(nextRun(nightly, troll!, "Antarctica/Troll")!.getTime() - troll!.getTime()).toBeGreaterThan(23 * 3_600_000);
+    // Every 15 minutes runs through the repeated hour, as cron does.
+    expect(nextRun(parseCron("*/15 * * * *"), at("2026-11-01T05:50:00Z"), "America/New_York")?.toISOString()).toBe("2026-11-01T06:00:00.000Z");
+    expect(nextRun(parseCron("30 * * * *"), at("2026-11-01T05:35:00Z"), "America/New_York")?.toISOString()).toBe("2026-11-01T06:30:00.000Z");
+  });
+
+  it("finds a rare day without stepping through it minute by minute", () => {
+    const started = Date.now();
+    expect(nextRun(parseCron("0 0 29 2 *"), at("2026-03-01T00:00:00Z"), "Europe/Berlin")?.toISOString()).toBe("2028-02-28T23:00:00.000Z");
+    expect(Date.now() - started).toBeLessThan(150);
   });
 
   it("runs on either day when both are restricted, as cron does", () => {
