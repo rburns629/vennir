@@ -285,7 +285,11 @@ func keyed(id, scope, p string) TaskDef {
 func TestASecondTaskWithTheSameKeyWaitsUntilTheFirstIsDone(t *testing.T) {
 	tx := txFor(t)
 	submit(t, tx, "idem-key-1", keyed("first", "acme-project", "web-1"))
-	submit(t, tx, "idem-key-2", keyed("second", "acme-project", "web-1"))
+	later := submit(t, tx, "idem-key-2", keyed("second", "acme-project", "web-1"))
+	// Ready after the first (one transaction gives both the same instant).
+	if _, err := tx.Exec(context.Background(), `UPDATE execution_tasks SET available_at = available_at + interval '1 millisecond' WHERE execution_id = $1::uuid`, later); err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now()
 	first := claim(t, tx, "scheduler-1", time.Minute, now)
 	equal(t, "first pass", len(first), 1)
