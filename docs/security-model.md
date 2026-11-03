@@ -451,9 +451,16 @@ sharing; a backend should still check the token's `api` as well as its
 `aud` (the sample does). Only the cluster's default domain is read
 (`.svc.cluster.local`): on a cluster with another, and for short names,
 pod IPs or anything else that reaches inside the cluster, `backendHosts`
-alone decides, so list exactly the hosts each API may use. A caller's own `Vertra-*` headers are dropped.
-Paths with encoded slashes or dot segments are refused, so what's checked
-is what's forwarded.
+alone decides, so list exactly the hosts each API may use. A caller's own `Vertra-*` headers are dropped,
+and so is what it says of where it's from (`Forwarded`, `X-Forwarded-*`,
+`X-Real-Ip`): `X-Forwarded-For` is the gateway's own peer. A cookie a
+backend sets is kept to its API's path, so one team's backend can't set or
+read another's on the gateway's shared origin.
+Paths with encoded slashes, backslashes or dot segments (`..;` too) are
+refused, so what's checked is what's forwarded. Before sign-in, an API
+that's hidden or paused is answered as one that isn't there (404), so its
+state and pause message reach only signed-in callers who can see it; a
+hidden one is 404 to a caller it isn't shared with, as in the console.
 
 Backends must be under hosts the admins allow (`gateway.backendHosts`), or
 the API is held: the gateway can't be pointed anywhere a catalog says. Its

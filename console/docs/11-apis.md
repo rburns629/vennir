@@ -95,16 +95,17 @@ Every answer carries two headers worth keeping:
 For each request to `/<team>/<name>/<path>`:
 
 1. **The API exists here.** On the public address, only APIs reachable from the internet are served. Else 404.
-2. **It's open.** Not closed by an admin, not paused, not held, and its spec could be read. Else 503.
-3. **You're signed in.** Else 401.
-4. **It's shared with your team.** Else 403.
-5. **The body isn't too large** for this API (`maxRequest`, 1 MiB unless it says otherwise). Else 413.
-6. **The method and path are an operation in the spec.** Else 404, and the request is counted as blocked.
-7. **Parameters, headers and body fit that operation's schemas**, with no query parameter it doesn't declare, a body only where it declares one, and that body with a `Content-Type`. Else 400, with what didn't fit.
-8. **Your team is within its requests a minute.** Else 429, with `Retry-After`.
-9. **Forwarded** to the backend, with the backend's own credential.
+2. **You're signed in.** Else 401; but 404 for a hidden or paused API, which before you sign in is answered as one that isn't there.
+3. **You may see it.** A hidden API is only for its own team, the teams it's shared with, and admins. Else 404, as in the console.
+4. **It's open.** Not closed by an admin, not paused, not held, and its spec could be read. Else 503.
+5. **It's shared with your team.** Else 403.
+6. **The body isn't too large** for this API (`maxRequest`, 1 MiB unless it says otherwise). Else 413.
+7. **The method and path are an operation in the spec.** Else 404, and the request is counted as blocked.
+8. **Parameters, headers and body fit that operation's schemas**, with no query parameter it doesn't declare, a body only where it declares one, and that body with a `Content-Type`. Else 400, with what didn't fit.
+9. **Your team is within its requests a minute.** Else 429, with `Retry-After`.
+10. **Forwarded** to the backend, with the backend's own credential. `X-Forwarded-For` is the address the gateway got the request from (on the public address, the ingress's); a caller's own `Forwarded`, `X-Forwarded-*` and `X-Real-Ip` are dropped. A cookie the backend sets is kept to the API's own path (`/<team>/<name>/`), since every API shares the gateway's address.
 
-A path with an encoded slash (`%2F`) or a `.` or `..` segment is refused with 404 before any of this, so the path that's checked is the path that's forwarded.
+A path with an encoded slash (`%2F`), a backslash (`%5C`), or a `.`, `..`, `.;…` or `..;…` segment is refused with 404 before any of this, so the path that's checked is the path that's forwarded.
 
 The API's page shows these steps too, as **What happens to a request**.
 
@@ -117,7 +118,7 @@ The gateway's own answers are JSON, `{"error": "<code>", "message": "…"}`, and
 | 401 | `UNAUTHENTICATED` | No token, or it's invalid, expired or revoked | Send `Authorization: Bearer <token>`; make a new bot token if it expired |
 | 403 | `NOT_SHARED` | The API isn't shared with your team, or not with the team in `Vertra-Team` | [Ask for access](#how-do-i-get-access-to-an-api) |
 | 404 | `NOT_IN_SPEC` | The spec has no such method and path. Nothing was forwarded | Check the endpoint list on its **Overview** |
-| 404 | `NOT_FOUND` | No such API here (or not on the public address), or the path has an encoded slash or dot segment | Check the address on its **Overview** |
+| 404 | `NOT_FOUND` | No such API here (or not on the public address, or one hidden from you, or one that's hidden or paused while you aren't signed in), or the path has an encoded slash, a backslash or a dot segment | Check the address on its **Overview**, and your token |
 | 400 | `INVALID_REQUEST` | The request doesn't fit the spec's schemas | Read `problems`; compare with the downloaded spec |
 | 413 | `TOO_LARGE` | The body is larger than this API takes | Send less; the limit is on its **Overview** |
 | 429 | `RATE_LIMITED` | Your team used this API's requests for the minute | Wait for `Retry-After` seconds |
@@ -168,7 +169,7 @@ What the gateway refused also appears on Observe, under **Refused, last 7 days**
 
 A maintainer of the API's team, or an admin, can pause it: on its page, under **Backend and pausing → Pause it**, write a **Message to callers** (for example, `Database failover; back by 15:00 UTC`) and press **Pause this API**. Until you press **Resume**:
 
-- every request gets 503 `API_PAUSED` with your message;
+- every signed-in caller who can see it gets 503 `API_PAUSED` with your message (one not signed in gets 404, as for an API that isn't there);
 - nothing reaches the backend;
 - the API shows **Paused** everywhere.
 
