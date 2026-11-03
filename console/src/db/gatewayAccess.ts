@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 /**
  * The gateway's own database role: what it reads to sign callers in and
- * find the published APIs, and its traffic counts and what it can't serve,
- * and nothing else. Never
+ * find the published APIs, and its traffic counts, what it can't serve and
+ * when an API token was last used, and nothing else. Never
  * a password hash, a sealed value or a secret's name: column grants on
  * `users` and `teams`, and no grant at all on the rest. Run by the
  * migration Job (migrate.ts) after the migrations, as the tables' owner, so
@@ -17,7 +17,9 @@ import type { Pool, PoolClient } from "pg";
 
 const GRANTS = [
   "GRANT SELECT (id, email, is_admin, is_bot, password_changed_at, must_change_password, order_templates) ON users TO %I",
-  "GRANT SELECT (user_id, token_hash, revoked_at, expires_at) ON api_tokens TO %I",
+  "GRANT SELECT (id, user_id, token_hash, revoked_at, expires_at, last_used_at) ON api_tokens TO %I",
+  // A token used at the gateway is used: its last_used_at, and nothing else of it.
+  "GRANT UPDATE (last_used_at) ON api_tokens TO %I",
   "GRANT SELECT (user_id, team_id) ON team_memberships TO %I",
   "GRANT SELECT (id, name, require_sso, retired_at, deleted_at) ON teams TO %I",
   "GRANT SELECT ON apis, gateway_state, revoked_sessions TO %I",

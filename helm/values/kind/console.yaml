@@ -1,7 +1,7 @@
 # execution-console on the local kind cluster (release `console`,
 # namespace vertra-system):
 #   helm upgrade --install console helm/charts/execution-console -n vertra-system \
-#     --kube-context kind-vertra-local -f helm/values/kind/console.yaml
+#     --reset-values --kube-context kind-vertra-local -f helm/values/kind/console.yaml
 kernelApiUrl: https://kernel-execution-kernel-api.vertra-system.svc.cluster.local:8000
 # kernel-api's HTTPS, and the kernel's Postgres, are checked against the
 # kernel chart's own CA.

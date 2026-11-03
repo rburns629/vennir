@@ -4,6 +4,7 @@ package pricing
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -119,6 +120,63 @@ func TestStandardEstimateKeepsItsNode(t *testing.T) {
 	}
 }
 
+// Warm headroom keeps one node of the size's steps pool: e2-standard-2 at
+// minimal, e2-standard-4 above.
+func TestStandardHeadroomIsTheStepsPoolsNode(t *testing.T) {
+	always := func(size string, headroom int) float64 {
+		c := config.Default("gcp")
+		c.Cluster.Mode, c.Console.Public, c.Size, c.StepHeadroom = "standard", false, size, headroom
+		for _, l := range GCP(prices(), c, "fetched now") {
+			if l.Label == "  Always" {
+				var v float64
+				if _, err := fmt.Sscanf(strings.TrimPrefix(l.Text, "$"), "%f", &v); err != nil {
+					t.Fatalf("%s: %q", size, l.Text)
+				}
+				return v
+			}
+		}
+		t.Fatalf("%s: no Always line", size)
+		return 0
+	}
+	// Spot e2 prices, and the node's 50 GB disk.
+	for size, node := range map[string]float64{
+		"minimal":   (2*0.013+8*0.00175)*hoursPerMonth + 50*0.1,
+		"resilient": (4*0.013+16*0.00175)*hoursPerMonth + 50*0.1,
+	} {
+		if got := always(size, 1) - always(size, 0); math.Abs(got-node) > 0.5 {
+			t.Errorf("%s: headroom costs %.2f, want %.2f", size, got, node)
+		}
+	}
+}
+
+// What the estimate doesn't price is named, when the install makes it.
+func TestUnpricedPartsAreNamed(t *testing.T) {
+	c := config.Default("gcp")
+	c.Console.Public = false
+	if out := text(GCP(prices(), c, "fetched now")); strings.Contains(out, "Managed Prometheus") || strings.Contains(out, "KMS") {
+		t.Errorf("nothing made, nothing named:\n%s", out)
+	}
+	c.Monitoring = config.Monitoring{Enabled: true, Provider: "google"}
+	c.Signing = "kms"
+	out := text(GCP(prices(), c, "fetched now"))
+	if !strings.Contains(out, "Managed Prometheus (per sample ingested)") || !strings.Contains(out, "the Cloud KMS signing key") || !strings.Contains(out, "your products' own cloud usage\n") {
+		t.Errorf("monitoring and the signing key:\n%s", out)
+	}
+
+	a := config.Default("aws")
+	a.Monitoring = config.Monitoring{Enabled: true, Provider: "amazon"}
+	a.Signing, a.Catalog.Owner, a.Catalog.Repository = "kms", "octocat", "vertra-catalog"
+	a.Database.Type = "managed"
+	p := awsPrices()
+	p.RDS = map[string][2]float64{"db.t4g.small": {0.032, 0.065}}
+	out = text(AWS(p, a, "fetched now"))
+	for _, want := range []string{"Amazon Managed Prometheus", "the KMS signing key", "the Secrets Manager secret RDS keeps its master password in"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}
+
 // The platform pool autoscales, so standard prices the nodes the platform's
 // requests and GKE's own Pods need.
 func TestStandardPricesTheNodesTheRequestsNeed(t *testing.T) {
@@ -211,6 +269,10 @@ func TestAManagedDatabaseIsPricedAndItsVolumeIsNot(t *testing.T) {
 	out := text(GCP(p, c, "fetched now"))
 	if !strings.Contains(out, "Database: $27.25: Cloud SQL") || !strings.Contains(out, "Always: $27.25: the database and disks") {
 		t.Errorf("the database, and no 10 GB volume beside it:\n%s", out)
+	}
+	// Nor the Postgres Pod awake: 0.3 vCPU and 1.25 GiB = $0.01945/h.
+	if !strings.Contains(out, "While awake: ~$14.20") {
+		t.Errorf("the platform's Pods without Postgres:\n%s", out)
 	}
 	c.Size, c.Database.HighAvailability = "scaled", true
 	if got := CloudSQLMonth(p, c); math.Abs(got-((2*0.0826+7.5*0.014)*730+3.4)) > 0.001 {

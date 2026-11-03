@@ -23,8 +23,10 @@ import (
 // The informers relist every resync period, which marks every Job changed:
 // a periodic resync in case an event was missed.
 type jobWatch struct {
-	mu      sync.Mutex
-	changed map[string]bool
+	mu sync.Mutex
+	// When each Job last changed, until it's asked about (or forgotten:
+	// Jobs released here, or another scheduler's, never are).
+	changed map[string]time.Time
 	up      map[string]bool
 	wake    chan struct{}
 	// The watched Pods, for Unschedulable.
@@ -32,7 +34,7 @@ type jobWatch struct {
 }
 
 func newJobWatch() *jobWatch {
-	return &jobWatch{changed: map[string]bool{}, up: map[string]bool{"jobs": false, "pods": false}, wake: make(chan struct{}, 1)}
+	return &jobWatch{changed: map[string]time.Time{}, up: map[string]bool{"jobs": false, "pods": false}, wake: make(chan struct{}, 1)}
 }
 
 func (w *jobWatch) healthy() bool {
@@ -52,11 +54,24 @@ func (w *jobWatch) setUp(kind string, up bool) {
 func (w *jobWatch) takeChanged(job string) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.changed[job] {
+	if _, ok := w.changed[job]; ok {
 		delete(w.changed, job)
 		return true
 	}
 	return false
+}
+
+// forgetChangedBefore drops changes no one asked about since before
+// cutoff. Safe for a Job still polled here once cutoff is a resync
+// interval or more ago: its last read is older still, so it's read anyway.
+func (w *jobWatch) forgetChangedBefore(cutoff time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for job, at := range w.changed {
+		if at.Before(cutoff) {
+			delete(w.changed, job)
+		}
+	}
 }
 
 func (w *jobWatch) markChanged(kind, job string) {
@@ -64,7 +79,7 @@ func (w *jobWatch) markChanged(kind, job string) {
 		return
 	}
 	w.mu.Lock()
-	w.changed[job] = true
+	w.changed[job] = time.Now()
 	w.up[kind] = true // an event arriving means this watch works (again)
 	w.mu.Unlock()
 	select {

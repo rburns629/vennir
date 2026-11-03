@@ -305,6 +305,31 @@ func TestAllowedTargets(t *testing.T) {
 	}
 }
 
+// A team's images sit beside the catalog's own repositories, and its name
+// is a namespace's: the names those take are refused, by the validator and
+// by the schema an editor reads.
+func TestReservedTeamNames(t *testing.T) {
+	team := func(name string) string {
+		return "apiVersion: " + APIVersion + "\nkind: Team\nname: " + name + "\ndisplayName: X\ndescription: X\nowner: x\n"
+	}
+	for _, name := range []string{"bases", "catalog-release", "vertra-system", "kube-system", "kube-x"} {
+		c := catalogWith(t, map[string]string{"teams/" + name + "/team.yaml": team(name)})
+		if out := errorsOf(t, (*Catalog).ValidateTeams, c); !strings.Contains(out, "no team may be called '"+name+"'") {
+			t.Errorf("%s: %q", name, out)
+		}
+		doc, _ := loadYAML([]byte(team(name)))
+		if len(schemaErrors(teamSchema(), doc)) == 0 {
+			t.Errorf("the schema accepts %s", name)
+		}
+	}
+	for _, name := range []string{"base", "kube", "my-bases", "vertra"} {
+		c := catalogWith(t, map[string]string{"teams/" + name + "/team.yaml": team(name)})
+		if out := errorsOf(t, (*Catalog).ValidateTeams, c); out != "" {
+			t.Errorf("%s was refused: %s", name, out)
+		}
+	}
+}
+
 // An action may be retried only when it says running it again is safe, and
 // a release carries both.
 func TestRetries(t *testing.T) {

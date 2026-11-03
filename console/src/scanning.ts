@@ -6,7 +6,9 @@
  *
  * One verdict per digest (db/schema.ts's imageScans), from a Trivy client
  * Job (k8s.ts's createScanJob) run against the chart's Trivy server, which
- * holds the vulnerability database. The rule is catalog CI's: a HIGH or
+ * holds the vulnerability database. A multi-platform image is scanned for
+ * every platform the cluster runs (config.scanning.platforms), since a step
+ * runs whichever its node pulls, and fails if any of them does. The rule is catalog CI's: a HIGH or
  * CRITICAL vulnerability that has a fix, or a secret baked into the image,
  * fails it; unfixable ones are reported, not blocking. A failed digest
  * blocks new registrations and runs (core/products.ts, routes/
@@ -21,7 +23,7 @@ import { config } from "./config.js";
 import { db } from "./db/client.js";
 import { imageScans } from "./db/schema.js";
 import { normalizeImage } from "./imageRef.js";
-import { createScanJob, deleteScanJob, readScanJob, readScanner, scaleScanner, updateScanPolicy } from "./k8s.js";
+import { createScanJob, deleteScanJob, NO_PLATFORM_MARKER, readScanJob, readScanner, scaleScanner, updateScanPolicy } from "./k8s.js";
 import { scansFinished } from "./metrics.js";
 
 export type ScanRow = typeof imageScans.$inferSelect;
@@ -87,6 +89,32 @@ export function parseScanOutput(output: string): ScanFindings | null {
   }
   result.findings = [...blocking, ...reported].slice(0, MAX_FINDINGS);
   return result;
+}
+
+/** Whether a scan container found no image for its platform (k8s.ts's SCAN_SCRIPT): no node of that platform can run it either. */
+function noSuchPlatform(output: string): boolean {
+  return output.trim().split("\n").at(-1)?.trim() === NO_PLATFORM_MARKER;
+}
+
+/**
+ * One scan's findings from its platforms' outputs (one each): those of
+ * every platform the image has, counted once however many have them. An
+ * error when one isn't a complete scan, or the image has none of them.
+ */
+export function combineScanOutputs(outputs: string[]): { findings: ScanFindings } | { error: string } {
+  const lines = new Set<string>();
+  let scanned = 0;
+  for (const output of outputs) {
+    if (parseScanOutput(output) === null) {
+      if (noSuchPlatform(output)) continue;
+      return { error: output.trim().split("\n").slice(-5).join("\n") || "The scan failed." };
+    }
+    scanned++;
+    for (const line of output.split("\n").map((l) => l.trim())) if (line && line !== "END") lines.add(line);
+  }
+  if (scanned === 0) return { error: `The image has none of the platforms scanned (${config.scanning.platforms.join(", ")}).` };
+  // Complete scans' lines, so this is one too.
+  return { findings: parseScanOutput([...lines, "END"].join("\n")) as ScanFindings };
 }
 
 export function verdictOf(findings: ScanFindings): "passed" | "failed" {
@@ -170,7 +198,7 @@ async function startScan(row: { digest: string; image: string }): Promise<void> 
     pullSecretName: config.scanning.pullSecretName,
     target,
     insecure,
-    platform: config.scanning.platform,
+    platforms: config.scanning.platforms,
     template: SCAN_TEMPLATE,
   });
 }
@@ -228,34 +256,38 @@ export async function reconcileScans(): Promise<boolean> {
     if (!row.jobName) continue;
     const job = await readScanJob(namespace, row.jobName, "trivy", true);
     if (job.state === "running") continue;
-    if (job.state === "failed" && IMAGE_GONE.test(job.output)) {
+    // Every write below is conditioned on this Job still being the row's:
+    // another reconcile (another replica's, or a submission waiting in
+    // scanBlocker) may have recorded it already and started the next scan.
+    const thisJob = and(eq(imageScans.digest, row.digest), eq(imageScans.jobName, row.jobName));
+    const outputs = job.state === "missing" ? [] : (job.outputs ?? [job.output]);
+    if (job.state === "failed" && outputs.some((output) => IMAGE_GONE.test(output)) && row.status !== "failed") {
       // The registry no longer has it: scanning again can never work. It
       // can't run either; if it's ever pushed again, its next use scans it.
-      await db.delete(imageScans).where(eq(imageScans.digest, row.digest));
+      // A failed verdict is kept (below, as a rescan that couldn't run), so
+      // the digest stays on the cluster's deny list.
+      const gone = await db.delete(imageScans).where(thisJob).returning({ digest: imageScans.digest });
       await deleteScanJob(namespace, row.jobName);
+      if (gone.length === 0) continue;
       scansFinished.inc({ status: "gone" });
       changed = true;
       continue;
     }
-    const findings = job.state === "succeeded" ? parseScanOutput(job.output) : null;
-    const status = findings ? verdictOf(findings) : "error";
-    const recorded: ScanFindings = findings ?? {
-      fixable: 0,
-      unfixable: 0,
-      secrets: 0,
-      findings: [],
-      error:
-        job.state === "missing"
-          ? "The scan Job disappeared."
-          : job.state === "succeeded" && job.unread
-            ? `The scan finished, but its output couldn't be read (${job.unread}).`
-            : job.output.trim().split("\n").slice(-5).join("\n") || "The scan failed.",
-    };
+    // A failed Job may still have complete scans in its other containers
+    // (one that failed for its own reason is an error all the same).
+    const scan: { findings: ScanFindings } | { error: string } =
+      job.state === "missing"
+        ? { error: "The scan Job disappeared." }
+        : job.state === "succeeded" && job.unread
+          ? { error: `The scan finished, but its output couldn't be read (${job.unread}).` }
+          : combineScanOutputs(outputs);
+    const status = "findings" in scan ? verdictOf(scan.findings) : "error";
+    const recorded: ScanFindings = "findings" in scan ? scan.findings : { fixable: 0, unfixable: 0, secrets: 0, findings: [], error: scan.error };
     // An accepted verdict stays accepted only while it finds nothing the
     // admin didn't see.
     const previous = new Set(((row.findings as ScanFindings | null)?.findings ?? []).map((f) => f.id));
     const somethingNew = recorded.findings.some((f) => !previous.has(f.id));
-    await db
+    const recordedRows = await db
       .update(imageScans)
       .set({
         // A rescan that couldn't run keeps the last real verdict.
@@ -265,8 +297,10 @@ export async function reconcileScans(): Promise<boolean> {
         jobName: null,
         ...(status === "failed" && somethingNew ? { acceptedAt: null, acceptedBy: null, acceptedReason: null } : {}),
       })
-      .where(eq(imageScans.digest, row.digest));
+      .where(thisJob)
+      .returning({ digest: imageScans.digest });
     await deleteScanJob(namespace, row.jobName);
+    if (recordedRows.length === 0) continue;
     scansFinished.inc({ status });
     changed ||= status !== row.status;
   }

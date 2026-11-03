@@ -21,7 +21,7 @@ const accounts = rpcClient(() => app);
 
 function reset(email: string) {
   return run("npx", ["tsx", "src/db/resetAdmin.ts", email], {
-    env: { ...process.env, DATABASE_URL: process.env["TEST_DATABASE_URL"] ?? "postgresql://postgres@localhost/execution_console_test", JWT_SECRET: "x", KERNEL_API_URL: "http://unused.invalid" },
+    env: { ...process.env, DATABASE_URL: process.env["TEST_DATABASE_URL"] ?? "postgresql://postgres@localhost/execution_console_test", KERNEL_API_URL: "http://unused.invalid" },
   });
 }
 
@@ -51,6 +51,12 @@ describe("resetting an admin's password", () => {
     expect(me.statusCode).toBe(401);
     const audited = await db.select().from(auditLog).where(eq(auditLog.route, "reset-admin-password"));
     expect(audited.some((a) => (a.target as { email?: string }).email === admin.email)).toBe(true);
+  }, 30_000);
+
+  it("finds the admin however their email is typed", async () => {
+    const admin = await accounts.makeUser({ admin: true });
+    const { stdout } = await reset(admin.email.toUpperCase());
+    expect(stdout).toMatch(/New password for .+: \S+/);
   }, 30_000);
 
   it("is an admin's only", async () => {

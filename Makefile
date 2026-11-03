@@ -19,9 +19,11 @@ DOCKER := $(shell command -v docker 2>/dev/null || echo $(DOCKER_DESKTOP_BIN)/do
 # `make up` would otherwise force-delete "Unknown" pods on whichever
 # cluster kubectl happened to point at. One name decides the cluster, its
 # context and its node: KIND_CLUSTER=vertra-perf works on the performance
-# cluster (perf/README.md) and nothing else.
+# cluster (perf/README.md) and nothing else. The context is derived, never
+# set: a KIND_CONTEXT exported for some other tool must not send helm and
+# kubectl to another cluster while `kind load` uses this one.
 KIND_CLUSTER ?= vertra-local
-KIND_CONTEXT ?= kind-$(KIND_CLUSTER)
+override KIND_CONTEXT := kind-$(KIND_CLUSTER)
 # Where the platform itself (kernel + console + their Postgres) is
 # installed. Deliberately not `default` -- that's the admins' own team
 # namespace, and tasks can never be dispatched into this one (see
@@ -108,7 +110,7 @@ quickstart: _quickstart-prereqs kind-cluster kind-registry kind-namespaces
 			echo "Restarting $$release onto the image just built (the :latest tag is reused)..."; \
 			case $$release in \
 				kernel) deployments="kernel-execution-kernel-api kernel-execution-kernel-scheduler";; \
-				console) deployments="console-execution-console";; \
+				console) deployments="console-execution-console console-execution-console-gateway";; \
 			esac; \
 			for d in $$deployments; do \
 				$(KUBECTL) -n $(PLATFORM_NAMESPACE) rollout restart deployment $$d > /dev/null || exit 1; \
@@ -417,7 +419,7 @@ gke-logs:
 		echo "stern isn't installed -- brew install stern"; \
 		exit 1; \
 	}
-	stern --context gke_my-gcp-project_us-central1_vertra-gke \
+	stern --context $(GKE_CONTEXT) \
 		"kernel-execution-kernel|console-execution-console|^ek-" \
 		--exclude-container wait-for-postgres --all-namespaces --since 1s \
 		| grep -v '"httpPath": "/health\|"url":"/health'
@@ -501,11 +503,14 @@ test-db:
 	$(DOCKER) run --rm --network host -e DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(KERNEL_TEST_DB) \
 		-v "$(CURDIR)/kernel":/src -v vertra-gomod:/go/pkg/mod -w /src $(GO_IMAGE) go run ./cmd/kernel migrate
 	cd console && DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(CONSOLE_TEST_DB) \
-		JWT_SECRET=unused KERNEL_API_URL=http://unused npm run --silent db:migrate
+		JWT_SECRET=unused-by-migrations-but-32-bytes-long KERNEL_API_URL=http://unused npm run --silent db:migrate
 
 test: test-db
 	$(DOCKER) run --rm --network host -e TEST_DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(KERNEL_TEST_DB) \
 		-v "$(CURDIR)":/src -v vertra-gomod:/go/pkg/mod -w /src/kernel $(GO_IMAGE) go test ./...
+	@# The gateway's tests read the console's test database, as in CI.
+	$(DOCKER) run --rm --network host -e TEST_DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(CONSOLE_TEST_DB) \
+		-v "$(CURDIR)":/src -v vertra-gomod:/go/pkg/mod -w /src/gateway $(GO_IMAGE) go test ./...
 	cd console && TEST_DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(CONSOLE_TEST_DB) npm test
 	cd console/frontend && npm test
 
@@ -625,6 +630,7 @@ gke-deploy-kernel-from-source: _gke-confirm
 # the kernel's imageSignature. Rarely changes; see the values file's notes.
 gke-deploy-policy-controller: GKE_WHAT = policy-controller (cosign-system)
 gke-deploy-policy-controller: _gke-confirm
+	helm repo add sigstore https://sigstore.github.io/helm-charts --force-update > /dev/null
 	helm upgrade --install policy-controller sigstore/policy-controller --version 0.10.8 \
 		--kube-context $(GKE_CONTEXT) -n cosign-system --create-namespace \
 		-f helm/values/gke/policy-controller.yaml --wait --timeout 10m

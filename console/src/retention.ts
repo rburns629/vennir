@@ -7,7 +7,7 @@
  * a kind forever.
  */
 import type { FastifyBaseLogger } from "fastify";
-import { and, eq, isNull, lt, lte, ne, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { config } from "./config.js";
 import { db } from "./db/client.js";
 import {
@@ -54,7 +54,14 @@ export async function deleteExpired(): Promise<{ executions: number; audit: numb
         await db
           .delete(imageScans)
           .where(
-            and(lt(imageScans.lastUsedAt, daysAgo(scanDays)), isNull(imageScans.jobName), ne(imageScans.status, "pending")),
+            and(
+              lt(imageScans.lastUsedAt, daysAgo(scanDays)),
+              isNull(imageScans.jobName),
+              ne(imageScans.status, "pending"),
+              // Never a blocking verdict: it's what keeps the digest on the
+              // cluster's deny list (scanning.ts's syncScanPolicy).
+              or(ne(imageScans.status, "failed"), isNotNull(imageScans.acceptedAt)),
+            ),
           )
           .returning({ digest: imageScans.digest })
       ).length

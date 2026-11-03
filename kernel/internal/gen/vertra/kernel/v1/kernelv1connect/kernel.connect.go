@@ -103,8 +103,9 @@ type KernelServiceClient interface {
 	// Attempts the cluster refused to start since a time (an admission
 	// policy's code: DISPATCH_REJECTED, TEAM_RETIRED, IMAGE_NOT_ALLOWED,
 	// IMAGE_NOT_PINNED, IMAGE_SCAN_FAILED, IMAGE_NOT_SIGNED,
-	// IDENTITY_NOT_ALLOWED), newest
-	// first, at most 500.
+	// IDENTITY_NOT_ALLOWED; or RESOURCES_NOT_ALLOWED, a Pod that can never
+	// fit its team's limits), newest first, at most 500. Only the kernel sets
+	// these codes: a step's own result may not use one.
 	ListRefusals(context.Context, *connect.Request[v1.ListRefusalsRequest]) (*connect.Response[v1.ListRefusalsResponse], error)
 	// What the steps did: started and waited per hour over the last day,
 	// why they failed over the last day, and how long each image's action
@@ -305,8 +306,9 @@ type KernelServiceHandler interface {
 	// Attempts the cluster refused to start since a time (an admission
 	// policy's code: DISPATCH_REJECTED, TEAM_RETIRED, IMAGE_NOT_ALLOWED,
 	// IMAGE_NOT_PINNED, IMAGE_SCAN_FAILED, IMAGE_NOT_SIGNED,
-	// IDENTITY_NOT_ALLOWED), newest
-	// first, at most 500.
+	// IDENTITY_NOT_ALLOWED; or RESOURCES_NOT_ALLOWED, a Pod that can never
+	// fit its team's limits), newest first, at most 500. Only the kernel sets
+	// these codes: a step's own result may not use one.
 	ListRefusals(context.Context, *connect.Request[v1.ListRefusalsRequest]) (*connect.Response[v1.ListRefusalsResponse], error)
 	// What the steps did: started and waited per hour over the last day,
 	// why they failed over the last day, and how long each image's action

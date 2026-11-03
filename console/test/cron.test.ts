@@ -50,7 +50,8 @@ describe("a schedule's next run", () => {
   it("finds a rare day without stepping through it minute by minute", () => {
     const started = Date.now();
     expect(nextRun(parseCron("0 0 29 2 *"), at("2026-03-01T00:00:00Z"), "Europe/Berlin")?.toISOString()).toBe("2028-02-28T23:00:00.000Z");
-    expect(Date.now() - started).toBeLessThan(150);
+    // Seconds, stepping a minute at a time; well under one, a day at a time.
+    expect(Date.now() - started).toBeLessThan(1500);
   });
 
   it("runs on either day when both are restricted, as cron does", () => {

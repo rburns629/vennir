@@ -7,6 +7,7 @@ import Button from "@mui/material/Button";
 import Link from "@mui/material/Link";
 import Skeleton from "@mui/material/Skeleton";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import AdminIcon from "@mui/icons-material/VerifiedUserOutlined";
 import CartIcon from "@mui/icons-material/ShoppingCartOutlined";
@@ -60,7 +61,7 @@ import { useEnvironment } from "../environment";
 import { imageName, imageVersion } from "../imageRef";
 import { useAsk } from "../layout/ask";
 import { runProgress, stepsDone } from "../runningNow";
-import { duration, useNow, when } from "../time";
+import { duration, inZone, scheduleTimes, useNow, when } from "../time";
 import { runLink } from "./RunFormPage";
 
 const DAYS = 14;
@@ -753,6 +754,7 @@ function PickUp({ actions, team, runnables, draft }: { actions: string[]; team: 
   );
 }
 
+/** The next runs, each in its schedule's own time zone (the one its cron is read in), the viewer's on hover. */
 function ComingUp({ schedules }: { schedules: Schedule[] }) {
   const next = schedules
     .filter((s) => s.enabled && s.nextRunAt)
@@ -763,17 +765,24 @@ function ComingUp({ schedules }: { schedules: Schedule[] }) {
     <Panel title="Coming up">
       <List>
         {next.map((s) => {
-          const at = new Date(s.nextRunAt ?? "");
+          const at = s.nextRunAt ?? "";
+          const day = inZone(at, s.timeZone);
+          const times = scheduleTimes(at, s.timeZone);
           return (
             <RowLink key={s.id} to={`/teams/${encodeURIComponent(s.team)}?tab=schedules`}>
               <Box sx={{ flex: "0 0 40px", display: "flex", flexDirection: "column", alignItems: "center", border: 1, borderColor: "divider", borderRadius: 2, py: "3px", lineHeight: 1.2, alignSelf: "center" }}>
-                <Typography sx={{ fontSize: 10, color: "text.secondary", textTransform: "uppercase" }}>{at.toLocaleDateString([], { weekday: "short" })}</Typography>
-                <Typography sx={{ fontWeight: 600, fontSize: 13 }}>{at.getDate()}</Typography>
+                <Typography sx={{ fontSize: 10, color: "text.secondary", textTransform: "uppercase" }}>{day.day}</Typography>
+                <Typography sx={{ fontWeight: 600, fontSize: 13 }}>{day.date}</Typography>
               </Box>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25, minWidth: 0, flex: "1 1 auto" }}>
                 <Typography sx={{ fontWeight: 500, fontSize: 13, overflowWrap: "anywhere" }}>{s.name}</Typography>
                 <Muted>
-                  {s.team} · {at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} ({s.timeZone})
+                  {s.team} ·{" "}
+                  <Tooltip title={times.yours} describeChild>
+                    <Box component="span" sx={{ textDecoration: "underline dotted", textUnderlineOffset: "3px" }}>
+                      {times.own}
+                    </Box>
+                  </Tooltip>
                 </Muted>
               </Box>
               <Box sx={{ alignSelf: "center" }}>
@@ -783,6 +792,7 @@ function ComingUp({ schedules }: { schedules: Schedule[] }) {
           );
         })}
       </List>
+      <Muted>Times are each schedule&apos;s own; hover one for yours.</Muted>
     </Panel>
   );
 }

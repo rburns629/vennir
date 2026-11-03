@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 // perf runs one benchmark scenario against a Vertra install on the
-// dedicated vertra-perf kind cluster, or a vertra-* cloud cluster named
-// exactly with -context (README.md): it submits DAGs of the
+// dedicated vertra-perf kind cluster, or a vertra-perf* cloud cluster
+// named exactly with -context (README.md): it submits DAGs of the
 // perf sample's no-op product through the console's API, as a pipeline
 // would, waits for each to finish, and writes what it measured, and
 // whether every run ended as it should, to results/ as JSON and Markdown.
@@ -68,7 +68,7 @@ func run() error {
 		rate        = flag.Float64("rate", 0, "submissions a second across all submitters; 0: as fast as they go")
 		allowLarge  = flag.Bool("allow-large", false, "allow more than 1,000 steps in all")
 		cluster     = flag.String("cluster", "vertra-perf", "the kind cluster it may use (its context is kind-<cluster>)")
-		cloud       = flag.String("context", "", "instead of -cluster: a vertra-* GKE or EKS cluster's kubectl context, named exactly")
+		cloud       = flag.String("context", "", "instead of -cluster: a vertra-perf* GKE or EKS cluster's kubectl context, named exactly")
 		consoleURL  = flag.String("console", "http://localhost:18080", "the console's address: this machine only")
 		team        = flag.String("team", "perf", "the team the steps run for")
 		image       = flag.String("image", "localhost:5001/perf-catalog/perf/noop:latest", "the no-op product's image")
@@ -150,16 +150,18 @@ func run() error {
 }
 
 // safe refuses anything but the named kind cluster's context (or, with
-// -context, a vertra-* cloud cluster's), existing and running Vertra, and a
-// console on this machine; it returns the context to use.
+// -context, a vertra-perf* cloud cluster's), existing and running Vertra,
+// and a console on this machine; it returns the context to use. A cloud
+// cluster is held to kind's prefix too, so the Makefile's vertra-gke, or
+// any other vertra install, is never one.
 func safe(cluster, cloud, consoleURL string) (string, error) {
 	context := "kind-" + cluster
 	switch {
 	case cloud != "":
 		// GKE's contexts end in _<cluster>, EKS's in /<cluster>.
 		name := cloud[strings.LastIndexAny(cloud, "_/")+1:]
-		if strings.HasPrefix(cloud, "kind-") || !strings.HasPrefix(name, "vertra-") {
-			return "", fmt.Errorf("context %q: -context is a vertra-* GKE or EKS cluster's; a kind cluster is -cluster (README.md)", cloud)
+		if strings.HasPrefix(cloud, "kind-") || !strings.HasPrefix(name, "vertra-perf") {
+			return "", fmt.Errorf("context %q: -context is a vertra-perf* GKE or EKS cluster's; a kind cluster is -cluster (README.md)", cloud)
 		}
 		context = cloud
 	case !strings.HasPrefix(cluster, "vertra-perf"):

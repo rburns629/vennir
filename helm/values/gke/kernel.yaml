@@ -2,7 +2,7 @@
 # default; a new install uses its own, vertra-system):
 #   make gke-deploy VERSION=v<x.y.z>   (the release's signed chart and images)
 #   or: helm upgrade --install kernel oci://ghcr.io/rburns629/vertra/charts/execution-kernel --version <x.y.z> -n default \
-#     --kube-context gke_my-gcp-project_us-central1_vertra-gke \
+#     --reset-values --force-conflicts --kube-context gke_my-gcp-project_us-central1_vertra-gke \
 #     -f helm/values/gke/kernel.yaml
 # A release's image, signed by its workflow (make gke-deploy VERSION=v...):
 # no tag, so the release's chart runs its own (appVersion).

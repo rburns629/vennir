@@ -106,8 +106,8 @@ its own directory.
   `console/src/db/gatewayAccess.ts`: a column it starts to read is granted
   there) (published APIs; who callers are, checked exactly as
   `console/src/auth/plugin.ts` does, and kept in step with it), writing
-  only its own traffic counts (`api_traffic`) and why an API can't be
-  served (`api_problems`). It checks sessions with the
+  only its own traffic counts (`api_traffic`), why an API can't be
+  served (`api_problems`) and API tokens' `last_used_at`. It checks sessions with the
   console's public key (`/api/auth/jwks`), never `JWT_SECRET`. The console chart deploys it (`gateway.enabled`); it may mint
   ServiceAccount tokens only for `*-api` ServiceAccounts in team namespaces
   (an admission policy). Its tests read the console's migrated test
@@ -221,7 +221,9 @@ its own directory.
 - **`_local/`** (gitignored): personal scratch space, such as a clone of
   your own catalog repository.
 - `examples/`: fake demo products (`project-product`,
-  `application-product`, `hello-world-app`) that deliberately share no code.
+  `application-product`, `hello-world-app`), the local API sample's backend
+  (`greetings-api`) and a reference order-callback receiver
+  (`order-receiver`), which deliberately share no code.
 
 ## Core contracts worth knowing before touching code
 
@@ -305,8 +307,9 @@ it, and a test checks it does. kernel-api's API is
 
 - Integration and end-to-end tests use **real Postgres**: `make test` (repo
   root) starts a throwaway container on `127.0.0.1:55432`, migrates both test
-  databases and runs both suites; `make test-db` does just the databases.
-  Both suites read `TEST_DATABASE_URL`, defaulting to
+  databases and runs the kernel's, the gateway's (against the console's
+  database), the console's and the frontend's tests; `make test-db` does
+  just the databases. The suites read `TEST_DATABASE_URL`, defaulting to
   `localhost/execution_{kernel,console}_test` (what CI uses). A missing
   database fails rather than skips. Never point the tests at an install's
   databases. Each kernel test runs in a rolled-back transaction, or (for

@@ -133,7 +133,8 @@ policySyncIntervalSeconds: 300
 # -- How long records are kept, in days; 0 keeps them forever. executionDays:
 # who may see an execution (keep it the kernel chart's executionRetentionDays,
 # which deletes the executions themselves); auditDays: the audit log;
-# scanDays: scan verdicts of images not used for that long.
+# scanDays: scan verdicts of images not used for that long (never a failed
+# one an admin hasn't accepted: that keeps the cluster refusing it).
 retention:
   executionDays: 90
   auditDays: 365
@@ -165,8 +166,13 @@ scanning:
   # for it, about a minute, and the database download). 0: always running.
   idleMinutes: 15
   rescanHours: 24
-  # -- Which image of a multi-platform index to scan, e.g. linux/amd64:
-  # what the cluster's nodes run. Empty: the console's own platform.
+  # -- Which images of a multi-platform index to scan, e.g. [linux/amd64,
+  # linux/arm64]: every platform the cluster's nodes run, since a step runs
+  # whichever its node pulls. An image fails if any of them does; a platform
+  # the image has no image for is skipped. Empty: the console's own platform.
+  platforms: []
+  # -- Deprecated: one platform, as platforms was before. Used only while
+  # platforms is empty.
   platform: ""
   # On the scan Jobs' ServiceAccount, e.g. a cloud identity that may read a
   # private registry (GKE: iam.gke.io/gcp-service-account). For a pull
@@ -273,8 +279,8 @@ gateway:
   # -- Run the gateway (gateway/): its Deployment and Service here, reading
   # this console's database. Off: API products are listed but not served.
   enabled: false
-  # -- The gateway's own database role, granted only what it reads
-  # (console/src/db/gatewayAccess.ts), so it never holds the console's
+  # -- The gateway's own database role, granted only what it reads and
+  # writes (console/src/db/gatewayAccess.ts), so it never holds the console's
   # credentials. existingSecret holds its `database-url` (and `password`):
   # the kernel chart's <release>-execution-kernel-gateway-db when the
   # console's database is on the kernel's Postgres (it makes the role too).
@@ -291,7 +297,10 @@ gateway:
   serviceAccountAnnotations: {}
   image:
     repository: ghcr.io/rburns629/vertra/execution-gateway
+    # -- Defaults to the chart's appVersion, as image.tag does.
     tag: ""
+    # -- Pin by digest ("sha256:…"), as image.digest does.
+    digest: ""
     pullPolicy: IfNotPresent
   replicaCount: 1
   # -- A second listener (the Service's port public) for APIs reachable
@@ -481,7 +490,8 @@ installCloud: ""
 # -- Keyless bots: the OIDC issuers whose ID tokens a team's bot may sign in
 # with instead of a stored token (a CI job's own identity), and the audience
 # those tokens must name. Empty audience: the console's URL (see
-# notifications.consoleUrl), else "vertra".
+# notifications.consoleUrl, or the ingress host); with neither, keyless bots
+# are off.
 keyless:
   issuers:
     - https://token.actions.githubusercontent.com
@@ -544,6 +554,7 @@ secretSources:
 # kept stable across upgrades (see templates/secret.yaml's lookup against
 # the existing Secret) -- set explicitly only if you have a specific
 # reason to; there's nothing this needs to be shared with.
+# At least 32 bytes: the console refuses to start with a shorter one.
 jwtSecret: ""
 
 # -- How long a login session lasts before the user has to sign in again:

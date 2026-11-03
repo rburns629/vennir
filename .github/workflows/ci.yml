@@ -102,7 +102,7 @@ jobs:
       - name: Migrate the console's test database (the gateway reads it)
         run: |
           apk add --no-cache nodejs npm
-          cd console && npm ci && DATABASE_URL=$TEST_DATABASE_URL JWT_SECRET=ci-only-unused KERNEL_API_URL=http://unused.invalid npm run db:migrate
+          cd console && npm ci && DATABASE_URL=$TEST_DATABASE_URL JWT_SECRET=ci-only-unused-but-32-bytes-or-longer KERNEL_API_URL=http://unused.invalid npm run db:migrate
       - working-directory: gateway
         run: test -z "$(gofmt -l .)" || { gofmt -l .; echo "run gofmt -w on these"; exit 1; }
       - working-directory: gateway
@@ -145,7 +145,7 @@ jobs:
       - name: Migrate the test database
         env:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
-          JWT_SECRET: ci-only-unused
+          JWT_SECRET: ci-only-unused-but-32-bytes-or-longer
           KERNEL_API_URL: http://unused.invalid
         run: npm run db:migrate
       - run: npm test

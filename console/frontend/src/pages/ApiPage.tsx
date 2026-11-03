@@ -142,7 +142,7 @@ export function ApiPage() {
           {(api.state !== "LIVE" || api.deprecated || !api.mayCall) && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
               {api.state === "PAUSED" && (
-                <Alert severity="warning">Paused by its team: every request gets 503 with “{api.pausedMessage}”, and nothing reaches the backend.</Alert>
+                <Alert severity="warning">Paused by its team: every signed-in caller gets 503 with “{api.pausedMessage}” (anyone else, 404), and nothing reaches the backend.</Alert>
               )}
               {api.state === "HELD" && <Alert severity="warning">Held: {api.heldReason}</Alert>}
               {api.state === "UNAVAILABLE" && (

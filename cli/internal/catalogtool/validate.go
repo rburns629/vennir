@@ -92,6 +92,21 @@ func contains[T comparable](list []T, v T) bool {
 	return false
 }
 
+// reservedTeamName says why name can't be a team's, or "" when it can. A
+// team's images are <registry>/<team>/<product>, beside the catalog's own
+// repositories, and its name is a Kubernetes namespace's.
+func reservedTeamName(name string) string {
+	switch {
+	case name == "bases":
+		return "<registry>/bases/ holds the catalog's mirrored base images (bases.yaml)"
+	case name == ReleaseRepositoryName:
+		return "<registry>/" + ReleaseRepositoryName + " is the catalog's release"
+	case name == "vertra-system" || strings.HasPrefix(name, "kube-"):
+		return "it's a platform namespace"
+	}
+	return ""
+}
+
 // ValidateTeams checks every team folder: a team.yaml matching its schema
 // and its folder's name, and nothing else at the top but what's allowed.
 func (c *Catalog) ValidateTeams() bool {
@@ -101,6 +116,11 @@ func (c *Catalog) ValidateTeams() bool {
 		ok = false
 	}
 	for _, dir := range c.TeamDirs() {
+		if why := reservedTeamName(filepath.Base(dir)); why != "" {
+			c.errorAt(dir, fmt.Sprintf("no team may be called %s: %s; rename the folder", quote(filepath.Base(dir)), why))
+			ok = false
+			continue
+		}
 		path := filepath.Join(dir, "team.yaml")
 		data, err := os.ReadFile(path)
 		if err != nil {

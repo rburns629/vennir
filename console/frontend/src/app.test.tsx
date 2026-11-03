@@ -264,6 +264,45 @@ describe("runs", () => {
     expect(screen.getByText("sam@acme.com")).toBeTruthy();
   });
 
+  it("says when the runs couldn't be loaded, in their card, and tries again", async () => {
+    let asked = 0;
+    await renderAt("/runs", MEMBER, {
+      // The list's first page fails once; the week's tiles (since set) load.
+      "ExecutionService/ListExecutions": (request: Record<string, unknown>) =>
+        request["since"] ? { executions: [RUN] } : asked++ === 0 ? refused(503, "unavailable", "kernel-api didn't answer.") : { executions: [RUN] },
+    });
+    const failed = await screen.findByText(/Couldn't load the runs: kernel-api didn't answer\. Nothing is wrong with the runs themselves\./, {}, { timeout: 5000 });
+    expect(screen.queryByText(/No runs you can see yet/)).toBeNull();
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("orders-api first deploy")).toBeTruthy();
+    expect(screen.queryByText(/Couldn't load the runs/)).toBeNull();
+  });
+
+  it("says when the steps to approve or the schedules couldn't be loaded, never that there are none, and tries again", async () => {
+    let approvalsAsked = 0;
+    let schedulesAsked = 0;
+    await renderAt("/runs", MEMBER, {
+      "ExecutionService/ListExecutions": { executions: [RUN] },
+      "ExecutionService/ListPendingApprovals": () =>
+        approvalsAsked++ === 0
+          ? refused(503, "unavailable", "kernel-api didn't answer.")
+          : { approvals: [{ executionId: RUN.executionId, executionName: "orders-api prod database", taskId: "database", team: "azure-apps", requestedBy: "sam@acme.com", canDecide: true }] },
+      "ScheduleService/ListSchedules": () => (schedulesAsked++ === 0 ? refused(503, "unavailable", "kernel-api didn't answer.") : { schedules: [] }),
+    });
+    const failed = await screen.findByText(/Couldn't load the steps waiting for your approval: kernel-api didn't answer\./, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole("tab", { name: /to approve/i }));
+    expect(screen.queryByText("Nothing waits for your teams to approve.")).toBeNull();
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("link", { name: "orders-api prod database" })).toBeTruthy();
+    expect(screen.queryByText(/Couldn't load the steps/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: /schedules/i }));
+    const noSchedules = await screen.findByText(/Couldn't load your teams' schedules: kernel-api didn't answer\./);
+    fireEvent.click(within(noSchedules.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    await waitFor(() => { expect(screen.queryByText(/Couldn't load your teams' schedules/)).toBeNull(); });
+    expect(schedulesAsked).toBe(2);
+  });
+
   it("counts the week's runs, filters by kind, and says who started each", async () => {
     const DAG = { ...RUN, executionId: "1b6f6a1e-6c64-4d39-9a0d-7d4c1f6c2a12", name: "kafka topics backfill", template: "", state: "EXECUTION_STATE_FAILED", submittedBy: "u9", submittedByEmail: "sam@acme.com" };
     const GONE = { ...RUN, executionId: "2b6f6a1e-6c64-4d39-9a0d-7d4c1f6c2a13", name: "old cleanup", template: "", state: "EXECUTION_STATE_SUCCEEDED" };
@@ -943,6 +982,23 @@ describe("the chat panel", () => {
 });
 
 describe("the cart", () => {
+  it("says when what its steps ask for couldn't be loaded, and won't place it until it is", async () => {
+    const { cart } = await import("./cart");
+    cart.add("gcp-app-hosting-create");
+    let asked = 0;
+    const action = { kind: "KIND_ACTION", team: "gcp", name: "gcp-app-hosting-create", displayName: "App hosting", parameters: { type: "object", properties: {} }, actions: ["gcp/app-hosting.create"], shared: true };
+    await renderAt("/catalog/cart", MEMBER, {
+      "TemplateService/ListTemplates": () => (asked++ === 0 ? refused(503, "unavailable", "The console is restarting.") : { runnables: [action] }),
+      "OrderService/PreviewOrder": { steps: [{ id: "app-hosting", product: "gcp-app-hosting-create", inputs: {} }] },
+    });
+    const failed = await screen.findByText(/Couldn't load what the steps ask for: The console is restarting\. Their inputs can't be asked until it is\./, {}, { timeout: 5000 });
+    await waitFor(() => { expect((screen.getByRole("button", { name: "Place order" }) as HTMLButtonElement).disabled).toBe(true); });
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    await waitFor(() => { expect((screen.getByRole("button", { name: "Place order" }) as HTMLButtonElement).disabled).toBe(false); });
+    expect(screen.queryByText(/Couldn't load what the steps ask for/)).toBeNull();
+    cart.clear();
+  });
+
   it("plans the cart for your team, offers what's there, and places it with what you fill in", async () => {
     const { cart } = await import("./cart");
     cart.add("gcp-app-hosting-create");
@@ -1346,13 +1402,55 @@ describe("admin", () => {
     expect(await screen.findByText(/claude-haiku-5-5 answered in 3.2 s, citing 1 section/)).toBeTruthy();
     expect(tried[0]?.["config"]).toMatchObject({ provider: "anthropic", model: "claude-haiku-5-5", apiKey: "sk-ant-typed" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(within(screen.getByRole("region", { name: "The model" })).getByRole("button", { name: "Save" }));
     expect(await screen.findByText(/Saved: in effect within seconds/)).toBeTruthy();
     expect(saved[0]?.["config"]).toMatchObject({ enabled: true, provider: "anthropic", model: "claude-haiku-5-5", apiKey: "sk-ant-typed" });
     // Saved, the key is never shown again: kept, and the field empty.
     expect((screen.getByLabelText("API key") as HTMLInputElement).value).toBe("");
     expect(screen.getByText(/One is kept \(encrypted, never shown\)/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Use the install's" })).toBeTruthy();
+  });
+
+  it("sets how many questions each person may ask, an hour's no more than a day's", async () => {
+    const saved: Record<string, unknown>[] = [];
+    await renderAt("/admin/chat", ADMIN, {
+      "ChatService/GetChatLimits": { limits: { perHour: 30, perDay: 200 } },
+      "ChatService/SetChatLimits": (request: Record<string, unknown>) => {
+        saved.push(request);
+        if (request["perHour"] === 9) return refused(400, "invalid_argument", "No more questions an hour than a day.", "BAD_CHAT_LIMITS");
+        return { limits: { perHour: request["perHour"], perDay: request["perDay"], updatedBy: "ana@acme.com", updatedAt: "2026-10-30T09:00:00Z" } };
+      },
+      "ChatService/ListChatFeedback": { ratings: [] },
+    });
+    const card = await screen.findByRole("region", { name: "Questions per person" }, { timeout: 5000 });
+    const hour = await within(card).findByLabelText("An hour");
+    expect((hour as HTMLInputElement).value).toBe("30");
+    // The defaults: nobody set them.
+    expect(within(card).queryByText(/^Set by/)).toBeNull();
+
+    const save = within(card).getByRole("button", { name: "Save" });
+    fireEvent.change(within(card).getByLabelText("A day"), { target: { value: "20" } });
+    expect(within(card).getByText("At least the hour's")).toBeTruthy();
+    expect(save.hasAttribute("disabled")).toBe(true);
+    fireEvent.change(within(card).getByLabelText("A day"), { target: { value: "20000" } });
+    expect(within(card).getByText("1 to 10,000")).toBeTruthy();
+    expect(save.hasAttribute("disabled")).toBe(true);
+
+    fireEvent.change(within(card).getByLabelText("A day"), { target: { value: "100" } });
+    fireEvent.change(hour, { target: { value: "10" } });
+    fireEvent.click(save);
+    expect(await within(card).findByText("Saved: 10 an hour, 100 a day.")).toBeTruthy();
+    expect(saved[0]).toMatchObject({ perHour: 10, perDay: 100 });
+    expect(within(card).getByText(/^Set by ana@acme\.com · /)).toBeTruthy();
+
+    // What the server refuses is said too.
+    fireEvent.change(hour, { target: { value: "9" } });
+    fireEvent.click(save);
+    expect(await within(card).findByText("No more questions an hour than a day.")).toBeTruthy();
+
+    fireEvent.click(within(card).getByRole("button", { name: "Use the defaults" }));
+    await waitFor(() => { expect(saved.at(-1)).toMatchObject({ perHour: 30, perDay: 200 }); });
+    expect(await within(card).findByText("Saved: 30 an hour, 200 a day.")).toBeTruthy();
   });
 });
 
@@ -1423,6 +1521,18 @@ describe("observe", () => {
     expect(screen.getByRole("heading", { name: "Who sees which lines" })).toBeTruthy();
   });
 
+  it("says when the APIs to search couldn't be loaded, and tries again", async () => {
+    let asked = 0;
+    await renderAt("/observe?tab=logs&from=api&team=payments&hours=24", MEMBER, {
+      "ObserveService/SearchLogs": { lines: [], searchDays: 30 },
+      "ApiService/ListApis": () => (asked++ === 0 ? refused(503, "unavailable", "The console is restarting.") : { apis: [] }),
+    });
+    const failed = await screen.findByText(/Couldn't load the APIs to choose from: The console is restarting\./, {}, { timeout: 5000 });
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    await waitFor(() => { expect(screen.queryByText(/Couldn't load the APIs/)).toBeNull(); });
+    expect(asked).toBe(2);
+  });
+
   it("counts what was refused by code, and marks who refused each", async () => {
     await renderAt("/observe", MEMBER, {
       "ObserveService/GetSecurity": {
@@ -1490,6 +1600,22 @@ describe("home", () => {
     expect(screen.getByRole("link", { name: "Review it" }).getAttribute("href")).toBe("/runs/r9");
     // The install at a glance is an admin's.
     expect(screen.queryByRole("heading", { name: /at a glance/ })).toBeNull();
+  });
+
+  it("says when schedules run next in each one's own time zone, and in yours on hover", async () => {
+    // 02:30 UTC on Sunday Nov 1 is 22:30 on Saturday Oct 31 in New York, whatever the viewer's zone.
+    const nightly = { id: "s1", team: "azure-apps", name: "nightly uptime check", cron: "30 22 * * *", timeZone: "America/New_York", enabled: true, nextRunAt: "2026-11-01T02:30:00Z", lastRunAt: "2026-10-31T02:30:00Z" };
+    await renderAt("/", MEMBER, { "ScheduleService/ListSchedules": { schedules: [nightly] } });
+    const panel = (await screen.findByRole("heading", { name: "Coming up" }, { timeout: 5000 })).closest("section") ?? document.body;
+    const time = within(panel as HTMLElement).getByText("22:30 New York time");
+    expect(within(panel as HTMLElement).getByText("Sat")).toBeTruthy();
+    expect(within(panel as HTMLElement).getByText("31")).toBeTruthy();
+    expect(within(panel as HTMLElement).getByText("Times are each schedule's own; hover one for yours.")).toBeTruthy();
+    // The tooltip describes the time; it doesn't replace it as the row's name.
+    expect(time.getAttribute("aria-label")).toBeNull();
+    expect(within(panel as HTMLElement).getByRole("link", { name: /22:30 New York time/ })).toBeTruthy();
+    fireEvent.mouseOver(time);
+    expect((await screen.findByRole("tooltip")).textContent).toMatch(/^\d\d:\d\d your time \(.+\)$/);
   });
 });
 
@@ -1623,6 +1749,23 @@ describe("a run form", () => {
         expect.objectContaining({ team: "payments", name: "app-on-cloud-run", kind: "template", runnableTeam: "gcp-platform", runnableName: "app-on-cloud-run", parameters: { projectId: "orders-api" }, cron: "0 2 * * *", botId: "b0b0b0b0-0000-4000-8000-000000000001" }),
       ]);
     });
+  });
+
+  it("says when the team's bots couldn't be loaded, rather than that it has none, and tries again", async () => {
+    let asked = 0;
+    await renderAt("/catalog/run?template=gcp-platform%2Fapp-on-cloud-run", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
+      "TemplateService/ListTemplates": { runnables: [TEMPLATE] },
+      "TokenService/ListBots": () => (asked++ === 0 ? refused(503, "unavailable", "The console is restarting.") : { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-nightly@bots.vertra.local" }] }),
+      "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
+    });
+    await screen.findByLabelText(/project id/i);
+    fireEvent.click(screen.getByRole("button", { name: "Schedule…" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/Couldn't load payments's bots: The console is restarting\./)).toBeTruthy();
+    expect(within(dialog).queryByText(/has no bot to run it as/)).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Schedule it" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
+    expect(await within(dialog).findByText("payments-nightly@bots.vertra.local")).toBeTruthy();
   });
 
   it("fills itself from an example", async () => {

@@ -9,17 +9,23 @@
 //
 //  1. the API exists, and here (an internet-reachable one, on the public
 //     listener); else 404
-//  2. it isn't paused or held, and its spec could be read; else 503
-//  3. the caller signs in, as the console's callers do; else 401
-//  4. it's shared with one of the caller's teams; else 403
-//  5. its body is within the API's size; else 413
-//  6. its method and path are an operation in the spec; else 404, blocked:
+//  2. the caller signs in, as the console's callers do; else 401, or 404
+//     for a hidden or paused API: before sign-in it's as one that isn't
+//     there, and nothing of its state is told
+//  3. the caller may see it: it isn't hidden, or it's their team's, or
+//     they're an admin; else 404, as the console's sees()
+//  4. it isn't closed, paused or held, and its spec could be read; else 503
+//  5. it's shared with one of the caller's teams; else 403
+//  6. its body is within the API's size; else 413
+//  7. its method and path are an operation in the spec; else 404, blocked:
 //     never forwarded
-//  7. its parameters, headers and body fit that operation's schemas, with
+//  8. its parameters, headers and body fit that operation's schemas, with
 //     no query parameter or body it doesn't declare, and a body only with a
 //     Content-Type; else 400
-//  8. the calling team is within the API's rate; else 429 with Retry-After
-//  9. forwarded, with the backend's credential minted for it
+//  9. the calling team is within the API's rate; else 429 with Retry-After
+//  10. forwarded, with the backend's credential minted for it, and
+//     X-Forwarded-For the gateway's own peer (never what the caller said);
+//     a cookie the backend sets is kept to the API's own path
 //
 // Every answer says who gave it: Vertra-Answered-By: gateway or backend.
 // Logs and metrics name the API, team, caller and outcome; never a body, a
@@ -209,6 +215,35 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	if o.endpoint == "" {
 		o.endpoint = r.Method + " " + rest
 	}
+	who, err := g.Callers.Resolve(r.Context(), r.Header.Get("Authorization"))
+	if err != nil {
+		// Before sign-in, a hidden or paused API is as one that isn't
+		// there: its state and pause message are for callers who see it.
+		if api.Hidden || api.PausedMessage != nil {
+			refused := "unauthenticated"
+			if !errors.Is(err, auth.ErrUnauthenticated) && !errors.Is(err, auth.ErrOrdersOnly) {
+				g.Log.Error("couldn't sign a caller in", "error", err)
+				refused = "unavailable"
+			}
+			return g.refuse(w, o.as(refused), http.StatusNotFound, "NOT_FOUND", "No such API here.")
+		}
+		switch {
+		case errors.Is(err, auth.ErrUnauthenticated):
+			w.Header().Set("WWW-Authenticate", `Bearer realm="vertra"`)
+			return g.refuse(w, o.as("unauthenticated"), http.StatusUnauthorized, "UNAUTHENTICATED", "Sign in: Authorization: Bearer <a session or bot token>.")
+		case errors.Is(err, auth.ErrOrdersOnly):
+			return g.refuse(w, o.as("forbidden"), http.StatusForbidden, "ORDERS_ONLY", "This bot places orders in the console: it calls no API.")
+		}
+		g.Log.Error("couldn't sign a caller in", "error", err)
+		return g.refuse(w, o.as("unavailable"), http.StatusServiceUnavailable, "UNAVAILABLE", "The gateway can't check who you are right now.")
+	}
+	o.subject = "user:" + who.UserID
+	if api.Hidden && !who.IsAdmin && !slices.Contains(who.Teams, api.Team) {
+		// As the console's sees(): a hidden API is its own team's (and
+		// admins'), whatever it's shared with, and no one else hears of it.
+		return g.refuse(w, o.as("not_found"), http.StatusNotFound, "NOT_FOUND", "No such API here.")
+	}
+
 	closed := g.Store.Closed()
 	switch {
 	case g.Settings.Closed || closed != "":
@@ -227,20 +262,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, o.as("unavailable"), http.StatusServiceUnavailable, "API_UNAVAILABLE", "This API's OpenAPI document can't be used, so nothing is forwarded.")
 	}
 
-	who, err := g.Callers.Resolve(r.Context(), r.Header.Get("Authorization"))
-	if errors.Is(err, auth.ErrUnauthenticated) {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="vertra"`)
-		return g.refuse(w, o.as("unauthenticated"), http.StatusUnauthorized, "UNAUTHENTICATED", "Sign in: Authorization: Bearer <a session or bot token>.")
-	}
-	if errors.Is(err, auth.ErrOrdersOnly) {
-		return g.refuse(w, o.as("forbidden"), http.StatusForbidden, "ORDERS_ONLY", "This bot places orders in the console: it calls no API.")
-	}
-	if err != nil {
-		g.Log.Error("couldn't sign a caller in", "error", err)
-		return g.refuse(w, o.as("unavailable"), http.StatusServiceUnavailable, "UNAVAILABLE", "The gateway can't check who you are right now.")
-	}
 	result := o
-	result.subject = "user:" + who.UserID
 	callingTeam, ok := g.callingTeam(who, api, r.Header.Get(TeamHeader))
 	if !ok {
 		result.name = "forbidden"
@@ -310,7 +332,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		result.name = "invalid"
 		return g.refuse(w, result, http.StatusBadRequest, "BAD_REQUEST", "The request can't be read.")
 	}
-	out.Header = forwardHeaders(r.Header)
+	out.Header = forwardHeaders(r.Header, r.RemoteAddr)
 	out.Header.Set(caller.Header, signed)
 	out.Header.Set(RequestIDHeader, requestID)
 	out.ContentLength = int64(len(body))
@@ -332,10 +354,16 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	}
 	defer res.Body.Close()
 	for k, values := range res.Header {
-		if slices.Contains(hopByHop, http.CanonicalHeaderKey(k)) {
+		k = http.CanonicalHeaderKey(k)
+		if slices.Contains(hopByHop, k) {
 			continue
 		}
 		for _, v := range values {
+			if k == "Set-Cookie" {
+				if v = scopeCookie(v, "/"+api.Team+"/"+api.Name, api.BackendURL.Path); v == "" {
+					continue
+				}
+			}
 			w.Header().Add(k, v)
 		}
 	}
@@ -380,8 +408,11 @@ func notInSpec(problems []*verrors.ValidationError) bool {
 
 // forwardHeaders are the caller's headers, less what's only for the
 // gateway: hop-by-hop ones, their Authorization (the gateway's sign-in,
-// never the backend's), and any Vertra-* (which only the gateway sets).
-func forwardHeaders(in http.Header) http.Header {
+// never the backend's), any Vertra-* (which only the gateway sets), and
+// what a caller could claim about where it's from (Forwarded,
+// X-Forwarded-*, X-Real-Ip): X-Forwarded-For is set to the address the
+// request came from (on the public listener, the ingress's).
+func forwardHeaders(in http.Header, remoteAddr string) http.Header {
 	out := in.Clone()
 	for _, h := range hopByHop {
 		out.Del(h)
@@ -392,10 +423,46 @@ func forwardHeaders(in http.Header) http.Header {
 		}
 	}
 	out.Del("Authorization")
+	out.Del("Forwarded")
+	out.Del("X-Real-Ip")
 	for k := range out {
-		if strings.HasPrefix(strings.ToLower(k), "vertra-") {
+		if lower := strings.ToLower(k); strings.HasPrefix(lower, "vertra-") || strings.HasPrefix(lower, "x-forwarded-") {
 			out.Del(k)
 		}
+	}
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		out.Set("X-Forwarded-For", host)
+	}
+	return out
+}
+
+// scopeCookie is a backend's Set-Cookie kept to its API's own path (every
+// API shares the gateway's origin), and to the gateway's host: its Path, as
+// the caller sees it (less the backend's own base path, backendPath), under
+// base (/<team>/<api>), the API's root when it's outside the backend's
+// base; no Domain; its other attributes kept. "" when it can't be read, or
+// it's a __Host- cookie (which must be Path=/, so can't be kept to one
+// API): it isn't passed on.
+func scopeCookie(setCookie, base, backendPath string) string {
+	c, err := http.ParseSetCookie(setCookie)
+	if err != nil || strings.HasPrefix(c.Name, "__Host-") {
+		return ""
+	}
+	path, prefix := c.Path, strings.TrimSuffix(backendPath, "/")
+	switch {
+	case !strings.HasPrefix(path, "/"):
+		path = "/"
+	case prefix == "":
+	case path == prefix || strings.HasPrefix(path, prefix+"/"):
+		path = "/" + strings.TrimPrefix(strings.TrimPrefix(path, prefix), "/")
+	default:
+		path = "/"
+	}
+	c.Path, c.Domain = base+path, ""
+	// String drops the attributes it doesn't know (Unparsed): kept as sent.
+	out := c.String()
+	for _, attr := range c.Unparsed {
+		out += "; " + attr
 	}
 	return out
 }
@@ -484,8 +551,13 @@ func split(escaped string) (team, name, rest string, ok bool) {
 		if rest, err1 = url.PathUnescape("/" + parts[2]); err1 != nil {
 			return "", "", "", false
 		}
+		// A backslash, and a dot segment with a ;parameter (..;), are
+		// slashes and dot segments to some backends' frameworks.
+		if strings.Contains(rest, "\\") {
+			return "", "", "", false
+		}
 		for _, segment := range strings.Split(rest, "/") {
-			if segment == "." || segment == ".." {
+			if segment == "." || segment == ".." || strings.HasPrefix(segment, ".;") || strings.HasPrefix(segment, "..;") {
 				return "", "", "", false
 			}
 		}

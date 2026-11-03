@@ -22,7 +22,7 @@ import { poolConfig } from "./connection.js";
 import * as schema from "./schema.js";
 
 async function main(): Promise<void> {
-  const email = process.argv[2] ?? config.bootstrapAdminEmail;
+  const email = schema.normalEmail(process.argv[2] ?? config.bootstrapAdminEmail);
   const pool = new Pool(poolConfig());
   const db = drizzle(pool);
   try {

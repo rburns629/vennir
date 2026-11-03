@@ -82,6 +82,7 @@ beforeAll(async () => {
   await db.insert(apiTraffic).values([
     { apiId: api!.id, minute, team: other, endpoint: "DELETE /orders/1", outcome: "blocked", count: 5, durationMs: 5 },
     { apiId: api!.id, minute, team: "", endpoint: "GET /orders", outcome: "unauthenticated", count: 2, durationMs: 1 },
+    { apiId: api!.id, minute, team: "", endpoint: "GET /orders/{id}", outcome: "not_found", count: 3, durationMs: 1 },
     { apiId: api!.id, minute, team: stranger, endpoint: "POST /orders", outcome: "invalid", count: 1, durationMs: 1 },
     { apiId: api!.id, minute, team: other, endpoint: "GET /orders", outcome: "forwarded_2xx", count: 10, durationMs: 90 },
   ]);
@@ -128,6 +129,7 @@ describe("security checks", () => {
       (await security(who)).refusals.filter((r) => r.source === "gateway" && r.team === owner).map((r) => `${r.code} ${String(r.count)} ${r.what} | ${r.detail}`).sort();
     expect(await gateway("owner")).toEqual([
       `INVALID_REQUEST 1 ${stranger} \u2192 ${owner}/orders | POST /orders`,
+      `NOT_FOUND 3 a caller with no team \u2192 ${owner}/orders | GET /orders/{id}`,
       `NOT_IN_SPEC 5 ${other} \u2192 ${owner}/orders | DELETE /orders/1`,
       `UNAUTHENTICATED 2 a caller with no team \u2192 ${owner}/orders | GET /orders`,
     ]);

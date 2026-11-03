@@ -17,6 +17,7 @@ import type { BuiltStep } from "../compose";
 import { CheckStrip } from "../components/CheckStrip";
 import { CloudPill, NotForThisInstall, cloudsSource, isNotForThisInstall, refusedProduct, useInstall } from "../components/Clouds";
 import { EmptyState } from "../components/EmptyState";
+import { LoadFailed, loadFailure } from "../components/LoadFailed";
 import { OrderChoice, optionKey, sameInput } from "../components/OrderChoice";
 import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
@@ -77,7 +78,10 @@ export function CartPage() {
   const { team: chosenTeam, actions, choices: proposedChoices, values: proposedValues } = useCart();
   const teams = user?.teamNames ?? [];
   const team = chosenTeam && teams.includes(chosenTeam) ? chosenTeam : (teams[0] ?? null);
-  const [runnables, setRunnables] = useState<Runnable[]>([]);
+  // What each step asks for: null until it's loaded, or while it couldn't be.
+  const [runnables, setRunnables] = useState<Runnable[] | null>(null);
+  const [runnablesFailed, setRunnablesFailed] = useState<string | null>(null);
+  const [runnablesTry, setRunnablesTry] = useState(0);
   const [choices, setChoices] = useState<OrderOption[]>(proposedChoices);
   const { plan, error: planError } = useOrderPlan(team, actions, choices);
   const [values, setValues] = useState<Record<string, Values>>({});
@@ -96,12 +100,15 @@ export function CartPage() {
   }, [proposedChoices, proposedValues]);
 
   useEffect(() => {
+    let cancelled = false;
+    setRunnablesFailed(null);
     listRunnables()
-      .then(setRunnables)
-      .catch(() => { setRunnables([]); });
-  }, []);
+      .then((found) => { if (!cancelled) setRunnables(found); })
+      .catch((err: unknown) => { if (!cancelled) setRunnablesFailed(loadFailure(err)); });
+    return () => { cancelled = true; };
+  }, [runnablesTry]);
 
-  const actionsByName = useMemo(() => new Map(runnables.filter((r) => r.kind === "action").map((r) => [r.name, r])), [runnables]);
+  const actionsByName = useMemo(() => new Map((runnables ?? []).filter((r) => r.kind === "action").map((r) => [r.name, r])), [runnables]);
   const action = (name: string) => actionsByName.get(name);
   // A step's name, with its number when another step has the same name (an action in the cart twice).
   const nameOf = (id: string) => {
@@ -213,6 +220,16 @@ export function CartPage() {
   return (
     <Box sx={{ maxWidth: 1280, mx: "auto" }}>
       {header}
+      {runnablesFailed && (
+        <Box sx={{ mb: 3 }}>
+          <LoadFailed
+            what="what the steps ask for"
+            reason={runnablesFailed}
+            note="Their inputs can't be asked until it is."
+            onRetry={() => { setRunnablesTry((n) => n + 1); }}
+          />
+        </Box>
+      )}
       <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "minmax(0, 1fr) 340px" }, alignItems: "start" }}>
         <Box component="section" aria-label="The plan" sx={{ display: "flex", flexDirection: "column", gap: 1.75, minWidth: 0 }}>
           {[...new Set(notHere.map((s) => s.product))].map((product) => {
@@ -412,7 +429,7 @@ export function CartPage() {
               variant="contained"
               size="large"
               fullWidth
-              disabled={!plan || placing || unchosen.length > 0 || Boolean(cycle) || notHere.length > 0}
+              disabled={!plan || !runnables || placing || unchosen.length > 0 || Boolean(cycle) || notHere.length > 0}
               onClick={() => void place()}
               aria-describedby={notHere.length > 0 ? "not-here-why" : undefined}
             >

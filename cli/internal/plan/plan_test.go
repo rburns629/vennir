@@ -77,3 +77,17 @@ func TestFloorOf(t *testing.T) {
 		t.Fatalf("log search's volume and the bundled Prometheus's: %v GiB (the database's %v)", f.OptionalVolumesGiB, f.VolumeGiB)
 	}
 }
+
+// A managed database's install runs no Postgres Pod, so its floor hasn't it.
+func TestAManagedDatabaseFloorHasNoPostgresPod(t *testing.T) {
+	c := config.Default("gcp")
+	c.Size, c.Gateway.Enabled, c.Logs.Enabled, c.Monitoring.Enabled = "scaled", false, false, false
+	c.Database.Type = "managed"
+	if f := FloorOf(c); f.CPU != "0.8 vCPU" || f.Memory != "3.25 GiB" || f.CPUCores != [2]float64{0.8, 0.8} {
+		t.Fatalf("scaled, managed: %s, %s", f.CPU, f.Memory)
+	}
+	c.Size = "minimal"
+	if f := FloorOf(c); f.CPU != "0.3 vCPU" || f.Memory != "1.25 GiB" {
+		t.Fatalf("minimal, managed: %s, %s", f.CPU, f.Memory)
+	}
+}

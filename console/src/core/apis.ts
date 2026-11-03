@@ -126,7 +126,7 @@ export function endpoints(openapi: unknown): { method: string; path: string; sum
   return out;
 }
 
-/** The team a call is made as, as the gateway's callingTeam picks it: the API's own, else the first of the caller's it's shared with; none, no call. */
+/** The team a call is made as, as the gateway's callingTeam picks it: the API's own, else the first of the caller's it's shared with (by name, byte for byte); none, no call. The gateway also passes over a retired team of the caller's, which this doesn't know of. */
 function callingTeam(caller: AuthUser, api: Api): string | undefined {
   if (caller.teamNames.includes(api.teamName)) return api.teamName;
   return caller.teamNames.find((t) => api.shareWith.includes("*") || api.shareWith.includes(t));
@@ -247,7 +247,7 @@ export async function pauseApi(caller: AuthUser | undefined, team: string, name:
 }
 
 /** Outcomes the gateway answers itself, without forwarding. */
-const STOPPED = ["blocked", "invalid", "limited", "unauthenticated", "forbidden", "paused", "held", "closed", "unavailable"];
+const STOPPED = ["blocked", "invalid", "limited", "unauthenticated", "forbidden", "not_found", "paused", "held", "closed", "unavailable"];
 
 /** An API's traffic over the last `hours`: its own team, and admins. */
 export async function getApiTraffic(caller: AuthUser | undefined, team: string, name: string, hours: number) {

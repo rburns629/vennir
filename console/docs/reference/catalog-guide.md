@@ -21,9 +21,12 @@ example teams, never published from there:
   TypeScript, Go, PowerShell and Rust. Copy the products in your languages
   into your team as starters, or the whole folder to `teams/local/` to
   prove an install end to end.
-- `samples/gcp`, `samples/aws`: products that call real, billed cloud APIs
-  (a project or bucket, a container service, a PostgreSQL database),
-  keyless. Copy one into a team once its cloud identity is set up.
+- `samples/gcp`, `samples/aws`, `samples/azure`: products that call real,
+  billed cloud APIs (a project, bucket or resource group, a container
+  service, a PostgreSQL database), keyless. Copy one into a team once its
+  cloud identity is set up. The azure ones haven't called Azure yet.
+- `samples/perf`: the platform's benchmark product, only ever installed
+  on its own test cluster. Nothing needs it; delete it if you like.
 
 A copied product's `team:` must be changed to its new team's name.
 
@@ -34,7 +37,7 @@ vertra.yaml                  where products publish: registry, signing
 vertra                        runs the pinned vertra (downloaded into .vertra/)
 tools/                        the schemas of every catalog file (format v2), for editors
 templates/                    starters to copy (checked by CI, never published)
-samples/<team>/               example teams: local (five languages); gcp, aws (billed)
+samples/<team>/               example teams: local (five languages); gcp, aws, azure (billed); perf
 teams/
   <team>/                    one team = one console team = one Kubernetes namespace
     team.yaml                 who the team is: name, description, owner, contact, help; allowedTargets; clouds
@@ -55,7 +58,9 @@ teams/
 ```
 
 A team's folder name is its identity everywhere: its console team, its
-namespace, and `team` in a DAG.
+namespace, and `team` in a DAG. It can't be `bases` or `catalog-release`
+(the catalog's own repositories in the registry, beside the teams'),
+`vertra-system` or `kube-*` (platform namespaces).
 
 ## Onboarding a team
 
@@ -545,8 +550,10 @@ Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
   or `{"status": "failed", "error": {"code": "...", "message": "...",
   "retryable": false}}` (`code` and `message` not empty; `retryable`
   optional, false if left out). Nothing else: any other field, at the top
-  or in `error`, anything after the object, or a `failed` without an
-  `error`, fails the step as `PRODUCT_RESULT_INVALID`. Output references
+  or in `error`, anything after the object, a `failed` without an
+  `error`, or a `code` that's the cluster's own refusal (such as
+  `IMAGE_NOT_ALLOWED`; that one isn't retried), fails the step as
+  `PRODUCT_RESULT_INVALID`. Output references
   (IDs, names, URIs), not data. What a step made goes in
   `outputs.resources` (see `cleanup` above).
 - The exit code doesn't matter once result.json is written: it decides.
@@ -626,9 +633,13 @@ Per product (`./vertra catalog check`, in `ci.yml`):
 | A base image not pinned by digest | `./vertra catalog bases` pins it; `./vertra catalog bases --update` moves every pin to its tag's current image |
 
 Across the repository (`security.yml`): committed secrets (gitleaks; rotate
-anything it finds), and Semgrep: its Dockerfile rules (including the
-final `USER` being non-root, though not that it's numeric) plus the
-catalog's own [.semgrep/malicious.yml](.semgrep/malicious.yml).
+anything it finds), and Semgrep: its Python, TypeScript, JavaScript, Go,
+Rust and Dockerfile rules (including the final `USER` being non-root,
+though not that it's numeric) plus the catalog's own
+[.semgrep/malicious.yml](.semgrep/malicious.yml), which also covers shell
+and PowerShell. A product in another language gets only the malicious-code
+patterns that are plain text (a download piped to a shell, a bare IP) and
+the secret scans.
 
 What blocks a merge is what `main`'s ruleset requires ([Protecting
 main](#protecting-main)). Publishing is gated either way: on `main`,
@@ -649,7 +660,7 @@ that fail.
 requiring a code owner's review ([Protecting main](#protecting-main)): the catalog admins own everything by
 default, each team's owners own `/teams/<team>/`, and the admins
 own, last so nothing overrides them, `.github/`, `tools/`, `vertra.yaml`,
-`vertra catalog`, `templates/` and every `/teams/*/secret-stores/`. A
+`vertra` (the wrapper), `templates/` and every `/teams/*/secret-stores/`. A
 team ships its own products, but can't change how CI builds and
 publishes, take another team's folder, add a team, or change what
 vault its namespace can read. `./vertra catalog validate` checks this layout, and
