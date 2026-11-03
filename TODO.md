@@ -1020,17 +1020,16 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
 
 ## Security
 
-- [ ] **A ConfigMap planted ahead of a step's Job could be mounted for a
-  moment** (K-8 follow-up, found 2026-11-03). The executor creates the
-  Job, then its request ConfigMap (immutable, owned by the Job); one
-  already under that name is replaced, so once `Start` returns the
-  request is the kernel's, but a Pod scheduled in between could mount
-  the planted one. It needs Job- or ConfigMap-create rights in a team
-  namespace, which teams and hardened steps don't have. Closing it means
-  the ConfigMap first, then the Job, then the ConfigMap's owner set (RBAC
-  `patch` on ConfigMaps and the dispatch policy fencing `UPDATE`), or a
-  Job created suspended and resumed once its ConfigMap is checked; either
-  is proven on kind first.
+- [x] **A ConfigMap planted ahead of a step's Job could be mounted for a
+  moment** (K-8 follow-up, found 2026-11-03; done 2026-11-03): the executor
+  creates each Job suspended, makes or replaces its request ConfigMap, then
+  resumes it, so no Pod exists until the ConfigMap is the kernel's. The
+  scheduler may `patch` Jobs, and the dispatch policy lets that be only a
+  resume of its own suspended Job in a live team namespace with nothing else
+  changed (nine admission cases; proven on kind). Someone who could delete
+  the kernel's ConfigMap in a team namespace and make another in the moment
+  before the kubelet mounts it still could: teams and steps have no such
+  right.
 
 - [ ] **The gateway's backends see the ingress, not the client, behind
   its public listener** (found 2026-11-03, G-10): the gateway sets
