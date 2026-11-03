@@ -155,6 +155,7 @@ What a maintainer should know:
 
 - **It runs as the bot, never as you.** Each run gets the bot's access as it is then, through the same checks as the bot running it itself: sharing, the inputs' schema, targets, and approvals. So pick a bot that may run it. An ordering bot may run only the templates on its list.
 - **A refused start is kept.** If the bot loses access, or the inputs no longer fit the template, that start is refused, shown in the **Schedules** tab's **Last** column, and told to the team's maintainers. The schedule stays on, and tries again next time.
+- **A schedule that can't run again says so.** If its timetable or time zone stops reading (a time zone the console no longer knows, say), it runs that once, then stops, with the reason in **Last** and told to the maintainers. **Edit** its timetable to start it again.
 - **At most every five minutes**, in the time zone you give.
 - **Times missed while the console was down** start once, for the latest time missed, not once for each.
 - **Deleting the bot deletes its schedules.** Revoking its token doesn't: the schedule doesn't use a token.
