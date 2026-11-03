@@ -813,7 +813,14 @@ taken, and what would still hold.
   can't read the platform's Secrets or run as another of its identities.
 - **kernel-api**'s ServiceAccount may only ask the API server who a token
   belongs to (`system:auth-delegator`). It holds the kernel's database: every run's
-  inputs, outputs and logs, and the task rows the scheduler runs. A task it
+  inputs, outputs and logs, and the task rows the scheduler runs. On the
+  bundled Postgres it signs in, as the scheduler and the sleeper do, as the
+  kernel's own role (`postgres.auth.kernelUsername`, `vertra_kernel`): no
+  superuser, owning only the kernel's database, refused the console's on
+  the same instance (proven on kind 2026-11-03); the superuser is used only
+  by Postgres itself, backups, and the step before each migration that
+  makes that role. With a managed database each process signs in as its own
+  cloud identity, likewise kept to the kernel's database. A task it
   wrote there still passes all four Job policies when the scheduler starts
   it: a registered product of the team, as its own ServiceAccount, with
   only the team's registered secrets, from an allowed, pinned, scanned

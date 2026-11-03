@@ -418,7 +418,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/kernel-scheduler-deployment.yaml` | kernel-scheduler. |
 | `templates/postgres-*.yaml` | The kernel's Postgres: Deployment, storage, Service, and (with `tls`) its `pg_hba` accepting only TLS from the network. |
 | `templates/tls.yaml` | TLS inside the cluster (`tls`): a CA of the release's own, made once and kept, and the certificates it signs for Postgres and kernel-api; the CA alone in `-tls-ca` for clients, the console's included. |
-| `templates/migration-job.yaml` | Runs database migrations before an upgrade (a Helm hook). |
+| `templates/migration-job.yaml` | Runs database migrations before an upgrade (a Helm hook); with the bundled Postgres, first makes the kernel's own login role (`postgres.auth.kernelUsername`) and hands it the kernel's database, as the superuser. |
 | `templates/backup-cronjob.yaml` | Scheduled database backup (both databases when they share the instance) to GCS, S3, Azure Blob or a volume. |
 | `templates/configmap.yaml`, `secret.yaml`, `serviceaccount.yaml` | Settings, the database password, the kernel's identity. |
 | `templates/rbac.yaml` | What the scheduler may do: create and delete Jobs and ConfigMaps, read Pods; and its logs-only ClusterRole, bound per team namespace by the console (or cluster-wide, `rbac.schedulerLogs: cluster`). |

@@ -31,20 +31,23 @@ const restoreRecord = "vertra-restore"
 
 // restoreScript replaces both databases with the dumps at $1 (the
 // kernel's) and $2 (the console's), as the Postgres superuser, keeping
-// the console's database owned by its own role and reachable only by it
-// and the gateway's.
+// each owned by its own role (the kernel's, once the install has one) and
+// reachable only by it (and the gateway's, for the console's).
 const restoreScript = `set -eu
 export PGUSER=postgres
+kernel_owner=postgres
+if [ "$(psql -Atc "SELECT 1 FROM pg_roles WHERE rolname = '` + kernelRole + `'")" = 1 ]; then kernel_owner=` + kernelRole + `; fi
 dropdb --force ` + kernelDatabase + `
-createdb ` + kernelDatabase + `
-pg_restore --exit-on-error -d ` + kernelDatabase + ` "$1"
+createdb -O "$kernel_owner" ` + kernelDatabase + `
+pg_restore --exit-on-error --no-owner --role="$kernel_owner" -d ` + kernelDatabase + ` "$1"
 dropdb --force ` + consoleDatabase + `
 createdb -O ` + consoleRole + ` ` + consoleDatabase + `
 pg_restore --exit-on-error --no-owner --role=` + consoleRole + ` -d ` + consoleDatabase + ` "$2"
 psql -v ON_ERROR_STOP=1 -q \
   -c 'REVOKE CONNECT ON DATABASE ` + kernelDatabase + ` FROM PUBLIC' \
   -c 'REVOKE CONNECT ON DATABASE ` + consoleDatabase + ` FROM PUBLIC' \
-  -c 'GRANT CONNECT ON DATABASE ` + consoleDatabase + ` TO ` + consoleRole + `'
+  -c 'GRANT CONNECT ON DATABASE ` + consoleDatabase + ` TO ` + consoleRole + `' \
+  -c "GRANT CONNECT ON DATABASE ` + kernelDatabase + ` TO $kernel_owner"
 if [ "$(psql -Atc "SELECT 1 FROM pg_roles WHERE rolname = '` + gatewayRole + `'")" = 1 ]; then
   psql -v ON_ERROR_STOP=1 -q -c 'GRANT CONNECT ON DATABASE ` + consoleDatabase + ` TO ` + gatewayRole + `'
 fi

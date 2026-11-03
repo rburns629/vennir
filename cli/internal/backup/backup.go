@@ -33,7 +33,9 @@ const (
 	kernelDatabase     = "execution_kernel"
 	consoleDatabase    = "execution_console"
 	consoleRole        = "console"
-	gatewayRole        = "vertra_gateway"
+	// The kernel's own login role (the kernel chart's postgres.auth.kernelUsername).
+	kernelRole  = "vertra_kernel"
+	gatewayRole = "vertra_gateway"
 	// The prefixes the backup CronJob stores each database's dumps under.
 	kernelPrefix  = install.KernelRelease
 	consolePrefix = "console"
