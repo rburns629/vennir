@@ -1039,7 +1039,9 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   gateway reads its `X-Forwarded-For` back past every trusted hop and
   passes the first address that isn't one as the backend's
   `X-Forwarded-For`. From any other peer, and always on the in-cluster
-  listener, it's the peer's own address, as before.
+  listener, it's the peer's own address, as before. It needs
+  `gateway.publicListenerFrom`, a NetworkPolicy letting only those proxies
+  reach the public listener (the chart refuses it without).
 
 - [x] **Add the `v*` tag ruleset (admins only)** (decided 2026-11-02, X-6;
   done 2026-11-03): the repository's `release tags` ruleset lets only
