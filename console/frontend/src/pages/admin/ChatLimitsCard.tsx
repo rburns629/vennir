@@ -45,6 +45,8 @@ export function ChatLimitsCard() {
   }, []);
 
   if (!saved) {
+    // TODO(F-6): once components/LoadFailed.tsx is on main (#185), a failed load is
+    // <LoadFailed what="the limits" … onRetry> with Try again, not a plain Alert.
     return <AdminCard title="Questions per person">{error ? <Alert severity="error">{error}</Alert> : <Typography color="text.secondary">Loading…</Typography>}</AdminCard>;
   }
 
