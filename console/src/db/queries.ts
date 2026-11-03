@@ -21,6 +21,8 @@ import {
   catalogSync,
   schedules,
   ssoGroupMappings,
+  teamCallbacks,
+  teamWebhooks,
   type Approval,
   type ErrorHelp,
   type ProductCleanup,
@@ -179,10 +181,13 @@ export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: num
       .returning({ userId: teamMemberships.userId });
     await tx.delete(secretGrants).where(eq(secretGrants.teamId, teamId));
     await tx.delete(products).where(eq(products.teamId, teamId));
-    // Nothing that would put people back in it, or run as it: its single
-    // sign-on group mappings, and its schedules.
+    // Nothing that would put people back in it, run as it, or post its
+    // news anywhere: its single sign-on group mappings, its schedules, and
+    // its webhook and order callback (their sealed URLs and secrets).
     await tx.delete(ssoGroupMappings).where(eq(ssoGroupMappings.teamId, teamId));
     await tx.delete(schedules).where(eq(schedules.teamId, teamId));
+    await tx.delete(teamWebhooks).where(eq(teamWebhooks.teamId, teamId));
+    await tx.delete(teamCallbacks).where(eq(teamCallbacks.teamId, teamId));
 
     let revokedBotTokens = 0;
     for (const { userId } of members) {

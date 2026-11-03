@@ -16,7 +16,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
-import { addTeamMember, createTeam, createUser, purgeTeam } from "../src/db/queries.js";
+import { addTeamMember, createTeam, createUser, purgeTeam, teamRolesForUser } from "../src/db/queries.js";
 import { ssoGroupMappings, ssoSettings, teamMemberships, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { refreshSso, resyncGoogleGroups } from "../src/sso.js";
@@ -160,7 +160,7 @@ describe("signing in", () => {
     expect(await teamsOf(`dev@${domain}`)).toEqual({ [teamC]: "member" });
   });
 
-  it("never puts anyone back in a purged team, and its mappings go with it", async () => {
+  it("deletes the mappings of a purged team, and passes over a purged team where any are left", async () => {
     const purged = `${prefix}-purged`;
     const purgedId = (await createTeam(purged)).id;
     await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-gone", team: purged });
@@ -172,6 +172,17 @@ describe("signing in", () => {
     expect(await db.select().from(ssoGroupMappings).where(eq(ssoGroupMappings.teamId, purgedId))).toEqual([]);
     expect(await provider.signIn(app, person("purged-member", { groups: ["g-gone"] }))).toMatchObject({ error: "" });
     expect(await teamsOf(`purged-member@${domain}`)).toEqual({});
+
+    // A mapping a purge left before purges deleted them is passed over too,
+    // and not listed; and a membership left in a purged team counts for nothing.
+    await db.insert(ssoGroupMappings).values({ groupName: "g-gone", teamId: purgedId, role: "member" });
+    await provider.signIn(app, person("purged-member", { groups: ["g-gone"] }));
+    expect(await teamsOf(`purged-member@${domain}`)).toEqual({});
+    const listed = await call<{ mappings?: { team: string }[] }>(admin, "SsoService/ListSsoGroupMappings");
+    expect((listed.body.mappings ?? []).map((m) => m.team)).not.toContain(purged);
+    const [member] = await db.select({ id: users.id }).from(users).where(eq(users.email, `purged-member@${domain}`));
+    await addTeamMember(member!.id, purgedId, "member");
+    expect((await teamRolesForUser(member!.id)).map((r) => r.name)).not.toContain(purged);
   });
 
   it("refuses a sign-in whose groups can't be read, touching nobody's teams", async () => {
