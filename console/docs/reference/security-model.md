@@ -943,7 +943,7 @@ tagging the wrong commit.
 Nothing verifies those signatures when installing: `vertra` checks the
 charts against the SHA-256s each release records (each cosign-verified
 once), but the charts run their images by tag unless
-`image.digest` pins them, and policy-controller doesn't cover the platform's
+`image.digest` (and `gateway.image.digest`) pins them, and policy-controller doesn't cover the platform's
 own namespace. To check one by hand (a version tag's run only: the same
 workflow run from a branch signs as `release.yml@refs/heads/<branch>`,
 which this refuses; `make gke-verify-release` requires the exact tag).
