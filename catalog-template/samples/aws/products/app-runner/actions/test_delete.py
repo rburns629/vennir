@@ -14,7 +14,7 @@ from botocore.exceptions import ClientError
 
 _MODULE_PATH = Path(__file__).parent / "delete.py"
 ARN = "arn:aws:apprunner:us-east-2:123456789012:service/web/0123abcd"
-MADE = {"Tags": [{"Key": "vertra-made", "Value": "true"}]}
+MADE = {"Tags": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
 
 
 def _load():
@@ -41,8 +41,11 @@ class DeleteActionTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
 
-    def _run(self, resource: dict, configure=lambda c: None) -> tuple[int, dict, object, object]:
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"resource": resource}}))
+    def _run(self, resource: dict, configure=lambda c: None, team: str | None = "web") -> tuple[int, dict, object, object]:
+        request: dict = {"inputs": {"resource": resource}}
+        if team:
+            request["forTeam"] = team
+        self.module.INPUT_PATH.write_text(json.dumps(request))
         with patch.object(self.module.boto3.session, "Session") as session_cls:
             client = session_cls.return_value.client.return_value
             client.describe_service.return_value = {"Service": {"ServiceName": "web", "Status": "RUNNING"}}
@@ -64,6 +67,18 @@ class DeleteActionTest(unittest.TestCase):
         )
         self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VERTRA"))
         client.delete_service.assert_not_called()
+
+    def test_one_made_for_another_team_is_refused(self) -> None:
+        code, result, client, _ = self._run(
+            {"type": "aws/app-runner-service", "id": ARN}, lambda c: setattr(c.list_tags_for_resource, "return_value", MADE), team="data"
+        )
+        self.assertEqual((code, result["error"]["code"]), (1, "NOT_THIS_TEAMS"))
+        client.delete_service.assert_not_called()
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        code, result, _, session_cls = self._run({"type": "aws/app-runner-service", "id": ARN}, team=None)
+        self.assertEqual((code, result["error"]["code"]), (1, "MISSING_TEAM"))
+        session_cls.assert_not_called()
 
     def test_one_already_gone_is_deleted(self) -> None:
         for configure in (

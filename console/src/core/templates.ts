@@ -545,7 +545,7 @@ export async function runProductSteps(
   name: string,
   list: ProductStep[],
   forTeam: string | undefined,
-  run: { template: string; parameters: Record<string, unknown> },
+  run: { template: string; parameters: Record<string, unknown>; forTeam?: string | undefined },
   options: { chained: boolean; eachShared: boolean },
   log: FastifyBaseLogger,
 ): Promise<{ executionId: string }> {
@@ -650,12 +650,18 @@ export async function previewTemplate(caller: AuthUser | undefined, team: string
   return { executionId, notPreviewed };
 }
 
-/** Runs cleanup steps one after another, newest first (core/resources.ts). */
+/**
+ * Runs cleanup steps one after another, newest first (core/resources.ts):
+ * for `forTeam` (the caller's, or none), and each step for `madeFor`, the
+ * team what it deletes was made for, so its product deletes only that
+ * team's.
+ */
 export async function runCleanup(
   who: AuthUser,
   name: string,
   cleanups: Omit<ProductStep, "id">[],
   forTeam: string | undefined,
+  madeFor: string,
   resourceIds: string[],
   log: FastifyBaseLogger,
 ): Promise<{ executionId: string; stepIds: string[] }> {
@@ -665,7 +671,7 @@ export async function runCleanup(
     name,
     list,
     forTeam,
-    { template: CLEANUP_RUN, parameters: { resources: resourceIds } },
+    { template: CLEANUP_RUN, parameters: { resources: resourceIds }, forTeam: madeFor },
     { chained: true, eachShared: true },
     log,
   );

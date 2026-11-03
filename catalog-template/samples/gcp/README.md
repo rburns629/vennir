@@ -15,11 +15,17 @@ Every action looks before it creates, so a retried step is harmless.
 ## Deleting what they made
 
 `project`, `app-hosting` and `cloud-sql` label what they create
-`vertra-made=true` and report it as `resources`, with a `delete` action as
-their `cleanup`: Delete on the run page (or **What runs made**) runs it. A
-delete refuses anything without the label (`NOT_MADE_BY_VERTRA`), so a
-project or service that was only found, never made, is never deleted, and
-one already gone counts as deleted. A project this product can't see fails
+`vertra-made=true` and `vertra-team=<the team it was made for>` (the
+request's `forTeam`: the team the run is for, which for a shared product's
+run is the consumer's, not this one's), and report it as `resources`, with
+a `delete` action as their `cleanup`: Delete on the run page (or **What
+runs made**) runs it. A delete refuses anything without the label
+(`NOT_MADE_BY_VERTRA`), so a project or service that was only found, never
+made, is never deleted; and anything whose `vertra-team` isn't the run's
+`forTeam` (`NOT_THIS_TEAMS`), so one team's delete, even run directly,
+can't remove another team's project. A run for no team (`MISSING_TEAM`) is
+refused. A create reports what it finds as made only when both labels match
+the same way. One already gone counts as deleted. A project this product can't see fails
 (`PROJECT_NOT_VISIBLE`) rather than being reported deleted: Google answers
 403 alike for a purged project and a missing permission. The console lets only the team it was
 made for, whoever ran it, and admins delete it. A deleted project is shut
@@ -27,6 +33,13 @@ down and can be restored for 30 days. Cloud SQL can take longer than a
 step's five minutes to delete an instance: the step then succeeds with
 `finishing: true`, since an accepted delete can't be stopped. `build-image`
 has no cleanup: the repository's own cleanup policies age images out.
+
+Made before they were labelled with a team (before 2026-11-03), a project,
+service or instance has `vertra-made` but no `vertra-team`, so its delete
+refuses it (`NOT_THIS_TEAMS`). Label it by hand with the team it was made
+for (`gcloud projects update <id> --update-labels=vertra-team=<team>`, and
+the same with `gcloud run services update` or `gcloud sql instances patch`),
+then delete it again, or delete it outside Vertra.
 Proven on GKE Autopilot (2026-10-25): a project, a Cloud Run service and a
 Cloud SQL instance made and deleted through Vertra.
 [dags/gcp-hello-world-dag.yaml](dags/gcp-hello-world-dag.yaml) chains the

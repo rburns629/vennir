@@ -23,8 +23,9 @@ actions:
   idempotent: true
   maxAttempts: 3
   script: actions/create.py
-  # A bucket it creates is tagged vertra-made=true and reported as a
-  # resource; delete removes it (and refuses any bucket without the tag).
+  # A bucket it creates is tagged vertra-made=true and vertra-team=<team>
+  # and reported as a resource; delete removes it (and refuses any bucket
+  # without both tags for the run's team).
   cleanup:
     action: delete
     inputs:

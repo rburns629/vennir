@@ -118,9 +118,15 @@ func resolveValue(value any, outputsByTask map[string]map[string]any) (any, erro
 }
 
 // ProductRequest is /platform/input/request.json: what a step is asked to do.
+// Team is the namespace it runs in (its product's team); ForTeam the team
+// it runs for, which may be another (a shared product's run), so a product
+// can mark what it makes as that team's, and clean up only that team's.
+// Left out when the task has none.
 type ProductRequest struct {
 	ExecutionID string         `json:"executionId"`
 	TaskID      string         `json:"taskId"`
+	Team        string         `json:"team"`
+	ForTeam     string         `json:"forTeam,omitempty"`
 	Action      string         `json:"action"`
 	Attempt     int            `json:"attempt"`
 	Inputs      map[string]any `json:"inputs"`

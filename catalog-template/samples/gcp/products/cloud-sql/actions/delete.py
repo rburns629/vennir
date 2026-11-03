@@ -3,8 +3,10 @@
 (its cleanup), and its databases with it. Given {"resource": {"type":
 "gcp/cloud-sql-instance", "id": "<project>:<region>:<instance>"}}.
 
-Only an instance carrying create's vertra-made label is deleted: one made
-some other way is refused, whoever asks. One already gone succeeds.
+Only an instance carrying create's vertra-made label, and the run's team
+(request.json's forTeam) as its vertra-team label, is deleted: one made some other way,
+or made for another team, is refused, whoever asks. One already gone
+succeeds.
 """
 
 import json
@@ -22,6 +24,7 @@ from googleapiclient import discovery
 from googleapiclient.errors import HttpError
 
 MADE_BY_LABEL = ("vertra-made", "true")
+TEAM_LABEL = "vertra-team"
 CONNECTION_NAME = re.compile(r"^([a-z][a-z0-9-]{4,28}[a-z0-9]):([a-z0-9-]+):([a-z][a-z0-9-]{0,97})$")
 
 INPUT_PATH = Path("/platform/input/request.json")
@@ -106,11 +109,15 @@ def main() -> int:
 
 
 def _run() -> int:
-    resource = json.loads(INPUT_PATH.read_text()).get("inputs", {}).get("resource") or {}
+    request = json.loads(INPUT_PATH.read_text())
+    resource = request.get("inputs", {}).get("resource") or {}
     connection = resource.get("id") if isinstance(resource, dict) else None
     match = CONNECTION_NAME.match(connection) if isinstance(connection, str) else None
     if resource.get("type") != "gcp/cloud-sql-instance" or not match:
         return _failure("MISSING_INPUT", "inputs.resource is the gcp/cloud-sql-instance to delete, as create reported it")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
     project_id, _region, instance_name = match.groups()
 
     service = discovery.build("sqladmin", "v1", credentials=_build_credentials(), cache_discovery=False)
@@ -126,6 +133,8 @@ def _run() -> int:
     labels = (instance.get("settings") or {}).get("userLabels") or {}
     if labels.get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
         return _failure("NOT_MADE_BY_VERTRA", f"Cloud SQL instance '{connection}' wasn't made by this product (it has no {MADE_BY_LABEL[0]} label), so it isn't deleted")
+    if labels.get(TEAM_LABEL) != team:
+        return _failure("NOT_THIS_TEAMS", f"Cloud SQL instance '{connection}' wasn't made for team '{team}' (its {TEAM_LABEL} label says otherwise), so it isn't deleted")
 
     done = True
     try:

@@ -3,8 +3,9 @@
 deployed (its cleanup). Given {"resource": {"type":
 "gcp/cloud-run-service", "id": "projects/<p>/locations/<r>/services/<name>"}}.
 
-Only a service carrying create's vertra-made label is deleted: one deployed
-some other way is refused, whoever asks. One already gone succeeds.
+Only a service carrying create's vertra-made label, and the run's team
+(request.json's forTeam) as its vertra-team label, is deleted: one deployed some other way, or
+for another team, is refused, whoever asks. One already gone succeeds.
 """
 
 import json
@@ -22,6 +23,7 @@ from google.auth import impersonated_credentials
 from google.cloud import run_v2
 
 MADE_BY_LABEL = ("vertra-made", "true")
+TEAM_LABEL = "vertra-team"
 SERVICE_PATH = re.compile(r"^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]+/services/[a-z][a-z0-9-]{0,62}$")
 
 INPUT_PATH = Path("/platform/input/request.json")
@@ -98,10 +100,14 @@ def main() -> int:
 
 
 def _run() -> int:
-    resource = json.loads(INPUT_PATH.read_text()).get("inputs", {}).get("resource") or {}
+    request = json.loads(INPUT_PATH.read_text())
+    resource = request.get("inputs", {}).get("resource") or {}
     path = resource.get("id") if isinstance(resource, dict) else None
     if resource.get("type") != "gcp/cloud-run-service" or not isinstance(path, str) or not SERVICE_PATH.match(path):
         return _failure("MISSING_INPUT", "inputs.resource is the gcp/cloud-run-service to delete, as create reported it")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
 
     services = run_v2.ServicesClient(credentials=_signed_in())
     try:
@@ -113,8 +119,11 @@ def _run() -> int:
     except GoogleAPIError as error:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
-    if dict(service.labels).get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
+    labels = dict(service.labels)
+    if labels.get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
         return _failure("NOT_MADE_BY_VERTRA", f"service '{path}' wasn't deployed by this product (it has no {MADE_BY_LABEL[0]} label), so it isn't deleted")
+    if labels.get(TEAM_LABEL) != team:
+        return _failure("NOT_THIS_TEAMS", f"service '{path}' wasn't deployed for team '{team}' (its {TEAM_LABEL} label says otherwise), so it isn't deleted")
 
     try:
         services.delete_service(name=path).result()

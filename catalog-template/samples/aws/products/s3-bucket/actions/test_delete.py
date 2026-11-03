@@ -13,7 +13,7 @@ from unittest.mock import patch
 from botocore.exceptions import ClientError
 
 _MODULE_PATH = Path(__file__).parent / "delete.py"
-MADE = {"TagSet": [{"Key": "vertra-made", "Value": "true"}]}
+MADE = {"TagSet": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
 
 
 def _load():
@@ -40,8 +40,11 @@ class DeleteActionTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
 
-    def _run(self, configure) -> tuple[int, dict, object]:
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"bucketName": "b", "region": "us-east-2"}}))
+    def _run(self, configure, team: str | None = "web") -> tuple[int, dict, object]:
+        request: dict = {"inputs": {"bucketName": "b", "region": "us-east-2"}}
+        if team:
+            request["forTeam"] = team
+        self.module.INPUT_PATH.write_text(json.dumps(request))
         with patch.object(self.module.boto3.session, "Session") as session_cls:
             s3 = session_cls.return_value.client.return_value
             configure(s3)
@@ -63,6 +66,17 @@ class DeleteActionTest(unittest.TestCase):
             code, result, s3 = self._run(configure)
             self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VERTRA"))
             s3.delete_bucket.assert_not_called()
+
+    def test_one_made_for_another_team_is_refused(self) -> None:
+        for tagging in (MADE, {"TagSet": [{"Key": "vertra-made", "Value": "true"}]}):
+            code, result, s3 = self._run(lambda s3, tagging=tagging: setattr(s3.get_bucket_tagging, "return_value", tagging), team="data")
+            self.assertEqual((code, result["error"]["code"]), (1, "NOT_THIS_TEAMS"))
+            s3.delete_bucket.assert_not_called()
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        code, result, s3 = self._run(lambda s3: setattr(s3.get_bucket_tagging, "return_value", MADE), team=None)
+        self.assertEqual((code, result["error"]["code"]), (1, "MISSING_TEAM"))
+        s3.delete_bucket.assert_not_called()
 
     def test_one_already_gone_is_deleted_and_one_it_cant_see_isnt(self) -> None:
         code, result, s3 = self._run(lambda s3: setattr(s3.head_bucket, "side_effect", _client_error("404", 404)))

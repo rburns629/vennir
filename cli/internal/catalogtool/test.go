@@ -88,6 +88,8 @@ func (c *Catalog) runContractCase(p *Product, tc contractCase, action map[string
 	full := map[string]any{
 		"executionId": "contract-test",
 		"taskId":      filepath.Base(tc.dir),
+		"team":        p.Team(),
+		"forTeam":     p.Team(),
 		"action":      tc.action(),
 		"attempt":     json.Number("1"),
 		"inputs":      map[string]any{},

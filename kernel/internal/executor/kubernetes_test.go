@@ -158,7 +158,7 @@ func TestTheConfigMapIsOwnedByItsJob(t *testing.T) {
 	check(t, "owner", []string{owner.Kind, owner.Name, string(owner.UID)}, []string{"Job", cm.Name, jobUID})
 	var request map[string]any
 	_ = json.Unmarshal([]byte(cm.Data["request.json"]), &request)
-	check(t, "request", request, map[string]any{"executionId": stepTask().ExecutionID, "taskId": "env", "action": "create", "attempt": 1.0, "inputs": map[string]any{}})
+	check(t, "request", request, map[string]any{"executionId": stepTask().ExecutionID, "taskId": "env", "team": stepTask().Team, "action": "create", "attempt": 1.0, "inputs": map[string]any{}})
 }
 
 // A pass that created the Job and then rolled back retries the same

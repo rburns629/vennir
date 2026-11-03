@@ -48,7 +48,7 @@ class CreateActionTest(unittest.TestCase):
     def _write_request(self, inputs: dict) -> None:
         self.module.INPUT_PATH.write_text(
             json.dumps(
-                {"executionId": "e", "taskId": "t", "action": "create", "attempt": 1, "inputs": inputs}
+                {"executionId": "e", "taskId": "t", "forTeam": "web", "action": "create", "attempt": 1, "inputs": inputs}
             )
         )
 
@@ -89,7 +89,7 @@ class CreateActionTest(unittest.TestCase):
     def test_an_existing_instance_still_being_made_is_waited_for(self) -> None:
         # A retry finding the instance its last attempt was still creating.
         self._write_request({"projectId": "demo-project", "instanceName": "made"})
-        made = {"name": "made", "connectionName": "demo-project:us-central1:made", "settings": {"userLabels": {"vertra-made": "true"}}}
+        made = {"name": "made", "connectionName": "demo-project:us-central1:made", "settings": {"userLabels": {"vertra-made": "true", "vertra-team": "web"}}}
         self.service.instances.return_value.get.return_value.execute.side_effect = [
             {**made, "state": "PENDING_CREATE"},
             {**made, "state": "PENDING_CREATE"},
@@ -126,6 +126,22 @@ class CreateActionTest(unittest.TestCase):
                 error = self._result()["error"]
                 self.assertEqual((error["code"], error["retryable"]), ("INSTANCE_NOT_USABLE", False))
                 self.assertNotIn("outputs", self._result())
+
+    def test_another_teams_instance_isnt_reported(self) -> None:
+        # Made by this product, but for another team: not this team's to delete.
+        self._write_request({"projectId": "demo-project", "instanceName": "theirs"})
+        self.service.instances.return_value.get.return_value.execute.return_value = {
+            "name": "theirs", "connectionName": "demo-project:us-central1:theirs", "state": "RUNNABLE",
+            "settings": {"userLabels": {"vertra-made": "true", "vertra-team": "data"}},
+        }
+        self.assertEqual(self.module.main(), 0)
+        self.assertNotIn("resources", self._result()["outputs"])
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"projectId": "demo-project", "instanceName": "new"}}))
+        self.assertEqual(self.module.main(), 1)
+        self.assertEqual(self._result()["error"]["code"], "MISSING_TEAM")
+        self.service.instances.return_value.insert.assert_not_called()
 
     def test_new_instance_is_created_and_waits_for_operation(self) -> None:
         self._write_request({"projectId": "demo-project", "instanceName": "brand-new"})
@@ -174,14 +190,14 @@ class CreateActionTest(unittest.TestCase):
         self._write_request({"projectId": "demo-project", "instanceName": "made"})
         self.service.instances.return_value.get.return_value.execute.side_effect = [
             _http_error(404),
-            {"name": "made", "connectionName": "demo-project:us-central1:made", "settings": {"userLabels": {"vertra-made": "true"}}},
+            {"name": "made", "connectionName": "demo-project:us-central1:made", "settings": {"userLabels": {"vertra-made": "true", "vertra-team": "web"}}},
         ]
         self.service.instances.return_value.insert.return_value.execute.return_value = {"name": "operation-1"}
         self.service.operations.return_value.get.return_value.execute.return_value = {"status": "DONE"}
         with patch.object(self.module.time, "sleep"):
             self.assertEqual(self.module.main(), 0)
         body = self.service.instances.return_value.insert.call_args.kwargs["body"]
-        self.assertEqual(body["settings"]["userLabels"], {"vertra-made": "true"})
+        self.assertEqual(body["settings"]["userLabels"], {"vertra-made": "true", "vertra-team": "web"})
         self.assertEqual(self._result()["outputs"]["resources"][0]["id"], "demo-project:us-central1:made")
 
     def test_operation_failure_is_a_retryable_failure(self) -> None:

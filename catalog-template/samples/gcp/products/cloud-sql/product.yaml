@@ -27,8 +27,9 @@ actions:
     idempotent: true
     maxAttempts: 3
     script: actions/create.py
-    # Deleting the instance it made (only one it made: create labels it
-    # vertra-made, and delete refuses any other), its databases with it.
+    # Deleting the instance it made (only one it made for the run's team:
+    # create labels it vertra-made and vertra-team, and delete refuses any
+    # other), its databases with it.
     cleanup:
       action: delete
     input:

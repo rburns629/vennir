@@ -347,7 +347,10 @@ async function deleteChecked(who: AuthUser, ids: string[], log: FastifyBaseLogge
   // For the team it was made for, when the caller is in it (else an admin or the person alone).
   const forTeam = ownerTeam && who.teamNames.includes(ownerTeam) ? ownerTeam : undefined;
   const name = rows.length === 1 ? `Delete ${rows[0]?.resource.type ?? ""} ${rows[0]?.resource.externalId ?? ""}` : `Delete ${String(rows.length)} resources`;
-  const { executionId, stepIds } = await runCleanup(who, name.slice(0, 200), steps, forTeam, ordered.map((row) => row.resource.id), log);
+  // Its steps run for the team the resources were made for (one made for a
+  // person alone: its product's team, as its run's step was), whoever asks.
+  const madeFor = ownerTeam ?? rows[0]?.resource.productTeam ?? "";
+  const { executionId, stepIds } = await runCleanup(who, name.slice(0, 200), steps, forTeam, madeFor, ordered.map((row) => row.resource.id), log);
   await db.transaction(async (tx) => {
     for (const [i, row] of ordered.entries()) {
       await tx

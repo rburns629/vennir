@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -174,17 +175,19 @@ func TestEverythingAsSubmittedIsStored(t *testing.T) {
 	req.Tasks[0].SecretRefs = []string{"gcp-key"}
 	req.Tasks[0].TimeoutSeconds, req.Tasks[0].MaxAttempts = &timeout, &attempts
 	req.Tasks[0].Resources = &kernelv1.Resources{Cpu: "250m", MemoryLimit: "1Gi"}
+	req.Tasks[0].ForTeam = "data"
 	res := submit(t, c, req)
-	var resources string
+	var resources, forTeam string
 	var gotTimeout, gotAttempts int
 	var secretRefs []string
-	if err := testPool.QueryRow(context.Background(), `SELECT resources::text, timeout_seconds, max_attempts, secret_refs
-		FROM execution_tasks WHERE execution_id = $1`, res.ExecutionId).Scan(&resources, &gotTimeout, &gotAttempts, &secretRefs); err != nil {
+	if err := testPool.QueryRow(context.Background(), `SELECT resources::text, timeout_seconds, max_attempts, secret_refs, for_team
+		FROM execution_tasks WHERE execution_id = $1`, res.ExecutionId).Scan(&resources, &gotTimeout, &gotAttempts, &secretRefs, &forTeam); err != nil {
 		t.Fatal(err)
 	}
 	// The JSON names the scheduler reads (domain.TaskResources).
-	if resources != `{"cpu": "250m", "memoryLimit": "1Gi"}` || gotTimeout != 60 || gotAttempts != 3 || !slices.Equal(secretRefs, []string{"gcp-key"}) {
-		t.Errorf("stored %s %d %d %v", resources, gotTimeout, gotAttempts, secretRefs)
+	if resources != `{"cpu": "250m", "memoryLimit": "1Gi"}` || gotTimeout != 60 || gotAttempts != 3 || !slices.Equal(secretRefs, []string{"gcp-key"}) ||
+		forTeam != "data" {
+		t.Errorf("stored %s %d %d %v %q", resources, gotTimeout, gotAttempts, secretRefs, forTeam)
 	}
 }
 
@@ -297,6 +300,15 @@ func TestMalformedSubmissionsAreRefused(t *testing.T) {
 		},
 		"a capacity that isn't one": func(r *kernelv1.SubmitExecutionRequest) {
 			r.Tasks[0].Capacity = "preemptible"
+		},
+		"a for_team that isn't a namespace name": func(r *kernelv1.SubmitExecutionRequest) {
+			r.Tasks[0].ForTeam = "Data Team"
+		},
+		"a for_team that ends in a hyphen": func(r *kernelv1.SubmitExecutionRequest) {
+			r.Tasks[0].ForTeam = "data-"
+		},
+		"a for_team past 63 characters": func(r *kernelv1.SubmitExecutionRequest) {
+			r.Tasks[0].ForTeam = strings.Repeat("a", 64)
 		},
 	} {
 		req := single(unique("malformed"))

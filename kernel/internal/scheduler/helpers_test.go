@@ -56,6 +56,8 @@ type TaskDef struct {
 	// At most CapLimit of its product's (CapScope's) tasks at once.
 	CapScope string
 	CapLimit int
+	// The team it runs for; "": none.
+	ForTeam string
 }
 
 func task(id string, fields ...func(*TaskDef)) TaskDef {
@@ -71,6 +73,7 @@ func inputs(m map[string]any) func(*TaskDef) { return func(d *TaskDef) { d.Input
 func maxAttempts(n int) func(*TaskDef)       { return func(d *TaskDef) { d.MaxAttempts = n } }
 func timeout(seconds int) func(*TaskDef)     { return func(d *TaskDef) { d.TimeoutSeconds = seconds } }
 func team(name string) func(*TaskDef)        { return func(d *TaskDef) { d.Team = name } }
+func forTeam(name string) func(*TaskDef)     { return func(d *TaskDef) { d.ForTeam = name } }
 func concurrency(scope string, inputs ...string) func(*TaskDef) {
 	return func(d *TaskDef) { d.ConcurrencyScope, d.ConcurrencyInputs = scope, inputs }
 }
@@ -130,13 +133,13 @@ func submit(t *testing.T, db DB, key string, tasks ...TaskDef) string {
 		var id string
 		if err := db.QueryRow(ctx, `INSERT INTO execution_tasks (id, execution_id, task_key, image, action, team,
 			service_account, secret_refs, resources, state, original_inputs, timeout_seconds, max_attempts, attempt_count, available_at,
-			input_schema, output_schema, concurrency_scope, concurrency_inputs, approval_required, cap_scope, cap_limit)
+			input_schema, output_schema, concurrency_scope, concurrency_inputs, approval_required, cap_scope, cap_limit, for_team)
 			VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12, 0, now() - interval '1 second',
-			$13::jsonb, $14::jsonb, NULLIF($15, ''), $16, $17, NULLIF($18, ''), $19)
+			$13::jsonb, $14::jsonb, NULLIF($15, ''), $16, $17, NULLIF($18, ''), $19, NULLIF($20, ''))
 			RETURNING id::text`,
 			executionID, d.ID, d.Image, d.Action, d.Team, d.ServiceAccount, d.SecretRefs, resources, string(state),
 			jsonValue(d.Inputs), d.TimeoutSeconds, d.MaxAttempts, inputSchema, outputSchema,
-			d.ConcurrencyScope, append([]string{}, d.ConcurrencyInputs...), d.ApprovalRequired, d.CapScope, d.CapLimit).Scan(&id); err != nil {
+			d.ConcurrencyScope, append([]string{}, d.ConcurrencyInputs...), d.ApprovalRequired, d.CapScope, d.CapLimit, d.ForTeam).Scan(&id); err != nil {
 			t.Fatal(err)
 		}
 		ids[d.ID] = id

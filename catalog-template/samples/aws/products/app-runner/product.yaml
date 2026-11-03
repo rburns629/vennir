@@ -24,8 +24,9 @@ actions:
   idempotent: true
   maxAttempts: 3
   script: actions/create.py
-  # A service it creates is tagged vertra-made=true and reported as a
-  # resource; delete removes it (and refuses any service without the tag).
+  # A service it creates is tagged vertra-made=true and vertra-team=<team>
+  # and reported as a resource; delete removes it (and refuses any service
+  # without both tags for the run's team).
   cleanup:
     action: delete
   input:

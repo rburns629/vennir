@@ -30,7 +30,9 @@ type ResolvedTask struct {
 	ResolvedInputs map[string]any
 	TimeoutSeconds int
 	// Team is the dispatch namespace; ServiceAccount the Pod's identity.
-	Team           string
+	Team string
+	// ForTeam is the team it runs for (request.json's forTeam); "": none.
+	ForTeam        string
 	ServiceAccount string
 	// SecretRefs are the Secrets mounted at /platform/secrets/<name>/.
 	SecretRefs []string
@@ -50,7 +52,7 @@ func (t ResolvedTask) ProductRequest() domain.ProductRequest {
 	if inputs == nil {
 		inputs = map[string]any{}
 	}
-	return domain.ProductRequest{ExecutionID: t.ExecutionID, TaskID: t.TaskKey, Action: t.Action, Attempt: t.Attempt, Inputs: inputs}
+	return domain.ProductRequest{ExecutionID: t.ExecutionID, TaskID: t.TaskKey, Team: t.Team, ForTeam: t.ForTeam, Action: t.Action, Attempt: t.Attempt, Inputs: inputs}
 }
 
 // RunState is what an executor sees of an attempt: running, or finished.

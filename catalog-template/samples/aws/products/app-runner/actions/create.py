@@ -6,8 +6,10 @@ Public) reference.
 
 The service is reachable only through a VPC interface endpoint unless
 `public` is true. Waits for a new service to be running, so later steps can
-use its URL. One it creates is tagged vertra-made=true and reported as a
-resource, which delete (its cleanup) removes; one it only found is neither.
+use its URL. One it creates is tagged vertra-made=true and
+vertra-team=<the run's team> and reported as a resource, which delete (its
+cleanup) removes; one it only found is neither, unless an earlier attempt
+made it for this team.
 Credentials as in the aws team's README.md: boto3's default chain (EKS Pod
 Identity or IRSA), optionally assuming the aws-target role.
 """
@@ -30,6 +32,10 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 # What marks a service this product made: delete removes no other.
 MADE_BY_TAG = ("vertra-made", "true")
+# And for which team (the request's forTeam, the team the run is for, not
+# the one it runs in), so it's reported, and deleted, only for that team:
+# another team's service, even one this product made, isn't theirs.
+TEAM_TAG = "vertra-team"
 RETRYABLE_CODES = {
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
     "ServiceUnavailable", "InternalError", "InternalFailure", "InternalServiceErrorException",
@@ -91,10 +97,10 @@ def _find_service(apprunner: Any, name: str) -> dict[str, Any] | None:
             return None
 
 
-def _made_here(apprunner: Any, arn: str) -> bool:
-    """Whether the service carries this product's tag."""
+def _made_here(apprunner: Any, arn: str, team: str) -> bool:
+    """Whether the service carries this product's tags, for this team."""
     tags = apprunner.list_tags_for_resource(ResourceArn=arn).get("Tags", [])
-    return {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]} in tags
+    return {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]} in tags and {"Key": TEAM_TAG, "Value": team} in tags
 
 
 def _outputs(service: dict[str, Any], region: str, made_here: bool) -> dict[str, Any]:
@@ -114,10 +120,14 @@ def _outputs(service: dict[str, Any], region: str, made_here: bool) -> dict[str,
 
 
 def main() -> int:
-    inputs = json.loads(INPUT_PATH.read_text()).get("inputs", {})
+    request = json.loads(INPUT_PATH.read_text())
+    inputs = request.get("inputs", {})
     name, image, region = inputs.get("serviceName"), inputs.get("image"), inputs.get("region")
     if not name or not image or not region:
         return _failure("MISSING_INPUT", "inputs.serviceName, inputs.image and inputs.region are required")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
     environment = inputs.get("environment") or {}
     if not all(isinstance(v, str) for v in environment.values()):
         return _failure("INVALID_INPUT", "inputs.environment values must be strings")
@@ -129,7 +139,7 @@ def main() -> int:
             # Left as it is, but waited for like a new one: a retry may find
             # the service its last attempt was still creating.
             print(f"service '{name}' already exists ({service.get('Status')}), leaving it as it is")
-            made_here = _made_here(apprunner, service["ServiceArn"])
+            made_here = _made_here(apprunner, service["ServiceArn"], team)
         else:
             repository: dict[str, Any] = {
                 "ImageIdentifier": image,
@@ -148,7 +158,7 @@ def main() -> int:
                 NetworkConfiguration={
                     "IngressConfiguration": {"IsPubliclyAccessible": bool(inputs.get("public", False))}
                 },
-                Tags=[{"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}],
+                Tags=[{"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}, {"Key": TEAM_TAG, "Value": team}],
             )["Service"]
             made_here = True
             print(f"creating service '{name}'")

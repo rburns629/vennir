@@ -3,9 +3,10 @@
 cleanup). Given {"resource": {"type": "gcp/project", "id": ...}} as the
 console recorded it.
 
-Only a project carrying create's vertra-made label is deleted: a project
-made some other way is refused, whoever asks. One already gone, or already
-shutting down, succeeds: a cleanup must, when there's nothing left to do.
+Only a project carrying create's vertra-made label, and the run's team
+(request.json's forTeam) as its vertra-team label, is deleted: a project made some other way,
+or made for another team, is refused, whoever asks. One already gone, or
+already shutting down, succeeds: a cleanup must, when there's nothing left to do.
 Google keeps a shut-down project for 30 days, when it can be restored.
 """
 
@@ -23,6 +24,7 @@ from google.auth import impersonated_credentials
 from google.cloud import resourcemanager_v3
 
 MADE_BY_LABEL = ("vertra-made", "true")
+TEAM_LABEL = "vertra-team"
 
 INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")
@@ -98,10 +100,14 @@ def main() -> int:
 
 
 def _run() -> int:
-    resource = json.loads(INPUT_PATH.read_text()).get("inputs", {}).get("resource") or {}
+    request = json.loads(INPUT_PATH.read_text())
+    resource = request.get("inputs", {}).get("resource") or {}
     project_id = resource.get("id") if isinstance(resource, dict) else None
     if not project_id or resource.get("type") != "gcp/project":
         return _failure("MISSING_INPUT", "inputs.resource is the gcp/project to delete, as create reported it")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
 
     projects = resourcemanager_v3.ProjectsClient(credentials=_signed_in())
     try:
@@ -125,10 +131,16 @@ def _run() -> int:
         print(f"project '{project_id}' is already shutting down")
         _write_result({"status": "succeeded", "outputs": {"deleted": project_id}})
         return 0
-    if dict(project.labels).get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
+    labels = dict(project.labels)
+    if labels.get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
         return _failure(
             "NOT_MADE_BY_VERTRA",
             f"project '{project_id}' wasn't made by this product (it has no {MADE_BY_LABEL[0]} label), so it isn't deleted",
+        )
+    if labels.get(TEAM_LABEL) != team:
+        return _failure(
+            "NOT_THIS_TEAMS",
+            f"project '{project_id}' wasn't made for team '{team}' (its {TEAM_LABEL} label says otherwise), so it isn't deleted",
         )
 
     try:

@@ -846,8 +846,34 @@ export interface TemplateRun {
   template: string;
   parameters: Record<string, unknown>;
   onBehalfOf: string | undefined;
+  /** The team its steps run for, when that isn't onBehalfOf: a cleanup's, the team what it deletes was made for. */
+  forTeam?: string | undefined;
   /** The schedule that started it (scheduler.ts). */
   scheduleId?: string | undefined;
+}
+
+/**
+ * The submission with each task's forTeam, the team it runs for
+ * (request.json's forTeam, which a product marks what it makes with, and
+ * cleans up only that team's): a run's forTeam or onBehalfOf; for a run
+ * for its person alone, the task's own team when the caller is in it, else
+ * none; a team's own DAG, the task's team, whose member submits it. Never
+ * the submitter's to choose: whatever a task carries is replaced.
+ */
+function withForTeam(submission: Record<string, unknown>, caller: AuthUser | undefined, run: TemplateRun | undefined): Record<string, unknown> {
+  const tasks = submission["tasks"];
+  if (!Array.isArray(tasks)) return submission;
+  return {
+    ...submission,
+    tasks: tasks.map((task: unknown) => {
+      if (!isRecord(task)) return task;
+      const rest = Object.fromEntries(Object.entries(task).filter(([key]) => key !== "forTeam"));
+      const team = optionalString(task["team"]);
+      const forTeam =
+        run === undefined ? team : (run.forTeam ?? run.onBehalfOf ?? (team !== undefined && caller?.teamNames.includes(team) ? team : undefined));
+      return forTeam ? { ...rest, forTeam } : rest;
+    }),
+  };
 }
 
 /**
@@ -880,11 +906,15 @@ export async function submitChecked(
 
   const pinnedBody = await pinned(body as Record<string, unknown>, context);
   await refuseUnscanned(taskImages(pinnedBody), context);
-  const submission = await withProductContract(await withProductResources(pinnedBody), {
-    teamNames: caller?.teamNames ?? [],
-    forTeam: run?.onBehalfOf,
-    isAdmin: caller?.isAdmin,
-  });
+  const submission = withForTeam(
+    await withProductContract(await withProductResources(pinnedBody), {
+      teamNames: caller?.teamNames ?? [],
+      forTeam: run?.onBehalfOf,
+      isAdmin: caller?.isAdmin,
+    }),
+    caller,
+    run,
+  );
 
   // Before the kernel has it: once it does, nothing may stand between it
   // and its record (recordOrCancel), or it would run unrecorded.

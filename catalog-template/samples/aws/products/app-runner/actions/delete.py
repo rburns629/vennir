@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """aws/app-runner's "delete" action, its create's cleanup: deletes a service
-create made (tagged vertra-made=true), and no other, given the resource
-create reported (its ARN, which names its region). A service that's already
-gone counts as deleted. App Runner finishes a delete on its own once it's
+create made (tagged vertra-made=true) for the run's team (tagged
+vertra-team=<it>), and no other, given the resource create reported (its
+ARN, which names its region). A service that's already gone counts as deleted. App Runner finishes a delete on its own once it's
 accepted, so this doesn't wait for it.
 
 Credentials as for create (see the aws team's README.md).
@@ -22,6 +22,7 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 MADE_BY_TAG = ("vertra-made", "true")
+TEAM_TAG = "vertra-team"
 SERVICE_ARN = re.compile(r"^arn:aws[a-z-]*:apprunner:([a-z0-9-]+):[0-9]{12}:service/[A-Za-z0-9_-]+/[0-9a-f]+$")
 RETRYABLE_CODES = {
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
@@ -77,10 +78,14 @@ def _gone(arn: str) -> int:
 
 
 def main() -> int:
-    resource = json.loads(INPUT_PATH.read_text()).get("inputs", {}).get("resource") or {}
+    request = json.loads(INPUT_PATH.read_text())
+    resource = request.get("inputs", {}).get("resource") or {}
     arn = resource.get("id", "")
     if resource.get("type") != "aws/app-runner-service" or not arn:
         return _failure("MISSING_INPUT", "inputs.resource is the aws/app-runner-service to delete, as create reported it")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
     match = SERVICE_ARN.match(arn)
     if not match:
         return _failure("INVALID_INPUT", f"'{arn}' isn't an App Runner service's ARN")
@@ -100,6 +105,11 @@ def main() -> int:
             return _failure(
                 "NOT_MADE_BY_VERTRA",
                 f"Service '{service.get('ServiceName')}' has no {MADE_BY_TAG[0]}={MADE_BY_TAG[1]} tag: this product deletes only services it made.",
+            )
+        if {"Key": TEAM_TAG, "Value": team} not in tags:
+            return _failure(
+                "NOT_THIS_TEAMS",
+                f"Service '{service.get('ServiceName')}' has no {TEAM_TAG}={team} tag: this product deletes only services it made for this team.",
             )
         try:
             apprunner.delete_service(ServiceArn=arn)

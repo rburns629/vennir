@@ -37,6 +37,11 @@ from google.cloud.billing_v1.types import ProjectBillingInfo
 # those: never a project someone made some other way. Also how a retry
 # that finds the project it made a moment ago still reports it.
 MADE_BY_LABEL = ("vertra-made", "true")
+# And for which team (the request's forTeam, the team the run is for, not
+# the one it runs in: a Kubernetes namespace name, so always a valid label
+# value), so it's reported, and deleted, only for that team: another team's
+# project, even one this product made, isn't theirs.
+TEAM_LABEL = "vertra-team"
 
 INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")
@@ -155,6 +160,9 @@ def _run() -> int:
     project_id = inputs.get("projectId")
     if not project_id:
         return _failure("MISSING_INPUT", "inputs.projectId is required")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
 
     credentials = _signed_in()
     projects = resourcemanager_v3.ProjectsClient(credentials=credentials)
@@ -172,7 +180,8 @@ def _run() -> int:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
     if existing is not None:
         print(f"project '{project_id}' already exists, skipping creation")
-        made_here = dict(existing.labels).get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1]
+        labels = dict(existing.labels)
+        made_here = labels.get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1] and labels.get(TEAM_LABEL) == team
         if made_here and billing_account_id:
             # The attempt that made it may have stopped before linking it.
             try:
@@ -190,7 +199,7 @@ def _run() -> int:
             project=resourcemanager_v3.Project(
                 project_id=project_id,
                 display_name=project_id,
-                labels=dict([MADE_BY_LABEL]),
+                labels={MADE_BY_LABEL[0]: MADE_BY_LABEL[1], TEAM_LABEL: team},
                 parent=inputs.get("parent", ""),
             )
         )

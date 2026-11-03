@@ -12,6 +12,8 @@ from unittest.mock import MagicMock, patch
 
 _MODULE_PATH = Path(__file__).parent / "delete.py"
 PATH = "projects/my-project/locations/us-central1/services/hello-world"
+# What create labels a service it deploys for team web with.
+MADE_FOR_WEB = {"vertra-made": "true", "vertra-team": "web"}
 
 
 def _load():
@@ -37,8 +39,11 @@ class DeleteActionTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
 
-    def _run(self, resource: dict, service: object = None, *, get_error: Exception | None = None):
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"resource": resource}}))
+    def _run(self, resource: dict, service: object = None, *, get_error: Exception | None = None, team: str | None = "web"):
+        request: dict = {"inputs": {"resource": resource}}
+        if team:
+            request["forTeam"] = team
+        self.module.INPUT_PATH.write_text(json.dumps(request))
         with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
             client = client_cls.return_value
             if get_error:
@@ -49,7 +54,7 @@ class DeleteActionTest(unittest.TestCase):
         return code, json.loads(self.module.OUTPUT_PATH.read_text()), client
 
     def test_a_service_it_deployed_is_deleted(self) -> None:
-        code, result, client = self._run({"type": "gcp/cloud-run-service", "id": PATH}, MagicMock(labels={"vertra-made": "true"}))
+        code, result, client = self._run({"type": "gcp/cloud-run-service", "id": PATH}, MagicMock(labels=MADE_FOR_WEB))
         self.assertEqual(code, 0)
         client.delete_service.assert_called_once_with(name=PATH)
         self.assertEqual(result["outputs"], {"deleted": PATH})
@@ -58,6 +63,16 @@ class DeleteActionTest(unittest.TestCase):
         code, result, client = self._run({"type": "gcp/cloud-run-service", "id": PATH}, MagicMock(labels={}))
         self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VERTRA"))
         client.delete_service.assert_not_called()
+
+    def test_one_deployed_for_another_team_is_refused(self) -> None:
+        code, result, client = self._run({"type": "gcp/cloud-run-service", "id": PATH}, MagicMock(labels=MADE_FOR_WEB), team="data")
+        self.assertEqual((code, result["error"]["code"]), (1, "NOT_THIS_TEAMS"))
+        client.delete_service.assert_not_called()
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        code, result, client = self._run({"type": "gcp/cloud-run-service", "id": PATH}, MagicMock(labels=MADE_FOR_WEB), team=None)
+        self.assertEqual((code, result["error"]["code"]), (1, "MISSING_TEAM"))
+        self.assertEqual(client.method_calls, [])
 
     def test_one_already_gone_succeeds(self) -> None:
         code, _, client = self._run({"type": "gcp/cloud-run-service", "id": PATH}, get_error=self.module.NotFound("gone"))
@@ -75,9 +90,9 @@ class DeleteActionTest(unittest.TestCase):
         self.assertEqual((code, result["error"]["code"], result["error"]["retryable"]), (1, "GCP_SIGN_IN_FAILED", False))
 
     def test_a_delete_still_running_when_the_wait_ends_is_retried(self) -> None:
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"resource": {"type": "gcp/cloud-run-service", "id": PATH}}}))
+        self.module.INPUT_PATH.write_text(json.dumps({"forTeam": "web", "inputs": {"resource": {"type": "gcp/cloud-run-service", "id": PATH}}}))
         with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
-            client_cls.return_value.get_service.return_value = MagicMock(labels={"vertra-made": "true"})
+            client_cls.return_value.get_service.return_value = MagicMock(labels=MADE_FOR_WEB)
             client_cls.return_value.delete_service.return_value.result.side_effect = TimeoutError()
             self.assertEqual(self.module.main(), 1)
         error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]

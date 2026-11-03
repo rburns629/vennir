@@ -25,8 +25,9 @@ actions:
     idempotent: true
     maxAttempts: 3
     script: actions/create.py
-    # Deleting the project it made (only one it made: create labels it
-    # vertra-made, and delete refuses any other). The console offers it to
+    # Deleting the project it made (only one it made for the run's team:
+    # create labels it vertra-made and vertra-team, and delete refuses any
+    # other). The console offers it to
     # whoever the run was for, and admins.
     cleanup:
       action: delete

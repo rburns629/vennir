@@ -122,6 +122,20 @@ func TestARefusedStartFailsAtOnceAndDiscardsWhatItLeft(t *testing.T) {
 	equal(t, "discarded", len(exec.Discarded), 1)
 }
 
+// The team a step runs for reaches its request.json, beside the namespace
+// it runs in; a step without one has none.
+func TestAStepIsStartedForTheTeamItRunsFor(t *testing.T) {
+	tx := txFor(t)
+	submit(t, tx, "for-team", task("shared", team("owner"), forTeam("consumer")), task("own", team("owner")))
+	exec := fake()
+	dispatchTicker(t, tx, exec, 5).tick(time.Now())
+	got := map[string]string{}
+	for _, s := range exec.Started {
+		got[s.TaskKey] = s.Team + "/" + s.ProductRequest().ForTeam
+	}
+	equal(t, "started", got, map[string]string{"shared": "owner/consumer", "own": "owner/"})
+}
+
 // The scheduler was down past the task's timeout; its Job had succeeded.
 func TestASuccessSeenLateCountsAndIsntRunAgain(t *testing.T) {
 	tx := txFor(t)

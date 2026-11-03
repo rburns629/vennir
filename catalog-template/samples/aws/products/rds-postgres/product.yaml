@@ -25,9 +25,9 @@ actions:
   idempotent: true
   maxAttempts: 3
   script: actions/create.py
-  # An instance it creates is tagged vertra-made=true and reported as a
-  # resource; delete removes it, keeping a final snapshot (and refuses any
-  # instance without the tag).
+  # An instance it creates is tagged vertra-made=true and vertra-team=<team>
+  # and reported as a resource; delete removes it, keeping a final snapshot
+  # (and refuses any instance without both tags for the run's team).
   cleanup:
     action: delete
   input:

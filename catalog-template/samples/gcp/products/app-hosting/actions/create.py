@@ -41,6 +41,11 @@ from google.cloud import run_v2
 # those, never a service deployed some other way; and how a retry that finds
 # the service it made a moment ago still reports it.
 MADE_BY_LABEL = ("vertra-made", "true")
+# And for which team (the request's forTeam, the team the run is for, not
+# the one it runs in: a Kubernetes namespace name, so always a valid label
+# value), so it's reported, and deleted, only for that team: another team's
+# service, even one this product made, isn't theirs.
+TEAM_LABEL = "vertra-team"
 
 INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")
@@ -163,6 +168,9 @@ def _run() -> int:
             "MISSING_INPUT",
             "inputs.projectId, inputs.serviceName, and inputs.image are required",
         )
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
     region = inputs.get("region", DEFAULT_REGION)
     registry = _setting("image-registry").rstrip("/")
     runtime_account = _setting("runtime-service-account")
@@ -183,7 +191,8 @@ def _run() -> int:
     try:
         existing = services.get_service(name=service_path)
         print(f"service '{service_name}' already exists, skipping deployment")
-        made_here = dict(existing.labels).get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1]
+        labels = dict(existing.labels)
+        made_here = labels.get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1] and labels.get(TEAM_LABEL) == team
         _write_result({"status": "succeeded", "outputs": _outputs(existing, project_id, region, service_name, made_here)})
         return 0
     except NotFound:
@@ -216,7 +225,7 @@ def _run() -> int:
         operation = services.create_service(
             parent=f"projects/{project_id}/locations/{region}",
             service_id=service_name,
-            service=run_v2.Service(template=template, labels=dict([MADE_BY_LABEL])),
+            service=run_v2.Service(template=template, labels={MADE_BY_LABEL[0]: MADE_BY_LABEL[1], TEAM_LABEL: team}),
         )
         service = operation.result()
     except GoogleAPIError as error:

@@ -281,6 +281,9 @@ describe("running a template", () => {
     // The product's image (pinned on the way when pinning is on; off here).
     expect(String(one?.["image"]).startsWith(`registry.example/${own}/hello:1`)).toBe(true);
     expect(two).toMatchObject({ id: "two", team: db_, serviceAccount: "store", dependsOn: ["one"], inputs: { value: { $fromTask: "one", $output: "text" } } });
+    // For no team (the caller has none): its steps run for none, so a
+    // product that marks what it makes refuses it.
+    expect([one?.["forTeam"], two?.["forTeam"]]).toEqual([undefined, undefined]);
 
     const [record] = await db.select().from(submittedExecutions).where(eq(submittedExecutions.executionId, run.body.executionId));
     expect(record).toMatchObject({ template: `${own}/chain`, templateParameters: { text: "hi" }, onBehalfOf: null, teams: [own, db_] });
@@ -312,6 +315,8 @@ describe("running a template", () => {
     expect(run.code).toBe("ok");
     const [record] = await db.select().from(submittedExecutions).where(eq(submittedExecutions.executionId, run.body.executionId));
     expect(record?.onBehalfOf).toBe(cons);
+    // Its step runs in its product's team, for the consumer's (request.json's forTeam).
+    expect(forwarded().tasks[0]).toMatchObject({ team: own, forTeam: cons });
     expect(
       (await call(consumerToken, "TemplateService/RunTemplate", { team: own, name: "for-cons", parameters: { text: "hi" }, onBehalfOf: priv })).code,
     ).toBe("permission_denied");
@@ -321,6 +326,14 @@ describe("running a template", () => {
     const refused = await call(outsiderToken, "TemplateService/RunTemplate", { team: own, name: "bad-share", parameters: {} });
     expect(refused.code).toBe("permission_denied");
     expect(submitExecution).not.toHaveBeenCalled();
+  });
+
+  it("runs a team's own DAG for that team, whatever forTeam it says", async () => {
+    const submitted = await call(ownMemberToken, "ExecutionService/SubmitExecution", {
+      dag: { name: "own", tasks: [{ id: "one", image: `registry.example/${own}/hello:1`, action: "run", team: own, forTeam: cons, inputs: { text: "hi" } }] },
+    });
+    expect(submitted.code).toBe("ok");
+    expect(forwarded().tasks[0]).toMatchObject({ team: own, forTeam: own });
   });
 
   it("is still refused as a DAG submitted by someone not in its teams", async () => {
@@ -341,9 +354,22 @@ describe("running an action on its own", () => {
       inputs: { value: "x" },
     });
     expect(run.code).toBe("ok");
-    expect(forwarded().tasks).toEqual([expect.objectContaining({ id: "put", team: db_, serviceAccount: "store", inputs: { value: "x" } })]);
+    // Run in the product's team, for the caller's: never the product's own.
+    expect(forwarded().tasks).toEqual([expect.objectContaining({ id: "put", team: db_, forTeam: own, serviceAccount: "store", inputs: { value: "x" } })]);
     const [record] = await db.select().from(submittedExecutions).where(eq(submittedExecutions.executionId, run.body.executionId));
     expect(record?.template).toBe(`${db_}/store.put`);
+  });
+
+  it("runs for the team asked for, only one of the caller's, and its own team's member's for that team", async () => {
+    // A team of the consumer's, named: what the kernel is told it's for.
+    expect((await call(consumerToken, "TemplateService/RunAction", { product: `${own}-hello-run`, inputs: { text: "hi" }, onBehalfOf: cons })).code).toBe("not_found");
+    expect((await call(ownMemberToken, "TemplateService/RunAction", { product: `${db_}-store-put`, inputs: { value: "x" }, onBehalfOf: cons })).code).toBe(
+      "permission_denied",
+    );
+    vi.mocked(submitExecution).mockClear();
+    // Its own team's member, naming no team: for its team.
+    expect((await call(ownMemberToken, "TemplateService/RunAction", { product: `${own}-hello-run`, inputs: { text: "hi" } })).code).toBe("ok");
+    expect(forwarded().tasks[0]).toMatchObject({ team: own, forTeam: own });
   });
 });
 

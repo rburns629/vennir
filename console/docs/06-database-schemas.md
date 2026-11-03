@@ -104,6 +104,7 @@ One row per task in a DAG, and the scheduler's work queue: it claims rows from h
 | `cap_scope` | text | yes | Its product's cap (product.yaml's `maxRunning`): the product, whose tasks share it; null: no cap. |
 | `cap_limit` | integer | no | How many of the product's tasks may be claimed or running at once; the rest wait, READY. 0 with no cap. |
 | `capacity` | text | yes | The capacity its product asks for (product.yaml's `capacity`): `spot` or `onDemand`, each a placement the install sets; null, the install's own. |
+| `for_team` | text | yes | The team it runs for, which may not be the one it runs in (`team`): the run's `onBehalfOf`, or a team's own DAG's team, as the console sends it. Its `request.json`'s `forTeam`, so a product marks what it makes as that team's and cleans up only that team's. Null: none. |
 | `next_attempt_requested_by` | text | yes | Who retried it, for its next attempt; cleared when that attempt is claimed. |
 | `approval_required` | boolean | no | It waits in `AWAITING_APPROVAL`, instead of becoming `READY`, until a maintainer of its team approves it. The console sets it from product.yaml's `approval` and the owning team's `allowedTargets`. |
 | `approved_by`, `approved_at` | text, timestamptz | yes | Who approved it (`user:<id>`) and when. Kept across retries, so an approved step isn't asked about again. |

@@ -36,8 +36,11 @@ class DeleteActionTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
 
-    def _run(self, resource: dict, project: object = None, *, get_error: Exception | None = None) -> tuple[int, dict, MagicMock]:
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"resource": resource}}))
+    def _run(self, resource: dict, project: object = None, *, get_error: Exception | None = None, team: str | None = "web") -> tuple[int, dict, MagicMock]:
+        request: dict = {"inputs": {"resource": resource}}
+        if team:
+            request["forTeam"] = team
+        self.module.INPUT_PATH.write_text(json.dumps(request))
         with patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls:
             client = client_cls.return_value
             if get_error:
@@ -48,7 +51,7 @@ class DeleteActionTest(unittest.TestCase):
         return code, json.loads(self.module.OUTPUT_PATH.read_text()), client
 
     def made(self, state=None) -> MagicMock:
-        return MagicMock(labels={"vertra-made": "true"}, state=state or self.module.resourcemanager_v3.Project.State.ACTIVE)
+        return MagicMock(labels={"vertra-made": "true", "vertra-team": "web"}, state=state or self.module.resourcemanager_v3.Project.State.ACTIVE)
 
     def test_a_project_it_made_is_shut_down(self) -> None:
         code, result, client = self._run({"type": "gcp/project", "id": "web-1"}, self.made())
@@ -61,6 +64,20 @@ class DeleteActionTest(unittest.TestCase):
         self.assertEqual(code, 1)
         client.delete_project.assert_not_called()
         self.assertEqual(result["error"]["code"], "NOT_MADE_BY_VERTRA")
+
+    def test_a_project_made_for_another_team_is_refused(self) -> None:
+        code, result, client = self._run({"type": "gcp/project", "id": "web-1"}, self.made(), team="data")
+        self.assertEqual((code, result["error"]["code"]), (1, "NOT_THIS_TEAMS"))
+        client.delete_project.assert_not_called()
+        # Made before projects were labelled with their team: refused too.
+        code, result, client = self._run({"type": "gcp/project", "id": "old"}, MagicMock(labels={"vertra-made": "true"}, state=1))
+        self.assertEqual((code, result["error"]["code"]), (1, "NOT_THIS_TEAMS"))
+        client.delete_project.assert_not_called()
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        code, result, client = self._run({"type": "gcp/project", "id": "web-1"}, self.made(), team=None)
+        self.assertEqual((code, result["error"]["code"]), (1, "MISSING_TEAM"))
+        self.assertEqual(client.method_calls, [])
 
     def test_one_already_gone_or_shutting_down_succeeds(self) -> None:
         code, _, client = self._run({"type": "gcp/project", "id": "gone"}, get_error=self.module.NotFound("gone"))
