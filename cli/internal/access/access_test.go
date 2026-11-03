@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -110,6 +111,78 @@ func TestCheckAWSInAnAllowedRegion(t *testing.T) {
 	}
 }
 
+// withZones answers describe-availability-zones for some regions itself
+// (nil error: the region answers), counting how often each is asked.
+func withZones(exec Exec, answers map[string]error, asked map[string]int) Exec {
+	var mu sync.Mutex
+	return func(ctx context.Context, name string, args ...string) (string, error) {
+		if len(args) > 0 && args[0] == "ec2" && args[1] == "describe-availability-zones" {
+			for i, a := range args {
+				if a != "--region" || i+1 == len(args) {
+					continue
+				}
+				r := args[i+1]
+				mu.Lock()
+				asked[r]++
+				mu.Unlock()
+				if err, ok := answers[r]; ok {
+					if err != nil {
+						return "", err
+					}
+					return `"` + r + `a"`, nil
+				}
+			}
+		}
+		return exec(ctx, name, args...)
+	}
+}
+
+// A region outside AWSRegions (opted in to, here) is asked too, and judged
+// by its own answer.
+func TestCheckAWSAsksTheRegionChosen(t *testing.T) {
+	asked := map[string]int{}
+	exec := withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"il-central-1": nil}, asked)
+	a := CheckAWS(context.Background(), exec, "vertra", "il-central-1")
+	if len(a.Problems) != 0 || !contains(a.Allowed, "il-central-1") || asked["il-central-1"] != 1 {
+		t.Errorf("allowed %v, asked %v:\n%s", a.Allowed, asked, report(a.Report))
+	}
+	if !strings.Contains(report(a.Report), "Region: il-central-1") {
+		t.Errorf("got:\n%s", report(a.Report))
+	}
+
+	// One the account hasn't opted in to is still a problem.
+	notEnabled := errors.New("\naws: [ERROR]: An error occurred (OptInRequired): You are not subscribed to this service.")
+	exec = withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"me-central-1": notEnabled}, asked)
+	a = CheckAWS(context.Background(), exec, "vertra", "me-central-1")
+	if !strings.Contains(report(a.Report), "PROBLEM can't use me-central-1 from this account") {
+		t.Errorf("got:\n%s", report(a.Report))
+	}
+
+	// ap-northeast-3 every account has: it's offered without being chosen.
+	exec = withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"ap-northeast-3": nil}, asked)
+	if a := CheckAWS(context.Background(), exec, "vertra", ""); !contains(a.Allowed, "ap-northeast-3") {
+		t.Errorf("allowed %v", a.Allowed)
+	}
+}
+
+// init offers a region outside AWSRegions once it has answered.
+func TestProbeRegionAddsItToAllowed(t *testing.T) {
+	asked := map[string]int{}
+	exec := withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"eu-south-1": nil}, asked)
+	a := CheckAWS(context.Background(), exec, "vertra", "")
+	if contains(a.Allowed, "eu-south-1") {
+		t.Fatalf("eu-south-1 asked before it was chosen: %v", a.Allowed)
+	}
+	a.ProbeRegion(context.Background(), exec, "vertra", "eu-south-1")
+	if strings.Join(a.Allowed, ",") != "eu-south-1,us-east-2" {
+		t.Errorf("allowed %v", a.Allowed)
+	}
+	a.ProbeRegion(context.Background(), exec, "vertra", "eu-south-2")
+	if a.Denied["eu-south-2"] == "" {
+		t.Errorf("an organization's refusal is kept: %v", a.Denied)
+	}
+}
+
 func TestCheckAWSRefusesRoot(t *testing.T) {
 	a := CheckAWS(context.Background(), fakeAWS("arn:aws:iam::111111111111:root"), "", "us-east-2")
 	if !a.Root || !strings.Contains(report(a.Report), "PROBLEM signed in as the account's root user") {
@@ -164,10 +237,64 @@ func TestCheckGCP(t *testing.T) {
 	}
 }
 
-func TestLocationAllowed(t *testing.T) {
-	if !locationAllowed([]string{"in:us-locations"}, "us-east1") || locationAllowed([]string{"in:eu-locations"}, "us-east1") ||
-		!locationAllowed([]string{"in:us-central1-locations"}, "us-central1") {
-		t.Error("location matching")
+func TestRegionInLocations(t *testing.T) {
+	for _, c := range []struct {
+		values []string
+		region string
+		want   location
+	}{
+		{[]string{"in:us-locations"}, "us-east1", locationAllowed},
+		{[]string{"in:us-central1-locations"}, "us-central1", locationAllowed},
+		{[]string{"us-central1"}, "us-central1", locationAllowed},
+		{[]string{"is:us-central1"}, "us-central1", locationAllowed},
+		{[]string{"in:northamerica-locations"}, "us-central1", locationAllowed},
+		{[]string{"in:northamerica-locations"}, "northamerica-northeast1", locationAllowed},
+		{[]string{"in:asia-locations", "in:europe-locations"}, "europe-west12", locationAllowed},
+		{[]string{"in:europe-locations"}, "us-central1", locationRefused},
+		{[]string{"in:us-locations"}, "northamerica-northeast1", locationRefused},
+		{[]string{"in:us-east1-locations", "europe-west1"}, "us-central1", locationRefused},
+		{[]string{"us-east1"}, "me-west1", locationRefused},
+		// Groups named after a jurisdiction can't be read from a region's name.
+		{[]string{"in:eu-locations"}, "europe-west1", locationUnknown},
+		{[]string{"in:eu-locations"}, "us-east1", locationUnknown},
+		{[]string{"in:canada-locations"}, "northamerica-northeast1", locationUnknown},
+		{[]string{"in:japan-locations", "in:us-locations"}, "asia-northeast1", locationUnknown},
+		// in:asia-locations leaves out asia-southeast3 (in:th-locations).
+		{[]string{"in:asia-locations"}, "asia-southeast3", locationUnknown},
+		{[]string{"in:asia-locations"}, "us-central1", locationUnknown},
+		// Nor can a region outside the prefix groups be ruled out of them.
+		{[]string{"in:europe-locations"}, "me-west1", locationUnknown},
+		// A zone, or global, says nothing sure about the region.
+		{[]string{"in:us-central1-a-locations"}, "us-central1", locationUnknown},
+		{[]string{"global"}, "us-central1", locationUnknown},
+	} {
+		if got := regionInLocations(c.values, c.region); got != c.want {
+			t.Errorf("%v, %s: %d, want %d", c.values, c.region, got, c.want)
+		}
+	}
+}
+
+// A group the check can't read is a line, not a problem that stops init
+// and apply.
+func TestCheckGCPCantTellIsNotAProblem(t *testing.T) {
+	exec := func(_ context.Context, name string, args ...string) (string, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(joined, "auth list"):
+			return `[{"account":"me@example.com","status":"ACTIVE"}]`, nil
+		case strings.HasPrefix(joined, "auth application-default print-access-token"):
+			return "ya29.token", nil
+		case strings.Contains(joined, "gcp.resourceLocations"):
+			return `{"listPolicy":{"allowedValues":["in:eu-locations"]}}`, nil
+		}
+		return "", nil
+	}
+	g := CheckGCP(context.Background(), exec, func(context.Context, string) string { return "me@example.com" }, "my-project", "europe-west1")
+	if len(g.Problems) > 0 {
+		t.Errorf("problems: %+v", g.Problems)
+	}
+	if out := report(g.Report); !strings.Contains(out, "Policy: your organization's policy allows only in:eu-locations: Vertra can't tell whether that includes europe-west1") {
+		t.Errorf("no line saying so in:\n%s", out)
 	}
 }
 

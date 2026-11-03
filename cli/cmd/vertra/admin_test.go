@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/rburns629/vertra/cli/internal/config"
 )
 
 func TestSavePassword(t *testing.T) {
@@ -85,5 +87,30 @@ func TestSavePasswordSymlinkAndListed(t *testing.T) {
 	entries, _ := os.ReadDir(dir)
 	if len(entries) != 3 {
 		t.Errorf("left behind: %v", entries)
+	}
+}
+
+// The first admin's password is given until an apply has finished: a first
+// console install that failed is listed by helm, but its retry's migrate may
+// be the one that creates the account.
+func TestFirstAdminPending(t *testing.T) {
+	dir := t.TempDir()
+	if !firstAdminPending(dir, "") {
+		t.Error("a fresh install")
+	}
+	if firstAdminPending(dir, "execution-console-0.1.0") {
+		t.Error("installed, and no password saved: nothing to give")
+	}
+	if _, err := savePassword(dir, "s3cret"); err != nil {
+		t.Fatal(err)
+	}
+	if !firstAdminPending(dir, "execution-console-0.1.0") || savedPassword(dir) != "s3cret" {
+		t.Error("a first install that stopped part way gives the saved password again")
+	}
+	if err := config.Default("kind").SaveApplied(dir); err != nil {
+		t.Fatal(err)
+	}
+	if firstAdminPending(dir, "execution-console-0.1.0") {
+		t.Error("an apply has finished: the account has its password")
 	}
 }

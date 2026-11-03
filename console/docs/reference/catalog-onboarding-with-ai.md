@@ -27,8 +27,8 @@ creates namespaces and publishes images.
 3. **A pull request, not a push to `main`.** Review it as you would a
    colleague's: what the action calls, what it outputs, what it logs.
 
-Once merged, CI publishes the product (pushes its image as the commit's tag
-and `:latest`) and the catalog's release, which each Vertra install reads
+Once merged, CI publishes the product (pushes its image as the commit's tag,
+signs it, then moves `:latest` to it) and the catalog's release, which each Vertra install reads
 within a few minutes: it registers the product, and a new team folder gets
 its console team and namespace. A name already taken by a team the catalog
 didn't make waits for that install's admin to adopt it.

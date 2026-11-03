@@ -62,6 +62,57 @@ func TestAWSEstimate(t *testing.T) {
 	}
 }
 
+// Auto Mode runs as many instances as the floor, with the parts turned on,
+// needs; each brings its fee, public address and disk.
+func TestAWSPricesTheInstancesTheFloorNeeds(t *testing.T) {
+	c6a := 0.0765 + 0.0092 + 0.005 + 80*0.08/hoursPerMonth
+	m6a := 0.0864 + 0.0104 + 0.005 + 80*0.08/hoursPerMonth
+	for _, tc := range []struct {
+		name  string
+		setup func(*config.Config)
+		want  string
+	}{
+		{"resilient", func(c *config.Config) { c.Size = "resilient" },
+			money(c6a*hoursPerMonth) + " a month if never asleep: about one c6a.large node"},
+		// 3.625 GiB against about 3.1 a c6a.large leaves.
+		{"resilient, logs, Amazon's Prometheus", func(c *config.Config) {
+			c.Size, c.Logs.Enabled, c.Monitoring = "resilient", true, config.Monitoring{Enabled: true, Provider: "amazon"}
+		}, money(2*c6a*hoursPerMonth) + " a month if never asleep: about 2 c6a.large nodes"},
+		// 2.625–4.125 GiB.
+		{"auto, logs", func(c *config.Config) { c.Size, c.Logs.Enabled = "auto", true },
+			money(c6a*hoursPerMonth) + "–" + money(2*c6a*hoursPerMonth) + " a month if never asleep: about 1–2 c6a.large nodes"},
+		// 2.0 vCPU against about 1.9.
+		{"scaled, gateway, logs", func(c *config.Config) { c.Size, c.Gateway.Enabled, c.Logs.Enabled = "scaled", true, true },
+			money(2*m6a*hoursPerMonth) + " a month if never asleep: about 2 m6a.large nodes"},
+	} {
+		c := config.Default("aws")
+		tc.setup(c)
+		if out := text(AWS(awsPrices(), c, "fetched now")); !strings.Contains(out, "While awake: "+tc.want) {
+			t.Errorf("%s: want %q:\n%s", tc.name, tc.want, out)
+		}
+	}
+	// Likely follows: always, the nodes for 88 hours, 50 step-hours.
+	c := config.Default("aws")
+	c.Size, c.Logs.Enabled, c.Monitoring = "resilient", true, config.Monitoring{Enabled: true, Provider: "amazon"}
+	out := text(AWS(awsPrices(), c, "fetched now"))
+	always := 73 + (50+2+2)*0.08
+	step := max(0.5/2, 1.0/4) * (0.03 + 0.0092 + 0.005 + 80*0.08/hoursPerMonth)
+	if want := "Likely: " + money(always+2*c6a*lightAwakeHours+step*lightStepHours) + " for light use"; !strings.Contains(out, want) {
+		t.Errorf("want %q:\n%s", want, out)
+	}
+}
+
+func TestAWSStandardPricesTheNodesTheRequestsNeed(t *testing.T) {
+	c := config.Default("aws")
+	c.Cluster.Mode, c.Size = "standard", "resilient"
+	// 3 GiB and the cluster's own Pods: two c6a.large.
+	out := text(AWS(awsPrices(), c, "fetched now"))
+	node := (0.0765 + 0.005 + 20*0.08/hoursPerMonth) * hoursPerMonth
+	if want := "Always: " + money(73+50*0.08+2*node) + ": the EKS cluster fee ($73.00; EKS has no free tier), 2 c6a.large nodes for the platform"; !strings.Contains(out, want) {
+		t.Errorf("want %q:\n%s", want, out)
+	}
+}
+
 func TestAWSEstimateWithoutSpotPrices(t *testing.T) {
 	p := awsPrices()
 	p.SpotUnavailable = true

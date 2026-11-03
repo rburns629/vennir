@@ -360,7 +360,10 @@ token's signature with the issuer's published keys (an issuer not on the
 list is never contacted), its issuer, its audience (`keyless.audience`,
 the console's URL by default, so a token minted for another service can't
 be replayed here) and expiry, and returns an hour's ordinary session for
-the one bot whose claims it carries; two or none is a refusal. Each sign-in
+the one bot whose claims it carries; two or none is a refusal. So no bot's
+identity may overlap another bot's (one token could match both: every claim
+they share has the same value), or one team could stop another team's bot
+signing in by adding a broader identity. Each sign-in
 is logged with the bot, issuer and subject, and the identity's last use is
 kept.
 
@@ -440,15 +443,26 @@ may only order its listed templates.
 The caller's `Authorization` stops at the gateway; the backend gets its own
 credential instead, minted per request, and `Vertra-Caller`, an EdDSA JWT
 the gateway signs (its key at `/.vertra/jwks.json`) naming the caller,
-their team and the API. A caller's own `Vertra-*` headers are dropped.
+their team and the API. An API may only use an in-cluster backend in its
+own team's namespace (`<service>.<team>.svc`): one pointed at another
+team's is held, by the console and the gateway, whatever `backendHosts`
+allows, so no team can serve another's backend under its own spec and
+sharing; a backend should still check the token's `api` as well as its
+`aud` (the sample does). Only the cluster's default domain is read
+(`.svc.cluster.local`): on a cluster with another, and for short names,
+pod IPs or anything else that reaches inside the cluster, `backendHosts`
+alone decides, so list exactly the hosts each API may use. A caller's own `Vertra-*` headers are dropped.
 Paths with encoded slashes or dot segments are refused, so what's checked
 is what's forwarded.
 
 Backends must be under hosts the admins allow (`gateway.backendHosts`), or
 the API is held: the gateway can't be pointed anywhere a catalog says. Its
 only Kubernetes right is minting ServiceAccount tokens, and an admission
-policy limits that to API ServiceAccounts (`*-api`) in team namespaces, so
-it can't mint the platform's or a team's other identities. It reads the
+policy limits that to API ServiceAccounts (`*-api`) in team namespaces, for
+a named audience that isn't the Kubernetes API's or kernel-api's, lasting an
+hour at most, so it can't mint the platform's or a team's other identities,
+or a token for the cluster itself. `-api` is reserved: no product may run as
+such a ServiceAccount, and an API's must end in it. It reads the
 console's database as a role of its own (`vertra_gateway`,
 `console/src/db/gatewayAccess.ts`): it may read the columns it needs to
 sign callers in and find APIs (never a password hash, a sealed value, a
@@ -690,6 +704,27 @@ without going through the console:
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
 | Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own) | console chart, `templates/write-fence-policy.yaml` |
 
+An install whose platform namespace is also a team's (`allowReleaseNamespace`,
+as the GKE reference values' `default` is) loses more than the dispatch
+guardrail there:
+- the team's `vertra-default-deny` admits every Pod in the namespace to
+  every other, so that team's steps can reach the platform's Postgres and
+  kernel-api (passwords and TokenReview still hold; the network layer
+  doesn't);
+- a product of that team may declare one of the platform's own
+  ServiceAccounts, and the identity policy lets its steps run as it (with
+  its cloud identity, on Workload Identity);
+- the console's write fence counts the namespace as a team's, so it may
+  write the platform's own Secrets (the databases', the session key);
+- policy-controller has to exclude it, so that team's steps run unsigned
+  images;
+- the gateway's token fence matches kernel-api's ServiceAccount there;
+- the team's quota counts the platform's own Pods.
+
+`vertra` installs into `vertra-system` by default and always turns
+`allowReleaseNamespace` off; the GKE reference install moves on its next
+run (`TODO.md`).
+
 The dispatch, image, scan and identity policies check the scheduler's own
 requests and nobody else's (their `matchConditions`). Anyone else the
 cluster lets create Pods in a team namespace, such as a cluster
@@ -732,10 +767,13 @@ subresource (which can't change what a Deployment runs), on Deployments
 named in their Roles: the kernel's sleeper (`scaleDown`, the platform's
 own Deployments, plus its own `-sleep` ConfigMap and a read of the
 console's `-activity` one) and the console (only the image scanner's, to
-idle it, and its own `-activity` ConfigMap). A stolen token of either can
-stop the platform, not change it.
+idle it, and its own `-activity` ConfigMap). The sleeper also patches two
+CronJobs, its own and the wake one, and an admission policy in
+`sleeper.yaml` lets it change only their `suspend`, `schedule` and
+`timeZone`, never the Job they run. A stolen token of either can stop the
+platform, not change it.
 
-And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api: a step's Pod can reach neither. Every team namespace also holds `vertra-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vertra-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vertra/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vertra-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vertra-team-quota`) and LimitRange (`vertra-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators. The bundled databases' passwords are generated on install.
+And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api: a step's Pod can reach neither. Every team namespace also holds `vertra-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vertra-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vertra/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vertra-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vertra-team-quota`) and LimitRange (`vertra-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators (and it mustn't also be a team's: see [Guardrails the cluster enforces](#guardrails-the-cluster-enforces)). The bundled databases' passwords are generated on install.
 
 ## What a step can reach
 
@@ -760,6 +798,16 @@ dispatch policy refuses any Job of the scheduler's that isn't hardened
 that way (no API token, non-root, a read-only root filesystem, no
 capabilities or privilege, nothing of the host's: proven on kind
 2026-10-28), so a scheduler tricked into making another Job still can't.
+
+Whatever the hardening setting, the dispatch policy holds a step's container
+to what the executor builds: its image's own entrypoint (no `command`), the
+action as its one argument, no environment but the install's
+`scheduler.taskExtraEnvironment` (as values, never from a Secret or
+ConfigMap), and no projected token without an audience (the Kubernetes
+API's). So even a Job the scheduler was tricked into making can't run other
+code as a product's identity, with its Secrets, or carry a token for the
+cluster. With hardening on, each container is held to it too: non-root,
+never user 0, seccomp `RuntimeDefault`, no host port.
 
 **The network.** In, only Pods of its own namespace (and the gateway, to a
 team's API backends). Out, anything: the internet, its cloud, the
@@ -855,7 +903,8 @@ taken, and what would still hold.
   (labelled `app=execution-kernel`, named `ek-…`) in team namespaces,
   retired ones included (proven on kind 2026-10-28); list events.
 - **The gateway** may mint ServiceAccount tokens only for `*-api`
-  ServiceAccounts in team namespaces ([The API gateway](#the-api-gateway)).
+  ServiceAccounts in team namespaces, for a backend's own audience, for an
+  hour at most ([The API gateway](#the-api-gateway)).
   Its database role reads who callers are and the published APIs, and
   writes its traffic counts; it holds no `JWT_SECRET`, so it can't make a
   session, and can't read a password hash or unseal anything. It could
@@ -867,23 +916,40 @@ taken, and what would still hold.
 ## Vertra's own supply chain
 
 On each version tag, the release workflow (`.github/workflows/release.yml`)
-builds the kernel, console and gateway images, scans them with CI's gate
-(`.github/scripts/scan-image.sh`: a HIGH or CRITICAL vulnerability with a
-fix, a secret in a layer, or a known-malicious package fails the release),
-pushes them to GHCR and signs each digest with cosign, keyless, as the
-workflow's own GitHub identity. The charts and the `vertra` binaries are
+refuses a tag whose commit isn't on `main` (which takes only reviewed pull
+requests), then builds the kernel, console and gateway images (amd64 and
+arm64) and pushes them to GHCR by digest. It scans each platform's image,
+as pushed, with CI's gate (`.github/scripts/scan-image.sh`: a HIGH or
+CRITICAL vulnerability with a fix, a secret in a layer, or a
+known-malicious package fails the release), signs each digest with cosign,
+keyless, as the workflow's own GitHub identity, and only once all three
+have passed tags them as the version. A version's tags are written once:
+a run refuses a version already published, and a re-run of its failed jobs
+keeps what an earlier attempt published. The charts and the `vertra` binaries are
 signed the same way, and a catalog's `./vertra` downloads its binary by
 SHA-256. Every pull request also runs Semgrep, gitleaks, and the same scan
 of the three platform images (`.github/workflows/security.yml`, `ci.yml`).
 
+The "only from `main`" check is the tagged commit's own: a tag push runs
+the `release.yml` in the commit it tags, so a branch commit whose
+`release.yml` leaves the check out would still be released, and signed as
+`release.yml@refs/tags/v…`. The guarantee holds only with a tag ruleset
+letting only admins create, update or delete `v*` tags (not yet in place:
+`TODO.md`); the check itself stops mistakes, such as tagging the wrong
+commit.
+
 Nothing verifies those signatures when installing: `vertra` pulls the
 charts by version, the charts run their images by tag unless
 `image.digest` pins them, and policy-controller doesn't cover the platform's
-own namespace. To check one by hand:
+own namespace. To check one by hand (a version tag's run only: the same
+workflow run from a branch signs as `release.yml@refs/heads/<branch>`,
+which this refuses; `make gke-verify-release` requires the exact tag).
+Either proves an image came from a version tag's run, which means reviewed
+code only with the `v*` tag ruleset above in place:
 
 ```console
 $ cosign verify ghcr.io/<owner>/<repo>/execution-kernel:<version> \
-    --certificate-identity-regexp 'https://github.com/<owner>/<repo>/.github/workflows/release.yml@.*' \
+    --certificate-identity-regexp '^https://github.com/<owner>/<repo>/.github/workflows/release.yml@refs/tags/v.*' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 

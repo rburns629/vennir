@@ -153,15 +153,10 @@ func PlatformPrefix(c *config.Config) string {
 	return c.Cluster.Name + "-platform"
 }
 
-// GitHubProvider is an existing GitHub OIDC provider's ARN for the module
-// to use, or "" for the module to make (and keep) its own: an account has
-// at most one. ownState says whether this install's state already holds
-// the provider it made; then that one stays the install's, or the next
-// apply would delete it.
-func GitHubProvider(ctx context.Context, r *run.Runner, c *config.Config, ownState bool) (string, error) {
-	if ownState {
-		return "", nil
-	}
+// GitHubProvider is the account's GitHub OIDC provider's ARN for the
+// module to use, or "" when it has none yet, for the module to make. An
+// account has at most one, which every install in it uses.
+func GitHubProvider(ctx context.Context, r *run.Runner, c *config.Config) (string, error) {
 	out, err := r.Output(ctx, "aws", args(c, "iam", "list-open-id-connect-providers")...)
 	if err != nil {
 		return "", err

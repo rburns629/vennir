@@ -47,6 +47,9 @@ func describe(problems []*verrors.ValidationError) []string {
 // parameter, a body that isn't JSON), fixed here: the validator's messages
 // quote the request's path, and so its path parameters' values.
 func unschematic(p *verrors.ValidationError) string {
+	if p.ValidationType == verrors.StrictValidationType && p.ValidationSubType == verrors.StrictSubTypeQuery {
+		return p.ParameterName + ": not a query parameter its OpenAPI document takes"
+	}
 	if p.ParameterName != "" {
 		if strings.Contains(p.Message, "missing") {
 			return p.ParameterName + ": required"
@@ -57,8 +60,10 @@ func unschematic(p *verrors.ValidationError) string {
 		switch {
 		case strings.Contains(p.Message, "is empty"):
 			return "the body: required"
-		case strings.Contains(p.Message, "not declared"), strings.Contains(p.Message, "no registered decoder"):
-			return "the body: its Content-Type isn't one this operation takes"
+		case strings.Contains(p.Message, "not declared"):
+			return "the body: this operation takes none"
+		case strings.Contains(p.Message, "no registered decoder"):
+			return "the body: its Content-Type isn't one the gateway can check"
 		}
 		return "the body: can't be read as its Content-Type says"
 	}

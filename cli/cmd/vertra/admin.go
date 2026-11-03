@@ -63,6 +63,15 @@ func (a *app) adminCmd() *cobra.Command {
 // passwordThen follows where a generated password is.
 const passwordThen = "You'll choose your own when you sign in; then delete the file."
 
+// savedPassword is the password savePassword saved in dir, "" if none.
+func savedPassword(dir string) string {
+	b, err := os.ReadFile(filepath.Join(dir, "admin-password"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
 // savePassword writes a generated admin password to admin-password in the
 // environment's folder, readable only by you and kept out of git beside it,
 // and returns its path. Printed, it would land in CI logs and anything

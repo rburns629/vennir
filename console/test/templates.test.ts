@@ -596,6 +596,21 @@ describe("a team's outcome webhook (decision 23)", () => {
       const [, t, v1] = /^t=(\d+),v1=([0-9a-f]+)$/.exec(mine[0]!.signature) ?? [];
       expect(v1).toBe(createHmac("sha256", secret).update(`${t ?? ""}.${mine[0]!.body}`).digest("hex"));
 
+      // Two consoles' passes at once: posted once, by one of them.
+      const overlap = randomUUID();
+      await runFinishedCallbacks({ ...run, executionId: overlap });
+      vi.stubGlobal("fetch", vi.fn((url: string, init: { body: string; headers: Record<string, string> }) => new Promise<Response>((resolve) => {
+        // Slow enough that the second pass starts while the first is posting.
+        setTimeout(() => {
+          posted.push({ url, body: init.body, signature: init.headers["vertra-signature"] ?? "" });
+          resolve(new Response("ok"));
+        }, 200);
+      })));
+      const counts = await Promise.all([deliverCallbacks({ warn: vi.fn() } as never), deliverCallbacks({ warn: vi.fn() } as never)]);
+      expect(counts.filter((n) => n === 0)).toHaveLength(1);
+      await deliverCallbacks({ warn: vi.fn() } as never);
+      expect(posted.filter((p) => p.body.includes(overlap))).toHaveLength(1);
+
       // Too big with its outputs: posted without them, and says so.
       const big = randomUUID();
       await runFinishedCallbacks({ ...run, executionId: big, tasks: [{ taskId: "make", state: "SUCCEEDED", outputs: { blob: "x".repeat(300_000) }, failure: null }] as never[] });

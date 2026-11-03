@@ -177,9 +177,12 @@ keys, so a key that's missing is just a file that isn't there, and your
 action should say so plainly. `shareWith` says which other
 teams may run the action or put it in their templates, and `deprecated`
 says what to use instead while it keeps working: the console records both
-and shows them. `idempotent` and `maxAttempts` are your retry policy: a step
-of an idempotent action that fails on the platform's side (a reclaimed node,
-a lost Job, a timeout), or with an error your code marks `retryable`, runs
+and shows them. A shared action runs with your team's secrets whoever
+calls it, so an action that sends a secret to a destination its caller
+chooses (a URL, a host) must never be shared: the caller would choose
+where your secret goes. `idempotent` and `maxAttempts` are your retry
+policy: a step of an idempotent action that fails on the platform's side
+(a reclaimed node, a lost Job, a timeout), or with an error your code marks `retryable`, runs
 again after a growing pause, up to `maxAttempts` in all. A template or DAG
 may ask for fewer attempts, never more, and an action that isn't idempotent
 gets exactly one: write it to find what it would create first (as every
@@ -445,7 +448,10 @@ namespace) can be published through the install's gateway, without
 changing it. Its OpenAPI file is the allowlist: the gateway forwards a
 request only when its method and path are an operation in the file and it
 fits that operation's schemas, exactly as sent (headers, query and body),
-with the caller's credential swapped for the backend's. Anything else gets
+with the caller's credential swapped for the backend's. Declare every query
+parameter and every body: an undeclared one is refused, and so is a body
+whose media type has a schema the gateway can't read (it reads JSON, YAML,
+XML, forms, multipart, text, CSV and binary). Anything else gets
 404 or 400 from the gateway and never reaches your backend.
 
 ```yaml
@@ -624,13 +630,19 @@ vault its namespace can read. `./vertra catalog validate` checks this layout, an
 ## Publishing
 
 `./vertra catalog publish` checks each product, then pushes its image tagged with
-the commit (or the time, from a laptop) and `:latest`, signs it if the
+the commit that last changed it (its folder, `tools/`, `vertra.yaml` or
+`vertra`; the time, from a laptop), signs it if the
 catalog signs, and attaches its software bill of materials (CycloneDX, from
 its scan) as an attestation signed the same way, which each install's
-Observe page offers for download. `./vertra catalog release` then pushes the catalog's release to
-`<registry>/catalog-release` (tagged with the commit and `latest`) and signs it
-the same way: every team, its SecretStore files, and every action as
-`<team>-<product>-<action>`, its image pinned by digest. It's complete, not a
+Observe page offers for download; only then does it move `:latest` to it. `./vertra catalog release` then pushes the catalog's release to
+`<registry>/catalog-release`, signs it the same way and only then tags it
+with the commit and `latest`: every team, its SecretStore files, and every action as
+`<team>-<product>-<action>`, its image pinned by digest to the image tagged
+with the product's commit (`:latest`, from a laptop). A product whose image
+for that commit is missing, or unsigned when the catalog signs (its publish
+failed), fails the release. In CI, `publish --changed` therefore also
+publishes every product whose image for its commit is missing or unsigned,
+so the next run on `main` (or rerunning the failed one) puts it right. It's complete, not a
 change: an install unregisters what a release no longer has, and retires a
 team whose folder is gone. Each console reads it every few minutes (an admin
 can press **Sync now**), verifies its signature, and applies it.

@@ -123,6 +123,12 @@ describe("ProductService", () => {
     expect(failureCode(response.json<RpcError>())).toBe("CONFLICT");
   });
 
+  it("refuses a product a ServiceAccount ending in -api: an API's, whose tokens the gateway mints", async () => {
+    const response = await rpc("ProductService", "RegisterProduct", registration({ name: `${prefix}-sneaky`, serviceAccount: "orders-api" }), { token: adminToken });
+    expect(response.json<RpcError>().code).toBe("invalid_argument");
+    expect(response.json<RpcError>().message).toContain("-api");
+  });
+
   it("checks a registration", async () => {
     const response = await rpc(
       "ProductService",

@@ -89,6 +89,19 @@ Console and gateway:
   decided to keep #72's way (`docs/operations.md`).
 
 Kernel and alerts:
+- [ ] **The GKE reference install runs the platform in `default`**, also an
+  admins' team namespace (`allowReleaseNamespace`; review H-9): there that
+  team's steps can reach the platform's Postgres and kernel-api, its
+  products can run as the platform's ServiceAccounts, the console's write
+  fence admits the platform's own Secrets, policy-controller excludes the
+  namespace, and the gateway's token fence matches kernel-api's
+  ServiceAccount (`docs/security-model.md`, "Guardrails the cluster
+  enforces"). The next billed GKE run installs fresh into `vertra-system`:
+  `GKE_NAMESPACE` in the Makefile, the values files' comments and
+  `kernelApiUrl` (`helm/values/gke/console.yaml`), `allowReleaseNamespace`
+  dropped, policy-controller's `NotIn default` dropped, and the Google
+  service accounts' Workload Identity bindings to the new namespace's
+  Kubernetes ServiceAccounts.
 - [ ] **Completion lag on GKE is policy-controller's webhook** (the r7 run,
   `perf/README.md`, "On GKE again"): with 40 at once, Job creations waited
   out its 10 s and were retried, and a pass that dispatches records
@@ -107,6 +120,12 @@ Kernel and alerts:
   GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
 
 ## Installing and operating
+
+- [ ] **The gcp access check reads only a location policy's allowed
+  values** (found reviewing M-1, 2026-11-03): `orgPolicyValues`
+  (`cli/internal/access/gcp.go`) reads `listPolicy.allowedValues`, so a
+  `gcp.resourceLocations` policy that lists `deniedValues` isn't seen. It
+  fails toward no problem: the apply stops when Google refuses the region.
 
 - [x] **A burst that starts a counter can't fire its alert** (found proving
   #45 on kind; fixed 2026-10-30, #46): a series born holding a burst has no
@@ -776,6 +795,15 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   `vertra admin reset-password` runs the console's `dist/db/resetAdmin.js`
   in its Pod (cluster access required): a new random password for an
   admin, printed once, every session revoked, audited. Proven on kind.
+  Since 2026-11-03 no first admin's password is ever in a log (a Job's log
+  is shipped to Cloud Logging or Loki and kept): `vertra apply` generates
+  it, saves it, and gives it to the console in the `vertra-first-admin`
+  Secret (`bootstrapAdmin.existingSecret`), deleted once installed; a chart
+  install that sets none gets a random one, never printed, and resets it.
+  An install from before whose first admin hasn't signed in yet: `vertra
+  admin reset-password` (the logged password still works).
+  To prove in the billed run: a fresh gcp install's `admin-password` signs
+  in, and Cloud Logging has no password from the migrate Job.
 - [x] **Cross-building on Apple silicon** (done 2026-10-27): the console's
   npm stages, and now the Node sample's (reverse) build stage, run on the
   build platform, so publishing for amd64 from a Mac doesn't run npm under
@@ -974,6 +1002,14 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
     volumes its volumes may have left.
 
 ## Security
+
+- [ ] **Add the `v*` tag ruleset (admins only)** (decided 2026-11-02, X-6):
+  a GitHub repository ruleset letting only admins create, update or delete
+  `v*` tags. A tag push runs the `release.yml` of the tagged commit, so a
+  branch commit whose `release.yml` drops the preflight check would still
+  sign as `release.yml@refs/tags/v…`; until the ruleset is in place, the
+  preflight's "on main" check only stops mistakes
+  (`docs/security-model.md`, Vertra's own supply chain).
 
 - [x] **Gaps the 2026-10-28 docs audit found** (closed 2026-10-29; documented in
   `docs/security-model.md`): the scheduler may read every Pod's logs

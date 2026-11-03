@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Vertra API product (apis/<name>/api.yaml, kind: Api), format v2",
-  "description": "A backend the team already runs, published through the install's gateway. Its OpenAPI file is the allowlist: the gateway forwards only requests whose method and path it describes and whose parameters, headers and body fit its schemas, and blocks everything else.",
+  "description": "A backend the team already runs, published through the install's gateway. Its OpenAPI file is the allowlist: the gateway forwards only requests whose method and path it describes, with only the query parameters it declares, and whose parameters, declared headers and body fit its schemas (a body only where it declares one, with a Content-Type it can check), and blocks everything else.",
   "type": "object",
   "additionalProperties": false,
   "required": [
