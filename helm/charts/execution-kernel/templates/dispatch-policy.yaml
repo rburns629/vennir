@@ -96,6 +96,30 @@ spec:
         "the scheduler may delete only its own Jobs and ConfigMaps, in team
         namespaces; not " + oldObject.metadata.name + " in " + namespaceObject.metadata.name
       reason: Forbidden
+    # A step's container, exactly as the executor makes it: its image's own
+    # entrypoint (no command, hook, probe or init container), the action as
+    # its one argument, and no
+    # environment but the install's taskExtraEnvironment, as values; and
+    # every projected token for an audience it names (one with none is the
+    # Kubernetes API's). So a Job can't run other code as a product's
+    # identity with its Secrets, or carry a token for the cluster itself.
+    - expression: >-
+        request.operation != "CREATE" || request.resource.resource != "jobs" || (
+        (!has(object.spec.template.spec.initContainers) || object.spec.template.spec.initContainers.size() == 0) &&
+        object.spec.template.spec.containers.all(c,
+          !has(c.command) && !has(c.workingDir) && !has(c.envFrom) &&
+          !has(c.lifecycle) && !has(c.livenessProbe) && !has(c.readinessProbe) && !has(c.startupProbe) &&
+          (!has(c.stdin) || !c.stdin) && (!has(c.tty) || !c.tty) &&
+          has(c.args) && size(c.args) == 1 &&
+          (!has(c.env) || c.env.all(e, !has(e.valueFrom) && e.name in {{ keys .Values.scheduler.taskExtraEnvironment | sortAlpha | toJson }}))) &&
+        (!has(object.spec.template.spec.volumes) || object.spec.template.spec.volumes.all(v,
+          !has(v.projected) || !has(v.projected.sources) || v.projected.sources.all(s,
+            !has(s.serviceAccountToken) || (has(s.serviceAccountToken.audience) && s.serviceAccountToken.audience != "")))))
+      message: >-
+        a step's container runs its image's own entrypoint with its action as
+        its one argument, no environment but the install's
+        (scheduler.taskExtraEnvironment), and no token for the Kubernetes API
+      reason: Forbidden
     {{- if .Values.scheduler.taskPodHardening }}
     # A step's Job, hardened as the executor makes it (scheduler.taskPodHardening).
     - expression: >-
@@ -119,11 +143,19 @@ spec:
           c.securityContext.readOnlyRootFilesystem == true &&
           has(c.securityContext.capabilities) && has(c.securityContext.capabilities.drop) &&
           "ALL" in c.securityContext.capabilities.drop &&
-          (!has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.size() == 0)))
+          (!has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.size() == 0) &&
+          (!has(c.securityContext.runAsNonRoot) || c.securityContext.runAsNonRoot == true) &&
+          (!has(c.securityContext.runAsUser) || c.securityContext.runAsUser != 0) &&
+          (!has(c.securityContext.seccompProfile) || c.securityContext.seccompProfile.type == "RuntimeDefault") &&
+          (!has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0))) &&
+        has(object.spec.template.spec.securityContext.seccompProfile) &&
+        object.spec.template.spec.securityContext.seccompProfile.type == "RuntimeDefault" &&
+        (!has(object.spec.template.spec.securityContext.runAsUser) || object.spec.template.spec.securityContext.runAsUser != 0))
       message: >-
         a step's Job must run hardened (scheduler.taskPodHardening): no
-        Kubernetes token, non-root, a read-only root filesystem, no
-        capabilities or privilege, nothing of the host's
+        Kubernetes token, non-root (each container too), seccomp RuntimeDefault,
+        a read-only root filesystem, no capabilities or privilege, nothing of
+        the host's
       reason: Forbidden
     {{- end }}
 ---
