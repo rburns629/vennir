@@ -60,3 +60,43 @@ func TestConsoleKeysSayWhenTheConsoleCantBeRead(t *testing.T) {
 		t.Fatalf("an unreadable console is the gateway's problem, not the caller's: %v", err)
 	}
 }
+
+func TestConsoleKeysDropAKeyTheConsoleNoLongerPublishes(t *testing.T) {
+	current := atomic.Value{}
+	current.Store("one")
+	var down atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if down.Load() {
+			http.Error(w, "down", http.StatusServiceUnavailable)
+			return
+		}
+		x := base64.RawURLEncoding.EncodeToString(secret.Public().(ed25519.PublicKey))
+		_ = json.NewEncoder(w).Encode(map[string]any{"keys": []map[string]string{
+			{"kty": "OKP", "crv": "Ed25519", "x": x, "kid": current.Load().(string), "alg": "EdDSA"},
+		}})
+	}))
+	defer server.Close()
+	k := &ConsoleKeys{URL: server.URL}
+	ctx := context.Background()
+	if _, err := k.Key(ctx, "one"); err != nil {
+		t.Fatal(err)
+	}
+	// The console restarting: the last set is still used for a while.
+	down.Store(true)
+	k.fetched = time.Now().Add(-keysFor)
+	if _, err := k.Key(ctx, "one"); err != nil {
+		t.Fatalf("while the console can't be read: %v", err)
+	}
+	k.fetched, k.good = time.Now().Add(-keysFor), time.Now().Add(-keptFor)
+	if _, err := k.Key(ctx, "one"); err == nil || err == ErrUnauthenticated {
+		t.Fatalf("once the last set is too old: %v", err)
+	}
+	// JWT_SECRET rotated: with no new session to ask about, the old key
+	// still stops working once the set is due again.
+	down.Store(false)
+	current.Store("two")
+	k.fetched = time.Now().Add(-keysFor)
+	if _, err := k.Key(ctx, "one"); err != ErrUnauthenticated {
+		t.Fatalf("the rotated-out key: %v", err)
+	}
+}
