@@ -155,10 +155,11 @@ var regionName = regexp.MustCompile(`^[a-z]+-[a-z]+[0-9]+$`)
 // prefixes. Groups named after a jurisdiction (in:eu-locations,
 // in:canada-locations, in:japan-locations…) don't follow the regions' names,
 // so they aren't here: what they hold can't be told from a region's name.
+// Nor is asia: in:asia-locations leaves out asia-southeast3 (Bangkok, only
+// in in:th-locations).
 var prefixGroups = map[string][]string{
 	"us":           {"us"},
 	"europe":       {"europe"},
-	"asia":         {"asia"},
 	"australia":    {"australia"},
 	"northamerica": {"northamerica", "us"},
 }

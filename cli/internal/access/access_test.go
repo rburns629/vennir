@@ -186,6 +186,9 @@ func TestRegionInLocations(t *testing.T) {
 		{[]string{"in:eu-locations"}, "us-east1", locationUnknown},
 		{[]string{"in:canada-locations"}, "northamerica-northeast1", locationUnknown},
 		{[]string{"in:japan-locations", "in:us-locations"}, "asia-northeast1", locationUnknown},
+		// in:asia-locations leaves out asia-southeast3 (in:th-locations).
+		{[]string{"in:asia-locations"}, "asia-southeast3", locationUnknown},
+		{[]string{"in:asia-locations"}, "us-central1", locationUnknown},
 		// Nor can a region outside the prefix groups be ruled out of them.
 		{[]string{"in:europe-locations"}, "me-west1", locationUnknown},
 		// A zone, or global, says nothing sure about the region.
