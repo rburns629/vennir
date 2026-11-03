@@ -97,6 +97,18 @@ spec:
         "The gateway may only mint tokens for API ServiceAccounts (*-api) in team namespaces, not " +
         request.namespace + "/" + request.name + "."
       reason: Forbidden
+    # For a backend's audience: named (none means the Kubernetes API's own),
+    # never the cluster's or kernel-api's, and short-lived (it asks for ten
+    # minutes, gateway/internal/credentials).
+    - expression: >-
+        has(object.spec.audiences) && object.spec.audiences.size() > 0 &&
+        object.spec.audiences.all(a, !(a in {{ list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" .Values.kernelApiToken.audience | toJson }}) &&
+          !a.startsWith("https://container.googleapis.com/"))
+      message: "The gateway mints tokens only for a backend's own audience: never the Kubernetes API's or kernel-api's."
+      reason: Forbidden
+    - expression: has(object.spec.expirationSeconds) && object.spec.expirationSeconds <= 3600
+      message: "The gateway mints tokens lasting an hour at most."
+      reason: Forbidden
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding

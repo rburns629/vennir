@@ -447,8 +447,11 @@ is what's forwarded.
 Backends must be under hosts the admins allow (`gateway.backendHosts`), or
 the API is held: the gateway can't be pointed anywhere a catalog says. Its
 only Kubernetes right is minting ServiceAccount tokens, and an admission
-policy limits that to API ServiceAccounts (`*-api`) in team namespaces, so
-it can't mint the platform's or a team's other identities. It reads the
+policy limits that to API ServiceAccounts (`*-api`) in team namespaces, for
+a named audience that isn't the Kubernetes API's or kernel-api's, lasting an
+hour at most, so it can't mint the platform's or a team's other identities,
+or a token for the cluster itself. `-api` is reserved: no product may run as
+such a ServiceAccount, and an API's must end in it. It reads the
 console's database as a role of its own (`vertra_gateway`,
 `console/src/db/gatewayAccess.ts`): it may read the columns it needs to
 sign callers in and find APIs (never a password hash, a sealed value, a
@@ -855,7 +858,8 @@ taken, and what would still hold.
   (labelled `app=execution-kernel`, named `ek-…`) in team namespaces,
   retired ones included (proven on kind 2026-10-28); list events.
 - **The gateway** may mint ServiceAccount tokens only for `*-api`
-  ServiceAccounts in team namespaces ([The API gateway](#the-api-gateway)).
+  ServiceAccounts in team namespaces, for a backend's own audience, for an
+  hour at most ([The API gateway](#the-api-gateway)).
   Its database role reads who callers are and the published APIs, and
   writes its traffic counts; it holds no `JWT_SECRET`, so it can't make a
   session, and can't read a password hash or unseal anything. It could
