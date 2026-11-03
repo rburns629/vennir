@@ -59,6 +59,10 @@ function ProviderChoice({ value, onChange }: { value: string; onChange: (id: str
   );
 }
 
+/** What's sent: Vertex's and Bedrock's address is built from the project or region, so none (one typed for another provider stays hidden in the form). */
+const sent = (form: ChatConfigInput): ChatConfigInput =>
+  form.provider === "vertex" || form.provider === "bedrock" ? { ...form, endpoint: "" } : form;
+
 /** The form's values from settings as they're set: a key is never among them. */
 function formOf(c: ChatConfig): ChatConfigInput {
   return {
@@ -139,12 +143,12 @@ export function ChatSettingsCard() {
     act(
       "save",
       async () => {
-        show(await setChatConfig(form));
+        show(await setChatConfig(sent(form)));
         setNotice(form.enabled ? "Saved: in effect within seconds." : "Saved: the chat agent is off.");
       },
       "Couldn't save them.",
     );
-  const test = () => act("test", async () => { setTested(await testChatConfig({ ...form, enabled: true })); }, "Couldn't try them.");
+  const test = () => act("test", async () => { setTested(await testChatConfig({ ...sent(form), enabled: true })); }, "Couldn't try them.");
   const reset = () =>
     act(
       "reset",

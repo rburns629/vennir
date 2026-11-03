@@ -67,7 +67,9 @@ export function targetFields(body: unknown): Record<string, unknown> {
     const chat = (body as Record<string, unknown>)["config"];
     if (chat && typeof chat === "object" && !Array.isArray(chat)) {
       for (const field of ["enabled", "provider", "model", "endpoint", "vertexProject", "vertexLocation", "bedrockRegion"] as const) {
-        const value = (chat as Record<string, unknown>)[field];
+        let value = (chat as Record<string, unknown>)[field];
+        // An address as far as its path: a query string or a user isn't kept.
+        if (field === "endpoint" && typeof value === "string") value = value.replace(/[?#].*$/, "").replace(/^(https?:\/\/)[^/@]*@/, "$1");
         if (value !== undefined && value !== "" && (typeof value !== "string" || value.length <= 500)) target[field] = value;
       }
       if ((chat as Record<string, unknown>)["apiKey"]) target["keyGiven"] = true;

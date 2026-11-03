@@ -144,6 +144,8 @@ export function chatFrom(input: ChatInput) {
   if (endpoint ? !/^https?:\/\/[^\s]+$/.test(endpoint) : provider === "openai-compatible") {
     throw new Error(`chat.endpoint "${endpoint}": the model's base URL, http(s)://.../v1`);
   }
+  // A credential belongs in chat.apiKey, never in the address (which is logged).
+  if (endpoint && /^https?:\/\/[^/?#]*@/.test(endpoint)) throw new Error("chat.endpoint: no user or password in the address; a key goes in chat.apiKey");
   if (provider === "anthropic" && !input.apiKey) throw new Error("chat.apiKey: Anthropic's API needs a key");
   if (input.effort && !["low", "medium", "high"].includes(input.effort)) throw new Error(`chat.effort "${input.effort}": low, medium or high`);
   for (const [name, n] of Object.entries({ maxSteps: input.maxSteps, timeoutSeconds: input.timeoutSeconds, maxTokens: input.maxTokens, contextTokens: input.contextTokens })) {

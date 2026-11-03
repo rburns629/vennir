@@ -184,7 +184,7 @@ export async function setChatConfig(caller: AuthUser | undefined, input: ChatCon
   };
   await db.insert(chatSettings).values({ id: 1, ...values }).onConflictDoUpdate({ target: chatSettings.id, set: values });
   log.warn(
-    { event: "chat_settings_changed", by: caller?.id, enabled: input.enabled, provider: input.provider, model: values.model, endpoint: values.endpoint, keyChanged: Boolean(input.apiKey) },
+    { event: "chat_settings_changed", by: caller?.id, enabled: input.enabled, provider: input.provider, model: values.model, endpoint: values.endpoint.replace(/[?#].*$/, ""), keyChanged: Boolean(input.apiKey) },
     "the chat agent's settings changed",
   );
   await refreshChatSettings(log);

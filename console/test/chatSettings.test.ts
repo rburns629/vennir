@@ -89,6 +89,7 @@ describe("the chat agent's settings", () => {
       [{ provider: "bedrock", bedrockRegion: "nowhere" }, "chat.bedrock.region"],
       [{ provider: "bedrock", bedrockRegion: "us-east-2", model: "gpt-5" }, "Bedrock's name for a Claude model"],
       [{ maxTokens: 50000, contextTokens: 20000 }, "chat.contextTokens"],
+      [{ endpoint: "https://someone:hunter2@models.example/v1" }, "no user or password"],
     ] as const) {
       const refused = await call(admin, "ChatService/SetChatConfig", { config: input(extra) });
       expect(refused.failure).toBe("BAD_CHAT_SETTINGS");
@@ -133,6 +134,10 @@ describe("the chat agent's settings", () => {
     const moved = `http://127.0.0.1:${String((model.address() as AddressInfo).port)}/v1/`;
     await call(admin, "ChatService/TestChatConfig", { config: input({ apiKey: "", endpoint: `${moved}x/..` }) });
     expect(seenKeys.filter((k) => k.includes("sk-first"))).toEqual([]);
+    // The same address, a trailing slash aside, still gets it.
+    seenKeys.length = 0;
+    await call(admin, "ChatService/TestChatConfig", { config: input({ apiKey: "", endpoint: `${endpoint}/` }) });
+    expect(seenKeys).toContain("Bearer sk-first");
 
     // Vertex's and Bedrock's address isn't anyone's to choose.
     const pointed = await call(admin, "ChatService/SetChatConfig", { config: input({ provider: "vertex", model: "", apiKey: "", vertexProject: "acyclix-dev", endpoint: "https://attacker.example/v1" }) });
