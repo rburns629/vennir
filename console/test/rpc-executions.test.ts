@@ -7,12 +7,12 @@
  * core/executions.ts.
  */
 import { randomUUID } from "node:crypto";
-import { like, sql } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, recordSubmittedExecution } from "../src/db/queries.js";
-import { auditLog, teams } from "../src/db/schema.js";
+import { auditLog, teamMemberships, teams } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { cancelExecution, getExecution, KernelApiError, submitExecution } from "../src/kernel/client.js";
 import { config } from "../src/config.js";
@@ -239,6 +239,35 @@ describe("watching", () => {
     expect(frames).toHaveLength(2);
     expect((frames[0] as { execution: { state: string } }).execution.state).toBe("EXECUTION_STATE_SUCCEEDED");
     expect(frames[1]).toEqual({});
+  });
+
+  it("ends once the watcher leaves the run's team, without another read", { timeout: 20_000 }, async () => {
+    const team = await createTeam(`${prefix}-leaves`);
+    const leaver = await makeUser();
+    await addTeamMember(leaver.id, team.id);
+    const leaverToken = await signIn(leaver.email);
+    const executionId = await recorded([team.name]);
+    let reads = 0;
+    vi.mocked(getExecution).mockImplementation(async (id: string) => {
+      reads += 1;
+      // Removed from the team while the stream is open.
+      await db.delete(teamMemberships).where(and(eq(teamMemberships.userId, leaver.id), eq(teamMemberships.teamId, team.id)));
+      return { executionId: id, name: "watched", state: "RUNNING", tasks: [] };
+    });
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/vertra.console.v1.ExecutionService/WatchExecution",
+        headers: { "content-type": "application/connect+json", authorization: `Bearer ${leaverToken}` },
+        payload: envelope({ executionId }),
+      });
+      const frames = unenvelope(response.rawPayload);
+      expect((frames[0] as { execution: { state: string } }).execution.state).toBe("EXECUTION_STATE_RUNNING");
+      expect((frames.at(-1) as { error?: { code: string } }).error?.code).toBe("permission_denied");
+      expect(reads).toBe(1);
+    } finally {
+      vi.mocked(getExecution).mockReset();
+    }
   });
 
   it("refuses an outsider in the end-of-stream frame", async () => {
