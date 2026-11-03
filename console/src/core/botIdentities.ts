@@ -12,7 +12,7 @@ import { identityProblem } from "../auth/keyless.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { config } from "../config.js";
 import { db } from "../db/client.js";
-import { findTeamById, findTeamByName } from "../db/queries.js";
+import { findTeamById, findTeamByName, findUserByEmail } from "../db/queries.js";
 import { botIdentities, teamMemberships, users } from "../db/schema.js";
 import { ensureNotRetired } from "./retired.js";
 import { ensureTeamsBot, teamBot } from "./tokens.js";
@@ -104,8 +104,10 @@ export async function createKeylessBot(
     .from(botIdentities)
     .where(and(eq(botIdentities.issuer, input.issuer), eq(botIdentities.claims, input.claims)));
   if (taken) throw new ApiError(409, "ALREADY_EXISTS", "A bot already signs in with exactly these claims.", Code.AlreadyExists);
-  // Before any bot is made: a refused identity leaves none behind.
-  if (await overlapsAnotherBot(input.issuer, input.claims, null)) throw overlapping();
+  // Before any bot is made: a refused identity leaves none behind. An
+  // existing bot at this address isn't "another" to itself.
+  const existing = await findUserByEmail(input.email);
+  if (await overlapsAnotherBot(input.issuer, input.claims, existing?.isBot ? existing.id : null)) throw overlapping();
   const bot = await teamBot(team, input);
   return { email: bot.email, identity: await addBotIdentity(who, teamName, bot.id, input.issuer, input.claims) };
 }

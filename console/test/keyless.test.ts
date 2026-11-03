@@ -129,21 +129,31 @@ describe("a bot's identity overlapping another bot's", () => {
   it("is refused, so one team can't stop another team's bot signing in", async () => {
     const victim = { sub: `repo:acme/${prefix}-victim:ref:refs/heads/main`, ref: "refs/heads/main" };
     await db.insert(botIdentities).values({ botId: otherBot.id, issuer: ISSUER, claims: victim });
-    // Broader (a subset of its claims): every token for the other bot would match it too.
-    const broader = await add(maintainerToken, { claims: { sub: victim.sub } });
-    expect(broader.code).toBe("already_exists");
-    expect(broader.failure).toBe("IDENTITY_OVERLAPS");
-    expect((await call(maintainerToken, "TokenService/CreateKeylessBot", { team, email: `${prefix}-broad@bots.vertra.local`, issuer: ISSUER, claims: { sub: victim.sub } })).failure).toBe("IDENTITY_OVERLAPS");
-    // Narrower, with a claim of its own the other doesn't name: one token could carry both.
-    expect((await add(maintainerToken, { claims: { sub: victim.sub, environment: "prod" } })).failure).toBe("IDENTITY_OVERLAPS");
-    // The other bot still signs in.
-    expect((await exchange(await sign(victim))).body.email).toBe(otherBot.email);
-    // Another subject is no overlap.
-    const own = await add(maintainerToken, { claims: { sub: `repo:acme/${prefix}-own:ref:refs/heads/main` } });
-    expect(own.code).toBe("ok");
-    // Left as the later cases expect.
-    await db.delete(botIdentities).where(eq(botIdentities.botId, otherBot.id));
-    await db.delete(botIdentities).where(eq(botIdentities.id, own.body.identity?.id ?? ""));
+    let own = "";
+    try {
+      // Broader (a subset of its claims): every token for the other bot would match it too.
+      const broader = await add(maintainerToken, { claims: { sub: victim.sub } });
+      expect(broader.code).toBe("already_exists");
+      expect(broader.failure).toBe("IDENTITY_OVERLAPS");
+      expect((await call(maintainerToken, "TokenService/CreateKeylessBot", { team, email: `${prefix}-broad@bots.vertra.local`, issuer: ISSUER, claims: { sub: victim.sub } })).failure).toBe("IDENTITY_OVERLAPS");
+      // Narrower, with a claim of its own the other doesn't name: one token could carry both.
+      expect((await add(maintainerToken, { claims: { sub: victim.sub, environment: "prod" } })).failure).toBe("IDENTITY_OVERLAPS");
+      // The other bot still signs in.
+      expect((await exchange(await sign(victim))).body.email).toBe(otherBot.email);
+      // Another subject is no overlap; and a bot's own identities never count against it.
+      const mine = await add(maintainerToken, { claims: { sub: `repo:acme/${prefix}-own:ref:refs/heads/main` } });
+      expect(mine.code).toBe("ok");
+      own = mine.body.identity?.id ?? "";
+      const again = await call<{ identity?: { id: string } }>(maintainerToken, "TokenService/CreateKeylessBot", {
+        team, email: bot.email, issuer: ISSUER, claims: { sub: `repo:acme/${prefix}-own:ref:refs/heads/main`, environment: "prod" },
+      });
+      expect(again.code).toBe("ok");
+      if (again.body.identity?.id) await db.delete(botIdentities).where(eq(botIdentities.id, again.body.identity.id));
+    } finally {
+      // Left as the later cases expect.
+      await db.delete(botIdentities).where(eq(botIdentities.botId, otherBot.id));
+      if (own) await db.delete(botIdentities).where(eq(botIdentities.id, own));
+    }
   });
 });
 
