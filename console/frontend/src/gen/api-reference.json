@@ -786,7 +786,7 @@
     },
     {
      "name": "RegisterProduct",
-     "comment": "Registers or updates a product: a member of its team, an admin, or a\ntoken with products:register. With no team it's a platform product:\nadmins only. Refused (already_exists) when another team owns its name\nor its image repository.",
+     "comment": "Registers or updates a product: an admin, or a token with\nproducts:register (the catalog's release); a team's maintainers don't.\nWith no team it's a platform product: admins only. Refused\n(already_exists) when another team owns its name or its image\nrepository.",
      "input": "vertra.console.v1.RegisterProductRequest",
      "output": "vertra.console.v1.RegisterProductResponse",
      "streaming": false,
@@ -804,7 +804,7 @@
     },
     {
      "name": "DeleteProduct",
-     "comment": "Unregisters a product. Its name and image repository stay its team's.",
+     "comment": "Unregisters a product: an admin, or a token with products:register.\nIts name and image repository stay its team's.",
      "input": "vertra.console.v1.DeleteProductRequest",
      "output": "vertra.console.v1.DeleteProductResponse",
      "streaming": false,
