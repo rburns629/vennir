@@ -305,7 +305,10 @@ func (a *app) destroyAWS(ctx context.Context, out io.Writer, dir string, c *conf
 	const bucket = "aws_s3_bucket.backups[0]"
 	var keep []string
 	if c.Database.Backups.Enabled && !deleteData {
-		keep = append(keep, bucket, "aws_s3_bucket_public_access_block.backups[0]", "aws_s3_bucket_lifecycle_configuration.backups[0]")
+		// Its versioning too: destroying that would suspend it on the kept
+		// bucket.
+		keep = append(keep, bucket, "aws_s3_bucket_public_access_block.backups[0]", "aws_s3_bucket_versioning.backups[0]",
+			"aws_s3_bucket_lifecycle_configuration.backups[0]")
 	}
 	// The audit log's copy is the record, and Object Lock refuses deletes.
 	if c.Audit.Export {

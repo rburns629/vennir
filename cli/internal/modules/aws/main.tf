@@ -471,6 +471,19 @@ resource "aws_s3_bucket_public_access_block" "backups" {
   restrict_public_buckets = true
 }
 
+# Versioned, so the writer can't destroy a dump it made before: its
+# s3:PutObject over an existing key keeps the old one as a noncurrent
+# version, which it has no permission to delete (as on gcp, where it may
+# create objects but not replace them). Each backup has a key of its own,
+# so there's normally no noncurrent version to keep.
+resource "aws_s3_bucket_versioning" "backups" {
+  count  = var.backups ? 1 : 0
+  bucket = aws_s3_bucket.backups[0].id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "backups" {
   count  = var.backups ? 1 : 0
   bucket = aws_s3_bucket.backups[0].id
@@ -481,7 +494,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
     expiration {
       days = var.backup_retention_days
     }
+    # On a versioned bucket, expiring a dump only makes it noncurrent (a
+    # delete marker goes on top); this deletes it. An overwritten dump is
+    # noncurrent from the overwrite, and kept the full retention after it,
+    # as on gcp it couldn't be touched. The price: S3 can't tell the two
+    # apart, so every dump is kept, and billed, for twice the retention
+    # (retention days current, then as many noncurrent).
+    noncurrent_version_expiration {
+      noncurrent_days = var.backup_retention_days
+    }
   }
+  depends_on = [aws_s3_bucket_versioning.backups]
 }
 
 resource "aws_iam_role" "backup" {
