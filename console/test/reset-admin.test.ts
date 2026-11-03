@@ -53,6 +53,12 @@ describe("resetting an admin's password", () => {
     expect(audited.some((a) => (a.target as { email?: string }).email === admin.email)).toBe(true);
   }, 30_000);
 
+  it("finds the admin however their email is typed", async () => {
+    const admin = await accounts.makeUser({ admin: true });
+    const { stdout } = await reset(admin.email.toUpperCase());
+    expect(stdout).toMatch(/New password for .+: \S+/);
+  }, 30_000);
+
   it("is an admin's only", async () => {
     const person = await accounts.makeUser();
     await expect(reset(person.email)).rejects.toMatchObject({ code: 2 });

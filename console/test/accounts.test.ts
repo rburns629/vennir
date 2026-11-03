@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { randomUUID } from "node:crypto";
-import { eq, like } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { eq, inArray, like, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { hashPassword } from "../src/auth/password.js";
@@ -147,5 +148,30 @@ describe("an email", () => {
     expect(login.code).toBe("ok");
     expect((await as(adminId, "UserService/DeleteUser", { email: `${prefix}-mixed@EXAMPLE.com` })).code).toBe("ok");
     expect(await db.select().from(users).where(like(users.email, `${prefix}-mixed%`))).toEqual([]);
+  });
+
+  it("is lowercased by 0062 for accounts from before, one per address", async () => {
+    // As Register used to store them (raw inserts: the code lowercases now).
+    const at = (minutes: number) => new Date(Date.UTC(2026, 0, 1, 0, minutes));
+    const rows = [
+      { email: `${prefix}-Erin@Old.com`, createdAt: at(0) }, // alone: lowercased
+      { email: `${prefix}-DAVE@x.com`, createdAt: at(1) }, // the oldest of its address: lowercased
+      { email: `${prefix}-Dave@X.com`, createdAt: at(2) }, // left as typed
+      { email: `${prefix}-fay@x.com`, createdAt: at(4) }, // already lowercase: keeps it
+      { email: `${prefix}-Fay@x.com`, createdAt: at(3) }, // left as typed, though older
+    ];
+    const made = await db.insert(users).values(rows).returning({ id: users.id, email: users.email });
+    const file = readFileSync(new URL("../src/db/migrations/0062_lowercase_emails.sql", import.meta.url), "utf8");
+    await db.execute(sql.raw(file));
+    const after = new Map(
+      (await db.select({ id: users.id, email: users.email }).from(users).where(inArray(users.id, made.map((m) => m.id)))).map((u) => [u.id, u.email]),
+    );
+    expect(made.map((m) => after.get(m.id))).toEqual([
+      `${prefix}-erin@old.com`,
+      `${prefix}-dave@x.com`,
+      `${prefix}-Dave@X.com`,
+      `${prefix}-fay@x.com`,
+      `${prefix}-Fay@x.com`,
+    ]);
   });
 });

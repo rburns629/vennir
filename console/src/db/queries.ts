@@ -4,6 +4,7 @@ import { and, arrayContains, arrayOverlaps, count, desc, eq, gte, ilike, inArray
 import { imageRepository } from "../imageRef.js";
 import { db } from "./client.js";
 import {
+  normalEmail,
   imageRepositories,
   teams,
   users,
@@ -34,6 +35,8 @@ import {
   type TemplateStep,
 } from "./schema.js";
 
+export { normalEmail };
+
 export interface User {
   id: string;
   email: string;
@@ -51,15 +54,6 @@ export interface User {
 
 /** The database, or a transaction on it: for the few queries one caller runs together. */
 export type Db = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-/**
- * An email as accounts keep it: lowercase, so Alice@x.com and alice@x.com
- * are one account however it was typed (signing in, registering, an admin
- * adding a member). Every write and lookup by email goes through it.
- */
-export function normalEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {
   const [user] = await db.select().from(users).where(eq(users.email, normalEmail(email))).limit(1);
