@@ -1234,7 +1234,8 @@ when one's needed, is a Secret named in `chat.apiKeySecret` (key
 --from-file=api-key=<file>`. What a person asks, and what
 the agent's tools find for them, goes to the model: on a cloud, use one in
 the install's own. Each person may ask 30 questions an hour and 200 a day
-(admins change it with `ChatService/SetChatLimits`), and bots none.
+(admins change it on the Admin page's chat agent section, or with
+`ChatService/SetChatLimits`), and bots none.
 `chat.maxSteps` (8), `timeoutSeconds` (180) and
 `maxTokens` (8000 on anthropic, bedrock and vertex, where thinking counts toward
 it; else 1500) bound one answer; `chat.effort` sets how hard Claude or
