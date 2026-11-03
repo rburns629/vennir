@@ -5,11 +5,14 @@
  */
 import { createContextKey, type HandlerContext } from "@connectrpc/connect";
 import type { FastifyBaseLogger } from "fastify";
-import type { AuthUser } from "../auth/plugin.js";
+import type { AuthUser, CallerResolution } from "../auth/plugin.js";
 import { unauthenticated } from "./errors.js";
 
 /** The signed-in caller; unset when there's no valid credential. */
 export const kCaller = createContextKey<AuthUser | undefined>(undefined, { description: "caller" });
+/** Resolves the request's credential again, as it is now: for a stream
+ * that outlives a change to who the caller is (WatchExecution). */
+export const kRecheckCaller = createContextKey<(() => Promise<CallerResolution>) | undefined>(undefined, { description: "recheck caller" });
 /** Why there's no caller, for the error a protected method answers with. */
 export const kAuthProblem = createContextKey<string | undefined>(undefined, { description: "auth problem" });
 /** An error resolving the credential (a database failure, say): the call
@@ -27,6 +30,16 @@ export function callerOf(ctx: HandlerContext) {
   const caller = ctx.values.get(kCaller);
   if (!caller) throw unauthenticated(ctx.values.get(kAuthProblem));
   return caller;
+}
+
+/** The caller as they are now (their teams, a sign-out, a password reset):
+ * refused when the credential no longer resolves to anyone. */
+export async function currentCallerOf(ctx: HandlerContext): Promise<AuthUser> {
+  const recheck = ctx.values.get(kRecheckCaller);
+  if (!recheck) throw new Error("A Connect call without its request's credential check.");
+  const resolved = await recheck();
+  if (!resolved.authUser) throw unauthenticated(resolved.problem);
+  return resolved.authUser;
 }
 
 /** The request's logger; rpc/server.ts always sets it. */

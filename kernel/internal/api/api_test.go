@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"maps"
@@ -310,6 +311,9 @@ func TestMalformedSubmissionsAreRefused(t *testing.T) {
 		"a for_team past 63 characters": func(r *kernelv1.SubmitExecutionRequest) {
 			r.Tasks[0].ForTeam = strings.Repeat("a", 64)
 		},
+		"inputs too big for a step's request": func(r *kernelv1.SubmitExecutionRequest) {
+			r.Tasks[0].Inputs = inputs(map[string]any{"data": strings.Repeat("x", MaxInputBytes)})
+		},
 	} {
 		req := single(unique("malformed"))
 		change(req)
@@ -319,6 +323,18 @@ func TestMalformedSubmissionsAreRefused(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
+}
+
+// A body past the bound is refused before it's read whole.
+func TestARequestPastTheSizeBoundIsRefused(t *testing.T) {
+	c := client(t)
+	req := single(unique("too-big"))
+	for i := 0; i < MaxRequestBytes/MaxInputBytes+1; i++ {
+		req.Tasks = append(req.Tasks, &kernelv1.Task{Id: fmt.Sprintf("t-%d", i), Image: "x:local", Action: "create", Team: "test-team",
+			ServiceAccount: "default", Inputs: inputs(map[string]any{"data": strings.Repeat("x", MaxInputBytes-100)})})
+	}
+	_, err := c.SubmitExecution(context.Background(), connect.NewRequest(req))
+	code(t, err, connect.CodeResourceExhausted)
 }
 
 // --- reading ---

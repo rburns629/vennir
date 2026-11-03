@@ -7,7 +7,7 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
-import { ApiError, getTeamProfile, listApis, listRunnables, type ApiProduct, type Runnable, type TeamProfile } from "../../api";
+import { errorMessage, getTeamProfile, listApis, listRunnables, type ApiProduct, type Runnable, type TeamProfile } from "../../api";
 import { Pill } from "../../components/Pill";
 import { ReadinessPill } from "../../components/ReadinessPill";
 import { runLink } from "../RunFormPage";
@@ -65,11 +65,11 @@ export function TeamOffers({ teamName, showProfile }: { teamName: string; showPr
     if (showProfile) {
       getTeamProfile(teamName)
         .then(setProfile)
-        .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the team."); });
+        .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the team.")); });
     }
     listRunnables()
       .then((all) => { setOffers(all.filter((r) => r.team === teamName)); })
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load what it offers."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load what it offers.")); });
     // Display only: without it, no APIs are listed.
     listApis()
       .then((all) => { setApis(all.filter((a) => a.team === teamName)); })

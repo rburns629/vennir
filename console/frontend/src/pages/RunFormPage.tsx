@@ -10,7 +10,7 @@ import Link from "@mui/material/Link";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { ApiError, listRunnables, previewRunnable, runRunnable, updateSchedule, type NotPreviewed, type Runnable } from "../api";
+import { ApiError, errorMessage, listRunnables, previewRunnable, runRunnable, updateSchedule, type NotPreviewed, type Runnable } from "../api";
 import { CloudPill, NotForThisInstall, isNotForThisInstall, notHereReason, refusedProduct, useInstall } from "../components/Clouds";
 import { CodeBlock } from "../components/CodeBlock";
 import { Pill } from "../components/Pill";
@@ -175,7 +175,7 @@ function RunForm({
       setFieldErrors(problems.fields);
       setErrors(problems.general.length > 0 || !fields ? [err.message] : []);
     } else {
-      setErrors([err instanceof ApiError ? err.message : "Something went wrong. Try again."]);
+      setErrors([errorMessage(err, "Something went wrong. Try again.")]);
     }
   }
 
@@ -471,7 +471,7 @@ export function RunFormPage() {
   useEffect(() => {
     listRunnables()
       .then(setRunnables)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the catalog."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the catalog.")); });
   }, []);
 
   const runnable = runnables?.find((r) => (template ? r.kind === "template" && `${r.team}/${r.name}` === template : r.kind === "action" && (r.name === action || r.actions[0] === action)));

@@ -15,7 +15,7 @@ import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { DEFAULT_TOKEN_DAYS, expiryText, TokenLifetime } from "../../components/TokenLifetime";
 import { AdminCard, Aside } from "./parts";
 import { useAdminChanged, workingTokens } from "./summary";
-import { AUTOMATION_SCOPES, ApiError, createAutomationToken, listAutomationTokens, revokeToken, type AutomationToken } from "../../api";
+import { AUTOMATION_SCOPES, errorMessage, createAutomationToken, listAutomationTokens, revokeToken, type AutomationToken } from "../../api";
 
 /** Platform-wide tokens for automation: each holds
  * specific permissions instead of team membership, so it can't read
@@ -38,7 +38,7 @@ export function AutomationTokensCard() {
     listAutomationTokens()
       .then(setTokens)
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Failed to load automation tokens.");
+        setError(errorMessage(err, "Failed to load automation tokens."));
       });
   }
 
@@ -56,7 +56,7 @@ export function AutomationTokensCard() {
       reload();
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setSubmitting(false);
     }
@@ -70,7 +70,7 @@ export function AutomationTokensCard() {
       reload();
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Revoke failed.");
+      setError(errorMessage(err, "Revoke failed."));
     } finally {
       setRevokeBusy(false);
       setRevoking(null);

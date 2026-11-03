@@ -41,8 +41,9 @@ type Options struct {
 	MaxDispatchFailures int
 	// LogRefresh is how often a running task's logs are captured; 0, never.
 	LogRefresh time.Duration
-	// JobDeadlineGrace is how far past its timeout a Job's own deadline is:
-	// a timed-out task whose Job can't be stopped fails only after it.
+	// JobDeadlineGrace is how far past its timeout and StartTimeout a Job's
+	// own deadline is: a timed-out or cancelled task whose Job can't be
+	// stopped leaves RUNNING only after it.
 	JobDeadlineGrace time.Duration
 	// StartTimeout is how long an attempt may wait to start (for a node,
 	// under a quota) before it fails as TASK_NOT_STARTED; its timeout counts
@@ -102,6 +103,8 @@ type pass struct {
 	pendingEvents *[]pendingEvent
 	// Executions this pass already moved to RUNNING.
 	startedExecutions map[string]bool
+	// Executions whose settling this pass holds (settling).
+	settling map[string]bool
 }
 
 // clock is the pass's time as it goes: its start plus the time since.
@@ -115,17 +118,22 @@ type pendingEvent struct {
 }
 
 // RunTick runs one scheduling pass on db (a transaction the caller commits):
-// RecordPass, then DispatchPass. The scheduler's loop commits each on its own
+// ExpireApprovals, RecordPass, then DispatchPass. The scheduler's loop commits each on its own
 // (Loop.pass), so a dispatch held up by the API server (an admission webhook
 // waiting out its timeout, seen on GKE) never holds what finished; tests run
 // both in one. A pass that fails leaves nothing behind once its transaction
 // rolls back, so running the next from scratch is always safe. Only
 // executor calls overlap; every row read and write is in order.
 func RunTick(ctx context.Context, db DB, exec executor.Executor, opts Options, now time.Time, log *slog.Logger) (Outcome, error) {
+	expired, err := ExpireApprovals(ctx, db, exec, opts, now, log)
+	if err != nil {
+		return Outcome{}, err
+	}
 	recorded, err := RecordPass(ctx, db, exec, opts, now, log)
 	if err != nil {
 		return Outcome{}, err
 	}
+	recorded = expired.and(recorded)
 	dispatched, err := DispatchPass(ctx, db, exec, opts, now, log)
 	if err != nil {
 		return Outcome{}, err
@@ -142,16 +150,30 @@ func (o Outcome) and(other Outcome) Outcome {
 	}
 }
 
-// RecordPass expires approvals and polls this scheduler's running tasks:
-// what finished is recorded (its dependents released), the rest's leases
-// renewed.
-func RecordPass(ctx context.Context, db DB, exec executor.Executor, opts Options, now time.Time, log *slog.Logger) (Outcome, error) {
+// ExpireApprovals fails the tasks that awaited approval too long, and
+// their executions; in a transaction of its own in the loop, as it settles
+// executions in an order of its own (settle).
+func ExpireApprovals(ctx context.Context, db DB, exec executor.Executor, opts Options, now time.Time, log *slog.Logger) (Outcome, error) {
 	p := &pass{ctx: ctx, db: db, exec: exec, opts: opts, now: now, began: time.Now(), log: log, pendingEvents: &[]pendingEvent{}}
-	if err := p.expireApprovals(); err != nil {
+	expired, err := p.expireApprovals()
+	if err != nil {
 		return Outcome{}, fmt.Errorf("expiring approvals: %w", err)
 	}
+	if err := p.flushEvents(); err != nil {
+		return Outcome{}, fmt.Errorf("recording events: %w", err)
+	}
+	return Outcome{Progressed: expired > 0, Events: p.events}, nil
+}
+
+// RecordPass polls this scheduler's running tasks: what finished is
+// recorded (its dependents released), the rest's leases renewed.
+func RecordPass(ctx context.Context, db DB, exec executor.Executor, opts Options, now time.Time, log *slog.Logger) (Outcome, error) {
+	p := &pass{ctx: ctx, db: db, exec: exec, opts: opts, now: now, began: time.Now(), log: log, pendingEvents: &[]pendingEvent{}}
+	// In one order, as every pass takes them: what finishes locks its
+	// dependents and then its execution, so passes taking two executions'
+	// rows in opposite orders could deadlock.
 	rows, err := db.Query(ctx, `SELECT `+taskColumns+` FROM execution_tasks
-		WHERE state = 'RUNNING' AND lease_owner = $1 FOR UPDATE SKIP LOCKED`, opts.Owner)
+		WHERE state = 'RUNNING' AND lease_owner = $1 ORDER BY execution_id, id FOR UPDATE SKIP LOCKED`, opts.Owner)
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -368,7 +390,7 @@ func (p *pass) recordStart(t *Task, resolved executor.ResolvedTask, handle execu
 		return err
 	}
 	if _, err := p.db.Exec(p.ctx, `UPDATE task_attempts SET started_at = $3, executor_handle = $4::jsonb
-		WHERE task_id = $1 AND attempt_number = $2`, t.ID, t.AttemptCount, p.now, jsonValue(handle)); err != nil {
+		WHERE task_id = $1 AND attempt_number = $2`, t.ID, t.AttemptCount, p.clock(), jsonValue(handle)); err != nil {
 		return err
 	}
 	if err := p.markExecutionRunning(t.ExecutionID); err != nil {
@@ -489,7 +511,14 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 	if domain.ExecutionState(executionState) == domain.ExecutionCancelled {
 		// Cancelled through kernel-api, which only marks rows: only the
 		// scheduler can stop an in-flight attempt.
-		_ = p.exec.Cancel(p.ctx, handle)
+		if err := p.exec.Cancel(p.ctx, handle); err != nil && !p.pastJobDeadline(t, attempt) {
+			// Not known to have stopped: it stays ours, and the cancel is
+			// tried again, until the Job's own deadline has stopped it.
+			p.log.Warn("couldn't stop a cancelled execution's task; trying again next pass", "executionId", t.ExecutionID,
+				"taskKey", t.TaskKey, "attempt", t.AttemptCount, "error", err.Error())
+			t.LeaseExpiresAt = ptr(p.now.Add(p.opts.LeaseDuration))
+			return false, saveTask(p.ctx, p.db, t)
+		}
 		attempt.CompletedAt = ptr(p.clock())
 		if err := saveAttempt(p.ctx, p.db, attempt); err != nil {
 			return false, err
@@ -501,6 +530,11 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 		return true, p.recordEvent(t.ExecutionID, &t.ID, domain.EventTaskCancelled, map[string]any{"taskKey": t.TaskKey, "attempt": t.AttemptCount})
 	}
 
+	if statusErr == nil && status.State != executor.Running {
+		if err := p.settle(t.ExecutionID); err != nil {
+			return false, err
+		}
+	}
 	// A result already in wins over the timeout: a task that finished is
 	// never failed for taking too long, even when seen late. Outputs that
 	// don't fit the product's schema are a failure of the product's
@@ -562,13 +596,16 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 			}
 		}
 		if elapsed > timeout {
-			if err := p.exec.Cancel(p.ctx, handle); err != nil && elapsed <= timeout+p.opts.JobDeadlineGrace {
+			if err := p.exec.Cancel(p.ctx, handle); err != nil && !p.pastJobDeadline(t, attempt) {
 				// Before the Job's own deadline the attempt may still be
 				// running: it stays ours, and the cancel is tried again.
 				p.log.Warn("couldn't stop a task past its timeout; trying again next pass", "executionId", t.ExecutionID,
 					"taskKey", t.TaskKey, "attempt", t.AttemptCount, "error", err.Error())
 				t.LeaseExpiresAt = ptr(p.now.Add(p.opts.LeaseDuration))
 				return false, saveTask(p.ctx, p.db, t)
+			}
+			if err := p.settle(t.ExecutionID); err != nil {
+				return false, err
 			}
 			return true, p.handleFailure(t, attempt, failure, handle)
 		}
@@ -596,6 +633,49 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 		}
 	}
 	return false, nil
+}
+
+// settle takes the execution's transaction-scoped advisory lock, once a
+// pass, before a task of it that finished (or whose approval expired)
+// locks its dependents, its waiting siblings or the execution. Two
+// schedulers finishing tasks of one execution would otherwise lock its
+// dependents in opposite orders (one finishing T1 then T3, the other T2,
+// each releasing a join) and deadlock; with it, one settles the execution
+// at a time. Each transaction that settles takes these in execution order
+// (RecordPass and ExpireApprovals read their tasks so, before locking
+// any), so settling passes never deadlock each other. Other writers to an
+// execution don't take it and can: a dispatch failing its execution
+// (MISSING_UPSTREAM_OUTPUT, INPUT_INVALID, a refusal, EXECUTOR_START_FAILED)
+// holds the rows it claimed, in the queue's order, so it can't wait here
+// without risking a cycle of its own; and kernel-api's cancel and retry
+// lock tasks, then the execution. Postgres aborts one of a deadlock, and
+// that pass is redone from the rows (a cancel or retry errs, and is sent
+// again).
+func (p *pass) settle(executionID string) error {
+	if p.settling[executionID] {
+		return nil
+	}
+	if _, err := p.db.Exec(p.ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, "settle:"+executionID); err != nil {
+		return err
+	}
+	if p.settling == nil {
+		p.settling = map[string]bool{}
+	}
+	p.settling[executionID] = true
+	return nil
+}
+
+// pastJobDeadline says the attempt's Job has passed its own deadline
+// (activeDeadlineSeconds: the task's timeout, plus StartTimeout, plus
+// JobDeadlineGrace, from its creation) and its Pod's termination grace,
+// so Kubernetes has stopped it. It counts from the attempt's started_at,
+// stamped once Start returned, so never before the Job was made.
+func (p *pass) pastJobDeadline(t *Task, attempt *Attempt) bool {
+	if attempt.StartedAt == nil {
+		return true // not known: never waited for forever
+	}
+	deadline := time.Duration(t.TimeoutSeconds)*time.Second + p.opts.StartTimeout + p.opts.JobDeadlineGrace + executor.PodTerminationGrace
+	return p.now.Sub(*attempt.StartedAt) > deadline
 }
 
 // captureLogs stores the attempt's output, replacing the last capture. Best
@@ -660,35 +740,69 @@ func (p *pass) handleFailure(t *Task, attempt *Attempt, failure domain.Structure
 // expireApprovals fails each task that has awaited approval longer than
 // ApprovalTimeout (APPROVAL_EXPIRED), and with it its execution, as a
 // decline would.
-func (p *pass) expireApprovals() error {
+func (p *pass) expireApprovals() (int, error) {
 	if p.opts.ApprovalTimeout <= 0 {
-		return nil
+		return 0, nil
 	}
-	rows, err := p.db.Query(p.ctx, `SELECT `+taskColumns+` FROM execution_tasks
-		WHERE state = 'AWAITING_APPROVAL' AND available_at <= $1 FOR NO KEY UPDATE SKIP LOCKED`, p.now.Add(-p.opts.ApprovalTimeout))
+	cutoff := p.now.Add(-p.opts.ApprovalTimeout)
+	// Read unlocked, by execution: each execution's settling is taken
+	// before any of its rows is locked (failExecution locks its waiting
+	// tasks, these among them), as a settling pass takes them.
+	rows, err := p.db.Query(p.ctx, `SELECT id::text, execution_id::text FROM execution_tasks
+		WHERE state = 'AWAITING_APPROVAL' AND available_at <= $1 ORDER BY execution_id, id`, cutoff)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	expired, err := scanTasks(rows)
-	if err != nil {
-		return err
+	type candidate struct{ id, executionID string }
+	var candidates []candidate
+	for rows.Next() {
+		var c candidate
+		if err := rows.Scan(&c.id, &c.executionID); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		candidates = append(candidates, c)
 	}
-	for _, t := range expired {
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	expired := 0
+	for _, c := range candidates {
+		if err := p.settle(c.executionID); err != nil {
+			return expired, err
+		}
+		// Still waiting, now it's locked? (Approved, declined, or cancelled
+		// with its execution meanwhile: left alone.)
+		rows, err := p.db.Query(p.ctx, `SELECT `+taskColumns+` FROM execution_tasks
+			WHERE id = $1 AND state = 'AWAITING_APPROVAL' AND available_at <= $2 FOR NO KEY UPDATE SKIP LOCKED`, c.id, cutoff)
+		if err != nil {
+			return expired, err
+		}
+		found, err := scanTasks(rows)
+		if err != nil {
+			return expired, err
+		}
+		if len(found) == 0 {
+			continue
+		}
+		t := found[0]
+		expired++
 		failure := domain.StructuredError{Code: "APPROVAL_EXPIRED", Message: "Nobody approved or declined it in time."}
 		t.State = domain.TaskFailed
 		t.Failure = failure.AsMap()
 		if err := saveTask(p.ctx, p.db, t); err != nil {
-			return err
+			return expired, err
 		}
 		if err := p.recordEvent(t.ExecutionID, &t.ID, domain.EventTaskFailed, map[string]any{
 			"taskKey": t.TaskKey, "attempt": t.AttemptCount, "error": failure.AsMap(), "willRetry": false}); err != nil {
-			return err
+			return expired, err
 		}
 		if err := p.failExecution(t.ExecutionID); err != nil {
-			return err
+			return expired, err
 		}
 	}
-	return nil
+	return expired, nil
 }
 
 // releaseReadyDependents makes each BLOCKED dependent of t READY (or

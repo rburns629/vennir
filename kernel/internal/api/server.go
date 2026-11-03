@@ -24,7 +24,7 @@ import (
 // callers is nil: development only), /health/live, /health/ready and
 // /metrics, every request logged and measured.
 func Handler(service *Service, callers *Callers, pool *pgxpool.Pool, log *slog.Logger) http.Handler {
-	var options []connect.HandlerOption
+	options := []connect.HandlerOption{connect.WithReadMaxBytes(MaxRequestBytes)}
 	if callers != nil {
 		options = append(options, connect.WithInterceptors(callers.Interceptor()))
 	}

@@ -16,7 +16,7 @@ import CartIcon from "@mui/icons-material/ShoppingCartOutlined";
 import CheckIcon from "@mui/icons-material/Check";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import LockIcon from "@mui/icons-material/LockOutlined";
-import { ApiError, listAllTeams, listProducts, listRunnables, previewOrder, submitExecution, type OrderOption, type OrderProblem, type Product, type Runnable } from "../api";
+import { ApiError, errorMessage, listAllTeams, listProducts, listRunnables, previewOrder, submitExecution, type OrderOption, type OrderProblem, type Product, type Runnable } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { useCart } from "../cart";
 import { CheckStrip, type Check } from "../components/CheckStrip";
@@ -379,7 +379,7 @@ function BuildFromCart({
       const fresh = built.problems.filter((p) => p.options.length > 0 && !asked.some((a) => sameInput(a, p)));
       setWired({ actions, asked: [...asked, ...fresh], steps: built.steps.length, added: built.steps.filter((s) => s.added).map((s) => s.product), problems: built.problems.filter((p) => p.options.length === 0) });
     } catch (err) {
-      if (mine === wiring.current) setError(err instanceof ApiError ? err.message : "Couldn't wire them.");
+      if (mine === wiring.current) setError(errorMessage(err, "Couldn't wire them."));
     } finally {
       if (mine === wiring.current) setBusy(false);
     }
@@ -515,7 +515,7 @@ export function ComposePage() {
         const source = list.find((r) => r.sourceUrl)?.sourceUrl ?? null;
         setRepository(source ? (source.split("/blob/")[0] ?? null) : null);
       })
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the catalog."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the catalog.")); });
     if (user?.isAdmin) {
       listAllTeams()
         .then((all) => { setTeams(all.map((t) => t.name)); })
@@ -571,7 +571,7 @@ export function ComposePage() {
       navigate(`/runs/${(await submitExecution(dag)).executionId}`);
     } catch (err) {
       if (isNotForThisInstall(err)) setRefusal(err);
-      else setError(err instanceof ApiError ? err.message : "Couldn't run it.");
+      else setError(errorMessage(err, "Couldn't run it."));
       setRunning(false);
     }
   }
@@ -803,7 +803,7 @@ export function ComposePage() {
                   aria-label={`Delete draft ${d.team}/${d.name}`}
                   title="Delete"
                   onClick={() => {
-                    stored.remove(d).catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't delete it."); });
+                    stored.remove(d).catch((err: unknown) => { setError(errorMessage(err, "Couldn't delete it.")); });
                   }}
                   sx={{ width: 36, height: 36 }}
                 >

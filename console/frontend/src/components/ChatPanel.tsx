@@ -20,7 +20,7 @@ import CartIcon from "@mui/icons-material/ShoppingCartOutlined";
 import DoneIcon from "@mui/icons-material/TaskAlt";
 import ThumbDownIcon from "@mui/icons-material/ThumbDownOutlined";
 import ThumbUpIcon from "@mui/icons-material/ThumbUpOutlined";
-import { ApiError, askChatStream, rateAnswer, type ChatAnswer } from "../api";
+import { ApiError, errorMessage, askChatStream, rateAnswer, type ChatAnswer } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { cart, useCart } from "../cart";
 import { ProposedCartLines } from "./ProposedCartLines";
@@ -196,7 +196,7 @@ function Rate({ question, turn, team, model }: { question: string; turn: Extract
       setSent(rating);
       setAsking(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't send it.");
+      setError(errorMessage(err, "Couldn't send it."));
     }
   }
 
@@ -340,7 +340,7 @@ export function ChatPanel({
       // The question stays in the box to ask again (or in a new conversation).
       setTurns(turns);
       setDraft(question);
-      setError({ message: err instanceof ApiError ? err.message : "Couldn't get an answer.", tooLong: err instanceof ApiError && err.code === "CONVERSATION_TOO_LONG" });
+      setError({ message: errorMessage(err, "Couldn't get an answer."), tooLong: err instanceof ApiError && err.code === "CONVERSATION_TOO_LONG" });
     } finally {
       if (asking.current === controller) {
         asking.current = null;

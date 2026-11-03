@@ -5,7 +5,7 @@ import Alert from "@mui/material/Alert";
 import Typography from "@mui/material/Typography";
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Mono } from "../../components/Mono";
-import { ApiError, listApis, type ApiProduct } from "../../api";
+import { errorMessage, listApis, type ApiProduct } from "../../api";
 import { ApiStatePill } from "../api/ApiStatePill";
 
 const COLUMNS: DataTableColumn<ApiProduct>[] = [
@@ -28,7 +28,7 @@ export function ApisTab({ teamName }: { teamName: string }) {
         if (!cancelled) setApis(all.filter((a) => a.team === teamName));
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load the team's APIs.");
+        if (!cancelled) setError(errorMessage(err, "Failed to load the team's APIs."));
       });
     return () => {
       cancelled = true;

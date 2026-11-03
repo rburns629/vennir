@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Alert, Box, Button, Stack, TextField, Typography } from "@mui/material";
 import { CodeBlock } from "./CodeBlock";
 import { Mono } from "./Mono";
-import { ApiError } from "../api";
+import { errorMessage } from "../api";
 import { when } from "../time";
 
 export interface CallbackState {
@@ -46,7 +46,7 @@ export function SignedCallback({
       setUrl("");
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save it. Try again.");
+      setError(errorMessage(err, "Couldn't save it. Try again."));
     } finally {
       setBusy(false);
     }

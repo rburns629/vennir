@@ -20,6 +20,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
+  errorMessage,
   addTeamMember,
   listSsoGroupMappings,
   listTeamMembers,
@@ -34,7 +35,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
 import { useEnvironment } from "../../environment";
-import { CardTitle, ChoiceCard, TabIntro, errorMessage, relativeTime, visuallyHidden } from "./shared";
+import { CardTitle, ChoiceCard, TabIntro, relativeTime, visuallyHidden } from "./shared";
 
 const ROLE_LABELS: Record<Role, string> = { maintainer: "Maintainer", member: "Member" };
 const ROLE_HELP: Record<Role, string> = {

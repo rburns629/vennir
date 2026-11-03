@@ -34,6 +34,13 @@ import (
 // MaxStatesPerRequest bounds GetExecutionStates; the console asks in batches.
 const MaxStatesPerRequest = 1000
 
+// MaxInputBytes bounds one task's inputs, as JSON: its request.json is a
+// ConfigMap, which holds at most 1 MiB, with its upstream outputs filled in.
+const MaxInputBytes = 256 << 10
+
+// MaxRequestBytes bounds any one request's body.
+const MaxRequestBytes = 32 << 20
+
 // Service implements KernelService.
 type Service struct {
 	Pool     *pgxpool.Pool
@@ -116,6 +123,9 @@ func taskDefs(tasks []*kernelv1.Task) ([]domain.TaskDef, []domain.ValidationIssu
 			Inputs: t.GetInputs().AsMap(), TimeoutSeconds: 300, MaxAttempts: 1, Team: t.GetTeam(),
 			ServiceAccount: t.GetServiceAccount(), SecretRefs: t.GetSecretRefs(), TokenAudiences: t.GetTokenAudiences(),
 			ApprovalRequired: t.GetApprovalRequired()}
+		if encoded, err := json.Marshal(def.Inputs); err == nil && len(encoded) > MaxInputBytes {
+			bad("inputs", fmt.Sprintf("are %d bytes as JSON, over the %d a step may be given: pass references (names, URIs), not data", len(encoded), MaxInputBytes))
+		}
 		if def.DependsOn == nil {
 			def.DependsOn = []string{}
 		}

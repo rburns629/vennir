@@ -38,7 +38,7 @@ import Typography from "@mui/material/Typography";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
-import { ApiError, getDoc, listDocs, searchDocs, type DocHit, type DocSummary } from "../api";
+import { errorMessage, getDoc, listDocs, searchDocs, type DocHit, type DocSummary } from "../api";
 import { helpHref } from "../components/HelpLink";
 import { PageHeader } from "../components/PageHeader";
 import { useAsk } from "../layout/ask";
@@ -953,7 +953,7 @@ export function DocsPage() {
     listDocs()
       .then(setDocs)
       .catch((err: unknown) => {
-        setListError(err instanceof ApiError ? err.message : "Failed to load the guides.");
+        setListError(errorMessage(err, "Failed to load the guides."));
       });
   }, []);
 
@@ -971,7 +971,7 @@ export function DocsPage() {
         if (current) setContent(text);
       })
       .catch((err: unknown) => {
-        if (current) setDocError(err instanceof ApiError ? err.message : "Failed to load this guide.");
+        if (current) setDocError(errorMessage(err, "Failed to load this guide."));
       })
       .finally(() => {
         if (current) setLoadingContent(false);

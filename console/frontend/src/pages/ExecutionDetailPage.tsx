@@ -9,7 +9,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Link from "@mui/material/Link";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
-import { ApiError, cancelExecution, decideApproval, rerunExecution, retryTask, type ExecutionDetail, type TaskStatus } from "../api";
+import { errorMessage, cancelExecution, decideApproval, rerunExecution, retryTask, type ExecutionDetail, type TaskStatus } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { HelpLink } from "../components/HelpLink";
 import { StatusBadge } from "../components/StatusBadge";
@@ -100,7 +100,7 @@ export function ExecutionDetailPage() {
       await action();
       resume();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : failed);
+      setActionError(errorMessage(err, failed));
     } finally {
       setBusy(null);
     }
@@ -113,7 +113,7 @@ export function ExecutionDetailPage() {
     try {
       navigate(`/runs/${(await rerunExecution(id)).executionId}`);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Couldn't run it again.");
+      setActionError(errorMessage(err, "Couldn't run it again."));
       setBusy(null);
     }
   }

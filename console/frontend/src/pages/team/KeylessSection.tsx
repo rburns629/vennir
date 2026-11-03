@@ -2,10 +2,10 @@
 import { useState } from "react";
 import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import LinkIcon from "@mui/icons-material/LinkOutlined";
-import { addBotIdentity, removeBotIdentity, type BotIdentity } from "../../api";
+import { errorMessage, addBotIdentity, removeBotIdentity, type BotIdentity } from "../../api";
 import { CodeBlock } from "../../components/CodeBlock";
 import { Mono } from "../../components/Mono";
-import { BotPart, errorMessage, relativeTime } from "./shared";
+import { BotPart, relativeTime } from "./shared";
 
 const GITHUB = "https://token.actions.githubusercontent.com";
 const GITLAB = "https://gitlab.com";

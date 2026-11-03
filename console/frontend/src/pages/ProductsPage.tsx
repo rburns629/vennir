@@ -27,7 +27,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
 import { ReadinessPill } from "../components/ReadinessPill";
 import { CloudPill, forInstalls, useInstall } from "../components/Clouds";
-import { ApiError, checkProduct, cloudList, listProducts, listRunnables, type Product, type ProductRelease, type Runnable } from "../api";
+import { errorMessage, checkProduct, cloudList, listProducts, listRunnables, type Product, type ProductRelease, type Runnable } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { cart, useCart } from "../cart";
 import { actionRef } from "../compose";
@@ -119,7 +119,7 @@ export function ProductsPage() {
     listProducts()
       .then(setProducts)
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Failed to load products.");
+        setError(errorMessage(err, "Failed to load products."));
       });
   }, []);
 
@@ -477,7 +477,7 @@ function ReadinessDetail({ product, install }: { product: Product; install: stri
             onClick={() => {
               checkProduct(product.name)
                 .then((started) => { setAsked(started ? "Checking now: refresh in a minute." : "A check is already under way."); })
-                .catch((err: unknown) => { setAsked(err instanceof ApiError ? err.message : "Couldn't start it."); });
+                .catch((err: unknown) => { setAsked(errorMessage(err, "Couldn't start it.")); });
             }}
           >
             Check now

@@ -25,7 +25,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
 import { ReadinessNote } from "../components/ReadinessNote";
 import { ReadinessPill } from "../components/ReadinessPill";
-import { ApiError, listRunnables, type OrderOption, type Runnable } from "../api";
+import { errorMessage, listRunnables, type OrderOption, type Runnable } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { useEnvironment } from "../environment";
 import { when } from "../time";
@@ -292,7 +292,7 @@ export function CatalogPage() {
     listRunnables()
       .then(setRunnables)
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Couldn't load the catalog.");
+        setError(errorMessage(err, "Couldn't load the catalog."));
       });
   }, []);
 

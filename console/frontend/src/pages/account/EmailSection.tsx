@@ -6,7 +6,7 @@ import Card from "@mui/material/Card";
 import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Typography from "@mui/material/Typography";
-import { ApiError, getEmailPreferences, setEmailPreferences } from "../../api";
+import { errorMessage, getEmailPreferences, setEmailPreferences } from "../../api";
 
 const KINDS = [
   { kind: "run_failed", label: "A run of mine failed" },
@@ -37,7 +37,7 @@ export function EmailSection() {
     setPrefs({ ...prefs, kinds: next });
     setError(null);
     setEmailPreferences(next).catch((err: unknown) => {
-      setError(err instanceof ApiError ? err.message : "Couldn't save it.");
+      setError(errorMessage(err, "Couldn't save it."));
     });
   }
 

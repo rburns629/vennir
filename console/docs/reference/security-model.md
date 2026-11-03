@@ -451,9 +451,16 @@ sharing; a backend should still check the token's `api` as well as its
 `aud` (the sample does). Only the cluster's default domain is read
 (`.svc.cluster.local`): on a cluster with another, and for short names,
 pod IPs or anything else that reaches inside the cluster, `backendHosts`
-alone decides, so list exactly the hosts each API may use. A caller's own `Vertra-*` headers are dropped.
-Paths with encoded slashes or dot segments are refused, so what's checked
-is what's forwarded.
+alone decides, so list exactly the hosts each API may use. A caller's own `Vertra-*` headers are dropped,
+and so is what it says of where it's from (`Forwarded`, `X-Forwarded-*`,
+`X-Real-Ip`): `X-Forwarded-For` is the gateway's own peer. A cookie a
+backend sets is kept to its API's path, so one team's backend can't set or
+read another's on the gateway's shared origin.
+Paths with encoded slashes, backslashes or dot segments (`..;` too) are
+refused, so what's checked is what's forwarded. Before sign-in, an API
+that's hidden or paused is answered as one that isn't there (404), so its
+state and pause message reach only signed-in callers who can see it; a
+hidden one is 404 to anyone but its own team and admins, as in the console.
 
 Backends must be under hosts the admins allow (`gateway.backendHosts`), or
 the API is held: the gateway can't be pointed anywhere a catalog says. Its
@@ -700,7 +707,7 @@ without going through the console:
 | Dispatch namespaces | Jobs in any namespace not labelled `vertra/team=true`, and in the platform's own namespace (`DISPATCH_REJECTED`), unless `dispatchPolicy.allowReleaseNamespace` is on: only for an install whose platform namespace is also a team's, as the GKE reference install's `default` is (`helm/values/gke/kernel.yaml`) | `helm/charts/execution-kernel/templates/dispatch-policy.yaml` |
 | Image sources | Images outside the allowed registries (`IMAGE_NOT_ALLOWED`) | `templates/image-policy.yaml` |
 | Image signatures | Where policy-controller is installed, any Pod in a team namespace whose image isn't signed by catalog CI under the source registry, whoever makes it (`IMAGE_NOT_SIGNED`): images from sources an admin added don't run there either (`no-match-policy` stays `deny`, so a compromised console adding a source can't get past it). It checks Pods, not the Jobs and other workloads that make them, which a second policy passes without verifying them (the webhook still admits them): a step's Job is made, and its Pod refused (the Job's `FailedCreate` event, which the kernel reads) | `templates/image-signature.yaml` |
-| Image scans | An image not pinned by digest (`IMAGE_NOT_PINNED`), or one whose digest failed its security scan unless an admin accepted it (`IMAGE_SCAN_FAILED`). The console scans every image before it's registered or run, and daily while in use | `templates/scan-policy.yaml` |
+| Image scans | An image not pinned by digest (`IMAGE_NOT_PINNED`), or one whose digest failed its security scan unless an admin accepted it (`IMAGE_SCAN_FAILED`). The console scans every image before it's registered or run, and daily while in use, for each platform the cluster runs (the console chart's `scanning.platforms`; a multi-arch cluster lists every one) | `templates/scan-policy.yaml` |
 | Step identity | A step running as any ServiceAccount but `default` unless it's a registered product running as the one its `product.yaml` declares; any step mounting a Secret unless it's a registered product and the Secret is registered for its team; Secrets reaching a step any way but a volume (`IDENTITY_NOT_ALLOWED`). The console keeps the policy's products and team secrets current. | `templates/identity-policy.yaml` |
 | Team deletion | A configured purger deleting a team namespace that isn't labelled retired. None is configured by default: the console leaves a purged team's namespace, labelled retired, for a cluster administrator to delete, so the identity that retires a namespace can't also delete it (`teamNamespaces.purge` would let it) | `templates/purge-policy.yaml` |
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
@@ -838,7 +845,8 @@ Auto Mode), off by default there.
   EKS 2026-10-29, and fixed). Steps that need AWS get their own role
   through EKS Pod Identity (`169.254.170.23`, still open) or a web-identity
   token. The write fence accepts that policy only in a shape that lets out
-  everything less what it excepts. Proven on EKS Auto Mode 2026-10-28: a
+  everything less `169.254.169.254`, and no egress rule in the console's
+  other policies (allows add up, so one would undo it). Proven on EKS Auto Mode 2026-10-28: a
   Pod in a team namespace gets no connection to the metadata server, while
   the internet answers; there, Auto Mode's nodes already refuse Pods the
   metadata server, so the policy is a second barrier. Proven on

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import type { PlatformInfo } from "../../api";
+import { catalogFileUrl } from "../../catalogFile";
 
 /**
  * What the "Connect a source" wizard knows about each secret provider:
@@ -351,15 +352,13 @@ export function providerGuide(id: string): ProviderGuide | undefined {
   return PROVIDERS.find((p) => p.id === id);
 }
 
+/** Where a team's SecretStore file is in the catalog. */
+export const secretStoreFile = (team: string) => `teams/${team}/secret-stores/secretstore.yaml`;
+
 /** A link that opens GitHub's "create file" page in the catalog with the
- * SecretStore filled in; GitHub then offers to commit it on a new branch
- * and open the PR. */
+ * SecretStore filled in. */
 export function newFileUrl(repo: string, team: string, manifest: string): string {
-  const params = new URLSearchParams({
-    filename: `teams/${team}/secret-stores/secretstore.yaml`,
-    value: `${manifest}\n`,
-  });
-  return `https://github.com/${repo}/new/main?${params.toString()}`;
+  return catalogFileUrl(repo, secretStoreFile(team), "new", `${manifest}\n`);
 }
 
 /** The command that fixes a GCP "permission denied" sync error: let the

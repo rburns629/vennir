@@ -9,7 +9,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import DownloadIcon from "@mui/icons-material/FileDownloadOutlined";
-import { ApiError, getApi, pauseApi, resumeApi, type ApiProduct } from "../api";
+import { errorMessage, getApi, pauseApi, resumeApi, type ApiProduct } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { HelpLink } from "../components/HelpLink";
 import { Mono } from "../components/Mono";
@@ -53,7 +53,7 @@ export function ApiPage() {
         setOpenapi(result.openapi);
       })
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Couldn't load the API.");
+        setError(errorMessage(err, "Couldn't load the API."));
       });
   }, [team, name]);
 
@@ -79,7 +79,7 @@ export function ApiPage() {
       load();
       return true;
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That didn't work.");
+      setError(errorMessage(err, "That didn't work."));
       return false;
     } finally {
       setBusy(false);
@@ -142,7 +142,7 @@ export function ApiPage() {
           {(api.state !== "LIVE" || api.deprecated || !api.mayCall) && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
               {api.state === "PAUSED" && (
-                <Alert severity="warning">Paused by its team: every request gets 503 with “{api.pausedMessage}”, and nothing reaches the backend.</Alert>
+                <Alert severity="warning">Paused by its team: every signed-in caller gets 503 with “{api.pausedMessage}” (anyone else, 404), and nothing reaches the backend.</Alert>
               )}
               {api.state === "HELD" && <Alert severity="warning">Held: {api.heldReason}</Alert>}
               {api.state === "UNAVAILABLE" && (

@@ -4,6 +4,7 @@ import { and, arrayContains, arrayOverlaps, count, desc, eq, gte, ilike, inArray
 import { imageRepository } from "../imageRef.js";
 import { db } from "./client.js";
 import {
+  normalEmail,
   imageRepositories,
   teams,
   users,
@@ -34,6 +35,8 @@ import {
   type TemplateStep,
 } from "./schema.js";
 
+export { normalEmail };
+
 export interface User {
   id: string;
   email: string;
@@ -53,7 +56,7 @@ export interface User {
 export type Db = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {
-  const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const [user] = await db.select().from(users).where(eq(users.email, normalEmail(email))).limit(1);
   return user;
 }
 
@@ -63,7 +66,7 @@ export async function findUserById(id: string): Promise<User | undefined> {
 }
 
 export async function createUser(email: string, passwordHash: string | null, mustChangePassword = false): Promise<User> {
-  const [user] = await db.insert(users).values({ email, passwordHash, mustChangePassword }).returning();
+  const [user] = await db.insert(users).values({ email: normalEmail(email), passwordHash, mustChangePassword }).returning();
   if (!user) throw new Error("Insert returned no row");
   return user;
 }
@@ -90,7 +93,7 @@ export async function bindOidcSubject(userId: string, subject: string): Promise<
 
 /** An account made at its first single sign-on: no password. */
 export async function createSsoUser(email: string, subject: string): Promise<User> {
-  const [user] = await db.insert(users).values({ email, oidcSubject: subject }).returning();
+  const [user] = await db.insert(users).values({ email: normalEmail(email), oidcSubject: subject }).returning();
   if (!user) throw new Error("Insert returned no row");
   return user;
 }
@@ -366,7 +369,8 @@ export async function botHasCredentials(userId: string, exec: Db = db): Promise<
  * treating it as one). In a transaction, the account stays locked to it
  * until it ends: one being made waits for its maker's transaction, an
  * existing one for anyone else's that has it. */
-export async function createBotUser(email: string, exec: Db = db): Promise<{ user: User; created: boolean }> {
+export async function createBotUser(given: string, exec: Db = db): Promise<{ user: User; created: boolean }> {
+  const email = normalEmail(given);
   const [inserted] = await exec
     .insert(users)
     .values({ email, isBot: true })

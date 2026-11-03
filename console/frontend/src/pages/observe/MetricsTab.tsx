@@ -12,7 +12,7 @@ import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { HelpLink } from "../../components/HelpLink";
 import { MetricCard } from "../../components/MetricCard";
 import { Mono } from "../../components/Mono";
-import { ApiError, getInstall, getMetrics, type InstallInfo, type MetricsView } from "../../api";
+import { errorMessage, getInstall, getMetrics, type InstallInfo, type MetricsView } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
 import { AlertsCard } from "./AlertsCard";
 
@@ -199,7 +199,7 @@ export function MetricsTab() {
         if (!cancelled) setView(v);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load the metrics.");
+        if (!cancelled) setError(errorMessage(err, "Failed to load the metrics."));
       });
     return () => {
       cancelled = true;

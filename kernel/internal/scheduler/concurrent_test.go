@@ -87,3 +87,24 @@ func TestAnExecutionWhoseLastTasksFinishTogetherCompletes(t *testing.T) {
 		}
 	}
 }
+
+// A pass that finished a task of an execution holds its settling until it
+// commits, so another scheduler's pass waits rather than locking the same
+// dependents in another order (a deadlock).
+func TestAPassHoldsTheSettlingOfAnExecutionItFinishedATaskOf(t *testing.T) {
+	ctx := context.Background()
+	tx := txFor(t)
+	id := submit(t, tx, "idem-settling", task("a"), task("b"), task("join", dependsOn("a", "b")))
+	exec := fake()
+	k := newTicker(t, tx, exec)
+	t0 := time.Now()
+	k.tick(t0)
+	exec.Complete(tasksByKey(t, tx, id)["a"].ExecutorHandle, map[string]any{})
+	k.tick(t0.Add(time.Second))
+
+	var free bool
+	if err := testPool.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0))`, "settle:"+id).Scan(&free); err != nil {
+		t.Fatal(err)
+	}
+	equal(t, "another scheduler may settle it", free, false)
+}

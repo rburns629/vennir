@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Typography from "@mui/material/Typography";
-import { ApiError, getTeamCallback, setTeamCallback, type TeamCallback } from "../../api";
+import { errorMessage, getTeamCallback, setTeamCallback, type TeamCallback } from "../../api";
 import { Mono } from "../../components/Mono";
 import { SignedCallback } from "../../components/SignedCallback";
 import { SettingsCard } from "./shared";
@@ -23,7 +23,7 @@ export function OutcomeWebhookSection({ team, canManage, retired }: { team: stri
         setCallback(found.callback);
         setAllowed(found.allowedHosts);
       })
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the outcome webhook."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the outcome webhook.")); });
   }, [team]);
   useEffect(load, [load]);
 

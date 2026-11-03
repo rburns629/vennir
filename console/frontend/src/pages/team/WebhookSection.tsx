@@ -7,7 +7,7 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { ApiError, deleteTeamWebhook, getTeamWebhook, setTeamWebhook, testTeamWebhook, type TeamWebhook } from "../../api";
+import { errorMessage, deleteTeamWebhook, getTeamWebhook, setTeamWebhook, testTeamWebhook, type TeamWebhook } from "../../api";
 import { when } from "../../time";
 import { Mono } from "../../components/Mono";
 import { SettingsCard } from "./shared";
@@ -50,7 +50,7 @@ export function WebhookSection({ team, canManage, retired }: { team: string; can
         if (found.configured) setKinds(found.kinds);
         else if (forAdmins) setKinds([...KINDS, ...ADMIN_KINDS].map((k) => k.kind));
       })
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the webhook."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the webhook.")); });
   }, [team]);
 
   async function act(action: () => Promise<void>): Promise<void> {
@@ -60,7 +60,7 @@ export function WebhookSection({ team, canManage, retired }: { team: string; can
     try {
       await action();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setBusy(false);
     }

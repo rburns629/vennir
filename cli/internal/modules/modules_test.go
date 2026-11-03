@@ -31,6 +31,30 @@ func TestTheAWSPublishRoleTrustsOnlyMain(t *testing.T) {
 	}
 }
 
+// Every Cloud SQL role the gcp module grants in the project is held to its
+// own instance by a condition, as aws's rds-db:connect names one user on
+// one instance.
+func TestTheGCPDatabaseRolesNameTheInstance(t *testing.T) {
+	main, err := files.ReadFile("gcp/main.tf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := regexp.MustCompile(`(?s)resource "google_project_iam_member" "[^"]+" \{.*?\n\}`).FindAll(main, -1)
+	found := 0
+	for _, b := range blocks {
+		if !strings.Contains(string(b), "roles/cloudsql.") {
+			continue
+		}
+		found++
+		if !strings.Contains(string(b), `expression = "resource.name == \"projects/${var.project}/instances/${google_sql_database_instance.this[0].name}\"`) {
+			t.Errorf("a Cloud SQL role granted project-wide:\n%s", b)
+		}
+	}
+	if found == 0 {
+		t.Fatal("no Cloud SQL roles in gcp/main.tf")
+	}
+}
+
 // The AWS backup writer can't destroy an earlier dump: its bucket is
 // versioned, and the writer may put and read objects but delete none, nor
 // any version (as on gcp, where it can't replace one).
