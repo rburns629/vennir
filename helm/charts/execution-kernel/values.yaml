@@ -210,6 +210,8 @@ scheduler:
   # watched Job or Pod change wakes it sooner, and a pass that made progress
   # is followed by the next at once.
   pollIntervalSeconds: 1
+  # A running step's lease is renewed each pass; it must outlast
+  # pollIntervalSeconds (checked at startup), or another replica adopts it.
   leaseDurationSeconds: 60
   # READY tasks claimed per pass, and Kubernetes API calls (Job starts,
   # status reads) a pass has in flight at once.
@@ -254,16 +256,30 @@ scheduler:
     maxLines: 5000
     maxBytes: 1048576
     refreshSeconds: 60
-  # The scheduler is restarted when its loop hasn't come round for this
-  # long (a hung pass). Well above a slow pass plus pollIntervalSeconds.
-  livenessSeconds: 120
+  # The scheduler is restarted when its heartbeat is this old (a hung pass),
+  # plus the probe's own 90 s (3 failures, 30 s apart). It's touched between
+  # each phase of a turn, so keep that above the slowest one a slow
+  # Kubernetes API can make (each call waits at most
+  # kubernetesRequestTimeoutSeconds, T):
+  #   dispatching: ceil(claimLimit / executorConcurrency) x 2 calls x T
+  #     (4 x 2 x 30 = 240 s by default);
+  #   recording: ceil(running steps / executorConcurrency) x 2 calls x T
+  #     for their statuses (as long as dispatching at 64 steps running,
+  #     longer above), plus its database statements;
+  #   releasing finished steps: 2 calls x T each, one at a time; and the
+  #     orphan sweep (every 5 minutes): one list, then 2 x T per orphan.
+  # Lower than that, a slow API server gets the scheduler restarted
+  # mid-pass, and the new one makes the same slow pass.
+  livenessSeconds: 300
   heartbeatFile: /tmp/vertra-scheduler-heartbeat
   # A running step whose Job and Pod haven't changed isn't re-read from the
   # API, except this often, in case a watch event was missed.
   watchResyncSeconds: 30
   # A finished Job is removed once the scheduler has committed its result
   # (and every few minutes, any no task needs); this is the backstop for
-  # one it never gets back to (kernel/internal/executor/kubernetes.go).
+  # one it never gets back to (kernel/internal/executor/kubernetes.go). More
+  # than 0, and longer than the scheduler may be away: a Job removed before
+  # its result is read fails as JOB_NOT_FOUND.
   jobTtlSecondsAfterFinished: 3600
   # -- How long a finished step's Job (and Pod) is kept once its result is
   # committed, so the console chart's log collector (logs.enabled) can
