@@ -781,16 +781,22 @@ data "aws_iam_policy_document" "publish_trust" {
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
-    # main only; a job in the catalog-publish Environment says so instead
-    # of its branch. Pull requests (any fork's code) never match.
-    # GitHub's subject names the repository, pinned by its id when it uses
-    # immutable subjects (a re-registered name can't match).
+    # main only, always. `vertra catalog create` sets the repository's
+    # subject template to repo, context and ref, so a job in the
+    # catalog-publish Environment names its branch too: whether or not the
+    # Environment exists with its main-only rule, a branch's job can't match.
+    # (The template-less form of a main job's subject is kept for a job
+    # before the template takes effect: it names the branch.) Pull requests
+    # (any fork's code) never match. GitHub's subject names the repository,
+    # pinned by its id when it uses immutable subjects (a re-registered name
+    # can't match).
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
+        "${local.catalog_subject}:environment:catalog-publish:ref:refs/heads/main",
+        "${local.catalog_subject}:ref:refs/heads/main:ref:refs/heads/main",
         "${local.catalog_subject}:ref:refs/heads/main",
-        "${local.catalog_subject}:environment:catalog-publish",
       ]
     }
   }
