@@ -4,6 +4,8 @@
 # (Python, npm, Rust), never meant for a pull request.
 __pycache__/
 *.pyc
+.venv/
+.pytest_cache/
 node_modules/
 dist/
 target/
