@@ -126,6 +126,8 @@ type outcome struct {
 	status              int
 	// apiID and endpoint, once the API is known: for traffic.
 	apiID, endpoint string
+	// served: the path named an API served here.
+	served bool
 }
 
 func (o outcome) as(name string) outcome {
@@ -161,13 +163,17 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	team, name, rest, ok := split(r.URL.EscapedPath())
-	key := team + "/" + name
 	var result outcome
 	if ok {
 		result = g.serve(w, r, team, name, rest, requestID)
 	} else {
-		key = "-"
 		result = g.refuse(w, outcome{name: "not_found"}, http.StatusNotFound, "NOT_FOUND", "No such API here: call /<team>/<api>/<path>, with no encoded slash or dot segment.")
+	}
+	// An API's own label only once it's one served here: any caller can
+	// make up paths, and each label would be series kept forever.
+	key := "-"
+	if result.served {
+		key = team + "/" + name
 	}
 	if g.Metrics != nil {
 		answeredBy := "gateway"
@@ -184,7 +190,11 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		g.Traffic.Record(result.apiID, result.team, result.endpoint, outcomeName, start, g.now().Sub(start))
 	}
-	g.Log.Info("request", "request_id", requestID, "api", key, "team", result.team, "caller", result.subject,
+	asked := "-"
+	if ok {
+		asked = team + "/" + name
+	}
+	g.Log.Info("request", "request_id", requestID, "api", asked, "team", result.team, "caller", result.subject,
 		"method", r.Method, "outcome", result.name, "status", result.status, "duration_ms", g.now().Sub(start).Milliseconds())
 }
 
@@ -193,7 +203,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	if api == nil || (g.Public && !(api.Internet && slices.Contains(g.Settings.InternetTeams, api.Team))) {
 		return g.refuse(w, outcome{name: "not_found"}, http.StatusNotFound, "NOT_FOUND", "No such API here.")
 	}
-	o := outcome{apiID: api.ID, endpoint: api.Match(r.Method, rest)}
+	o := outcome{apiID: api.ID, endpoint: api.Match(r.Method, rest), served: true}
 	if o.endpoint == "" {
 		o.endpoint = r.Method + " " + rest
 	}

@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/rburns629/vertra/gateway/internal/auth"
 	"github.com/rburns629/vertra/gateway/internal/caller"
 	"github.com/rburns629/vertra/gateway/internal/limits"
@@ -301,5 +303,25 @@ func TestItsOwnPaths(t *testing.T) {
 	x, _ := base64.RawURLEncoding.DecodeString(jwks.Keys[0]["x"])
 	if !ed25519.PublicKey(x).Equal(f.public) {
 		t.Error("the JWKS key isn't the signing key's public half")
+	}
+}
+
+func TestOnlyServedAPIsGetTheirOwnMetricLabel(t *testing.T) {
+	f := setup(t, "")
+	reg := prometheus.NewRegistry()
+	f.gw.Metrics = NewMetrics(reg)
+	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "web-person", "", nil)
+	f.do("GET", "/made-up/api/x", "", "", nil)
+	f.do("GET", "/another/one/x", "", "", nil)
+	f.gw.Public = true // not served on the internet listener
+	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "web-person", "", nil)
+	if got := testutil.ToFloat64(f.gw.Metrics.Requests.WithLabelValues("payments/orders", "forwarded")); got != 1 {
+		t.Errorf("payments/orders forwarded: %v", got)
+	}
+	if got := testutil.ToFloat64(f.gw.Metrics.Requests.WithLabelValues("-", "not_found")); got != 3 {
+		t.Errorf("not found under -: %v", got)
+	}
+	if n := testutil.CollectAndCount(f.gw.Metrics.Requests); n != 2 {
+		t.Errorf("%d request series, want 2", n)
 	}
 }
