@@ -21,6 +21,9 @@ import {
   apis,
   catalogSync,
   schedules,
+  ssoGroupMappings,
+  teamCallbacks,
+  teamWebhooks,
   type Approval,
   type ErrorHelp,
   type ProductCleanup,
@@ -46,6 +49,9 @@ export interface User {
   orderTemplates: string[] | null;
 }
 
+/** The database, or a transaction on it: for the few queries one caller runs together. */
+export type Db = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export async function findUserByEmail(email: string): Promise<User | undefined> {
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   return user;
@@ -67,11 +73,16 @@ export async function findUserByOidcSubject(subject: string): Promise<User | und
   return user;
 }
 
-/** Binds an account to its single sign-on identity, once: never over another. */
+/**
+ * Binds an account to its single sign-on identity, once: never over another.
+ * Single sign-on is then the only way in: its password goes, and so does
+ * every session from before (passwordChangedAt), so whoever set that
+ * password (anyone may register an unclaimed email) can't keep using it.
+ */
 export async function bindOidcSubject(userId: string, subject: string): Promise<boolean> {
   const bound = await db
     .update(users)
-    .set({ oidcSubject: subject })
+    .set({ oidcSubject: subject, passwordHash: null, mustChangePassword: false, passwordChangedAt: new Date() })
     .where(and(eq(users.id, userId), isNull(users.oidcSubject)))
     .returning({ id: users.id });
   return bound.length === 1;
@@ -179,6 +190,13 @@ export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: num
       .returning({ userId: teamMemberships.userId });
     await tx.delete(secretGrants).where(eq(secretGrants.teamId, teamId));
     await tx.delete(products).where(eq(products.teamId, teamId));
+    // Nothing that would put people back in it, run as it, or post its
+    // news anywhere: its single sign-on group mappings, its schedules, and
+    // its webhook and order callback (their sealed URLs and secrets).
+    await tx.delete(ssoGroupMappings).where(eq(ssoGroupMappings.teamId, teamId));
+    await tx.delete(schedules).where(eq(schedules.teamId, teamId));
+    await tx.delete(teamWebhooks).where(eq(teamWebhooks.teamId, teamId));
+    await tx.delete(teamCallbacks).where(eq(teamCallbacks.teamId, teamId));
 
     let revokedBotTokens = 0;
     for (const { userId } of members) {
@@ -205,8 +223,8 @@ export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: num
 
 /** Adds someone, as a maintainer unless said otherwise; someone already in
  * the team keeps the role they have. */
-export async function addTeamMember(userId: string, teamId: string, role: TeamRole = "maintainer"): Promise<void> {
-  await db.insert(teamMemberships).values({ userId, teamId, role }).onConflictDoNothing();
+export async function addTeamMember(userId: string, teamId: string, role: TeamRole = "maintainer", exec: Db = db): Promise<void> {
+  await exec.insert(teamMemberships).values({ userId, teamId, role }).onConflictDoNothing();
 }
 
 /** False when the user isn't a member. */
@@ -316,8 +334,8 @@ export async function countAdmins(): Promise<number> {
 /** The names of every team a user belongs to — this, not anything baked
  * into a JWT, is the live authorization source checked on every request,
  * so a membership change takes effect immediately, not at next login. */
-export async function teamNamesForUser(userId: string): Promise<string[]> {
-  return (await teamRolesForUser(userId)).map((row) => row.name);
+export async function teamNamesForUser(userId: string, exec: Db = db): Promise<string[]> {
+  return (await teamRolesForUser(userId, exec)).map((row) => row.name);
 }
 
 /** Every team a user belongs to, and as what: the same live source. */
@@ -325,27 +343,37 @@ export async function setTeamRequireSso(teamId: string, requireSso: boolean): Pr
   await db.update(teams).set({ requireSso }).where(eq(teams.id, teamId));
 }
 
-export async function teamRolesForUser(userId: string): Promise<{ name: string; role: TeamRole; requireSso: boolean }[]> {
-  return db
+export async function teamRolesForUser(userId: string, exec: Db = db): Promise<{ name: string; role: TeamRole; requireSso: boolean }[]> {
+  return exec
     .select({ name: teams.name, role: teamMemberships.role, requireSso: teams.requireSso })
     .from(teamMemberships)
     .innerJoin(teams, eq(teams.id, teamMemberships.teamId))
-    .where(eq(teamMemberships.userId, userId));
+    .where(and(eq(teamMemberships.userId, userId), isNull(teams.deletedAt)));
 }
 
-/** Idempotent: reuses the bot user if one with this email already exists
- * (core/tokens.ts still checks it's actually a bot, not a human who
- * happens to share the email, before treating it as one). */
-export async function createBotUser(email: string): Promise<User> {
-  const [inserted] = await db
+/** Whether a bot has ever had a credential: a token (revoked or not) or a keyless identity. */
+export async function botHasCredentials(userId: string, exec: Db = db): Promise<boolean> {
+  const [token] = await exec.select({ id: apiTokens.id }).from(apiTokens).where(eq(apiTokens.userId, userId)).limit(1);
+  if (token) return true;
+  const [identity] = await exec.select({ id: botIdentities.id }).from(botIdentities).where(eq(botIdentities.botId, userId)).limit(1);
+  return identity !== undefined;
+}
+
+/** Idempotent: reuses the account if one with this email already exists,
+ * saying so (core/tokens.ts checks it's a bot, and this team's, before
+ * treating it as one). In a transaction, the account stays locked to it
+ * until it ends: one being made waits for its maker's transaction, an
+ * existing one for anyone else's that has it. */
+export async function createBotUser(email: string, exec: Db = db): Promise<{ user: User; created: boolean }> {
+  const [inserted] = await exec
     .insert(users)
     .values({ email, isBot: true })
     .onConflictDoNothing({ target: users.email })
     .returning();
-  if (inserted) return inserted;
-  const existing = await findUserByEmail(email);
+  if (inserted) return { user: inserted, created: true };
+  const [existing] = await exec.select().from(users).where(eq(users.email, email)).for("update");
   if (!existing) throw new Error("Insert conflicted but no existing row was found");
-  return existing;
+  return { user: existing, created: false };
 }
 
 export interface ApiTokenMeta {
@@ -1370,6 +1398,6 @@ export async function markResourcesUnrecorded(executionId: string): Promise<void
 }
 
 /** An ordering bot's templates (decision 23): the only ones it may run. */
-export async function setOrderTemplates(userId: string, templates: string[]): Promise<void> {
-  await db.update(users).set({ orderTemplates: templates }).where(and(eq(users.id, userId), eq(users.isBot, true)));
+export async function setOrderTemplates(userId: string, templates: string[], exec: Db = db): Promise<void> {
+  await exec.update(users).set({ orderTemplates: templates }).where(and(eq(users.id, userId), eq(users.isBot, true)));
 }

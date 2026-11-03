@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { hashPassword } from "../src/auth/password.js";
 import { db } from "../src/db/client.js";
-import { addTeamMember, createTeam, createUser, setTeamRetired, setUserAdmin } from "../src/db/queries.js";
+import { addTeamMember, createBotUser, createTeam, createUser, setTeamRetired, setUserAdmin } from "../src/db/queries.js";
 import { teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { caller, failureCode, type RpcError } from "./rpc.js";
@@ -147,6 +147,17 @@ describe("adding a team member", () => {
     expect(added.code).toBe("failed_precondition");
     expect(added.failure).toBe("TEAM_RETIRED");
     expect(await memberIds(t.name)).not.toContain(newcomer.id);
+  });
+
+  it("is refused for a bot: it belongs to the team that made it", async () => {
+    const t = await teamOfTwo();
+    const email = `${prefix}-bot-${randomUUID()}@example.com`;
+    emails.push(email);
+    const { user: bot } = await createBotUser(email);
+    const added = await call(t.first.token, "TeamService/AddMember", { team: t.name, email });
+    expect(added.code).toBe("already_exists");
+    expect(added.failure).toBe("CONFLICT");
+    expect(await memberIds(t.name)).not.toContain(bot.id);
   });
 
   it("is limited per caller, so emails can't be swept", async () => {

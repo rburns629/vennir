@@ -152,7 +152,7 @@ describe("applying a release", () => {
           product(teamA, "site"),
           product(teamA, "site", "remove"),
           product(teamB, "db"),
-          // A team no release made and that doesn't exist.
+          // A team this release doesn't name (and that doesn't exist).
           product(`${prefix}-ghost`, "x"),
         ],
       }),
@@ -161,7 +161,7 @@ describe("applying a release", () => {
     await syncCatalog(log);
     const row = await status();
     expect(row?.commit).toBe("c2");
-    expect(row?.problems).toEqual([{ item: `product ${prefix}-ghost-x-run`, message: expect.stringContaining("No such team") as string }]);
+    expect(row?.problems).toEqual([{ item: `product ${prefix}-ghost-x-run`, message: expect.stringContaining("isn't one of this release's teams") as string }]);
     expect((await catalogProducts()).length).toBe(3);
   });
 
@@ -348,6 +348,20 @@ describe("a team the catalog didn't make", () => {
     expect(adopted.body.status.problems ?? []).toEqual([]);
     expect(await names()).toContain(`${taken}-svc-run`);
     expect(vi.mocked(applySecretStoreObjects).mock.calls.map((c) => c[0])).toEqual([taken]);
+  });
+
+  it("isn't given products by a release that doesn't name it", async () => {
+    const handMade = `${prefix}-handmade`;
+    await createTeam(handMade);
+    publish(
+      release({ commit: "unnamed", teams: [{ name: teamA }], products: [product(teamA, "site"), product(handMade, "svc")] }),
+      digestOf(41),
+    );
+    expect(await syncCatalog(log)).toBe(true);
+    const names = (await catalogProducts()).map((p) => p.name);
+    expect(names).toContain(`${teamA}-site-run`);
+    expect(names).not.toContain(`${handMade}-svc-run`);
+    expect((await status())?.problems).toEqual([expect.objectContaining({ item: `product ${handMade}-svc-run` })]);
   });
 });
 

@@ -210,7 +210,10 @@ func SampleTasks(ctx context.Context, db DB, now time.Time) error {
 		states[i] = string(state)
 	}
 	counts := map[string]float64{}
-	rows, err := db.Query(ctx, `SELECT state, count(*) FROM execution_tasks WHERE state = ANY($1) GROUP BY state`, states)
+	// A READY task of a failed execution waits for a retry of its failed
+	// sibling (which resumes the execution): not in the queue until then.
+	rows, err := db.Query(ctx, `SELECT t.state, count(*) FROM execution_tasks t JOIN executions e ON e.id = t.execution_id
+		WHERE t.state = ANY($1) AND (t.state <> 'READY' OR e.state IN ('PENDING', 'RUNNING')) GROUP BY t.state`, states)
 	if err != nil {
 		return err
 	}
@@ -228,7 +231,8 @@ func SampleTasks(ctx context.Context, db DB, now time.Time) error {
 		return err
 	}
 	var oldest *time.Time
-	if err := db.QueryRow(ctx, `SELECT min(available_at) FROM execution_tasks WHERE state = $1`, string(domain.TaskReady)).Scan(&oldest); err != nil {
+	if err := db.QueryRow(ctx, `SELECT min(t.available_at) FROM execution_tasks t JOIN executions e ON e.id = t.execution_id
+		WHERE t.state = $1 AND e.state IN ('PENDING', 'RUNNING')`, string(domain.TaskReady)).Scan(&oldest); err != nil {
 		return err
 	}
 	for _, state := range unfinished {

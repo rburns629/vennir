@@ -240,7 +240,7 @@ func (a *app) catalog(ctx context.Context, out io.Writer, dir string, c *config.
 	if environments {
 		p.Changes = append(p.Changes, plan.Line{Label: "Environments", Text: "catalog-publish (main only), purge (main only, you review: deleting a removed team's images)"})
 	} else {
-		p.Notes = append(p.Notes, "Skipped: Environments and branch rules, which a private repository needs a paid GitHub plan for. The publish job still runs from main only (federation refuses other branches).")
+		p.Notes = append(p.Notes, "Skipped: Environments and branch rules, which a private repository needs a paid GitHub plan for. The publish job still runs from main only (federation refuses other branches: on AWS, its tokens' subject names the branch).")
 	}
 	p.Notes = append(p.Notes, "Team "+cat.Team+" (and its namespace) is made by the console when it applies the first release, not before.")
 	if !noSmoke && len(cat.Languages) > 0 {
@@ -724,6 +724,11 @@ func validateCatalog(ctx context.Context, dir string) error {
 // trustCatalogSubject reads the repository's OIDC subject prefix and, if the
 // publish role doesn't trust it yet, records it and updates the role's trust.
 func (a *app) trustCatalogSubject(ctx context.Context, out io.Writer, dir string, c *config.Config, gh *githost.GitHub, repo string) error {
+	// The publish role trusts a job of the catalog-publish Environment only
+	// on main: its tokens must say both (modules/aws publish_trust).
+	if err := gh.SetSubjectTemplate(ctx, repo); err != nil {
+		return fmt.Errorf("setting %s's OIDC subject to name its branch (the publish role trusts main only): %w", repo, err)
+	}
 	prefix, err := gh.SubjectPrefix(ctx, repo)
 	if err != nil {
 		return err

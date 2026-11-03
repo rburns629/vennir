@@ -11,12 +11,12 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { currentChat, refreshChatSettings } from "../src/chat/settings.js";
 import { chatFrom, config, type ChatConfig } from "../src/config.js";
 import { db } from "../src/db/client.js";
-import { chatSettings } from "../src/db/schema.js";
+import { auditLog, chatSettings } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { caller, rpcClient } from "./rpc.js";
 
@@ -89,6 +89,7 @@ describe("the chat agent's settings", () => {
       [{ provider: "bedrock", bedrockRegion: "nowhere" }, "chat.bedrock.region"],
       [{ provider: "bedrock", bedrockRegion: "us-east-2", model: "gpt-5" }, "Bedrock's name for a Claude model"],
       [{ maxTokens: 50000, contextTokens: 20000 }, "chat.contextTokens"],
+      [{ endpoint: "https://someone:hunter2@models.example/v1" }, "no user or password"],
     ] as const) {
       const refused = await call(admin, "ChatService/SetChatConfig", { config: input(extra) });
       expect(refused.failure).toBe("BAD_CHAT_SETTINGS");
@@ -109,7 +110,7 @@ describe("the chat agent's settings", () => {
     await call(admin, "ChatService/SetChatConfig", { config: input({ apiKey: "", model: "stand-in-2", maxSteps: 4 }) });
     expect(currentChat()).toMatchObject({ model: "stand-in-2", apiKey: "sk-first", maxSteps: 4 });
     // Another provider: the old one's key goes; Vertex keeps none.
-    const vertex = (await call<Config>(admin, "ChatService/SetChatConfig", { config: input({ provider: "vertex", model: "", apiKey: "sk-not-kept", vertexProject: "acyclix-dev" }) })).body.config;
+    const vertex = (await call<Config>(admin, "ChatService/SetChatConfig", { config: input({ provider: "vertex", model: "", endpoint: "", apiKey: "sk-not-kept", vertexProject: "acyclix-dev" }) })).body.config;
     expect(vertex).toMatchObject({ provider: "vertex", model: "google/gemini-3.5-flash", keySet: false });
     expect((await db.select().from(chatSettings))[0]?.apiKeyEncrypted).toBeNull();
     // Bedrock signs in as the console's AWS identity: no key either, its model by default.
@@ -117,6 +118,36 @@ describe("the chat agent's settings", () => {
     expect(bedrock).toMatchObject({ provider: "bedrock", model: "anthropic.claude-sonnet-5", bedrockRegion: "us-east-2", keySet: false });
     expect((await db.select().from(chatSettings))[0]?.apiKeyEncrypted).toBeNull();
     expect(currentChat()).toMatchObject({ provider: "bedrock", endpoint: "https://bedrock-mantle.us-east-2.api.aws/anthropic", apiKey: "" });
+  });
+
+  it("send a key only to the address it was given for", async () => {
+    await call(admin, "ChatService/SetChatConfig", { config: input() });
+    expect(currentChat()).toMatchObject({ apiKey: "sk-first" });
+    // Another address with no key given: the kept one isn't sent there, and goes.
+    const elsewhere = (await call<Config>(admin, "ChatService/SetChatConfig", { config: input({ apiKey: "", endpoint: "http://127.0.0.1:9/v1" }) })).body.config;
+    expect(elsewhere).toMatchObject({ keySet: false });
+    expect(currentChat()).toMatchObject({ apiKey: "" });
+    expect((await db.select().from(chatSettings))[0]?.apiKeyEncrypted).toBeNull();
+    // Tried there, either: the model sees no key it wasn't given.
+    await call(admin, "ChatService/SetChatConfig", { config: input() });
+    seenKeys.length = 0;
+    const moved = `http://127.0.0.1:${String((model.address() as AddressInfo).port)}/v1/`;
+    await call(admin, "ChatService/TestChatConfig", { config: input({ apiKey: "", endpoint: `${moved}x/..` }) });
+    expect(seenKeys.filter((k) => k.includes("sk-first"))).toEqual([]);
+    // The same address, a trailing slash aside, still gets it.
+    seenKeys.length = 0;
+    await call(admin, "ChatService/TestChatConfig", { config: input({ apiKey: "", endpoint: `${endpoint}/` }) });
+    expect(seenKeys).toContain("Bearer sk-first");
+
+    // Vertex's and Bedrock's address isn't anyone's to choose.
+    const pointed = await call(admin, "ChatService/SetChatConfig", { config: input({ provider: "vertex", model: "", apiKey: "", vertexProject: "acyclix-dev", endpoint: "https://attacker.example/v1" }) });
+    expect(pointed.failure).toBe("BAD_CHAT_SETTINGS");
+    expect((await call(admin, "ChatService/TestChatConfig", { config: input({ provider: "bedrock", model: "", apiKey: "", bedrockRegion: "us-east-2", endpoint: "https://attacker.example" }) })).failure).toBe("BAD_CHAT_SETTINGS");
+
+    // Where they'd send its questions is in the audit log.
+    const [entry] = await db.select().from(auditLog).where(eq(auditLog.route, "vertra.console.v1.ChatService/TestChatConfig")).orderBy(desc(auditLog.id)).limit(1);
+    expect(entry?.target).toMatchObject({ provider: "bedrock", endpoint: "https://attacker.example", bedrockRegion: "us-east-2" });
+    await call(admin, "ChatService/ResetChatConfig");
   });
 
   it("use the install's key for the install's own provider when none is given", async () => {
@@ -129,6 +160,9 @@ describe("the chat agent's settings", () => {
       // In effect, as every console reads it: with the install's key.
       expect(currentChat()).toMatchObject({ model: "stand-in-3", apiKey: "sk-install" });
       expect((await db.select().from(chatSettings))[0]?.apiKeyEncrypted).toBeNull();
+      // Never to another address.
+      await call(admin, "ChatService/SetChatConfig", { config: input({ apiKey: "", endpoint: "http://127.0.0.1:9/v1" }) });
+      expect(currentChat()).toMatchObject({ apiKey: "" });
     } finally {
       config.chat = install;
       await call(admin, "ChatService/ResetChatConfig");

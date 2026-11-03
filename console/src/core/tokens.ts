@@ -23,6 +23,7 @@ import type { AuthUser } from "../auth/plugin.js";
 import { ScopeSchema } from "../auth/scopes.js";
 import {
   addTeamMember,
+  botHasCredentials,
   createApiToken,
   createBotUser,
   findApiTokenById,
@@ -32,6 +33,7 @@ import {
   revokeApiToken,
   setOrderTemplates,
   teamNamesForUser,
+  type Db,
 } from "../db/queries.js";
 import { db } from "../db/client.js";
 import { botCallbacks } from "../db/schema.js";
@@ -86,24 +88,46 @@ export async function createBotToken(
 /**
  * The team's bot with this address: made if it doesn't exist, and in the
  * team, as a pipeline's bot (a maintainer) or an ordering bot (a member).
+ * A bot belongs to the one team that made it: an existing one is this
+ * team's only if it's in this team and no other, so no team can take
+ * another's bot (or an admin's automation bot) and act as it.
  * The caller has checked the team's maintainer and that it isn't retired.
  */
-export async function teamBot(team: { id: string }, input: { email: string; ordering?: boolean; orderTemplates?: string[] }) {
-  const bot = await createBotUser(input.email);
-  if (!bot.isBot) {
-    throw new ApiError(409, "CONFLICT", `"${input.email}" already belongs to a non-bot account.`, Code.AlreadyExists);
-  }
-  const ordering = bot.orderTemplates !== null;
-  if (input.ordering && !ordering && (await teamNamesForUser(bot.id)).length > 0) {
-    throw new ApiError(409, "CONFLICT", `"${input.email}" is a pipeline's bot already; make an ordering bot with its own address.`, Code.AlreadyExists);
-  }
-  if (input.ordering || ordering) {
-    if (!ordering) await setOrderTemplates(bot.id, input.orderTemplates ?? []);
-    await addTeamMember(bot.id, team.id, "member");
-  } else {
-    await addTeamMember(bot.id, team.id, "maintainer");
-  }
-  return bot;
+export async function teamBot(team: { id: string; name: string }, input: { email: string; ordering?: boolean; orderTemplates?: string[] }) {
+  // Made (or found) and put in the team in one transaction, holding the
+  // account: another request for the address waits, then sees whose it is.
+  return db.transaction(async (tx) => {
+    const { user: bot, created } = await createBotUser(input.email, tx);
+    if (!bot.isBot) {
+      throw new ApiError(409, "CONFLICT", `"${input.email}" already belongs to a non-bot account.`, Code.AlreadyExists);
+    }
+    const teams = created ? [] : await teamNamesForUser(bot.id, tx);
+    if (!created) await ensureTeamsBot(team.name, input.email, bot.id, teams, tx);
+    const ordering = bot.orderTemplates !== null;
+    if (input.ordering && !ordering && teams.length > 0) {
+      throw new ApiError(409, "CONFLICT", `"${input.email}" is a pipeline's bot already; make an ordering bot with its own address.`, Code.AlreadyExists);
+    }
+    if (input.ordering || ordering) {
+      if (!ordering) await setOrderTemplates(bot.id, input.orderTemplates ?? [], tx);
+      await addTeamMember(bot.id, team.id, "member", tx);
+    } else {
+      await addTeamMember(bot.id, team.id, "maintainer", tx);
+    }
+    return bot;
+  });
+}
+
+/**
+ * Refuses a bot that isn't the team's alone. One in no team is the team's
+ * only while nothing was ever made for it (a creation that stopped before
+ * its membership): one with a token or identity is another's, such as an
+ * admin's automation bot or a purged team's.
+ */
+export async function ensureTeamsBot(teamName: string, email: string, botId: string, teams?: string[], exec: Db = db): Promise<void> {
+  const of = teams ?? (await teamNamesForUser(botId, exec));
+  if (of.length === 1 && of[0] === teamName) return;
+  if (of.length === 0 && !(await botHasCredentials(botId, exec))) return;
+  throw new ApiError(409, "CONFLICT", `"${email}" is another team's bot, or was one: choose another address.`, Code.AlreadyExists);
 }
 
 /** Sets what an ordering bot of the team may order (its maintainers). */
@@ -179,7 +203,7 @@ export async function createAutomationToken(
   log: FastifyBaseLogger | undefined,
 ) {
   forbiddenUnlessAdmin(caller);
-  const bot = await createBotUser(`automation-${randomUUID().slice(0, 8)}@bot.internal`);
+  const { user: bot } = await createBotUser(`automation-${randomUUID().slice(0, 8)}@bot.internal`);
   const rawToken = generateApiToken();
   const tokenMeta = await createApiToken(
     bot.id,

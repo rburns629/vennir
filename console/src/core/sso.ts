@@ -9,7 +9,7 @@
  * write-only: kept sealed, never sent back. Admins only.
  */
 import type { FastifyBaseLogger } from "fastify";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { ApiError, forbiddenUnlessAdmin } from "../apiError.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { config } from "../config.js";
@@ -154,6 +154,8 @@ export async function listSsoGroupMappings(caller: AuthUser | undefined): Promis
     .select({ id: ssoGroupMappings.id, group: ssoGroupMappings.groupName, team: teams.name, role: ssoGroupMappings.role })
     .from(ssoGroupMappings)
     .innerJoin(teams, eq(teams.id, ssoGroupMappings.teamId))
+    // A purged team's are deleted with it; one left from before isn't shown.
+    .where(isNull(teams.deletedAt))
     .orderBy(asc(ssoGroupMappings.groupName), asc(teams.name));
 }
 

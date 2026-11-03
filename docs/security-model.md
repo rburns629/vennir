@@ -17,7 +17,7 @@ gaps in [Not yet enforced](#not-yet-enforced) are why.
 | Who can read a secret? | Steps of its team's registered products that list it in `secretRefs`, and cluster administrators. Not the console: it writes Secrets but has no right to read them. See [Who can read a secret](#who-can-read-a-secret). |
 | Can one team's step reach another team's secret? | No. A step runs in its own team's namespace, and a Pod can only mount Secrets from its own namespace. |
 | Can one product reach another product's secret in the same team? | By design, yes: a team's secrets are the team's, and the team chooses per step which ones it gets (`secretRefs`). What a team can't do is give one to an image that isn't its registered product (it runs with no secrets), or mount a Secret it never registered. The console checks this at submit time, and an admission policy makes the cluster enforce it on every step's Job. A product's own cloud identity (its declared ServiceAccount) is still its own: another product can't run as it. |
-| Can a team register another team's product, or its image, as its own? | No. A product name and an image repository belong to the first team that registers them, the repository even after its products are deleted (an admin can release an unused one). Catalog CI also derives each image's path from its team's folder, so one team can't publish under another's name. |
+| Can a team register another team's product, or its image, as its own? | No. A team doesn't register products at all: the catalog's release does (`products:register`), or an admin, so what code runs, and as what, is decided by the catalog's review. A product name and an image repository belong to the first team that registers them, the repository even after its products are deleted (an admin can release an unused one). Catalog CI also derives each image's path from its team's folder, so one team can't publish under another's name. |
 | Can anything but the console submit work? | No. kernel-api accepts only the console's ServiceAccount token, issued for kernel-api alone and checked with a TokenReview. See [How kernel-api knows its caller](#how-kernel-api-knows-its-caller). |
 | Is anything enforced if the console is bypassed? | Yes: which namespaces steps may run in, which image sources they may use, that images are pinned and passed their scan, which ServiceAccount and Secrets a step may have, image signatures (with Sigstore's policy-controller installed) and who may delete a team namespace. These are admission policies the Kubernetes API server applies to the scheduler's Jobs. They don't hold if the console itself is compromised: it can rewrite three of them. See [If a component is compromised](#if-a-component-is-compromised). |
 | Are secrets encrypted at rest? | That depends on the cluster. Enabling encryption of Secrets at rest in etcd, ideally with a KMS provider, is the cluster operator's responsibility and a prerequisite for production. |
@@ -202,7 +202,12 @@ replaced, so neither a question that talks it out of its instructions nor
 the model's memory can put an answer in front of someone. A conversation
 is bounded by `chat.contextTokens`. Admins may set its model in the console
 (`console/src/core/chatSettings.ts`): its key sealed with a key derived
-from `JWT_SECRET`, write-only. An address an admin gives is fetched by the
+from `JWT_SECRET`, write-only, and sent only to the address it was given
+for: one kept, or the install's own, never goes to an address an admin
+changes it to, and Vertex's and Bedrock's address is always built from the
+project or region, so the console's own cloud identity can't be pointed
+elsewhere. Each change and test is audited with where it points. An
+address an admin gives is fetched by the
 console from inside the cluster, so testing one reports only whether it
 answered as a model, never what it replied. On GCP it's Gemini through Vertex AI in
 the install's own project, as the console's Workload Identity; on AWS,
@@ -313,7 +318,16 @@ it was last used, to within five minutes. A token works until it expires
 (`api_tokens.expires_at`: 90 days unless its maker chose 30 days, a year,
 two years, or until revoked), it's revoked (`TokenService/RevokeToken`, by
 a maintainer of a team its bot is in, or an admin), or its bot is deleted.
-The console and the gateway both refuse an expired one. What a leaked token can
+The console and the gateway both refuse an expired one. A bot belongs to the
+one team that made it: a token or keyless identity asked for at another
+team's bot's address, or an automation bot's, is refused, and a bot can't
+be added to another team as a member (`teamBot` in `console/src/core/tokens.ts`,
+`addMember` in `teams.ts`). An upgrade leaves a bot already in several teams
+in its earliest one, its maker's: every token, keyless identity and order
+callback made for it since a second team joined is revoked or removed, and
+an ordering bot's templates are cleared for its team to list again
+(console migration 0058).
+What a leaked token can
 do depends on its kind:
 
 - **A team's bot** is a maintainer of its team (`console/src/core/tokens.ts`),
@@ -321,7 +335,8 @@ do depends on its kind:
   the team's secrets, submit raw DAGs, retry and cancel the team's runs,
   and manage its people and bots.
 - **An ordering bot** is a member, and may only order the templates its
-  maintainers list for it ([Ordering bots](#ordering-bots)).
+  maintainers list for it ([Ordering bots](#ordering-bots)); it calls no API
+  through the gateway.
 - **An automation token** (admins only) belongs to no team and can do
   exactly what its scopes say (`console/src/auth/scopes.ts`): create teams,
   register any team's products, retire or purge teams, apply SecretStores.
@@ -415,7 +430,13 @@ and path are an operation in the API's reviewed OpenAPI document and it fits
 that operation's schemas; anything else is answered by the gateway (404 or
 400) and never reaches the backend. Callers sign in as at the console (a
 session or a bot token, checked against the console's database the same
-way), and may call an API only when it's shared with one of their teams.
+way: a team requiring single sign-on refuses a password's session whether
+the install's settings or an admin in the console turned it on (if the
+saved client secret can't be unsealed, the console counts it off and the
+gateway, which never reads it, on), and a
+purged team counts for nobody), and may call an API only when it's shared
+with one of their teams. An ordering bot calls none (403 `ORDERS_ONLY`): it
+may only order its listed templates.
 The caller's `Authorization` stops at the gateway; the backend gets its own
 credential instead, minted per request, and `Vertra-Caller`, an EdDSA JWT
 the gateway signs (its key at `/.vertra/jwks.json`) naming the caller,
@@ -526,7 +547,10 @@ console as its audience, this sign-in's nonce, a verified email, and a
 Workspace domain listed in `sso.allowedDomains` (a personal Google account
 has none, so it can't sign in). The first sign-in binds the account to the
 provider's identity (`users.oidc_subject`): from then on, a different
-provider account given the same email is refused. The session comes back in
+provider account given the same email is refused. Binding an account that
+already existed makes single sign-on its only way in: its password goes,
+and every session from before ends (anyone may register an unclaimed email
+with a password of their own, where self-registration is on). The session comes back in
 the URL's fragment, which browsers never send to a server.
 
 Turning single sign-on on changes nothing else: passwords still work. A team
@@ -795,10 +819,22 @@ taken, and what would still hold.
   beyond one fixed RoleBinding per team namespace (the scheduler reading
   its steps' logs; the write fence refuses any other subject, role or
   name), or read a Secret through the API; policy-controller's signature check, where
-  installed; Pod Security in the namespaces it created.
+  installed; Pod Security in the namespaces it created; and the only Jobs it
+  may run in the platform's namespace are its image scans and catalog
+  verifications, as the scanning identity with no token, this release's
+  Trivy or cosign image, no Secret but the registry pull Secret, non-root
+  and with nothing from the node (`console-jobs-policy.yaml`), so a Job
+  can't read the platform's Secrets or run as another of its identities.
 - **kernel-api**'s ServiceAccount may only ask the API server who a token
   belongs to (`system:auth-delegator`). It holds the kernel's database: every run's
-  inputs, outputs and logs, and the task rows the scheduler runs. A task it
+  inputs, outputs and logs, and the task rows the scheduler runs. On the
+  bundled Postgres it signs in, as the scheduler and the sleeper do, as the
+  kernel's own role (`postgres.auth.kernelUsername`, `vertra_kernel`): no
+  superuser, owning only the kernel's database, refused the console's on
+  the same instance (proven on kind 2026-11-03); the superuser is used only
+  by Postgres itself, backups, and the step before each migration that
+  makes that role. With a managed database each process signs in as its own
+  cloud identity, likewise kept to the kernel's database. A task it
   wrote there still passes all four Job policies when the scheduler starts
   it: a registered product of the team, as its own ServiceAccount, with
   only the team's registered secrets, from an allowed, pinned, scanned

@@ -12,7 +12,7 @@
 import { Type } from "@sinclair/typebox";
 import { ApiError, forbiddenUnlessAdmin } from "../apiError.js";
 import type { FastifyBaseLogger } from "fastify";
-import { canMaintainTeam, ensureTeamMember } from "../auth/access.js";
+import { ensureTeamMember } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { hasScope, SCOPES } from "../auth/scopes.js";
 import { CLOUDS, config } from "../config.js";
@@ -22,7 +22,6 @@ import {
   deleteProductByName,
   findProductByName,
   findRunnableProduct,
-  findTeamById,
   findTeamByIdIncludingDeleted,
   findTeamByName,
   listImageRepositories,
@@ -255,8 +254,10 @@ export async function registerProduct(caller: AuthUser | undefined, input: Regis
   if (teamName === null) {
     forbiddenUnlessAdmin(caller, "Registering a platform product (no team) requires admin access.");
   } else {
-    if (!canMaintainTeam(caller, teamName) && !hasScope(caller, SCOPES.PRODUCTS_REGISTER)) {
-      throw new ApiError(403, "FORBIDDEN", `Not a maintainer of team "${teamName}", and not a platform admin.`);
+    // Products come from the catalog (its review decides what code runs, as
+    // what), or from an admin: a team's maintainers don't register them.
+    if (!caller?.isAdmin && !hasScope(caller, SCOPES.PRODUCTS_REGISTER)) {
+      throw new ApiError(403, "FORBIDDEN", "Products are registered by the catalog's release, or by a platform admin.");
     }
     const team = await findTeamByName(teamName);
     if (!team) throw new ApiError(404, "NOT_FOUND", `No such team: "${teamName}".`);
@@ -357,14 +358,8 @@ export async function deleteProduct(caller: AuthUser | undefined, name: string):
   if (product.teamId === null) {
     forbiddenUnlessAdmin(caller, "Deleting a platform product (no team) requires admin access.");
   } else {
-    const team = await findTeamById(product.teamId);
-    const canAct = team ? canMaintainTeam(caller, team.name) : (caller?.isAdmin ?? false);
-    if (!canAct && !hasScope(caller, SCOPES.PRODUCTS_REGISTER)) {
-      throw new ApiError(
-        403,
-        "FORBIDDEN",
-        "Not a maintainer of the team that owns this product, and not a platform admin.",
-      );
+    if (!caller?.isAdmin && !hasScope(caller, SCOPES.PRODUCTS_REGISTER)) {
+      throw new ApiError(403, "FORBIDDEN", "Products are unregistered by the catalog's release, or by a platform admin.");
     }
   }
   await deleteProductByName(name);

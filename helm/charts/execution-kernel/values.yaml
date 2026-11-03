@@ -420,6 +420,13 @@ postgres:
     # rotate it (docs/operations.md, "Databases").
     password: ""
     database: execution_kernel
+    # -- The login role kernel-api, the scheduler and the sleeper use: no
+    # superuser, owning only the kernel's database, so a compromised kernel
+    # process can't reach the console's (postgres.consoleDatabase) or the
+    # server itself. Made, with its own generated password, and handed the
+    # database before each migration (templates/migration-job.yaml). Empty:
+    # they use username, the superuser, as installs from before 2026-11-03 did.
+    kernelUsername: vertra_kernel
   # -- Also host the console's database on this instance, under its own role
   # (templates/console-database.yaml), so the console needs no Postgres of
   # its own: one Pod and volume instead of two. Then set the console chart's

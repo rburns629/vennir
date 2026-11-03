@@ -1141,8 +1141,11 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   the billed run (2026-10-31).
 - [x] **Catalog: keep pull-request workflows away from secrets and cloud
   identities** (checked 2026-10-22): the cloud identities trust only `main`
-  (GCP's `assertion.ref`) or the `catalog-publish` Environment (AWS's
-  `sub`), so a pull request's token never matches; the publish and purge
+  (GCP's `assertion.ref`; AWS's `sub`, which since 2026-11-03 names the
+  branch for a job in the `catalog-publish` Environment too, by the
+  repository's subject template, so the Environment alone, which GitHub
+  makes unprotected when a workflow names a missing one, isn't enough), so
+  a pull request's or another branch's token never matches; the publish and purge
   jobs run in `main`-only Environments; `vertra` sets no secrets (OIDC to
   the registry, keyless signing). Added: `vertra catalog create` warns, by
   name, about any repository-level secret (which every pull request's

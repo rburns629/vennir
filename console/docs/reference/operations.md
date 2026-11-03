@@ -586,8 +586,8 @@ The metrics, for alerts and dashboards of your own:
 
 | Metric | Labels | What it counts |
 | --- | --- | --- |
-| `kernel_tasks` | `state` | Unfinished steps by state (`BLOCKED`, `READY`, `AWAITING_APPROVAL`, `CLAIMED`, `RUNNING`) |
-| `kernel_oldest_ready_task_age_seconds` | | How long the longest-waiting `READY` step has waited; 0 when none is |
+| `kernel_tasks` | `state` | Unfinished steps by state (`BLOCKED`, `READY`, `AWAITING_APPROVAL`, `CLAIMED`, `RUNNING`); `READY` only of running executions (a failed one's wait for a retry) |
+| `kernel_oldest_ready_task_age_seconds` | | How long the longest-waiting `READY` step of a running execution has waited; 0 when none is |
 | `kernel_scheduler_tick_duration_seconds` | | One scheduler pass |
 | `kernel_scheduler_tick_errors_total` | | Passes that failed (logged, retried next pass) |
 | `kernel_scheduler_status_read_errors_total` | | Failed reads of a running step's status (read again) |
@@ -783,23 +783,36 @@ way, starting as root to take ownership, until it's
 makes on Google Cloud or AWS (below). On a small install the kernel's
 Postgres can also hold the console's database (`postgres.consoleDatabase`),
 where the console signs in as its own role, which owns only its database.
+The kernel's processes sign in as a role of their own too
+(`postgres.auth.kernelUsername`, `vertra_kernel`), which owns only the
+kernel's database and isn't a superuser; the step before each migration
+makes it, sets its password from the release's Secret, and hands it the
+database and everything in it, so an upgrade from an install that used the
+superuser moves over by itself (kernel-api and the scheduler restart onto
+it). The superuser (`postgres.auth.username`) is then only Postgres's own,
+the backups', and that step's.
 
 **Passwords** are generated on install when left empty, kept in the
-release's Secret (`<release>-execution-kernel-db` for the kernel,
+release's Secret (`<release>-execution-kernel-db` for the kernel: the
+superuser's `postgres-password`, the kernel role's `kernel-password`;
 `<release>-execution-console` for the console) and read back on every
-upgrade. To rotate one:
+upgrade. To rotate the superuser's:
 
 ```
 NS=vertra-system; PG=deploy/kernel-execution-kernel-postgres; SECRET=kernel-execution-kernel-db
 NEW=$(openssl rand -hex 24)
 # 1. The role, sent on stdin so it never shows in a process list.
 printf "ALTER ROLE postgres PASSWORD '%s';\n" "$NEW" | kubectl -n $NS exec -i $PG -- psql -q -U postgres -v ON_ERROR_STOP=1
-# 2. Both fields of the Secret, before any helm upgrade (the migration hook reads database-url).
-URL=$(kubectl -n $NS get secret $SECRET -o jsonpath='{.data.database-url}' | base64 -d | sed "s|^\([^:]*://[^:]*\):[^@]*@|\1:$NEW@|")
-kubectl -n $NS patch secret $SECRET --type merge -p "{\"stringData\":{\"postgres-password\":\"$NEW\",\"database-url\":\"$URL\"}}"
-# 3. Restart what holds the old one.
-kubectl -n $NS rollout restart deployment kernel-execution-kernel-api kernel-execution-kernel-scheduler
+# 2. The Secret, before any helm upgrade (the migration hook signs in with it).
+kubectl -n $NS patch secret $SECRET --type merge -p "{\"stringData\":{\"postgres-password\":\"$NEW\"}}"
+# Nothing to restart: backups and the step before each migration read it when they run.
 ```
+
+The kernel role's: set `kernel-password` and the password in `database-url`
+together in the same Secret, then `helm upgrade` (the step before the
+migration sets the role's password from it), then restart kernel-api and
+the scheduler. With `kernelUsername` empty the kernel's processes use the
+superuser, as before, and its rotation changes `database-url` too.
 
 A console with its own Postgres is the same with its Secret
 (`console-execution-console`, deployment `console-execution-console-postgres`),
@@ -1089,13 +1102,17 @@ kubectl -n $NS exec -i deploy/kernel-execution-kernel-postgres -- sh -c 'cat > /
 kubectl -n $NS exec -i deploy/kernel-execution-kernel-postgres -- sh -c 'cat > /tmp/console.pgdump' < console.pgdump
 # 4. Inside the Pod (kubectl exec -it ... -- sh):
 export PGUSER=postgres
-dropdb --force execution_kernel && createdb execution_kernel
-pg_restore --exit-on-error -d execution_kernel /tmp/kernel.pgdump
+# The kernel's own role owns its database (vertra_kernel; postgres on an
+# install from before it had one).
+K=vertra_kernel; [ "$(psql -Atc "SELECT 1 FROM pg_roles WHERE rolname = '$K'")" = 1 ] || K=postgres
+dropdb --force execution_kernel && createdb -O $K execution_kernel
+pg_restore --exit-on-error --no-owner --role=$K -d execution_kernel /tmp/kernel.pgdump
 dropdb --force execution_console && createdb -O console execution_console
 pg_restore --exit-on-error --no-owner --role=console -d execution_console /tmp/console.pgdump
 psql -c 'REVOKE CONNECT ON DATABASE execution_kernel FROM PUBLIC' \
      -c 'REVOKE CONNECT ON DATABASE execution_console FROM PUBLIC' \
-     -c 'GRANT CONNECT ON DATABASE execution_console TO console'
+     -c 'GRANT CONNECT ON DATABASE execution_console TO console' \
+     -c "GRANT CONNECT ON DATABASE execution_kernel TO $K"
 # With the API gateway on, its role reads the console's database too:
 psql -c 'GRANT CONNECT ON DATABASE execution_console TO vertra_gateway'
 rm /tmp/*.pgdump

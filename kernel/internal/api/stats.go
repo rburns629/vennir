@@ -88,8 +88,10 @@ func (s *Service) GetStats(ctx context.Context, _ *connect.Request[kernelv1.GetS
 		return nil, err
 	}
 
-	if err := s.Pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE state = 'READY')::int, count(*) FILTER (WHERE state IN ('CLAIMED', 'RUNNING'))::int
-		FROM execution_tasks WHERE state IN ('READY', 'CLAIMED', 'RUNNING')`).Scan(&out.Ready, &out.Running); err != nil {
+	// READY counts only an active execution's (a failed one's waits for a retry).
+	if err := s.Pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE t.state = 'READY' AND e.state IN ('PENDING', 'RUNNING'))::int,
+		count(*) FILTER (WHERE t.state IN ('CLAIMED', 'RUNNING'))::int
+		FROM execution_tasks t JOIN executions e ON e.id = t.execution_id WHERE t.state IN ('READY', 'CLAIMED', 'RUNNING')`).Scan(&out.Ready, &out.Running); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(out), nil

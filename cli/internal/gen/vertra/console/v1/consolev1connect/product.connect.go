@@ -65,15 +65,17 @@ const (
 type ProductServiceClient interface {
 	// Every product the caller may see: all but other teams' hidden ones.
 	ListProducts(context.Context, *connect.Request[v1.ListProductsRequest]) (*connect.Response[v1.ListProductsResponse], error)
-	// Registers or updates a product: a member of its team, an admin, or a
-	// token with products:register. With no team it's a platform product:
-	// admins only. Refused (already_exists) when another team owns its name
-	// or its image repository.
+	// Registers or updates a product: an admin, or a token with
+	// products:register (the catalog's release); a team's maintainers don't.
+	// With no team it's a platform product: admins only. Refused
+	// (already_exists) when another team owns its name or its image
+	// repository.
 	RegisterProduct(context.Context, *connect.Request[v1.RegisterProductRequest]) (*connect.Response[v1.RegisterProductResponse], error)
 	// Runs a product's check now (product.yaml's check): its team's members,
 	// and admins. started is false when one is already under way.
 	CheckProduct(context.Context, *connect.Request[v1.CheckProductRequest]) (*connect.Response[v1.CheckProductResponse], error)
-	// Unregisters a product. Its name and image repository stay its team's.
+	// Unregisters a product: an admin, or a token with products:register.
+	// Its name and image repository stay its team's.
 	DeleteProduct(context.Context, *connect.Request[v1.DeleteProductRequest]) (*connect.Response[v1.DeleteProductResponse], error)
 	// Which team owns each image repository. Admins only.
 	ListImageRepositories(context.Context, *connect.Request[v1.ListImageRepositoriesRequest]) (*connect.Response[v1.ListImageRepositoriesResponse], error)
@@ -213,15 +215,17 @@ func (c *productServiceClient) ReplaceWiringTypes(ctx context.Context, req *conn
 type ProductServiceHandler interface {
 	// Every product the caller may see: all but other teams' hidden ones.
 	ListProducts(context.Context, *connect.Request[v1.ListProductsRequest]) (*connect.Response[v1.ListProductsResponse], error)
-	// Registers or updates a product: a member of its team, an admin, or a
-	// token with products:register. With no team it's a platform product:
-	// admins only. Refused (already_exists) when another team owns its name
-	// or its image repository.
+	// Registers or updates a product: an admin, or a token with
+	// products:register (the catalog's release); a team's maintainers don't.
+	// With no team it's a platform product: admins only. Refused
+	// (already_exists) when another team owns its name or its image
+	// repository.
 	RegisterProduct(context.Context, *connect.Request[v1.RegisterProductRequest]) (*connect.Response[v1.RegisterProductResponse], error)
 	// Runs a product's check now (product.yaml's check): its team's members,
 	// and admins. started is false when one is already under way.
 	CheckProduct(context.Context, *connect.Request[v1.CheckProductRequest]) (*connect.Response[v1.CheckProductResponse], error)
-	// Unregisters a product. Its name and image repository stay its team's.
+	// Unregisters a product: an admin, or a token with products:register.
+	// Its name and image repository stay its team's.
 	DeleteProduct(context.Context, *connect.Request[v1.DeleteProductRequest]) (*connect.Response[v1.DeleteProductResponse], error)
 	// Which team owns each image repository. Admins only.
 	ListImageRepositories(context.Context, *connect.Request[v1.ListImageRepositoriesRequest]) (*connect.Response[v1.ListImageRepositoriesResponse], error)

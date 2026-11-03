@@ -418,7 +418,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/kernel-scheduler-deployment.yaml` | kernel-scheduler. |
 | `templates/postgres-*.yaml` | The kernel's Postgres: Deployment, storage, Service, and (with `tls`) its `pg_hba` accepting only TLS from the network. |
 | `templates/tls.yaml` | TLS inside the cluster (`tls`): a CA of the release's own, made once and kept, and the certificates it signs for Postgres and kernel-api; the CA alone in `-tls-ca` for clients, the console's included. |
-| `templates/migration-job.yaml` | Runs database migrations before an upgrade (a Helm hook). |
+| `templates/migration-job.yaml` | Runs database migrations before an upgrade (a Helm hook); with the bundled Postgres, first makes the kernel's own login role (`postgres.auth.kernelUsername`) and hands it the kernel's database, as the superuser. |
 | `templates/backup-cronjob.yaml` | Scheduled database backup (both databases when they share the instance) to GCS, S3, Azure Blob or a volume. |
 | `templates/configmap.yaml`, `secret.yaml`, `serviceaccount.yaml` | Settings, the database password, the kernel's identity. |
 | `templates/rbac.yaml` | What the scheduler may do: create and delete Jobs and ConfigMaps, read Pods; and its logs-only ClusterRole, bound per team namespace by the console (or cluster-wide, `rbac.schedulerLogs: cluster`). |
@@ -451,6 +451,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/networkpolicy.yaml` | The console's metrics port only from `metricsFrom`; when it runs its own Postgres, only this release's Pods may reach it. |
 | `templates/write-fence-policy.yaml` | Admission policy: the console may write Secrets, ServiceAccounts, Roles, RoleBindings and ExternalSecrets only in team namespaces. |
 | `templates/gateway.yaml` | The API gateway (`gateway.enabled`): its Deployment and Service, its signing key (generated once, kept), its one RBAC verb (ServiceAccount tokens), the admission policy limiting that to `*-api` ServiceAccounts in team namespaces, its egress (anywhere but the cloud metadata server, by default) and ingress (its metrics port only from `metricsFrom`), and an Ingress for its public listener. |
+| `templates/console-jobs-policy.yaml` | Admission policy: the only Jobs the console may run are its image scans and catalog verifications, as `k8s.ts` builds them (the scanning identity with no token, this release's Trivy or cosign image, only the pull Secret, non-root, nothing from the node), in its own namespace. |
 | `templates/namespace-policy.yaml` | Admission policy: the console may only create namespaces labelled a team's and change that one label on a team's namespace, never on kube-* or protected ones. |
 | `templates/scanner.yaml` | The Trivy server image scans run against, the scan Jobs' ServiceAccount (no token) and the Role that lets the console run them in its own namespace and idle the server (its replica count only). |
 | `templates/configmap.yaml`, `secret.yaml`, `serviceaccount.yaml` | Settings, generated secrets (kept across upgrades), the console's identity. |

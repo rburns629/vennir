@@ -17,7 +17,7 @@
  * groups, which would take people out of their teams.
  */
 import type { FastifyBaseLogger } from "fastify";
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { config } from "./config.js";
 import { db } from "./db/client.js";
 import { ssoGroupMappings, ssoSettings, teamMemberships, teams, users, type TeamRole } from "./db/schema.js";
@@ -174,7 +174,9 @@ export async function syncMappedTeams(userId: string, groups: string[], log: Fas
   const mappings = await db
     .select({ groupName: ssoGroupMappings.groupName, teamId: ssoGroupMappings.teamId, role: ssoGroupMappings.role, teamName: teams.name })
     .from(ssoGroupMappings)
-    .innerJoin(teams, eq(teams.id, ssoGroupMappings.teamId));
+    .innerJoin(teams, eq(teams.id, ssoGroupMappings.teamId))
+    // A purged team's are deleted with it; one from before never applies.
+    .where(isNull(teams.deletedAt));
   if (mappings.length === 0) return [];
   const mine = new Set(groups);
   // Each mapped team's best role from the person's groups, and which of them give it.

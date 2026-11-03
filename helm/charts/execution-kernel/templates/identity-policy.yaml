@@ -95,9 +95,9 @@ spec:
   variables:
     # The two the console edits.
     - name: products
-      expression: {{ $productsExpr | squote }}
+      expression: {{ $productsExpr | toJson }}
     - name: teamSecrets
-      expression: {{ $teamSecretsExpr | squote }}
+      expression: {{ $teamSecretsExpr | toJson }}
     - name: pod
       expression: object.spec.template.spec
     - name: serviceAccount
