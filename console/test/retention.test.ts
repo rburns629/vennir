@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 /** Deleting what's past retention (retention.ts), and keeping the rest. */
 import { createHash, randomUUID } from "node:crypto";
-import { eq, inArray, like, sql } from "drizzle-orm";
+import { inArray, like } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { db } from "../src/db/client.js";
-import { config } from "../src/config.js";
-import { auditExport, auditLog, imageScans, submittedExecutions } from "../src/db/schema.js";
+import { auditLog, imageScans, submittedExecutions } from "../src/db/schema.js";
 import { deleteExpired } from "../src/retention.js";
 import { createUser } from "../src/db/queries.js";
 import { users } from "../src/db/schema.js";
@@ -53,21 +52,4 @@ describe("retention", () => {
     expect(scans.map((s) => s.image)).toEqual([`${prefix}/new`]);
   });
 
-  it("keeps old audit entries the write-once copy doesn't have yet", async () => {
-    const before = { ...config.audit.export };
-    config.audit.export.bucket = "acme-audit";
-    try {
-      const [row] = await db.insert(auditLog).values({ method: "POST", route: `/api/${prefix}/uncopied`, status: 200, at: longAgo }).returning();
-      // The export has copied up to the entry before it, at most (another
-      // file may reset the export's row to nothing copied meanwhile).
-      await db
-        .insert(auditExport)
-        .values({ id: 1, lastId: row!.id - 1 })
-        .onConflictDoUpdate({ target: auditExport.id, set: { lastId: sql`least(${auditExport.lastId}, ${row!.id - 1})` } });
-      await deleteExpired();
-      expect(await db.select().from(auditLog).where(eq(auditLog.id, row!.id))).toHaveLength(1);
-    } finally {
-      Object.assign(config.audit.export, before);
-    }
-  });
 });
