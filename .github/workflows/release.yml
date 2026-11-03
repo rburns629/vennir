@@ -4,12 +4,13 @@ name: release
 #
 #   main    refuses a tag whose commit isn't on main: only reviewed code is
 #           released and signed with the release's identity.
-#   images  builds the kernel and console images, scans them with the same
-#           gate CI uses (.github/scripts/scan-image.sh), then builds them
-#           for linux/amd64 and linux/arm64, pushes them to
-#           ghcr.io/<owner>/<repo>/execution-{kernel,console,gateway} as the version
-#           (and as latest, unless it's a pre-release), and signs each by
-#           digest, keyless, with this workflow's own identity.
+#   images  builds the kernel, console and gateway images for linux/amd64
+#           and linux/arm64 and pushes them, by digest only, to
+#           ghcr.io/<owner>/<repo>/execution-{kernel,console,gateway}; scans
+#           each platform's image, as pushed, with the same gate CI uses
+#           (.github/scripts/scan-image.sh); signs each by digest, keyless,
+#           with this workflow's own identity; and only then tags it as the
+#           version (and as latest, unless it's a pre-release).
 #   charts  packages both Helm charts at that version (their appVersion
 #           too, so they run the images just pushed), pushes them to
 #           oci://ghcr.io/<owner>/<repo>/charts, signs them, and creates the
@@ -71,37 +72,64 @@ jobs:
       TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: bash .github/scripts/install-scanners.sh trivy osv-scanner cosign
-      - name: Build for the scan
-        run: docker build --pull -t "vertra-release/$COMPONENT:scan" "$COMPONENT/"
-      - name: Scan
-        # The amd64 build; the arm64 one is built from the same Dockerfile
-        # and base image, by digest.
-        run: bash .github/scripts/scan-image.sh "vertra-release/$COMPONENT:scan" "$COMPONENT"
+      - run: bash .github/scripts/install-scanners.sh trivy osv-scanner cosign oras
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Sign in to GHCR
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-      - name: Build and push (amd64, arm64)
+      - name: Build and push by digest (amd64, arm64)
+        # No tag yet: nothing names it until it has passed the scan.
         id: push
         run: |
           version="${TAG#v}"
           image="ghcr.io/${GITHUB_REPOSITORY,,}/execution-$COMPONENT"
-          tags=(-t "$image:$version")
-          case "$version" in *-*) ;; *) tags+=(-t "$image:latest") ;; esac
           docker buildx build --platform linux/amd64,linux/arm64 --pull \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.version=$version" \
             --label "org.opencontainers.image.licenses=MIT" \
-            "${tags[@]}" --metadata-file "$RUNNER_TEMP/meta.json" --push "$COMPONENT/"
+            --output "type=image,name=$image,push-by-digest=true,name-canonical=true,push=true" \
+            --metadata-file "$RUNNER_TEMP/meta.json" "$COMPONENT/"
           digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/meta.json")
           echo "ref=$image@$digest" >> "$GITHUB_OUTPUT"
+      - name: Scan what was pushed, each platform
+        # The very bytes pushed, pulled back by each platform's own digest
+        # (not the index's, which a daemon resolves to its own platform),
+        # with the gate CI uses.
+        env:
+          REF: ${{ steps.push.outputs.ref }}
+        run: |
+          image="${REF%@*}"
+          docker buildx imagetools inspect --raw "$REF" \
+            | jq -r '.manifests[] | select(.platform.os != "unknown") | "\(.platform.os)-\(.platform.architecture) \(.digest)"' \
+            > "$RUNNER_TEMP/platforms"
+          cat "$RUNNER_TEMP/platforms"
+          [ "$(cut -d' ' -f1 "$RUNNER_TEMP/platforms" | sort | tr '\n' ' ')" = "linux-amd64 linux-arm64 " ] \
+            || { echo "::error::$REF doesn't hold exactly linux/amd64 and linux/arm64."; exit 1; }
+          failed=0
+          mapfile -t platforms < "$RUNNER_TEMP/platforms"
+          for line in "${platforms[@]}"; do
+            platform="${line% *}" digest="${line#* }"
+            docker pull -q --platform "${platform/-//}" "$image@$digest"
+            docker tag "$image@$digest" "vertra-release/$COMPONENT:$platform"
+            bash .github/scripts/scan-image.sh "vertra-release/$COMPONENT:$platform" "$COMPONENT" || failed=1
+          done
+          exit "$failed"
       - name: Sign
         env:
           REF: ${{ steps.push.outputs.ref }}
         run: cosign sign --yes "$REF"
+      - name: Tag the version (and latest)
+        env:
+          REF: ${{ steps.push.outputs.ref }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${TAG#v}"
+          tags=("$version")
+          case "$version" in *-*) ;; *) tags+=(latest) ;; esac
+          echo "$TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          oras tag "$REF" "${tags[@]}"
 
   charts:
     needs: images

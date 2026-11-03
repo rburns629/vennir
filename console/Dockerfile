@@ -10,7 +10,9 @@
 # on Apple silicon has miscomputed floating-point and broken npm). The one
 # native dependency, argon2, ships prebuilt binaries for every platform and
 # loads the right one at run time.
-FROM --platform=$BUILDPLATFORM node:26-slim AS frontend-build
+# The base is pinned by digest, as the kernel's and gateway's are
+# (Dependabot proposes newer ones).
+FROM --platform=$BUILDPLATFORM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
@@ -19,7 +21,7 @@ COPY frontend/public ./public
 COPY frontend/src ./src
 RUN npm run build
 
-FROM --platform=$BUILDPLATFORM node:26-slim AS build
+FROM --platform=$BUILDPLATFORM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -27,14 +29,15 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-FROM --platform=$BUILDPLATFORM node:26-slim AS deps
+FROM --platform=$BUILDPLATFORM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-FROM node:26-slim
+FROM node:26-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39
 # Security fixes released since the base image was published; CI's image
-# scan fails on any high or critical one that has a fix.
+# scan fails on any high or critical one that has a fix. They make each
+# build's packages differ, so a release scans the image it pushed.
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json ./

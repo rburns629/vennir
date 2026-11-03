@@ -868,11 +868,13 @@ taken, and what would still hold.
 
 On each version tag, the release workflow (`.github/workflows/release.yml`)
 refuses a tag whose commit isn't on `main` (which takes only reviewed pull
-requests), then builds the kernel, console and gateway images, scans them with CI's gate
-(`.github/scripts/scan-image.sh`: a HIGH or CRITICAL vulnerability with a
-fix, a secret in a layer, or a known-malicious package fails the release),
-pushes them to GHCR and signs each digest with cosign, keyless, as the
-workflow's own GitHub identity. The charts and the `vertra` binaries are
+requests), then builds the kernel, console and gateway images (amd64 and
+arm64) and pushes them to GHCR by digest. It scans each platform's image,
+as pushed, with CI's gate (`.github/scripts/scan-image.sh`: a HIGH or
+CRITICAL vulnerability with a fix, a secret in a layer, or a
+known-malicious package fails the release), signs each digest with cosign,
+keyless, as the workflow's own GitHub identity, and only then tags it as
+the version. The charts and the `vertra` binaries are
 signed the same way, and a catalog's `./vertra` downloads its binary by
 SHA-256. Every pull request also runs Semgrep, gitleaks, and the same scan
 of the three platform images (`.github/workflows/security.yml`, `ci.yml`).
