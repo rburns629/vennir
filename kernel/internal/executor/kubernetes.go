@@ -1004,8 +1004,9 @@ func (k *Kubernetes) WaitForChange(ctx context.Context, timeout time.Duration) {
 	}
 	k.watch.wait(ctx, timeout)
 	// Forget Jobs no longer polled here (finished elsewhere, or adopted by
-	// another scheduler).
+	// another scheduler, or released), and changes to them.
 	stale := time.Now().Add(-10 * k.opts.WatchResync)
+	k.watch.forgetChangedBefore(stale)
 	k.mu.Lock()
 	for name, at := range k.quietSince {
 		if at.Before(stale) {
