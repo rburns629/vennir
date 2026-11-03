@@ -32,11 +32,23 @@ export function chatSource(): { source: "install" | "admins"; problem: string | 
 }
 
 /** A saved row as settings to check, its key unsealed. */
+/** Providers that sign in as the console's own cloud identity: no key kept, no address chosen. */
+export const keyless = (provider: string) => provider === "vertex" || provider === "bedrock";
+
+/** Whether two base URLs are the same, a trailing slash aside. */
+export const sameEndpoint = (a: string, b: string) => a.trim().replace(/\/+$/, "") === b.trim().replace(/\/+$/, "");
+
+/** Whether the install's own key may go to this provider's endpoint: only to the install's own. */
+export const installKeyFor = (provider: string, endpoint: string) =>
+  !keyless(provider) && config.chat?.provider === provider && sameEndpoint(endpoint, config.chat.endpoint) ? config.chat.apiKey : "";
+
 export function inputOf(row: Row, apiKey: string): ChatInput {
   return {
     provider: row.provider,
     model: row.model,
-    endpoint: row.endpoint,
+    // Vertex's and Bedrock's address is built from the project or region,
+    // whatever was saved: the console's own cloud identity goes nowhere else.
+    endpoint: keyless(row.provider) ? "" : row.endpoint,
     apiKey,
     vertexProject: row.vertexProject,
     vertexLocation: row.vertexLocation,
@@ -60,7 +72,7 @@ export async function refreshChatSettings(log?: FastifyBaseLogger): Promise<void
     return;
   }
   // None kept for the install's own provider: the install's (its Secret's).
-  let apiKey = row.provider !== "vertex" && row.provider !== "bedrock" && config.chat?.provider === row.provider ? config.chat.apiKey : "";
+  let apiKey = installKeyFor(row.provider, row.endpoint);
   if (row.apiKeyEncrypted) {
     const key = unseal(row.apiKeyEncrypted, KEY_PURPOSE);
     if (key === null) {
