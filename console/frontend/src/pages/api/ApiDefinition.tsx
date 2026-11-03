@@ -18,16 +18,19 @@ const AUTH: Record<string, string> = {
 
 /** What the gateway does with each request, in the order gateway/internal/gateway/gateway.go does it. */
 const STEPS: [string, string][] = [
-  ["Open?", "The gateway isn't closed, and the API isn't paused, held or unusable; else 503."],
-  ["Who is calling", "A person's session or a bot's token; Google sign-in when the caller's team requires it; else 401."],
+  ["Who is calling", "A person's session or a bot's token; Google sign-in when the caller's team requires it; else 401. Until then, nothing about the API is said."],
+  ["Can they see it?", "A hidden API is its own team's and admins' only; else 404, as for no API at all."],
+  ["Open?", "The gateway isn't closed, and the API isn't paused (with its message), held or unusable; else 503."],
   ["Shared with them?", "Its shareWith covers the caller's team; else 403."],
   ["Small enough?", "The body is within its size limit; else 413."],
   ["In the spec?", "The method and path are an operation in its OpenAPI file; else 404, blocked."],
-  ["Does it fit?", "Parameters, headers and body against that operation's schemas; else 400."],
+  ["Does it fit?", "Only the query parameters and body it declares, against that operation's schemas; else 400."],
   ["Within its limit", "The calling team's requests a minute; else 429."],
-  ["Forward", "Same method, path, query, headers and body; the caller's Authorization swapped for the backend's, Vertra-Caller added."],
-  ["Answer", "The backend's response, passed back unchanged."],
+  ["Forward", "Same method, path, query and body; Authorization swapped for the backend's, Vertra-Caller added; the caller's Forwarded and X-Forwarded-* dropped."],
+  ["Answer", "The backend's response; any cookie it sets is kept to this API's path."],
 ];
+/** The step the page highlights: what the "Blocked: not in the spec" table counts. */
+const SPEC_STEP = 5;
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -95,8 +98,8 @@ export function ApiPause({
       </Typography>
       <Typography variant="body2" sx={{ fontSize: 13, lineHeight: 1.5 }}>
         {paused
-          ? `Paused: every request gets 503 with “${api.pausedMessage}”, and nothing reaches the backend, until you resume it. Recorded in the audit log.`
-          : `For an incident: every request gets 503 with your message until you resume it, and nothing reaches the backend. Recorded in the audit log. ${api.team}’s maintainers and admins can.`}
+          ? `Paused: every signed-in caller gets 503 with “${api.pausedMessage}” (anyone else, 404), and nothing reaches the backend, until you resume it. Recorded in the audit log.`
+          : `For an incident: every signed-in caller gets 503 with your message until you resume it (anyone else, 404), and nothing reaches the backend. Recorded in the audit log. ${api.team}’s maintainers and admins can.`}
       </Typography>
       {!paused && (
         <TextField
@@ -132,7 +135,7 @@ export function ApiPause({
       </Box>
       {!paused && !message.trim() && (
         <Typography variant="caption" color="text.secondary">
-          Write a message first; callers see it in every 503.
+          Write a message first; signed-in callers see it in every 503.
         </Typography>
       )}
     </Card>
@@ -155,8 +158,8 @@ export function RequestSteps() {
               p: 1.5,
               borderRadius: 2,
               border: 1,
-              borderColor: i === 2 ? "warning.light" : "divider",
-              bgcolor: i === 2 ? "warning.light" : "background.default",
+              borderColor: i === SPEC_STEP ? "warning.light" : "divider",
+              bgcolor: i === SPEC_STEP ? "warning.light" : "background.default",
               display: "flex",
               flexDirection: "column",
               gap: 0.5,

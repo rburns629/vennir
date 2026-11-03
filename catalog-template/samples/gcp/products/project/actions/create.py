@@ -123,6 +123,22 @@ def _outputs(project_id: str, made_here: bool) -> dict[str, Any]:
     return outputs
 
 
+def _found(credentials: google.auth.credentials.Credentials, project: Any, project_id: str, team: str,
+           billing_account_id: str | None) -> int:
+    """Succeeds with a project that's already there, reporting it (and
+    linking billing) only when this product made it for this team."""
+    labels = dict(project.labels)
+    made_here = labels.get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1] and labels.get(TEAM_LABEL) == team
+    if made_here and billing_account_id:
+        # The attempt that made it may have stopped before linking it.
+        try:
+            _link_billing(credentials, project_id, billing_account_id)
+        except GoogleAPIError as error:
+            return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
+    _write_result({"status": "succeeded", "outputs": _outputs(project_id, made_here)})
+    return 0
+
+
 def _iam_busy(error: Exception) -> bool:
     """Whether IAM refused to impersonate gcp-target only for now: its
     answer, a RefreshError's second argument, a 429 or 5xx, not a 401/403."""
@@ -180,16 +196,7 @@ def _run() -> int:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
     if existing is not None:
         print(f"project '{project_id}' already exists, skipping creation")
-        labels = dict(existing.labels)
-        made_here = labels.get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1] and labels.get(TEAM_LABEL) == team
-        if made_here and billing_account_id:
-            # The attempt that made it may have stopped before linking it.
-            try:
-                _link_billing(credentials, project_id, billing_account_id)
-            except GoogleAPIError as error:
-                return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
-        _write_result({"status": "succeeded", "outputs": _outputs(project_id, made_here)})
-        return 0
+        return _found(credentials, existing, project_id, team, billing_account_id)
 
     # New-user path: create the project, then link billing if given --
     # without it the project exists but can't run billable services like
@@ -208,7 +215,22 @@ def _run() -> int:
         if billing_account_id:
             _link_billing(credentials, project_id, billing_account_id)
     except AlreadyExists:
-        return _failure("PROJECT_ID_TAKEN", f"project id '{project_id}' is already taken, somewhere this product can't see")
+        # Made a moment ago by another step for the same id (concurrencyKey
+        # makes that rare) or an earlier attempt: found, if it can be seen.
+        try:
+            existing = projects.get_project(name=f"projects/{project_id}")
+        except (NotFound, PermissionDenied):
+            # Taken somewhere this identity can't see, or still being created
+            # by an earlier attempt of this step, which the next may find.
+            return _failure(
+                "PROJECT_ID_TAKEN",
+                f"project id '{project_id}' is already taken, somewhere this product can't see",
+                retryable=request.get("attempt", 1) > 1,
+            )
+        except GoogleAPIError as error:
+            return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
+        print(f"project '{project_id}' was created meanwhile, skipping creation")
+        return _found(credentials, existing, project_id, team, billing_account_id)
     except GoogleAPIError as error:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 

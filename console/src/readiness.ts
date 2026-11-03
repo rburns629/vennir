@@ -17,6 +17,7 @@
  */
 import type { FastifyBaseLogger } from "fastify";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { ApiError } from "./apiError.js";
 import { submitChecked } from "./core/executions.js";
 import { db } from "./db/client.js";
 import { listRunnableProducts, type Product } from "./db/queries.js";
@@ -88,13 +89,16 @@ async function submit(check: TeamProduct, log: FastifyBaseLogger): Promise<void>
     );
     await db.update(productReadiness).set({ executionId }).where(eq(productReadiness.product, check.name));
   } catch (error) {
-    // Refused before it ran (its team retired, its image not allowed): that's the answer.
-    const why = error instanceof Error ? error.message : String(error);
+    // Refused before it ran (its team retired, its image not allowed): that's
+    // the answer. Anything else (a cluster or kernel-api error, whose message
+    // can carry the API server's response) is only logged: detail is shown
+    // to everyone signed in.
+    const why = error instanceof ApiError ? error.message : "Vertra couldn't start its check: the platform didn't answer.";
     await db
       .update(productReadiness)
       .set({ state: "failed", detail: why.slice(0, 1000), checkedAt: sql`now()` })
       .where(eq(productReadiness.product, check.name));
-    log.warn({ event: "readiness_check_refused", product: check.name, err: why }, "couldn't run a product's check");
+    log.warn({ event: "readiness_check_refused", product: check.name, err: error },"couldn't run a product's check");
   }
 }
 

@@ -22,7 +22,6 @@ import {
   catalogRepository,
   deleteSecretGrantRecord,
   findTeamByName,
-  isSecretRegistered,
   listSecretGrantsForTeam,
   recordSecretGrant,
 } from "../db/queries.js";
@@ -83,6 +82,21 @@ async function writableTeam(caller: AuthUser | undefined, teamName: string, secr
 }
 
 /**
+ * Whether the team already has this secret, from the same source. One from
+ * the other source is refused: switching would leave the other kind's
+ * object behind (an ExternalSecret that overwrites a pasted value and,
+ * once revoked, makes the Secret again), so it's revoked first.
+ */
+async function alreadyRegisteredAs(teamId: string, secretName: string, source: "literal" | "external"): Promise<boolean> {
+  const grant = (await listSecretGrantsForTeam(teamId)).find((g) => g.secretName === secretName);
+  if (grant && grant.source !== source) {
+    const was = grant.source === "external" ? "synced from a SecretStore" : "pasted";
+    throw new ApiError(409, "CONFLICT", `"${secretName}" is ${was}. Revoke it first to ${source === "external" ? "sync it" : "paste a value"} instead.`);
+  }
+  return grant !== undefined;
+}
+
+/**
  * Writes a secret to the cluster and records it, in the order that never
  * strands one: a secret new to the team is recorded first (the console's
  * records are what make an existing Secret its own to replace, since it
@@ -116,7 +130,7 @@ export async function putSecret(
   input: { team: string; secretName: string; data: Record<string, string> },
 ): Promise<void> {
   const team = await writableTeam(caller, input.team, input.secretName);
-  const alreadyGranted = await isSecretRegistered(team.id, input.secretName);
+  const alreadyGranted = await alreadyRegisteredAs(team.id, input.secretName, "literal");
   await writeAndRecord(
     team.id,
     input.secretName,
@@ -142,7 +156,7 @@ export async function syncSecret(
   },
 ): Promise<void> {
   const team = await writableTeam(caller, input.team, input.secretName);
-  const alreadyGranted = await isSecretRegistered(team.id, input.secretName);
+  const alreadyGranted = await alreadyRegisteredAs(team.id, input.secretName, "external");
   await writeAndRecord(
     team.id,
     input.secretName,

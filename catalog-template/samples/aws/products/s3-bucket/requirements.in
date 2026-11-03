@@ -1,0 +1,4 @@
+# What this product installs. requirements.txt pins it, and everything it
+# brings, by version and hash: after changing this file, regenerate it as its
+# header says.
+boto3~=1.43

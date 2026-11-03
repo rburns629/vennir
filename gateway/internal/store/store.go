@@ -33,12 +33,14 @@ type API struct {
 	BackendAuth    map[string]map[string]string
 	ServiceAccount string
 	ShareWith      []string
-	Internet       bool
-	PerMinute      map[string]int
-	Timeout        time.Duration
-	MaxRequest     int64
-	PausedMessage  *string
-	UpdatedAt      time.Time
+	// Hidden: only its own team (and those it's shared with) hears of it.
+	Hidden        bool
+	Internet      bool
+	PerMinute     map[string]int
+	Timeout       time.Duration
+	MaxRequest    int64
+	PausedMessage *string
+	UpdatedAt     time.Time
 	// Validator checks a request against the spec; Problem says why there
 	// isn't one (the API then answers 503: it can't be checked, so it isn't
 	// forwarded).
@@ -170,7 +172,7 @@ func (s *Store) Refresh(ctx context.Context) error {
 	}
 	states.Close()
 	rows, err := s.DB.Query(ctx, `SELECT a.id::text, t.name, a.name, a.openapi::text, a.backend_url, coalesce(a.backend_auth::text, ''),
-			a.service_account, a.share_with, a.internet, a.per_minute::text, a.timeout_seconds, a.max_request_bytes,
+			a.service_account, a.share_with, a.hidden, a.internet, a.per_minute::text, a.timeout_seconds, a.max_request_bytes,
 			a.paused_message, a.updated_at
 		FROM apis a JOIN teams t ON t.id = a.team_id WHERE t.retired_at IS NULL AND t.deleted_at IS NULL`)
 	if err != nil {
@@ -185,7 +187,7 @@ func (s *Store) Refresh(ctx context.Context) error {
 		var a API
 		var spec, backendURL, auth, perMinute string
 		var timeout int
-		if err := rows.Scan(&a.ID, &a.Team, &a.Name, &spec, &backendURL, &auth, &a.ServiceAccount, &a.ShareWith, &a.Internet,
+		if err := rows.Scan(&a.ID, &a.Team, &a.Name, &spec, &backendURL, &auth, &a.ServiceAccount, &a.ShareWith, &a.Hidden, &a.Internet,
 			&perMinute, &timeout, &a.MaxRequest, &a.PausedMessage, &a.UpdatedAt); err != nil {
 			return err
 		}

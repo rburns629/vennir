@@ -25,7 +25,11 @@ func (a *app) requireTools(ctx context.Context, out io.Writer, target string, fr
 		}
 		if s.Downloadable {
 			version, _ := tools.Pinned(s.Tool)
-			ok, err := a.ask.Confirm(fmt.Sprintf("%s: %s. Download %s %s to %s?", s.Tool, s.Problem, s.Tool, version, tools.Dir()), true)
+			dir, err := tools.Dir()
+			if err != nil {
+				return err
+			}
+			ok, err := a.ask.Confirm(fmt.Sprintf("%s: %s. Download %s %s to %s?", s.Tool, s.Problem, s.Tool, version, dir), true)
 			if err != nil {
 				return err
 			}

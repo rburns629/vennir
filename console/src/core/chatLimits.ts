@@ -4,7 +4,8 @@
  * 2026-11-02, review D-5): every question can cost many model calls on a
  * billed model, so each person's are counted, an hour's and a day's, in
  * Postgres (rate_limit_windows), the same on every console. By default 30
- * an hour and 200 a day; admins set their own (ChatService/SetChatLimits).
+ * an hour and 200 a day; admins set their own on the Admin page's chat agent
+ * section, its Questions per person card (ChatService/SetChatLimits).
  * Only a question the agent will answer counts: one refused (a bot's, one
  * that isn't valid, chat off) doesn't.
  */

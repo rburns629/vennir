@@ -973,7 +973,10 @@ func buildStatus(terminated *corev1.ContainerStateTerminated, logs []string) Sta
 			Message: fmt.Sprintf("Container's result.json was over the %d bytes Kubernetes keeps of it, so it was cut short. Output small values (IDs, names, URIs), and put large data in storage, outputting where it is.", resultLimit)}}
 	}
 	if err != nil {
-		return Status{State: Failed, Error: &domain.StructuredError{Code: "PRODUCT_RESULT_INVALID", Retryable: true,
+		// Claiming the cluster's own refusal is the step's code, not chance:
+		// it would write the same again.
+		var reserved *domain.ReservedCodeError
+		return Status{State: Failed, Error: &domain.StructuredError{Code: "PRODUCT_RESULT_INVALID", Retryable: !errors.As(err, &reserved),
 			Message: domain.RedactText("Container's result.json was invalid: " + err.Error())}}
 	}
 	if result.Status == "succeeded" {
@@ -1091,8 +1094,9 @@ func (k *Kubernetes) WaitForChange(ctx context.Context, timeout time.Duration) {
 	}
 	k.watch.wait(ctx, timeout)
 	// Forget Jobs no longer polled here (finished elsewhere, or adopted by
-	// another scheduler).
+	// another scheduler, or released), and changes to them.
 	stale := time.Now().Add(-10 * k.opts.WatchResync)
+	k.watch.forgetChangedBefore(stale)
 	k.mu.Lock()
 	for name, at := range k.quietSince {
 		if at.Before(stale) {

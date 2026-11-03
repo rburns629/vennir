@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import { useAuth } from "../auth/AuthContext";
+import { SessionChecking } from "../auth/ProtectedRoute";
+import { returnPath } from "../auth/returnTo";
 import { PasswordChangeForm } from "../components/PasswordChangeForm";
 import { SignInLayout } from "../layout/SignInLayout";
 
@@ -16,10 +18,11 @@ import { SignInLayout } from "../layout/SignInLayout";
 export function ChoosePasswordPage() {
   const { user, loading, refresh, logout } = useAuth();
   const navigate = useNavigate();
+  const { state } = useLocation();
 
-  if (loading) return null;
-  if (!user) return <Navigate to="/login" replace />;
-  if (!user.mustChangePassword) return <Navigate to="/" replace />;
+  if (loading) return <SessionChecking />;
+  if (!user) return <Navigate to="/login" replace state={state} />;
+  if (!user.mustChangePassword) return <Navigate to={returnPath(state)} replace />;
 
   return (
     <SignInLayout>
@@ -37,7 +40,7 @@ export function ChoosePasswordPage() {
         submitLabel="Save and continue"
         onChanged={async () => {
           await refresh();
-          navigate("/", { replace: true });
+          navigate(returnPath(state), { replace: true });
         }}
       />
       <Box sx={{ display: "flex", justifyContent: "center", mt: 1.5 }}>

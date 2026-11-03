@@ -14,9 +14,12 @@ starters a new team copies for the languages it uses. As a whole team
 | [`rot13`](products/rot13/) | Rust | `Hello` → `Uryyb` | a release binary on distroless, the entrypoint itself |
 
 Every one has the action `transform`, the input `text` (up to 1,000
-characters, since `result.json` is limited to 4 KB) and the outputs `text`
-and `language`. They fail the same way too: `MISSING_INPUT` without text,
-`TEXT_TOO_LONG` over the limit.
+characters) and the outputs `text` and `language`. They fail the same way
+too: `MISSING_INPUT` without text, `TEXT_TOO_LONG` over the limit. Since
+`result.json` is limited to 4 KB, they also measure the result they'd
+write, and fail `TEXT_TOO_LONG` when it wouldn't fit: 1,000 characters can
+be far more bytes (JSON writes a control character as six, UTF-8 some
+characters as four). `slug` keeps only letters and digits, which always fit.
 
 One more, [`ticket`](products/ticket/) (Python), shows what a run made and
 deleting it later: `open` reports the ticket it opens in its outputs'
