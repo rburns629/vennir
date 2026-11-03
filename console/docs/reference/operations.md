@@ -577,6 +577,10 @@ Which Prometheus is `monitoring.provider`, the same in both charts:
   there. Google keeps no firing alert's own text, so each shows its rule's
   summary and its labels. Without the role, the rules show with their state
   unknown, saying what's missing. `vertra` sets both and grants the role.
+  GKE's in-cluster rule evaluator (`rule-evaluator.gke-gmp-system.svc:19092`)
+  does serve `/api/v1/rules`, with live states and each alert's text, but
+  it's an internal endpoint, not a published API, so `vertra` doesn't point
+  `prometheusUrl` at it (decided 2026-11-02).
 
 The metrics, for alerts and dashboards of your own:
 
