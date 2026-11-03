@@ -136,23 +136,25 @@ func (r *Recorder) Flush(ctx context.Context) error {
 	return err
 }
 
-// retry: whether a row's error says to try the whole flush again later (the
-// connection or the context gone, or Postgres asking for a retry) rather
-// than that this row can't be written.
+// retry: whether a row's error says to try the whole flush again later,
+// rather than that this row can't be written. A row is given up on only when
+// Postgres refuses its data (a data exception, an integrity violation, the
+// statement cancelled) or pgx can't send it; anything else (the connection
+// or context gone, the transaction aborted or read-only, a deadlock,
+// permissions) is kept for the next flush.
 func retry(ctx context.Context, tx pgx.Tx, err error) bool {
 	if ctx.Err() != nil || tx.Conn().IsClosed() {
 		return true
 	}
 	var pg *pgconn.PgError
-	if errors.As(err, &pg) {
-		// Connection, transaction rollback (deadlock, serialization),
-		// insufficient resources, operator intervention (shutdown).
-		switch pg.Code[:2] {
-		case "08", "40", "53", "57":
-			return true
-		}
+	if !errors.As(err, &pg) {
+		return pgconn.SafeToRetry(err) || pgconn.Timeout(err)
 	}
-	return false
+	switch {
+	case pg.Code[:2] == "22", pg.Code[:2] == "23", pg.Code == "57014":
+		return false
+	}
+	return true
 }
 
 type txStarter struct {

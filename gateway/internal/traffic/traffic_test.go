@@ -67,10 +67,11 @@ func TestCountsAddUpInTheConsolesTable(t *testing.T) {
 
 func TestEndpointsAreTextPostgresTakes(t *testing.T) {
 	for in, want := range map[string]string{
-		"GET /orders/1":         "GET /orders/1",
-		"GET /\xff":             "GET /�",
-		"GET /a\x00b":           "GET /a�b",
-		strings.Repeat("é", 81): strings.Repeat("é", 80), // 162 bytes: cut between characters, not inside one
+		"GET /orders/1":                       "GET /orders/1",
+		"GET /\xff":                           "GET /�",
+		"GET /a\x00b":                         "GET /a�b",
+		"a" + strings.Repeat("é", 80):         "a" + strings.Repeat("é", 79),                      // byte 160 is inside an é: cut before it
+		"GET /" + strings.Repeat("\xff/", 52): "GET /" + strings.Repeat("\uFFFD/", 38) + "\uFFFD", // replacements make it longer: cut after
 	} {
 		if got := text(in); got != want || !utf8.ValidString(got) || len(got) > MaxEndpoint {
 			t.Errorf("text(%q) = %q, want %q", in, got, want)
@@ -119,8 +120,15 @@ func TestABadRowDoesntStopTheRest(t *testing.T) {
 	at := time.Date(2026, 10, 22, 12, 30, 0, 0, time.UTC)
 	r.Record(apiID, "web", "GET /orders/\xff\x00", "not_found", at, 0)
 	r.Record(apiID, "web", "GET /orders/{id}", "forwarded_2xx", at, 0)
+	// One Postgres refuses (its count overflows the stored one's), and one
+	// pgx can't send: both dropped, in their savepoints, the rest written.
+	if _, err := pool.Exec(ctx, `INSERT INTO api_traffic (api_id, minute, team, endpoint, outcome, count, duration_ms)
+		VALUES ($1::uuid, $2, 'web', 'GET /full', 'blocked', 2147483600, 0)`, apiID, at); err != nil {
+		t.Fatal(err)
+	}
 	r.mu.Lock()
-	r.pending[key{api: apiID, team: "web", endpoint: "GET /too-many", outcome: "blocked", minute: at}] = counts{n: 1 << 40} // past an integer column
+	r.pending[key{api: apiID, team: "web", endpoint: "GET /full", outcome: "blocked", minute: at}] = counts{n: 100}
+	r.pending[key{api: apiID, team: "web", endpoint: "GET /too-many", outcome: "blocked", minute: at}] = counts{n: 1 << 40}
 	r.mu.Unlock()
 	if err := r.Flush(ctx); err != nil {
 		t.Fatal(err)
@@ -136,7 +144,7 @@ func TestABadRowDoesntStopTheRest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"GET /orders/{id}", "GET /orders/��"}; fmt.Sprint(endpoints) != fmt.Sprint(want) {
+	if want := []string{"GET /full", "GET /orders/{id}", "GET /orders/��"}; fmt.Sprint(endpoints) != fmt.Sprint(want) {
 		t.Errorf("recorded %q, want %q", endpoints, want)
 	}
 }
