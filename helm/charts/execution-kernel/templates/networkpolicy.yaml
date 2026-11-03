@@ -40,7 +40,8 @@ spec:
 ---
 {{- end }}
 # kernel-api: the console (which is also all it accepts, by token), plus
-# any metrics scrapers listed.
+# any metrics scrapers listed. Only its Deployment's Pods (component app),
+# not the rest of its release: its gateway, Jobs and databases.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -58,7 +59,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              {{- toYaml .Values.networkPolicy.consoleSelector | nindent 14 }}
+              {{- merge (dict "app.kubernetes.io/component" "app") .Values.networkPolicy.consoleSelector | toYaml | nindent 14 }}
         {{- with .Values.networkPolicy.metricsFrom }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

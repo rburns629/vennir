@@ -589,7 +589,10 @@ databaseMaxConnections: 10
 # GKE Dataplane V2, Calico, Cilium, ...); others ignore them silently.
 networkPolicy:
   enabled: true
-  # -- The console's Pods, in this namespace.
+  # -- The console release's Pods, in this namespace: all of them may reach
+  # Postgres when it holds the console's database (its migrations and the
+  # gateway use it too); kernel-api's adds app.kubernetes.io/component: app,
+  # the console's own Deployment alone.
   consoleSelector:
     app.kubernetes.io/name: execution-console
   # -- Extra NetworkPolicy peers allowed to scrape /metrics (kernel-api's
