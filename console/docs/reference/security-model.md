@@ -413,7 +413,9 @@ that operation's schemas; anything else is answered by the gateway (404 or
 400) and never reaches the backend. Callers sign in as at the console (a
 session or a bot token, checked against the console's database the same
 way: a team requiring single sign-on refuses a password's session whether
-the install's settings or an admin in the console turned it on, and a
+the install's settings or an admin in the console turned it on (if the
+saved client secret can't be unsealed, the console counts it off and the
+gateway, which never reads it, on), and a
 purged team counts for nobody), and may call an API only when it's shared
 with one of their teams. An ordering bot calls none (403 `ORDERS_ONLY`): it
 may only order its listed templates.

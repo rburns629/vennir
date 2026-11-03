@@ -162,7 +162,11 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 }
 
 // ssoOn: single sign-on is on, by the install's settings or as an admin
-// saved it in the console (sso.ts refreshSso: on, and complete).
+// saved it in the console (sso.ts refreshSso: on, and complete). One
+// difference, on the side of refusing: the console also needs the saved
+// client secret to unseal, which the gateway, granted no part of it, can't
+// check; while it can't (JWT_SECRET changed), the console treats single
+// sign-on as off and the gateway as on, until an admin saves it again.
 func (r *Resolver) ssoOn(ctx context.Context) (bool, error) {
 	if r.SSO {
 		return true, nil
