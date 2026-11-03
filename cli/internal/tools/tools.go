@@ -32,13 +32,15 @@ import (
 	"github.com/rburns629/vertra/cli/internal/run"
 )
 
-// Dir is where downloaded tools live: ~/.vertra/bin.
-func Dir() string {
+// Dir is where downloaded tools live: ~/.vertra/bin. With no home
+// directory there's none, rather than a shared one such as the temp
+// directory, where another user could put a tool for vertra to run.
+func Dir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return filepath.Join(os.TempDir(), "vertra-bin")
+		return "", fmt.Errorf("no home directory for vertra's tools (~/.vertra/bin): %w", err)
 	}
-	return filepath.Join(home, ".vertra", "bin")
+	return filepath.Join(home, ".vertra", "bin"), nil
 }
 
 // ExtendPath adds the directories vertra's tools may be in to this
@@ -46,7 +48,10 @@ func Dir() string {
 // bin, where `gcloud components install` puts gke-gcloud-auth-plugin
 // (kubectl runs that by name).
 func ExtendPath() {
-	dirs := []string{Dir()}
+	var dirs []string
+	if dir, err := Dir(); err == nil {
+		dirs = append(dirs, dir)
+	}
 	if gcloud, err := exec.LookPath("gcloud"); err == nil {
 		if real, err := filepath.EvalSymlinks(gcloud); err == nil {
 			dirs = append(dirs, filepath.Dir(real))
@@ -64,9 +69,11 @@ func ExtendPath() {
 // Path returns the executable to run for a tool: vertra's own copy if
 // it downloaded one, else the one on PATH, else the bare name.
 func Path(name string) string {
-	own := filepath.Join(Dir(), name)
-	if info, err := os.Stat(own); err == nil && !info.IsDir() {
-		return own
+	if dir, err := Dir(); err == nil {
+		own := filepath.Join(dir, name)
+		if info, err := os.Stat(own); err == nil && !info.IsDir() {
+			return own
+		}
 	}
 	if p, err := exec.LookPath(name); err == nil {
 		return p
@@ -309,10 +316,14 @@ func Download(ctx context.Context, tool string) (string, error) {
 	}
 	url := strings.NewReplacer("{os}", runtime.GOOS, "{arch}", runtime.GOARCH, "{version}", pin.Version).Replace(pin.URL)
 
-	if err := os.MkdirAll(Dir(), 0o755); err != nil {
+	dir, err := Dir()
+	if err != nil {
 		return "", err
 	}
-	tmp, err := os.CreateTemp(Dir(), tool+"-*.download")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	tmp, err := os.CreateTemp(dir, tool+"-*.download")
 	if err != nil {
 		return "", err
 	}
@@ -339,7 +350,7 @@ func Download(ctx context.Context, tool string) (string, error) {
 		return "", fmt.Errorf("%s's checksum doesn't match (%s, expected %s): refusing to use it", tool, got, sum)
 	}
 
-	dest := filepath.Join(Dir(), tool)
+	dest := filepath.Join(dir, tool)
 	if pin.TarMember != "" {
 		member := strings.NewReplacer("{os}", runtime.GOOS, "{arch}", runtime.GOARCH).Replace(pin.TarMember)
 		if err := extract(tmp.Name(), member, dest); err != nil {
