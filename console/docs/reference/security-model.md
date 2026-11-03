@@ -458,7 +458,7 @@ is what's forwarded.
 Backends must be under hosts the admins allow (`gateway.backendHosts`), or
 the API is held: the gateway can't be pointed anywhere a catalog says. Its
 only Kubernetes right is minting ServiceAccount tokens, and an admission
-policy limits that to API ServiceAccounts (`*-api`) in team namespaces, for
+policy limits that to API ServiceAccounts (`*-api`) in active (not retired) team namespaces, for
 a named audience that isn't the Kubernetes API's or kernel-api's, lasting an
 hour at most, so it can't mint the platform's or a team's other identities,
 or a token for the cluster itself. `-api` is reserved: no product may run as
@@ -773,7 +773,7 @@ CronJobs, its own and the wake one, and an admission policy in
 `timeZone`, never the Job they run. A stolen token of either can stop the
 platform, not change it.
 
-And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api: a step's Pod can reach neither. Every team namespace also holds `vertra-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vertra-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vertra/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vertra-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vertra-team-quota`) and LimitRange (`vertra-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators (and it mustn't also be a team's: see [Guardrails the cluster enforces](#guardrails-the-cluster-enforces)). The bundled databases' passwords are generated on install.
+And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api (not the gateway, which forwards where catalogs say): a step's Pod can reach neither. Every team namespace also holds `vertra-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vertra-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vertra/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vertra-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vertra-team-quota`) and LimitRange (`vertra-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators (and it mustn't also be a team's: see [Guardrails the cluster enforces](#guardrails-the-cluster-enforces)). The bundled databases' passwords are generated on install.
 
 ## What a step can reach
 
@@ -944,7 +944,7 @@ tagging the wrong commit.
 Nothing verifies those signatures when installing: `vertra` checks the
 charts against the SHA-256s each release records (each cosign-verified
 once), but the charts run their images by tag unless
-`image.digest` pins them, and policy-controller doesn't cover the platform's
+`image.digest` (and `gateway.image.digest`) pins them, and policy-controller doesn't cover the platform's
 own namespace. To check one by hand (a version tag's run only: the same
 workflow run from a branch signs as `release.yml@refs/heads/<branch>`,
 which this refuses; `make gke-verify-release` requires the exact tag).
@@ -966,10 +966,17 @@ who (a user or bot id), the method, the fields that name what it acted on
 and the outcome, with the request's id and the client's address. Signing
 in is recorded the same way, allowed or refused (the email tried, never
 the password; a successful one's actor is who signed in), as are keyless
-and single sign-on sign-ins, registering and changing a password. Each
+and single sign-on sign-ins, registering and changing a password. A call
+with no one signed in to a method that needs someone is refused before it
+does anything and only logged (`event: "rpc_unauthenticated"`), so
+anyone who can reach the console can't fill the audit log. Each
 entry is in the `audit_log`
 table, hash-chained so a change or removal shows, and in the console's log
-as `event: "audit"`. A catalog release's changes are recorded too.
+as `event: "audit"`. A catalog release's changes are recorded too, and
+so is each team membership single sign-on groups add, remove or change (at
+a sign-in or the hourly resync). Settings are recorded as they're set (the
+chat agent's provider and endpoint, single sign-on's issuer, client id and
+domains), never a key or secret, only that one was given.
 Entries are kept `retention.auditDays` (365 by default); `audit.export`
 copies them to write-once storage, and the database is compared with that
 copy entry by entry, so even a change with every later hash rewritten

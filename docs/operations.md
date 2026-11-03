@@ -38,7 +38,7 @@ Every day:
 | `make logs` | Tails kernel-api, the scheduler and the console together (any install: `vertra logs <env> -f`) |
 | `make catalog-publish` | Publishes `catalog-template/` with its `local` sample team (one product in five languages); `CATALOG=<folder>` publishes your own catalog, `SAMPLES=` other samples |
 | `make kind-deploy` | Rebuilds both platform images and upgrades both releases (`kind-deploy-kernel`, `kind-deploy-console` for one) |
-| `make test` | Starts a throwaway Postgres on `127.0.0.1:55432` and runs both projects' tests |
+| `make test` | Starts a throwaway Postgres on `127.0.0.1:55432` and runs the kernel's, gateway's, console's and frontend's tests |
 
 To try it: publish the samples, then paste the DAG from
 `catalog-template/samples/local/README.md` into **Executions → Submit new**.
@@ -598,6 +598,7 @@ The metrics, for alerts and dashboards of your own:
 | --- | --- | --- |
 | `kernel_tasks` | `state` | Unfinished steps by state (`BLOCKED`, `READY`, `AWAITING_APPROVAL`, `CLAIMED`, `RUNNING`); `READY` only of running executions (a failed one's wait for a retry) |
 | `kernel_oldest_ready_task_age_seconds` | | How long the longest-waiting `READY` step of a running execution has waited; 0 when none is |
+| `kernel_unschedulable_steps` | | Step Pods no node has room for now (the cluster full, or unable to grow), from the scheduler's watch; the chart's unschedulable alert fires on it |
 | `kernel_scheduler_tick_duration_seconds` | | One scheduler pass |
 | `kernel_scheduler_tick_errors_total` | | Passes that failed (logged, retried next pass) |
 | `kernel_scheduler_status_read_errors_total` | | Failed reads of a running step's status (read again) |
@@ -1177,8 +1178,8 @@ Both charts ship NetworkPolicies (`networkPolicy.enabled`, on by default):
 
 | Pod | Accepts connections from |
 | --- | --- |
-| Kernel Postgres | The kernel release's Pods, and the console's when it holds the console's database |
-| kernel-api | The console (`networkPolicy.consoleSelector`), and `networkPolicy.metricsFrom` |
+| Kernel Postgres | The kernel release's Pods, and, when it holds the console's database, the console, its migrations and the gateway (`networkPolicy.consoleDatabaseSelector`) |
+| kernel-api | The console's own Pods, not its gateway (`networkPolicy.consoleSelector`), and `networkPolicy.metricsFrom` |
 | Scheduler | `networkPolicy.metricsFrom` only |
 | Console | Anyone on its port; its metrics port, `networkPolicy.metricsFrom` only |
 | Gateway | Anyone on its ports; its metrics port, `networkPolicy.metricsFrom` only |

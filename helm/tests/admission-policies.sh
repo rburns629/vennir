@@ -108,7 +108,9 @@ k label namespace "$RETIRED_NS" "$PROTECTED_NS" vertra/team=retired --overwrite 
 for sa in eso-gcp db-sa orders-api; do
   k -n "$TEAM_A" create serviceaccount "$sa" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
-k -n "$OTHER_NS" create serviceaccount orders-api --dry-run=client -o yaml | k apply -f - > /dev/null
+for ns in "$OTHER_NS" "$RETIRED_NS"; do
+  k -n "$ns" create serviceaccount orders-api --dry-run=client -o yaml | k apply -f - > /dev/null
+done
 # What the scheduler may and may not delete: ConfigMaps as the executor
 # labels its own (and one that isn't), in a team namespace, a retired one
 # and the platform's.
@@ -252,10 +254,12 @@ print(json.dumps({"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
 PY
 }
 
-# A token the gateway asks for (gateway/internal/credentials: ten minutes).
+# A token the gateway asks for (gateway/internal/credentials: ten minutes;
+# dryRun=All, so none is issued). An empty audience asks for none.
 token() {  # namespace, ServiceAccount, audience, seconds
-  local out
-  out=$(echo '{"apiVersion":"authentication.k8s.io/v1","kind":"TokenRequest","spec":{"audiences":["'"$3"'"],"expirationSeconds":'"${4:-600}"'}}' \
+  local out audiences='[]'
+  [ -n "$3" ] && audiences='["'"$3"'"]'
+  out=$(echo '{"apiVersion":"authentication.k8s.io/v1","kind":"TokenRequest","spec":{"audiences":'"$audiences"',"expirationSeconds":'"${4:-600}"'}}' \
     | k --as="$GATEWAY" create --raw "/api/v1/namespaces/$1/serviceaccounts/$2/token?dryRun=All" -f - 2>&1)
   # Never print a token: only whether it was allowed, or the refusal.
   if echo "$out" | grep -q '"kind":"TokenRequest"'; then echo "(server dry run)"; else echo "$out"; fi
@@ -399,6 +403,8 @@ echo "Gateway tokens:"
 expect "an API's, for its backend"               allowed                      "$(token "$TEAM_A" orders-api https://orders.example)"
 expect "a ServiceAccount that isn't an API's"    "only mint tokens for API"   "$(token "$TEAM_A" db-sa https://orders.example)"
 expect "an API's outside team namespaces"        "only mint tokens for API"   "$(token "$OTHER_NS" orders-api https://orders.example)"
+expect "an API's in a retired team's namespace"  "only mint tokens for API"   "$(token "$RETIRED_NS" orders-api https://orders.example)"
+expect "no audience (the Kubernetes API's)"      "never the Kubernetes API"   "$(token "$TEAM_A" orders-api "")"
 expect "for the Kubernetes API"                  "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://kubernetes.default.svc)"
 expect "for GKE's API"                           "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://container.googleapis.com/v1/projects/p)"
 expect "for kernel-api"                          "never the Kubernetes API"   "$(token "$TEAM_A" orders-api vertra-kernel-api)"

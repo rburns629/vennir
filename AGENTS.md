@@ -305,8 +305,9 @@ it, and a test checks it does. kernel-api's API is
 
 - Integration and end-to-end tests use **real Postgres**: `make test` (repo
   root) starts a throwaway container on `127.0.0.1:55432`, migrates both test
-  databases and runs both suites; `make test-db` does just the databases.
-  Both suites read `TEST_DATABASE_URL`, defaulting to
+  databases and runs the kernel's, the gateway's (against the console's
+  database), the console's and the frontend's tests; `make test-db` does
+  just the databases. The suites read `TEST_DATABASE_URL`, defaulting to
   `localhost/execution_{kernel,console}_test` (what CI uses). A missing
   database fails rather than skips. Never point the tests at an install's
   databases. Each kernel test runs in a rolled-back transaction, or (for

@@ -16,8 +16,10 @@
  * A lookup that fails refuses the sign-in rather than counting as no
  * groups, which would take people out of their teams.
  */
+import { randomUUID } from "node:crypto";
 import type { FastifyBaseLogger } from "fastify";
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { writeAuditEntry } from "./audit.js";
 import { config } from "./config.js";
 import { db } from "./db/client.js";
 import { ssoGroupMappings, ssoSettings, teamMemberships, teams, users, type TeamRole } from "./db/schema.js";
@@ -168,7 +170,8 @@ const rank = (role: TeamRole) => (role === "maintainer" ? 2 : 1);
 /**
  * Makes the person's membership of every mapped team follow their groups:
  * the best role a group of theirs is mapped to, or none. Teams nothing maps
- * to are left alone. Returns what changed.
+ * to are left alone. Each change is audited (no request makes it: a sign-in
+ * or the hourly resync). Returns what changed.
  */
 export async function syncMappedTeams(userId: string, groups: string[], log: FastifyBaseLogger): Promise<string[]> {
   const mappings = await db
@@ -200,19 +203,33 @@ export async function syncMappedTeams(userId: string, groups: string[], log: Fas
     ).map((m) => [m.teamId, m.role]),
   );
   const changes: string[] = [];
+  const audit = (change: "joined" | "left" | "role", team: string, role: TeamRole | null, groups: string[]) =>
+    writeAuditEntry(log, {
+      actorId: null,
+      method: "SSO",
+      route: "sso-group-sync",
+      target: { userId, team, change, ...(role ? { role } : {}), groups },
+      status: 200,
+      requestId: randomUUID(),
+    });
   for (const [teamId, { name, role, via }] of wanted) {
     const now = held.get(teamId);
     const viaGroups = [...new Set(via)].sort();
     if (role === null && now) {
       await db.delete(teamMemberships).where(and(eq(teamMemberships.userId, userId), eq(teamMemberships.teamId, teamId)));
       changes.push(`left ${name}`);
+      await audit("left", name, null, viaGroups);
     } else if (role && !now) {
       await db.insert(teamMemberships).values({ userId, teamId, role, viaGroups }).onConflictDoNothing();
       changes.push(`joined ${name} as ${role}`);
+      await audit("joined", name, role, viaGroups);
     } else if (role) {
       // The role, and which groups give it, kept current either way.
       await db.update(teamMemberships).set({ role, viaGroups }).where(and(eq(teamMemberships.userId, userId), eq(teamMemberships.teamId, teamId)));
-      if (now !== role) changes.push(`${role} of ${name}`);
+      if (now !== role) {
+        changes.push(`${role} of ${name}`);
+        await audit("role", name, role, viaGroups);
+      }
     }
   }
   if (changes.length > 0) log.warn({ event: "sso_teams_synced", userId, changes }, "team memberships follow single sign-on groups");

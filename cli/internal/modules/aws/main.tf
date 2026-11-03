@@ -688,7 +688,7 @@ resource "aws_eks_pod_identity_association" "prometheus" {
 # --- the audit log's write-once copy --------------------------------------
 # Object Lock: every object kept audit_keep_days (governance; compliance
 # when audit_lock, which nobody can shorten, the root account included).
-# The console may only put objects. Kept by destroy: it's the record.
+# The console may only put new objects. Kept by destroy: it's the record.
 
 resource "aws_s3_bucket" "audit" {
   count               = var.audit_export ? 1 : 0
@@ -727,8 +727,20 @@ resource "aws_s3_bucket_object_lock_configuration" "audit" {
 
 data "aws_iam_policy_document" "console_audit" {
   count = var.audit_export ? 1 : 0
+  # Create-only: a put must carry If-None-Match: *, which S3 refuses for a
+  # key that exists. Without it a put to an existing key would make a new
+  # current version, leaving the locked original noncurrent.
   statement {
-    actions   = ["s3:PutObject", "s3:GetObject"]
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.audit[0].arn}/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "s3:if-none-match"
+      values   = ["*"]
+    }
+  }
+  statement {
+    actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.audit[0].arn}/*"]
   }
   # Reading its copies back, to compare the database with them.

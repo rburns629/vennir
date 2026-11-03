@@ -584,14 +584,23 @@ databaseMaxConnections: 10
 
 # -- NetworkPolicies (templates/networkpolicy.yaml): only this release's Pods
 # (and the console's, when this instance hosts its database) may reach
-# Postgres; only the console may reach kernel-api; only metricsFrom may
+# Postgres; only the console (not its gateway) may reach kernel-api; only metricsFrom may
 # reach the scheduler. Needs a CNI that enforces NetworkPolicy (kindnet,
 # GKE Dataplane V2, Calico, Cilium, ...); others ignore them silently.
 networkPolicy:
   enabled: true
-  # -- The console's Pods, in this namespace.
+  # -- The console's own Pods, in this namespace: the only ones that may
+  # reach kernel-api (not the gateway's, which forwards where catalogs say).
   consoleSelector:
     app.kubernetes.io/name: execution-console
+    app.kubernetes.io/component: app
+  # -- With postgres.consoleDatabase, the console's Pods that use its
+  # database here: the console, its migrations and the gateway.
+  consoleDatabaseSelector:
+    matchLabels:
+      app.kubernetes.io/name: execution-console
+    matchExpressions:
+      - {key: app.kubernetes.io/component, operator: In, values: [app, migrate, gateway]}
   # -- Extra NetworkPolicy peers allowed to scrape /metrics (kernel-api's
   # port 8000, the scheduler's metricsPort), e.g.
   #   - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}

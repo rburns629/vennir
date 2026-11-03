@@ -1,5 +1,7 @@
 # Values for Sigstore's policy-controller on the GKE cluster, which verifies
-# catalog image signatures for the execution-kernel chart's imageSignature:
+# catalog image signatures for the execution-kernel chart's imageSignature
+# (`make gke-deploy-policy-controller` runs these):
+#   helm repo add sigstore https://sigstore.github.io/helm-charts --force-update
 #   helm upgrade --install policy-controller sigstore/policy-controller \
 #     --version 0.10.8 -n cosign-system --create-namespace \
 #     -f helm/values/gke/policy-controller.yaml
