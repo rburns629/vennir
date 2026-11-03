@@ -43,6 +43,17 @@ spec:
     - expression: request.namespace == {{ .Release.Namespace | quote }}
       message: "The console runs Jobs only in the platform's namespace."
       reason: Forbidden
+    # Only the labels k8s.ts gives them, and those the API server adds to a
+    # Job's Pods: none a NetworkPolicy admits (a database's, kernel-api's)
+    # or a Service selects (taking its traffic).
+    - expression: >-
+        has(object.spec.template.metadata) && has(object.spec.template.metadata.labels) &&
+        object.spec.template.metadata.labels.all(k, k in ["app.kubernetes.io/managed-by", "app.kubernetes.io/component",
+          "job-name", "controller-uid", "batch.kubernetes.io/job-name", "batch.kubernetes.io/controller-uid"]) &&
+        object.spec.template.metadata.labels[?"app.kubernetes.io/managed-by"].orValue("") == "vertra-console" &&
+        object.spec.template.metadata.labels[?"app.kubernetes.io/component"].orValue("") in ["image-scan", "catalog-verify"]
+      message: "A console Job's Pod carries only its own labels (managed-by vertra-console, an image-scan or catalog-verify component)."
+      reason: Forbidden
     - expression: >-
         has(variables.pod.serviceAccountName) && variables.pod.serviceAccountName == {{ $scanner | quote }} &&
         has(variables.pod.automountServiceAccountToken) && variables.pod.automountServiceAccountToken == false
@@ -62,7 +73,13 @@ spec:
           has(c.securityContext) && has(c.securityContext.allowPrivilegeEscalation) && !c.securityContext.allowPrivilegeEscalation &&
           (!has(c.securityContext.privileged) || !c.securityContext.privileged) &&
           (!has(c.securityContext.runAsNonRoot) || c.securityContext.runAsNonRoot) &&
-          (!has(c.securityContext.runAsUser) || c.securityContext.runAsUser != 0))
+          (!has(c.securityContext.runAsUser) || c.securityContext.runAsUser != 0) &&
+          (!has(c.securityContext.capabilities) || !has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.size() == 0) &&
+          !has(c.securityContext.seLinuxOptions) && !has(c.securityContext.appArmorProfile) &&
+          (!has(c.securityContext.seccompProfile) || c.securityContext.seccompProfile.type == "RuntimeDefault") &&
+          (!has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0))) &&
+        (!has(variables.pod.securityContext.seLinuxOptions)) && (!has(variables.pod.securityContext.appArmorProfile)) &&
+        (!has(variables.pod.securityContext.seccompProfile) || variables.pod.securityContext.seccompProfile.type == "RuntimeDefault")
       message: "A console Job runs as non-root, unprivileged, with nothing from the node."
       reason: Forbidden
     - expression: >-
