@@ -1491,6 +1491,22 @@ describe("home", () => {
     // The install at a glance is an admin's.
     expect(screen.queryByRole("heading", { name: /at a glance/ })).toBeNull();
   });
+
+  it("says when schedules run next in each one's own time zone, and in yours on hover", async () => {
+    // 02:30 UTC on Sunday Nov 1 is 22:30 on Saturday Oct 31 in New York, whatever the viewer's zone.
+    const nightly = { id: "s1", team: "azure-apps", name: "nightly uptime check", cron: "30 22 * * *", timeZone: "America/New_York", enabled: true, nextRunAt: "2026-11-01T02:30:00Z", lastRunAt: "2026-10-31T02:30:00Z" };
+    await renderAt("/", MEMBER, { "ScheduleService/ListSchedules": { schedules: [nightly] } });
+    const panel = (await screen.findByRole("heading", { name: "Coming up" }, { timeout: 5000 })).closest("section") ?? document.body;
+    const time = within(panel as HTMLElement).getByText("22:30 New York time");
+    expect(within(panel as HTMLElement).getByText("Sat")).toBeTruthy();
+    expect(within(panel as HTMLElement).getByText("31")).toBeTruthy();
+    expect(within(panel as HTMLElement).getByText("Times are each schedule's own; hover one for yours.")).toBeTruthy();
+    // The tooltip describes the time; it doesn't replace it as the row's name.
+    expect(time.getAttribute("aria-label")).toBeNull();
+    expect(within(panel as HTMLElement).getByRole("link", { name: /22:30 New York time/ })).toBeTruthy();
+    fireEvent.mouseOver(time);
+    expect((await screen.findByRole("tooltip")).textContent).toMatch(/^\d\d:\d\d your time \(.+\)$/);
+  });
 });
 
 describe("preferences", () => {
