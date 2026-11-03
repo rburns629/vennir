@@ -598,6 +598,7 @@ The metrics, for alerts and dashboards of your own:
 | --- | --- | --- |
 | `kernel_tasks` | `state` | Unfinished steps by state (`BLOCKED`, `READY`, `AWAITING_APPROVAL`, `CLAIMED`, `RUNNING`); `READY` only of running executions (a failed one's wait for a retry) |
 | `kernel_oldest_ready_task_age_seconds` | | How long the longest-waiting `READY` step of a running execution has waited; 0 when none is |
+| `kernel_unschedulable_steps` | | Step Pods no node has room for now (the cluster full, or unable to grow), from the scheduler's watch; the chart's unschedulable alert fires on it |
 | `kernel_scheduler_tick_duration_seconds` | | One scheduler pass |
 | `kernel_scheduler_tick_errors_total` | | Passes that failed (logged, retried next pass) |
 | `kernel_scheduler_status_read_errors_total` | | Failed reads of a running step's status (read again) |
