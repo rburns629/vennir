@@ -35,8 +35,10 @@ class CheckActionTest(unittest.TestCase):
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
         self.module.TARGET_SERVICE_ACCOUNT_FILE = Path(self.tmp_dir.name) / "service-account"
         # The team's secret app-hosting, mounted.
-        self.module.RUNTIME_SERVICE_ACCOUNT_FILE = Path(self.tmp_dir.name) / "runtime-service-account"
-        self.module.RUNTIME_SERVICE_ACCOUNT_FILE.write_text(RUNTIME + "\n")
+        self.module.SETTINGS_DIR = Path(self.tmp_dir.name) / "app-hosting"
+        self.module.SETTINGS_DIR.mkdir()
+        (self.module.SETTINGS_DIR / "image-registry").write_text("us-central1-docker.pkg.dev/my-project/demo\n")
+        (self.module.SETTINGS_DIR / "runtime-service-account").write_text(RUNTIME + "\n")
         self.source = MagicMock(service_account_email="my-project.svc.id.goog")
         patcher = patch.object(self.module.google.auth, "default", return_value=(self.source, "my-project"))
         self.default = patcher.start()
@@ -94,14 +96,18 @@ class CheckActionTest(unittest.TestCase):
             )
 
     def test_not_ready_without_the_team_secret(self) -> None:
-        self.module.RUNTIME_SERVICE_ACCOUNT_FILE.unlink()
-        exit_code, result = self._run(["web-1"], {"web-1": ALL})
-        self.assertEqual(exit_code, 0)
-        self.assertFalse(result["outputs"]["ready"])
-        self.assertEqual(
-            result["outputs"]["missing"],
-            ["the team secret app-hosting, with image-registry and runtime-service-account"],
-        )
+        for key in ("image-registry", "runtime-service-account"):
+            with self.subTest(missing=key):
+                value = (self.module.SETTINGS_DIR / key).read_text()
+                (self.module.SETTINGS_DIR / key).unlink()
+                exit_code, result = self._run(["web-1"], {"web-1": ALL})
+                (self.module.SETTINGS_DIR / key).write_text(value)
+                self.assertEqual(exit_code, 0)
+                self.assertFalse(result["outputs"]["ready"])
+                self.assertEqual(
+                    result["outputs"]["missing"],
+                    ["the team secret app-hosting, with image-registry and runtime-service-account"],
+                )
 
     def test_without_workload_identity_it_is_not_ready(self) -> None:
         self.default.side_effect = self.module.google.auth.exceptions.DefaultCredentialsError("none")

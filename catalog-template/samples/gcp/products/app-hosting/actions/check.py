@@ -37,8 +37,9 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 # signs in as, named in what an admin must grant it.
 SERVICE_ACCOUNT = "gcp-app-hosting"
 TARGET_SERVICE_ACCOUNT_FILE = Path("/platform/secrets/gcp-target/service-account")
-# The team's secret app-hosting: the account a service runs as (create.py).
-RUNTIME_SERVICE_ACCOUNT_FILE = Path("/platform/secrets/app-hosting/runtime-service-account")
+# The team's secret app-hosting: the registry images come from and the
+# account a service runs as (create.py), both needed.
+SETTINGS_DIR = Path("/platform/secrets/app-hosting")
 IMPERSONATION_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 RESOURCE_MANAGER = "https://cloudresourcemanager.googleapis.com/v3"
@@ -128,8 +129,11 @@ def main() -> int:
     except google.auth.exceptions.TransportError as error:
         return _failure("GCP_API_ERROR", f"couldn't reach Google to sign in: {error}", retryable=True)
 
-    runtime = RUNTIME_SERVICE_ACCOUNT_FILE.read_text().strip() if RUNTIME_SERVICE_ACCOUNT_FILE.exists() else ""
-    if not runtime:
+    registry, runtime = (
+        (SETTINGS_DIR / key).read_text().strip() if (SETTINGS_DIR / key).is_file() else ""
+        for key in ("image-registry", "runtime-service-account")
+    )
+    if not registry or not runtime:
         return _answer(
             False, principal, ["the team secret app-hosting, with image-registry and runtime-service-account"],
             "It can sign in, but doesn't know which registry to deploy from or which account to run as.",
