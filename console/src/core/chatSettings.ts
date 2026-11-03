@@ -16,7 +16,7 @@ import { ApiError, forbiddenUnlessAdmin } from "../apiError.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { ask } from "../chat/agent.js";
 import { ModelUnavailable, modelFor, type ChatModel } from "../chat/model.js";
-import { chatSource, currentChat, KEY_PURPOSE, refreshChatSettings } from "../chat/settings.js";
+import { chatSource, currentChat, installKeyFor, KEY_PURPOSE, keyless, refreshChatSettings, sameEndpoint } from "../chat/settings.js";
 import { CHAT_PROVIDERS, chatFrom, config, type ChatConfig } from "../config.js";
 import { db } from "../db/client.js";
 import { chatSettings, users } from "../db/schema.js";
@@ -66,15 +66,22 @@ export interface ChatConfigView {
 
 const bad = (message: string) => new ApiError(400, "BAD_CHAT_SETTINGS", message);
 
-/** Providers that sign in as the console's own cloud identity: no key kept. */
-const keyless = (provider: string) => provider === "vertex" || provider === "bedrock";
+/** A kept key goes only where it was kept for: the same provider and endpoint. */
+const keptFor = (input: Pick<ChatConfigInput, "provider" | "endpoint">, stored: typeof chatSettings.$inferSelect | undefined) =>
+  stored?.apiKeyEncrypted && stored.provider === input.provider && sameEndpoint(stored.endpoint, input.endpoint) ? stored.apiKeyEncrypted : null;
 
-/** The key these settings use: the one given, the one kept for this provider, or the install's for its own. */
-function keyFor(input: Pick<ChatConfigInput, "provider" | "apiKey">, stored: typeof chatSettings.$inferSelect | undefined): string {
+/**
+ * The key these settings use: the one given; else the one kept, for this
+ * provider and endpoint; else the install's, for its own provider and
+ * endpoint. A key is never sent to an address other than the one it was
+ * given for.
+ */
+function keyFor(input: Pick<ChatConfigInput, "provider" | "apiKey" | "endpoint">, stored: typeof chatSettings.$inferSelect | undefined): string {
   if (keyless(input.provider)) return "";
   if (input.apiKey) return input.apiKey;
-  if (stored?.apiKeyEncrypted && stored.provider === input.provider) return unseal(stored.apiKeyEncrypted, KEY_PURPOSE) ?? "";
-  return config.chat?.provider === input.provider ? config.chat.apiKey : "";
+  const kept = keptFor(input, stored);
+  if (kept) return unseal(kept, KEY_PURPOSE) ?? "";
+  return installKeyFor(input.provider, input.endpoint);
 }
 
 /** The settings checked as the install's are: refused (400) naming what's wrong. */
@@ -87,6 +94,10 @@ function checked(input: ChatConfigInput, apiKey: string): ChatConfig {
     throw bad(error instanceof Error ? error.message : String(error));
   }
   if (!chat) throw bad("Name a model.");
+  // The console's own cloud identity goes only to its cloud's address.
+  if (keyless(input.provider) && input.endpoint.trim()) {
+    throw bad(`${input.provider === "vertex" ? "Vertex AI" : "Bedrock"}'s address is built from its ${input.provider === "vertex" ? "project and location" : "region"}: leave the endpoint empty.`);
+  }
   return chat;
 }
 
@@ -154,7 +165,7 @@ export async function setChatConfig(caller: AuthUser | undefined, input: ChatCon
   else if (!(CHAT_PROVIDERS as readonly string[]).includes(input.provider)) input = { ...input, provider: "openai-compatible" };
   // A key given is kept; one kept for another provider goes; Vertex and Bedrock keep none.
   const apiKeyEncrypted =
-    keyless(input.provider) ? null : input.apiKey ? seal(input.apiKey, KEY_PURPOSE) : stored?.provider === input.provider ? (stored.apiKeyEncrypted ?? null) : null;
+    keyless(input.provider) ? null : input.apiKey ? seal(input.apiKey, KEY_PURPOSE) : keptFor(input, stored);
   const values = {
     enabled: input.enabled,
     provider: input.provider,

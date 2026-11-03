@@ -62,6 +62,16 @@ export function targetFields(body: unknown): Record<string, unknown> {
     // A submission's DAG: its name and how many tasks.
     const dag = (body as Record<string, unknown>)["dag"];
     if (dag) Object.assign(target, targetFields(dag));
+    // The chat agent's settings (Set/TestChatConfig): where they'd send its
+    // questions, and with what; never the key.
+    const chat = (body as Record<string, unknown>)["config"];
+    if (chat && typeof chat === "object" && !Array.isArray(chat)) {
+      for (const field of ["enabled", "provider", "model", "endpoint", "vertexProject", "vertexLocation", "bedrockRegion"] as const) {
+        const value = (chat as Record<string, unknown>)[field];
+        if (value !== undefined && value !== "" && (typeof value !== "string" || value.length <= 500)) target[field] = value;
+      }
+      if ((chat as Record<string, unknown>)["apiKey"]) target["keyGiven"] = true;
+    }
   }
   return target;
 }

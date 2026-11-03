@@ -202,7 +202,12 @@ replaced, so neither a question that talks it out of its instructions nor
 the model's memory can put an answer in front of someone. A conversation
 is bounded by `chat.contextTokens`. Admins may set its model in the console
 (`console/src/core/chatSettings.ts`): its key sealed with a key derived
-from `JWT_SECRET`, write-only. An address an admin gives is fetched by the
+from `JWT_SECRET`, write-only, and sent only to the address it was given
+for: one kept, or the install's own, never goes to an address an admin
+changes it to, and Vertex's and Bedrock's address is always built from the
+project or region, so the console's own cloud identity can't be pointed
+elsewhere. Each change and test is audited with where it points. An
+address an admin gives is fetched by the
 console from inside the cluster, so testing one reports only whether it
 answered as a model, never what it replied. On GCP it's Gemini through Vertex AI in
 the install's own project, as the console's Workload Identity; on AWS,
