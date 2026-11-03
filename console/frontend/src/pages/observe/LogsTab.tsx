@@ -14,6 +14,7 @@ import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
+import { LoadFailed, loadFailure } from "../../components/LoadFailed";
 import { Mono } from "../../components/Mono";
 import { useAuth } from "../../auth/AuthContext";
 import { ApiError, listAllTeams, listApis, searchLogs, type LogLineView } from "../../api";
@@ -75,12 +76,16 @@ export function LogsTab({
   const [run, setRun] = useState(initialRun);
   const [api, setApi] = useState(initialApi && initialTeam ? `${initialTeam}/${initialApi}` : "");
   // The API products whose backends the caller may search: their teams' (every one, for an admin).
-  const [apis, setApis] = useState<{ team: string; name: string }[]>([]);
+  const [apis, setApis] = useState<{ team: string; name: string }[] | null>(null);
+  const [apisFailed, setApisFailed] = useState<string | null>(null);
+  const [apisTry, setApisTry] = useState(0);
   const [level, setLevel] = useState("");
   const [source, setSource] = useState<Source>(initialSource === "api" || initialSource === "platform" ? initialSource : "step");
   // A link's range when it's one offered (an API's 24-hour card), else a run's week or the last hour.
   const [hours, setHours] = useState(RANGES.some(([h]) => h === initialHours) ? (initialHours ?? 1) : initialRun ? 168 : 1);
   const [teams, setTeams] = useState<string[]>([]);
+  const [teamsFailed, setTeamsFailed] = useState<string | null>(null);
+  const [teamsTry, setTeamsTry] = useState(0);
   const [lines, setLines] = useState<LogLineView[] | null>(null);
   const [searched, setSearched] = useState({ source, team, run: initialRun, hours, api: initialApi ?? "" });
   const [truncated, setTruncated] = useState(false);
@@ -95,21 +100,27 @@ export function LogsTab({
       setTeams(user.teamNames);
       return;
     }
+    let current = true;
+    setTeamsFailed(null);
     listAllTeams()
       .then((all) => {
-        setTeams(all.map((t) => t.name).sort());
+        if (current) setTeams(all.map((t) => t.name).sort());
       })
-      .catch(() => {
-        setTeams([]);
+      .catch((err: unknown) => {
+        if (current) setTeamsFailed(loadFailure(err));
       });
-  }, [user]);
+    return () => { current = false; };
+  }, [user, teamsTry]);
 
   useEffect(() => {
     if (!user || source !== "api") return;
+    let current = true;
+    setApisFailed(null);
     listApis()
-      .then((found) => { setApis(found.filter((a) => user.isAdmin || user.teamNames.includes(a.team)).map((a) => ({ team: a.team, name: a.name }))); })
-      .catch(() => { setApis([]); });
-  }, [user, source]);
+      .then((found) => { if (current) setApis(found.filter((a) => user.isAdmin || user.teamNames.includes(a.team)).map((a) => ({ team: a.team, name: a.name }))); })
+      .catch((err: unknown) => { if (current) setApisFailed(loadFailure(err)); });
+    return () => { current = false; };
+  }, [user, source, apisTry]);
 
   async function search(): Promise<void> {
     setSearching(true);
@@ -198,6 +209,8 @@ export function LogsTab({
             )}
           </ToggleButtonGroup>
         </Box>
+        {teamsFailed && source !== "platform" && <LoadFailed what="the teams to choose from" reason={teamsFailed} onRetry={() => { setTeamsTry((n) => n + 1); }} />}
+        {apisFailed && source === "api" && <LoadFailed what="the APIs to choose from" reason={apisFailed} onRetry={() => { setApisTry((n) => n + 1); }} />}
         <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
           <TextField
             label="Text to find"
@@ -253,7 +266,7 @@ export function LogsTab({
                 }}
               >
                 <MenuItem value="">{team ? `Any of ${team}’s APIs` : "Any API"}</MenuItem>
-                {apis
+                {(apis ?? [])
                   .filter((a) => !team || a.team === team)
                   .map((a) => (
                     <MenuItem key={`${a.team}/${a.name}`} value={`${a.team}/${a.name}`}>
