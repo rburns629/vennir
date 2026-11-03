@@ -2,8 +2,9 @@
 
 // The gateway (decision 20): one front door for every team's API products,
 // forwarding to each API's backend exactly what its OpenAPI document
-// describes (internal/gateway). It reads the console's database and never
-// writes it; it holds no state of its own beyond rate counters.
+// describes (internal/gateway). It reads the console's database, writing
+// only its traffic counts (api_traffic) and why an API can't be served
+// (api_problems); it holds no state of its own beyond rate counters.
 package main
 
 import (
@@ -119,7 +120,18 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	recorder := &traffic.Recorder{DB: pool, Log: log}
-	go recorder.Run(ctx, 30*time.Second)
+	// Stopped only once the servers have drained, so what the last requests
+	// came to is counted too, and waited for before the pool closes.
+	recording, stopRecording := context.WithCancel(context.Background())
+	recorded := make(chan struct{})
+	go func() {
+		defer close(recorded)
+		recorder.Run(recording, 30*time.Second)
+	}()
+	defer func() {
+		stopRecording()
+		<-recorded
+	}()
 	registry := prometheus.NewRegistry()
 	metrics := gateway.NewMetrics(registry)
 	// One set of the console's keys, so both listeners drop a rotated one alike.

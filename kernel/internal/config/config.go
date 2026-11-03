@@ -194,6 +194,9 @@ type Settings struct {
 	// token. Off only for images that can't.
 	TaskPodHardening bool
 
+	// How long Kubernetes keeps a finished Job the scheduler hasn't
+	// released (more than 0: at 0 it may delete one before its result is
+	// read, which fails as JOB_NOT_FOUND).
 	JobTTL time.Duration
 	// How long a finished step's Job (and Pod) is kept once its result is
 	// committed, so a log collector can still read its output.
@@ -357,7 +360,7 @@ func Load(getenv func(string) string) (Settings, error) {
 		KubernetesBurst:        r.integer("KUBERNETES_CLIENT_BURST", 100, true),
 		TaskImagePullSecret:    r.str("TASK_IMAGE_PULL_SECRET", ""),
 		TaskPodHardening:       r.boolean("TASK_POD_HARDENING", true),
-		JobTTL:                 r.seconds("KUBERNETES_JOB_TTL_SECONDS", 3600, false),
+		JobTTL:                 r.seconds("KUBERNETES_JOB_TTL_SECONDS", 3600, true),
 		ReleaseFinishedAfter:   r.seconds("RELEASE_FINISHED_AFTER_SECONDS", 30, false),
 		ImagePullGrace:         r.seconds("IMAGE_PULL_GRACE_SECONDS", 120, true),
 		KubernetesTimeout:      r.seconds("KUBERNETES_REQUEST_TIMEOUT_SECONDS", 30, true),
@@ -371,6 +374,12 @@ func Load(getenv func(string) string) (Settings, error) {
 		HeartbeatFile:          r.str("SCHEDULER_HEARTBEAT_FILE", "/tmp/vertra-scheduler-heartbeat"),
 		MetricsPort:            r.integer("METRICS_PORT", 9090, true),
 		ProfilingAddress:       r.str("PROFILING_ADDRESS", ""),
+	}
+	// Each is checked alone above; these, against each other.
+	if s.PollInterval >= s.LeaseDuration && s.LeaseDuration > 0 {
+		// An idle replica's leases would lapse between its passes, and the
+		// others adopt its tasks.
+		r.problems = append(r.problems, fmt.Sprintf("SCHEDULER_POLL_INTERVAL_SECONDS: must be less than LEASE_DURATION_SECONDS (%s), got %s", s.LeaseDuration, s.PollInterval))
 	}
 	if s.ProfilingAddress != "" && !loopback(s.ProfilingAddress) {
 		r.problems = append(r.problems, fmt.Sprintf("PROFILING_ADDRESS: a loopback address and port (127.0.0.1:6060), got %q", s.ProfilingAddress))

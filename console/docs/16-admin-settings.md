@@ -12,7 +12,7 @@ This page is for the install's admins. It goes through every section of the **Ad
 | [Image sources](#image-sources) | The allowed sources | Their first value, at install |
 | [Image scans](#image-scans) | **Rescan now**, **Accept** | Whether scanning is on, how often |
 | [API gateway](#api-gateway) | Closing and reopening it | Everything else |
-| [Chat agent](#chat-agent) | The model, its provider and limits | A default model |
+| [Chat agent](#chat-agent) | The model, its provider and limits; questions per person | A default model |
 | [Admins' alerts](#admins-alerts) | Which team's chat gets them | Email, webhook hosts |
 | [Cluster policies](#cluster-policies) | **Write them again** | How often they're rewritten |
 | [Audit log copy](#audit-log-copy) | Nothing: it shows status | The bucket |
@@ -242,7 +242,7 @@ These change with `vertra apply`, not here. See [operations](operations.md#the-a
 
 What the agent is sent reaches the model's provider. On a cloud, choose the install's own cloud.
 
-**Questions per person.** Each question can take several model calls, so each person may ask 30 an hour and 200 a day by default; one more is refused (`RATE_LIMITED`) until their hour or day is up. Only questions the agent answers count. Bots can't ask at all. This page doesn't show the limits yet: admins change them with the API, `ChatService/SetChatLimits` (`perHour`, `perDay`: 1 to 10,000 each, no more an hour than a day), and they apply on every console at once.
+**Questions per person** sets how many questions each person may ask: **An hour** (30 by default) and **A day** (200 by default, and at least the hour's), 1 to 10,000 each. Each question can take several model calls, so one more is refused (`RATE_LIMITED`) until that person's hour or day is up. Only questions the agent answers count, and bots can't ask at all. **Save** applies them on every console at once; **Use the defaults** saves 30 and 200 again. The card says who set them, and when, once an admin has. The API is `ChatService/SetChatLimits` (`perHour`, `perDay`).
 
 **Chat answers** lists what people rated in Ask, filtered by **Wrong**, **Good** or **All**, with the question, comment, answer and the docs it cited. A wrong answer is usually a doc to fix, because the agent answers from the docs. Ratings are kept 90 days.
 

@@ -27,7 +27,7 @@ every other team's.
 
 ## The pieces
 
-![The pieces: a catalog repository's CI pushes product images and a signed catalog release to a registry; each console pulls the release. People and bots sign in to the console, which keeps its own Postgres and hands authorized DAGs to kernel-api, which stores them in the kernel's Postgres. kernel-scheduler claims steps from those rows and creates one Job per step attempt in a team namespace; admission policies check every Job.](architecture/6-the-pieces.svg)
+![The pieces: a catalog repository's CI pushes product images and a signed catalog release to a registry; each console pulls the release. People and bots sign in to the console, which keeps its own Postgres and hands authorized DAGs to kernel-api, which stores them in the kernel's Postgres. kernel-scheduler claims steps from those rows and creates one Job per step attempt in a team namespace; admission policies check every Job. The gateway, reading the console's Postgres, serves API products from their backends.](architecture/6-the-pieces.svg)
 
 The whole of it as deployed on GKE, with the cloud services around it and
 one execution traced through it: [the system diagram](architecture/1-system.svg).
@@ -49,6 +49,15 @@ kernel and module in the console, a run call by call, and the state machines.
   - **kernel-scheduler** claims ready steps, starts them as Jobs, watches
     them, records their results, and releases the steps that depended on
     them.
+- **gateway** (`gateway/`, Go; optional, `gateway.enabled` in the console
+  chart): serves API products (decision 20), forwarding to each one's
+  backend only what its reviewed OpenAPI document describes. Every backend
+  must be under a host `gateway.backendHosts` allows, which may be outside
+  the cluster; only an in-cluster one is also held to its own team's
+  namespace. It signs callers in as the
+  console does, reading the
+  console's database as a role of its own (docs/security-model.md, "The
+  API gateway").
 - **Two Postgres databases**, one per project, never shared between them
   (on a small install they can live on one Postgres instance, each with its
   own role).

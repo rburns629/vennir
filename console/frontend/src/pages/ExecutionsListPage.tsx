@@ -19,6 +19,7 @@ import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
 import { DataTable, type DataTableColumn } from "../components/DataTable";
+import { LoadFailed, loadFailure } from "../components/LoadFailed";
 import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
 import { QuickTile, QuickTiles } from "../components/QuickTile";
@@ -154,7 +155,10 @@ export function ExecutionsListPage() {
   const [schedules, setSchedules] = useState<Schedule[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // A Load more that failed; the first page's failure is listFailed.
   const [error, setError] = useState<string | null>(null);
+  const [listFailed, setListFailed] = useState<string | null>(null);
+  const [listTry, setListTry] = useState(0);
   const [whose, setWhose] = useState<Whose>("all");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -163,7 +167,13 @@ export function ExecutionsListPage() {
   // A week tile was pressed: the table shows that state over the week's runs
   // (those the tiles count), not over the pages loaded.
   const [fromTile, setFromTile] = useState(false);
-  const [weekFailed, setWeekFailed] = useState(false);
+  const [weekFailed, setWeekFailed] = useState<string | null>(null);
+  const [approvalsFailed, setApprovalsFailed] = useState<string | null>(null);
+  const [schedulesFailed, setSchedulesFailed] = useState<string | null>(null);
+  // Each load's Try again: a new number loads it again.
+  const [weekTry, setWeekTry] = useState(0);
+  const [approvalsTry, setApprovalsTry] = useState(0);
+  const [schedulesTry, setSchedulesTry] = useState(0);
   // Each new filter's number: a Load more for an older one is dropped.
   const listing = useRef(0);
   const [kindFilter, setKindFilter] = useState<Kind | "">("");
@@ -183,44 +193,54 @@ export function ExecutionsListPage() {
     setExecutions(null);
     setNextCursor(null);
     setLoadingMore(false);
+    setError(null);
+    setListFailed(null);
     listExecutions({ limit: PAGE_SIZE, search: query, team: teamFilter, mine: whose === "mine" })
       .then((page) => {
         if (cancelled) return;
-        setError(null);
         setExecutions(page.executions);
         setNextCursor(page.nextCursor);
         setRetentionDays(page.runRetentionDays);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Couldn't load the runs.");
+        if (!cancelled) setListFailed(loadFailure(err));
       });
     return () => { cancelled = true; };
-  }, [query, teamFilter, whose]);
+  }, [query, teamFilter, whose, listTry]);
 
   // The tiles: the week's runs, for whose and which team.
   useEffect(() => {
     let cancelled = false;
     setWeek(null);
-    setWeekFailed(false);
+    setWeekFailed(null);
     listExecutions({ limit: WEEK_LIMIT, since: new Date(now - WEEK_MS).toISOString(), team: teamFilter, mine: whose === "mine" })
       .then((page) => { if (!cancelled) setWeek(page.executions); })
-      .catch(() => { if (!cancelled) setWeekFailed(true); }); // The tiles say — ; the list says if runs can't load.
+      .catch((err: unknown) => { if (!cancelled) setWeekFailed(loadFailure(err)); }); // The tiles say —, and why above them.
     return () => { cancelled = true; };
-  }, [now, teamFilter, whose]);
+  }, [now, teamFilter, whose, weekTry]);
 
   useEffect(() => {
+    let cancelled = false;
+    setApprovals(null);
+    setApprovalsFailed(null);
     listPendingApprovals()
-      .then((list) => { setApprovals(list.filter((a) => a.canDecide)); })
-      .catch(() => { setApprovals([]); });
-  }, []);
+      .then((list) => { if (!cancelled) setApprovals(list.filter((a) => a.canDecide)); })
+      .catch((err: unknown) => { if (!cancelled) setApprovalsFailed(loadFailure(err)); });
+    return () => { cancelled = true; };
+  }, [approvalsTry]);
 
   const teamNames = user?.teamNames;
   useEffect(() => {
     if (!teamNames) return;
-    Promise.all(teamNames.map((team) => listSchedules(team).catch(() => [] as Schedule[])))
-      .then((lists) => { setSchedules(lists.flat()); })
-      .catch(() => { setSchedules([]); });
-  }, [teamNames]);
+    let cancelled = false;
+    setSchedules(null);
+    setSchedulesFailed(null);
+    // Every team's or none: one team's left out would read as it having none.
+    Promise.all(teamNames.map((team) => listSchedules(team)))
+      .then((lists) => { if (!cancelled) setSchedules(lists.flat()); })
+      .catch((err: unknown) => { if (!cancelled) setSchedulesFailed(loadFailure(err)); });
+    return () => { cancelled = true; };
+  }, [teamNames, schedulesTry]);
 
   useEffect(() => {
     if (!user?.isAdmin) return;
@@ -287,7 +307,7 @@ export function ExecutionsListPage() {
     setStatusFilter(off ? "" : state);
     setFromTile(!off);
   };
-  const unknown = tiles === null && (weekFailed || week !== null) ? "—" : "…";
+  const unknown = tiles === null && (weekFailed !== null || week !== null) ? "—" : "…";
 
   const columns: DataTableColumn<ExecutionSummary>[] = [
     {
@@ -394,6 +414,9 @@ export function ExecutionsListPage() {
       </Tabs>
 
       {error && <Alert severity="error">{error}</Alert>}
+      {approvalsFailed && view !== "schedules" && (
+        <LoadFailed what="the steps waiting for your approval" reason={approvalsFailed} onRetry={() => { setApprovalsTry((n) => n + 1); }} />
+      )}
 
       {view === "runs" && (
         <>
@@ -413,6 +436,7 @@ export function ExecutionsListPage() {
             </Alert>
           )}
 
+          {weekFailed && <LoadFailed what="this week's runs" reason={weekFailed} onRetry={() => { setWeekTry((n) => n + 1); }} />}
           <QuickTiles label="This week at a glance">
             <QuickTile
               label="Running"
@@ -515,19 +539,26 @@ export function ExecutionsListPage() {
                 </Typography>
               )}
             </Box>
-            <DataTable
-              columns={columns}
-              rows={filtered}
-              getRowKey={(e) => e.executionId}
-              onRowClick={(e) => { open(e.executionId); }}
-              emptyMessage={
-                executions && executions.length > 0
-                  ? "No runs match these filters."
-                  : whose === "mine"
-                    ? "You haven't started a run yet. Find something to run in the Catalog."
-                    : "No runs you can see yet: they're your own, your teams', and any that used your teams' steps."
-              }
-            />
+            {listFailed && (
+              <Box sx={{ px: 2.5, pb: 2.5, pt: 1 }}>
+                <LoadFailed what="the runs" reason={listFailed} note="Nothing is wrong with the runs themselves." onRetry={() => { setListTry((n) => n + 1); }} />
+              </Box>
+            )}
+            {!listFailed && (
+              <DataTable
+                columns={columns}
+                rows={filtered}
+                getRowKey={(e) => e.executionId}
+                onRowClick={(e) => { open(e.executionId); }}
+                emptyMessage={
+                  executions && executions.length > 0
+                    ? "No runs match these filters."
+                    : whose === "mine"
+                      ? "You haven't started a run yet. Find something to run in the Catalog."
+                      : "No runs you can see yet: they're your own, your teams', and any that used your teams' steps."
+                }
+              />
+            )}
           </Card>
           {(retentionDays !== null || nextCursor) && (
             <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 1.25, mt: -1.5 }}>
@@ -545,7 +576,7 @@ export function ExecutionsListPage() {
         </>
       )}
 
-      {view === "approve" && (
+      {view === "approve" && !approvalsFailed && (
         <Card>
           <DataTable
             columns={approvalColumns}
@@ -557,7 +588,10 @@ export function ExecutionsListPage() {
         </Card>
       )}
 
-      {view === "schedules" && (
+      {view === "schedules" && schedulesFailed && (
+        <LoadFailed what="your teams' schedules" reason={schedulesFailed} onRetry={() => { setSchedulesTry((n) => n + 1); }} />
+      )}
+      {view === "schedules" && !schedulesFailed && (
         <RunsSchedules
           schedules={schedules}
           onSaved={(saved) => { setSchedules((current) => current?.map((s) => (s.id === saved.id ? saved : s)) ?? null); }}

@@ -3,7 +3,8 @@
  * Schedules (src/core/schedules.ts, src/scheduleRunner.ts): who makes them
  * and what's refused; a due schedule starts once, as its bot, for its team,
  * even with two consoles at once; a refused start is kept and told to the
- * team's maintainers; pausing. kernel-api and the registry are stubbed; the
+ * team's maintainers, as is one that can't run again; a time claimed and
+ * not started is started by another console; pausing. kernel-api and the registry are stubbed; the
  * rest is the real console on the real test database.
  */
 import { randomUUID } from "node:crypto";
@@ -177,14 +178,71 @@ describe("a due schedule", () => {
     }
   });
 
-  it("paused, doesn't run", async () => {
+  it("that can't run again (its time zone no longer reads) runs this once, and says why", async () => {
     await addTeamMember(bot.id, ownTeamId, "maintainer");
-    const [row] = await db.select().from(schedules).where(eq(schedules.teamId, ownTeamId));
+    const [row] = await db
+      .update(schedules)
+      .set({ nextRunAt: new Date(Date.now() - 60_000), timeZone: "Mars/Olympus" })
+      .where(eq(schedules.teamId, ownTeamId))
+      .returning();
+    try {
+      await startDueSchedules(silent);
+      expect(ours()).toHaveLength(1);
+      const [after] = await db.select().from(schedules).where(eq(schedules.id, row?.id ?? ""));
+      expect(after?.nextRunAt).toBeNull();
+      expect(after?.lastError).toMatch(/^It won't run again: "Mars\/Olympus" isn't a time zone/);
+      const events = await db.select().from(notificationEvents).where(like(notificationEvents.key, `schedule:${row?.id ?? ""}%:stopped`));
+      expect(events.map((e) => e.title)).toEqual(["Schedule nightly won't run again"]);
+    } finally {
+      await db.update(schedules).set({ timeZone: "Europe/Berlin", lastError: null }).where(eq(schedules.id, row?.id ?? ""));
+    }
+  });
+
+  it("claimed by a console that stopped before starting it, is started by another", async () => {
+    const due = new Date(Date.now() - 10 * 60_000);
+    const [row] = await db
+      .update(schedules)
+      .set({ nextRunAt: new Date(Date.now() + 3_600_000), claimedRunAt: due, claimedAt: new Date() })
+      .where(eq(schedules.teamId, ownTeamId))
+      .returning();
+    await startDueSchedules(silent);
+    expect(ours()).toEqual([]); // still the claiming console's to start
+    await db.update(schedules).set({ claimedAt: new Date(Date.now() - 6 * 60_000) }).where(eq(schedules.id, row?.id ?? ""));
+    await Promise.all([startDueSchedules(silent), startDueSchedules(silent)]);
+    expect(ours()).toHaveLength(1);
+    expect((ours()[0]?.[0] as { requestId?: string }).requestId).toMatch(new RegExp(`schedule:${row?.id ?? ""}:${due.toISOString()}$`));
+    const [after] = await db.select().from(schedules).where(eq(schedules.id, row?.id ?? ""));
+    expect(after).toMatchObject({ claimedRunAt: null, claimedAt: null, lastRunAt: due });
+  });
+
+  it("paused, doesn't run, and resumed, doesn't start a time claimed before", async () => {
+    await addTeamMember(bot.id, ownTeamId, "maintainer");
+    // A time claimed and never started, long enough ago for another console to take it.
+    const [row] = await db
+      .update(schedules)
+      .set({ claimedRunAt: new Date(Date.now() - 3 * 86_400_000), claimedAt: new Date(Date.now() - 3 * 86_400_000) })
+      .where(eq(schedules.teamId, ownTeamId))
+      .returning();
     const paused = await call<{ schedule?: { enabled?: boolean; nextRunAt?: string } }>(maintainerToken, "ScheduleService/UpdateSchedule", { id: row?.id, enabled: false });
     expect(paused.body.schedule?.enabled ?? false).toBe(false);
     expect(paused.body.schedule?.nextRunAt).toBeUndefined();
     await startDueSchedules(silent);
     expect(ours()).toEqual([]);
+    expect((await call(maintainerToken, "ScheduleService/UpdateSchedule", { id: row?.id, enabled: true })).code).toBe("ok");
+    await startDueSchedules(silent);
+    expect(ours()).toEqual([]);
+    expect((await db.select().from(schedules).where(eq(schedules.id, row?.id ?? "")))[0]).toMatchObject({ claimedRunAt: null, claimedAt: null });
     expect((await call(maintainerToken, "ScheduleService/DeleteSchedule", { id: row?.id })).code).toBe("ok");
+  });
+
+  it("with a new timetable, doesn't start a time claimed under the old one", async () => {
+    const made = await call<{ schedule?: { id?: string } }>(maintainerToken, "ScheduleService/CreateSchedule", nightly({ name: "retimed" }));
+    const id = made.body.schedule?.id ?? "";
+    const long = new Date(Date.now() - 86_400_000);
+    await db.update(schedules).set({ claimedRunAt: long, claimedAt: long }).where(eq(schedules.id, id));
+    expect((await call(maintainerToken, "ScheduleService/UpdateSchedule", { id, cron: "0 3 * * *" })).code).toBe("ok");
+    await startDueSchedules(silent);
+    expect(ours()).toEqual([]);
+    expect((await call(maintainerToken, "ScheduleService/DeleteSchedule", { id })).code).toBe("ok");
   });
 });

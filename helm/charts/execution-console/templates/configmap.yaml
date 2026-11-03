@@ -149,7 +149,7 @@ data:
   SCAN_WAIT_SECONDS: {{ .Values.scanning.waitSeconds | quote }}
   SCAN_RESCAN_HOURS: {{ .Values.scanning.rescanHours | quote }}
   SCAN_POLICY_NAME: {{ .Values.scanning.policyName | quote }}
-  SCAN_PLATFORM: {{ .Values.scanning.platform | quote }}
+  SCAN_PLATFORMS: {{ join "," (.Values.scanning.platforms | default (compact (list .Values.scanning.platform))) | quote }}
   {{- if gt (int .Values.scanning.idleMinutes) 0 }}
   SCANNER_DEPLOYMENT: {{ printf "%s-trivy" (include "execution-console.fullname" .) | quote }}
   SCANNER_IDLE_MINUTES: {{ .Values.scanning.idleMinutes | quote }}

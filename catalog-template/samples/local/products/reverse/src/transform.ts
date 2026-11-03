@@ -10,8 +10,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const INPUT_PATH = "/platform/input/request.json";
 const OUTPUT_PATH = "/platform/output/result.json";
-// result.json is limited to 4 KB, and the output carries the text back.
+// The output carries the text back, and result.json is limited to 4 KB: a
+// limit in characters, and the encoded result measured too, since JSON
+// writes a control character as six bytes and UTF-8 others as up to four.
 const MAX_LENGTH = 1000;
+const MAX_RESULT_BYTES = 4096;
 
 type Result =
   | { status: "succeeded"; outputs: { text: string; language: string } }
@@ -44,8 +47,12 @@ function main(): number {
   }
   // A JSON line with level info: what everyone who can see the run sees.
   // Anything else (debug, warn, error, plain) only this team sees.
+  const result: Result = { status: "succeeded", outputs: { text: reverse(text), language: "TypeScript" } };
+  if (Buffer.byteLength(JSON.stringify(result)) > MAX_RESULT_BYTES) {
+    return fail("TEXT_TOO_LONG", `inputs.text would make a result over ${MAX_RESULT_BYTES} bytes.`);
+  }
   console.log(JSON.stringify({ level: "info", msg: `reversed ${length} characters` }));
-  writeResult({ status: "succeeded", outputs: { text: reverse(text), language: "TypeScript" } });
+  writeResult(result);
   return 0;
 }
 

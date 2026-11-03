@@ -420,6 +420,45 @@ func TestSSOValues(t *testing.T) {
 	}
 }
 
+// A saved sign-in callback that isn't where the console is reached now
+// stops apply: made public, a new hostname, a new address once the cloud
+// side is made. One that matches, or a public address not yet known, doesn't.
+func TestCheckSSORedirect(t *testing.T) {
+	c := config.Default("gcp")
+	if err := CheckSSORedirect(c, ""); err != nil {
+		t.Errorf("no sso: %v", err)
+	}
+	c.SSO = config.SSO{Provider: "google", RedirectURL: "http://localhost:18080/api/auth/oidc/callback"}
+	if err := CheckSSORedirect(c, ""); err != nil {
+		t.Errorf("private, matching: %v", err)
+	}
+
+	c.Console.Public = true
+	if err := CheckSSORedirect(c, ""); err != nil {
+		t.Errorf("public, its nip.io address not known yet: %v", err)
+	}
+	err := CheckSSORedirect(c, "console.1-2-3-4.nip.io")
+	if err == nil || !strings.Contains(err.Error(), "https://console.1-2-3-4.nip.io/api/auth/oidc/callback") || !strings.Contains(err.Error(), "vertra sso google") {
+		t.Errorf("made public: %v", err)
+	}
+
+	c.SSO.RedirectURL = "https://console.1-2-3-4.nip.io/api/auth/oidc/callback"
+	if err := CheckSSORedirect(c, "console.1-2-3-4.nip.io"); err != nil {
+		t.Errorf("public, matching: %v", err)
+	}
+	if err := CheckSSORedirect(c, "console.5-6-7-8.nip.io"); err == nil {
+		t.Error("a new address was accepted")
+	}
+	c.Console.Hostname = "console.example.com"
+	if err := CheckSSORedirect(c, ""); err == nil {
+		t.Error("a new hostname was accepted before the cloud side")
+	}
+	c.Console.Public = false
+	if err := CheckSSORedirect(c, ""); err == nil {
+		t.Error("made private was accepted")
+	}
+}
+
 // A signed catalog: both charts trust the same signer, the kernel's
 // imageSignature on (policy-controller enforces it), the console's
 // catalog.signature set; nothing while signing is off.

@@ -81,6 +81,18 @@ function wholeNumber(name: string, fallback: number): number {
   return n;
 }
 
+/** SCAN_PLATFORMS (os/arch or os/arch/variant, comma-separated), or the console's own; anything else fails startup. */
+function scanPlatforms(): string[] {
+  const platforms = (process.env["SCAN_PLATFORMS"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  for (const platform of platforms) {
+    if (!/^[a-z0-9]+\/[a-z0-9]+(\/[a-z0-9]+)?$/.test(platform)) {
+      throw new Error(`Invalid SCAN_PLATFORMS entry "${platform}": expected os/arch, e.g. linux/arm64.`);
+    }
+  }
+  if (platforms.length > 0) return [...new Set(platforms)];
+  return [`linux/${process.arch === "x64" ? "amd64" : process.arch}`];
+}
+
 /** Where the audit log is copied: gcs or s3; anything else fails startup (it would copy to the wrong cloud). */
 function auditExportProvider(): "gcs" | "s3" {
   const value = process.env["AUDIT_EXPORT_PROVIDER"] || "gcs";
@@ -367,6 +379,26 @@ function loadEmail() {
   return email;
 }
 
+/** JWT_SECRET: at least 32 bytes. Every session's key, every sealing key and the SSO cookie's HMAC come from it. */
+function jwtSecret(): string {
+  const value = requireEnv("JWT_SECRET");
+  if (Buffer.byteLength(value) < 32) throw new Error("JWT_SECRET is shorter than 32 bytes: use a long random value (the chart generates one when jwtSecret is empty).");
+  return value;
+}
+
+/**
+ * Keyless bots: the issuers allowed, and the audience their tokens must
+ * name (KEYLESS_AUDIENCE, else the console's URL). With neither set, no
+ * issuer is allowed: a constant audience would accept tokens minted for
+ * any other service that uses it. (A console with no address CI can reach
+ * has no use for keyless bots anyway.) noAudience says that's why it's off.
+ */
+function keyless(): { issuers: string[]; audience: string; noAudience: boolean } {
+  const audience = process.env["KEYLESS_AUDIENCE"] || (process.env["CONSOLE_URL"] ?? "").replace(/\/+$/, "");
+  const issuers = audience ? list(process.env["KEYLESS_ISSUERS"] ?? "https://token.actions.githubusercontent.com,https://gitlab.com") : [];
+  return { issuers, audience, noAudience: !audience };
+}
+
 /** INSTALL_CLOUD: one of the catalog's clouds, or "" when not known. */
 function installCloud(): string {
   const value = process.env["INSTALL_CLOUD"] ?? "";
@@ -436,8 +468,9 @@ export const config = {
     password: process.env["GATEWAY_DB_PASSWORD"] || undefined,
   },
   // Signs and verifies session JWTs. Must be long and random in any real
-  // deployment — this is not a value with a safe default.
-  jwtSecret: requireEnv("JWT_SECRET"),
+  // deployment — this is not a value with a safe default. Shorter than 32
+  // bytes fails startup.
+  jwtSecret: jwtSecret(),
   // How long a login session stays valid before the user has to sign in
   // again. Bounded on purpose: with no expiry, a leaked token was usable
   // forever, and rotating JWT_SECRET (logging *everyone* out) was the only
@@ -480,10 +513,7 @@ export const config = {
   // Keyless bots (auth/keyless.ts): the OIDC issuers whose ID tokens a
   // bot may sign in with instead of a stored token (a CI's own identity,
   // such as GitHub Actions'), and the audience those tokens must be for.
-  keyless: {
-    issuers: list(process.env["KEYLESS_ISSUERS"] ?? "https://token.actions.githubusercontent.com,https://gitlab.com"),
-    audience: process.env["KEYLESS_AUDIENCE"] || (process.env["CONSOLE_URL"] ?? "").replace(/\/+$/, "") || "vertra",
-  },
+  keyless: keyless(),
   // Notifications (notifier.ts): the hosts a team's chat webhook may be
   // under ("hooks.slack.com", or "*.webhook.office.com" for any name below
   // it), so a webhook can't point the console at anything else.
@@ -600,7 +630,7 @@ export const config = {
     // execution_retention_days, which deletes the executions themselves.
     executionDays: wholeNumber("EXECUTION_RETENTION_DAYS", 90),
     auditDays: wholeNumber("AUDIT_RETENTION_DAYS", 365),
-    // Scan verdicts of images not used for this long.
+    // Scan verdicts of images not used for this long; never a blocking one.
     scanDays: wholeNumber("SCAN_RETENTION_DAYS", 90),
   },
   // The platform's registry pull Secret (a .dockerconfigjson file, mounted
@@ -635,10 +665,11 @@ export const config = {
     // left running.
     scannerDeployment: process.env["SCANNER_DEPLOYMENT"] ?? "",
     idleMinutes: wholeNumber("SCANNER_IDLE_MINUTES", 15),
-    // Which image of a multi-platform index to scan: what the cluster runs.
+    // Which images of a multi-platform index to scan: every platform the
+    // cluster's nodes run, since a step runs whichever its node pulls.
     // Defaults to the console's own (its nodes'), as Trivy would otherwise
     // pick linux/amd64 whatever the cluster is.
-    platform: process.env["SCAN_PLATFORM"] || `linux/${process.arch === "x64" ? "amd64" : process.arch}`,
+    platforms: scanPlatforms(),
   },
   // The audit log's write-once copy (auditExport.ts): a bucket that refuses
   // deletes and overwrites, written every `minutes`. Empty bucket: off.

@@ -22,9 +22,15 @@
       "const": "Team"
     },
     "name": {
-      "description": "The team's folder name, which is also its team and namespace.",
+      "description": "The team's folder name, which is also its team and namespace. Never bases or catalog-release (the catalog's own repositories, beside <registry>/<team>/), vertra-system or kube-* (platform namespaces).",
       "type": "string",
-      "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$",
+      "not": {
+        "anyOf": [
+          {"enum": ["bases", "catalog-release", "vertra-system"]},
+          {"pattern": "^kube-"}
+        ]
+      }
     },
     "displayName": {
       "type": "string",

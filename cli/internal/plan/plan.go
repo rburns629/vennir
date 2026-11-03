@@ -54,13 +54,24 @@ var Floors = map[string]Floor{
 		CPUCores: [2]float64{0.8, 1.2}, MemGiB: [2]float64{2.25, 3.75}, StepCPU: 0.5, StepMemGiB: 1, StepCap: 50, Spot: true, VolumeGiB: 50},
 }
 
+// postgresPod is the in-cluster Postgres's requests per size, vCPU and GiB
+// (the kernel chart's postgres.resources and sizes/), counted in Floors.
+var postgresPod = map[string][2]float64{
+	"minimal": {0.25, 0.5}, "resilient": {0.5, 1}, "scaled": {1, 2}, "auto": {0.5, 1},
+}
+
 // FloorOf is c's size's floor with the optional parts c turns on, each at
 // its chart's requests: the gateway (gateway.resources), log search
 // (logs.loki and logs.collector) and a Prometheus of the install's own
-// (monitoring.prometheus, bundled or writing to Amazon's).
+// (monitoring.prometheus, bundled or writing to Amazon's); and without
+// the Postgres Pod when the database is managed.
 func FloorOf(c *config.Config) Floor {
 	f := Floors[c.Size]
 	var parts [][2]float64 // vCPU, GiB
+	if c.Database.Type == "managed" {
+		pg := postgresPod[c.Size]
+		parts = append(parts, [2]float64{-pg[0], -pg[1]})
+	}
 	if c.Gateway.Enabled {
 		parts = append(parts, [2]float64{0.05, 0.0625})
 	}

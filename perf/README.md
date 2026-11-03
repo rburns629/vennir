@@ -99,7 +99,9 @@ DAGs, 50 steps, 5,000 steps in all; over 1,000 needs `-allow-large`). It
 refuses a cluster not named `vertra-perf*`, a console not on this machine,
 and a port-forward to any other cluster's console.
 
-On a cloud cluster (GKE or EKS, a `vertra-*` one only), name its kubectl
+On a cloud cluster (GKE or EKS, a `vertra-perf*` one only, as on kind: an
+install made for benchmarks, never the Makefile's `vertra-gke` or another
+team's install), name its kubectl
 context exactly in place of `-cluster`, with the perf sample published to
 its registry and the forward the driver looks for:
 
@@ -111,7 +113,7 @@ $ go run . -context <context> -image <registry>/perf/noop:latest -scenario burst
 Its nodes aren't sampled (the report leaves out the node line); the cloud's
 own monitoring has them. The check is on the context's name, which kubectl
 lets you rename: never name a shared or production cluster's context
-`vertra-*`.
+`vertra-perf*`.
 
 The scheduler and Postgres alone, on the test database (`make test-db`):
 

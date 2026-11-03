@@ -48,7 +48,11 @@ const TARGET_FIELDS = [
   "secretStore",
   "product",
   "onBehalfOf",
+  "issuer",
 ] as const;
+
+/** The single sign-on settings' (SetSsoSettings): the provider, who may sign in, where groups come from. */
+const SSO_FIELDS = ["clientId", "redirectUrl", "allowedDomains", "groupsClaim", "googleGroups"] as const;
 
 export function targetFields(body: unknown): Record<string, unknown> {
   const target: Record<string, unknown> = {};
@@ -73,6 +77,17 @@ export function targetFields(body: unknown): Record<string, unknown> {
         if (value !== undefined && value !== "" && (typeof value !== "string" || value.length <= 500)) target[field] = value;
       }
       if ((chat as Record<string, unknown>)["apiKey"]) target["keyGiven"] = true;
+    }
+    // The single sign-on settings: what they are now; never the client
+    // secret, only that one was given.
+    const fields = body as Record<string, unknown>;
+    if (SSO_FIELDS.some((field) => field in fields) || "clientSecret" in fields) {
+      for (const field of SSO_FIELDS) {
+        const value = fields[field];
+        if (value !== undefined && (typeof value !== "string" || value.length <= 500)) target[field] = value;
+      }
+      target["enabled"] = fields["enabled"] === true;
+      if (fields["clientSecret"]) target["secretGiven"] = true;
     }
   }
   return target;

@@ -4,10 +4,13 @@ FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0
 # The base image's OS packages lag behind Debian's security fixes; catalog
 # CI's image scan fails on any high or critical CVE that has a fix.
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
-# Majors pinned: these SDKs rename things between them.
-# pip isn't needed once the image is built, and the copies of other packages
-# it bundles (urllib3, msgpack, setuptools' pkg_resources) fail the scan.
-RUN pip install --no-cache-dir 'azure-identity~=1.26' 'azure-mgmt-resource~=26.0' \
+# Exactly what requirements.txt pins (made from requirements.in, as its
+# header says), each package checked against its hash, so every build
+# installs the same code. pip isn't needed once the image is built, and
+# the copies of other packages it bundles (urllib3, msgpack, setuptools'
+# pkg_resources) fail the scan.
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.txt \
     && pip uninstall --yes pip
 
 WORKDIR /app

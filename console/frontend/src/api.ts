@@ -3066,6 +3066,28 @@ export async function testChatConfig(config: ChatConfigInput): Promise<ChatTestR
   return { ok: r.ok, problem: r.problem, seconds: r.seconds, model: r.model, answer: r.answer, citations: r.citations };
 }
 
+/** How many questions each person may ask the chat agent; who set them, and when, empty while they're the defaults. */
+export interface ChatLimits {
+  perHour: number;
+  perDay: number;
+  updatedBy: string;
+  updatedAt: string | null;
+}
+
+function chatLimits(l: { perHour: number; perDay: number; updatedBy: string; updatedAt?: Timestamp } | undefined): ChatLimits {
+  return { perHour: l?.perHour ?? 0, perDay: l?.perDay ?? 0, updatedBy: l?.updatedBy ?? "", updatedAt: iso(l?.updatedAt) };
+}
+
+/** The chat agent's limits per person (admins only). */
+export async function getChatLimits(): Promise<ChatLimits> {
+  return chatLimits((await call(() => chatApi.getChatLimits({}))).limits);
+}
+
+/** New limits per person: 1 to 10,000 each, and no more an hour than a day (BAD_CHAT_LIMITS). */
+export async function setChatLimits(perHour: number, perDay: number): Promise<ChatLimits> {
+  return chatLimits((await call(() => chatApi.setChatLimits({ perHour, perDay }))).limits);
+}
+
 export interface ChatRating {
   id: string;
   rating: "up" | "down";

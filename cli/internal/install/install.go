@@ -915,22 +915,47 @@ func ReadGoogleClient(path string) (*GoogleClient, error) {
 	return &GoogleClient{ID: file.Web.ClientID, Secret: file.Web.ClientSecret, RedirectURIs: file.Web.RedirectURIs}, nil
 }
 
+// localSSORedirect is a private console's sign-in callback: the
+// port-forward's (vertra console, at its default port).
+const localSSORedirect = "http://localhost:18080/api/auth/oidc/callback"
+
+func publicSSORedirect(host string) string {
+	return "https://" + host + "/api/auth/oidc/callback"
+}
+
 // SSORedirect is where Google sends people back: the console's public
-// address, or the port-forward's (vertra console) when it has none.
-func SSORedirect(ctx context.Context, r *run.Runner, c *config.Config) (string, error) {
+// address, or the port-forward's (vertra console) when it has none. host
+// is the public name the cloud side gave it (gcp's nip.io name for its
+// reserved address, aws's in its zone), or "" when there's none yet; then
+// a configured hostname. Nothing in the cluster is read, so it's known as
+// soon as the cloud side is made, before the console is installed.
+func SSORedirect(c *config.Config, host string) (string, error) {
 	if !c.Console.Public {
-		return "http://localhost:18080/api/auth/oidc/callback", nil
+		return localSSORedirect, nil
 	}
-	host := c.Console.Hostname
 	if host == "" {
-		// gcp's nip.io name: on the console's Ingress once applied.
-		out, err := r.Output(ctx, "kubectl", "--context", cluster.Context(c), "--namespace", c.Namespace,
-			"get", "ingress", ConsoleRelease+"-execution-console", "--ignore-not-found", "-o", "jsonpath={.spec.rules[0].host}")
-		if host = strings.TrimSpace(out); err != nil || host == "" {
-			return "", fmt.Errorf("the console's public address isn't known until it's installed: `vertra apply` first")
-		}
+		host = c.Console.Hostname
 	}
-	return "https://" + host + "/api/auth/oidc/callback", nil
+	if host == "" {
+		return "", fmt.Errorf("the console's public address isn't known until the cloud side is made: `vertra apply` first")
+	}
+	return publicSSORedirect(host), nil
+}
+
+// CheckSSORedirect refuses an install whose saved sign-in callback isn't
+// where the console is reached now (made public or private, a new
+// hostname, a new address): Google would send people to the old one.
+// host is as SSORedirect's; a public address not yet known isn't checked.
+func CheckSSORedirect(c *config.Config, host string) error {
+	if c.SSO.Provider != "google" {
+		return nil
+	}
+	want, err := SSORedirect(c, host)
+	if err != nil || c.SSO.RedirectURL == want {
+		return nil
+	}
+	return fmt.Errorf("Google sign-in sends people back to %s, but the console's callback is now %s: add it to the OAuth client's redirect URIs in Google's console, download its JSON again, and rerun `vertra sso google`, then apply",
+		c.SSO.RedirectURL, want)
 }
 
 // EnsureSSOSecret writes the OAuth client's secret into the console's
@@ -945,8 +970,24 @@ func EnsureSSOSecret(ctx context.Context, r *run.Runner, c *config.Config) error
 		"metadata":   map[string]any{"name": SSOSecretName, "namespace": c.Namespace, "labels": map[string]string{"app.kubernetes.io/managed-by": "vertra"}},
 		"stringData": map[string]string{"client-secret": client.Secret},
 	})
-	return r.RunInput(ctx, string(manifest), "kubectl", "--context", cluster.Context(c), "apply", "-f", "-")
+	return applySecret(ctx, r, c, SSOSecretName, string(manifest))
 }
+
+// applySecret applies a Secret's manifest in the platform namespace,
+// through stdin, server-side: a client-side apply would keep a plaintext
+// copy of it in the kubectl.kubernetes.io/last-applied-configuration
+// annotation, which object exports and metadata tooling show. One an older
+// vertra's client-side apply left is removed, as the API server keeps an
+// annotation it finds up to date.
+func applySecret(ctx context.Context, r *run.Runner, c *config.Config, name, manifest string) error {
+	k := []string{"--context", cluster.Context(c), "--namespace", c.Namespace}
+	if err := r.RunInput(ctx, manifest, "kubectl", append(k, "apply", "--server-side", "--field-manager=vertra", "--force-conflicts", "-f", "-")...); err != nil {
+		return err
+	}
+	return r.Run(ctx, "kubectl", append(k, "annotate", "secret", name, lastApplied+"-")...)
+}
+
+const lastApplied = "kubectl.kubernetes.io/last-applied-configuration"
 
 // CertManagerChart is the cert-manager chart version vertra installs, on an
 // existing cluster that hasn't got it, for the console's certificate.
@@ -1111,7 +1152,7 @@ metadata:
 stringData:
   password: %q
 `, FirstAdminSecret, password)
-	return r.RunInput(ctx, manifest, "kubectl", "--context", cluster.Context(c), "--namespace", c.Namespace, "apply", "-f", "-")
+	return applySecret(ctx, r, c, FirstAdminSecret, manifest)
 }
 
 // WithFirstAdmin has a fresh install's console create the first admin with
@@ -1132,7 +1173,8 @@ func AdminCreated(ctx context.Context, r *run.Runner, c *config.Config) bool {
 		"logs", "--selector", "batch.kubernetes.io/job-name="+ConsoleRelease+"-execution-console-migrate",
 		"--tail=-1", "--max-log-requests=20")
 	// No Pod at all (the Job gone) says nothing either way.
-	return err != nil || out == "" || strings.Contains(out, "Bootstrap admin account created: "+c.Admin.Email)
+	// The console keeps emails lowercase (console/src/db/schema.ts normalEmail).
+	return err != nil || out == "" || strings.Contains(strings.ToLower(out), strings.ToLower("Bootstrap admin account created: "+strings.TrimSpace(c.Admin.Email)))
 }
 
 // ForgetPassword deletes GivePassword's Secret once the console is

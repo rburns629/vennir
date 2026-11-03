@@ -168,6 +168,9 @@ lives**:
 | If the value needs to rotate | Someone re-pastes the new value through the console | Update it once in the vault — ESO picks up the change on its own refresh cycle |
 | What this repo's Git history ever sees | Nothing — never touches the catalog repo at all | A scope reference only (*which* vault, *which* identity may read it) — never the value |
 
+A secret stays the kind it was registered as: to turn a pasted one into a
+synced one (or back), revoke it first, then add it again the other way.
+
 Setting up the ESO path needs one extra, one-time step a direct-paste
 secret doesn't: a `SecretStore` — a privileged object naming which
 external vault a team's namespace may read from, and with what

@@ -1,0 +1,6 @@
+# What this product installs. requirements.txt pins it, and everything it
+# brings, by version and hash: after changing this file, regenerate it as its
+# header says.
+# Majors pinned: these SDKs rename things between them.
+azure-identity~=1.26
+azure-mgmt-resource~=26.0

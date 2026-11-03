@@ -277,6 +277,10 @@ resource "aws_eks_addon" "ebs" {
   count        = local.standard ? 1 : 0
   cluster_name = aws_eks_cluster.this.name
   addon_name   = "aws-ebs-csi-driver"
+  # Volumes it makes carry this cluster's tag (kubernetes.io/cluster/<name>
+  # and KubernetesCluster), so a destroy that can't reach the cluster tells
+  # its left volumes from another install's (awscloud.LeftVolumes).
+  configuration_values = jsonencode({ controller = { k8sTagClusterId = aws_eks_cluster.this.name } })
   pod_identity_association {
     role_arn        = aws_iam_role.ebs[0].arn
     service_account = "ebs-csi-controller-sa"
@@ -467,6 +471,19 @@ resource "aws_s3_bucket_public_access_block" "backups" {
   restrict_public_buckets = true
 }
 
+# Versioned, so the writer can't destroy a dump it made before: its
+# s3:PutObject over an existing key keeps the old one as a noncurrent
+# version, which it has no permission to delete (as on gcp, where it may
+# create objects but not replace them). Each backup has a key of its own,
+# so there's normally no noncurrent version to keep.
+resource "aws_s3_bucket_versioning" "backups" {
+  count  = var.backups ? 1 : 0
+  bucket = aws_s3_bucket.backups[0].id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "backups" {
   count  = var.backups ? 1 : 0
   bucket = aws_s3_bucket.backups[0].id
@@ -477,7 +494,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
     expiration {
       days = var.backup_retention_days
     }
+    # On a versioned bucket, expiring a dump only makes it noncurrent (a
+    # delete marker goes on top); this deletes it. An overwritten dump is
+    # noncurrent from the overwrite, and kept the full retention after it,
+    # as on gcp it couldn't be touched. The price: S3 can't tell the two
+    # apart, so every dump is kept, and billed, for twice the retention
+    # (retention days current, then as many noncurrent).
+    noncurrent_version_expiration {
+      noncurrent_days = var.backup_retention_days
+    }
   }
+  depends_on = [aws_s3_bucket_versioning.backups]
 }
 
 resource "aws_iam_role" "backup" {
@@ -688,7 +715,7 @@ resource "aws_eks_pod_identity_association" "prometheus" {
 # --- the audit log's write-once copy --------------------------------------
 # Object Lock: every object kept audit_keep_days (governance; compliance
 # when audit_lock, which nobody can shorten, the root account included).
-# The console may only put objects. Kept by destroy: it's the record.
+# The console may only put new objects. Kept by destroy: it's the record.
 
 resource "aws_s3_bucket" "audit" {
   count               = var.audit_export ? 1 : 0
@@ -727,8 +754,20 @@ resource "aws_s3_bucket_object_lock_configuration" "audit" {
 
 data "aws_iam_policy_document" "console_audit" {
   count = var.audit_export ? 1 : 0
+  # Create-only: a put must carry If-None-Match: *, which S3 refuses for a
+  # key that exists. Without it a put to an existing key would make a new
+  # current version, leaving the locked original noncurrent.
   statement {
-    actions   = ["s3:PutObject", "s3:GetObject"]
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.audit[0].arn}/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "s3:if-none-match"
+      values   = ["*"]
+    }
+  }
+  statement {
+    actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.audit[0].arn}/*"]
   }
   # Reading its copies back, to compare the database with them.

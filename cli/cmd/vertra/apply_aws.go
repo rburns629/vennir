@@ -305,7 +305,10 @@ func (a *app) destroyAWS(ctx context.Context, out io.Writer, dir string, c *conf
 	const bucket = "aws_s3_bucket.backups[0]"
 	var keep []string
 	if c.Database.Backups.Enabled && !deleteData {
-		keep = append(keep, bucket, "aws_s3_bucket_public_access_block.backups[0]", "aws_s3_bucket_lifecycle_configuration.backups[0]")
+		// Its versioning too: destroying that would suspend it on the kept
+		// bucket.
+		keep = append(keep, bucket, "aws_s3_bucket_public_access_block.backups[0]", "aws_s3_bucket_versioning.backups[0]",
+			"aws_s3_bucket_lifecycle_configuration.backups[0]")
 	}
 	// The audit log's copy is the record, and Object Lock refuses deletes.
 	if c.Audit.Export {
@@ -369,8 +372,20 @@ func (a *app) destroyAWS(ctx context.Context, out io.Writer, dir string, c *conf
 		}
 	}
 	if unreached {
-		vols, err := awscloud.LeftVolumes(ctx, a.runner, c, c.Namespace)
-		leftBehind(out, "EBS volume", vols, err, "aws ec2 delete-volume --volume-id <id> --region "+c.AWS.Region)
+		mine, unknown, err := awscloud.LeftVolumes(ctx, a.runner, c, c.Namespace)
+		switch {
+		case err != nil:
+			fmt.Fprintf(out, "Couldn't list the EBS volumes its volumes may have left (%v): check for unattached ones.\n", err)
+		case len(mine) > 0:
+			fmt.Fprintf(out, "Unattached EBS volumes this cluster's volumes left: %s\n", strings.Join(mine, ", "))
+			fmt.Fprintf(out, "Delete each once you're sure: aws ec2 delete-volume --volume-id <id> --region %s\n", c.AWS.Region)
+		}
+		if err == nil && len(unknown) > 0 {
+			// Another install's in this region (a sleeping one's database
+			// among them) may be one of these.
+			fmt.Fprintf(out, "Unattached EBS volumes from a %s namespace that no cluster tag says are this install's: %s\n", c.Namespace, strings.Join(unknown, ", "))
+			fmt.Fprintf(out, "Another install's may be among them: check each's tags first (aws ec2 describe-volumes --volume-ids <id> --region %s).\n", c.AWS.Region)
+		}
 	}
 	for _, kind := range []string{"context", "cluster", "user"} {
 		_ = a.runner.Succeeds(ctx, "kubectl", "config", "delete-"+kind, kctx)

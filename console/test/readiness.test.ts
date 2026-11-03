@@ -168,4 +168,14 @@ describe("a product's check", () => {
     expect(vi.mocked(submitExecution).mock.calls.filter((c) => (c[0] as { tasks: Record<string, unknown>[] }).tasks[0]?.["team"] === prov)).toHaveLength(1);
     expect(await db.select().from(productReadiness).where(inArray(productReadiness.product, [`${prov}-svc-ready`]))).toHaveLength(1);
   });
+
+  it("that couldn't start shows a plain sentence, never the platform's error", async () => {
+    await db.update(productReadiness).set({ state: "failed" }).where(eq(productReadiness.product, `${prov}-svc-ready`));
+    // What a client-node error's message looks like: the API server's body and headers.
+    vi.mocked(submitExecution).mockRejectedValueOnce(new Error('HTTP-Code: 500 Message: Body: {"secret":"cluster-detail"} Headers: {"audit-id":"x"}'));
+    expect((await call<{ started?: boolean }>(maintainerToken, "ProductService/CheckProduct", { name: `${prov}-svc-create` })).body.started).toBe(true);
+    const row = await readinessRow();
+    expect(row?.state).toBe("failed");
+    expect(row?.detail).toBe("Vertra couldn't start its check: the platform didn't answer.");
+  });
 });

@@ -944,30 +944,41 @@ export function DocsPage() {
   const { hash } = useLocation();
   const [docs, setDocs] = useState<DocSummary[] | null>(null);
   const [content, setContent] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [docError, setDocError] = useState<string | null>(null);
   const [loadingContent, setLoadingContent] = useState(false);
+  const error = listError ?? docError;
 
   useEffect(() => {
     listDocs()
       .then(setDocs)
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Failed to load the guides.");
+        setListError(err instanceof ApiError ? err.message : "Failed to load the guides.");
       });
   }, []);
 
-  // A doc is fetched once, whichever of its pages is open.
+  // A doc is fetched once, whichever of its pages is open. The page stays
+  // mounted from guide to guide, so one guide's failure clears when another
+  // opens, and a late answer for a guide no longer open is dropped.
   useEffect(() => {
+    setDocError(null);
     if (!id || id === API_REFERENCE_ID) return;
+    let current = true;
     setLoadingContent(true);
     setContent(null);
     getDoc(id)
-      .then(setContent)
+      .then((text) => {
+        if (current) setContent(text);
+      })
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Failed to load this guide.");
+        if (current) setDocError(err instanceof ApiError ? err.message : "Failed to load this guide.");
       })
       .finally(() => {
-        setLoadingContent(false);
+        if (current) setLoadingContent(false);
       });
+    return () => {
+      current = false;
+    };
   }, [id]);
 
   const categories = useMemo(() => (docs ? contentsOf(docs) : []), [docs]);

@@ -31,6 +31,15 @@ function browserDrafts(): Draft[] {
   }
 }
 
+/** Forgets the drafts this browser kept, when its person's session ends: they're theirs, not the next person's. */
+export function forgetBrowserDrafts(): void {
+  try {
+    localStorage.removeItem(BROWSER_KEY);
+  } catch {
+    // Storage blocked: nothing was kept.
+  }
+}
+
 export type SaveStatus = "idle" | "saving" | "saved" | "conflict" | "error";
 
 /**

@@ -118,6 +118,14 @@ Kernel and alerts:
   resilient and scaled). The Admin page's image sources card says added
   sources don't run where signing is required (board 12j, 2026-11-02). Also to see on the next
   GKE run: build-image's encoded package name over gRPC (#74; seen only by REST).
+- [ ] **Cloud SQL's roles held to the instance by an IAM condition** (L-9,
+  #165): unproven that `cloudsql.instances.login` (Instance User) is checked
+  against the instance, so that `resource.name ==
+  "projects/<project>/instances/<instance>"` admits it. Before relying on
+  it, prove one IAM sign-in on acyclix-dev with a managed database (the
+  kernel, console, gateway and `kernel database-setup` all connect), and
+  that upgrading an install whose bindings had no condition keeps sign-ins
+  working through the apply.
 
 ## Installing and operating
 
@@ -1011,6 +1019,14 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
     volumes its volumes may have left.
 
 ## Security
+
+- [ ] **The gateway's backends see the ingress, not the client, behind
+  its public listener** (found 2026-11-03, G-10): the gateway sets
+  `X-Forwarded-For` to its own peer and drops what callers send, since its
+  listeners are reachable from inside the cluster too. Behind an ingress,
+  that peer is the ingress. If a backend needs the client's address, give
+  the gateway a trusted-proxy list (as the console's `trustProxy`) and keep
+  the ingress's `X-Forwarded-For` only from those.
 
 - [x] **Add the `v*` tag ruleset (admins only)** (decided 2026-11-02, X-6;
   done 2026-11-03): the repository's `release tags` ruleset lets only

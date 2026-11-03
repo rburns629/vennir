@@ -25,7 +25,10 @@ tasks:
     inputs:
       projectId: {$fromTask: create-gcp-project, $output: projectId}
       sourceArchiveUrl: gs://my-bucket/hello-world-source.zip                  # CHANGE
-      imageUri: us-central1-docker.pkg.dev/my-project-id/demo/hello-world-app:latest  # CHANGE
+      # A tag of its own for each version of the source (its commit, say):
+      # build-image skips the build when the tag is already there, so a
+      # tag that's reused, such as latest, deploys the first build forever.
+      imageUri: us-central1-docker.pkg.dev/my-project-id/demo/hello-world-app:v1  # CHANGE
 
   - id: deploy-cloud-run-service
     image: <registry>/gcp/app-hosting:latest
