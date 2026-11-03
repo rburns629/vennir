@@ -54,10 +54,12 @@ KIND_NODE ?= $(KIND_CLUSTER)-control-plane
 # at `kind create cluster` (make kind-cluster has the from-scratch
 # version); containerd is restarted only if its config actually changed,
 # and running Pods survive a containerd restart.
+# The registry's image, by digest (vertra's cluster.RegistryImage, the same).
+KIND_REGISTRY_IMAGE := registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 kind-registry:
 	@if [ "$$($(DOCKER) inspect -f '{{.State.Running}}' $(KIND_REGISTRY_NAME) 2>/dev/null)" != "true" ]; then \
 		$(DOCKER) start $(KIND_REGISTRY_NAME) 2>/dev/null || \
-		$(DOCKER) run -d --restart=always -p "127.0.0.1:$(KIND_REGISTRY_PORT):5000" --name $(KIND_REGISTRY_NAME) registry:2; \
+		$(DOCKER) run -d --restart=always -p "127.0.0.1:$(KIND_REGISTRY_PORT):5000" --name $(KIND_REGISTRY_NAME) $(KIND_REGISTRY_IMAGE); \
 	fi
 	@$(DOCKER) network connect kind $(KIND_REGISTRY_NAME) 2>/dev/null || true
 	@$(DOCKER) exec $(KIND_NODE) sh -c '\

@@ -5,7 +5,8 @@
 // pinned versions, checked against their projects' published checksums,
 // into vertra's own directory. It never uses sudo or changes PATH, and
 // it doesn't download tools that need a real installer (docker, the cloud
-// CLIs): for those it gives the install command.
+// CLIs): for those it gives the install command. It also pulls the
+// third-party Helm charts vertra installs, each checked against its pin.
 package tools
 
 import (
@@ -351,6 +352,123 @@ func Download(ctx context.Context, tool string) (string, error) {
 		return "", err
 	}
 	return dest, nil
+}
+
+// PullChart fetches a pinned third-party chart into a new directory and
+// checks it against its pinned SHA-256, returning the checked package to
+// install from (never the repository, which could serve another by then)
+// and a cleanup that removes it.
+func PullChart(ctx context.Context, r *run.Runner, chart string) (string, func(), error) {
+	pin, ok := charts[chart]
+	if !ok {
+		return "", nil, fmt.Errorf("no pinned chart %s", chart)
+	}
+	dir, err := os.MkdirTemp("", "vertra-chart-*")
+	if err != nil {
+		return "", nil, err
+	}
+	cleanup := func() { _ = os.RemoveAll(dir) }
+	archive, err := PullChartTo(ctx, r, dir, pin.SHA256, chart, "--repo", pin.Repo, "--version", pin.Version)
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	return archive, cleanup, nil
+}
+
+// PullChartTo fetches a chart (helm pull's arguments, the chart first) into
+// dir, an empty directory, and checks it against sum: the package's path.
+func PullChartTo(ctx context.Context, r *run.Runner, dir, sum string, args ...string) (string, error) {
+	if _, err := r.Output(ctx, "helm", append(append([]string{"pull"}, args...), "--destination", dir)...); err != nil {
+		return "", err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", err
+	}
+	if len(entries) != 1 || !strings.HasSuffix(entries[0].Name(), ".tgz") {
+		return "", fmt.Errorf("helm pull %s: expected one chart package in %s", args[0], dir)
+	}
+	archive := filepath.Join(dir, entries[0].Name())
+	if err := CheckSHA256(archive, sum); err != nil {
+		return "", fmt.Errorf("%s: %w", args[0], err)
+	}
+	return archive, nil
+}
+
+// CheckSHA256 refuses a file whose SHA-256 isn't sum.
+func CheckSHA256(path, sum string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, f); err != nil {
+		return err
+	}
+	if got := hex.EncodeToString(hash.Sum(nil)); got != sum {
+		return fmt.Errorf("%s's checksum doesn't match (%s, expected %s): refusing to use it", filepath.Base(path), got, sum)
+	}
+	return nil
+}
+
+// untarLimit is the biggest file Untar unpacks.
+const untarLimit = 64 << 20
+
+// Untar unpacks a .tgz's directories and regular files into dest; anything
+// else (links), a name that would land outside dest, or a file over
+// untarLimit, is refused.
+func Untar(archive, dest string) error {
+	f, err := os.Open(archive)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(gz)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if !filepath.IsLocal(h.Name) {
+			return fmt.Errorf("%s: %q is outside the archive", filepath.Base(archive), h.Name)
+		}
+		path := filepath.Join(dest, h.Name)
+		switch h.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(path, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if h.Size > untarLimit {
+				return fmt.Errorf("%s: %q is bigger than a chart's file should be", filepath.Base(archive), h.Name)
+			}
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return err
+			}
+			out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(out, tr); err != nil {
+				out.Close()
+				return err
+			}
+			if err := out.Close(); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("%s: %q isn't a file or a directory", filepath.Base(archive), h.Name)
+		}
+	}
 }
 
 func extract(archive, member, dest string) error {

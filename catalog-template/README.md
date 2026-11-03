@@ -608,6 +608,12 @@ anything it finds), and Semgrep: its Dockerfile rules (including the
 final `USER` being non-root, though not that it's numeric) plus the
 catalog's own [.semgrep/malicious.yml](.semgrep/malicious.yml).
 
+What blocks a merge is what `main`'s ruleset requires ([Protecting
+main](#protecting-main)). Publishing is gated either way: on `main`,
+`ci.yml` reruns the product checks and `security.yml`'s scans before it
+pushes or signs anything, so a finding that was merged is still never
+published.
+
 An accepted finding gets its exception where it applies, with the reason, so
 the pull request's review decides: a vulnerability ID in the product's
 `.trivyignore`, or `# nosemgrep: <rule>` on the line. Every product is
@@ -617,8 +623,8 @@ that fail.
 
 ## Who approves what
 
-[.github/CODEOWNERS](.github/CODEOWNERS), with branch protection on `main`
-requiring a code owner's review: the catalog admins own everything by
+[.github/CODEOWNERS](.github/CODEOWNERS), with `main`'s ruleset
+requiring a code owner's review ([Protecting main](#protecting-main)): the catalog admins own everything by
 default, each team's owners own `/teams/<team>/`, and the admins
 own, last so nothing overrides them, `.github/`, `tools/`, `vertra.yaml`,
 `vertra catalog`, `templates/` and every `/teams/*/secret-stores/`. A
@@ -626,6 +632,39 @@ team ships its own products, but can't change how CI builds and
 publishes, take another team's folder, add a team, or change what
 vault its namespace can read. `./vertra catalog validate` checks this layout, and
 `check-codeowners.yml` checks every owner exists.
+
+### Protecting main
+
+None of that holds until `main` has a ruleset, which `vertra catalog
+create` doesn't make: add one under **Settings → Rules → Rulesets → New
+branch ruleset**, targeting the default branch, with:
+
+- **Restrict deletions** and **Block force pushes**.
+- **Require a pull request before merging**, with at least one approval
+  and **Require review from Code Owners** (and **Dismiss stale pull request
+  approvals when new commits are pushed**).
+- **Require status checks to pass**, with these checks, each from GitHub
+  Actions:
+
+  | Check | Workflow | What |
+  |---|---|---|
+  | `check` | `ci.yml` | the changed products validated, built, tested and scanned; the workflows linted |
+  | `secrets` | `security.yml` | gitleaks |
+  | `code` | `security.yml` | Semgrep, with `.semgrep/malicious.yml` |
+  | `codeowners` | `check-codeowners.yml` | every owner in CODEOWNERS exists |
+
+  Each of these runs on every pull request (no paths filter), so none can
+  leave one waiting forever. `secret-stores` (`check-secret-stores.yml`)
+  is deliberately not on the list: it runs only on pull requests that touch
+  a `secret-stores/` folder, so requiring it would block every other one;
+  it still fails the pull request it runs on, and the release on `main`
+  refuses SecretStore files that fail it. A check shows up in the list once it has run
+  in the repository at least once.
+- No bypass list, or only the catalog admins, and only for pull requests.
+
+A ruleset on a private repository needs a paid GitHub plan. Without one,
+nothing stops a merge that fails these checks, but the publish on `main`
+reruns the product checks and scans and publishes nothing that fails them.
 
 ## Publishing
 

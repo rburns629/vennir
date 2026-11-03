@@ -69,3 +69,52 @@ func Pinned(tool string) (string, bool) {
 	p, ok := pins[tool]
 	return p.Version, ok
 }
+
+// ChartPin is a third-party Helm chart's pinned version and the SHA-256 of
+// its package (the .tgz `helm pull` fetches).
+type ChartPin struct {
+	Repo    string
+	Version string
+	SHA256  string
+}
+
+// The third-party charts vertra installs, each checked against its sum
+// before Helm installs it (PullChart). To upgrade one: change its version,
+// then `helm pull <chart> --repo <repo> --version <v>` and take the .tgz's
+// `shasum -a 256`. Pick releases at least two weeks old.
+var charts = map[string]ChartPin{
+	"metrics-server": {
+		Repo:    "https://kubernetes-sigs.github.io/metrics-server/",
+		Version: "3.14.0",
+		SHA256:  "c2ca1185c01e6e7f53dd1b7d131f0c9b3fa50e003ed068b784563a1b5a3422a1",
+	},
+	"cert-manager": {
+		Repo:    "https://charts.jetstack.io",
+		Version: "v1.21.2",
+		SHA256:  "73a56e1728edd6c99f1f31082618c3259d279a76b7ebd3d4bdc5475c2442d34a",
+	},
+	"external-secrets": {
+		Repo:    "https://charts.external-secrets.io",
+		Version: "2.10.0",
+		SHA256:  "b96e948fff3674638b5d3f9e43886f3796e04739c4b4127929aed2ddac7d1418",
+	},
+	"policy-controller": {
+		Repo:    "https://sigstore.github.io/helm-charts",
+		Version: "0.10.8",
+		SHA256:  "71ecc9f1168dd7ad04b2f7456c2d492b5ca3e09a31883bb71f6369213ceeb814",
+	},
+	"cluster-autoscaler": {
+		Repo:    "https://kubernetes.github.io/autoscaler",
+		Version: "9.59.0",
+		SHA256:  "90276dafe65cf5d4328ef8313baf6cfb9d130683e0c9f3c28a03b4d8a9ed8f6e",
+	},
+}
+
+// ChartVersion returns a pinned chart's version.
+func ChartVersion(chart string) string {
+	p, ok := charts[chart]
+	if !ok {
+		panic("no pinned chart " + chart)
+	}
+	return p.Version
+}

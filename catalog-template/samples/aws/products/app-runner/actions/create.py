@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """aws/app-runner's "create" action: deploys a container image as an App
 Runner service, or returns the existing service's URL if one of that name
-exists. Never builds an image: `image` is an ECR (or ECR Public) reference.
+exists, once it's running. Never builds an image: `image` is an ECR (or ECR
+Public) reference.
 
 The service is reachable only through a VPC interface endpoint unless
 `public` is true. Waits for a new service to be running, so later steps can
@@ -123,33 +124,37 @@ def main() -> int:
 
     try:
         apprunner = _session(region).client("apprunner")
-        existing = _find_service(apprunner, name)
-        if existing:
-            print(f"service '{name}' already exists ({existing.get('Status')}), leaving it as it is")
-            _write_result({"status": "succeeded", "outputs": _outputs(existing, region, _made_here(apprunner, existing["ServiceArn"]))})
-            return 0
+        service = _find_service(apprunner, name)
+        if service:
+            # Left as it is, but waited for like a new one: a retry may find
+            # the service its last attempt was still creating.
+            print(f"service '{name}' already exists ({service.get('Status')}), leaving it as it is")
+            made_here = _made_here(apprunner, service["ServiceArn"])
+        else:
+            repository: dict[str, Any] = {
+                "ImageIdentifier": image,
+                "ImageRepositoryType": "ECR_PUBLIC" if image.startswith("public.ecr.aws/") else "ECR",
+                "ImageConfiguration": {
+                    "Port": str(inputs.get("port", 8080)),
+                    "RuntimeEnvironmentVariables": environment,
+                },
+            }
+            source: dict[str, Any] = {"ImageRepository": repository, "AutoDeploymentsEnabled": False}
+            if inputs.get("accessRoleArn"):  # pulling from a private ECR repository
+                source["AuthenticationConfiguration"] = {"AccessRoleArn": inputs["accessRoleArn"]}
+            service = apprunner.create_service(
+                ServiceName=name,
+                SourceConfiguration=source,
+                NetworkConfiguration={
+                    "IngressConfiguration": {"IsPubliclyAccessible": bool(inputs.get("public", False))}
+                },
+                Tags=[{"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}],
+            )["Service"]
+            made_here = True
+            print(f"creating service '{name}'")
 
-        repository: dict[str, Any] = {
-            "ImageIdentifier": image,
-            "ImageRepositoryType": "ECR_PUBLIC" if image.startswith("public.ecr.aws/") else "ECR",
-            "ImageConfiguration": {
-                "Port": str(inputs.get("port", 8080)),
-                "RuntimeEnvironmentVariables": environment,
-            },
-        }
-        source: dict[str, Any] = {"ImageRepository": repository, "AutoDeploymentsEnabled": False}
-        if inputs.get("accessRoleArn"):  # pulling from a private ECR repository
-            source["AuthenticationConfiguration"] = {"AccessRoleArn": inputs["accessRoleArn"]}
-        service = apprunner.create_service(
-            ServiceName=name,
-            SourceConfiguration=source,
-            NetworkConfiguration={
-                "IngressConfiguration": {"IsPubliclyAccessible": bool(inputs.get("public", False))}
-            },
-            Tags=[{"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}],
-        )["Service"]
-        print(f"creating service '{name}'")
-
+        # Still starting (or changing) is worth a retry, which waits again;
+        # CREATE_FAILED, PAUSED and the rest need someone to step in.
         deadline = time.monotonic() + START_TIMEOUT_SECONDS
         while service.get("Status") == "OPERATION_IN_PROGRESS" and time.monotonic() < deadline:
             time.sleep(POLL_SECONDS)
@@ -164,7 +169,7 @@ def main() -> int:
         return _aws_failure(error)
 
     print(f"service '{name}' is running")
-    _write_result({"status": "succeeded", "outputs": _outputs(service, region, True)})
+    _write_result({"status": "succeeded", "outputs": _outputs(service, region, made_here)})
     return 0
 
 

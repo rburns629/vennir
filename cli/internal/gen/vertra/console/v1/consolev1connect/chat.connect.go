@@ -54,6 +54,12 @@ const (
 	// ChatServiceTestChatConfigProcedure is the fully-qualified name of the ChatService's
 	// TestChatConfig RPC.
 	ChatServiceTestChatConfigProcedure = "/vertra.console.v1.ChatService/TestChatConfig"
+	// ChatServiceGetChatLimitsProcedure is the fully-qualified name of the ChatService's GetChatLimits
+	// RPC.
+	ChatServiceGetChatLimitsProcedure = "/vertra.console.v1.ChatService/GetChatLimits"
+	// ChatServiceSetChatLimitsProcedure is the fully-qualified name of the ChatService's SetChatLimits
+	// RPC.
+	ChatServiceSetChatLimitsProcedure = "/vertra.console.v1.ChatService/SetChatLimits"
 	// ChatServiceRateAnswerProcedure is the fully-qualified name of the ChatService's RateAnswer RPC.
 	ChatServiceRateAnswerProcedure = "/vertra.console.v1.ChatService/RateAnswer"
 	// ChatServiceListChatFeedbackProcedure is the fully-qualified name of the ChatService's
@@ -88,6 +94,11 @@ type ChatServiceClient interface {
 	// agent, as the admin. Says whether the model answered, not what another
 	// server said.
 	TestChatConfig(context.Context, *connect.Request[v1.TestChatConfigRequest]) (*connect.Response[v1.TestChatConfigResponse], error)
+	// How many questions each person may ask: by default 30 an hour and 200
+	// a day. Admins only.
+	GetChatLimits(context.Context, *connect.Request[v1.GetChatLimitsRequest]) (*connect.Response[v1.GetChatLimitsResponse], error)
+	// An admin's own limits (BAD_CHAT_LIMITS), for every console at once.
+	SetChatLimits(context.Context, *connect.Request[v1.SetChatLimitsRequest]) (*connect.Response[v1.SetChatLimitsResponse], error)
 	// Thumbs up or down on an answer you got, sent with its question and
 	// answer, for the admins (kept 90 days).
 	RateAnswer(context.Context, *connect.Request[v1.RateAnswerRequest]) (*connect.Response[v1.RateAnswerResponse], error)
@@ -150,6 +161,19 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("TestChatConfig")),
 			connect.WithClientOptions(opts...),
 		),
+		getChatLimits: connect.NewClient[v1.GetChatLimitsRequest, v1.GetChatLimitsResponse](
+			httpClient,
+			baseURL+ChatServiceGetChatLimitsProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("GetChatLimits")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		setChatLimits: connect.NewClient[v1.SetChatLimitsRequest, v1.SetChatLimitsResponse](
+			httpClient,
+			baseURL+ChatServiceSetChatLimitsProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("SetChatLimits")),
+			connect.WithClientOptions(opts...),
+		),
 		rateAnswer: connect.NewClient[v1.RateAnswerRequest, v1.RateAnswerResponse](
 			httpClient,
 			baseURL+ChatServiceRateAnswerProcedure,
@@ -175,6 +199,8 @@ type chatServiceClient struct {
 	setChatConfig    *connect.Client[v1.SetChatConfigRequest, v1.SetChatConfigResponse]
 	resetChatConfig  *connect.Client[v1.ResetChatConfigRequest, v1.ResetChatConfigResponse]
 	testChatConfig   *connect.Client[v1.TestChatConfigRequest, v1.TestChatConfigResponse]
+	getChatLimits    *connect.Client[v1.GetChatLimitsRequest, v1.GetChatLimitsResponse]
+	setChatLimits    *connect.Client[v1.SetChatLimitsRequest, v1.SetChatLimitsResponse]
 	rateAnswer       *connect.Client[v1.RateAnswerRequest, v1.RateAnswerResponse]
 	listChatFeedback *connect.Client[v1.ListChatFeedbackRequest, v1.ListChatFeedbackResponse]
 }
@@ -214,6 +240,16 @@ func (c *chatServiceClient) TestChatConfig(ctx context.Context, req *connect.Req
 	return c.testChatConfig.CallUnary(ctx, req)
 }
 
+// GetChatLimits calls vertra.console.v1.ChatService.GetChatLimits.
+func (c *chatServiceClient) GetChatLimits(ctx context.Context, req *connect.Request[v1.GetChatLimitsRequest]) (*connect.Response[v1.GetChatLimitsResponse], error) {
+	return c.getChatLimits.CallUnary(ctx, req)
+}
+
+// SetChatLimits calls vertra.console.v1.ChatService.SetChatLimits.
+func (c *chatServiceClient) SetChatLimits(ctx context.Context, req *connect.Request[v1.SetChatLimitsRequest]) (*connect.Response[v1.SetChatLimitsResponse], error) {
+	return c.setChatLimits.CallUnary(ctx, req)
+}
+
 // RateAnswer calls vertra.console.v1.ChatService.RateAnswer.
 func (c *chatServiceClient) RateAnswer(ctx context.Context, req *connect.Request[v1.RateAnswerRequest]) (*connect.Response[v1.RateAnswerResponse], error) {
 	return c.rateAnswer.CallUnary(ctx, req)
@@ -251,6 +287,11 @@ type ChatServiceHandler interface {
 	// agent, as the admin. Says whether the model answered, not what another
 	// server said.
 	TestChatConfig(context.Context, *connect.Request[v1.TestChatConfigRequest]) (*connect.Response[v1.TestChatConfigResponse], error)
+	// How many questions each person may ask: by default 30 an hour and 200
+	// a day. Admins only.
+	GetChatLimits(context.Context, *connect.Request[v1.GetChatLimitsRequest]) (*connect.Response[v1.GetChatLimitsResponse], error)
+	// An admin's own limits (BAD_CHAT_LIMITS), for every console at once.
+	SetChatLimits(context.Context, *connect.Request[v1.SetChatLimitsRequest]) (*connect.Response[v1.SetChatLimitsResponse], error)
 	// Thumbs up or down on an answer you got, sent with its question and
 	// answer, for the admins (kept 90 days).
 	RateAnswer(context.Context, *connect.Request[v1.RateAnswerRequest]) (*connect.Response[v1.RateAnswerResponse], error)
@@ -309,6 +350,19 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceMethods.ByName("TestChatConfig")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceGetChatLimitsHandler := connect.NewUnaryHandler(
+		ChatServiceGetChatLimitsProcedure,
+		svc.GetChatLimits,
+		connect.WithSchema(chatServiceMethods.ByName("GetChatLimits")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceSetChatLimitsHandler := connect.NewUnaryHandler(
+		ChatServiceSetChatLimitsProcedure,
+		svc.SetChatLimits,
+		connect.WithSchema(chatServiceMethods.ByName("SetChatLimits")),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatServiceRateAnswerHandler := connect.NewUnaryHandler(
 		ChatServiceRateAnswerProcedure,
 		svc.RateAnswer,
@@ -338,6 +392,10 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceResetChatConfigHandler.ServeHTTP(w, r)
 		case ChatServiceTestChatConfigProcedure:
 			chatServiceTestChatConfigHandler.ServeHTTP(w, r)
+		case ChatServiceGetChatLimitsProcedure:
+			chatServiceGetChatLimitsHandler.ServeHTTP(w, r)
+		case ChatServiceSetChatLimitsProcedure:
+			chatServiceSetChatLimitsHandler.ServeHTTP(w, r)
 		case ChatServiceRateAnswerProcedure:
 			chatServiceRateAnswerHandler.ServeHTTP(w, r)
 		case ChatServiceListChatFeedbackProcedure:
@@ -377,6 +435,14 @@ func (UnimplementedChatServiceHandler) ResetChatConfig(context.Context, *connect
 
 func (UnimplementedChatServiceHandler) TestChatConfig(context.Context, *connect.Request[v1.TestChatConfigRequest]) (*connect.Response[v1.TestChatConfigResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vertra.console.v1.ChatService.TestChatConfig is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetChatLimits(context.Context, *connect.Request[v1.GetChatLimitsRequest]) (*connect.Response[v1.GetChatLimitsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vertra.console.v1.ChatService.GetChatLimits is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) SetChatLimits(context.Context, *connect.Request[v1.SetChatLimitsRequest]) (*connect.Response[v1.SetChatLimitsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vertra.console.v1.ChatService.SetChatLimits is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) RateAnswer(context.Context, *connect.Request[v1.RateAnswerRequest]) (*connect.Response[v1.RateAnswerResponse], error) {

@@ -6,7 +6,7 @@ name: app-runner
 team: aws
 displayName: App Runner service
 description: Deploys a container image as an App Runner service and waits for it to run, or
-  returns the existing service's URL. Private (reachable through a VPC interface endpoint)
+  returns the existing service's URL once it runs. Private (reachable through a VPC interface endpoint)
   unless public is true.
 owner: aws-team
 runtime: python3.12

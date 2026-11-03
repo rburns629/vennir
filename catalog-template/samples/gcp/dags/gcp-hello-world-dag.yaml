@@ -33,6 +33,8 @@ tasks:
     team: gcp
     # A $fromTask reference must name a task in dependsOn.
     dependsOn: [create-gcp-project, build-image-from-source]
+    # The team's secret: the registry images come from, the account it runs as.
+    secretRefs: [app-hosting]
     inputs:
       projectId: {$fromTask: create-gcp-project, $output: projectId}
       serviceName: hello-world

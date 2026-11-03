@@ -26,8 +26,10 @@ name: catalog-ci
 # keyless or KMS signing. `vertra catalog create` warns about any it finds.
 
 on:
+  # No paths filter: `check` is a required status check on main (README,
+  # "Protecting main"), and a required check that never starts blocks the
+  # pull request. --changed already checks only the products it changes.
   pull_request:
-    paths: ["teams/**", "templates/**", "tools/**", "vertra.yaml", "vertra", ".github/CODEOWNERS", ".github/workflows/**"]
   push:
     branches: [main]
     paths: ["teams/**", "tools/**", "vertra.yaml", "vertra"]
@@ -74,6 +76,14 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: ./vertra catalog check --changed "$BASE"
 
+  # main, before publishing: gitleaks and Semgrep (security.yml), so a
+  # finding stops the publish even if it was merged.
+  security:
+    if: github.ref == 'refs/heads/main' && inputs.version == '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+
   # main: the same checks, then push and sign each product that passed, then
   # the release. Runs in the catalog-publish Environment, which only main may
   # use, so a workflow edited in a pull request never gets its credentials.
@@ -84,7 +94,13 @@ jobs:
   # Weekly (the schedule), it mirrors the approved bases instead: the same
   # sign-in, no products published.
   publish:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
+    needs: security
+    # Products only once security passed; a version and the weekly bases
+    # mirror publish no product, so they don't wait for it (it's skipped).
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') &&
+      (needs.security.result == 'success' || (needs.security.result == 'skipped' && (inputs.version != '' || github.event_name == 'schedule')))
     runs-on: ubuntu-latest
     environment: catalog-publish
     concurrency:

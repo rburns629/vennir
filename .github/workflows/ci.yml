@@ -386,7 +386,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bash .github/scripts/install-scanners.sh actionlint
       - run: actionlint
-      - run: actionlint catalog-template/.github/workflows/*.yml
+      # In a Git repository of its own, as a catalog is: actionlint resolves
+      # the template's `uses: ./.github/workflows/...` from the nearest Git
+      # repository's root, which here (even from inside catalog-template/)
+      # would be this one's.
+      - name: actionlint the catalog template
+        run: |
+          cp -R catalog-template "$RUNNER_TEMP/catalog"
+          git -C "$RUNNER_TEMP/catalog" init -q
+          cd "$RUNNER_TEMP/catalog" && actionlint
 
   catalog-template:
     runs-on: ubuntu-latest

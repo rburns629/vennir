@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 _MODULE_PATH = Path(__file__).parent / "check.py"
 ALL = ["run.services.get", "run.services.create", "run.services.delete"]
-RUNTIME = "42-compute@developer.gserviceaccount.com"
+RUNTIME = "web-runtime@my-project.iam.gserviceaccount.com"
 
 
 def _load_check_module():
@@ -34,6 +34,11 @@ class CheckActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
         self.module.TARGET_SERVICE_ACCOUNT_FILE = Path(self.tmp_dir.name) / "service-account"
+        # The team's secret app-hosting, mounted.
+        self.module.SETTINGS_DIR = Path(self.tmp_dir.name) / "app-hosting"
+        self.module.SETTINGS_DIR.mkdir()
+        (self.module.SETTINGS_DIR / "image-registry").write_text("us-central1-docker.pkg.dev/my-project/demo\n")
+        (self.module.SETTINGS_DIR / "runtime-service-account").write_text(RUNTIME + "\n")
         self.source = MagicMock(service_account_email="my-project.svc.id.goog")
         patcher = patch.object(self.module.google.auth, "default", return_value=(self.source, "my-project"))
         self.default = patcher.start()
@@ -47,7 +52,7 @@ class CheckActionTest(unittest.TestCase):
             if url.endswith("projects:search"):
                 return _response({"projects": [{"projectId": p, "name": "projects/42"} for p in projects]})
             if url.startswith(self.module.IAM):
-                self.assertIn(f"/serviceAccounts/{RUNTIME}:testIamPermissions", url)
+                self.assertIn(f"/projects/-/serviceAccounts/{RUNTIME}:testIamPermissions", url)
                 return act_as
             project = url.split("/projects/")[1].split(":")[0]
             return _response({"permissions": held[project]} if held.get(project) else {})
@@ -87,8 +92,22 @@ class CheckActionTest(unittest.TestCase):
             self.assertFalse(result["outputs"]["ready"])
             self.assertEqual(
                 result["outputs"]["missing"],
-                [f"roles/iam.serviceAccountUser on {RUNTIME} (Cloud Run's runtime account in web-1)"],
+                [f"roles/iam.serviceAccountUser on {RUNTIME} (the team's Cloud Run runtime account)"],
             )
+
+    def test_not_ready_without_the_team_secret(self) -> None:
+        for key in ("image-registry", "runtime-service-account"):
+            with self.subTest(missing=key):
+                value = (self.module.SETTINGS_DIR / key).read_text()
+                (self.module.SETTINGS_DIR / key).unlink()
+                exit_code, result = self._run(["web-1"], {"web-1": ALL})
+                (self.module.SETTINGS_DIR / key).write_text(value)
+                self.assertEqual(exit_code, 0)
+                self.assertFalse(result["outputs"]["ready"])
+                self.assertEqual(
+                    result["outputs"]["missing"],
+                    ["the team secret app-hosting, with image-registry and runtime-service-account"],
+                )
 
     def test_without_workload_identity_it_is_not_ready(self) -> None:
         self.default.side_effect = self.module.google.auth.exceptions.DefaultCredentialsError("none")

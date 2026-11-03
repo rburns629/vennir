@@ -30,6 +30,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -426,7 +427,7 @@ func ReadPolicy(partition, region, account, prefix string) string {
 }
 
 // PlanAWS is the grant (or revoke) on an owner's ECR.
-func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke bool) (*Plan, error) {
+func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke, replace bool) (*Plan, error) {
 	if !r.Federated() {
 		return nil, errors.New("an aws owner trusts the reader's cluster: --issuer and --subject")
 	}
@@ -453,9 +454,40 @@ func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke bool) 
 		Access:   "pull and list tags on " + o.Prefix + "/* (its images and its release), nothing else",
 	}
 
-	_, roleErr := exec(ctx, "aws", o.Args("iam", "get-role", "--role-name", role)...)
+	trust := TrustPolicy(providerArn, r)
+	trusts := "only " + r.Subject + " from " + host + " may assume it"
+	out, roleErr := exec(ctx, "aws", o.Args("iam", "get-role", "--role-name", role)...)
 	if roleErr != nil && !notFound(roleErr) {
 		return nil, roleErr
+	}
+	// The role is keyed by the reader's name alone, which another reader
+	// may share (a cluster's default name is vertra): one trusting another
+	// reader is left alone unless --replace says otherwise.
+	var sameReader, sameTrust bool
+	leaving := r.Name
+	if roleErr == nil {
+		var got struct {
+			Role struct {
+				AssumeRolePolicyDocument json.RawMessage
+			}
+		}
+		if err := json.Unmarshal([]byte(out), &got); err != nil {
+			return nil, fmt.Errorf("the role %s: %w", role, err)
+		}
+		has, who := trustedBy(got.Role.AssumeRolePolicyDocument)
+		sameReader = has == (trusted{providerArn, r.Subject})
+		if !sameReader {
+			leaving = who
+		}
+		sameTrust = sameReader && sameJSON(got.Role.AssumeRolePolicyDocument, trust)
+		if !sameReader && !replace {
+			what := "replace its trust"
+			if revoke {
+				what = "delete it"
+			}
+			return nil, fmt.Errorf("the role %s lets %s assume it, not %s from %s: another reader's, of the same name? "+
+				"Give this one another --reader, or --replace to %s anyway", role, who, r.Subject, host, what)
+		}
 	}
 	if revoke {
 		if roleErr == nil {
@@ -467,7 +499,7 @@ func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke bool) 
 				p.Actions = append(p.Actions, Action{Label: "Will delete", Text: "the role's policy " + PolicyName,
 					Tool: "aws", Args: o.Args("iam", "delete-role-policy", "--role-name", role, "--policy-name", PolicyName)})
 			}
-			p.Actions = append(p.Actions, Action{Label: "Will delete", Text: "the role " + role + ": " + r.Name + " can no longer assume it",
+			p.Actions = append(p.Actions, Action{Label: "Will delete", Text: "the role " + role + ": " + leaving + " can no longer assume it",
 				Tool: "aws", Args: o.Args("iam", "delete-role", "--role-name", role)})
 		}
 		p.Notes = append(p.Notes, "The OIDC provider for "+host+" stays: it lets nothing in by itself, and a role of another reader on the same cluster may use it. "+
@@ -495,20 +527,77 @@ func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke bool) 
 				Tool: "aws", Args: o.Args("iam", "add-client-id-to-open-id-connect-provider", "--open-id-connect-provider-arn", providerArn, "--client-id", "sts.amazonaws.com")})
 		}
 	}
-	trust := TrustPolicy(providerArn, r)
-	trusts := "only " + r.Subject + " from " + host + " may assume it"
-	if roleErr != nil {
+	switch {
+	case roleErr != nil:
 		p.Actions = append(p.Actions, Action{Label: "Will create", Text: "the role " + role + ": " + trusts,
 			Tool: "aws", Args: o.Args("iam", "create-role", "--role-name", role, "--assume-role-policy-document", trust,
 				"--max-session-duration", "3600", "--description", "Vertra: "+r.Name+"'s console reads the catalog", "--tags", "Key=vertra,Value=catalog-reader")})
-	} else {
-		// Set again whatever it says now: running it again makes it so.
-		p.Actions = append(p.Actions, Action{Label: "Will set", Text: "the role " + role + "'s trust: " + trusts,
+	case sameTrust:
+		p.Actions = append(p.Actions, Action{Label: "Has", Text: "the role " + role + ": " + trusts})
+	default:
+		label := "Will set"
+		if !sameReader {
+			label = "Will replace"
+		}
+		p.Actions = append(p.Actions, Action{Label: label, Text: "the role " + role + "'s trust: " + trusts,
 			Tool: "aws", Args: o.Args("iam", "update-assume-role-policy", "--role-name", role, "--policy-document", trust)})
 	}
-	p.Actions = append(p.Actions, Action{Label: "Will set", Text: "its one policy, " + PolicyName + ": " + p.Access,
-		Tool: "aws", Args: o.Args("iam", "put-role-policy", "--role-name", role, "--policy-name", PolicyName,
-			"--policy-document", ReadPolicy(partition, o.Region, me.Account, o.Prefix))})
+	policy := ReadPolicy(partition, o.Region, me.Account, o.Prefix)
+	samePolicy := false
+	if roleErr == nil {
+		out, err := exec(ctx, "aws", o.Args("iam", "get-role-policy", "--role-name", role, "--policy-name", PolicyName)...)
+		if err != nil && !notFound(err) {
+			return nil, err
+		}
+		if err == nil {
+			var got struct{ PolicyDocument json.RawMessage }
+			if err := json.Unmarshal([]byte(out), &got); err != nil {
+				return nil, fmt.Errorf("the role %s's policy %s: %w", role, PolicyName, err)
+			}
+			samePolicy = sameJSON(got.PolicyDocument, policy)
+		}
+	}
+	if samePolicy {
+		p.Actions = append(p.Actions, Action{Label: "Has", Text: "its one policy, " + PolicyName + ": " + p.Access})
+	} else {
+		p.Actions = append(p.Actions, Action{Label: "Will set", Text: "its one policy, " + PolicyName + ": " + p.Access,
+			Tool: "aws", Args: o.Args("iam", "put-role-policy", "--role-name", role, "--policy-name", PolicyName, "--policy-document", policy)})
+	}
 	p.ReaderSets = [2]string{"externalCatalog.awsRoleArn", roleArn}
 	return p, nil
+}
+
+// trusted is whom a role's trust lets assume it: a provider's subject.
+type trusted struct{ provider, subject string }
+
+// trustedBy reads whom a trust policy lets assume the role, when it's the
+// one web-identity statement TrustPolicy writes, and says so for the screen.
+func trustedBy(doc json.RawMessage) (trusted, string) {
+	var policy struct {
+		Statement []struct {
+			Effect    string
+			Principal struct{ Federated any }
+			Action    any
+			Condition map[string]map[string]any
+		}
+	}
+	if json.Unmarshal(doc, &policy) == nil && len(policy.Statement) == 1 {
+		st := policy.Statement[0]
+		provider, _ := st.Principal.Federated.(string)
+		for key, value := range st.Condition["StringEquals"] {
+			host, ok := strings.CutSuffix(key, ":sub")
+			subject, isString := value.(string)
+			if ok && isString && provider != "" && st.Effect == "Allow" && st.Action == "sts:AssumeRoleWithWebIdentity" {
+				return trusted{provider, subject}, subject + " from " + host
+			}
+		}
+	}
+	return trusted{}, "a trust policy vertra didn't write"
+}
+
+// sameJSON says whether two JSON documents say the same, whatever their
+// spacing and key order.
+func sameJSON(a json.RawMessage, b string) bool {
+	var x, y any
+	return json.Unmarshal(a, &x) == nil && json.Unmarshal([]byte(b), &y) == nil && reflect.DeepEqual(x, y)
 }

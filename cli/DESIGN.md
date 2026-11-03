@@ -433,7 +433,9 @@ New chart features, so Helm users get them too:
    credential, since each console pulls the catalog's release; remove and
    revoke the console URL and tokens an earlier version stored; create the
    `catalog-publish` and `purge`
-   Environments and the branch rules where the plan allows. A repository
+   Environments where the plan allows. `main`'s ruleset isn't made yet (the
+   plan says so; the catalog README's "Protecting main" lists it; TODO.md).
+   A repository
    that already has commits isn't pushed: when it last published to another
    registry (`--take-over`), `catalog-ci` is run by hand
    (`workflow_dispatch`) to republish every product to this install's.
@@ -518,6 +520,18 @@ costs nothing).
   job (registry pull, one bucket, one vault, signing).
 - **Verified tools:** pinned versions and checksums; released CLI binaries
   are signed like the images.
+- **Verified charts:** every chart is checked before Helm installs it. The
+  third-party ones (metrics-server, cert-manager, External Secrets,
+  policy-controller, the Cluster Autoscaler) are pinned by their package's
+  SHA-256 (`internal/tools/pins.go`) and installed from the checked file,
+  never the repository. A release's own are checked against the SHA-256s
+  its release recorded (`internal/install/release-charts.sha256`, which the
+  release workflow adds to each release's vertra, with any earlier
+  release's missing, and to main). The package is kept in
+  `deploy/<env>/charts/<version>/`, checked again on each apply, and the
+  chart unpacked afresh from it, so an edit there is never installed; a
+  release the running vertra doesn't know (a newer one) is refused before
+  the approval screen. kind's local registry runs `registry` by digest.
 - **The OpenTofu state** can contain resource details: it stays next to the
   config, gitignored, or in a remote backend you control.
 

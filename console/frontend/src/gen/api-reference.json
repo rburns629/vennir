@@ -288,6 +288,24 @@
      "public": false
     },
     {
+     "name": "GetChatLimits",
+     "comment": "How many questions each person may ask: by default 30 an hour and 200\na day. Admins only.",
+     "input": "vertra.console.v1.GetChatLimitsRequest",
+     "output": "vertra.console.v1.GetChatLimitsResponse",
+     "streaming": false,
+     "idempotency": "read",
+     "public": false
+    },
+    {
+     "name": "SetChatLimits",
+     "comment": "An admin's own limits (BAD_CHAT_LIMITS), for every console at once.",
+     "input": "vertra.console.v1.SetChatLimitsRequest",
+     "output": "vertra.console.v1.SetChatLimitsResponse",
+     "streaming": false,
+     "idempotency": "",
+     "public": false
+    },
+    {
      "name": "RateAnswer",
      "comment": "Thumbs up or down on an answer you got, sent with its question and\nanswer, for the admins (kept 90 days).",
      "input": "vertra.console.v1.RateAnswerRequest",
@@ -4768,6 +4786,93 @@
      "repeated": true,
      "optional": false,
      "comment": "AMBIGUOUS: the outputs that could fill it; CHOOSE_EXISTING: what's\nthere, and a new one."
+    }
+   ]
+  },
+  "vertra.console.v1.ChatLimits": {
+   "name": "ChatLimits",
+   "comment": "Questions each person may ask the chat agent (Ask and AskStream alike);\none more is refused RATE_LIMITED, with Retry-After. Bots may not ask.",
+   "fields": [
+    {
+     "name": "perHour",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "perDay",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "updatedBy",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Empty, and no time, while they're the defaults."
+    },
+    {
+     "name": "updatedAt",
+     "type": "timestamp (RFC 3339 string)",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    }
+   ]
+  },
+  "vertra.console.v1.GetChatLimitsRequest": {
+   "name": "GetChatLimitsRequest",
+   "comment": "",
+   "fields": []
+  },
+  "vertra.console.v1.GetChatLimitsResponse": {
+   "name": "GetChatLimitsResponse",
+   "comment": "",
+   "fields": [
+    {
+     "name": "limits",
+     "type": "ChatLimits",
+     "ref": "vertra.console.v1.ChatLimits",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    }
+   ]
+  },
+  "vertra.console.v1.SetChatLimitsRequest": {
+   "name": "SetChatLimitsRequest",
+   "comment": "",
+   "fields": [
+    {
+     "name": "perHour",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": "1 to 10,000 each, and no more an hour than a day."
+    },
+    {
+     "name": "perDay",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    }
+   ]
+  },
+  "vertra.console.v1.SetChatLimitsResponse": {
+   "name": "SetChatLimitsResponse",
+   "comment": "",
+   "fields": [
+    {
+     "name": "limits",
+     "type": "ChatLimits",
+     "ref": "vertra.console.v1.ChatLimits",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
     }
    ]
   },

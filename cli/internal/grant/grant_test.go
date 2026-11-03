@@ -3,6 +3,7 @@
 package grant
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -226,7 +227,7 @@ func TestAWSGrantsAWebIdentity(t *testing.T) {
 		{"get-role", noSuch},
 		{"get-open-id-connect-provider", noSuch},
 	}}
-	p, err := PlanAWS(context.Background(), c.exec, awsOwner(), gke, false)
+	p, err := PlanAWS(context.Background(), c.exec, awsOwner(), gke, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,16 +273,57 @@ func TestAWSGrantsAWebIdentity(t *testing.T) {
 	}
 }
 
-// Again: the provider is kept, and the role's trust and policy set again
-// (whatever they say now); an existing provider without STS's audience
-// gets it.
+const eksHost = "oidc.eks.us-east-2.amazonaws.com/id/ABC"
+
+// role is get-role's answer for a role with trust, spaced as the CLI
+// prints it.
+func role(t *testing.T, trust string) string {
+	t.Helper()
+	var b strings.Builder
+	b.WriteString(`{"Role":{"RoleName":"vertra-reader-vertra-eks","AssumeRolePolicyDocument":`)
+	var out bytes.Buffer
+	if err := json.Indent(&out, []byte(trust), "    ", "  "); err != nil {
+		t.Fatal(err)
+	}
+	b.WriteString(out.String() + `}}`)
+	return b.String()
+}
+
+// policyAnswer is get-role-policy's answer.
+func policyAnswer(policy string) string {
+	return `{"RoleName":"vertra-reader-vertra-eks","PolicyName":"read-catalog","PolicyDocument":` + policy + `}`
+}
+
+// Again, with nothing different: nothing to change.
+func TestAWSGrantAgainChangesNothing(t *testing.T) {
+	c := &cloud{answers: [][2]any{
+		{"get-caller-identity", `{"Account":"123456789012","Arn":"arn:aws:iam::123456789012:user/owner"}`},
+		{"get-role-policy", policyAnswer(ReadPolicy("aws", "us-east-2", "123456789012", "vertra-products"))},
+		{"get-role", role(t, TrustPolicy("arn:aws:iam::123456789012:oidc-provider/"+eksHost, eks))},
+		{"get-open-id-connect-provider", `{"ClientIDList":["sts.amazonaws.com"]}`},
+	}}
+	p, err := PlanAWS(context.Background(), c.exec, awsOwner(), eks, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if labels(p) != "Has,Has,Has" || p.Changes() {
+		t.Errorf("again: %s", labels(p))
+	}
+}
+
+// Again for the same reader, set differently (an older version's trust,
+// a missing policy): set again; an existing provider without STS's
+// audience gets it.
 func TestAWSGrantAgain(t *testing.T) {
+	provider := "arn:aws-us-gov:iam::123456789012:oidc-provider/" + eksHost
 	c := &cloud{answers: [][2]any{
 		{"get-caller-identity", `{"Account":"123456789012","Arn":"arn:aws-us-gov:iam::123456789012:user/owner"}`},
-		{"get-role", `{"Role":{}}`},
+		{"get-role-policy", errors.New("An error occurred (NoSuchEntity) when calling the GetRolePolicy operation")},
+		{"get-role", role(t, `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Federated":"`+provider+`"},
+		  "Action":"sts:AssumeRoleWithWebIdentity","Condition":{"StringEquals":{"`+eksHost+`:sub":"`+eks.Subject+`"}}}]}`)},
 		{"get-open-id-connect-provider", `{"ClientIDList":["other"]}`},
 	}}
-	p, err := PlanAWS(context.Background(), c.exec, awsOwner(), eks, false)
+	p, err := PlanAWS(context.Background(), c.exec, awsOwner(), eks, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,15 +331,66 @@ func TestAWSGrantAgain(t *testing.T) {
 		t.Errorf("again: %s %v", labels(p), p.ReaderSets)
 	}
 	find(t, p, "update-assume-role-policy")
+	find(t, p, "put-role-policy")
+}
+
+// The role is named by the reader alone: one trusting another reader's
+// console (another cluster of the same name) is refused, on grant and on
+// revoke, unless --replace.
+func TestAWSRoleOfAnotherReader(t *testing.T) {
+	other := Reader{Name: eks.Name, Issuer: "https://oidc.eks.eu-west-1.amazonaws.com/id/XYZ", Subject: eks.Subject}
+	theirs := role(t, TrustPolicy("arn:aws:iam::123456789012:oidc-provider/oidc.eks.eu-west-1.amazonaws.com/id/XYZ", other))
+	for _, tc := range []struct {
+		name  string
+		trust string
+		says  string
+	}{
+		{"another issuer", theirs, "system:serviceaccount:vertra-system:console-execution-console from oidc.eks.eu-west-1.amazonaws.com/id/XYZ"},
+		{"another subject", role(t, TrustPolicy("arn:aws:iam::123456789012:oidc-provider/"+eksHost,
+			Reader{Issuer: eks.Issuer, Subject: "system:serviceaccount:vertra-system:other"})), "system:serviceaccount:vertra-system:other from " + eksHost},
+		{"not vertra's", role(t, `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+			"a trust policy vertra didn't write"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &cloud{answers: [][2]any{
+				{"get-caller-identity", `{"Account":"123456789012","Arn":"arn:aws:iam::123456789012:user/owner"}`},
+				{"get-role-policy", policyAnswer(ReadPolicy("aws", "us-east-2", "123456789012", "vertra-products"))},
+				{"get-role", tc.trust},
+				{"get-open-id-connect-provider", `{"ClientIDList":["sts.amazonaws.com"]}`},
+				{"list-role-policies", `{"PolicyNames":["read-catalog"]}`},
+			}}
+			for _, revoke := range []bool{false, true} {
+				_, err := PlanAWS(context.Background(), c.exec, awsOwner(), eks, revoke, false)
+				if err == nil || !strings.Contains(err.Error(), "lets "+tc.says+" assume it") || !strings.Contains(err.Error(), "--replace") {
+					t.Errorf("revoke %v: %v", revoke, err)
+				}
+			}
+			p, err := PlanAWS(context.Background(), c.exec, awsOwner(), eks, false, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if labels(p) != "Has,Will replace,Has" {
+				t.Errorf("replace: %s", labels(p))
+			}
+			find(t, p, "update-assume-role-policy")
+			p, err = PlanAWS(context.Background(), c.exec, awsOwner(), eks, true, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if labels(p) != "Will delete,Will delete" || !strings.Contains(p.Actions[1].Text, tc.says+" can no longer assume it") {
+				t.Errorf("revoke with --replace: %s %q", labels(p), p.Actions[1].Text)
+			}
+		})
+	}
 }
 
 func TestAWSRevokes(t *testing.T) {
 	c := &cloud{answers: [][2]any{
 		{"get-caller-identity", `{"Account":"123456789012","Arn":"arn:aws:iam::123456789012:user/owner"}`},
-		{"get-role", `{"Role":{}}`},
+		{"get-role", role(t, TrustPolicy("arn:aws:iam::123456789012:oidc-provider/"+eksHost, eks))},
 		{"list-role-policies", `{"PolicyNames":["read-catalog"]}`},
 	}}
-	p, err := PlanAWS(context.Background(), c.exec, awsOwner(), eks, true)
+	p, err := PlanAWS(context.Background(), c.exec, awsOwner(), eks, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +400,7 @@ func TestAWSRevokes(t *testing.T) {
 	if a := p.Actions[1]; strings.Join(a.Args[:4], " ") != "iam delete-role --role-name vertra-reader-vertra-eks" {
 		t.Errorf("order: %v", a.Args)
 	}
-	if _, err := PlanAWS(context.Background(), c.exec, awsOwner(), Reader{Name: "x", ServiceAccounts: []string{"a@b.gserviceaccount.com"}}, false); err == nil {
+	if _, err := PlanAWS(context.Background(), c.exec, awsOwner(), Reader{Name: "x", ServiceAccounts: []string{"a@b.gserviceaccount.com"}}, false, false); err == nil {
 		t.Error("service accounts on aws")
 	}
 }
@@ -319,7 +412,7 @@ func TestOtherErrorsStop(t *testing.T) {
 		{"get-caller-identity", `{"Account":"123456789012","Arn":"arn:aws:iam::123456789012:user/owner"}`},
 		{"get-role", errors.New("AccessDenied")},
 	}}
-	if _, err := PlanAWS(context.Background(), c.exec, awsOwner(), eks, false); err == nil || !strings.Contains(err.Error(), "AccessDenied") {
+	if _, err := PlanAWS(context.Background(), c.exec, awsOwner(), eks, false, false); err == nil || !strings.Contains(err.Error(), "AccessDenied") {
 		t.Errorf("got %v", err)
 	}
 }

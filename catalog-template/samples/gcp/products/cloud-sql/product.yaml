@@ -6,8 +6,8 @@ displayName: GCP Cloud SQL
 description: >-
   Looks up a Cloud SQL instance by name within a project, creating it only
   if it doesn't already exist. Idempotent, same as gcp/_project: re-running
-  against an existing instance name is a no-op that still returns its
-  connection info. A real Cloud SQL instance is genuinely billed
+  against an existing instance name changes nothing, and returns its
+  connection info once it is RUNNABLE. A real Cloud SQL instance is billed
   infrastructure and takes several minutes to provision on first create --
   submit this with a generous `timeoutSeconds` (900+) on the task, not the
   kernel's default.
