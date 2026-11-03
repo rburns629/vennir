@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { asc, desc, eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { compareWithCopy, exportAudit } from "../src/auditExport.js";
+import { compared, compareWithCopy, exportAudit } from "../src/auditExport.js";
 import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { auditExport, auditLog } from "../src/db/schema.js";
@@ -134,6 +134,21 @@ describe("the database compared with its copy", () => {
     bucket(name, body);
     await compareWithCopy(app.log);
     expect(await state()).toMatchObject({ comparedThrough: ids[2], differsAt: null, compareProblem: null });
+  });
+
+  it("compares the entry, not the row: a column audit_log gains or loses later changes nothing", async () => {
+    const { ids, name, body } = await copied("columns");
+    // Copied by a release whose audit_log had a column since dropped.
+    const lines = body
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.stringify({ ...(JSON.parse(line) as Record<string, unknown>), droppedColumn: "x" }));
+    bucket(name, lines.join("\n") + "\n");
+    await compareWithCopy(app.log);
+    expect(await state()).toMatchObject({ comparedThrough: ids[2], differsAt: null, compareProblem: null });
+    // And a column added since: the row has it, its copy doesn't.
+    const [row] = await db.select().from(auditLog).where(eq(auditLog.id, ids[0]!));
+    expect(compared({ ...row, addedColumn: null })).toBe(compared(JSON.parse(body.split("\n")[0]!) as Record<string, unknown>));
   });
 
   it("names an entry changed after it was copied, its hashes rewritten or not", async () => {
