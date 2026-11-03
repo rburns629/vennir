@@ -390,10 +390,12 @@ func (a *app) destroyCmd() *cobra.Command {
 					if slices.Contains(install.RecordedAddOns(dir), addOn) {
 						question := fmt.Sprintf("Uninstall %s from %s, which vertra installed? %s", addOn.Name, addOn.Namespace, addOn.Loses)
 						if addOn == install.ExternalSecretsAddOn && labelled {
-							// Their ExternalSecrets own the Secrets they synced.
-							question += " The team namespaces kept may lose the secrets it synced into them."
+							question += " That includes the secrets it synced into the team namespaces kept."
 						}
-						yes, err := ask(question)
+						// Never answered by --all: an add-on isn't this
+						// install's data, and others may use it. Without a
+						// terminal, it's kept.
+						yes, err := a.ask.Confirm(question, false)
 						if err != nil {
 							return err
 						}

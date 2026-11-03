@@ -172,7 +172,8 @@ database, its backups, logs, the registry), keeping whatever you say;
 --all deletes them too. A kept managed database keeps its network. The
 audit log's write-once copy is always kept. The environment's folder stays.
 On an existing cluster it also asks about the team namespaces the console
-made (by name; none labelled by hand) and each add-on vertra installed there.`,
+made (by name; none labelled by hand) and each add-on vertra installed there
+(--all doesn't answer those: they're kept unless you say yes).`,
 		example: `  vertra destroy dev
   vertra destroy dev --all --yes   # everything, data included, no questions`,
 	},

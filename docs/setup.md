@@ -117,7 +117,8 @@ until it lapses. A local registry another kind cluster still uses is kept too.
 On an existing cluster, it offers to delete only the team namespaces the
 console made, naming them, never one labelled `vertra/team` by hand; and
 to uninstall only the add-ons (policy-controller, External Secrets
-Operator, cert-manager) vertra installed there, asking about each.
+Operator, cert-manager) vertra installed there, asking about each, even
+with `--all`.
 
 **Upgrading.** The release an install runs is the `vertra` setting
 (`vertra init --release <x.y.z>` chooses it; `source` builds your checkout

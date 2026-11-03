@@ -508,10 +508,15 @@ console made (labelled `app.kubernetes.io/managed-by: vertra-console`),
 named on the screen; one labelled `vertra/team` by hand is listed as kept.
 The add-ons it offers to uninstall (policy-controller, External Secrets
 Operator, cert-manager) are those an apply of this environment installed,
-recorded in `add-ons` beside the config when the cluster hadn't got them:
+recorded in `add-ons` beside the config when helm confirmed the cluster
+hadn't got them (when helm can't tell, apply stops rather than guess):
 apply upgrades one someone else installed, but destroy leaves it, and says
 so, with a warning when policy-controller would go on refusing Pods in
-team namespaces that are kept.
+team namespaces that are kept. An add-on isn't data, and others may use
+it, so `--all` doesn't answer these questions; without a terminal, each is
+kept. Each question says what goes with it: ESO's and policy-controller's
+charts delete their resource definitions, and with them every
+ExternalSecret, SecretStore or ClusterImagePolicy in the cluster.
 
 On AWS, the account's IAM OIDC provider for GitHub's issuer stays, even
 with `--all`: an account has one, which every install's catalog CI in it

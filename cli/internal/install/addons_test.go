@@ -34,6 +34,40 @@ func TestRecordedAddOns(t *testing.T) {
 	}
 }
 
+// An add-on is recorded as this environment's only when helm confirms its
+// release isn't there; helm failing isn't taken for "not installed".
+func TestRecordIfMissing(t *testing.T) {
+	for _, tc := range []struct {
+		name, script  string
+		recorded, err bool
+	}{
+		{"not installed", "exit 0", true, false},
+		{"someone else's", "echo external-secrets", false, false},
+		{"helm can't tell", "echo 'Kubernetes cluster unreachable' >&2; exit 1", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bin := t.TempDir()
+			script := filepath.Join(bin, "helm")
+			if err := os.WriteFile(script, []byte("#!/bin/sh\necho \"$@\" > \""+bin+"/args\"\n"+tc.script+"\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			r := &run.Runner{Out: os.Stdout, Err: os.Stderr, Resolve: func(string) string { return script }}
+			dir := t.TempDir()
+			err := RecordIfMissing(context.Background(), r, kindConfig(), dir, ExternalSecretsAddOn)
+			if (err != nil) != tc.err {
+				t.Errorf("err = %v", err)
+			}
+			if got := len(RecordedAddOns(dir)) == 1; got != tc.recorded {
+				t.Errorf("recorded = %v", got)
+			}
+			args, _ := os.ReadFile(filepath.Join(bin, "args"))
+			if !strings.Contains(string(args), "list") || !strings.Contains(string(args), "--namespace external-secrets --all --filter ^external-secrets$") {
+				t.Errorf("args: %s", args)
+			}
+		})
+	}
+}
+
 // The team namespaces destroy may delete are the console's, by its label;
 // those labelled vertra/team by hand are listed apart.
 func TestTeamNamespaces(t *testing.T) {

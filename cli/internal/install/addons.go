@@ -4,6 +4,7 @@ package install
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -22,13 +23,17 @@ type AddOn struct {
 	Loses string
 }
 
+// What each loses was read from the pinned charts (2026-11-03): ESO's and
+// policy-controller's resource definitions are templates with no
+// helm.sh/resource-policy: keep, so uninstalling deletes them, and every
+// object of their kinds in the cluster; cert-manager's are kept.
 var (
 	PolicyControllerAddOn = AddOn{"policy-controller", "policy-controller", "cosign-system",
-		"Anything else's image policies stop being enforced."}
+		"Its resource definitions go with it, and so does every ClusterImagePolicy in the cluster, anyone's."}
 	ExternalSecretsAddOn = AddOn{"External Secrets Operator", "external-secrets", "external-secrets",
-		"Anything else's SecretStores stop syncing."}
+		"Its resource definitions go with it, and so does every SecretStore and ExternalSecret in the cluster, anyone's, with the Secrets they own."}
 	CertManagerAddOn = AddOn{"cert-manager", "cert-manager", "cert-manager",
-		"Anything else's certificates stop renewing."}
+		"Its resource definitions stay, but anything else's certificates stop renewing."}
 )
 
 // AddOns are every add-on apply may install, in the order destroy offers
@@ -40,6 +45,23 @@ var AddOns = []AddOn{PolicyControllerAddOn, ExternalSecretsAddOn, CertManagerAdd
 // cluster before. Destroy offers to uninstall those, and only those, as
 // apply also upgrades an add-on someone else installed.
 const AddOnsFile = "add-ons"
+
+// RecordIfMissing records a as this environment's (RecordAddOn) when helm
+// confirms the cluster hasn't got its release, in any state: apply calls it
+// just before installing a. When helm can't tell, it's an error, never
+// taken for "not installed", so someone else's add-on is never recorded.
+// Recorded first, so a failed install is recorded too.
+func RecordIfMissing(ctx context.Context, r *run.Runner, c *config.Config, dir string, a AddOn) error {
+	out, err := r.Output(ctx, "helm", "list", "--kube-context", cluster.Context(c), "--namespace", a.Namespace,
+		"--all", "--filter", "^"+a.Release+"$", "--short")
+	if err != nil {
+		return fmt.Errorf("couldn't tell whether %s is installed already: %w", a.Name, err)
+	}
+	if strings.TrimSpace(out) != "" {
+		return nil
+	}
+	return RecordAddOn(dir, a)
+}
 
 // RecordAddOn adds a to dir's AddOnsFile.
 func RecordAddOn(dir string, a AddOn) error {
