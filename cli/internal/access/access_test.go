@@ -102,6 +102,47 @@ func TestCheckAWSFindsTheRegionsAnOrganizationAllows(t *testing.T) {
 	}
 }
 
+// An account with no budgets: the AWS CLI prints nothing (no Budgets key),
+// or Budgets answers NotFoundException. Either is none, and offered one.
+func TestCheckAWSWithNoBudgets(t *testing.T) {
+	exec := fakeAWS("arn:aws:iam::111111111111:user/rburns")
+	for name, answer := range map[string]struct {
+		out string
+		err error
+	}{
+		"nothing printed":   {"", nil},
+		"NotFoundException": {"", errors.New("\naws: [ERROR]: An error occurred (NotFoundException) when calling the DescribeBudgets operation: [Exception=NotFoundException] Account 111111111111 has no budgets")},
+	} {
+		a := CheckAWS(context.Background(), func(ctx context.Context, n string, args ...string) (string, error) {
+			if strings.HasPrefix(strings.Join(args, " "), "budgets describe-budgets") {
+				return answer.out, answer.err
+			}
+			return exec(ctx, n, args...)
+		}, "vertra", "us-east-2")
+		if out := report(a.Report); a.BudgetsUnread || a.Budgets != 0 || !strings.Contains(out, "Budgets: none in this account") {
+			t.Errorf("%s: unread %v, %d budgets:\n%s", name, a.BudgetsUnread, a.Budgets, out)
+		}
+	}
+}
+
+// Budgets that can't be read aren't "none": the check says so, and init
+// doesn't offer one.
+func TestCheckAWSWithoutBudgetsAccess(t *testing.T) {
+	exec := fakeAWS("arn:aws:iam::111111111111:user/rburns")
+	a := CheckAWS(context.Background(), func(ctx context.Context, name string, args ...string) (string, error) {
+		if strings.HasPrefix(strings.Join(args, " "), "budgets describe-budgets") {
+			return "", errors.New("An error occurred (AccessDeniedException)")
+		}
+		return exec(ctx, name, args...)
+	}, "vertra", "us-east-2")
+	if out := report(a.Report); !a.BudgetsUnread || !strings.Contains(out, "Budgets: couldn't read them") || strings.Contains(out, "none in this account") {
+		t.Errorf("unread %v:\n%s", a.BudgetsUnread, out)
+	}
+	if b := CheckAWS(context.Background(), exec, "vertra", "us-east-2"); b.BudgetsUnread {
+		t.Error("budgets read, but marked unread")
+	}
+}
+
 func TestCheckAWSInAnAllowedRegion(t *testing.T) {
 	a := CheckAWS(context.Background(), fakeAWS("arn:aws:iam::111111111111:user/rburns"), "vertra", "us-east-2")
 	out := report(a.Report)

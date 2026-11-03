@@ -20,7 +20,7 @@ import {
 } from "../src/db/queries.js";
 import { teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
-import { SecretNotManagedError, deleteSecretGrant, upsertSecretGrant } from "../src/k8s.js";
+import { SecretNotManagedError, deleteSecretGrant, upsertExternalSecretGrant, upsertSecretGrant } from "../src/k8s.js";
 import { syncIdentityPolicy } from "../src/productPolicy.js";
 import { caller } from "./rpc.js";
 
@@ -120,6 +120,25 @@ describe("registering", () => {
     await recordSecretGrant({ teamId: ours.id, secretName: "old-key", keys: ["value"], source: "literal" });
     await put(literal({ secretName: "old-key" }));
     expect(vi.mocked(upsertSecretGrant).mock.calls[1]?.[0]).toMatchObject({ alreadyGranted: true });
+  });
+
+  it("refuses switching a secret between pasted and synced until it's revoked", async () => {
+    await recordSecretGrant({ teamId: ours.id, secretName: "synced-key", keys: ["value"], source: "external" });
+    const pasted = await put(literal({ secretName: "synced-key" }));
+    expect(pasted.code).toBe("failed_precondition");
+    expect(JSON.stringify(pasted.body)).toContain("Revoke it first");
+    expect(upsertSecretGrant).not.toHaveBeenCalled();
+
+    await recordSecretGrant({ teamId: ours.id, secretName: "pasted-key", keys: ["value"], source: "literal" });
+    vi.mocked(upsertExternalSecretGrant).mockClear();
+    const synced = await call(member, "SecretService/SyncSecret", {
+      team: ours.name,
+      secretName: "pasted-key",
+      secretStoreName: "vault",
+      keys: [{ secretKey: "value", remoteKey: "db/key" }],
+    });
+    expect(synced.code).toBe("failed_precondition");
+    expect(upsertExternalSecretGrant).not.toHaveBeenCalled();
   });
 });
 

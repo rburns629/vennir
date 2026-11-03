@@ -20,7 +20,7 @@ import { caller } from "./rpc.js";
 
 const call = caller(() => app);
 import { createScanJob, readScanJob, scaleScanner, updateScanPolicy } from "../src/k8s.js";
-import { parseScanOutput, reconcileScans, RETRY_ERRORED_MINUTES, scanBlocker, scanTarget, verdictOf } from "../src/scanning.js";
+import { parseScanOutput, reconcileScans, requestScan, RETRY_ERRORED_MINUTES, scanBlocker, scanTarget, syncScanPolicy, verdictOf } from "../src/scanning.js";
 
 /** What each scan Job (by target) prints when it finishes. */
 const outputs = new Map<string, string>();
@@ -219,6 +219,72 @@ describe("what a verdict allows", () => {
     try {
       await reconcileScans();
       expect(await db.select().from(imageScans).where(eq(imageScans.digest, digest))).toEqual([]);
+    } finally {
+      vi.mocked(readScanJob).mockImplementation((_namespace: string, name: string) => {
+        const output = outputs.get(jobs.get(name) ?? "");
+        return Promise.resolve(output === undefined ? { state: "running" } : { state: "succeeded", output });
+      });
+    }
+  });
+
+  it("keeps a failed verdict when the registry no longer has the image, so the cluster still refuses it", async () => {
+    const img = image();
+    const digest = img.split("@")[1] ?? "";
+    await scanned(img, VULNERABLE);
+    const longAgo = new Date(Date.now() - 48 * 3_600_000);
+    await db.update(imageScans).set({ scannedAt: longAgo, requestedAt: longAgo }).where(eq(imageScans.digest, digest));
+    await reconcileScans(); // due: started
+    vi.mocked(readScanJob).mockImplementation(() =>
+      Promise.resolve({ state: "failed", output: `remote error: GET https://registry.example/v2/app/manifests/${digest}: MANIFEST_UNKNOWN: manifest unknown` }),
+    );
+    try {
+      await reconcileScans();
+      const [row] = await db.select().from(imageScans).where(eq(imageScans.digest, digest));
+      expect(row).toMatchObject({ status: "failed", jobName: null });
+      expect((row?.findings as { fixable?: number } | null)?.fixable).toBe(1);
+      await syncScanPolicy();
+      expect(JSON.parse(policyWritten ?? "[]")).toContain(digest);
+    } finally {
+      vi.mocked(readScanJob).mockImplementation((_namespace: string, name: string) => {
+        const output = outputs.get(jobs.get(name) ?? "");
+        return Promise.resolve(output === undefined ? { state: "running" } : { state: "succeeded", output });
+      });
+    }
+  });
+
+  it("never lets a reconcile holding a finished scan overwrite the next one", async () => {
+    const img = image();
+    const { target } = scanTarget(img);
+    const digest = img.split("@")[1] ?? "";
+    expect((await scanBlocker([img]))?.error).toBe("IMAGE_SCAN_PENDING");
+    const first = vi.mocked(createScanJob).mock.calls.find(([spec]) => spec.target === target)?.[0].name ?? "";
+    outputs.set(target, CLEAN);
+    // A reconcile that read the first Job's row, and is slow to hear back
+    // from the cluster: by then the Job is gone.
+    let answer: (state: { state: "missing" }) => void = () => {};
+    const slow = new Promise<{ state: "missing" }>((resolve) => (answer = resolve));
+    let held = false;
+    vi.mocked(readScanJob).mockImplementation((_namespace: string, name: string) => {
+      if (name === first && !held) {
+        held = true;
+        return slow;
+      }
+      const output = outputs.get(jobs.get(name) ?? "");
+      return Promise.resolve(output === undefined ? { state: "running" } : { state: "succeeded", output });
+    });
+    try {
+      const stale = reconcileScans();
+      await vi.waitFor(() => expect(held).toBe(true));
+      await reconcileScans(); // records the first scan
+      await requestScan(img, { force: true }); // and a rescan starts
+      const [rescanning] = await db.select().from(imageScans).where(eq(imageScans.digest, digest));
+      expect(rescanning?.jobName).not.toBeNull();
+      expect(rescanning?.jobName).not.toBe(first);
+      outputs.delete(target); // the rescan is still running
+      answer({ state: "missing" });
+      await stale;
+      const [row] = await db.select().from(imageScans).where(eq(imageScans.digest, digest));
+      expect(row).toMatchObject({ status: "passed", jobName: rescanning?.jobName });
     } finally {
       vi.mocked(readScanJob).mockImplementation((_namespace: string, name: string) => {
         const output = outputs.get(jobs.get(name) ?? "");

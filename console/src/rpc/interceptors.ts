@@ -102,6 +102,14 @@ export const audit: Interceptor = (next) => async (req) => {
   if (req.method.idempotency === MethodOptions_IdempotencyLevel.NO_SIDE_EFFECTS) {
     return next(req);
   }
+  // No one signed in, for a method that needs someone: requireCaller
+  // refuses it before it does anything. Logged, never an audit entry, so
+  // anyone who can reach the console can't fill the log (each entry waits
+  // for the chain's lock).
+  if (!PUBLIC.has(name) && !req.contextValues.get(kCaller)) {
+    req.contextValues.get(kLog)?.info({ event: "rpc_unauthenticated", procedure: name, clientIp: req.contextValues.get(kClientIp) }, "a call with no one signed in was refused");
+    return next(req);
+  }
   let status = 200;
   // The run a call started, when it started one (a submit, a template, a
   // rerun): recorded so the entry reaches every team in that run.

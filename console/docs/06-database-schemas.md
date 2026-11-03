@@ -446,7 +446,7 @@ Which team owns each image repository: the first team to register a product from
 
 ### audit_log
 
-Who changed what (`src/audit.ts`): one row per call that tried to change something (any method not marked as only reading), allowed or refused, recorded once it's answered, signing in and changing a password included. Admins read it with `AdminService/ListAuditEntries`; each entry is also logged (`event: "audit"`).
+Who changed what (`src/audit.ts`): one row per call that tried to change something (any method not marked as only reading), allowed or refused, recorded once it's answered, signing in and changing a password included (not a call with no one signed in to a method that needs someone: that is only logged). Admins read it with `AdminService/ListAuditEntries`; each entry is also logged (`event: "audit"`).
 
 | Column | Type | Null | Meaning |
 | --- | --- | --- | --- |
@@ -818,7 +818,9 @@ A team's schedules: a template or action run on a cron, with set parameters, for
 | `next_run_at` | timestamptz | yes | When it runs next; null while paused. A console starting it moves this on first, so only one does. |
 | `last_run_at` | timestamptz | yes | |
 | `last_execution_id` | uuid | yes | Its last run. |
-| `last_error` | text | yes | Why its last start was refused. |
+| `last_error` | text | yes | Why its last start was refused, or why it won't run again (its cron or time zone no longer reads). |
+| `claimed_run_at` | timestamptz | yes | A time a console claimed and hasn't started yet. Another console starts it once `claimed_at` is five minutes old (its request id keeps that to one run). Cleared when the schedule is paused or its timetable or time zone changes. |
+| `claimed_at` | timestamptz | yes | When `claimed_run_at` was claimed. |
 | `created_by` | uuid | yes | |
 | `updated_by` | uuid | yes | Who last changed it. Its runs, as its bot, aren't theirs to approve. |
 | `created_at` | timestamptz | no | |

@@ -1,7 +1,7 @@
 # execution-kernel on the local kind cluster `vertra-local` (release
 # `kernel`, namespace vertra-system):
 #   helm upgrade --install kernel helm/charts/execution-kernel -n vertra-system \
-#     --kube-context kind-vertra-local -f helm/values/kind/kernel.yaml
+#     --reset-values --force-conflicts --kube-context kind-vertra-local -f helm/values/kind/kernel.yaml
 # The images make kind-deploy builds and loads onto the node.
 image:
   repository: execution-kernel

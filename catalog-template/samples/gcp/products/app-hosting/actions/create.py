@@ -181,7 +181,7 @@ def _run() -> int:
             "app-hosting for this team in the console (the gcp team's README.md).",
         )
     if not image.startswith(registry + "/"):
-        return _failure("IMAGE_NOT_ALLOWED", f"inputs.image must be under {registry}/, the registry this team deploys from.")
+        return _failure("IMAGE_OUTSIDE_REGISTRY", f"inputs.image must be under {registry}/, the registry this team deploys from.")
 
     services = run_v2.ServicesClient(credentials=_signed_in())
     service_path = services.service_path(project_id, region, service_name)
