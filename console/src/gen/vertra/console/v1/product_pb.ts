@@ -720,10 +720,11 @@ export const ProductService: GenService<{
     output: typeof ListProductsResponseSchema;
   },
   /**
-   * Registers or updates a product: a member of its team, an admin, or a
-   * token with products:register. With no team it's a platform product:
-   * admins only. Refused (already_exists) when another team owns its name
-   * or its image repository.
+   * Registers or updates a product: an admin, or a token with
+   * products:register (the catalog's release); a team's maintainers don't.
+   * With no team it's a platform product: admins only. Refused
+   * (already_exists) when another team owns its name or its image
+   * repository.
    *
    * @generated from rpc vertra.console.v1.ProductService.RegisterProduct
    */
@@ -744,7 +745,8 @@ export const ProductService: GenService<{
     output: typeof CheckProductResponseSchema;
   },
   /**
-   * Unregisters a product. Its name and image repository stay its team's.
+   * Unregisters a product: an admin, or a token with products:register.
+   * Its name and image repository stay its team's.
    *
    * @generated from rpc vertra.console.v1.ProductService.DeleteProduct
    */

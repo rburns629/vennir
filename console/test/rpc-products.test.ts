@@ -33,6 +33,7 @@ const registry = `registry.example/${prefix}`;
 let ours: { id: string; name: string };
 let theirs: { id: string; name: string };
 let token: string;
+let adminToken: string;
 
 beforeAll(async () => {
   app = await buildApp();
@@ -42,6 +43,7 @@ beforeAll(async () => {
   const member = await makeUser();
   await addTeamMember(member.id, ours.id);
   token = await signIn(member.email);
+  adminToken = await signIn((await makeUser({ admin: true })).email);
 });
 
 afterAll(async () => {
@@ -67,8 +69,14 @@ const registration = (overrides: object = {}) => ({
 });
 
 describe("ProductService", () => {
-  it("registers a member's product and lists it, schemas and all", async () => {
+  it("refuses a team's maintainer: products come from the catalog, or an admin", async () => {
     const response = await rpc("ProductService", "RegisterProduct", registration(), { token });
+    expect(response.statusCode).toBe(403);
+    expect(response.json<RpcError>().message).toContain("catalog");
+  });
+
+  it("registers a team's product, as an admin, and lists it to its members, schemas and all", async () => {
+    const response = await rpc("ProductService", "RegisterProduct", registration(), { token: adminToken });
     expect(response.statusCode).toBe(200);
     expect(response.json<{ product: { teamId: string } }>().product.teamId).toBe(ours.id);
 
@@ -125,9 +133,9 @@ describe("ProductService", () => {
     expect(response.json<RpcError>().code).toBe("invalid_argument");
   });
 
-  it("deletes a member's product", async () => {
-    const response = await rpc("ProductService", "DeleteProduct", { name: `${prefix}-greet` }, { token });
-    expect(response.statusCode).toBe(200);
+  it("deletes a product for an admin, never for a team's maintainer", async () => {
+    expect((await rpc("ProductService", "DeleteProduct", { name: `${prefix}-greet` }, { token })).statusCode).toBe(403);
+    expect((await rpc("ProductService", "DeleteProduct", { name: `${prefix}-greet` }, { token: adminToken })).statusCode).toBe(200);
   });
 
   it("lets only admins or products:register replace the wiring types", async () => {

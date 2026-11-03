@@ -30,7 +30,6 @@ const emails: string[] = [];
 let app: FastifyInstance;
 let admin: string;
 let memberA: string;
-let memberB: string;
 let catalogCi: string;
 
 const call = caller(() => app);
@@ -54,7 +53,6 @@ beforeAll(async () => {
   const b = await createTeam(teamB);
   admin = await newUser(true);
   memberA = await newUser(false, a.id);
-  memberB = await newUser(false, b.id);
   const botEmail = `${prefix}-ci@bots.vertra.local`;
   emails.push(botEmail);
   const bot = await createBotUser(botEmail);
@@ -74,9 +72,9 @@ afterAll(async () => {
 describe("product names", () => {
   it("another team can't take over a product's name", async () => {
     const name = `${prefix}-deploy`;
-    expect((await register(memberA, { name, image: `${repo("deploy")}:1`, action: "run", team: teamA })).code).toBe("ok");
+    expect((await register(catalogCi, { name, image: `${repo("deploy")}:1`, action: "run", team: teamA })).code).toBe("ok");
 
-    const takeover = await register(memberB, { name, image: `${repo("evil")}:1`, action: "run", team: teamB });
+    const takeover = await register(catalogCi, { name, image: `${repo("evil")}:1`, action: "run", team: teamB });
     expect(takeover.code).toBe("failed_precondition");
     expect(takeover.message).toContain(`team "${teamA}"`);
 
@@ -90,7 +88,7 @@ describe("product names", () => {
 
   it("its own team can still update it", async () => {
     const name = `${prefix}-update`;
-    expect((await register(memberA, { name, image: `${repo("update")}:1`, action: "run", team: teamA })).code).toBe("ok");
+    expect((await register(catalogCi, { name, image: `${repo("update")}:1`, action: "run", team: teamA })).code).toBe("ok");
     const updated = await register(catalogCi, { name, image: `${repo("update")}@sha256:${"a".repeat(64)}`, action: "run", team: teamA });
     expect(updated.code).toBe("ok");
   });
@@ -98,47 +96,47 @@ describe("product names", () => {
   it("a team can't take over a platform product's name, nor the platform a team's", async () => {
     const platformName = `${prefix}-platform`;
     expect((await register(admin, { name: platformName, image: `${repo("platform")}:1`, action: "run" })).code).toBe("ok");
-    const byTeam = await register(memberA, { name: platformName, image: `${repo("x")}:1`, action: "run", team: teamA });
+    const byTeam = await register(catalogCi, { name: platformName, image: `${repo("x")}:1`, action: "run", team: teamA });
     expect(byTeam.code).toBe("failed_precondition");
     expect(byTeam.message).toContain("the platform");
 
     const teamName = `${prefix}-teams`;
-    expect((await register(memberA, { name: teamName, image: `${repo("teams")}:1`, action: "run", team: teamA })).code).toBe("ok");
+    expect((await register(catalogCi, { name: teamName, image: `${repo("teams")}:1`, action: "run", team: teamA })).code).toBe("ok");
     expect((await register(admin, { name: teamName, image: `${repo("y")}:1`, action: "run" })).code).toBe("failed_precondition");
   });
 });
 
 describe("image repositories", () => {
   it("only the team that first registered a repository may use it, by any tag or digest", async () => {
-    expect((await register(memberA, { name: `${prefix}-build`, image: `${repo("build")}:1`, action: "build", team: teamA })).code).toBe("ok");
+    expect((await register(catalogCi, { name: `${prefix}-build`, image: `${repo("build")}:1`, action: "build", team: teamA })).code).toBe("ok");
 
     for (const image of [`${repo("build")}:1`, `${repo("build")}:2`, `${repo("build")}@sha256:${"b".repeat(64)}`]) {
-      const borrowed = await register(memberB, { name: `${prefix}-b-build-${randomUUID().slice(0, 4)}`, image, action: "build", team: teamB });
+      const borrowed = await register(catalogCi, { name: `${prefix}-b-build-${randomUUID().slice(0, 4)}`, image, action: "build", team: teamB });
       expect(borrowed.code).toBe("failed_precondition");
       expect(borrowed.message).toContain(`team "${teamA}"`);
     }
     // The owning team may register more products (actions) from it.
-    expect((await register(memberA, { name: `${prefix}-build-check`, image: `${repo("build")}:1`, action: "check", team: teamA })).code).toBe("ok");
+    expect((await register(catalogCi, { name: `${prefix}-build-check`, image: `${repo("build")}:1`, action: "check", team: teamA })).code).toBe("ok");
   });
 
   it("stays reserved after its product is deleted, until an admin releases it", async () => {
     const name = `${prefix}-gone`;
     const image = `${repo("gone")}:1`;
-    expect((await register(memberA, { name, image, action: "run", team: teamA })).code).toBe("ok");
-    expect((await call(memberA, "ProductService/DeleteProduct", { name })).code).toBe("ok");
+    expect((await register(catalogCi, { name, image, action: "run", team: teamA })).code).toBe("ok");
+    expect((await call(catalogCi, "ProductService/DeleteProduct", { name })).code).toBe("ok");
 
-    const afterDelete = await register(memberB, { name: `${prefix}-b-gone`, image, action: "run", team: teamB });
+    const afterDelete = await register(catalogCi, { name: `${prefix}-b-gone`, image, action: "run", team: teamB });
     expect(afterDelete.code).toBe("failed_precondition");
 
     expect((await releaseRepo(memberA, repo("gone"))).code).toBe("permission_denied");
     expect((await releaseRepo(admin, repo("gone"))).code).toBe("ok");
     expect((await releaseRepo(admin, repo("gone"))).code).toBe("not_found");
 
-    expect((await register(memberB, { name: `${prefix}-b-gone`, image, action: "run", team: teamB })).code).toBe("ok");
+    expect((await register(catalogCi, { name: `${prefix}-b-gone`, image, action: "run", team: teamB })).code).toBe("ok");
   });
 
   it("can't be released while a product uses it", async () => {
-    expect((await register(memberA, { name: `${prefix}-busy`, image: `${repo("busy")}:1`, action: "run", team: teamA })).code).toBe("ok");
+    expect((await register(catalogCi, { name: `${prefix}-busy`, image: `${repo("busy")}:1`, action: "run", team: teamA })).code).toBe("ok");
     expect((await releaseRepo(admin, repo("busy"))).code).toBe("failed_precondition");
   });
 
@@ -165,6 +163,6 @@ describe("image repositories", () => {
     const [owner] = await db.select().from(imageRepositories).where(like(imageRepositories.repository, repo("old")));
     expect(owner?.teamId).toBe(ownerA?.id);
     // So team B's existing registration can't be refreshed any more.
-    expect((await register(memberB, { name: `${prefix}-old-b`, image: `${repo("old")}:3`, action: "run", team: teamB })).code).toBe("failed_precondition");
+    expect((await register(catalogCi, { name: `${prefix}-old-b`, image: `${repo("old")}:3`, action: "run", team: teamB })).code).toBe("failed_precondition");
   });
 });
