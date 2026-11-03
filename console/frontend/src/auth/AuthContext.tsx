@@ -1,8 +1,15 @@
 // SPDX-License-Identifier: MIT
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, getMe, login as apiLogin, signOut as apiSignOut, SESSION_EXPIRED_EVENT, type Me } from "../api";
 import { cart } from "../cart";
 import { forgetBrowserDrafts } from "../pages/useComposeDrafts";
+
+/** Why the first check hasn't settled: the console can't answer yet (asked
+ * again, with backoff), or it answered something other than who's signed in. */
+export interface SessionTrouble {
+  retrying: boolean;
+  message: string;
+}
 
 interface AuthState {
   user: Me | null;
@@ -10,6 +17,10 @@ interface AuthState {
    * localStorage) has resolved -- lets consumers avoid a login-page flash
    * for a user who's actually already got a valid session. */
   loading: boolean;
+  /** While loading: why the first check hasn't settled yet, if it failed. */
+  trouble: SessionTrouble | null;
+  /** Asks the first check again now, instead of waiting for the next try. */
+  retryNow: () => void;
   /** True when the user was signed out because their session expired or
    * was revoked, not because they clicked "Sign out" -- so the login page
    * can say why they're there. Cleared by the next successful login. */
@@ -32,15 +43,22 @@ function forgetKept(): void {
   forgetBrowserDrafts();
 }
 
-/** A failure the console may get over by itself (restarting, the network), not an answer about the session. */
-const passing = (error: unknown) => !(error instanceof ApiError) || error.status >= 500 || error.status === 429;
+/** A failure the console may get over by itself (restarting, the network),
+ * not an answer about the session. Not 501: a console that doesn't have the
+ * method won't grow it by being asked again. */
+const passing = (error: unknown) => !(error instanceof ApiError) || (error.status >= 500 && error.status !== 501) || error.status === 429;
+
+const UNREACHABLE = "Can't reach the console. Trying again…";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
+  const [trouble, setTrouble] = useState<SessionTrouble | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
+  // The first check while it's unsettled: the next try, and how to ask now.
+  const first = useRef<{ timer: ReturnType<typeof setTimeout> | undefined; wait: number; check: (() => void) | null }>({ timer: undefined, wait: 1000, check: null });
 
-  async function refresh(): Promise<void> {
+  async function loadMe(): Promise<void> {
     if (!localStorage.getItem("token")) {
       setUser(null);
       return;
@@ -60,31 +78,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /** The first check is over (it answered, or a sign-in did): no more tries. */
+  function settle(): void {
+    clearTimeout(first.current.timer);
+    first.current.check = null;
+    setTrouble(null);
+    setLoading(false);
+  }
+
+  async function refresh(): Promise<void> {
+    await loadMe();
+    settle();
+  }
+
   // The first check, asked again while the console can't answer (a rolling
   // restart, the network): still loading, not signed out, since the token
-  // may well be good. Any other refusal is a sign-in page, as no session is.
+  // may well be good, and saying so. Any other answer but who's signed in
+  // is shown as it is, to try again by hand.
   useEffect(() => {
     let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    function check(wait: number): void {
-      refresh().then(
+    function check(): void {
+      loadMe().then(
         () => {
-          if (!stopped) setLoading(false);
+          if (!stopped && first.current.check === check) settle();
         },
         (error: unknown) => {
-          if (stopped) return;
-          if (passing(error)) timer = setTimeout(() => { check(Math.min(wait * 2, 30_000)); }, wait);
-          else setLoading(false);
+          if (stopped || first.current.check !== check) return;
+          if (!passing(error)) {
+            setTrouble({ retrying: false, message: error instanceof Error && error.message ? error.message : "The console couldn't say who's signed in." });
+            return;
+          }
+          setTrouble({ retrying: true, message: UNREACHABLE });
+          const wait = first.current.wait;
+          first.current.wait = Math.min(wait * 2, 30_000);
+          // (One try waiting at a time, though Retry now may have asked meanwhile.)
+          clearTimeout(first.current.timer);
+          first.current.timer = setTimeout(check, wait);
         },
       );
     }
-    check(1000);
+    first.current.check = check;
+    check();
     return () => {
       stopped = true;
-      clearTimeout(timer);
+      clearTimeout(first.current.timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, on mount only
   }, []);
+
+  function retryNow(): void {
+    const check = first.current.check;
+    if (!check) return;
+    clearTimeout(first.current.timer);
+    first.current.wait = 1000;
+    check();
+  }
 
   // api.ts has already dropped the token by the time this fires; clearing
   // `user` is what makes ProtectedRoute send the browser to /login.
@@ -125,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, sessionExpired, login, logout, refresh, adoptToken }}>
+    <AuthContext.Provider value={{ user, loading, trouble, retryNow, sessionExpired, login, logout, refresh, adoptToken }}>
       {children}
     </AuthContext.Provider>
   );
