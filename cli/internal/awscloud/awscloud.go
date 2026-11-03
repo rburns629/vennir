@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -506,17 +507,51 @@ func publicKeyPEM(out string) (string, error) {
 }
 
 // LeftVolumes are EBS volumes a namespace's claims made that nothing has
-// attached: what a cluster deleted without its volume claims leaves.
-func LeftVolumes(ctx context.Context, r *run.Runner, c *config.Config, namespace string) ([]string, error) {
+// attached: what a cluster deleted without its volume claims leaves. Every
+// install's namespace is vertra-system by default, and a sleeping install's
+// database volume is unattached too, so they're told apart by the cluster
+// the EBS driver tagged them with: mine name this cluster, unknown name
+// none (to check by hand), and another cluster's aren't returned.
+func LeftVolumes(ctx context.Context, r *run.Runner, c *config.Config, namespace string) (mine, unknown []string, err error) {
 	out, err := r.Output(ctx, "aws", args(c, "ec2", "describe-volumes", "--filters",
 		"Name=tag:kubernetes.io/created-for/pvc/namespace,Values="+namespace, "Name=status,Values=available",
-		"--query", "Volumes[].VolumeId")...)
+		"--query", "Volumes[].{id: VolumeId, tags: Tags}")...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var ids []string
-	_ = json.Unmarshal([]byte(out), &ids)
-	return ids, nil
+	return volumesOf(out, c.Cluster.Name)
+}
+
+// volumesOf sorts describe-volumes' answer by the cluster each volume's
+// tags name: the EBS CSI driver's kubernetes.io/cluster/<name> and
+// KubernetesCluster (with its cluster id set), and Auto Mode's
+// eks:eks-cluster-name.
+func volumesOf(out, cluster string) (mine, unknown []string, err error) {
+	var vols []struct {
+		ID   string `json:"id"`
+		Tags []struct{ Key, Value string }
+	}
+	if err := json.Unmarshal([]byte(out), &vols); err != nil {
+		return nil, nil, fmt.Errorf("describe-volumes' answer: %w", err)
+	}
+	for _, v := range vols {
+		var named []string
+		for _, t := range v.Tags {
+			switch {
+			case strings.HasPrefix(t.Key, "kubernetes.io/cluster/"):
+				named = append(named, strings.TrimPrefix(t.Key, "kubernetes.io/cluster/"))
+			case t.Key == "KubernetesCluster" || t.Key == "eks:eks-cluster-name":
+				named = append(named, t.Value)
+			}
+		}
+		switch {
+		case len(named) == 0:
+			unknown = append(unknown, v.ID)
+		case !slices.ContainsFunc(named, func(n string) bool { return n != cluster }):
+			mine = append(mine, v.ID)
+		}
+	}
+	return mine, unknown, nil
 }
 
 // BedrockAuthorized says whether this account may call model in Amazon
