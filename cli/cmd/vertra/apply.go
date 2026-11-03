@@ -107,6 +107,13 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 	if err != nil {
 		return err
 	}
+	// Its charts are checked against the sums this vertra carries: before
+	// anything is approved, not once the cloud side exists.
+	if c.Vertra != "source" {
+		if err := install.KnownRelease(c.Vertra); err != nil {
+			return err
+		}
+	}
 	p := buildPlan(ctx, c, envName(dir), state, images, installed, now, cloud)
 	p.Notes = append(p.Notes, upgrade...)
 	var screen bytes.Buffer

@@ -19,6 +19,7 @@ import (
 	"github.com/rburns629/vertra/cli/internal/cluster"
 	"github.com/rburns629/vertra/cli/internal/config"
 	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vertra/cli/internal/tools"
 )
 
 // args adds the config's profile and region to an aws command.
@@ -253,19 +254,21 @@ func DeleteTaskRepositories(ctx context.Context, r *run.Runner, c *config.Config
 // (standard mode) is matched to.
 const KubernetesVersion = "1.36"
 
-// The Cluster Autoscaler for standard mode: its chart and the image for
-// KubernetesVersion, pinned (the chart's own default is an older release).
-const (
-	autoscalerChart = "9.59.0"
-	autoscalerImage = "v1.36.1@sha256:461388d03eb5b55db58941ee7a81d9a619dd15302b01cbab9f5a9946715994b4"
-)
+// The Cluster Autoscaler's image for KubernetesVersion (standard mode),
+// pinned (its chart's default is an older release; the chart is pinned in
+// tools).
+const autoscalerImage = "v1.36.1@sha256:461388d03eb5b55db58941ee7a81d9a619dd15302b01cbab9f5a9946715994b4"
 
 // InstallAutoscaler installs the Cluster Autoscaler (standard mode), which
 // grows and shrinks the node groups, the steps' from zero. It signs in as
 // the module's autoscaler role (EKS Pod Identity, by its ServiceAccount).
 func InstallAutoscaler(ctx context.Context, r *run.Runner, c *config.Config) error {
-	return r.Run(ctx, "helm", "upgrade", "--install", "cluster-autoscaler", "cluster-autoscaler",
-		"--repo", "https://kubernetes.github.io/autoscaler", "--version", autoscalerChart,
+	chart, done, err := tools.PullChart(ctx, r, "cluster-autoscaler")
+	if err != nil {
+		return err
+	}
+	defer done()
+	return r.Run(ctx, "helm", "upgrade", "--install", "cluster-autoscaler", chart,
 		"--kube-context", cluster.Context(c), "--namespace", "kube-system",
 		"--set", "autoDiscovery.clusterName="+c.Cluster.Name,
 		"--set", "awsRegion="+c.AWS.Region,
