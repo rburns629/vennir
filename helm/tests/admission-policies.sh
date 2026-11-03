@@ -221,6 +221,8 @@ expect "a command of its own"                 "its image's own entrypoint"  "$(j
 expect "more than its action as arguments"    "its image's own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"args":["run","--and-more"]')"
 expect "an environment variable of its own"   "its image's own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"env":[{"name":"EXTRA","value":"x"}]')"
 expect "a Kubernetes API token"               "its image's own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ',{"name":"t","projected":{"sources":[{"serviceAccountToken":{"path":"t"}}]}}')"
+expect "a postStart hook"                     "its image's own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"lifecycle":{"postStart":{"exec":{"command":["sh","-c","id"]}}}')"
+expect "an exec probe"                        "its image's own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"livenessProbe":{"exec":{"command":["sh","-c","id"]}}')"
 expect "a container as root"                  "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"securityContext":{'"$HARD"',"runAsUser":0}' own)"
 expect "a container without seccomp"          "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"securityContext":{'"$HARD"',"seccompProfile":{"type":"Unconfined"}}' own)"
 expect "a port on the node"                   "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"ports":[{"containerPort":80,"hostPort":80}]')"
@@ -241,7 +243,8 @@ expect "a team's product in another team"        IDENTITY_NOT_ALLOWED  "$(job "$
 expect "a platform product in any team"          allowed               "$(job "$TEAM_B" $SOURCE/platform:2 run plat-sa "")"
 expect "an unregistered image as a product's SA" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run db-sa "")"
 expect "default with a secret"                   IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run default db-key)"
-expect "a secret through env, not a volume"      IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"env":[{"name":"K","valueFrom":{"secretKeyRef":{"name":"db-key","key":"k"}}}]')"
+# The dispatch policy refuses any valueFrom too; either refusal will do.
+expect "a secret through env, not a volume"      "IDENTITY_NOT_ALLOWED\|own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"env":[{"name":"K","valueFrom":{"secretKeyRef":{"name":"db-key","key":"k"}}}]')"
 
 echo "Image scans:"
 expect "an image whose scan failed"              IMAGE_SCAN_FAILED     "$(job "$TEAM_A" $SOURCE/app:1@$BLOCKED_DIGEST run default "")"
