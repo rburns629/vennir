@@ -592,7 +592,9 @@ names a binary built from a checkout (`.github/scripts/build-vertra.sh`).
   OpenTofu directly); the console reads ECR with its own role through EKS
   Pod Identity (`registryCheck.ecrToken`). Prices: the cluster fee (no free
   tier), Auto Mode's per-instance fee, EC2, gp3, public IPv4 and Spot,
-  estimated on the instance Auto Mode would likely pick. An organization's
+  estimated on as many of the instance Auto Mode would likely pick as the
+  platform's requests, with the parts turned on, need (by each instance's
+  allocatable, less a margin per node). An organization's
   region restriction (an SCP) is caught up front. The sleeper suspends its
   own CronJob while asleep, since on Auto Mode each run would start a node.
   The public console (an ACM certificate needs DNS you control, so no
