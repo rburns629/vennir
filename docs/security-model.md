@@ -445,7 +445,10 @@ own team's namespace (`<service>.<team>.svc`): one pointed at another
 team's is held, by the console and the gateway, whatever `backendHosts`
 allows, so no team can serve another's backend under its own spec and
 sharing; a backend should still check the token's `api` as well as its
-`aud` (the sample does). A caller's own `Vertra-*` headers are dropped.
+`aud` (the sample does). Only the cluster's default domain is read
+(`.svc.cluster.local`): on a cluster with another, and for short names,
+pod IPs or anything else that reaches inside the cluster, `backendHosts`
+alone decides, so list exactly the hosts each API may use. A caller's own `Vertra-*` headers are dropped.
 Paths with encoded slashes or dot segments are refused, so what's checked
 is what's forwarded.
 
