@@ -103,6 +103,8 @@ type pass struct {
 	pendingEvents *[]pendingEvent
 	// Executions this pass already moved to RUNNING.
 	startedExecutions map[string]bool
+	// Executions whose settling this pass holds (settling).
+	settling map[string]bool
 }
 
 // clock is the pass's time as it goes: its start plus the time since.
@@ -372,7 +374,7 @@ func (p *pass) recordStart(t *Task, resolved executor.ResolvedTask, handle execu
 		return err
 	}
 	if _, err := p.db.Exec(p.ctx, `UPDATE task_attempts SET started_at = $3, executor_handle = $4::jsonb
-		WHERE task_id = $1 AND attempt_number = $2`, t.ID, t.AttemptCount, p.now, jsonValue(handle)); err != nil {
+		WHERE task_id = $1 AND attempt_number = $2`, t.ID, t.AttemptCount, p.clock(), jsonValue(handle)); err != nil {
 		return err
 	}
 	if err := p.markExecutionRunning(t.ExecutionID); err != nil {
@@ -512,6 +514,11 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 		return true, p.recordEvent(t.ExecutionID, &t.ID, domain.EventTaskCancelled, map[string]any{"taskKey": t.TaskKey, "attempt": t.AttemptCount})
 	}
 
+	if statusErr == nil && status.State != executor.Running {
+		if err := p.settle(t.ExecutionID); err != nil {
+			return false, err
+		}
+	}
 	// A result already in wins over the timeout: a task that finished is
 	// never failed for taking too long, even when seen late. Outputs that
 	// don't fit the product's schema are a failure of the product's
@@ -581,6 +588,9 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 				t.LeaseExpiresAt = ptr(p.now.Add(p.opts.LeaseDuration))
 				return false, saveTask(p.ctx, p.db, t)
 			}
+			if err := p.settle(t.ExecutionID); err != nil {
+				return false, err
+			}
 			return true, p.handleFailure(t, attempt, failure, handle)
 		}
 	}
@@ -609,15 +619,39 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 	return false, nil
 }
 
+// settle takes the execution's transaction-scoped advisory lock, once a
+// pass, before a task of it that finished locks its dependents and the
+// execution. Two schedulers finishing tasks of one execution would
+// otherwise lock its dependents in opposite orders (one finishing T1 then
+// T3, the other T2, each releasing a join) and deadlock; with it, one
+// settles the execution at a time. A pass takes these in execution order
+// (RecordPass reads its tasks so), so passes never wait on each other in
+// a cycle. Only RecordPass's polls take it: a dispatch's order is the
+// queue's.
+func (p *pass) settle(executionID string) error {
+	if p.settling[executionID] {
+		return nil
+	}
+	if _, err := p.db.Exec(p.ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, "settle:"+executionID); err != nil {
+		return err
+	}
+	if p.settling == nil {
+		p.settling = map[string]bool{}
+	}
+	p.settling[executionID] = true
+	return nil
+}
+
 // pastJobDeadline says the attempt's Job has passed its own deadline
 // (activeDeadlineSeconds: the task's timeout, plus StartTimeout, plus
-// JobDeadlineGrace, from its creation), so Kubernetes has stopped it. It
-// counts from the dispatch, which is never before the Job was made.
+// JobDeadlineGrace, from its creation) and its Pod's termination grace,
+// so Kubernetes has stopped it. It counts from the attempt's started_at,
+// stamped once Start returned, so never before the Job was made.
 func (p *pass) pastJobDeadline(t *Task, attempt *Attempt) bool {
 	if attempt.StartedAt == nil {
 		return true // not known: never waited for forever
 	}
-	deadline := time.Duration(t.TimeoutSeconds)*time.Second + p.opts.StartTimeout + p.opts.JobDeadlineGrace
+	deadline := time.Duration(t.TimeoutSeconds)*time.Second + p.opts.StartTimeout + p.opts.JobDeadlineGrace + executor.PodTerminationGrace
 	return p.now.Sub(*attempt.StartedAt) > deadline
 }
 

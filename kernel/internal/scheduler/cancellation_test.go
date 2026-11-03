@@ -201,7 +201,7 @@ func TestACancelledExecutionsStepIsGivenUpOnPastItsJobsDeadline(t *testing.T) {
 	k.tick(t0)
 	cancelExecution(t, tx, id)
 	exec.CancelError = errors.New("forbidden")
-	k.tick(t0.Add(30*time.Second + k.opts.StartTimeout + k.opts.JobDeadlineGrace + time.Second))
+	k.tick(t0.Add(30*time.Second + k.opts.StartTimeout + k.opts.JobDeadlineGrace + executor.PodTerminationGrace + time.Second))
 	equal(t, "state", tasksByKey(t, tx, id)["create-project"].State, domain.TaskCancelled)
 }
 

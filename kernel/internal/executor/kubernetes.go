@@ -205,6 +205,10 @@ func (k *Kubernetes) Start(ctx context.Context, task ResolvedTask) (Handle, erro
 		return nil, err
 	}
 	if err := k.createConfigMap(ctx, task.Team, name, uid, string(request)); err != nil {
+		if _, ok := IsDispatchRejected(err); ok {
+			_ = k.deleteJob(ctx, task.Team, name)
+			return nil, err
+		}
 		if apierrors.IsForbidden(err) || apierrors.IsInvalid(err) || apierrors.IsRequestEntityTooLargeError(err) {
 			// Refused by policy, or too big for a ConfigMap (inputs over
 			// 1 MiB once resolved): this attempt would never get its
@@ -297,7 +301,24 @@ func (k *Kubernetes) createConfigMap(ctx context.Context, namespace, name, jobUI
 		},
 		Data: map[string]string{"request.json": request},
 	}, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) { // created along with an adopted Job
+	if apierrors.IsAlreadyExists(err) {
+		// Created along with an adopted Job, by an earlier start of this
+		// attempt: it holds the same request, and names this Job. Anything
+		// else would hand the step a request the kernel didn't make.
+		callCtx, cancel := k.call(ctx)
+		defer cancel()
+		existing, err := k.client.CoreV1().ConfigMaps(namespace).Get(callCtx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		owned := false
+		for _, owner := range existing.OwnerReferences {
+			owned = owned || (owner.Kind == "Job" && owner.Name == name && string(owner.UID) == jobUID)
+		}
+		if !owned || len(existing.Data) != 1 || existing.Data["request.json"] != request || len(existing.BinaryData) != 0 {
+			return &DispatchRejected{Code: "DISPATCH_REJECTED", Message: fmt.Sprintf(
+				"A ConfigMap named %s already exists in %s that the kernel didn't make for this attempt (its owner or request differs), so it wasn't used.", name, namespace)}
+		}
 		return nil
 	}
 	return err
@@ -446,6 +467,7 @@ func (k *Kubernetes) jobFor(name string, task ResolvedTask) (*batchv1.Job, error
 	// A backstop: a Job the scheduler lost track of mustn't run forever. It
 	// counts from the Job's creation, so it allows for waiting to start.
 	deadline := int64(task.TimeoutSeconds) + int64(k.opts.StartTimeout.Seconds()) + int64(k.opts.JobDeadlineGrace.Seconds())
+	terminationGrace := int64(PodTerminationGrace.Seconds())
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels, Annotations: annotations},
 		Spec: batchv1.JobSpec{
@@ -459,14 +481,15 @@ func (k *Kubernetes) jobFor(name string, task ResolvedTask) (*batchv1.Job, error
 						Env: env, VolumeMounts: mounts, TerminationMessagePath: resultFilePath,
 						TerminationMessagePolicy: corev1.TerminationMessageReadFile, SecurityContext: security, Resources: resources,
 					}},
-					AutomountServiceAccountToken: automount,
-					SecurityContext:              podSecurity,
-					ServiceAccountName:           task.ServiceAccount,
-					Volumes:                      volumes,
-					NodeSelector:                 placement.NodeSelector,
-					Tolerations:                  placement.Tolerations,
-					Affinity:                     k.opts.Affinity,
-					ImagePullSecrets:             pullSecrets,
+					TerminationGracePeriodSeconds: &terminationGrace,
+					AutomountServiceAccountToken:  automount,
+					SecurityContext:               podSecurity,
+					ServiceAccountName:            task.ServiceAccount,
+					Volumes:                       volumes,
+					NodeSelector:                  placement.NodeSelector,
+					Tolerations:                   placement.Tolerations,
+					Affinity:                      k.opts.Affinity,
+					ImagePullSecrets:              pullSecrets,
 				},
 			},
 		},
@@ -529,9 +552,12 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 	defer cancel()
 	job, err := k.client.BatchV1().Jobs(namespace).Get(callCtx, name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		// A Job is only deleted after its outcome is committed, and never
-		// polled after that: this one went another way (by hand, or its TTL
-		// while no scheduler ran). Its result is lost; a retry may make up.
+		// The kernel deletes a Job only once it knows its outcome: after
+		// it's committed (Release), or when it can't start (its failure
+		// cached here first), and never reads it after. This one went
+		// another way (by hand, or its TTL while no scheduler ran, or this
+		// scheduler restarted before committing a failure). Its result is
+		// lost; a retry may make up.
 		record := terminalRecord{status: Status{State: Failed, Error: &domain.StructuredError{
 			Code: "JOB_NOT_FOUND", Message: "The task's Job no longer exists, so its result was lost.", Retryable: true}}}
 		k.remember(name, record)
@@ -599,7 +625,8 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 			// Its image may yet pull and the step run: stopped now, so a
 			// retry can't start beside it. A failure for good is left in
 			// place until it's committed (Release).
-			if err := k.remove(ctx, namespace, name); err != nil {
+			// Its ConfigMap goes with it (owned by the Job).
+			if err := k.deleteJob(ctx, namespace, name); err != nil {
 				return Status{}, err
 			}
 		}
@@ -766,6 +793,11 @@ func NeverFits(message string) string {
 var imageNotFound = regexp.MustCompile(`(?i)\bnot found\b|manifest unknown|NotFound`)
 
 const kubeletMessageLimit = 1000
+
+// PodTerminationGrace is how long a step's Pod has to stop once its Job is
+// deleted or past its deadline (SIGTERM, then SIGKILL): Kubernetes'
+// default, set on every step Pod so the scheduler can count on it.
+const PodTerminationGrace = 30 * time.Second
 
 // resultLimit is the most of a container's termination message (its
 // result.json) the kubelet keeps: a longer one arrives cut short.

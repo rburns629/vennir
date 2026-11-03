@@ -87,7 +87,7 @@ func TestATimedOutTaskThatCantBeStoppedWaitsForItsJobsDeadline(t *testing.T) {
 
 	// Short of the Job's deadline (it allows for the wait to start too), it
 	// may still be running.
-	deadline := 30*time.Second + k.opts.StartTimeout + grace
+	deadline := 30*time.Second + k.opts.StartTimeout + grace + executor.PodTerminationGrace
 	k.tick(t0.Add(deadline))
 	equal(t, "state", tasksByKey(t, tx, id)["provision"].State, domain.TaskRunning)
 

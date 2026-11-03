@@ -209,7 +209,7 @@ concurrently, then `recordStart()` each in order)
             → recordEvent(TASK_DISPATCH_RETRY)
         [at the limit] → exec.Discard() → handleFailure(EXECUTOR_START_FAILED, retryable=true)
 → dispatch_failures = 0; resolved_inputs and executor_handle saved; RUNNING
-→ the attempt's started_at = now
+→ the attempt's started_at = now (once Start returned: never before its Job was made)
 → markExecutionRunning()                           [PENDING → RUNNING on the first dispatch]
 → recordEvent(TASK_STARTED)
 ```
@@ -231,7 +231,8 @@ read concurrently first, then `poll()` acts on each in order)
      (TASK_START_TIMEOUT_SECONDS: waiting for a node isn't running), or
      its status couldn't be read and it was dispatched more than timeout_seconds ago?]
     → exec.Cancel()
-        [failed, and the Job's own deadline (timeout + start timeout + grace) not yet passed?]
+        [failed, and the Job's own deadline (timeout + start timeout + grace, plus the Pod's
+         30 s to stop, from when Start returned) not yet passed?]
             → renew the lease, try again next pass (no retry may run beside it)
     → handleFailure(TASK_TIMEOUT, or TASK_NOT_STARTED; retryable=true)
 → the status read above:
@@ -252,10 +253,19 @@ read concurrently first, then `poll()` acts on each in order)
                     tasks) at once are serialized, so the second sees the first's
                     commit. NO KEY UPDATE, not UPDATE: rows referencing these
                     (events, outputs) take FOR KEY SHARE, which UPDATE would
-                    conflict with. Lock order everywhere: tasks, then execution;
-                    and across executions, a pass takes its running tasks
-                    ordered by (execution_id, id), so two passes finishing tasks
-                    of two executions lock their rows in the same order.
+                    conflict with. Between schedulers, the order is: a pass
+                    locks its running tasks (SKIP LOCKED: it never waits for
+                    them), then goes through them by (execution_id, id), and
+                    before a finished one touches anything else it takes its
+                    execution's settle: advisory lock (pg_advisory_xact_lock,
+                    once a pass, held to commit). One pass at a time settles
+                    an execution, and passes take those locks in one order,
+                    so they never deadlock. kernel-api's cancel and retry lock
+                    tasks, then the execution; a pass finishing two tasks of
+                    one execution locks the execution between them, so one
+                    landing just then can still deadlock with it: Postgres
+                    aborts one, and the pass is redone from the rows (a
+                    cancel errs, and is sent again).
     Failed    → handleFailure(status.Error)
 → every task that finished goes into Outcome.Finished
 ```
@@ -286,7 +296,9 @@ implementation of `Executor`; the scheduler only knows the interface):
   adopted rather than started twice, but only if it's the Job this start
   would make (its labels, image, command, arguments, ServiceAccount and
   Secrets): the admission policies only check the scheduler's own creates,
-  so one made otherwise is a `DISPATCH_REJECTED`. Every Job has
+  so one made otherwise is a `DISPATCH_REJECTED`; so is an existing
+  ConfigMap that doesn't name this Job as its owner and hold this
+  attempt's request. Every Job has
   `activeDeadlineSeconds` (the task's timeout, plus the start timeout, plus
   a grace period, from its creation), so Kubernetes stops one the scheduler
   has lost track of. A ConfigMap too big for the API server (inputs over
