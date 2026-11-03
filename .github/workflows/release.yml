@@ -2,6 +2,8 @@ name: release
 
 # On a version tag (v1.2.3, or v1.2.3-rc.1 for a pre-release):
 #
+#   govulncheck  checks vertra's code for known vulnerabilities it can
+#           reach (as CI does), before anything below is pushed.
 #   images  builds the kernel and console images, scans them with the same
 #           gate CI uses (.github/scripts/scan-image.sh), then builds them
 #           for linux/amd64 and linux/arm64, pushes them to
@@ -40,7 +42,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Before anything is pushed, so a vulnerability vertra's code can reach
+  # stops the release whole rather than half-published.
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check vertra for known vulnerabilities
+        # As CI's govulncheck job, in the Go image vertra is built with. The
+        # version is pinned in both (here and ci.yml): bump them together.
+        run: |
+          image=$(sed -n 's/^GO_IMAGE ?= *//p' Makefile)
+          docker run --rm -v "$PWD":/repo -w /repo/cli -e CGO_ENABLED=0 "$image" \
+            go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
   images:
+    needs: govulncheck
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -140,13 +157,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bash .github/scripts/install-scanners.sh oras cosign
-      - name: Check vertra for known vulnerabilities
-        # As CI's govulncheck job, at the same version: nothing is pushed
-        # while its code can reach one.
-        run: |
-          image=$(sed -n 's/^GO_IMAGE ?= *//p' Makefile)
-          docker run --rm -v "$PWD":/repo -w /repo/cli -e CGO_ENABLED=0 "$image" \
-            go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - name: Build vertra for each platform
         # In the Go image CI uses, pinned by digest (the Makefile's GO_IMAGE).
         run: |
