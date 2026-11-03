@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """aws/s3-bucket's "create" action: finds an S3 bucket by name, creating it
 (with every kind of public access blocked) only if it doesn't exist. One it
-creates is tagged vertra-made=true and reported as a resource, which delete
-(its cleanup) removes; one it only found is neither.
+creates is tagged vertra-made=true in the create call itself, so a step cut
+short right after still finds its bucket tagged, and reported as a resource,
+which delete (its cleanup) removes; one it only found is neither. A bucket
+it made, found again, has its public access block put again, in case the
+step that made it stopped before that.
 
 Credentials come from boto3's default chain: on EKS, Pod Identity or IRSA
 supplies short-lived ones for the step's ServiceAccount, so nothing is
@@ -109,10 +112,9 @@ def main() -> int:
         s3 = _session(region).client("s3")
         try:
             found = s3.head_bucket(Bucket=bucket)
-            actual = found.get("BucketRegion") or region
-            print(f"bucket '{bucket}' already exists, in {actual}")
-            _write_result({"status": "succeeded", "outputs": _outputs(bucket, actual, _made_here(s3, bucket))})
-            return 0
+            region = found.get("BucketRegion") or region
+            print(f"bucket '{bucket}' already exists, in {region}")
+            made_here = _made_here(s3, bucket)
         except ClientError as error:
             code = error.response.get("Error", {}).get("Code")
             if code == "403":
@@ -123,34 +125,45 @@ def main() -> int:
                 )
             if code != "404":
                 raise
-
-        create: dict[str, Any] = {"Bucket": bucket}
-        if region != "us-east-1":  # us-east-1 refuses a LocationConstraint
-            create["CreateBucketConfiguration"] = {"LocationConstraint": region}
-        try:
-            s3.create_bucket(**create)
-        except ClientError as error:
-            code = error.response.get("Error", {}).get("Code")
-            if code == "BucketAlreadyExists":
+            made_here = _create(s3, bucket, region)
+            if made_here is None:
                 return _failure("BUCKET_NAME_TAKEN", f"Bucket name '{bucket}' is taken. Choose another.")
-            if code != "BucketAlreadyOwnedByYou":  # an earlier attempt made it
-                raise
-        s3.put_public_access_block(
-            Bucket=bucket,
-            PublicAccessBlockConfiguration={
-                "BlockPublicAcls": True,
-                "IgnorePublicAcls": True,
-                "BlockPublicPolicy": True,
-                "RestrictPublicBuckets": True,
-            },
-        )
-        s3.put_bucket_tagging(Bucket=bucket, Tagging={"TagSet": [{"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}]})
+            print(f"created bucket '{bucket}' in {region}")
+
+        if made_here:
+            s3.put_public_access_block(
+                Bucket=bucket,
+                PublicAccessBlockConfiguration={
+                    "BlockPublicAcls": True,
+                    "IgnorePublicAcls": True,
+                    "BlockPublicPolicy": True,
+                    "RestrictPublicBuckets": True,
+                },
+            )
     except (ClientError, BotoCoreError) as error:
         return _aws_failure(error)
 
-    print(f"created bucket '{bucket}' in {region}")
-    _write_result({"status": "succeeded", "outputs": _outputs(bucket, region, True)})
+    _write_result({"status": "succeeded", "outputs": _outputs(bucket, region, made_here)})
     return 0
+
+
+def _create(s3: Any, bucket: str, region: str) -> bool | None:
+    """Creates the bucket, tagged: whether it's this product's, or None if
+    the name is another account's."""
+    configuration: dict[str, Any] = {"Tags": [{"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}]}
+    if region != "us-east-1":  # us-east-1 refuses a LocationConstraint
+        configuration["LocationConstraint"] = region
+    try:
+        s3.create_bucket(Bucket=bucket, CreateBucketConfiguration=configuration)
+    except ClientError as error:
+        code = error.response.get("Error", {}).get("Code")
+        if code == "BucketAlreadyExists":
+            return None
+        if code != "BucketAlreadyOwnedByYou":
+            raise
+        # Made a moment ago, by a run that got there first: its tag says whose.
+        return _made_here(s3, bucket)
+    return True
 
 
 if __name__ == "__main__":
