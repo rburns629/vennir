@@ -32,6 +32,7 @@ describe("settings", () => {
       ["PORT", "70000"],
       ["SMTP_PORT", "0"],
       ["AUDIT_EXPORT_PROVIDER", "azure"],
+      ["DATABASE_POOL_SIZE", "1"], // a background pass's lock takes one of them
     ] as const) {
       await expect(load({ [name]: value }), name).rejects.toThrow(name);
     }

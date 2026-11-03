@@ -16,7 +16,8 @@ replicaCount: 1
 # -- Most database connections each console process holds; the gateway's
 # is gateway.databaseMaxConnections. Every size keeps the sum over all
 # processes (the kernel's too, when they share a database) under
-# postgres.settings.max_connections.
+# postgres.settings.max_connections. At least 2: a background pass holds
+# one for its lock while it works on another.
 databasePoolSize: 10
 # -- Longest opening a database connection may take. One opened just as
 # Postgres's Pod is replaced would otherwise wait out TCP's retries (about two
