@@ -5,7 +5,7 @@ team: gcp
 displayName: GCP Cloud SQL
 description: >-
   Looks up a Cloud SQL instance by name within a project, creating it only
-  if it doesn't already exist. Idempotent, same as gcp/_project: re-running
+  if it doesn't already exist. Idempotent, same as gcp/project: re-running
   against an existing instance name changes nothing, and returns its
   connection info once it is RUNNABLE. A real Cloud SQL instance is billed
   infrastructure and takes several minutes to provision on first create --
@@ -42,7 +42,7 @@ actions:
           x-vertra-needs: gcp.project  # a target: checked against allowedTargets for other teams
           description: >-
             The already-existing GCP project this instance should live in
-            -- typically gcp/_project's own output, via $fromTask/$output.
+            -- typically gcp/project's own output, via $fromTask/$output.
         instanceName:
           type: string
           pattern: "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"

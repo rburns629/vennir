@@ -26,11 +26,10 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/migrate"
 )
 
-// Ported from the Python kernel's tests/integration/test_api_{executions,cancel_retry}.py
-// and test_execution_service.py: kernel-api over HTTP, through the
-// generated client, on a database of its own (these commit). Refusing
-// Python field names and accepting the old ones is now the console's
-// client's job (console/src/kernel/client.ts), where JSON becomes a request.
+// kernel-api over HTTP, through the generated client, on a database of its
+// own (these commit). Refusing Python field names and accepting the old
+// ones is now the console's client's job (console/src/kernel/client.ts),
+// where JSON becomes a request.
 
 var testPool *pgxpool.Pool
 

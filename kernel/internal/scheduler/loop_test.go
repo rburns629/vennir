@@ -19,8 +19,8 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/executor/executortest"
 )
 
-// Ported from the Python kernel's tests/unit/test_scheduler_{concurrency,shutdown}.py.
-// Waiting for the schema is tested in internal/migrate.
+// The loop's concurrency and shutdown. Waiting for the schema is tested in
+// internal/migrate.
 
 func TestCallsOverlapUpToTheLimitAndResultsKeepTheirOrder(t *testing.T) {
 	var inFlight, most atomic.Int32
@@ -53,8 +53,8 @@ func TestAFailingCallYieldsItsErrorWithoutStoppingTheRest(t *testing.T) {
 	equal(t, "error", errs[1] != nil && errs[0] == nil && errs[2] == nil, true)
 }
 
-// Ported from test_scheduler_shutdown.py, end to end: told to stop, the
-// loop cuts its wait short, finishes, and hands back its leases.
+// End to end: told to stop, the loop cuts its wait short, finishes, and
+// hands back its leases.
 func TestStoppingCutsTheWaitShortAndReleasesLeases(t *testing.T) {
 	ctx := context.Background()
 	var id string

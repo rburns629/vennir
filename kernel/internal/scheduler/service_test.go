@@ -16,8 +16,6 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/executor/executortest"
 )
 
-// Ported from the Python kernel's tests/integration/test_scheduler_service.py.
-
 func twoTasks(outputKey string, attempts int) []TaskDef {
 	return []TaskDef{
 		task("create-project", inputs(map[string]any{"projectName": "demo-project"}), maxAttempts(attempts)),

@@ -73,7 +73,7 @@ The direct mapping:
 | A `resource` block | A `task` |
 | An interpolation reference (`google_sql_database_instance.x.connection_name`) | `$fromTask`/`$output` |
 | Implicit or explicit `depends_on` | `dependsOn` |
-| `terraform plan`'s dependency graph | The persisted `TaskDependency` edges |
+| `terraform plan`'s dependency graph | The persisted dependency edges (`task_dependencies`) |
 | `terraform apply` walking the graph | `kernel-scheduler`'s poll loop, claiming whatever's `READY` |
 
 **Where it genuinely differs — worth being precise about, not papering

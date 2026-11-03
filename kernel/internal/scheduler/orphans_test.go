@@ -11,13 +11,12 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/executor"
 )
 
-// Ported from the Python kernel's tests/integration/test_orphaned_attempts.py: the sweep
-// that removes attempts' Jobs no task can use any more (R4). The case it
-// exists for: a pass starts a task's Job, its commit fails (the task is
-// READY again, one attempt behind the Job), and the execution is cancelled
-// before any pass claims the task again. The sweep must never touch a Job a
-// task still needs: the running attempt's, or the one a ready task will
-// adopt.
+// The sweep that removes attempts' Jobs no task can use any more (R4 in
+// docs/assessment.md). The case it exists for: a pass starts a task's Job,
+// its commit fails (the task is READY again, one attempt behind the Job),
+// and the execution is cancelled before any pass claims the task again. The
+// sweep must never touch a Job a task still needs: the running attempt's,
+// or the one a ready task will adopt.
 
 // startAsARolledBackPassWould starts the attempt the task's next claim
 // would make, without recording it.

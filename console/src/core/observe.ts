@@ -177,7 +177,7 @@ const GATEWAY_REFUSALS: Record<string, { code: string; why: string }> = {
   paused: { code: "API_PAUSED", why: "Its team paused the API." },
   closed: { code: "GATEWAY_CLOSED", why: "The gateway was closed." },
   held: { code: "API_HELD", why: "Its backend isn't one this install allows yet." },
-  unavailable: { code: "API_UNAVAILABLE", why: "The API's OpenAPI document couldn't be used, or the gateway couldn't check callers." },
+  unavailable: { code: "API_UNAVAILABLE", why: "The API couldn't be served as set up (its OpenAPI document, backend URL or settings), or the gateway couldn't check callers." },
 };
 
 /**

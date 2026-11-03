@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// Ported from the Python kernel's tests/unit/test_dag_validation.py.
-
 func task(id string, dependsOn []string, inputs map[string]any) TaskDef {
 	return TaskDef{ID: id, Image: id + ":local", Action: "create", DependsOn: dependsOn, Inputs: inputs, Team: "test-team", ServiceAccount: "default"}
 }

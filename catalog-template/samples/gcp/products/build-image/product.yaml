@@ -37,7 +37,7 @@ actions:
           x-vertra-needs: gcp.project  # a target: checked against allowedTargets for other teams
           description: >-
             GCP project the build runs in (and is billed to). Typically
-            supplied via $fromTask/$output from a gcp/_project create task.
+            supplied via $fromTask/$output from a gcp/project create task.
         sourceArchiveUrl:
           type: string
           pattern: "^gs://.+"

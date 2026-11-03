@@ -16,8 +16,6 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/executor"
 )
 
-// Ported from the Python kernel's tests/integration/test_claiming.py.
-
 func newPass(db DB, owner string, lease time.Duration, now time.Time, set ...func(*Options)) *pass {
 	opts := DefaultOptions(owner)
 	opts.LeaseDuration = lease

@@ -25,8 +25,7 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/config"
 )
 
-// Ported from the Python kernel's tests/unit/test_sleeper.py; KernelActivity is tested
-// against the real database in activity_test.go.
+// KernelActivity is tested against the real database in activity_test.go.
 
 const twoHours = 2 * time.Hour
 

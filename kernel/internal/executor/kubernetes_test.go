@@ -21,10 +21,9 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
-// Ported from the Python kernel's tests/unit/test_kubernetes_{executor_errors,image_pull,
-// release,executor_credentials,watch}.py and test_task_placement.py. No
-// cluster: client-go's fake clientset stands in, with reactors for the
-// API's refusals. The real thing is proven on kind.
+// The executor's errors, image pulls, release, credentials, watch and task
+// placement. No cluster: client-go's fake clientset stands in, with
+// reactors for the API's refusals. The real thing is proven on kind.
 
 const jobUID = "6b1f3d0e-0000-0000-0000-000000000001"
 

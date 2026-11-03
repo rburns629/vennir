@@ -9,9 +9,8 @@ import (
 	"time"
 )
 
-// Ported from the Python kernel's tests/integration/test_logs_and_retention.py: a running
-// step's log is captured as it goes, and finished executions are deleted
-// once past retention (F-08).
+// A running step's log is captured as it goes, and finished executions are
+// deleted once past retention.
 
 func TestARunningStepsLogIsCapturedAndRefreshed(t *testing.T) {
 	tx := txFor(t)

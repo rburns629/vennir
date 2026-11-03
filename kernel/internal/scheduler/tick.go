@@ -55,7 +55,8 @@ type Options struct {
 	ApprovalTimeout time.Duration
 }
 
-// DefaultOptions are the scheduler's defaults (the Python kernel's).
+// DefaultOptions are the scheduler's defaults, for tests (the chart's values
+// set the running scheduler's).
 func DefaultOptions(owner string) Options {
 	return Options{
 		Owner: owner, LeaseDuration: 60 * time.Second, ClaimLimit: 50, ExecutorConcurrency: 16,

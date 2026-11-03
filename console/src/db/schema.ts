@@ -109,8 +109,8 @@ export const users = pgTable("users", {
   // future may never have a local password at all.
   passwordHash: text("password_hash"),
   // A platform-wide role, separate from team membership: team membership
-  // governs one team's own Secrets/RBAC (see docs/multi-tenant-secrets-
-  // design.md); isAdmin governs cross-team and platform-level actions --
+  // governs one team's own Secrets/RBAC (see docs/security-model.md);
+  // isAdmin governs cross-team and platform-level actions --
   // adding a member to a team you're not in, registering a secret for a
   // team you're not in, and (once built) configuring SSO/SAML/OIDC, which
   // has no single owning team to scope it to. Deliberately a boolean, not
@@ -263,7 +263,7 @@ export const products = pgTable(
     // The rest of the action's description from its product.yaml, as
     // catalog CI registers it: enough to list it, build its order form,
     // and wire it into a generated DAG (see the catalog's
-    // docs/product-schema.md). Empty until CI registers the product with
+    // tools/product.schema.json). Empty until CI registers the product with
     // them; nothing that runs a task reads them.
     displayName: text("display_name"),
     description: text("description"),
@@ -535,8 +535,8 @@ export const secretGrants = pgTable(
 );
 
 /**
- * kernel-api has no concept of users or teams at all (see docs/multi-
- * tenant-secrets-design.md -- it stays deliberately blind to both), so it
+ * kernel-api has no concept of users or teams at all (see
+ * docs/security-model.md -- it stays deliberately blind to both), so it
  * can't answer "who's allowed to see this execution." This is that answer,
  * recorded here at submission time (see core/executions.ts): every team
  * named by any task in the submission, so a later read/cancel/retry can

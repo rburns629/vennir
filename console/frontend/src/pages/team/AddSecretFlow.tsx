@@ -340,7 +340,7 @@ export function AddSecretFlow({
 }
 
 /**
- * A secret's value (review F-7): masked as it's pasted, still multi-line
+ * A secret's value: masked as it's pasted, still multi-line
  * for a whole file such as a key.json, and never spell-checked, corrected
  * or remembered by the browser (enhanced spell check sends what it checks
  * to its vendor). Show unmasks it to check it.

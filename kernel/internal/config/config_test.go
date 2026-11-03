@@ -34,7 +34,6 @@ func TestTheDriverNameIsDroppedFromThePythonURL(t *testing.T) {
 	}
 }
 
-// Ported from test_task_placement.py.
 func TestSettingsReadPlacementFromJSON(t *testing.T) {
 	s, err := load(t, map[string]string{
 		"TASK_NODE_SELECTOR": `{"cloud.google.com/gke-spot": "true"}`,
