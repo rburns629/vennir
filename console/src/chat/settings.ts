@@ -31,7 +31,6 @@ export function chatSource(): { source: "install" | "admins"; problem: string | 
   return current.source === "admins" ? { source: "admins", problem: current.problem } : { source: "install", problem: null };
 }
 
-/** A saved row as settings to check, its key unsealed. */
 /** Providers that sign in as the console's own cloud identity: no key kept, no address chosen. */
 export const keyless = (provider: string) => provider === "vertex" || provider === "bedrock";
 
@@ -42,6 +41,7 @@ export const sameEndpoint = (a: string, b: string) => a.trim().replace(/\/+$/, "
 export const installKeyFor = (provider: string, endpoint: string) =>
   !keyless(provider) && config.chat?.provider === provider && sameEndpoint(endpoint, config.chat.endpoint) ? config.chat.apiKey : "";
 
+/** A saved row as settings to check, its key unsealed. */
 export function inputOf(row: Row, apiKey: string): ChatInput {
   return {
     provider: row.provider,

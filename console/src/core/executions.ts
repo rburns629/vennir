@@ -886,13 +886,16 @@ export async function submitChecked(
     isAdmin: caller?.isAdmin,
   });
 
+  // Before the kernel has it: once it does, nothing may stand between it
+  // and its record (recordOrCancel), or it would run unrecorded.
+  const excluded = await notDeciders(caller?.id ?? null);
   const result = await submitExecution(scopeRequestId(submission, run ? [`user:${caller?.id ?? ""}`] : teams), requester(caller));
   await recordOrCancel(
     {
       executionId: result.executionId,
       teams,
       submittedBy: caller?.id ?? null,
-      notDeciders: await notDeciders(caller?.id ?? null),
+      notDeciders: excluded,
       name: typeof submission["name"] === "string" ? submission["name"] : "",
       payload: recordable(submission),
       template: run?.template,
@@ -1116,13 +1119,14 @@ export async function rerun(caller: AuthUser | undefined, executionId: string, l
     isAdmin: caller?.isAdmin,
   });
 
+  const excluded = await notDeciders(caller?.id ?? null); // before the kernel has it (see submitChecked)
   const result = await submitExecution(scopeRequestId(rerunPayload, submitted.teams), requester(caller));
   await recordOrCancel(
     {
       executionId: result.executionId,
       teams: submitted.teams,
       submittedBy: caller?.id ?? "",
-      notDeciders: await notDeciders(caller?.id ?? null),
+      notDeciders: excluded,
       name: submitted.name,
       payload: recordable(rerunPayload),
     },
