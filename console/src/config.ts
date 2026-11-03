@@ -67,6 +67,11 @@ function positiveInt(name: string, fallback: number): number {
   return n;
 }
 
+function atLeastTwo(n: number): number {
+  if (n < 2) throw new Error(`Invalid DATABASE_POOL_SIZE "${String(n)}": at least 2 (a background pass holds one for its lock and works on another).`);
+  return n;
+}
+
 /** A whole number, zero or more, or the default when unset; anything else fails startup. */
 function wholeNumber(name: string, fallback: number): number {
   const value = process.env[name];
@@ -411,7 +416,10 @@ export const config = {
   databaseUrl: requireEnv("DATABASE_URL"),
   // Most connections this process holds (each request it serves may take
   // one); the size keeps every process's sum under Postgres's limit.
-  databasePoolSize: positiveInt("DATABASE_POOL_SIZE", 10),
+  // At least two: a background pass (catalog sync, the audit copy, each
+  // delivery pass) holds one connection for its lock while it works on
+  // another (db/client.ts whileHolding); with one, it would wait forever.
+  databasePoolSize: atLeastTwo(positiveInt("DATABASE_POOL_SIZE", 10)),
   // Longest opening a database connection may take (db/connection.ts).
   databaseConnectTimeoutSeconds: positiveInt("DATABASE_CONNECT_TIMEOUT_SECONDS", 10),
   // Sign in with its own cloud identity instead of a password: "gcp"
