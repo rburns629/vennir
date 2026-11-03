@@ -38,7 +38,7 @@ Every day:
 | `make logs` | Tails kernel-api, the scheduler and the console together (any install: `vertra logs <env> -f`) |
 | `make catalog-publish` | Publishes `catalog-template/` with its `local` sample team (one product in five languages); `CATALOG=<folder>` publishes your own catalog, `SAMPLES=` other samples |
 | `make kind-deploy` | Rebuilds both platform images and upgrades both releases (`kind-deploy-kernel`, `kind-deploy-console` for one) |
-| `make test` | Starts a throwaway Postgres on `127.0.0.1:55432` and runs both projects' tests |
+| `make test` | Starts a throwaway Postgres on `127.0.0.1:55432` and runs the kernel's, gateway's, console's and frontend's tests |
 
 To try it: publish the samples, then paste the DAG from
 `catalog-template/samples/local/README.md` into **Executions → Submit new**.
