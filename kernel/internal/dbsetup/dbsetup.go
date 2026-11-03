@@ -7,9 +7,10 @@
 // opened to its own service alone (CONNECT and CREATE on it and its public
 // schema), and to no one else (PUBLIC's default CONNECT is revoked). The
 // services then make and own their own tables, as with the in-cluster
-// Postgres; none can read another's. The console's is given with the grant
-// option, so its migration can give the gateway what it reads
-// (console/src/db/gatewayAccess.ts). Running it again changes nothing.
+// Postgres; none can read another's. The console may pass on CONNECT and
+// the schema's USAGE alone (the grant option), so its migration can give
+// the gateway what it reads (console/src/db/gatewayAccess.ts); its tables
+// it owns. Running it again changes nothing.
 package dbsetup
 
 import (
@@ -23,8 +24,8 @@ import (
 type Grant struct {
 	Database string
 	Role     string
-	// Regrant: the role may pass what it's given on (the console, to the
-	// gateway).
+	// Regrant: the role may pass on CONNECT and the schema's USAGE (the
+	// console, to the gateway), and nothing else it's given.
 	Regrant bool
 }
 
@@ -61,19 +62,22 @@ func Run(ctx context.Context, connect Connect, maintenance string, setup Setup) 
 	}
 	for _, g := range setup.Grants {
 		database, role := pgx.Identifier{g.Database}.Sanitize(), pgx.Identifier{g.Role}.Sanitize()
-		option := ""
-		if g.Regrant {
-			option = " WITH GRANT OPTION"
-		}
-		for _, statement := range []string{
+		statements := []string{
 			fmt.Sprintf("REVOKE ALL ON DATABASE %s FROM PUBLIC", database),
-			fmt.Sprintf("GRANT CONNECT, CREATE, TEMPORARY ON DATABASE %s TO %s%s", database, role, option),
-		} {
+			// What an earlier setup let it pass on, and nothing passes on now.
+			fmt.Sprintf("REVOKE GRANT OPTION FOR CREATE, TEMPORARY ON DATABASE %s FROM %s", database, role),
+			fmt.Sprintf("GRANT CONNECT, CREATE, TEMPORARY ON DATABASE %s TO %s", database, role),
+		}
+		if g.Regrant {
+			// Only what the console gives the gateway's role.
+			statements = append(statements, fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s WITH GRANT OPTION", database, role))
+		}
+		for _, statement := range statements {
 			if _, err := admin.Exec(ctx, statement); err != nil {
 				return fmt.Errorf("%s: %w", g.Database, err)
 			}
 		}
-		if err := grantSchema(ctx, connect, g, role, option); err != nil {
+		if err := grantSchema(ctx, connect, g, role); err != nil {
 			return err
 		}
 	}
@@ -118,14 +122,23 @@ func prepare(ctx context.Context, admin *pgx.Conn, setup Setup) error {
 	return nil
 }
 
-func grantSchema(ctx context.Context, connect Connect, g Grant, role, option string) error {
+func grantSchema(ctx context.Context, connect Connect, g Grant, role string) error {
 	conn, err := connect(ctx, g.Database)
 	if err != nil {
 		return err
 	}
 	defer conn.Close(context.WithoutCancel(ctx))
-	if _, err := conn.Exec(ctx, fmt.Sprintf("GRANT USAGE, CREATE ON SCHEMA public TO %s%s", role, option)); err != nil {
-		return fmt.Errorf("%s's public schema: %w", g.Database, err)
+	statements := []string{
+		"REVOKE GRANT OPTION FOR CREATE ON SCHEMA public FROM " + role,
+		"GRANT USAGE, CREATE ON SCHEMA public TO " + role,
+	}
+	if g.Regrant {
+		statements = append(statements, "GRANT USAGE ON SCHEMA public TO "+role+" WITH GRANT OPTION")
+	}
+	for _, statement := range statements {
+		if _, err := conn.Exec(ctx, statement); err != nil {
+			return fmt.Errorf("%s's public schema: %w", g.Database, err)
+		}
 	}
 	return nil
 }
