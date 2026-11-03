@@ -131,7 +131,7 @@ export async function updateSchedule(caller: AuthUser | undefined, id: string, c
   if (merged.enabled) await checkedAsBot(team.name, merged);
   const [updated] = await db
     .update(schedules)
-    .set({ ...merged, nextRunAt: merged.enabled ? next : null, ...(merged.enabled && !row.enabled ? { lastError: null } : {}) })
+    .set({ ...merged, updatedBy: who.id, nextRunAt: merged.enabled ? next : null, ...(merged.enabled && !row.enabled ? { lastError: null } : {}) })
     .where(eq(schedules.id, id))
     .returning();
   return (await views(updated ? [updated] : [], team.name))[0] as ScheduleView;

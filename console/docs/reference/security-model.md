@@ -237,9 +237,11 @@ the teams whose runs need one), or an
 it in `AWAITING_APPROVAL`, never claimed, until a maintainer of the step's
 team approves it. The person who submitted the run can't decide, even as a
 maintainer, and nor can, for a bot's run, whoever made the bot a token, a
-keyless identity or a schedule, so two people agree before it runs
-(`console/src/core/approvals.ts`; a token from before its maker was recorded
-names them only when the audit log does). Each decision is in the audit log and, with who decided, in
+keyless identity or a schedule, or last changed that schedule (and so on
+through any bot among them), and a bot never decides: two people agree
+before it runs. Who can't is worked out when the run is submitted and kept
+with it (`console/src/core/approvals.ts`; a token from before its maker was
+recorded names them only when the audit log does). Each decision is in the audit log and, with who decided, in
 the step's events; a declined or expired step fails (`APPROVAL_DECLINED`,
 `APPROVAL_EXPIRED`), and retrying it asks again. The check is the console's:
 kernel-api trusts its caller, as it does for everything else.

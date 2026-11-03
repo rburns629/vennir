@@ -542,6 +542,10 @@ export const submittedExecutions = pgTable("submitted_executions", {
   // Null once the submitter's account is deleted: the execution's record
   // (and so its history in the console) outlives the account.
   submittedBy: uuid("submitted_by").references(() => users.id, { onDelete: "set null" }),
+  // Who may not approve its steps, worked out when it was submitted
+  // (core/approvals.ts notDeciders): its submitter and, for a bot, whoever
+  // made it something to act with. Empty for a run from before.
+  notDeciders: uuid("not_deciders").array().notNull().default(sql`'{}'::uuid[]`),
   name: text("external_reference").notNull(),
   // The exact body forwarded to kernel-api's `POST /v1/executions` (see
   // core/executions.ts) -- kept so a later rerun can resubmit the same
@@ -904,6 +908,8 @@ export const schedules = pgTable(
     // Why its last start was refused, if it was.
     lastError: text("last_error"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    // Who last changed it: it runs as its bot, so they too don't approve its runs.
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique("schedules_team_id_name").on(table.teamId, table.name), index("schedules_next_run_at_idx").on(table.nextRunAt)],

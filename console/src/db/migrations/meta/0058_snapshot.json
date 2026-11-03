@@ -1,5 +1,5 @@
 {
-  "id": "18ca99ba-5e9f-4ee6-ab06-38a5357fac35",
+  "id": "9fd960b3-2841-44d9-a055-3687064c7776",
   "prevId": "69f99432-93f7-447f-b4e7-28f23bc786db",
   "version": "7",
   "dialect": "postgresql",
@@ -2725,6 +2725,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2783,6 +2789,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "schedules_updated_by_users_id_fk": {
+          "name": "schedules_updated_by_users_id_fk",
+          "tableFrom": "schedules",
+          "tableTo": "users",
+          "columnsFrom": [
+            "updated_by"
           ],
           "columnsTo": [
             "id"
@@ -3194,6 +3213,13 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "not_deciders": {
+          "name": "not_deciders",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
         },
         "external_reference": {
           "name": "external_reference",

@@ -373,12 +373,13 @@ export async function createApiToken(
 }
 
 /** Everyone who made a bot something to act with: a token, a keyless
- * identity, or a schedule that runs as it. */
+ * identity, or a schedule that runs as it (made or last changed it). */
 export async function botMakers(botId: string): Promise<string[]> {
   const rows = await db.execute<{ id: string }>(sql`
     SELECT created_by AS id FROM ${apiTokens} WHERE user_id = ${botId} AND created_by IS NOT NULL
     UNION SELECT created_by FROM ${botIdentities} WHERE bot_id = ${botId} AND created_by IS NOT NULL
-    UNION SELECT created_by FROM ${schedules} WHERE bot_id = ${botId} AND created_by IS NOT NULL`);
+    UNION SELECT created_by FROM ${schedules} WHERE bot_id = ${botId} AND created_by IS NOT NULL
+    UNION SELECT updated_by FROM ${schedules} WHERE bot_id = ${botId} AND updated_by IS NOT NULL`);
   return rows.rows.map((r) => r.id);
 }
 
@@ -910,6 +911,8 @@ export interface SubmittedExecution {
   teams: string[];
   /** Null once the submitter's account was deleted (history outlives it). */
   submittedBy: string | null;
+  /** Who may not approve its steps, as worked out at submission (core/approvals.ts). */
+  notDeciders: string[];
   name: string;
   // The exact body originally forwarded to kernel-api -- `null` only for
   // rows recorded before this column existed (see schema.ts). This is
@@ -937,6 +940,7 @@ export async function recordSubmittedExecution(input: {
   teams: string[];
   /** Null: the console itself (readiness checks). */
   submittedBy: string | null;
+  notDeciders?: string[];
   scheduleId?: string | undefined;
   name: string;
   payload: unknown;
@@ -968,7 +972,7 @@ export async function findSubmittedExecutions(executionIds: string[]): Promise<S
     .where(inArray(submittedExecutions.executionId, executionIds));
 }
 
-export type SubmittedExecutionSummary = Omit<SubmittedExecution, "payload" | "templateParameters" | "onBehalfOf">;
+export type SubmittedExecutionSummary = Omit<SubmittedExecution, "payload" | "templateParameters" | "onBehalfOf" | "notDeciders">;
 
 // Every list caller (core/executions.ts's list) only ever
 // renders summary fields -- `payload` is a full stored task graph, fetched
