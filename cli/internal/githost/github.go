@@ -389,6 +389,25 @@ func (g *GitHub) DeleteVariable(ctx context.Context, repo, name string) error {
 	return err
 }
 
+// SubjectClaimKeys is the subject template vertra sets on a catalog
+// repository: the job's context (its branch, or its Environment) and its
+// branch, so a job in an Environment says which branch it ran from too.
+var SubjectClaimKeys = []string{"repo", "context", "ref"}
+
+// SetSubjectTemplate has the repository's Actions OIDC tokens carry
+// SubjectClaimKeys in their subject: a role trusting a job of the
+// catalog-publish Environment can then require main as well, whether or
+// not the Environment exists with its main-only rule (GitHub makes one a
+// workflow names, unprotected, where the plan has Environments).
+func (g *GitHub) SetSubjectTemplate(ctx context.Context, repo string) error {
+	body, err := json.Marshal(map[string]any{"use_default": false, "include_claim_keys": SubjectClaimKeys})
+	if err != nil {
+		return err
+	}
+	_, err = g.api(ctx, "PUT", "/repos/"+repo+"/actions/oidc/customization/sub", string(body))
+	return err
+}
+
 // SubjectPrefix is how GitHub names the repository in its Actions OIDC
 // tokens' subject: repo:<owner>/<name>, or with immutable subjects
 // repo:<owner>@<id>/<name>@<id>.
