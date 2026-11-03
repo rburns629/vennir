@@ -146,11 +146,31 @@ func (d Dir) Outputs(ctx context.Context) (map[string]json.RawMessage, error) {
 
 // Forget removes resources from the state without deleting them, so a
 // destroy leaves them (a backup bucket, the task registry you chose to keep).
+// An address the state doesn't have is skipped: `state rm` refuses one, and
+// destroy names what the config could have made (a managed database's
+// install has no backup bucket; a setting may postdate the last apply).
 func (d Dir) Forget(ctx context.Context, addresses ...string) error {
 	if len(addresses) == 0 {
 		return nil
 	}
-	return d.r.Run(ctx, "tofu", append([]string{"-chdir=" + d.Path, "state", "rm"}, addresses...)...)
+	out, err := d.r.Output(ctx, "tofu", "-chdir="+d.Path, "state", "list")
+	if err != nil {
+		return fmt.Errorf("tofu state list: %w", err)
+	}
+	inState := map[string]bool{}
+	for _, a := range strings.Split(out, "\n") {
+		inState[strings.TrimSpace(a)] = true
+	}
+	var there []string
+	for _, a := range addresses {
+		if inState[a] {
+			there = append(there, a)
+		}
+	}
+	if len(there) == 0 {
+		return nil
+	}
+	return d.r.Run(ctx, "tofu", append([]string{"-chdir=" + d.Path, "state", "rm"}, there...)...)
 }
 
 // HasState reports whether anything has been applied.
