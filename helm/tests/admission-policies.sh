@@ -125,6 +125,20 @@ k apply -f - > /dev/null <<EOF
  {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"name":"vertra-default-deny","namespace":"$TEAM_B"},
   "spec":{"podSelector":{},"policyTypes":["Ingress"],"ingress":[{"from":[{"podSelector":{}}]}]}}]}
 EOF
+# And Jobs for it to resume, or not: suspended as the executor makes them
+# (and one already resumed, with no Pods to make), none of them run.
+fixture_job() {  # namespace, name, labels as JSON, suspend, parallelism
+  printf '{"apiVersion":"batch/v1","kind":"Job","metadata":{"name":"%s","namespace":"%s","labels":%s},"spec":{"suspend":%s,"parallelism":%s,"backoffLimit":0,"template":{"spec":{"restartPolicy":"Never","containers":[{"name":"step","image":"busybox:1.36","args":["create"]}]}}}}' "$2" "$1" "$3" "$4" "$5"
+}
+OWN='{"app":"execution-kernel"}'
+k apply -f - > /dev/null <<EOF
+{"apiVersion":"v1","kind":"List","items":[
+ $(fixture_job "$TEAM_A" ek-suspended "$OWN" true 1),
+ $(fixture_job "$TEAM_A" ek-resumed "$OWN" false 0),
+ $(fixture_job "$TEAM_A" ek-unlabelled '{}' true 1),
+ $(fixture_job "$RETIRED_NS" ek-suspended "$OWN" true 1),
+ $(fixture_job "$OTHER_NS" ek-suspended "$OWN" true 1)]}
+EOF
 
 # RBAC comes before admission, so the impersonated identities need leave to
 # create what the cases try to create.
@@ -133,7 +147,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata: {name: $RELEASE-dry-run}
 rules:
-  - {apiGroups: [batch], resources: [jobs], verbs: [create, delete]}
+  - {apiGroups: [batch], resources: [jobs], verbs: [create, get, patch, delete]}
   - {apiGroups: [""], resources: [secrets, configmaps], verbs: [create, delete]}
   - {apiGroups: [""], resources: [namespaces], verbs: [get, create, update, patch]}
   - {apiGroups: [""], resources: [serviceaccounts], verbs: [get, update, patch]}
@@ -228,6 +242,12 @@ secret() {  # namespace
   k --as="$CONSOLE" -n "$1" create secret generic policy-check --from-literal=a=b --dry-run=server 2>&1
 }
 
+# The scheduler patching a Job (made above).
+scheduler_patch() {  # namespace, name, merge patch
+  # kubectl's patch doesn't say "(server dry run)" when it's one, as create
+  # and delete do: said here, as expect reads it.
+  k --as="$SCHEDULER" -n "$1" patch job "$2" --type=merge -p "$3" --dry-run=server 2>&1 | sed 's/ patched$/ patched (server dry run)/'
+}
 # The scheduler deleting a ConfigMap (made above).
 scheduler_delete() {  # namespace, name
   k --as="$SCHEDULER" -n "$1" delete configmap "$2" --dry-run=server 2>&1
@@ -310,6 +330,18 @@ expect "delete one not labelled its own"      "may delete only its own"     "$(s
 expect "delete one not named ek-"             "may delete only its own"     "$(scheduler_delete "$TEAM_A" not-ek)"
 expect "delete in the platform's namespace"   "may delete only its own"     "$(scheduler_delete "$PLATFORM_NS" ek-mine)"
 expect "delete outside team namespaces"       "may delete only its own"     "$(scheduler_delete "$OTHER_NS" ek-mine)"
+
+# Resuming a Job it made suspended: the one change it may make to one.
+RESUME='{"spec":{"suspend":false}}'
+expect "resume its own suspended Job"          allowed                       "$(scheduler_patch "$TEAM_A" ek-suspended "$RESUME")"
+expect "resume, and run more Pods"             "may only resume its own"     "$(scheduler_patch "$TEAM_A" ek-suspended '{"spec":{"suspend":false,"parallelism":5}}')"
+expect "resume, and move the Pod's node"       "may only resume its own"     "$(scheduler_patch "$TEAM_A" ek-suspended '{"spec":{"suspend":false,"template":{"spec":{"nodeSelector":{"x":"y"}}}}}')"
+expect "resume, and label it"                  "may only resume its own"     "$(scheduler_patch "$TEAM_A" ek-suspended '{"metadata":{"labels":{"extra":"x"}},"spec":{"suspend":false}}')"
+expect "change a suspended Job, not resuming"  "may only resume its own"     "$(scheduler_patch "$TEAM_A" ek-suspended '{"spec":{"parallelism":5}}')"
+expect "suspend a running Job"                 "may only resume its own"     "$(scheduler_patch "$TEAM_A" ek-resumed '{"spec":{"suspend":true}}')"
+expect "resume one not labelled its own"       "may only resume its own"     "$(scheduler_patch "$TEAM_A" ek-unlabelled "$RESUME")"
+expect "resume in a retired team's"            "TEAM_RETIRED"                "$(scheduler_patch "$RETIRED_NS" ek-suspended "$RESUME")"
+expect "resume outside team namespaces"        "may only resume its own"     "$(scheduler_patch "$OTHER_NS" ek-suspended "$RESUME")"
 
 echo "Image sources:"
 expect "an image from another registry"       IMAGE_NOT_ALLOWED              "$(job "$TEAM_A" busybox:1.36 run default "")"

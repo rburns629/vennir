@@ -25,7 +25,10 @@ create either in a namespace a task doesn't belong in. It deletes them too
 (labelled app=execution-kernel, named ek-...), only in a team namespace,
 retired ones included (a retired team's running steps still finish and are
 cleaned up). Its ClusterRole would otherwise let it delete any Job or
-ConfigMap in the cluster.
+ConfigMap in the cluster. The one change it may make to a Job is resuming
+it: the executor creates each suspended, makes its request ConfigMap, then
+resumes it, so its Pod never mounts a ConfigMap planted ahead of it. Only
+its own, suspended, in a live team namespace, and nothing else changed.
 
 With scheduler.taskPodHardening on, a Job must also be hardened as the
 executor makes it (kernel/internal/executor/kubernetes.go): no Kubernetes
@@ -49,7 +52,7 @@ spec:
     resourceRules:
       - apiGroups: ["batch"]
         apiVersions: ["v1"]
-        operations: ["CREATE", "DELETE"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
         resources: ["jobs"]
       - apiGroups: [""]
         apiVersions: ["v1"]
@@ -95,6 +98,38 @@ spec:
       messageExpression: >-
         "the scheduler may delete only its own Jobs and ConfigMaps, in team
         namespaces; not " + oldObject.metadata.name + " in " + namespaceObject.metadata.name
+      reason: Forbidden
+    # Updating: only resuming its own suspended Job, in a team namespace
+    # that isn't retired, with nothing else changed (what the Pod runs, as
+    # whom, with what, was checked when the Job was created).
+    - expression: >-
+        request.operation != "UPDATE" || (
+        {{- if not .Values.dispatchPolicy.allowReleaseNamespace }}
+        namespaceObject.metadata.name != {{ .Release.Namespace | quote }} &&
+        {{- end }}
+        variables.labelled &&
+        namespaceObject.metadata.labels[{{ $label | quote }}] == "true" &&
+        oldObject.metadata.name.startsWith("ek-") &&
+        has(oldObject.metadata.labels) && "app" in oldObject.metadata.labels &&
+        oldObject.metadata.labels["app"] == "execution-kernel" &&
+        has(oldObject.spec.suspend) && oldObject.spec.suspend == true &&
+        has(object.spec.suspend) && object.spec.suspend == false &&
+        object.spec.template == oldObject.spec.template &&
+        (has(object.metadata.labels) ? object.metadata.labels : {}) == (has(oldObject.metadata.labels) ? oldObject.metadata.labels : {}) &&
+        (has(object.metadata.annotations) ? object.metadata.annotations : {}) == (has(oldObject.metadata.annotations) ? oldObject.metadata.annotations : {}) &&
+        (has(object.metadata.ownerReferences) ? object.metadata.ownerReferences : []) == (has(oldObject.metadata.ownerReferences) ? oldObject.metadata.ownerReferences : []) &&
+        (has(object.metadata.finalizers) ? object.metadata.finalizers : []) == (has(oldObject.metadata.finalizers) ? oldObject.metadata.finalizers : []) &&
+        (has(object.spec.parallelism) ? object.spec.parallelism : -1) == (has(oldObject.spec.parallelism) ? oldObject.spec.parallelism : -1) &&
+        (has(object.spec.completions) ? object.spec.completions : -1) == (has(oldObject.spec.completions) ? oldObject.spec.completions : -1) &&
+        (has(object.spec.activeDeadlineSeconds) ? object.spec.activeDeadlineSeconds : -1) == (has(oldObject.spec.activeDeadlineSeconds) ? oldObject.spec.activeDeadlineSeconds : -1) &&
+        (has(object.spec.ttlSecondsAfterFinished) ? object.spec.ttlSecondsAfterFinished : -1) == (has(oldObject.spec.ttlSecondsAfterFinished) ? oldObject.spec.ttlSecondsAfterFinished : -1) &&
+        (has(object.spec.backoffLimit) ? object.spec.backoffLimit : -1) == (has(oldObject.spec.backoffLimit) ? oldObject.spec.backoffLimit : -1))
+      messageExpression: >-
+        variables.labelled && namespaceObject.metadata.labels[{{ $label | quote }}] == "retired"
+        ? "TEAM_RETIRED: team " + namespaceObject.metadata.name + " is retired, so nothing
+        new runs in its namespace; an admin can un-retire it"
+        : "the scheduler may only resume its own suspended Jobs, in team namespaces,
+        changing nothing else; not " + oldObject.metadata.name + " in " + namespaceObject.metadata.name
       reason: Forbidden
     # A step's container, exactly as the executor makes it: its image's own
     # entrypoint (no command, hook, probe or init container), the action as

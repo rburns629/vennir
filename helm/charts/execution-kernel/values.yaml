@@ -261,16 +261,16 @@ scheduler:
   # each phase of a turn, so keep that above the slowest one a slow
   # Kubernetes API can make (each call waits at most
   # kubernetesRequestTimeoutSeconds, T):
-  #   dispatching: ceil(claimLimit / executorConcurrency) x 2 calls x T
-  #     (4 x 2 x 30 = 240 s by default);
+  #   dispatching: ceil(claimLimit / executorConcurrency) x 3 calls x T
+  #     (the Job, its ConfigMap, the resume: 4 x 3 x 30 = 360 s by default);
   #   recording: ceil(running steps / executorConcurrency) x 2 calls x T
-  #     for their statuses (as long as dispatching at 64 steps running,
+  #     for their statuses (as long as dispatching at 96 steps running,
   #     longer above), plus its database statements;
   #   releasing finished steps: 2 calls x T each, one at a time; and the
   #     orphan sweep (every 5 minutes): one list, then 2 x T per orphan.
   # Lower than that, a slow API server gets the scheduler restarted
   # mid-pass, and the new one makes the same slow pass.
-  livenessSeconds: 300
+  livenessSeconds: 420
   heartbeatFile: /tmp/vertra-scheduler-heartbeat
   # A running step whose Job and Pod haven't changed isn't re-read from the
   # API, except this often, in case a watch event was missed.

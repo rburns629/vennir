@@ -14,7 +14,8 @@ metadata:
   name: {{ include "execution-kernel.fullname" . }}-scheduler
   labels:
     {{- include "execution-kernel.labels" . | nindent 4 }}
-# Exactly the calls kernel/internal/executor makes: Jobs created, read
+# Exactly the calls kernel/internal/executor makes: Jobs created (suspended),
+# resumed (patch: the dispatch policy lets it change nothing else), read
 # (status included), listed for the orphan sweep, watched, deleted; their
 # Pods listed and watched; the request ConfigMap created and deleted;
 # events listed, to tell a Pod the team's limits refuse for good from one
@@ -22,7 +23,7 @@ metadata:
 rules:
   - apiGroups: ["batch"]
     resources: ["jobs"]
-    verbs: ["create", "get", "list", "watch", "delete"]
+    verbs: ["create", "patch", "get", "list", "watch", "delete"]
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["list", "watch"]
