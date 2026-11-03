@@ -451,15 +451,27 @@ const githubProvider = "aws_iam_openid_connect_provider.github[0]"
 // no install keeps it in its state: the one that made it forgets it on its
 // next run (before any plan, a destroy's included), and then uses it like
 // the others. So neither a destroy nor clearing the catalog deletes it from
-// under another install.
+// under another install. The ARN of one it forgets comes from the state:
+// IAM's list may not show a provider made moments ago (the catalog step
+// runs right after the apply that made it), and a missing one would be
+// made again.
 func (a *app) writeAWSVars(ctx context.Context, c *config.Config, tf tofu.Dir, deleteData bool) error {
+	github := ""
 	if tf.Has(ctx, githubProvider) {
+		var err error
+		if github, err = tf.Attribute(ctx, githubProvider, "arn"); err != nil {
+			return err
+		}
+		if github == "" {
+			return fmt.Errorf("the state holds %s without its ARN", githubProvider)
+		}
 		if err := tf.Forget(ctx, githubProvider); err != nil {
 			return err
 		}
 	}
-	github := ""
-	if c.Catalog.Repo() != "" {
+	if c.Catalog.Repo() == "" {
+		github = ""
+	} else if github == "" {
 		var err error
 		if github, err = awscloud.GitHubProvider(ctx, a.runner, c); err != nil {
 			return err

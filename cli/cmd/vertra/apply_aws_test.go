@@ -18,24 +18,26 @@ import (
 const providerARN = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
 
 // awsTools fakes tofu and aws: the state holds the GitHub provider when
-// inState, and the account has it. Every call is logged to the returned file.
+// inState, and then IAM doesn't list it yet (it was made moments ago);
+// otherwise the account has it. Every call is logged to the returned file.
 func awsTools(t *testing.T, inState bool) (*run.Runner, string) {
 	t.Helper()
 	dir := t.TempDir()
 	log := filepath.Join(dir, "calls")
-	state := ""
+	state, listed := "", `,{"Arn":"`+providerARN+`"}`
 	if inState {
-		state = githubProvider
+		state, listed = githubProvider, ""
 	}
 	scripts := map[string]string{
 		"tofu": `echo "tofu $*" >> "` + log + `"
 case "$*" in
   *"state list "*) [ -n "` + state + `" ] && echo "` + state + `" ;;
+  *"show -json"*) echo '{"values":{"root_module":{"resources":[{"address":"` + state + `","values":{"arn":"` + providerARN + `"}}]}}}' ;;
 esac
 exit 0
 `,
 		"aws": `echo "aws $*" >> "` + log + `"
-echo '{"OpenIDConnectProviderList":[{"Arn":"arn:aws:iam::123456789012:oidc-provider/oidc.eks.us-east-2.amazonaws.com/id/X"},{"Arn":"` + providerARN + `"}]}'
+echo '{"OpenIDConnectProviderList":[{"Arn":"arn:aws:iam::123456789012:oidc-provider/oidc.eks.us-east-2.amazonaws.com/id/X"}` + listed + `]}'
 `,
 	}
 	for name, body := range scripts {
@@ -61,7 +63,8 @@ func writtenGitHubProvider(t *testing.T, tf tofu.Dir) any {
 
 // The install that made the account's GitHub provider forgets it, so its
 // destroy (or clearing its catalog) can't delete it from under another
-// install, and then uses it as any other install does.
+// install, taking its ARN from the state (IAM may not list it yet), and
+// then uses it as any other install does.
 func TestWriteAWSVarsLeavesTheGitHubProviderToTheAccount(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
@@ -92,6 +95,9 @@ func TestWriteAWSVarsLeavesTheGitHubProviderToTheAccount(t *testing.T) {
 			calls, _ := os.ReadFile(log)
 			if forgot := strings.Contains(string(calls), "state rm "+githubProvider); forgot != tc.forgets {
 				t.Errorf("forgot the provider: %v, want %v; calls:\n%s", forgot, tc.forgets, calls)
+			}
+			if listed := strings.Contains(string(calls), "list-open-id-connect-providers"); listed == tc.inState {
+				t.Errorf("listed the account's providers: %v; calls:\n%s", listed, calls)
 			}
 			if got := writtenGitHubProvider(t, tf); got != tc.wantsProvider {
 				t.Errorf("github_oidc_provider_arn = %v, want %q", got, tc.wantsProvider)
