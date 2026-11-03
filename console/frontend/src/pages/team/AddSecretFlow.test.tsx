@@ -34,13 +34,13 @@ describe("a pasted secret's value", () => {
     expect(masked()).toBe(true);
     const toggle = screen.getByRole("button", { name: "Show" });
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
-    fireEvent.change(value, { target: { value: '{\n  "type": "service_account"\n}' } });
+    fireEvent.change(value, { target: { value: '{\n  "token": "not-a-real-one"\n}' } });
     fireEvent.click(toggle);
     expect(screen.getByRole("button", { name: "Hide" }).getAttribute("aria-pressed")).toBe("true");
     // Shown, it no longer says it's hidden.
     expect(screen.getByText("Never spell-checked or suggested. Kept encrypted; nobody can read it back here.")).toBeTruthy();
     // Shown or hidden, it's the same text, still on several lines.
-    expect((screen.getByLabelText("Value") as HTMLTextAreaElement).value).toBe('{\n  "type": "service_account"\n}');
+    expect((screen.getByLabelText("Value") as HTMLTextAreaElement).value).toBe('{\n  "token": "not-a-real-one"\n}');
     fireEvent.click(screen.getByRole("button", { name: "Hide" }));
     expect(screen.getByRole("button", { name: "Show" }).getAttribute("aria-pressed")).toBe("false");
   });
