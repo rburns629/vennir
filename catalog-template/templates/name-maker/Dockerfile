@@ -4,7 +4,9 @@ FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0
 # Security fixes released since the base image was published: CI's scan
 # fails on a high or critical vulnerability that has a fix.
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
-# Your dependencies, if any, e.g.: RUN pip install --no-cache-dir requests==2.32.3
+# Your dependencies, if any, each pinned: e.g. RUN pip install --no-cache-dir
+# requests==2.32.3, or better, by hash, as the cloud samples do (a
+# requirements.txt from pip-compile --generate-hashes, --require-hashes).
 # pip isn't needed once the image is built, and the copies of other packages
 # it bundles (urllib3, msgpack, setuptools' pkg_resources) fail the scan.
 RUN pip uninstall --yes pip

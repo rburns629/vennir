@@ -76,3 +76,13 @@ updates:
     directory: /catalog-template/samples/local/products/rot13
     schedule: {interval: weekly}
     cooldown: {default-days: 7}
+  # The cloud samples' requirements.txt, pinned by hash.
+  - package-ecosystem: pip
+    directories:
+      - /catalog-template/samples/gcp/products/*
+      - /catalog-template/samples/aws/products/*
+      - /catalog-template/samples/azure/products/*
+    schedule: {interval: weekly}
+    cooldown: {default-days: 7}
+    groups:
+      sample-pip: {patterns: ["*"]}

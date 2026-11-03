@@ -1,0 +1,7 @@
+# What this product installs. requirements.txt pins it, and everything it
+# brings, by version and hash: after changing this file, regenerate it as its
+# header says.
+# google-auth brings pyasn1, whose releases before 0.6.5 fail the image scan.
+pyasn1>=0.6.5
+google-api-python-client
+google-auth
