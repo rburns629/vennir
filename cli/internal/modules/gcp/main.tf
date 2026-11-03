@@ -449,7 +449,10 @@ resource "google_service_account" "database_admin" {
   depends_on   = [google_project_service.apis]
 }
 
-# Connecting (cloudsql.client) and signing in (cloudsql.instanceUser).
+# Connecting (cloudsql.client) and signing in (cloudsql.instanceUser), on
+# this instance only (an IAM condition: Cloud SQL has no instance-level
+# policy), so Vertra's identities can't reach another instance in the
+# project.
 resource "google_project_iam_member" "database" {
   for_each = var.managed_database ? merge([for who, sa in {
     kernel  = google_service_account.kernel_db[0].member
@@ -463,6 +466,10 @@ resource "google_project_iam_member" "database" {
   project = var.project
   role    = each.value.role
   member  = each.value.member
+  condition {
+    title      = "only ${google_sql_database_instance.this[0].name}"
+    expression = "resource.name == \"projects/${var.project}/instances/${google_sql_database_instance.this[0].name}\" && resource.service == \"sqladmin.googleapis.com\""
+  }
 }
 
 # Which Kubernetes ServiceAccounts sign in as which: every kernel Pod that
