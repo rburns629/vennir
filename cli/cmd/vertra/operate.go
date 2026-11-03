@@ -293,6 +293,8 @@ func (a *app) destroyCmd() *cobra.Command {
 
 			var steps []string
 			var deleteCluster, deleteRegistry, deleteData, deleteTeams bool
+			var teamNamespaces []string   // existing: the console's, to delete if deleteTeams
+			var uninstall []install.AddOn // existing: the add-ons to uninstall
 			switch c.Target {
 			case "gcp", "aws":
 				kind := map[string]string{"gcp": "GKE", "aws": "EKS"}[c.Target]
@@ -359,11 +361,58 @@ func (a *app) destroyCmd() *cobra.Command {
 				if deleteData {
 					steps = append(steps, "delete the database volume")
 				}
-				if deleteTeams, err = ask("Delete the team namespaces (labelled vertra/team) and their secrets?"); err != nil {
-					return err
+				// Only the namespaces the console made, by name: never one
+				// labelled vertra/team by hand, which may hold anything.
+				var others []string
+				if teamNamespaces, others, err = install.TeamNamespaces(ctx, a.runner, c); err != nil {
+					return fmt.Errorf("listing the team namespaces: %w", err)
 				}
-				if deleteTeams {
-					steps = append(steps, "delete every team namespace")
+				if len(teamNamespaces) > 0 {
+					names := strings.Join(teamNamespaces, ", ")
+					if deleteTeams, err = ask("Delete the team namespaces the console made (" + names + ") and everything in them?"); err != nil {
+						return err
+					}
+					if deleteTeams {
+						steps = append(steps, "delete the team namespaces "+names)
+					} else {
+						steps = append(steps, "keep the team namespaces "+names)
+					}
+				}
+				if len(others) > 0 {
+					steps = append(steps, "keep "+strings.Join(others, ", ")+": labelled vertra/team, but not made by the console")
+				}
+				labelled := len(others) > 0 || (len(teamNamespaces) > 0 && !deleteTeams)
+				for _, addOn := range install.AddOns {
+					if install.InstalledIn(ctx, a.runner, c, addOn.Namespace, addOn.Release) == "" {
+						continue
+					}
+					keep := fmt.Sprintf("keep %s in %s", addOn.Name, addOn.Namespace)
+					if slices.Contains(install.RecordedAddOns(dir), addOn) {
+						question := fmt.Sprintf("Uninstall %s from %s, which vertra installed? %s", addOn.Name, addOn.Namespace, addOn.Loses)
+						if addOn == install.ExternalSecretsAddOn && labelled {
+							question += " That includes the secrets it synced into the team namespaces kept."
+						}
+						// Never answered by --all: an add-on isn't this
+						// install's data, and others may use it. Without a
+						// terminal, it's kept.
+						yes, err := a.ask.Confirm(question, false)
+						if err != nil {
+							return err
+						}
+						if yes {
+							steps = append(steps, fmt.Sprintf("uninstall %s from %s", addOn.Name, addOn.Namespace))
+							uninstall = append(uninstall, addOn)
+							continue
+						}
+					} else {
+						keep += fmt.Sprintf(" (not recorded as this environment's: someone else, or an older vertra, installed it; `helm uninstall %s -n %s` once nothing uses it)", addOn.Release, addOn.Namespace)
+					}
+					if addOn == install.PolicyControllerAddOn && labelled {
+						// Its webhook covers them with no-match-policy deny:
+						// with the kernel chart's policies gone, nothing runs.
+						keep += ": it refuses every Pod in the namespaces labelled vertra/team once the kernel's image policies are gone, until it's uninstalled or they're unlabelled"
+					}
+					steps = append(steps, keep)
 				}
 			}
 			if len(steps) == 0 {
@@ -421,7 +470,13 @@ func (a *app) destroyCmd() *cobra.Command {
 					}
 				}
 				if deleteTeams {
-					if err := a.runner.Run(ctx, "kubectl", "--context", kctx, "delete", "namespace", "-l", "vertra/team"); err != nil {
+					if err := a.runner.Run(ctx, "kubectl", append([]string{"--context", kctx, "delete", "namespace", "--ignore-not-found"}, teamNamespaces...)...); err != nil {
+						return err
+					}
+				}
+				// After the releases, whose resources are their kinds.
+				for _, addOn := range uninstall {
+					if err := install.UninstallAddOn(ctx, a.runner, c, addOn); err != nil {
 						return err
 					}
 				}

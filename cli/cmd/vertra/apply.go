@@ -198,6 +198,9 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 				return fmt.Errorf("the console's certificate needs cert-manager, which this cluster hasn't got: install it, or `vertra config set console.tls.installCertManager true` for vertra to (%s)", install.CertManagerChart)
 			}
 			fmt.Fprintln(out, "Installing cert-manager", install.CertManagerChart, "(the console's certificate)...")
+			if err := install.RecordIfMissing(ctx, a.runner, c, dir, install.CertManagerAddOn); err != nil {
+				return err
+			}
 			if err := install.CertManager(ctx, a.runner, c); err != nil {
 				return err
 			}
@@ -234,6 +237,9 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 	if c.ChecksSignatures() {
 		// Before the kernel chart, whose image policy is its kind.
 		fmt.Fprintln(out, "Installing policy-controller", install.PolicyControllerChart, "(only images catalog CI signed run)...")
+		if err := install.RecordIfMissing(ctx, a.runner, c, dir, install.PolicyControllerAddOn); err != nil {
+			return err
+		}
 		if err := install.PolicyController(ctx, a.runner, c, made); err != nil {
 			return err
 		}
@@ -261,6 +267,9 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 	if c.ExternalSecrets {
 		// Before the console, which writes teams' SecretStores.
 		fmt.Fprintln(out, "Installing External Secrets Operator", install.ExternalSecretsChart, "(teams' SecretStores)...")
+		if err := install.RecordIfMissing(ctx, a.runner, c, dir, install.ExternalSecretsAddOn); err != nil {
+			return err
+		}
 		if err := install.ExternalSecrets(ctx, a.runner, c); err != nil {
 			return err
 		}
