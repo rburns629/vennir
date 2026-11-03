@@ -490,7 +490,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
     expiration {
       days = var.backup_retention_days
     }
-    # An overwritten dump is kept as long as any backup is.
+    # On a versioned bucket, expiring a dump only makes it noncurrent (a
+    # delete marker goes on top); this deletes it. An overwritten dump is
+    # noncurrent from the overwrite, and kept the full retention after it,
+    # as on gcp it couldn't be touched. The price: S3 can't tell the two
+    # apart, so every dump is kept, and billed, for twice the retention
+    # (retention days current, then as many noncurrent).
     noncurrent_version_expiration {
       noncurrent_days = var.backup_retention_days
     }

@@ -1087,8 +1087,11 @@ For the cloud destinations, the copy runs as `backup.serviceAccountName`
 it to an identity that may write to the bucket and nothing else: on GCS,
 `roles/storage.objectCreator` and `roles/storage.objectViewer` on the bucket
 (`gsutil` lists before writing); on S3, `s3:PutObject`, on a versioned bucket
-so an overwrite can't destroy an earlier dump (vertra's aws module does
-this); on Azure, Storage Blob Data Contributor on the container. Keep dumps
+so an overwrite can't destroy an earlier dump. vertra's aws module does
+this, and expires noncurrent versions as long after as current ones: an
+overwritten dump stays the full retention after the overwrite, but every
+dump is stored (and billed) for twice the retention, since expiring a
+version only makes it noncurrent. On Azure, Storage Blob Data Contributor on the container. Keep dumps
 as long as you need with a lifecycle rule on the bucket. For `pvc`, create the claim yourself
 (`backup.pvc.claimName`): most storage classes bind a volume only once a Pod
 uses it, which would hang `helm upgrade --wait`.
