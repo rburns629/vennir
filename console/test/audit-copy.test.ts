@@ -153,6 +153,17 @@ describe("the database compared with its copy", () => {
     expect((await state())?.compareProblem).toContain(`entry ${String(ids[0])} is gone from the database`);
   });
 
+  it("expects an entry past retention to be gone from the database", async () => {
+    const { ids, name, body } = await copied("retained");
+    // The first copied a decade ago, and since deleted by retention.
+    const lines = body.split("\n");
+    lines[0] = JSON.stringify({ ...(JSON.parse(lines[0]!) as Record<string, unknown>), at: "2016-01-01T00:00:00.000Z" });
+    bucket(name, lines.join("\n"));
+    await db.delete(auditLog).where(eq(auditLog.id, ids[0]!));
+    await compareWithCopy(app.log);
+    expect(await state()).toMatchObject({ comparedThrough: ids[2], differsAt: null, compareProblem: null });
+  });
+
   it("says when it can't read the copy, without calling that a difference", async () => {
     const { name } = await copied("unread");
     bucket(name, null);
