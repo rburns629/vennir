@@ -1748,12 +1748,30 @@ describe("signing in", () => {
 
   it("offers single sign-on only when the install has it", async () => {
     await renderAt("/login", null, { "AuthService/GetEnvironment": { label: "test", ssoLabel: "Google" } });
-    expect(await screen.findByRole("link", { name: /sign in with google/i })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /sign in with google/i })).toBeTruthy();
     cleanup();
 
     await renderAt("/login", null);
     await screen.findByLabelText(/email/i);
-    expect(screen.queryByRole("link", { name: /sign in with google/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /sign in with google/i })).toBeNull();
+  });
+
+  it("takes a session back from single sign-on only when this tab started that sign-in", async () => {
+    // A link carrying someone else's session: no sign-in was started here.
+    window.history.replaceState(null, "", "/login#token=someone-elses&tab=0123456789abcdef0123456789abcdef");
+    await renderAt("/login", null);
+    expect(await screen.findByText(/wasn't started from this window/i)).toBeTruthy();
+    expect(localStorage.getItem("token")).toBeNull();
+    cleanup();
+
+    // Back from the sign-in this tab started: its own value comes back.
+    sessionStorage.setItem("vertra_sso_tab", "fedcba9876543210fedcba9876543210");
+    window.history.replaceState(null, "", "/login#token=this-tabs&tab=fedcba9876543210fedcba9876543210");
+    await renderAt("/login", null, { "AuthService/GetMe": MEMBER });
+    await waitFor(() => {
+      expect(localStorage.getItem("token")).toBe("this-tabs");
+    });
+    expect(sessionStorage.getItem("vertra_sso_tab")).toBeNull();
   });
 
   it("holds someone with a password set by someone else until they choose their own", async () => {
