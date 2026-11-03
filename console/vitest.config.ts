@@ -7,7 +7,8 @@ import { defineConfig } from "vitest/config";
  *
  *   createdb execution_console_test
  *   DATABASE_URL=postgresql://localhost/execution_console_test \
- *     JWT_SECRET=x KERNEL_API_URL=http://unused npm run db:migrate
+ *     JWT_SECRET=test-only-jwt-secret-of-32-bytes-or-more \
+ *     KERNEL_API_URL=http://unused npm run db:migrate
  *
  * config.ts reads these at import time, so they have to be set here rather
  * than inside a test.
@@ -18,7 +19,8 @@ export default defineConfig({
     globalSetup: ["test/globalSetup.ts"],
     env: {
       DATABASE_URL: process.env["TEST_DATABASE_URL"] ?? "postgresql://localhost/execution_console_test",
-      JWT_SECRET: "test-only-jwt-secret",
+      JWT_SECRET: "test-only-jwt-secret-of-32-bytes-or-more",
+      KEYLESS_AUDIENCE: "https://console.test",
       KERNEL_API_URL: "http://kernel-api.invalid",
       // The guides as they ship in the image (src/routes/docs.ts).
       DOCS_DIR: "docs",

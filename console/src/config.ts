@@ -367,6 +367,26 @@ function loadEmail() {
   return email;
 }
 
+/** JWT_SECRET: at least 32 bytes. Every session's key, every sealing key and the SSO cookie's HMAC come from it. */
+function jwtSecret(): string {
+  const value = requireEnv("JWT_SECRET");
+  if (Buffer.byteLength(value) < 32) throw new Error("JWT_SECRET is shorter than 32 bytes: use a long random value (the chart generates one when jwtSecret is empty).");
+  return value;
+}
+
+/**
+ * Keyless bots: the issuers allowed, and the audience their tokens must
+ * name (KEYLESS_AUDIENCE, else the console's URL). With neither set, no
+ * issuer is allowed: a constant audience would accept tokens minted for
+ * any other service that uses it. (A console with no address CI can reach
+ * has no use for keyless bots anyway.)
+ */
+function keyless(): { issuers: string[]; audience: string } {
+  const audience = process.env["KEYLESS_AUDIENCE"] || (process.env["CONSOLE_URL"] ?? "").replace(/\/+$/, "");
+  const issuers = audience ? list(process.env["KEYLESS_ISSUERS"] ?? "https://token.actions.githubusercontent.com,https://gitlab.com") : [];
+  return { issuers, audience };
+}
+
 /** INSTALL_CLOUD: one of the catalog's clouds, or "" when not known. */
 function installCloud(): string {
   const value = process.env["INSTALL_CLOUD"] ?? "";
@@ -436,8 +456,9 @@ export const config = {
     password: process.env["GATEWAY_DB_PASSWORD"] || undefined,
   },
   // Signs and verifies session JWTs. Must be long and random in any real
-  // deployment — this is not a value with a safe default.
-  jwtSecret: requireEnv("JWT_SECRET"),
+  // deployment — this is not a value with a safe default. Shorter than 32
+  // bytes fails startup.
+  jwtSecret: jwtSecret(),
   // How long a login session stays valid before the user has to sign in
   // again. Bounded on purpose: with no expiry, a leaked token was usable
   // forever, and rotating JWT_SECRET (logging *everyone* out) was the only
@@ -480,10 +501,7 @@ export const config = {
   // Keyless bots (auth/keyless.ts): the OIDC issuers whose ID tokens a
   // bot may sign in with instead of a stored token (a CI's own identity,
   // such as GitHub Actions'), and the audience those tokens must be for.
-  keyless: {
-    issuers: list(process.env["KEYLESS_ISSUERS"] ?? "https://token.actions.githubusercontent.com,https://gitlab.com"),
-    audience: process.env["KEYLESS_AUDIENCE"] || (process.env["CONSOLE_URL"] ?? "").replace(/\/+$/, "") || "vertra",
-  },
+  keyless: keyless(),
   // Notifications (notifier.ts): the hosts a team's chat webhook may be
   // under ("hooks.slack.com", or "*.webhook.office.com" for any name below
   // it), so a webhook can't point the console at anything else.

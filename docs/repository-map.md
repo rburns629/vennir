@@ -376,6 +376,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `sso.test.ts`, `oidcProvider.ts` | Single sign-on as admins set it: admins only, the secret sealed and unsent, issuers checked, an install's provider read-only, signing in following the saved settings, mapped teams following the claim's and Google Workspace's groups (and untouched when they can't be read), manual edits refused; the stand-in provider it signs in against. |
 | `oidc.test.ts` | Signing in with single sign-on against a stand-in provider: new accounts, binding an existing one once, every refusal (domain, unverified email, signature, nonce, state); a team requiring it refusing its members' passwords and password sessions, admins exempt, nothing while it's off. |
 | `reset-admin.test.ts` | Resetting a lost admin password: printed once, sessions revoked, audited, admins only. |
+| `config.test.ts` | Startup settings: a short `JWT_SECRET` refused, keyless bots off with no audience to check. |
 | `execution-list.test.ts` | The execution list, a page at a time: every row once, only the caller's, server-side filters. |
 | `access.test.ts` | The authorization rules in `auth/access.ts`. |
 | `security-headers.test.ts` | The browser security headers (CSP and others) on pages and errors. |
