@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -107,6 +108,78 @@ func TestCheckAWSInAnAllowedRegion(t *testing.T) {
 	if len(a.Problems) != 0 || !strings.Contains(out, "Region: us-east-2 (your organization allows only us-east-2)") ||
 		!strings.Contains(out, "Spot: your organization's policy denies reading Spot prices") {
 		t.Errorf("got:\n%s", out)
+	}
+}
+
+// withZones answers describe-availability-zones for some regions itself
+// (nil error: the region answers), counting how often each is asked.
+func withZones(exec Exec, answers map[string]error, asked map[string]int) Exec {
+	var mu sync.Mutex
+	return func(ctx context.Context, name string, args ...string) (string, error) {
+		if len(args) > 0 && args[0] == "ec2" && args[1] == "describe-availability-zones" {
+			for i, a := range args {
+				if a != "--region" || i+1 == len(args) {
+					continue
+				}
+				r := args[i+1]
+				mu.Lock()
+				asked[r]++
+				mu.Unlock()
+				if err, ok := answers[r]; ok {
+					if err != nil {
+						return "", err
+					}
+					return `"` + r + `a"`, nil
+				}
+			}
+		}
+		return exec(ctx, name, args...)
+	}
+}
+
+// A region outside AWSRegions (opted in to, here) is asked too, and judged
+// by its own answer.
+func TestCheckAWSAsksTheRegionChosen(t *testing.T) {
+	asked := map[string]int{}
+	exec := withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"il-central-1": nil}, asked)
+	a := CheckAWS(context.Background(), exec, "vertra", "il-central-1")
+	if len(a.Problems) != 0 || !contains(a.Allowed, "il-central-1") || asked["il-central-1"] != 1 {
+		t.Errorf("allowed %v, asked %v:\n%s", a.Allowed, asked, report(a.Report))
+	}
+	if !strings.Contains(report(a.Report), "Region: il-central-1") {
+		t.Errorf("got:\n%s", report(a.Report))
+	}
+
+	// One the account hasn't opted in to is still a problem.
+	notEnabled := errors.New("\naws: [ERROR]: An error occurred (OptInRequired): You are not subscribed to this service.")
+	exec = withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"me-central-1": notEnabled}, asked)
+	a = CheckAWS(context.Background(), exec, "vertra", "me-central-1")
+	if !strings.Contains(report(a.Report), "PROBLEM can't use me-central-1 from this account") {
+		t.Errorf("got:\n%s", report(a.Report))
+	}
+
+	// ap-northeast-3 every account has: it's offered without being chosen.
+	exec = withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"ap-northeast-3": nil}, asked)
+	if a := CheckAWS(context.Background(), exec, "vertra", ""); !contains(a.Allowed, "ap-northeast-3") {
+		t.Errorf("allowed %v", a.Allowed)
+	}
+}
+
+// init offers a region outside AWSRegions once it has answered.
+func TestProbeRegionAddsItToAllowed(t *testing.T) {
+	asked := map[string]int{}
+	exec := withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"eu-south-1": nil}, asked)
+	a := CheckAWS(context.Background(), exec, "vertra", "")
+	if contains(a.Allowed, "eu-south-1") {
+		t.Fatalf("eu-south-1 asked before it was chosen: %v", a.Allowed)
+	}
+	a.ProbeRegion(context.Background(), exec, "vertra", "eu-south-1")
+	if strings.Join(a.Allowed, ",") != "eu-south-1,us-east-2" {
+		t.Errorf("allowed %v", a.Allowed)
+	}
+	a.ProbeRegion(context.Background(), exec, "vertra", "eu-south-2")
+	if a.Denied["eu-south-2"] == "" {
+		t.Errorf("an organization's refusal is kept: %v", a.Denied)
 	}
 }
 
