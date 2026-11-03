@@ -228,11 +228,18 @@ export async function reconcileScans(): Promise<boolean> {
     if (!row.jobName) continue;
     const job = await readScanJob(namespace, row.jobName, "trivy", true);
     if (job.state === "running") continue;
-    if (job.state === "failed" && IMAGE_GONE.test(job.output)) {
+    // Every write below is conditioned on this Job still being the row's:
+    // another reconcile (another replica's, or a submission waiting in
+    // scanBlocker) may have recorded it already and started the next scan.
+    const thisJob = and(eq(imageScans.digest, row.digest), eq(imageScans.jobName, row.jobName));
+    if (job.state === "failed" && IMAGE_GONE.test(job.output) && row.status !== "failed") {
       // The registry no longer has it: scanning again can never work. It
       // can't run either; if it's ever pushed again, its next use scans it.
-      await db.delete(imageScans).where(eq(imageScans.digest, row.digest));
+      // A failed verdict is kept (below, as a rescan that couldn't run), so
+      // the digest stays on the cluster's deny list.
+      const gone = await db.delete(imageScans).where(thisJob).returning({ digest: imageScans.digest });
       await deleteScanJob(namespace, row.jobName);
+      if (gone.length === 0) continue;
       scansFinished.inc({ status: "gone" });
       changed = true;
       continue;
@@ -255,7 +262,7 @@ export async function reconcileScans(): Promise<boolean> {
     // admin didn't see.
     const previous = new Set(((row.findings as ScanFindings | null)?.findings ?? []).map((f) => f.id));
     const somethingNew = recorded.findings.some((f) => !previous.has(f.id));
-    await db
+    const recordedRows = await db
       .update(imageScans)
       .set({
         // A rescan that couldn't run keeps the last real verdict.
@@ -265,8 +272,10 @@ export async function reconcileScans(): Promise<boolean> {
         jobName: null,
         ...(status === "failed" && somethingNew ? { acceptedAt: null, acceptedBy: null, acceptedReason: null } : {}),
       })
-      .where(eq(imageScans.digest, row.digest));
+      .where(thisJob)
+      .returning({ digest: imageScans.digest });
     await deleteScanJob(namespace, row.jobName);
+    if (recordedRows.length === 0) continue;
     scansFinished.inc({ status });
     changed ||= status !== row.status;
   }
