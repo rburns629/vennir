@@ -442,15 +442,26 @@ func parentDomain(zone string) string {
 	return zone
 }
 
+// githubProvider is the module's GitHub OIDC provider, made when the account
+// has none.
+const githubProvider = "aws_iam_openid_connect_provider.github[0]"
+
 // writeAWSVars writes the module's variables, after Init (it reads the
-// state): a GitHub OIDC provider this install made stays its own, and one
-// the account already had is only used.
+// state). The account's GitHub OIDC provider is every install's there, so
+// no install keeps it in its state: the one that made it forgets it on its
+// next run (before any plan, a destroy's included), and then uses it like
+// the others. So neither a destroy nor clearing the catalog deletes it from
+// under another install.
 func (a *app) writeAWSVars(ctx context.Context, c *config.Config, tf tofu.Dir, deleteData bool) error {
+	if tf.Has(ctx, githubProvider) {
+		if err := tf.Forget(ctx, githubProvider); err != nil {
+			return err
+		}
+	}
 	github := ""
 	if c.Catalog.Repo() != "" {
 		var err error
-		own := tf.Has(ctx, "aws_iam_openid_connect_provider.github[0]")
-		if github, err = awscloud.GitHubProvider(ctx, a.runner, c, own); err != nil {
+		if github, err = awscloud.GitHubProvider(ctx, a.runner, c); err != nil {
 			return err
 		}
 	}

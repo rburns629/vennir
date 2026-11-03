@@ -319,6 +319,13 @@ func (a *app) destroyCmd() *cobra.Command {
 						steps = append(steps, "keep the task registry "+c.TaskImages.Name)
 					}
 				}
+				if c.Target == "aws" && c.Catalog.Repo() != "" {
+					// Never, not even with --all: every install in the account
+					// uses the one provider, and vertra can't tell whether
+					// another does.
+					steps = append(steps, "keep the account's IAM OIDC provider for GitHub (free), which every install's catalog CI in the account signs in with: "+
+						"`aws iam delete-open-id-connect-provider` deletes it once none does")
+				}
 			case "kind":
 				if !st.ClusterExists {
 					fmt.Fprintln(out, "The kind cluster", c.Cluster.Name, "doesn't exist.")

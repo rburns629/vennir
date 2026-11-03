@@ -494,6 +494,14 @@ identities, keys, the releases) is removed. `--all` removes the data too,
 without those questions; it still shows the plan and asks for one final
 confirmation unless `--yes` is also given.
 
+On AWS, the account's IAM OIDC provider for GitHub's issuer stays, even
+with `--all`: an account has one, which every install's catalog CI in it
+signs in with. The install that makes it forgets it from its state on its
+next run, so no install's destroy (or a cleared catalog) deletes it from
+under another; the screen names it, and `aws iam
+delete-open-id-connect-provider` deletes it once no install uses it (it
+costs nothing).
+
 ## Security
 
 - **No standing secrets on disk:** the config holds names; database
