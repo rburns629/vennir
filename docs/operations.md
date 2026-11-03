@@ -1046,7 +1046,9 @@ kubectl -n vertra-system rollout restart deployment console-execution-console
 
 A changed Secret restarts nothing by itself, hence the restart. The
 gateway needs none: it reads the new public key the first time a session
-names it. Then:
+names it, and drops the old one within a minute (it reads the console's
+keys every minute; while the console can't be read, it keeps using the
+last ones it read for up to ten). Then:
 
 - every session ends, so everyone signs in again;
 - every sealed value becomes unreadable and has to be entered again: each
