@@ -102,11 +102,11 @@ const lastSubmitted = () => {
 };
 
 /** Records finished runs until this one is. */
-async function recorded(executionId: string): Promise<void> {
+async function recorded(executionId: string, pass: { perPass?: number } = {}): Promise<void> {
   for (let i = 0; i < 50; i++) {
     const [row] = await db.select({ at: submittedExecutions.resourcesRecordedAt }).from(submittedExecutions).where(eq(submittedExecutions.executionId, executionId));
     if (row?.at) return;
-    await recordFinishedRuns();
+    await recordFinishedRuns(pass);
   }
   throw new Error(`${executionId} was never recorded`);
 }
@@ -312,6 +312,32 @@ describe("what runs made", () => {
     const refused = await call(consumerToken, "ResourceService/DeleteResources", { resourceIds: [note?.id] });
     expect(refused.failure).toBe("NO_CLEANUP");
     expect(vi.mocked(submitExecution)).toHaveBeenCalledTimes(1); // only the run that made it
+  });
+
+  it("is recorded behind more unfinished runs, older than it, than a pass looks at", async () => {
+    // Three passes' worth of runs from long ago that haven't finished: once
+    // they filled every pass, and nothing newer was ever looked at.
+    const perPass = 5;
+    const waiting = Array.from({ length: perPass * 3 }, (_, i) => ({
+      executionId: randomUUID(),
+      teams: [cons],
+      name: "waiting",
+      onBehalfOf: cons,
+      template: `${cons}/waiting`,
+      createdAt: new Date(Date.UTC(2000, 0, 1, 0, 0, i)),
+    }));
+    for (const run of waiting) kernelRuns.set(run.executionId, { executionId: run.executionId, name: "waiting", state: "RUNNING", tasks: [] });
+    await db.insert(submittedExecutions).values(waiting);
+    try {
+      const run = await call<{ executionId: string }>(consumerToken, "TemplateService/RunAction", { product: `${prov}-thing-create`, inputs: {}, onBehalfOf: cons });
+      const executionId = run.body.executionId;
+      kernelRuns.set(executionId, { executionId, name: "x", state: "SUCCEEDED", tasks: [step("create", "SUCCEEDED", { resources: [{ type: "demo/thing", id: `${prefix}-behind` }] })] });
+      await recorded(executionId, { perPass });
+      expect((await list(consumerToken, { executionId })).map((r) => r.externalId)).toEqual([`${prefix}-behind`]);
+    } finally {
+      await db.delete(submittedExecutions).where(inArray(submittedExecutions.executionId, waiting.map((r) => r.executionId)));
+      for (const run of waiting) kernelRuns.delete(run.executionId);
+    }
   });
 });
 

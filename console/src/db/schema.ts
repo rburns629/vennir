@@ -578,6 +578,11 @@ export const submittedExecutions = pgTable("submitted_executions", {
   index("submitted_executions_teams_idx").using("gin", table.teams),
   // An ordering bot's runs in the last minute (core/orderRate.ts).
   index("submitted_executions_submitted_by_idx").on(table.submittedBy, table.createdAt),
+  // The runs not yet recorded, in the resource recorder's order and cursor
+  // (resourceRecorder.ts): only those, however many are recorded.
+  index("submitted_executions_unrecorded_idx")
+    .on(table.createdAt, table.executionId)
+    .where(sql`${table.resourcesRecordedAt} IS NULL`),
 ]);
 
 /**

@@ -306,8 +306,20 @@ export async function recordRun(run: Run, detail: KernelExecution): Promise<numb
   return rows.length;
 }
 
-/** One pass: finished runs not yet recorded, oldest first. */
-export async function recordFinishedRuns(): Promise<{ runs: number; resources: number }> {
+/**
+ * Where the last pass stopped in the runs not yet recorded (created_at as
+ * Postgres writes it, to the microsecond, and execution id), so the next
+ * goes on from there: runs that haven't finished, however many and however
+ * old, are passed over instead of filling every pass ahead of newer ones.
+ * Back to the oldest once a pass reaches the end. Each replica keeps its
+ * own; a run two replicas both record is recorded the same twice and told
+ * once (its news has keys).
+ */
+let cursor: { time: string; id: string } | null = null;
+
+/** One pass: finished runs not yet recorded, oldest first from where the last pass stopped. */
+export async function recordFinishedRuns({ perPass = PER_PASS }: { perPass?: number } = {}): Promise<{ runs: number; resources: number }> {
+  const after = cursor;
   const pending = await db
     .select({
       executionId: submittedExecutions.executionId,
@@ -317,16 +329,31 @@ export async function recordFinishedRuns(): Promise<{ runs: number; resources: n
       payload: submittedExecutions.payload,
       template: submittedExecutions.template,
       onBehalfOf: submittedExecutions.onBehalfOf,
+      cursorTime: sql<string>`${submittedExecutions.createdAt}::text`,
     })
     .from(submittedExecutions)
-    .where(isNull(submittedExecutions.resourcesRecordedAt))
-    .orderBy(asc(submittedExecutions.createdAt))
-    .limit(PER_PASS);
-  if (pending.length === 0) return { runs: 0, resources: 0 };
+    .where(
+      and(
+        isNull(submittedExecutions.resourcesRecordedAt),
+        after ? sql`(${submittedExecutions.createdAt}, ${submittedExecutions.executionId}) > (${after.time}::timestamptz, ${after.id}::uuid)` : undefined,
+      ),
+    )
+    .orderBy(asc(submittedExecutions.createdAt), asc(submittedExecutions.executionId))
+    .limit(perPass);
+  if (pending.length === 0) {
+    cursor = null;
+    return { runs: 0, resources: 0 };
+  }
   const states = new Map((await getExecutionStates(pending.map((r) => r.executionId))).map((s) => [s.executionId, s]));
   let runs = 0;
   let recorded = 0;
+  let stopped = false;
   for (const run of pending) {
+    // Done with: the next pass goes on after it. One that throws isn't, so
+    // the next pass starts with it.
+    const passed = () => {
+      cursor = { time: run.cursorTime, id: run.executionId };
+    };
     const { state, updatedAt } = states.get(run.executionId) ?? {};
     if (state === undefined) {
       // The kernel no longer has it (past its retention): nothing to read.
@@ -334,20 +361,32 @@ export async function recordFinishedRuns(): Promise<{ runs: number; resources: n
         .update(submittedExecutions)
         .set({ resourcesRecordedAt: sql`now()` })
         .where(and(eq(submittedExecutions.executionId, run.executionId), isNull(submittedExecutions.resourcesRecordedAt)));
+      passed();
       continue;
     }
-    if (!FINISHED.has(state) || runs === READ_PER_PASS) continue;
+    if (!FINISHED.has(state)) {
+      // Not finished yet: looked at again when the cursor comes round.
+      passed();
+      continue;
+    }
+    if (runs === READ_PER_PASS) {
+      // Enough read for one pass: this one and what's after it, next pass.
+      stopped = true;
+      break;
+    }
     if (run.template === "check") {
       // A readiness check: its answer is the product's (readiness.ts).
       await recordCheck(run.executionId, await getExecution(run.executionId));
       await db.update(submittedExecutions).set({ resourcesRecordedAt: sql`now()` }).where(eq(submittedExecutions.executionId, run.executionId));
       runs += 1;
+      passed();
       continue;
     }
     if (run.template === "preview") {
       // A preview changes nothing and says so itself: no resources, no news.
       await db.update(submittedExecutions).set({ resourcesRecordedAt: sql`now()` }).where(eq(submittedExecutions.executionId, run.executionId));
       runs += 1;
+      passed();
       continue;
     }
     const detail = await getExecution(run.executionId);
@@ -365,7 +404,10 @@ export async function recordFinishedRuns(): Promise<{ runs: number; resources: n
     await runFinishedCallbacks({ ...run, state, finishedAt: updatedAt ?? null, tasks: detail.tasks });
     recorded += await recordRun(run, detail);
     runs += 1;
+    passed();
   }
+  // Reached the end of what's not recorded: from the oldest again next pass.
+  if (!stopped && pending.length < perPass) cursor = null;
   return { runs, resources: recorded };
 }
 
