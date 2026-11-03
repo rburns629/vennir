@@ -51,28 +51,38 @@ rules:
 
   - id: js-decode-and-execute
     languages: [javascript, typescript]
-    patterns:
+    # Taint, so a decoded value is followed through variables to where it runs.
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: Buffer.from($X, "base64")
+          - pattern: Buffer.from($X, "base64url")
+          - pattern: Buffer.from($X, "hex")
+          - pattern: atob(...)
+    pattern-sinks:
       - pattern-either:
           - pattern: eval(...)
           - pattern: new Function(...)
           - pattern: Function(...)
-      - pattern-either:
-          - pattern-inside: eval(<... Buffer.from(...) ...>)
-          - pattern-inside: eval(<... atob(...) ...>)
-          - pattern-inside: new Function(<... Buffer.from(...) ...>)
-          - pattern-inside: new Function(<... atob(...) ...>)
-          - pattern-inside: Function(<... Buffer.from(...) ...>)
-          - pattern-inside: Function(<... atob(...) ...>)
+          - pattern: $VM.runInThisContext(...)
+          - pattern: $VM.runInNewContext(...)
+          - pattern: $VM.runInContext(...)
+          - pattern: new $VM.Script(...)
+          - pattern: runInThisContext(...)
+          - pattern: runInNewContext(...)
+          - pattern: runInContext(...)
+          - pattern: new Script(...)
     message: >-
-      Executes code that's decoded at run time (base64). That's how a
-      payload is hidden from review; real product code has no reason to do it.
+      Executes code that's decoded at run time (base64, hex), directly or
+      through a variable. That's how a payload is hidden from review; real
+      product code has no reason to do it.
     severity: ERROR
 
   - id: powershell-download-and-execute
     languages: [generic]
     paths:
       include: ["**/*.ps1", "**/Dockerfile"]
-    pattern-regex: '(?i)\b(iex|invoke-expression)\b[^\n]*\b(iwr|irm|invoke-webrequest|invoke-restmethod|downloadstring|frombase64string)\b|\b(iwr|irm|invoke-webrequest|invoke-restmethod|downloadstring|frombase64string)\b[^\n]*\|\s*(iex|invoke-expression)\b'
+    pattern-regex: '(?i)\b(iex|invoke-expression)\b[^\n]*\b(iwr|irm|invoke-webrequest|invoke-restmethod|downloadstring|frombase64string)\b|\b(iwr|irm|invoke-webrequest|invoke-restmethod)\b[^\n]*\|\s*(iex|invoke-expression)\b|\b(downloadstring|frombase64string)\b[^\n]*\b(iex|invoke-expression)\b'
     message: >-
       Runs PowerShell it downloads or decodes at run time (Invoke-Expression
       of a web request or of base64), so what runs is never what was
