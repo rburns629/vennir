@@ -1102,13 +1102,17 @@ kubectl -n $NS exec -i deploy/kernel-execution-kernel-postgres -- sh -c 'cat > /
 kubectl -n $NS exec -i deploy/kernel-execution-kernel-postgres -- sh -c 'cat > /tmp/console.pgdump' < console.pgdump
 # 4. Inside the Pod (kubectl exec -it ... -- sh):
 export PGUSER=postgres
-dropdb --force execution_kernel && createdb execution_kernel
-pg_restore --exit-on-error -d execution_kernel /tmp/kernel.pgdump
+# The kernel's own role owns its database (vertra_kernel; postgres on an
+# install from before it had one).
+K=vertra_kernel; [ "$(psql -Atc "SELECT 1 FROM pg_roles WHERE rolname = '$K'")" = 1 ] || K=postgres
+dropdb --force execution_kernel && createdb -O $K execution_kernel
+pg_restore --exit-on-error --no-owner --role=$K -d execution_kernel /tmp/kernel.pgdump
 dropdb --force execution_console && createdb -O console execution_console
 pg_restore --exit-on-error --no-owner --role=console -d execution_console /tmp/console.pgdump
 psql -c 'REVOKE CONNECT ON DATABASE execution_kernel FROM PUBLIC' \
      -c 'REVOKE CONNECT ON DATABASE execution_console FROM PUBLIC' \
-     -c 'GRANT CONNECT ON DATABASE execution_console TO console'
+     -c 'GRANT CONNECT ON DATABASE execution_console TO console' \
+     -c "GRANT CONNECT ON DATABASE execution_kernel TO $K"
 # With the API gateway on, its role reads the console's database too:
 psql -c 'GRANT CONNECT ON DATABASE execution_console TO vertra_gateway'
 rm /tmp/*.pgdump

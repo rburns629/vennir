@@ -86,10 +86,17 @@ spec:
             - -c
             - |
               set -eu
-              until pg_isready -q; do echo "waiting for Postgres"; sleep 2; done
+              # Five minutes at most: a sleeping database fails the Job
+              # (its backoffLimit), not the upgrade's whole timeout.
+              tries=0
+              until pg_isready -q; do
+                tries=$((tries + 1)); [ "$tries" -le 150 ] || { echo "Postgres isn't answering"; exit 1; }
+                echo "waiting for Postgres"; sleep 2
+              done
               psql -v ON_ERROR_STOP=1 -d {{ .Values.postgres.auth.database | quote }} \
                 -v role={{ .Values.postgres.auth.kernelUsername | quote }} \
-                -v db={{ .Values.postgres.auth.database | quote }} -v password="$KERNEL_PASSWORD" <<'SQL'
+                -v db={{ .Values.postgres.auth.database | quote }} <<'SQL'
+              \getenv password KERNEL_PASSWORD
               SELECT format('CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE', :'role')
                 WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'role') \gexec
               SELECT format('ALTER ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD %L', :'role', :'password') \gexec
