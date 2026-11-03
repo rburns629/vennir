@@ -5,9 +5,11 @@
 // (EdDSA, checked with the console's public key, keys.go: the gateway can
 // verify a session but never make one; one issued before the account's
 // last password change, or signed out, is revoked), or a bot's API token
-// (mp_..., found by its SHA-256 in api_tokens, unless revoked or expired). The caller's teams are read from
-// the console's database on every request, so a membership change counts at
-// once. A token is never logged or kept.
+// (mp_..., found by its SHA-256 in api_tokens, unless revoked or expired;
+// its last_used_at kept as the console keeps it). The caller's teams are
+// read from the console's database on every request, so a membership change
+// counts at once; a retired team (read-only in the console) calls as
+// nobody. A token is never logged or kept.
 package auth
 
 import (
@@ -18,10 +20,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // APITokenPrefix marks a bot's API token (console/src/auth/apiToken.ts).
@@ -33,7 +37,7 @@ type Caller struct {
 	Email   string
 	IsAdmin bool
 	IsBot   bool
-	// Teams are the teams the caller is in.
+	// Teams are the teams the caller is in that may call: not retired ones.
 	Teams []string
 }
 
@@ -45,10 +49,19 @@ var ErrUnauthenticated = errors.New("missing, invalid, expired or revoked creden
 // calls no API.
 var ErrOrdersOnly = errors.New("an ordering bot calls no API")
 
+// tokenUseResolution is how stale an API token's last_used_at may get
+// before a request updates it (console/src/auth/plugin.ts, the same).
+const tokenUseResolution = 5 * time.Minute
+
+// uuidPattern is a user id as the console makes them: anything else in a
+// session names nobody.
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
 // DB is what the lookups run on (a pool).
 type DB interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 
 // Resolver signs callers in.
@@ -77,15 +90,24 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	passwordSession := false
 	if strings.HasPrefix(bearer, APITokenPrefix) {
 		sum := sha256.Sum256([]byte(bearer))
-		err := r.DB.QueryRow(ctx, `SELECT u.id::text, u.email, u.is_admin, u.is_bot, u.order_templates IS NOT NULL FROM api_tokens t
-			JOIN users u ON u.id = t.user_id WHERE t.token_hash = $1 AND t.revoked_at IS NULL
+		var tokenID string
+		var lastUsed *time.Time
+		err := r.DB.QueryRow(ctx, `SELECT u.id::text, u.email, u.is_admin, u.is_bot, u.order_templates IS NOT NULL, t.id::text, t.last_used_at
+			FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = $1 AND t.revoked_at IS NULL
 			AND (t.expires_at IS NULL OR t.expires_at > now())`, hex.EncodeToString(sum[:])).
-			Scan(&c.UserID, &c.Email, &c.IsAdmin, &c.IsBot, &ordering)
+			Scan(&c.UserID, &c.Email, &c.IsAdmin, &c.IsBot, &ordering, &tokenID, &lastUsed)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUnauthenticated
 		}
 		if err != nil {
 			return nil, err
+		}
+		// Used here counts as used: a bot that only calls APIs mustn't look
+		// stale in the console's token list.
+		if lastUsed == nil || r.now().Sub(*lastUsed) > tokenUseResolution {
+			if _, err := r.DB.Exec(ctx, `UPDATE api_tokens SET last_used_at = now() WHERE id = $1::uuid`, tokenID); err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		claims, err := r.verifyJWT(ctx, bearer)
@@ -96,8 +118,11 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 			// The console's keys couldn't be read: not the caller's fault.
 			return nil, err
 		}
+		if !uuidPattern.MatchString(claims.UserID) {
+			return nil, ErrUnauthenticated
+		}
 		err = r.DB.QueryRow(ctx, `SELECT id::text, email, is_admin, is_bot, password_changed_at, must_change_password, order_templates IS NOT NULL
-			FROM users WHERE id::text = $1`, claims.UserID).
+			FROM users WHERE id = $1::uuid`, claims.UserID).
 			Scan(&c.UserID, &c.Email, &c.IsAdmin, &c.IsBot, &passwordChanged, &mustChangePassword, &ordering)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUnauthenticated
@@ -130,8 +155,11 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	if ordering {
 		return nil, ErrOrdersOnly
 	}
-	rows, err := r.DB.Query(ctx, `SELECT t.name, t.require_sso FROM team_memberships m JOIN teams t ON t.id = m.team_id
-		WHERE m.user_id::text = $1 AND t.deleted_at IS NULL ORDER BY t.name`, c.UserID)
+	// Ordered by name byte for byte, as the console's teamRolesForUser is,
+	// so both pick the same calling team. A retired team's require_sso
+	// still counts (as the console's does), but it calls as nobody.
+	rows, err := r.DB.Query(ctx, `SELECT t.name, t.require_sso, t.retired_at IS NOT NULL FROM team_memberships m JOIN teams t ON t.id = m.team_id
+		WHERE m.user_id = $1::uuid AND t.deleted_at IS NULL ORDER BY t.name COLLATE "C"`, c.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -139,11 +167,13 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	ssoRequired := false
 	for rows.Next() {
 		var team string
-		var requireSSO bool
-		if err := rows.Scan(&team, &requireSSO); err != nil {
+		var requireSSO, retired bool
+		if err := rows.Scan(&team, &requireSSO, &retired); err != nil {
 			return nil, err
 		}
-		c.Teams = append(c.Teams, team)
+		if !retired {
+			c.Teams = append(c.Teams, team)
+		}
 		ssoRequired = ssoRequired || requireSSO
 	}
 	if err := rows.Err(); err != nil {
@@ -213,14 +243,17 @@ func (r *Resolver) verifyJWT(ctx context.Context, token string) (*claims, error)
 	if err := decodeSegment(parts[1], &c); err != nil || c.UserID == "" {
 		return nil, ErrUnauthenticated
 	}
-	now := time.Now
-	if r.Now != nil {
-		now = r.Now
-	}
-	if c.ExpiresAt == 0 || now().Unix() >= c.ExpiresAt {
+	if c.ExpiresAt == 0 || r.now().Unix() >= c.ExpiresAt {
 		return nil, ErrUnauthenticated
 	}
 	return &c, nil
+}
+
+func (r *Resolver) now() time.Time {
+	if r.Now != nil {
+		return r.Now()
+	}
+	return time.Now()
 }
 
 func decodeSegment(segment string, into any) error {

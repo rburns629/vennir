@@ -106,8 +106,8 @@ its own directory.
   `console/src/db/gatewayAccess.ts`: a column it starts to read is granted
   there) (published APIs; who callers are, checked exactly as
   `console/src/auth/plugin.ts` does, and kept in step with it), writing
-  only its own traffic counts (`api_traffic`) and why an API can't be
-  served (`api_problems`). It checks sessions with the
+  only its own traffic counts (`api_traffic`), why an API can't be
+  served (`api_problems`) and API tokens' `last_used_at`. It checks sessions with the
   console's public key (`/api/auth/jwks`), never `JWT_SECRET`. The console chart deploys it (`gateway.enabled`); it may mint
   ServiceAccount tokens only for `*-api` ServiceAccounts in team namespaces
   (an admission policy). Its tests read the console's migrated test
