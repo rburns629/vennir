@@ -73,7 +73,8 @@ rules:
     verbs: ["get", "patch"]
 ---
 # RBAC can name the CronJobs but not the fields; a patch to jobTemplate
-# would run anything as any ServiceAccount here.
+# would run anything as any ServiceAccount here (and an owner or finalizer
+# would have them deleted, or stop an uninstall).
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
@@ -102,7 +103,11 @@ spec:
         has(object.spec.successfulJobsHistoryLimit) == has(oldObject.spec.successfulJobsHistoryLimit) &&
         (!has(object.spec.successfulJobsHistoryLimit) || object.spec.successfulJobsHistoryLimit == oldObject.spec.successfulJobsHistoryLimit) &&
         has(object.spec.failedJobsHistoryLimit) == has(oldObject.spec.failedJobsHistoryLimit) &&
-        (!has(object.spec.failedJobsHistoryLimit) || object.spec.failedJobsHistoryLimit == oldObject.spec.failedJobsHistoryLimit)
+        (!has(object.spec.failedJobsHistoryLimit) || object.spec.failedJobsHistoryLimit == oldObject.spec.failedJobsHistoryLimit) &&
+        has(object.metadata.ownerReferences) == has(oldObject.metadata.ownerReferences) &&
+        (!has(object.metadata.ownerReferences) || object.metadata.ownerReferences == oldObject.metadata.ownerReferences) &&
+        has(object.metadata.finalizers) == has(oldObject.metadata.finalizers) &&
+        (!has(object.metadata.finalizers) || object.metadata.finalizers == oldObject.metadata.finalizers)
       message: >-
         The sleeper may only suspend or resume a CronJob and set its schedule
         and time zone.
