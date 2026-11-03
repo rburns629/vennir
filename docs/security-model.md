@@ -867,7 +867,8 @@ taken, and what would still hold.
 ## Vertra's own supply chain
 
 On each version tag, the release workflow (`.github/workflows/release.yml`)
-builds the kernel, console and gateway images, scans them with CI's gate
+refuses a tag whose commit isn't on `main` (which takes only reviewed pull
+requests), then builds the kernel, console and gateway images, scans them with CI's gate
 (`.github/scripts/scan-image.sh`: a HIGH or CRITICAL vulnerability with a
 fix, a secret in a layer, or a known-malicious package fails the release),
 pushes them to GHCR and signs each digest with cosign, keyless, as the
@@ -879,11 +880,13 @@ of the three platform images (`.github/workflows/security.yml`, `ci.yml`).
 Nothing verifies those signatures when installing: `vertra` pulls the
 charts by version, the charts run their images by tag unless
 `image.digest` pins them, and policy-controller doesn't cover the platform's
-own namespace. To check one by hand:
+own namespace. To check one by hand (a version tag's run only: the same
+workflow run from a branch signs as `release.yml@refs/heads/<branch>`,
+which this refuses; `make gke-verify-release` requires the exact tag):
 
 ```console
 $ cosign verify ghcr.io/<owner>/<repo>/execution-kernel:<version> \
-    --certificate-identity-regexp 'https://github.com/<owner>/<repo>/.github/workflows/release.yml@.*' \
+    --certificate-identity-regexp '^https://github.com/<owner>/<repo>/.github/workflows/release.yml@refs/tags/v.*' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 

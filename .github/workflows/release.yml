@@ -2,6 +2,8 @@ name: release
 
 # On a version tag (v1.2.3, or v1.2.3-rc.1 for a pre-release):
 #
+#   main    refuses a tag whose commit isn't on main: only reviewed code is
+#           released and signed with the release's identity.
 #   images  builds the kernel and console images, scans them with the same
 #           gate CI uses (.github/scripts/scan-image.sh), then builds them
 #           for linux/amd64 and linux/arm64, pushes them to
@@ -22,7 +24,7 @@ name: release
 #           pin a release with .github/scripts/pin-vertra.sh <version>.
 #
 # Verify an image: cosign verify ghcr.io/<owner>/<repo>/execution-kernel:<v> \
-#   --certificate-identity-regexp 'https://github.com/<owner>/<repo>/.github/workflows/release.yml@.*' \
+#   --certificate-identity-regexp '^https://github.com/<owner>/<repo>/.github/workflows/release.yml@refs/tags/v.*' \
 #   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 #
 # The packages are private on first push: make them public on GitHub (the
@@ -40,7 +42,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # main's history, to find the tag's commit in it
+      - name: The tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) isn't on main: only a commit on main is released."
+            exit 1
+          fi
+
   images:
+    needs: main
     runs-on: ubuntu-latest
     permissions:
       contents: read
