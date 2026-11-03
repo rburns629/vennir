@@ -421,7 +421,7 @@ What a DAG step can run: one row per image and action.
 | `from_catalog` | boolean | no | Registered from a catalog release: unregistered when a release no longer has it. One an admin registered by hand isn't. |
 | `created_at` | timestamptz | no | |
 
-Catalog CI registers all of these from the product's `product.yaml` (the catalog's `docs/product-schema.md` describes it). A registration that leaves one out keeps what's stored. Nothing that runs a task reads them: they're for browsing products, building forms and generating DAGs.
+Catalog CI registers all of these from the product's `product.yaml` (the catalog's `tools/product.schema.json` describes it). A registration that leaves one out keeps what's stored. Nothing that runs a task reads them: they're for browsing products, building forms and generating DAGs.
 
 ### product_releases
 

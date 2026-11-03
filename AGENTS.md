@@ -398,9 +398,11 @@ real kernel/UI code).
   is an interface with exactly one production implementer (the
   Kubernetes one, since the Docker executor was removed when the
   platform went Kubernetes-only). It still earns its keep because it
-  makes the code testable: `scheduler.RunTick` holds all the claiming,
-  retry and DAG-progression logic, and it's tested against
-  `executortest.Fake` without needing a real cluster. That's a concrete,
+  makes the code testable: the scheduler's passes (`RecordPass`,
+  `DispatchPass`, which the loop commits one at a time and `RunTick` runs
+  together for tests) hold all the claiming, retry and DAG-progression
+  logic, and they're tested against `executortest.Fake` without needing a
+  real cluster. That's a concrete,
   present need. What's *not* earned is abstraction built for a need
   that's speculative or merely imagined — a plugin system for a second
   implementation that isn't planned, a second production backend "just

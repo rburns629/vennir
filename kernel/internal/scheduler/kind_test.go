@@ -13,9 +13,8 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/logging"
 )
 
-// Ported from the Python kernel's tests/end_to_end/test_two_task_chain.py: real passes,
-// a real cluster (kind) and the real demo products (examples/), the
-// project's output feeding the application's input.
+// Real passes, a real cluster (kind) and the real demo products
+// (examples/), the project's output feeding the application's input.
 
 func kindChain(t *testing.T, projectInputs map[string]any, outputKey string) []TaskDef {
 	project, application := kindtest.Image(t, kindtest.ProjectImage), kindtest.Image(t, kindtest.ApplicationImage)

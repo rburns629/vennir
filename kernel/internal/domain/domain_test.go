@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// Ported from the Python kernel's tests/unit/test_{credentials,retry_backoff,states,
-// input_resolution}.py, plus the result.json contract.
+// Credentials, retry backoff, states, input resolution and the result.json
+// contract.
 
 // Built up so no scanner mistakes this file for a leak.
 var (
@@ -180,7 +180,7 @@ func TestParseTaskResult(t *testing.T) {
 	}
 }
 
-// Ported from test_task_resources.py: Kubernetes quantities, and nothing else.
+// Kubernetes quantities, and nothing else.
 func TestTaskResourcesAcceptKubernetesQuantitiesOnly(t *testing.T) {
 	if err := (TaskResources{CPU: "250m", Memory: "512Mi", MemoryLimit: "1Gi"}).Check(); err != nil {
 		t.Error(err)

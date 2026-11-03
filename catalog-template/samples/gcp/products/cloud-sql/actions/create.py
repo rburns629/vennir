@@ -8,7 +8,7 @@ Run directly by this product's entrypoint.sh, which already guarantees this
 script only ever runs for action="create" -- see product.yaml for this
 action's declared input/output schema.
 
-Unlike gcp/_project and gcp/app-hosting, the Cloud SQL Admin API has no
+Unlike gcp/project and gcp/app-hosting, the Cloud SQL Admin API has no
 dedicated GAPIC client library (no `google.cloud.sql_v1`) -- Google's own
 documentation points at the generic, discovery-based
 `googleapiclient.discovery` client instead (the same "sqladmin" v1 service
@@ -19,10 +19,10 @@ By default, calls the Cloud SQL Admin API using whatever
 GOOGLE_APPLICATION_CREDENTIALS/ADC the container finds. If
 the gcp-target secret is mounted, those base credentials are never used to
 call GCP APIs directly -- they're only the *source* identity used to
-impersonate that service account instead. See gcp/_project's own
-create.py and catalog/README.md for the full reasoning (identical pattern,
-copied rather than shared -- see the gcp team's README.md on why products don't
-share code).
+impersonate that service account instead. See gcp/project's own
+create.py and the gcp samples' README.md for the full reasoning (identical
+pattern, copied rather than shared -- the same README says why products
+don't share code).
 """
 
 import json

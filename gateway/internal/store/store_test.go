@@ -96,6 +96,44 @@ func TestWhyAnAPICantBeServedIsRecordedUntilItCan(t *testing.T) {
 	}
 }
 
+// Backend credential settings or limits that don't decode are a problem,
+// never "none": forwarding without the backend's credential, or the API's
+// limits, isn't what its team set up.
+func TestSettingsThatDontDecodeAreAProblem(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		url = "postgresql://postgres@localhost/execution_console_test"
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	var teamID, team string
+	if err := pool.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-store-' || substr(md5(random()::text), 1, 6)) RETURNING id::text, name`).Scan(&teamID, &team); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID) })
+	spec := `{"openapi": "3.1.0", "info": {"title": "Orders", "version": "1"}, "paths": {}}`
+	for name, c := range map[string]struct{ auth, perMinute, want string }{
+		"auth":   {`{"serviceAccountToken": {"audience": 7}}`, `{}`, "its backend credential settings can't be read"},
+		"limits": {`{}`, `{"default": "lots"}`, "its rate limits can't be read"},
+	} {
+		if _, err := pool.Exec(ctx, `INSERT INTO apis (team_id, name, display_name, openapi, backend_url, service_account, backend_auth, per_minute)
+			VALUES ($1::uuid, $2, $2, $3::jsonb, 'https://x', 'orders-api', $4::jsonb, $5::jsonb)`, teamID, name, spec, c.auth, c.perMinute); err != nil {
+			t.Fatal(err)
+		}
+		s := &Store{DB: pool, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+		if err := s.Refresh(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if got := s.Get(team, name); got == nil || got.Problem != c.want || got.Validator != nil {
+			t.Errorf("%s: %+v, want the problem %q and no validator", name, got, c.want)
+		}
+	}
+}
+
 // An in-cluster backend host names its namespace; any other host names none.
 func TestBackendNamespace(t *testing.T) {
 	for raw, want := range map[string]string{

@@ -209,16 +209,6 @@ func (g *GitHub) SetVariable(ctx context.Context, repo, name, value string) erro
 	return g.r.Run(ctx, "gh", "variable", "set", name, "--repo", repo, "--body", value)
 }
 
-// SetSecret sets a repository secret (in an Environment, if env is set),
-// passing the value on stdin: it's never an argument, a file or output.
-func (g *GitHub) SetSecret(ctx context.Context, repo, env, name, value string) error {
-	args := []string{"secret", "set", name, "--repo", repo}
-	if env != "" {
-		args = append(args, "--env", env)
-	}
-	return g.r.RunInput(ctx, value, "gh", args...)
-}
-
 // DeleteSecret deletes a repository secret, or an Environment's with env;
 // one that isn't there is fine.
 func (g *GitHub) DeleteSecret(ctx context.Context, repo, env, name string) error {

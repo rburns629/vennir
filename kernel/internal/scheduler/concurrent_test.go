@@ -14,8 +14,7 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/executor"
 )
 
-// Ported from the Python kernel's tests/integration/test_concurrent_completion.py: two
-// schedulers finishing tasks of the same execution at the same moment.
+// Two schedulers finishing tasks of the same execution at the same moment.
 // Without locking, each saw the other's task as still running: a task whose
 // two dependencies finished together was never released, and an execution
 // whose last two tasks finished together never completed. Committed rows

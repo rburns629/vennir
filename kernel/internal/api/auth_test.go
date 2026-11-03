@@ -12,8 +12,6 @@ import (
 	"connectrpc.com/connect"
 )
 
-// Ported from the Python kernel's tests/unit/test_api_auth.py.
-
 const console = "system:serviceaccount:vertra-system:execution-console"
 
 type reviews struct {

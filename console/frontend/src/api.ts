@@ -840,7 +840,7 @@ export interface Product {
   teamName: string | null;
   inputSchema: Record<string, unknown>;
   /** The rest of its product.yaml, as its catalog's release registers it
-   * (null or empty when it doesn't say): see the catalog's docs/product-schema.md. */
+   * (null or empty when it doesn't say): see the catalog's tools/product.schema.json. */
   displayName: string | null;
   description: string | null;
   outputSchema: Record<string, unknown>;
@@ -2928,11 +2928,6 @@ export async function askChatStream(
     throw apiError(error);
   }
   throw new ApiError(502, "The answer didn't arrive.");
-}
-
-/** The chat agent's answer to the conversation's last message. */
-export async function askChat(team: string | null, messages: { role: "user" | "assistant"; content: string }[]): Promise<ChatAnswer> {
-  return chatAnswer(await call(() => chatApi.ask({ team: team ?? "", messages })));
 }
 
 function chatAnswer(r: AskResponse): ChatAnswer {

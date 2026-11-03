@@ -11,9 +11,6 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/executor"
 )
 
-// Ported from the Python kernel's tests/integration/test_dispatch_retries.py and
-// test_scheduler_edge_cases.py.
-
 const later = time.Hour // past any backoff
 
 func only(attempts int) TaskDef {

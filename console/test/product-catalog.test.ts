@@ -20,7 +20,7 @@ vi.mock("../src/k8s.js", async (importOriginal) => ({
 }));
 
 // What catalog CI registers about a product beyond its image (the
-// catalog's docs/product-schema.md), and its wiring vocabulary.
+// catalog's tools/product.schema.json), and its wiring vocabulary.
 
 const prefix = `cat-${randomUUID().slice(0, 6)}`;
 const emails: string[] = [];

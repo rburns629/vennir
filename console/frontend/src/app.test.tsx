@@ -1452,6 +1452,23 @@ describe("admin", () => {
     await waitFor(() => { expect(saved.at(-1)).toMatchObject({ perHour: 30, perDay: 200 }); });
     expect(await within(card).findByText("Saved: 30 an hour, 200 a day.")).toBeTruthy();
   });
+
+  it("says when the limits couldn't be loaded, and loads them again on Try again", async () => {
+    let calls = 0;
+    await renderAt("/admin/chat", ADMIN, {
+      "ChatService/GetChatLimits": () => {
+        calls++;
+        return calls === 1 ? refused(503, "unavailable", "The console's database didn't answer.") : { limits: { perHour: 12, perDay: 90 } };
+      },
+      "ChatService/ListChatFeedback": { ratings: [] },
+    });
+    const card = await screen.findByRole("region", { name: "Questions per person" }, { timeout: 5000 });
+    const failed = await within(card).findByText(/Couldn't load the limits: The console's database didn't answer\./);
+    expect(within(card).queryByLabelText("An hour")).toBeNull();
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    expect(((await within(card).findByLabelText("An hour")) as HTMLInputElement).value).toBe("12");
+    expect(within(card).queryByText(/Couldn't load the limits/)).toBeNull();
+  });
 });
 
 describe("observe", () => {

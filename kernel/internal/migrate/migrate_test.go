@@ -232,8 +232,7 @@ func TestTheDatabaseGuideDocumentsEveryKernelTableAndColumn(t *testing.T) {
 	same(t, "tables and columns", sorted(documented), sorted(actual))
 }
 
-// Ported from the Python kernel's tests/integration/test_persistence.py: what the schema
-// itself guarantees.
+// What the schema itself guarantees.
 func TestTheSchemaKeepsRequestIDsUniqueAndDeletesAnExecutionWhole(t *testing.T) {
 	ctx := context.Background()
 	tx := dbtest.Tx(t, testPool)

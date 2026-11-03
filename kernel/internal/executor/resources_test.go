@@ -11,9 +11,9 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/domain"
 )
 
-// Ported from the Python kernel's tests/unit/test_task_resources.py: a task's Pod size,
-// its defaults, and what reaches the Pod spec. (Refusing a malformed size
-// at submission is kernel-api's, and stays with its tests.)
+// A task's Pod size, its defaults, and what reaches the Pod spec. (Refusing
+// a malformed size at submission is kernel-api's, and stays with its
+// tests.)
 
 func sized(r *domain.TaskResources) ResolvedTask {
 	return ResolvedTask{ExecutionID: "00000000-0000-0000-0000-000000000001", TaskKey: "step", Image: "hello:1",

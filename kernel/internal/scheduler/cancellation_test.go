@@ -14,9 +14,8 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/executor"
 )
 
-// Ported from the Python kernel's tests/integration/test_cancellation_and_retry.py: the
-// scheduler's side of cancelling and manually retrying (kernel-api's own
-// outcomes stay with its Python tests until it moves).
+// The scheduler's side of cancelling and manually retrying (kernel-api's
+// own outcomes are in internal/api's tests).
 
 func chain() []TaskDef {
 	return []TaskDef{

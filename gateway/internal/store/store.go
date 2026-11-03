@@ -200,12 +200,15 @@ func (s *Store) Refresh(ctx context.Context) error {
 			continue
 		}
 		a.Timeout = time.Duration(timeout) * time.Second
-		_ = json.Unmarshal([]byte(perMinute), &a.PerMinute)
-		if auth != "" {
-			_ = json.Unmarshal([]byte(auth), &a.BackendAuth)
-		}
+		// What can't be read is a problem, never a default: settings that
+		// didn't decode would forward without the backend's credential, or
+		// without the API's limits.
 		if a.BackendURL, err = url.Parse(backendURL); err != nil {
 			a.Problem = "its backend URL can't be read"
+		} else if json.Unmarshal([]byte(perMinute), &a.PerMinute) != nil {
+			a.Problem = "its rate limits can't be read"
+		} else if auth != "" && json.Unmarshal([]byte(auth), &a.BackendAuth) != nil {
+			a.Problem = "its backend credential settings can't be read"
 		} else if v, keys, problem := build([]byte(spec)); problem != "" {
 			a.Problem = problem
 		} else {

@@ -4,7 +4,7 @@
 #
 # google-api-python-client, not a google-cloud-* GAPIC package: the Cloud
 # SQL Admin API has no dedicated GAPIC client library (unlike Resource
-# Manager/Billing, see gcp/_project's own Dockerfile) -- see
+# Manager/Billing, see gcp/project's own Dockerfile) -- see
 # actions/create.py's own comment on why.
 FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
 # The base image's OS packages lag behind Debian's security fixes; catalog

@@ -41,7 +41,7 @@ actions:
           x-vertra-needs: gcp.project  # a target: checked against allowedTargets for other teams
           description: >-
             GCP project the service is deployed into. Typically supplied
-            via $fromTask/$output from a gcp/_project create task.
+            via $fromTask/$output from a gcp/project create task.
         serviceName:
           type: string
           pattern: "^[a-z][a-z0-9-]{0,61}[a-z0-9]$"
@@ -79,7 +79,7 @@ actions:
             identity still needs roles/cloudsql.client granted separately
             -- this product only wires the connection, it doesn't grant
             IAM on the running service's behalf (same "deploy vs. grant
-            access" split gcp/_project already draws for billing).
+            access" split gcp/project already draws for billing).
     output:
       type: object
       required: [serviceUrl]

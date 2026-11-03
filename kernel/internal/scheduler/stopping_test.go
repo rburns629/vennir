@@ -13,8 +13,7 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/executor/executortest"
 )
 
-// Ported from the Python kernel's tests/integration/test_scheduler_stopping_before_retry.py:
-// an attempt is only given up on once it's known to have stopped, and a
+// An attempt is only given up on once it's known to have stopped, and a
 // finished task's Job is only removed after its outcome is committed.
 
 const grace = 600 * time.Second

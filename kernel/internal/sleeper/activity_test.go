@@ -15,7 +15,6 @@ var testPool *pgxpool.Pool
 
 func TestMain(m *testing.M) { dbtest.Main(m, &testPool) }
 
-// Ported from the Python kernel's tests/integration/test_sleeper_activity.py.
 func TestAnUnfinishedExecutionIsBusyAndAFinishedOneIsNot(t *testing.T) {
 	ctx := context.Background()
 	tx := dbtest.Tx(t, testPool)

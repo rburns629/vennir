@@ -24,11 +24,9 @@ import (
 	"github.com/rburns629/vertra/kernel/internal/logging"
 )
 
-// Ported from the Python kernel's tests/integration/test_kubernetes_executor.py: the
-// executor against a real cluster (kind), with a minimal fixture image
-// (internal/kindtest/fixture) that exercises its own
-// mechanics: ConfigMap input, termination-message output, cancellation,
-// release.
+// The executor against a real cluster (kind), with a minimal fixture image
+// (internal/kindtest/fixture) that exercises its own mechanics: ConfigMap
+// input, termination-message output, cancellation, release.
 
 func kindOptions() executor.KubernetesOptions {
 	return executor.KubernetesOptions{JobTTL: time.Hour, ImagePullGrace: 120 * time.Second, JobDeadlineGrace: 600 * time.Second,
@@ -327,7 +325,7 @@ func TestKindAMissingImageFailsFastAsImageNotFound(t *testing.T) {
 	}
 }
 
-// Ported from test_product_examples.py: the demo products, run directly.
+// The demo products, run directly.
 func TestKindTheDemoProducts(t *testing.T) {
 	k, _ := kindExecutor(t)
 	project, application := kindtest.Image(t, kindtest.ProjectImage), kindtest.Image(t, kindtest.ApplicationImage)

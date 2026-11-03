@@ -6,6 +6,7 @@ import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { errorMessage, getChatLimits, setChatLimits, type ChatLimits } from "../../api";
+import { LoadFailed, loadFailure } from "../../components/LoadFailed";
 import { useAdminChanged } from "./summary";
 import { AdminCard, Aside } from "./parts";
 
@@ -19,7 +20,7 @@ const inRange = (n: number | null): n is number => n !== null && n >= 1 && n <= 
 
 /**
  * How many questions each person may ask the chat agent, an hour and a
- * day (review D-5): each can take several model calls. The server checks
+ * day: each can take several model calls. The server checks
  * the same rules (BAD_CHAT_LIMITS); they're checked here first to say so
  * on the field.
  */
@@ -31,6 +32,8 @@ export function ChatLimitsCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState<string | null>(null);
+  const [loadTry, setLoadTry] = useState(0);
 
   function show(l: ChatLimits): void {
     setSaved(l);
@@ -39,15 +42,24 @@ export function ChatLimitsCard() {
   }
 
   useEffect(() => {
+    let current = true;
+    setLoadFailed(null);
     getChatLimits()
-      .then(show)
-      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the limits.")); });
-  }, []);
+      .then((l) => { if (current) show(l); })
+      .catch((err: unknown) => { if (current) setLoadFailed(loadFailure(err)); });
+    return () => { current = false; };
+  }, [loadTry]);
 
   if (!saved) {
-    // TODO(F-6): once components/LoadFailed.tsx is on main (#185), a failed load is
-    // <LoadFailed what="the limits" … onRetry> with Try again, not a plain Alert.
-    return <AdminCard title="Questions per person">{error ? <Alert severity="error">{error}</Alert> : <Typography color="text.secondary">Loading…</Typography>}</AdminCard>;
+    return (
+      <AdminCard title="Questions per person">
+        {loadFailed ? (
+          <LoadFailed what="the limits" reason={loadFailed} onRetry={() => { setLoadTry((n) => n + 1); }} />
+        ) : (
+          <Typography color="text.secondary">Loading…</Typography>
+        )}
+      </AdminCard>
+    );
   }
 
   const perHour = whole(hour);
