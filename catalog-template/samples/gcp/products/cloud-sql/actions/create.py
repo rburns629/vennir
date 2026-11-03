@@ -70,6 +70,9 @@ OPERATION_POLL_INTERVAL_SECONDS = 5
 # (PENDING_CREATE, MAINTENANCE, ...) is waited out, as a retry finding the
 # instance its last attempt made needs to.
 READY_STATE = "RUNNABLE"
+# Shorter than a step's default five minutes, so a step run without a
+# longer timeoutSeconds still ends with its own retryable answer.
+READY_TIMEOUT_SECONDS = 240
 STUCK_STATES = {"FAILED", "SUSPENDED", "PENDING_DELETE"}
 
 
@@ -130,7 +133,7 @@ def _wait_for_operation(service, project_id: str, operation_name: str) -> str | 
 def _wait_until_ready(service, project_id: str, name: str, instance: dict[str, Any]) -> tuple[dict[str, Any], int | None]:
     """Waits for an instance to be RUNNABLE: the instance, and None once it
     is, or the failure's exit code if it's stuck or still not ready."""
-    deadline = time.monotonic() + OPERATION_TIMEOUT_SECONDS
+    deadline = time.monotonic() + READY_TIMEOUT_SECONDS
     while True:
         state = instance.get("state")
         if state == READY_STATE:
@@ -143,7 +146,7 @@ def _wait_until_ready(service, project_id: str, name: str, instance: dict[str, A
         if time.monotonic() >= deadline:
             return instance, _failure(
                 "INSTANCE_NOT_READY",
-                f"Cloud SQL instance '{name}' is still {state} after {OPERATION_TIMEOUT_SECONDS}s; "
+                f"Cloud SQL instance '{name}' is still {state} after {READY_TIMEOUT_SECONDS}s; "
                 "running the step again waits for it.",
                 retryable=True,
             )

@@ -105,7 +105,7 @@ class CreateActionTest(unittest.TestCase):
 
     def test_an_existing_instance_still_not_ready_is_a_retryable_failure(self) -> None:
         self._write_request({"projectId": "demo-project", "instanceName": "slow"})
-        self.module.OPERATION_TIMEOUT_SECONDS = 0
+        self.module.READY_TIMEOUT_SECONDS = 0
         self.service.instances.return_value.get.return_value.execute.return_value = {
             "name": "slow", "connectionName": "demo-project:us-central1:slow", "state": "PENDING_CREATE",
         }
