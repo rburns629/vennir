@@ -25,13 +25,14 @@ import {
 } from "../../gen/vertra/console/v1/execution_pb.js";
 import { KernelApiError } from "../../kernel/client.js";
 import { timestamp, unsetIfEmpty } from "../convert.js";
-import { callerOf, logOf } from "../context.js";
+import { callerOf, currentCallerOf, logOf } from "../context.js";
 import { rpcError } from "../errors.js";
 import { check } from "../validate.js";
 
 /**
- * How often a watch re-reads its execution (each read re-checks the
- * caller's access); how often it sends the execution unchanged, so a load
+ * How often a watch re-reads its execution (each read resolves the
+ * caller's credential again, so a sign-out, a password reset or leaving
+ * the team ends it); how often it sends the execution unchanged, so a load
  * balancer's idle timeout doesn't cut a quiet stream; and how long one
  * lasts before the client reconnects.
  */
@@ -275,11 +276,11 @@ export function executionService(): ServiceImpl<typeof ExecutionService> {
 
     async *watchExecution(req, ctx) {
       const { executionId } = check({ executionId: ExecutionId }, req);
-      const caller = callerOf(ctx);
       const until = Date.now() + WATCH_MAX_MS;
       let last = "";
       let sentAt = 0;
       while (!ctx.signal.aborted && Date.now() < until) {
+        const caller = await currentCallerOf(ctx);
         const detail = await viaKernel(ctx, () => executionDetail(caller, executionId, logOf(ctx)));
         const seen = JSON.stringify(detail);
         if (seen !== last || Date.now() - sentAt >= WATCH_HEARTBEAT_MS) {
