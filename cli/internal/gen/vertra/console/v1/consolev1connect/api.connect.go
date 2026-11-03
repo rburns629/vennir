@@ -59,9 +59,9 @@ type ApiServiceClient interface {
 	ListApis(context.Context, *connect.Request[v1.ListApisRequest]) (*connect.Response[v1.ListApisResponse], error)
 	// One API, with its OpenAPI document. Not found and hidden look the same.
 	GetApi(context.Context, *connect.Request[v1.GetApiRequest]) (*connect.Response[v1.GetApiResponse], error)
-	// Stops an API for an incident: every request gets 503 with the message
-	// until it's resumed, and nothing reaches the backend. A maintainer of its
-	// team, or an admin.
+	// Stops an API for an incident: every signed-in caller gets 503 with its
+	// message (anyone else, 404) until it's resumed, and nothing reaches the
+	// backend. A maintainer of its team, or an admin.
 	PauseApi(context.Context, *connect.Request[v1.PauseApiRequest]) (*connect.Response[v1.PauseApiResponse], error)
 	// Lets a paused API through again; as PauseApi.
 	ResumeApi(context.Context, *connect.Request[v1.ResumeApiRequest]) (*connect.Response[v1.ResumeApiResponse], error)
@@ -190,9 +190,9 @@ type ApiServiceHandler interface {
 	ListApis(context.Context, *connect.Request[v1.ListApisRequest]) (*connect.Response[v1.ListApisResponse], error)
 	// One API, with its OpenAPI document. Not found and hidden look the same.
 	GetApi(context.Context, *connect.Request[v1.GetApiRequest]) (*connect.Response[v1.GetApiResponse], error)
-	// Stops an API for an incident: every request gets 503 with the message
-	// until it's resumed, and nothing reaches the backend. A maintainer of its
-	// team, or an admin.
+	// Stops an API for an incident: every signed-in caller gets 503 with its
+	// message (anyone else, 404) until it's resumed, and nothing reaches the
+	// backend. A maintainer of its team, or an admin.
 	PauseApi(context.Context, *connect.Request[v1.PauseApiRequest]) (*connect.Response[v1.PauseApiResponse], error)
 	// Lets a paused API through again; as PauseApi.
 	ResumeApi(context.Context, *connect.Request[v1.ResumeApiRequest]) (*connect.Response[v1.ResumeApiResponse], error)
