@@ -239,6 +239,7 @@ func (a *app) catalog(ctx context.Context, out io.Writer, dir string, c *config.
 		plan.Line{Label: "Will remove", Text: "a console URL and tokens an earlier vertra gave the repository, if any (and revoke those tokens)"})
 	if environments {
 		p.Changes = append(p.Changes, plan.Line{Label: "Environments", Text: "catalog-publish (main only), purge (main only, you review: deleting a removed team's images)"})
+		p.Notes = append(p.Notes, "Not made: main's ruleset (code-owner review, and the checks check, secrets, code and codeowners). Until you add it, a failing check doesn't block a merge (publishing still reruns the scans): the catalog's README, \"Protecting main\".")
 	} else {
 		p.Notes = append(p.Notes, "Skipped: Environments and branch rules, which a private repository needs a paid GitHub plan for. The publish job still runs from main only (federation refuses other branches: on AWS, its tokens' subject names the branch).")
 	}

@@ -1253,6 +1253,19 @@ export const chatSettings = pgTable(
   (table) => [check("chat_settings_one_row", sql`${table.id} = 1`)],
 );
 
+/** How many questions each person may ask the chat agent, as an admin set it (core/chatLimits.ts). One row at most; none: the defaults. */
+export const chatLimits = pgTable(
+  "chat_limits",
+  {
+    id: integer("id").primaryKey().default(1),
+    perHour: integer("per_hour").notNull(),
+    perDay: integer("per_day").notNull(),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [check("chat_limits_one_row", sql`${table.id} = 1`)],
+);
+
 /** A provider group that makes its members a team's, at each single sign-on (sso.ts). */
 export const ssoGroupMappings = pgTable(
   "sso_group_mappings",

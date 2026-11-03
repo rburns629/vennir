@@ -31,7 +31,7 @@ func awsTools(t *testing.T, inState bool) (*run.Runner, string) {
 	scripts := map[string]string{
 		"tofu": `echo "tofu $*" >> "` + log + `"
 case "$*" in
-  *"state list "*) [ -n "` + state + `" ] && echo "` + state + `" ;;
+  *"state list"*) [ -n "` + state + `" ] && echo "` + state + `" ;;
   *"show -json"*) echo '{"values":{"root_module":{"resources":[{"address":"` + state + `","values":{"arn":"` + providerARN + `"}}]}}}' ;;
 esac
 exit 0

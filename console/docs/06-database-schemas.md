@@ -771,6 +771,18 @@ The chat agent's model as an admin set it on the Admin page (Chat agent), in pla
 | `updated_by` | uuid | yes | The admin who set them. |
 | `updated_at` | timestamptz | no | |
 
+### chat_limits
+
+How many questions each person may ask the chat agent, as an admin set them (`core/chatLimits.ts`). No row: 30 an hour and 200 a day. At most one row. Questions are counted in `rate_limit_windows`, keyed `chat-hour:<user id>` and `chat-day:<user id>`.
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `id` | integer | no | Always 1. |
+| `per_hour` | integer | no | Questions each person may ask in an hour. |
+| `per_day` | integer | no | And in a day. |
+| `updated_by` | uuid | yes | The admin who set them. |
+| `updated_at` | timestamptz | no | |
+
 ### bot_identities
 
 Who a bot is when it signs in without a stored token (`auth/keyless.ts`): a CI's OIDC issuer and the exact claims its ID token must carry.

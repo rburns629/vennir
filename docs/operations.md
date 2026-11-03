@@ -376,7 +376,12 @@ rather than a repository policy: ECR creates each product's repository on
 its first push, and a role scoped to the prefix covers those too.
 
 Running the grant again changes nothing; `--revoke` takes it away (the
-binding and the provider; the role and its policy). The pool, and an IAM
+binding and the provider; the role and its policy). On aws the role is
+named by `--reader` alone, so when `vertra-reader-<reader>` already trusts
+another issuer or subject (another reader with the same cluster name,
+`vertra` by default), the grant and the revoke both refuse and say whom it
+trusts: give this reader another `--reader`, or pass `--replace` to change
+(or delete) that role anyway. The pool, and an IAM
 OIDC provider, stay: neither lets anyone in by itself. Readers set up with
 the gcloud commands earlier versions printed (the bare subject, shared by
 every reader in the pool) keep working; the grant moves a reader's
@@ -1228,7 +1233,9 @@ when one's needed, is a Secret named in `chat.apiKeySecret` (key
 `api-key`): `kubectl -n vertra-system create secret generic console-chat-key
 --from-file=api-key=<file>`. What a person asks, and what
 the agent's tools find for them, goes to the model: on a cloud, use one in
-the install's own. `chat.maxSteps` (8), `timeoutSeconds` (180) and
+the install's own. Each person may ask 30 questions an hour and 200 a day
+(admins change it with `ChatService/SetChatLimits`), and bots none.
+`chat.maxSteps` (8), `timeoutSeconds` (180) and
 `maxTokens` (8000 on anthropic, bedrock and vertex, where thinking counts toward
 it; else 1500) bound one answer; `chat.effort` sets how hard Claude or
 Gemini thinks. `chat.contextTokens` (64000 on anthropic, bedrock and vertex, else 16000; at most the model's

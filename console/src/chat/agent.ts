@@ -173,6 +173,9 @@ function fromPlatform(steps: Answer["steps"]): boolean {
 
 function checked(caller: AuthUser | undefined, request: AskRequest): { who: AuthUser; team: string | null } {
   if (!caller) throw new ApiError(401, "UNAUTHORIZED", "Sign in first.", Code.Unauthenticated);
+  // Every question can cost many calls to a billed model: people ask, and
+  // each person's are counted (core/chatLimits.ts); a bot doesn't.
+  if (caller.isBot) throw new ApiError(403, "FORBIDDEN", "The chat agent answers people, not bots.");
   // An ordering bot orders its templates, and nothing else (decision 23).
   ensureMayOrder(caller);
   const { messages, team } = request;
@@ -220,6 +223,8 @@ export interface AskOptions {
   onStep?: (step: Answer["steps"][number]) => void;
   /** The person's gone: no more model calls. */
   signal?: AbortSignal;
+  /** Counts the question, once it's one the agent will answer (core/chatLimits.ts); throws to refuse it. */
+  counted?: () => Promise<void>;
 }
 
 /** The person's latest question answered. `model`: the install's, unless given (tests). */
@@ -232,6 +237,7 @@ export async function ask(
 ): Promise<Answer> {
   const { who, team } = checked(caller, request);
   if (!model) throw new ApiError(503, "CHAT_OFF", "The chat agent isn't set up on this install: an admin sets chat.model.", Code.Unavailable);
+  await options.counted?.();
   const started = Date.now();
   const { model: counting, tokens } = counted(model);
   const state: TurnState = { caller: who, team, log, sources: [], cart: null };
@@ -378,12 +384,14 @@ export async function* askStream(
   log: FastifyBaseLogger,
   model: ChatModel | null,
   signal?: AbortSignal,
+  counted?: () => Promise<void>,
 ): AsyncGenerator<{ step: Answer["steps"][number] } | { answer: Answer }> {
   const pending: Answer["steps"] = [];
   let wake = () => {};
   const flow = { finished: false };
   const answer = ask(caller, request, log, model, {
     ...(signal ? { signal } : {}),
+    ...(counted ? { counted } : {}),
     onStep: (step) => {
       pending.push(step);
       wake();

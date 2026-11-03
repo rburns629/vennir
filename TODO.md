@@ -780,7 +780,8 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
     (`<reader>:<subject>`), or a reader's service accounts, on gcp; an IAM
     OIDC provider and a role `vertra-reader-<reader>` reading only
     `<prefix>/*` on aws. Shows, asks, changes only what differs,
-    `--revoke`. apply prints it in place of the gcloud commands. Tested
+    `--revoke`; on aws, a role trusting another reader's issuer or subject
+    is refused unless `--replace`. apply prints it in place of the gcloud commands. Tested
     against a faked gcloud and AWS CLI only.
   - To prove (one billed run): a GKE reader of an EKS owner's ECR and an
     EKS reader in a second account (release applied, step pulled by the
@@ -1269,6 +1270,16 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   one is refused, the editor naming the new field.
 
 ## Products and catalog
+
+- [ ] **`vertra catalog create` applies `main`'s ruleset** (found
+  2026-11-02, T-5). It creates the Environments but no ruleset, so a
+  failing check, or a missing code-owner review, doesn't block a merge
+  until someone adds one by hand (catalog README, "Protecting main", lists
+  what to require: code-owner review and `check`, `secrets`, `code`,
+  `codeowners`). Publishing reruns the scans either way. Applying it means
+  deciding who can still merge in a new one-person catalog, where the
+  creator can't approve their own pull request (a bypass for repository
+  admins, pull requests only, is the likely answer).
 
 - [ ] **Prove the chat agent answering through Bedrock** once the acyclix
   account can: it has the Anthropic use-case form to submit, and every

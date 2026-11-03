@@ -66,6 +66,40 @@ class CreateActionTest(unittest.TestCase):
         _, result, _ = self._run({"serviceName": "web", "image": "i", "region": "eu-west-1"}, configure)
         self.assertEqual(result["outputs"]["resources"][0]["id"], "arn:svc")
 
+    def test_an_existing_service_still_starting_is_waited_for(self) -> None:
+        # A retry finding the service its last attempt was still creating.
+        def configure(client):
+            client.list_services.return_value = {"ServiceSummaryList": [{**RUNNING, "Status": "OPERATION_IN_PROGRESS"}]}
+            client.list_tags_for_resource.return_value = {"Tags": [{"Key": "vertra-made", "Value": "true"}]}
+            client.describe_service.side_effect = [
+                {"Service": {**RUNNING, "Status": "OPERATION_IN_PROGRESS"}},
+                {"Service": RUNNING},
+            ]
+        exit_code, result, client = self._run({"serviceName": "web", "image": "i", "region": "eu-west-1"}, configure)
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(client.describe_service.call_count, 2)
+        client.create_service.assert_not_called()
+        self.assertEqual(result["outputs"]["serviceUrl"], "https://abc.awsapprunner.com")
+        self.assertEqual(result["outputs"]["resources"][0]["id"], "arn:svc")
+
+    def test_an_existing_service_still_starting_at_the_deadline_is_retryable(self) -> None:
+        self.module.START_TIMEOUT_SECONDS = 0
+        def configure(client):
+            client.list_services.return_value = {"ServiceSummaryList": [{**RUNNING, "Status": "OPERATION_IN_PROGRESS"}]}
+        exit_code, result, _ = self._run({"serviceName": "web", "image": "i", "region": "eu-west-1"}, configure)
+        self.assertEqual(exit_code, 1)
+        self.assertEqual((result["error"]["code"], result["error"]["retryable"]), ("SERVICE_NOT_RUNNING", True))
+
+    def test_an_existing_service_that_failed_fails_for_good(self) -> None:
+        for status in ("CREATE_FAILED", "DELETE_FAILED", "PAUSED"):
+            with self.subTest(status=status):
+                def configure(client):
+                    client.list_services.return_value = {"ServiceSummaryList": [{**RUNNING, "Status": status}]}
+                exit_code, result, client = self._run({"serviceName": "web", "image": "i", "region": "eu-west-1"}, configure)
+                self.assertEqual(exit_code, 1)
+                self.assertEqual((result["error"]["code"], result["error"]["retryable"]), ("SERVICE_NOT_RUNNING", False))
+                client.create_service.assert_not_called()
+
     def test_a_private_service_has_no_url(self) -> None:
         # App Runner gives a private service no ServiceUrl (found on EKS, 2026-10-25).
         private = {k: v for k, v in RUNNING.items() if k != "ServiceUrl"}

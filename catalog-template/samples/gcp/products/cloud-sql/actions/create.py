@@ -65,6 +65,16 @@ DEFAULT_REGION = "us-central1"
 OPERATION_TIMEOUT_SECONDS = 600
 OPERATION_POLL_INTERVAL_SECONDS = 5
 
+# An instance that's there but not usable: one that won't become usable
+# without someone stepping in fails the step for good; any other state
+# (PENDING_CREATE, MAINTENANCE, ...) is waited out, as a retry finding the
+# instance its last attempt made needs to.
+READY_STATE = "RUNNABLE"
+# Shorter than a step's default five minutes, so a step run without a
+# longer timeoutSeconds still ends with its own retryable answer.
+READY_TIMEOUT_SECONDS = 240
+STUCK_STATES = {"FAILED", "SUSPENDED", "PENDING_DELETE"}
+
 
 def _write_result(result: dict[str, Any]) -> None:
     OUTPUT_PATH.write_text(json.dumps(result))
@@ -118,6 +128,31 @@ def _wait_for_operation(service, project_id: str, operation_name: str) -> str | 
             return json.dumps(error) if error else None
         time.sleep(OPERATION_POLL_INTERVAL_SECONDS)
     return f"operation '{operation_name}' did not reach DONE within {OPERATION_TIMEOUT_SECONDS}s"
+
+
+def _wait_until_ready(service, project_id: str, name: str, instance: dict[str, Any]) -> tuple[dict[str, Any], int | None]:
+    """Waits for an instance to be RUNNABLE: the instance, and None once it
+    is, or the failure's exit code if it's stuck or still not ready."""
+    deadline = time.monotonic() + READY_TIMEOUT_SECONDS
+    while True:
+        state = instance.get("state")
+        if state == READY_STATE:
+            return instance, None
+        if state in STUCK_STATES:
+            return instance, _failure(
+                "INSTANCE_NOT_USABLE",
+                f"Cloud SQL instance '{name}' is {state}; see it in the Google Cloud console.",
+            )
+        if time.monotonic() >= deadline:
+            return instance, _failure(
+                "INSTANCE_NOT_READY",
+                f"Cloud SQL instance '{name}' is still {state} after {READY_TIMEOUT_SECONDS}s; "
+                "running the step again waits for it.",
+                retryable=True,
+            )
+        print(f"Cloud SQL instance '{name}' is {state}; waiting")
+        time.sleep(OPERATION_POLL_INTERVAL_SECONDS)
+        instance = service.instances().get(project=project_id, instance=name).execute()
 
 
 def _outputs_from_instance(instance: dict[str, Any]) -> dict[str, Any]:
@@ -184,10 +219,15 @@ def _run() -> int:
     service = _build_service(credentials)
 
     # Existing-instance path: an instance with this name already exists in
-    # the project, so this action is a no-op other than reporting it back.
+    # the project, so this action makes nothing, and reports it back once
+    # it's usable (a retry may find the one its last attempt was still
+    # creating).
     try:
         existing = service.instances().get(project=project_id, instance=instance_name).execute()
         print(f"Cloud SQL instance '{instance_name}' already exists in '{project_id}', skipping creation")
+        existing, failed = _wait_until_ready(service, project_id, instance_name, existing)
+        if failed is not None:
+            return failed
         _write_result({"status": "succeeded", "outputs": _outputs_from_instance(existing)})
         return 0
     except HttpError as error:

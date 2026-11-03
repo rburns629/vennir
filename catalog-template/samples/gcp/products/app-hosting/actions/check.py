@@ -6,9 +6,10 @@ Run by the console with no inputs, as this product's identity. It asks
 Google for a token as that identity (impersonating gcp-target when the
 team's secret is mounted, as create does), then asks, with
 testIamPermissions, whether it may deploy and delete Cloud Run services in
-a project it can see, and act as that project's default compute service
-account, which a service create deploys runs as. create's projectId is per
-run, so it looks for any project: ready means there's at least one.
+a project it can see, and act as the runtime service account the team's
+app-hosting secret names, which a service create deploys runs as. create's
+projectId is per run, so it looks for any project: ready means there's at
+least one.
 Reports what's missing as the roles to grant (the gcp team's README.md,
 Credentials).
 
@@ -36,6 +37,9 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 # signs in as, named in what an admin must grant it.
 SERVICE_ACCOUNT = "gcp-app-hosting"
 TARGET_SERVICE_ACCOUNT_FILE = Path("/platform/secrets/gcp-target/service-account")
+# The team's secret app-hosting: the registry images come from and the
+# account a service runs as (create.py), both needed.
+SETTINGS_DIR = Path("/platform/secrets/app-hosting")
 IMPERSONATION_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 RESOURCE_MANAGER = "https://cloudresourcemanager.googleapis.com/v3"
@@ -125,6 +129,16 @@ def main() -> int:
     except google.auth.exceptions.TransportError as error:
         return _failure("GCP_API_ERROR", f"couldn't reach Google to sign in: {error}", retryable=True)
 
+    registry, runtime = (
+        (SETTINGS_DIR / key).read_text().strip() if (SETTINGS_DIR / key).is_file() else ""
+        for key in ("image-registry", "runtime-service-account")
+    )
+    if not registry or not runtime:
+        return _answer(
+            False, principal, ["the team secret app-hosting, with image-registry and runtime-service-account"],
+            "It can sign in, but doesn't know which registry to deploy from or which account to run as.",
+        )
+
     wanted = list(PROJECT_PERMISSIONS)
     session = AuthorizedSession(credentials)
     try:
@@ -148,13 +162,12 @@ def main() -> int:
             roles = sorted({PROJECT_PERMISSIONS[p] for p in wanted if p not in best[1]})
             return _answer(False, principal, [f"{', '.join(roles)} on project {project_id}"],
                            "It can sign in, but can't deploy to Cloud Run in any project it sees.")
-        # A service runs as its project's default compute service account
-        # (create names no other), and deploying one needs to act as it.
-        runtime = f"{best[0]['name'].removeprefix('projects/')}-compute@developer.gserviceaccount.com"
-        response = session.request("POST", f"{IAM}/projects/{project_id}/serviceAccounts/{runtime}:testIamPermissions",
+        # A service runs as the team's runtime account, and deploying one
+        # needs to act as it. "-": the account's own project, whichever.
+        response = session.request("POST", f"{IAM}/projects/-/serviceAccounts/{runtime}:testIamPermissions",
                                    json={"permissions": [ACT_AS]}, timeout=TIMEOUT_SECONDS)
-        # 403 or 404: it may not even see the account, or there's none
-        # (Compute Engine's API is off): either way, nothing to act as.
+        # 403 or 404: it may not even see the account, or there's none:
+        # either way, nothing to act as.
         unseen = response.status_code in (403, 404)
         if not unseen:
             response.raise_for_status()
@@ -166,7 +179,7 @@ def main() -> int:
 
     if not acts_as:
         return _answer(
-            False, principal, [f"roles/iam.serviceAccountUser on {runtime} (Cloud Run's runtime account in {project_id})"],
+            False, principal, [f"roles/iam.serviceAccountUser on {runtime} (the team's Cloud Run runtime account)"],
             f"It may deploy to Cloud Run in project {project_id}, but not run a service as its runtime account.",
         )
     return _answer(True, principal, [], f"It may deploy to Cloud Run in project {project_id}.")

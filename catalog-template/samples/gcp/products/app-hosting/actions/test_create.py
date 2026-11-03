@@ -18,6 +18,8 @@ _VALID_INPUTS = {
     "image": "us-central1-docker.pkg.dev/my-project/demo/hello-world-app:latest",
 }
 
+_RUNTIME_ACCOUNT = "web-runtime@my-project.iam.gserviceaccount.com"
+
 
 def _load_create_module():
     spec = importlib.util.spec_from_file_location("gcp_app_hosting_create", _MODULE_PATH)
@@ -26,12 +28,21 @@ def _load_create_module():
     return module
 
 
+def _mount_settings(module, folder: Path) -> None:
+    """The team's secret app-hosting, mounted."""
+    module.SETTINGS_DIR = folder / "app-hosting"
+    module.SETTINGS_DIR.mkdir()
+    (module.SETTINGS_DIR / "image-registry").write_text("us-central1-docker.pkg.dev/my-project/demo/\n")
+    (module.SETTINGS_DIR / "runtime-service-account").write_text(_RUNTIME_ACCOUNT + "\n")
+
+
 class CreateActionTest(unittest.TestCase):
     def setUp(self) -> None:
         self.module = _load_create_module()
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.INPUT_PATH = Path(self.tmp_dir.name) / "request.json"
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
+        _mount_settings(self.module, Path(self.tmp_dir.name))
         # Signed in as whatever ADC finds: a stand-in whose refresh passes,
         # unless a test makes it fail.
         self.adc = MagicMock()
@@ -66,6 +77,33 @@ class CreateActionTest(unittest.TestCase):
         client_cls.assert_not_called()
         self.assertEqual(exit_code, 1)
         self.assertEqual(self._result()["error"]["code"], "MISSING_INPUT")
+
+    def test_without_the_team_secret_nothing_is_deployed(self) -> None:
+        for key in ("image-registry", "runtime-service-account"):
+            with self.subTest(missing=key):
+                value = (self.module.SETTINGS_DIR / key).read_text()
+                (self.module.SETTINGS_DIR / key).unlink()
+                self._write_request(_VALID_INPUTS)
+                with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+                    self.assertEqual(self.module.main(), 1)
+                (self.module.SETTINGS_DIR / key).write_text(value)
+                client_cls.assert_not_called()
+                error = self._result()["error"]
+                self.assertEqual((error["code"], error["retryable"]), ("MISSING_SECRET", False))
+
+    def test_an_image_from_another_registry_is_refused(self) -> None:
+        for image in (
+            "docker.io/anyone/tool:latest",
+            "us-central1-docker.pkg.dev/my-project/demo-other/app:1",  # a prefix, not the registry
+            "us-central1-docker.pkg.dev/my-project/demo",
+        ):
+            with self.subTest(image=image):
+                self._write_request({**_VALID_INPUTS, "image": image})
+                with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+                    self.assertEqual(self.module.main(), 1)
+                client_cls.assert_not_called()
+                error = self._result()["error"]
+                self.assertEqual((error["code"], error["retryable"]), ("IMAGE_NOT_ALLOWED", False))
 
     def test_existing_service_skips_deployment(self) -> None:
         self._write_request(_VALID_INPUTS)
@@ -113,6 +151,8 @@ class CreateActionTest(unittest.TestCase):
         submitted_image = call_kwargs["service"].template.containers[0].image
         self.assertEqual(submitted_image, _VALID_INPUTS["image"])
         self.assertEqual(dict(call_kwargs["service"].labels), {"vertra-made": "true"})
+        # The team's runtime account, never the project's default compute one.
+        self.assertEqual(call_kwargs["service"].template.service_account, _RUNTIME_ACCOUNT)
         self.assertEqual(exit_code, 0)
         outputs = self._result()["outputs"]
         self.assertEqual(outputs["serviceUrl"], "https://hello-world-xyz789-uc.a.run.app")
@@ -200,7 +240,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertFalse(result["error"]["retryable"])
 
     def test_a_deploy_still_running_when_the_wait_ends_is_retried(self) -> None:
-        self._write_request({"projectId": "p", "serviceName": "hello", "image": "us-docker.pkg.dev/p/r/hello:1"})
+        self._write_request({"projectId": "p", "serviceName": "hello", "image": _VALID_INPUTS["image"]})
         with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
             client = client_cls.return_value
             client.get_service.side_effect = self.module.NotFound("no such service")
@@ -210,7 +250,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual((error["code"], error["retryable"]), ("GCP_TIMEOUT", True))
 
     def test_google_unreachable_to_sign_in_is_retried(self) -> None:
-        self._write_request({"projectId": "p", "serviceName": "hello", "image": "us-docker.pkg.dev/p/r/hello:1"})
+        self._write_request({"projectId": "p", "serviceName": "hello", "image": _VALID_INPUTS["image"]})
         with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
             self.adc.refresh.side_effect = self.module.google.auth.exceptions.TransportError("reset")
             self.assertEqual(self.module.main(), 1)
@@ -224,6 +264,7 @@ class BuildCredentialsTest(unittest.TestCase):
         self.module = _load_create_module()
         # Where the team secret gcp-target would be mounted: absent until a test writes it.
         self.module.TARGET_SERVICE_ACCOUNT_FILE = Path(tempfile.mkdtemp()) / "service-account"
+        _mount_settings(self.module, Path(tempfile.mkdtemp()))
 
     def test_returns_none_without_the_target_secret(self) -> None:
         self.assertIsNone(self.module._build_credentials())

@@ -433,7 +433,9 @@ New chart features, so Helm users get them too:
    credential, since each console pulls the catalog's release; remove and
    revoke the console URL and tokens an earlier version stored; create the
    `catalog-publish` and `purge`
-   Environments and the branch rules where the plan allows. A repository
+   Environments where the plan allows. `main`'s ruleset isn't made yet (the
+   plan says so; the catalog README's "Protecting main" lists it; TODO.md).
+   A repository
    that already has commits isn't pushed: when it last published to another
    registry (`--take-over`), `catalog-ci` is run by hand
    (`workflow_dispatch`) to republish every product to this install's.

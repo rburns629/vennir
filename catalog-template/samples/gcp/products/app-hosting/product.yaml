@@ -7,7 +7,9 @@ description: >-
   Deploys a pre-built container image to Cloud Run under the given service
   name, or returns the existing service's URL unchanged if that name is
   already taken in the target project/region. Never builds an image itself
-  -- the image to deploy is always a caller-supplied input.
+  -- the image to deploy is a caller-supplied input, from the registry the
+  team's app-hosting secret names, and the service runs as the account that
+  secret names.
 owner: gcp-team
 runtime: python3.12
 # Its own identity: bound to only what it does (README.md, Credentials).
@@ -55,10 +57,10 @@ actions:
           type: string
           x-vertra-needs: gcp.container-image
           description: >-
-            Fully-qualified container image to deploy (e.g. an Artifact
-            Registry path), built and pushed ahead of time. This product
-            only deploys a reference to it -- it never builds an image
-            itself.
+            Fully-qualified container image to deploy, built and pushed
+            ahead of time, under the team's image-registry (its app-hosting
+            secret): any other is refused. This product only deploys a
+            reference to it -- it never builds an image itself.
         cloudSqlConnectionName:
           type: string
           # Optional: the cart suggests a database (cloud-sql.create) for it.
@@ -99,6 +101,15 @@ actions:
               id: {type: string}
               name: {type: string}
               link: {type: string}
+    secretRefs:
+      - name: app-hosting
+        keys: [image-registry, runtime-service-account]
+        description: >-
+          image-registry: the registry path every image must be under, such
+          as us-central1-docker.pkg.dev/my-project/catalog.
+          runtime-service-account: the email of the service account a
+          service runs as: one made for this team's services, holding only
+          what they need, never the project's default compute account.
   - name: delete
     # Deleting a service that's already gone is a no-op.
     idempotent: true
@@ -145,3 +156,9 @@ actions:
           description: What an admin must grant it here.
           items: {type: string}
         detail: {type: string, title: Detail}
+    secretRefs:
+      - name: app-hosting
+        keys: [image-registry, runtime-service-account]
+        description: >-
+          As create's: the check asks whether it may act as
+          runtime-service-account.

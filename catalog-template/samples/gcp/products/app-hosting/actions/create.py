@@ -17,6 +17,11 @@ roles/iam.serviceAccountTokenCreator on the target service account, and the
 target service account needs its own IAM grants (run.services.{get,create},
 iam.serviceAccounts.actAs on the Cloud Run runtime service account) -- see
 the gcp team's README.md.
+
+What it deploys, and as whom, is the team's choice, not the caller's: the
+team secret app-hosting names the registry images must come from and the
+service account a service runs as (one the team made for its services,
+never the project's default compute account, which is often an Editor).
 """
 
 import json
@@ -46,6 +51,10 @@ DEFAULT_REGION = "us-central1"
 # secretRefs. See the gcp team's README.md.
 TARGET_SERVICE_ACCOUNT_FILE = Path("/platform/secrets/gcp-target/service-account")
 IMPERSONATION_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
+# The team's secret app-hosting: image-registry, the registry (an Artifact
+# Registry repository, say) an image must be under, and
+# runtime-service-account, the email of the account a service runs as.
+SETTINGS_DIR = Path("/platform/secrets/app-hosting")
 
 
 def _write_result(result: dict[str, Any]) -> None:
@@ -57,6 +66,11 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
         {"status": "failed", "error": {"code": code, "message": message, "retryable": retryable}}
     )
     return 1
+
+
+def _setting(key: str) -> str:
+    path = SETTINGS_DIR / key
+    return path.read_text().strip() if path.is_file() else ""
 
 
 def _retryable(error: GoogleAPIError) -> bool:
@@ -150,6 +164,16 @@ def _run() -> int:
             "inputs.projectId, inputs.serviceName, and inputs.image are required",
         )
     region = inputs.get("region", DEFAULT_REGION)
+    registry = _setting("image-registry").rstrip("/")
+    runtime_account = _setting("runtime-service-account")
+    if not registry or not runtime_account:
+        return _failure(
+            "MISSING_SECRET",
+            f"{SETTINGS_DIR} needs image-registry and runtime-service-account: add the secret "
+            "app-hosting for this team in the console (the gcp team's README.md).",
+        )
+    if not image.startswith(registry + "/"):
+        return _failure("IMAGE_NOT_ALLOWED", f"inputs.image must be under {registry}/, the registry this team deploys from.")
 
     services = run_v2.ServicesClient(credentials=_signed_in())
     service_path = services.service_path(project_id, region, service_name)
@@ -168,7 +192,7 @@ def _run() -> int:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     container = run_v2.Container(image=image)
-    template = run_v2.RevisionTemplate()
+    template = run_v2.RevisionTemplate(service_account=runtime_account)
 
     # See product.yaml's cloudSqlConnectionName field -- this is the actual
     # wiring for "an API that needs its own database": a volume backed by
