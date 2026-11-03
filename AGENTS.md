@@ -15,7 +15,8 @@ already exist — check them before re-deriving anything:
   vault sync, what isn't enforced yet.
 - `docs/assessment.md`: the 2026-10-19 architecture assessment and the
   agreed direction (consumers and templates, identity in two layers, one
-  catalog pulled by many installs), with its roadmap in `TODO.md`.
+  catalog pulled by many installs), built since; what's open is in
+  `TODO.md`.
 - `docs/repository-map.md`: every folder and file, one line each. Update it
   when adding, moving or removing files.
 - `docs/architecture/`: draw.io diagrams (system, UML classes for both

@@ -22,7 +22,8 @@ installCloud: gcp
 # kernel chart's own CA.
 tls:
   kernelCaSecret: kernel-execution-kernel-tls-ca
-# Public, over plain HTTP: put TLS in front of it before real use (TODO.md).
+# Public, over plain HTTP: put TLS in front of it before real use
+# (docs/operations.md, "HTTPS for the console").
 service:
   type: LoadBalancer
   # Keep each browser's real IP, so the login limit (per client IP and

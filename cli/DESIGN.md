@@ -2,8 +2,8 @@
 
 The installer CLI for Vertra: from nothing to a running install on your
 machine or a cloud, and a catalog repository ready to publish to. This is
-the design to build it from; decisions are recorded in [TODO.md](../TODO.md)
-and here, and anything still open is listed at the end.
+the design to build it from; decisions are recorded here, and anything
+still open is listed at the end (and in [TODO.md](../TODO.md)).
 
 ## Goals
 

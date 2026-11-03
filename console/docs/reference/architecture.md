@@ -242,9 +242,9 @@ in `docs/architecture/` (`5-states`), with the rest of the diagrams.
 
 ## Agreed direction
 
-Decided on 2026-10-19 and not built yet; the reasoning, findings and
-roadmap are in [assessment.md](assessment.md), the work in
-[`TODO.md`](../TODO.md#agreed-direction).
+Decided on 2026-10-19, and built since (each item says when); the
+reasoning, findings and roadmap are in [assessment.md](assessment.md), and
+what's still open is in [`TODO.md`](../TODO.md).
 
 - **Consumers run templates** (built 2026-10-21: the Run page).
   Anyone may run a team's published template, supplying only its inputs;
