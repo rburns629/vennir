@@ -15,7 +15,9 @@
 //  5. its body is within the API's size; else 413
 //  6. its method and path are an operation in the spec; else 404, blocked:
 //     never forwarded
-//  7. its parameters, headers and body fit that operation's schemas; else 400
+//  7. its parameters, headers and body fit that operation's schemas, with
+//     no query parameter or body it doesn't declare, and a body only with a
+//     Content-Type; else 400
 //  8. the calling team is within the API's rate; else 429 with Retry-After
 //  9. forwarded, with the backend's credential minted for it
 //
@@ -256,6 +258,13 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, result, http.StatusRequestEntityTooLarge, "TOO_LARGE", "The body is larger than this API takes: "+strconv.FormatInt(api.MaxRequest, 10)+" bytes.")
 	}
 
+	// The validator checks a body only by its Content-Type, and would let
+	// one without it through unchecked.
+	if len(body) > 0 && r.Header.Get("Content-Type") == "" {
+		result.name = "invalid"
+		return g.refuse(w, result, http.StatusBadRequest, "INVALID_REQUEST", "A body needs a Content-Type: nothing was forwarded.")
+	}
+
 	target := *api.BackendURL
 	target.Path = strings.TrimSuffix(api.BackendURL.Path, "/") + rest
 	target.RawPath = ""
@@ -267,7 +276,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, result, http.StatusBadRequest, "BAD_REQUEST", "The request can't be read.")
 	}
 	check.Header = r.Header.Clone()
-	if valid, problems := api.Validator.ValidateHttpRequest(check); !valid {
+	if valid, problems := api.Validator.ValidateHttpRequest(check); !valid && !onlyStyledKeys(api, o.endpoint, problems) {
 		if notInSpec(problems) {
 			result.name = "blocked"
 			return g.refuse(w, result, http.StatusNotFound, "NOT_IN_SPEC", "This API's OpenAPI document has no "+r.Method+" "+rest+": nothing was forwarded.")
@@ -488,4 +497,16 @@ func newID() string {
 	b := make([]byte, 12)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// onlyStyledKeys: every problem is a query key strict mode didn't know is
+// one of a declared parameter's (a deepObject's filter[x], an exploded
+// object's properties), so the request does fit.
+func onlyStyledKeys(api *store.API, endpoint string, problems []*verrors.ValidationError) bool {
+	for _, p := range problems {
+		if p.ValidationType != verrors.StrictValidationType || p.ValidationSubType != verrors.StrictSubTypeQuery || !api.TakesQueryKey(endpoint, p.ParameterName) {
+			return false
+		}
+	}
+	return true
 }
