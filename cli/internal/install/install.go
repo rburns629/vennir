@@ -945,8 +945,24 @@ func EnsureSSOSecret(ctx context.Context, r *run.Runner, c *config.Config) error
 		"metadata":   map[string]any{"name": SSOSecretName, "namespace": c.Namespace, "labels": map[string]string{"app.kubernetes.io/managed-by": "vertra"}},
 		"stringData": map[string]string{"client-secret": client.Secret},
 	})
-	return r.RunInput(ctx, string(manifest), "kubectl", "--context", cluster.Context(c), "apply", "-f", "-")
+	return applySecret(ctx, r, c, SSOSecretName, string(manifest))
 }
+
+// applySecret applies a Secret's manifest in the platform namespace,
+// through stdin, server-side: a client-side apply would keep a plaintext
+// copy of it in the kubectl.kubernetes.io/last-applied-configuration
+// annotation, which object exports and metadata tooling show. One an older
+// vertra's client-side apply left is removed, as the API server keeps an
+// annotation it finds up to date.
+func applySecret(ctx context.Context, r *run.Runner, c *config.Config, name, manifest string) error {
+	k := []string{"--context", cluster.Context(c), "--namespace", c.Namespace}
+	if err := r.RunInput(ctx, manifest, "kubectl", append(k, "apply", "--server-side", "--field-manager=vertra", "--force-conflicts", "-f", "-")...); err != nil {
+		return err
+	}
+	return r.Run(ctx, "kubectl", append(k, "annotate", "secret", name, lastApplied+"-")...)
+}
+
+const lastApplied = "kubectl.kubernetes.io/last-applied-configuration"
 
 // CertManagerChart is the cert-manager chart version vertra installs, on an
 // existing cluster that hasn't got it, for the console's certificate.
@@ -1111,7 +1127,7 @@ metadata:
 stringData:
   password: %q
 `, FirstAdminSecret, password)
-	return r.RunInput(ctx, manifest, "kubectl", "--context", cluster.Context(c), "--namespace", c.Namespace, "apply", "-f", "-")
+	return applySecret(ctx, r, c, FirstAdminSecret, manifest)
 }
 
 // WithFirstAdmin has a fresh install's console create the first admin with
