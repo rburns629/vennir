@@ -110,8 +110,11 @@ export async function accountFor(email: string, subject: string, log: FastifyBas
     if (existing.oidcSubject || !(await bindOidcSubject(existing.id, subject))) {
       throw new SignInRefused("ACCOUNT_LINKED_ELSEWHERE", `${email}'s account signs in with another identity.`);
     }
-    log.warn({ event: "sso_account_linked", userId: existing.id, email }, "account linked to its single sign-on identity");
-    return { ...existing, oidcSubject: subject };
+    log.warn(
+      { event: "sso_account_linked", userId: existing.id, email, hadPassword: existing.passwordHash !== null },
+      "account linked to its single sign-on identity: its password and earlier sessions no longer work",
+    );
+    return { ...existing, oidcSubject: subject, passwordHash: null };
   }
   const user = await createSsoUser(email, subject);
   log.warn({ event: "sso_account_created", userId: user.id, email }, "account created at its first single sign-on");

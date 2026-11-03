@@ -66,11 +66,16 @@ export async function findUserByOidcSubject(subject: string): Promise<User | und
   return user;
 }
 
-/** Binds an account to its single sign-on identity, once: never over another. */
+/**
+ * Binds an account to its single sign-on identity, once: never over another.
+ * Single sign-on is then the only way in: its password goes, and so does
+ * every session from before (passwordChangedAt), so whoever set that
+ * password (anyone may register an unclaimed email) can't keep using it.
+ */
 export async function bindOidcSubject(userId: string, subject: string): Promise<boolean> {
   const bound = await db
     .update(users)
-    .set({ oidcSubject: subject })
+    .set({ oidcSubject: subject, passwordHash: null, mustChangePassword: false, passwordChangedAt: new Date() })
     .where(and(eq(users.id, userId), isNull(users.oidcSubject)))
     .returning({ id: users.id });
   return bound.length === 1;
