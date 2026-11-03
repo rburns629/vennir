@@ -310,7 +310,7 @@ People and bots alike.
 | Column | Type | Null | Meaning |
 | --- | --- | --- | --- |
 | `id` | uuid | no | |
-| `email` | text | no, unique | A bot's is made up, such as `team-a-release-pipeline@bots.vertra.local`. |
+| `email` | text | no, unique | Kept lowercase however it was typed. A bot's is made up, such as `team-a-release-pipeline@bots.vertra.local`. |
 | `password_hash` | text | yes | An argon2 hash. Empty for bots, which use tokens, and for people who sign in only through single sign-on. |
 | `is_admin` | boolean | no | A platform admin: may act on every team and use the Admin page. |
 | `is_bot` | boolean | no | A machine identity, which signs in only with an API token. |

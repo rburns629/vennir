@@ -7,6 +7,7 @@ import { hashPassword } from "../src/auth/password.js";
 import { db } from "../src/db/client.js";
 import { createTeam, createUser, recordSubmittedExecution, setTeamRetired, setUserAdmin } from "../src/db/queries.js";
 import { submittedExecutions, teams, users } from "../src/db/schema.js";
+import { config } from "../src/config.js";
 import { buildApp } from "../src/index.js";
 import { caller } from "./rpc.js";
 
@@ -124,5 +125,27 @@ describe("deleting an account", () => {
     // (The last-admin rule can't be reached here: the shared test database
     // always holds other tests' admins. It's the same countAdmins() check
     // that SetAdmin already relies on.)
+  });
+});
+
+describe("an email", () => {
+  it("is one account however it's typed: registering, signing in, an admin's lookups", async () => {
+    const was = config.allowSelfRegistration;
+    config.allowSelfRegistration = true;
+    try {
+      const registered = await call<{ email: string }>(undefined, "AuthService/Register", {
+        email: `${prefix}-Mixed@Example.com`,
+        password: "correct-horse-battery",
+      });
+      expect(registered.body.email).toBe(`${prefix}-mixed@example.com`);
+      const again = await call(undefined, "AuthService/Register", { email: `${prefix}-mixed@example.com`, password: "correct-horse-battery" });
+      expect(again.code).toBe("already_exists");
+    } finally {
+      config.allowSelfRegistration = was;
+    }
+    const login = await call(undefined, "AuthService/Login", { email: `${prefix}-MIXED@example.COM`, password: "correct-horse-battery" });
+    expect(login.code).toBe("ok");
+    expect((await as(adminId, "UserService/DeleteUser", { email: `${prefix}-mixed@EXAMPLE.com` })).code).toBe("ok");
+    expect(await db.select().from(users).where(like(users.email, `${prefix}-mixed%`))).toEqual([]);
   });
 });

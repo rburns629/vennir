@@ -38,6 +38,7 @@ export async function seedBootstrapAdmin<S extends Record<string, unknown>>(
   givenPassword: string | undefined,
   mustChangePassword = false,
 ): Promise<void> {
+  email = email.trim().toLowerCase();
   const [existing] = await db
     .select({ id: schema.users.id })
     .from(schema.users)
