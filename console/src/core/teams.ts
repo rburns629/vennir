@@ -216,6 +216,11 @@ export async function addMember(
   ensureNotRetired(team);
   const user = await findUserByEmail(email);
   if (!user) throw new ApiError(404, "NOT_FOUND", "No such user.");
+  // A bot belongs to the team that made it (tokens.ts teamBot): one added
+  // here would act for this team on its own team's tokens.
+  if (user.isBot) {
+    throw new ApiError(409, "CONFLICT", `${email} is a bot: make this team its own (Bots), rather than adding another team's.`, Code.AlreadyExists);
+  }
   await ensureNotFollowingGroups(team, { email: user.email, usesSso: user.oidcSubject !== null });
   await addTeamMember(user.id, team.id, role);
 }

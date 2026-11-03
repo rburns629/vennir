@@ -9,7 +9,7 @@
  * test issuer's discovery document and keys are served by a stubbed fetch.
  */
 import { randomUUID } from "node:crypto";
-import { eq, like } from "drizzle-orm";
+import { and, eq, like, ne } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { exportJWK, generateKeyPair, SignJWT, type JWK } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,7 +17,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam } from "../src/db/queries.js";
-import { botIdentities, teams, users as usersTable } from "../src/db/schema.js";
+import { botIdentities, teamMemberships, teams, users as usersTable } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { caller, rpcClient } from "./rpc.js";
 
@@ -111,6 +111,18 @@ describe("a bot's identities", () => {
     const listed = await call<{ identities?: unknown[]; audience?: string }>(memberToken, "TokenService/ListBotIdentities", { team });
     expect(listed.body).toMatchObject({ audience: AUDIENCE, identities: [{ issuer: ISSUER, claims: { sub: SUBJECT }, botEmail: bot.email }] });
   });
+
+  it("aren't added to a bot that's in another team too, as one could be from before bots had one team", async () => {
+    const [otherTeam] = await db.select({ id: teams.id }).from(teams).where(eq(teams.name, other));
+    await addTeamMember(otherBot.id, (await db.select({ id: teams.id }).from(teams).where(eq(teams.name, team)))[0]!.id, "maintainer");
+    try {
+      const refused = await add(maintainerToken, { botId: otherBot.id, claims: { sub: "repo:acme/shared:ref:refs/heads/main" } });
+      expect(refused.code).toBe("already_exists");
+      expect(refused.failure).toBe("CONFLICT");
+    } finally {
+      await db.delete(teamMemberships).where(and(eq(teamMemberships.userId, otherBot.id), ne(teamMemberships.teamId, otherTeam!.id)));
+    }
+  });
 });
 
 describe("a keyless bot", () => {
@@ -142,6 +154,16 @@ describe("a keyless bot", () => {
     // And it signs in.
     const session = await exchange(await sign({ sub: "repo:acme/deploy:ref:refs/heads/main" }));
     expect(session.body.email).toBe(email);
+  });
+
+  it("can't be another team's bot, given an identity this team chose", async () => {
+    const claims = { sub: "repo:acme/takeover:ref:refs/heads/main" };
+    const taken = await made(maintainerToken, { email: otherBot.email, claims });
+    expect(taken.code).toBe("already_exists");
+    expect(taken.failure).toBe("CONFLICT");
+    expect(await tokensOf(otherBot.email)).toBeUndefined();
+    expect(await db.select().from(botIdentities).where(eq(botIdentities.botId, otherBot.id))).toEqual([]);
+    expect((await exchange(await sign(claims))).body.email).toBeUndefined();
   });
 });
 
