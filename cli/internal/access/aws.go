@@ -144,9 +144,15 @@ func CheckAWS(ctx context.Context, exec Exec, profile, region string) *AWS {
 	// Money: budgets, and whether Spot prices can be read here.
 	var b struct{ Budgets []json.RawMessage }
 	out, err = cli.call(ctx, region, "budgets", "describe-budgets", "--account-id", id.Account)
-	if err == nil {
+	switch {
+	case err != nil && strings.Contains(err.Error(), "NotFoundException"):
+		// How Budgets has answered an account with none.
+		err = nil
+	case err == nil && strings.TrimSpace(out) != "":
 		err = json.Unmarshal([]byte(out), &b)
 	}
+	// Nothing printed is none too: with no Budgets key in the answer, the
+	// AWS CLI prints nothing.
 	a.Budgets, a.BudgetsUnread = len(b.Budgets), err != nil
 	budget := fmt.Sprintf("%d in this account", a.Budgets)
 	switch {
