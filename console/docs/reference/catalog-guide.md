@@ -634,8 +634,9 @@ with the commit and `latest`: every team, its SecretStore files, and every actio
 `<team>-<product>-<action>`, its image pinned by digest to the image tagged
 with the product's commit (`:latest`, from a laptop). A product whose image
 for that commit is missing, or unsigned when the catalog signs (its publish
-failed), fails the release; running `ci.yml` by hand on `main` publishes
-every product again. It's complete, not a
+failed), fails the release. In CI, `publish --changed` therefore also
+publishes every product whose image for its commit is missing or unsigned,
+so the next run on `main` (or rerunning the failed one) puts it right. It's complete, not a
 change: an install unregisters what a release no longer has, and retires a
 team whose folder is gone. Each console reads it every few minutes (an admin
 can press **Sync now**), verifies its signature, and applies it.

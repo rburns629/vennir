@@ -388,7 +388,7 @@ func (c *Catalog) publishedImage(ctx context.Context, p *Product, s Settings) (s
 		if err != nil {
 			return "", err.Error()
 		}
-		tag, how = commit, "its publish failed or never ran: rerun catalog-ci by hand on main, which publishes every product"
+		tag, how = commit, "its publish failed or never ran: publish --changed publishes it again (as catalog-ci on main does; rerun it)"
 	}
 	reference := p.Repository(s) + ":" + tag
 	digest, err := tagDigest(ctx, reference)

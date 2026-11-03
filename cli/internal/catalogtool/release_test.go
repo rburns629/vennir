@@ -98,6 +98,110 @@ func TestAReleaseIsTaggedOnlyOnceSigned(t *testing.T) {
 	}
 }
 
+// gitIn runs git in root, as a committer, failing the test if it fails.
+func gitIn(t *testing.T, root string) func(args ...string) string {
+	return func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = root
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+}
+
+// publishSigned writes an image to <repository>:tag in the test registry,
+// with a signature beside it, as publish leaves a signed one.
+func publishSigned(t *testing.T, repository, tag string) {
+	t.Helper()
+	for _, signature := range []bool{false, true} {
+		image, err := random.Image(64, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ref, _ := name.NewTag(repository + ":" + tag)
+		if err := remote.Write(ref, image); err != nil {
+			t.Fatal(err)
+		}
+		if signature {
+			return
+		}
+		digest, _ := image.Digest()
+		tag = strings.Replace(digest.String(), ":", "-", 1) + ".sig"
+	}
+}
+
+// In CI, publish --changed also takes every product whose image for its
+// commit isn't there, signed: one changed and reverted within a push (no
+// net diff, but a new commit), and one whose push's run never published it
+// (the concurrency group skipped it); not one that's there.
+func TestInCIPublishAlsoTakesProductsWhoseCommitHasNoImage(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	server := httptest.NewServer(registry.New())
+	defer server.Close()
+	host := strings.TrimPrefix(server.URL, "http://")
+	s := Settings{Registry: host + "/catalog-products", SigningMode: "key"}
+	ctx := context.Background()
+
+	files := map[string]string{}
+	for _, n := range []string{"reverted", "skipped", "fine", "changed"} {
+		for path, content := range product(n, "[]") {
+			files[path] = content
+		}
+	}
+	c := catalogWith(t, files)
+	git := gitIn(t, c.Root)
+	git("init", "-q")
+	git("add", "-A")
+	git("commit", "-qm", "all")
+	first := git("rev-parse", "HEAD")
+	for _, n := range []string{"reverted", "skipped", "fine", "changed"} {
+		publishSigned(t, s.Registry+"/a/"+n, first)
+	}
+	commit := func(path, content, message string) {
+		if err := os.WriteFile(filepath.Join(c.Root, path), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		git("add", "-A")
+		git("commit", "-qm", message)
+	}
+	// A push whose run the concurrency group skipped: skipped/ never published.
+	commit("teams/a/products/skipped/notes.txt", "one\n", "skipped")
+	before := git("rev-parse", "HEAD")
+	// This push: reverted/ changed and changed back, changed/ changed.
+	commit("teams/a/products/reverted/notes.txt", "x\n", "change")
+	if err := os.Remove(filepath.Join(c.Root, "teams/a/products/reverted/notes.txt")); err != nil {
+		t.Fatal(err)
+	}
+	git("add", "-A")
+	git("commit", "-qm", "revert")
+	commit("teams/a/products/changed/notes.txt", "two\n", "changed")
+	head := git("rev-parse", "HEAD")
+	c.Getenv = func(key string) string {
+		if key == "GITHUB_SHA" {
+			return head
+		}
+		return ""
+	}
+
+	changed, err := c.SelectProducts(nil, &before)
+	if err != nil || len(changed) != 1 || changed[0].Name() != "changed" {
+		t.Fatalf("the diff selects %v (%v), only changed", changed, err)
+	}
+	var got []string
+	for _, p := range c.withUnpublished(ctx, changed, s) {
+		got = append(got, p.Name())
+	}
+	if strings.Join(got, ",") != "changed,reverted,skipped" {
+		t.Errorf("publishes %v; want changed, reverted and skipped, not fine", got)
+	}
+}
+
 // In CI a release pins each product to the image tagged with the commit
 // that last changed it, not :latest, and refuses one that's missing or,
 // when the catalog signs, unsigned.
@@ -114,16 +218,7 @@ func TestInCIAReleasePinsEachProductsOwnCommit(t *testing.T) {
 	files := product("mine", "[]")
 	files["teams/a/team.yaml"] = "apiVersion: vertra.dev/v2\nkind: Team\nname: a\ndisplayName: A\ndescription: A\nowner: \"@acme/team-a\"\ncontact: a@acme.com\n"
 	c := catalogWith(t, files)
-	git := func(args ...string) string {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = c.Root
-		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-		return strings.TrimSpace(string(out))
-	}
+	git := gitIn(t, c.Root)
 	git("init", "-q")
 	git("add", "-A")
 	git("commit", "-qm", "mine")
