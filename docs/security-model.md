@@ -968,7 +968,11 @@ the password; a successful one's actor is who signed in), as are keyless
 and single sign-on sign-ins, registering and changing a password. Each
 entry is in the `audit_log`
 table, hash-chained so a change or removal shows, and in the console's log
-as `event: "audit"`. A catalog release's changes are recorded too.
+as `event: "audit"`. A catalog release's changes are recorded too, and
+so is each team membership single sign-on groups add, remove or change (at
+a sign-in or the hourly resync). Settings are recorded as they're set (the
+chat agent's provider and endpoint, single sign-on's issuer, client id and
+domains), never a key or secret, only that one was given.
 Entries are kept `retention.auditDays` (365 by default); `audit.export`
 copies them to write-once storage, and the database is compared with that
 copy entry by entry, so even a change with every later hash rewritten

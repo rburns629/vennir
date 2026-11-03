@@ -8,16 +8,17 @@
  * Workspace, make a mapped team's membership follow them at each sign-in,
  * leave unmapped teams alone, and, when they can't be read, refuse the
  * sign-in without touching anyone's teams. A mapped team's single sign-on
- * members can't be changed by hand. Against a stand-in provider.
+ * members can't be changed by hand. The settings and each membership
+ * change are audited. Against a stand-in provider.
  */
 import { randomUUID } from "node:crypto";
-import { and, eq, like } from "drizzle-orm";
+import { and, asc, desc, eq, like, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, createUser, purgeTeam, teamRolesForUser } from "../src/db/queries.js";
-import { ssoGroupMappings, ssoSettings, teamMemberships, teams, users } from "../src/db/schema.js";
+import { auditLog, ssoGroupMappings, ssoSettings, teamMemberships, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { refreshSso, resyncGoogleGroups } from "../src/sso.js";
 import { CLIENT_ID, CLIENT_SECRET, startProvider } from "./oidcProvider.js";
@@ -103,6 +104,19 @@ describe("the settings", () => {
     // Saved again without a secret: the stored one stays.
     expect((await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", label: "Okta SSO" }))).code).toBe("ok");
     expect((await db.select().from(ssoSettings))[0]?.clientSecretEncrypted).toBe(row?.clientSecretEncrypted);
+    // Audited as set: the provider and who may sign in, and whether a secret was given, never the secret.
+    const audited = await db
+      .select({ target: auditLog.target })
+      .from(auditLog)
+      .where(and(eq(auditLog.route, "vertra.console.v1.SsoService/SetSsoSettings"), eq(auditLog.status, 200)))
+      .orderBy(desc(auditLog.id))
+      .limit(2);
+    expect(audited.map((a) => a.target)).toMatchObject([
+      { issuer: provider.issuer, clientId: CLIENT_ID, allowedDomains: [domain], groupsClaim: "groups", enabled: true, label: "Okta SSO" },
+      { issuer: provider.issuer, clientId: CLIENT_ID, enabled: true, secretGiven: true },
+    ]);
+    expect(audited[0]?.target).not.toHaveProperty("secretGiven");
+    expect(JSON.stringify(audited)).not.toContain(CLIENT_SECRET);
   });
 
   it("refuses an issuer that doesn't answer, and a provider the install set", async () => {
@@ -158,6 +172,24 @@ describe("signing in", () => {
     expect(await via()).toEqual({ [teamA]: ["g-lead"], [teamB]: ["g-ops"], [teamC]: null });
     await provider.signIn(app, person("dev", { groups: ["unmapped"] }));
     expect(await teamsOf(`dev@${domain}`)).toEqual({ [teamC]: "member" });
+    // Each change is in the audit log, as single sign-on's, not a request's.
+    const audited = await db
+      .select({ actorId: auditLog.actorId, method: auditLog.method, target: auditLog.target })
+      .from(auditLog)
+      .where(and(eq(auditLog.route, "sso-group-sync"), sql`${auditLog.target}->>'userId' = ${dev.id}`))
+      .orderBy(asc(auditLog.id));
+    expect(audited.every((a) => a.actorId === null && a.method === "SSO")).toBe(true);
+    expect(audited.map((a) => a.target)).toEqual([
+      { userId: dev.id, team: teamA, change: "joined", role: "member", groups: ["g-dev"] },
+      ...[
+        { userId: dev.id, team: teamA, change: "role", role: "maintainer", groups: ["g-lead"] },
+        { userId: dev.id, team: teamB, change: "joined", role: "member", groups: ["g-ops"] },
+      ].sort((a, b) => a.team.localeCompare(b.team)),
+      ...[
+        { userId: dev.id, team: teamA, change: "left", groups: [] },
+        { userId: dev.id, team: teamB, change: "left", groups: [] },
+      ],
+    ]);
   });
 
   it("deletes the mappings of a purged team, and passes over a purged team where any are left", async () => {
