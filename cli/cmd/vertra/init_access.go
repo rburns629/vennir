@@ -97,7 +97,11 @@ func (a *app) awsAccess(ctx context.Context, out io.Writer, c *config.Config, f 
 		return nil, problemsError(check.Report)
 	}
 
-	// The region: from those that answer for this account.
+	// The region: from those that answer for this account, the one asked
+	// for (an opt-in region, say) among them if it does.
+	if f.region != "" && !contains(access.AWSRegions, f.region) {
+		check.ProbeRegion(ctx, a.runner.Exec, profile, f.region)
+	}
 	def := orDefault(f.region, "us-east-2")
 	if !contains(check.Allowed, def) && len(check.Allowed) > 0 {
 		def = check.Allowed[0]

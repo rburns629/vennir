@@ -69,7 +69,8 @@ aws configure sso --profile vertra  # Identity Center
 ## Regions
 
 `init` asks every common region whether it answers for your account and
-offers those that do. If your organization's policy allows only some (a
+offers those that do. A region you've opted in to isn't one of them: give
+it with `--region`, and it's asked and offered too. If your organization's policy allows only some (a
 region restriction), pick one of them, or have the organization's
 management account allow another (AWS Organizations → Policies → Service
 control policies). us-east-2 costs the same as us-east-1 for everything
