@@ -40,6 +40,78 @@ spec:
         - {name: tmp, emptyDir: {}}
         {{- include "execution-kernel.tlsCaVolume" . | nindent 8 }}
       restartPolicy: Never
+      {{- if and .Values.postgres.enabled .Values.postgres.auth.kernelUsername (not .Values.existingSecret) }}
+      initContainers:
+        # As the superuser, the one thing it's used for besides Postgres
+        # itself and backups: the kernel's own login role (no superuser, no
+        # CREATEDB or CREATEROLE), with this release's password for it, made
+        # the owner of the kernel's database and of everything in it, so
+        # the migration below and the kernel's processes run as it. An
+        # upgrade from the superuser hands over what's already there.
+        - name: kernel-role
+          image: {{ include "execution-kernel.image" .Values.postgres.image | quote }}
+          securityContext:
+            {{- include "execution-kernel.containerSecurityContext" . | nindent 12 }}
+            runAsUser: 999
+            runAsGroup: 999
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- include "execution-kernel.tlsCaMount" . | nindent 12 }}
+          env:
+            - {name: HOME, value: /tmp}
+            - name: PGHOST
+              value: "{{ include "execution-kernel.fullname" . }}-postgres"
+            {{- if .Values.tls.enabled }}
+            - {name: PGSSLMODE, value: verify-full}
+            - {name: PGSSLROOTCERT, value: /etc/vertra/tls/ca.crt}
+            {{- end }}
+            - name: PGUSER
+              value: {{ .Values.postgres.auth.username | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "execution-kernel.databaseSecretName" . }}
+                  key: postgres-password
+            - name: KERNEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "execution-kernel.fullname" . }}-db-migrate
+                  key: kernel-password
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              until pg_isready -q; do echo "waiting for Postgres"; sleep 2; done
+              psql -v ON_ERROR_STOP=1 -d {{ .Values.postgres.auth.database | quote }} \
+                -v role={{ .Values.postgres.auth.kernelUsername | quote }} \
+                -v db={{ .Values.postgres.auth.database | quote }} -v password="$KERNEL_PASSWORD" <<'SQL'
+              SELECT format('CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE', :'role')
+                WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'role') \gexec
+              SELECT format('ALTER ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD %L', :'role', :'password') \gexec
+              SELECT format('ALTER DATABASE %I OWNER TO %I', :'db', :'role') \gexec
+              SELECT format('GRANT CONNECT ON DATABASE %I TO %I', :'db', :'role') \gexec
+              SELECT format('ALTER SCHEMA public OWNER TO %I', :'role') \gexec
+              SELECT format('ALTER %s %I.%I OWNER TO %I',
+                  CASE c.relkind WHEN 'S' THEN 'SEQUENCE' WHEN 'v' THEN 'VIEW' WHEN 'm' THEN 'MATERIALIZED VIEW' ELSE 'TABLE' END,
+                  n.nspname, c.relname, :'role')
+                FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'S')
+                  AND pg_get_userbyid(c.relowner) <> :'role'
+                  AND NOT (c.relkind = 'S' AND EXISTS (SELECT FROM pg_depend d WHERE d.objid = c.oid AND d.deptype IN ('a', 'i'))) \gexec
+              SELECT format('ALTER TYPE %I.%I OWNER TO %I', n.nspname, t.typname, :'role')
+                FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+                WHERE n.nspname = 'public' AND t.typtype IN ('e', 'd') AND pg_get_userbyid(t.typowner) <> :'role' \gexec
+              SELECT format('ALTER FUNCTION %I.%I(%s) OWNER TO %I', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid), :'role')
+                FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                WHERE n.nspname = 'public' AND pg_get_userbyid(p.proowner) <> :'role' \gexec
+              SQL
+              echo "the kernel's database is {{ .Values.postgres.auth.kernelUsername }}'s"
+      {{- end }}
       containers:
         - name: migrate
           image: {{ include "execution-kernel.appImage" . | quote }}

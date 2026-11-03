@@ -58,7 +58,7 @@ that Secret is referenced directly instead of one this chart creates.
 {{- define "execution-kernel.databaseUrl" -}}
 {{- $root := .root -}}
 {{- if $root.Values.postgres.enabled -}}
-postgresql://{{ $root.Values.postgres.auth.username }}:{{ .password }}@{{ include "execution-kernel.fullname" $root }}-postgres:5432/{{ $root.Values.postgres.auth.database }}{{ include "execution-kernel.databaseTls" $root }}
+postgresql://{{ $root.Values.postgres.auth.kernelUsername | default $root.Values.postgres.auth.username }}:{{ .password }}@{{ include "execution-kernel.fullname" $root }}-postgres:5432/{{ $root.Values.postgres.auth.database }}{{ include "execution-kernel.databaseTls" $root }}
 {{- else -}}
 {{- $root.Values.externalDatabaseUrl -}}
 {{- end -}}
@@ -80,6 +80,20 @@ once per render and reuse the value (secret.yaml does).
 {{- else -}}
 {{- randAlphaNum 32 -}}
 {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The kernel's own login role's password (postgres.auth.kernelUsername): the
+one already in this release's Secret, so upgrades keep it; otherwise a new
+random one. Call it once per render (secret.yaml does).
+*/}}
+{{- define "execution-kernel.kernelPassword" -}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace (include "execution-kernel.databaseSecretName" .) -}}
+{{- if and $existing (index ($existing.data | default dict) "kernel-password") -}}
+{{- index $existing.data "kernel-password" | b64dec -}}
+{{- else -}}
+{{- randAlphaNum 32 -}}
 {{- end -}}
 {{- end -}}
 

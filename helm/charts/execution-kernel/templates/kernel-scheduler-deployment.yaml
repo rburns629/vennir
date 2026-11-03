@@ -30,6 +30,8 @@ spec:
         # upgrade` rolls a fresh Pod automatically instead of silently
         # leaving the old env in place.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # Who it signs in to the database as: a change (to the kernel's own role) restarts it.
+        checksum/database-role: {{ .Values.postgres.auth.kernelUsername | default .Values.postgres.auth.username | sha256sum }}
     spec:
       # The only workload in this chart that gets a ServiceAccount with any
       # Kubernetes API access — see templates/rbac.yaml. kernel-api never
