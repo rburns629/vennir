@@ -261,7 +261,7 @@ React 19, MUI, Vite, react-router. Its own `package.json`.
 | `src/time.ts` | Durations and times as people say them ("8m 05s", "today 14:02"), a schedule's next run in its own time zone ("02:00 New York time") and the viewer's, and a clock that ticks while something runs. Tested in `time.test.ts`. |
 | `src/statusColor.ts` | Each state's color and label, shared by the status chips and the home charts. |
 | `src/runningNow.ts` | What a run is doing now ("app-hosting.create, attempt 2 of 3"), for Home's Running now and the Runs list. Tested in `runningNow.test.ts`. |
-| `src/auth/` | The signed-in user (`AuthContext`) and the guard that sends signed-out visitors to the login page. |
+| `src/auth/` | The signed-in user (`AuthContext`), the guard that sends signed-out visitors to the login page, and where signing in goes back to (`returnTo`). |
 | `src/layout/` | The sidebar (the install, the places, your account and its settings menu; a top bar opens it on a phone), and `SignInLayout`, the screens before it (signing in, registering, choosing your own password). Old addresses (`/executions`, `/run`) redirect in `App.tsx`. |
 | `src/environment.tsx` | The install's public settings (its label, open registration, single sign-on), fetched once for the whole app. |
 | `src/components/` | Shared pieces (`Pill`, the tinted label every state and status uses; `ErrorPage`: not found, admins only, and the error boundary around each page; `CodeBlock`: commands and snippets with a copy button): tables, page headers, status badges, metric cards, team cards, empty states, confirm dialogs, inline monospace (`Mono`), `HelpLink` (a link into a guide's section, which page headers and empty states take). |

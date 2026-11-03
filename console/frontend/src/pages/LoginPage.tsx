@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { useEffect, useState, type FormEvent } from "react";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import AlertTitle from "@mui/material/AlertTitle";
 import Box from "@mui/material/Box";
@@ -13,6 +13,7 @@ import Typography from "@mui/material/Typography";
 import GlobeIcon from "@mui/icons-material/LanguageOutlined";
 import { ApiError, SSO_START } from "../api";
 import { useAuth } from "../auth/AuthContext";
+import { keepForSso, returnPath, takeAfterSso } from "../auth/returnTo";
 import { useEnvironment } from "../environment";
 import { SignInLayout } from "../layout/SignInLayout";
 
@@ -33,7 +34,8 @@ const SSO_ERRORS: Record<string, string> = {
 const SSO_TAB_KEY = "vertra_sso_tab";
 
 /** Starts single sign-on from this tab: a value only it knows, which must come back with the session. */
-function startSso(): void {
+function startSso(returnTo: string): void {
+  keepForSso(returnTo);
   const tab = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
   try {
     sessionStorage.setItem(SSO_TAB_KEY, tab);
@@ -58,6 +60,8 @@ function startedHere(tab: string | null): boolean {
 export function LoginPage() {
   const { login, sessionExpired, adoptToken, refresh } = useAuth();
   const navigate = useNavigate();
+  // The page that sent the browser here, to go back to once signed in.
+  const returnTo = returnPath(useLocation().state);
   const environment = useEnvironment();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -91,7 +95,7 @@ export function LoginPage() {
       }
       adoptToken(token);
       void refresh().then(() => {
-        navigate("/");
+        navigate(takeAfterSso());
       });
     }
   }, [adoptToken, refresh, navigate]);
@@ -103,7 +107,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      navigate("/");
+      navigate(returnTo);
     } catch (err) {
       if (err instanceof ApiError && err.code === "SSO_REQUIRED") setSsoRequired(err.message);
       else setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
@@ -132,7 +136,7 @@ export function LoginPage() {
         )}
         {sso && (
           <>
-            <Button variant="outlined" size="large" onClick={startSso} startIcon={<GlobeIcon />} sx={{ color: "text.primary", borderColor: "divider" }}>
+            <Button variant="outlined" size="large" onClick={() => { startSso(returnTo); }} startIcon={<GlobeIcon />} sx={{ color: "text.primary", borderColor: "divider" }}>
               Sign in with {sso}
             </Button>
             <Divider>

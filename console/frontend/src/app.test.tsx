@@ -1794,6 +1794,103 @@ describe("signing in", () => {
     expect(localStorage.getItem("token")).toBeNull();
   });
 
+  it("goes back to the page a link opened once signed in, with a password or single sign-on", async () => {
+    const RUN = "0b6f6a1e-6c64-4d39-9a0d-7d4c1f6c2a11";
+    const run = { "ExecutionService/WatchExecution": [{ execution: { executionId: RUN, name: "the failed run", state: "EXECUTION_STATE_FAILED", createdAt: "2026-10-21T16:20:00Z", tasks: [] } }] };
+    await renderAt(`/runs/${RUN}`, null, { "AuthService/Login": { token: "a-session" }, "AuthService/GetMe": MEMBER, ...run });
+    fireEvent.change(await screen.findByLabelText(/email/i), { target: { value: "ana@acme.com" } });
+    fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: "their-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    expect(await screen.findByText("the failed run", undefined, { timeout: 5000 })).toBeTruthy();
+    cleanup();
+    localStorage.clear();
+
+    // Single sign-on leaves the page, so where to go back to waits in this tab.
+    sessionStorage.setItem("vertra_sso_tab", "fedcba9876543210fedcba9876543210");
+    sessionStorage.setItem("vertra_sso_return", `/runs/${RUN}`);
+    window.history.replaceState(null, "", "/login#token=this-tabs&tab=fedcba9876543210fedcba9876543210");
+    await renderAt("/login", null, { "AuthService/GetMe": MEMBER, ...run });
+    expect(await screen.findByText("the failed run", undefined, { timeout: 5000 })).toBeTruthy();
+    expect(sessionStorage.getItem("vertra_sso_return")).toBeNull();
+  });
+
+  it("waits out a console that can't answer yet instead of signing out", async () => {
+    let asked = 0;
+    await renderAt("/observe", MEMBER, {
+      "AuthService/GetMe": () => {
+        asked += 1;
+        return asked === 1 ? refused(503, "unavailable", "Restarting.") : MEMBER;
+      },
+    });
+    expect(await screen.findByRole("navigation", { name: /main/i }, { timeout: 3000 })).toBeTruthy();
+    expect(asked).toBe(2);
+    expect(screen.queryByLabelText(/email/i)).toBeNull();
+    expect(localStorage.getItem("token")).toBe("a-session");
+  });
+
+  it("says it can't reach the console while it waits, and asks again at once on Retry now", async () => {
+    let up = false;
+    await renderAt("/observe", MEMBER, { "AuthService/GetMe": () => (up ? MEMBER : refused(503, "unavailable", "Restarting.")) });
+    expect(await screen.findByText("Can't reach the console. Trying again…")).toBeTruthy();
+    up = true;
+    fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
+    // Well before the next try (a second after the first).
+    expect(await screen.findByRole("navigation", { name: /main/i }, { timeout: 800 })).toBeTruthy();
+  });
+
+  it("doesn't ask again a console without the method (501): it says so", async () => {
+    let asked = 0;
+    await renderAt("/observe", MEMBER, {
+      "AuthService/GetMe": () => {
+        asked += 1;
+        return refused(501, "unimplemented", "No such method here.");
+      },
+    });
+    expect(await screen.findByText("No such method here.")).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(asked).toBe(1);
+    expect(screen.queryByText("Can't reach the console. Trying again…")).toBeNull();
+  });
+
+  it("opens the console when someone signs in while the first check is still trying", async () => {
+    let signedIn = false;
+    await renderAt("/login", MEMBER, {
+      "AuthService/GetMe": () => (signedIn ? MEMBER : refused(503, "unavailable", "Restarting.")),
+      "AuthService/Login": () => {
+        signedIn = true;
+        return { token: "a-new-session" };
+      },
+    });
+    const email = await screen.findByLabelText(/email/i);
+    // Past the second try, so the next is two seconds off.
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    fireEvent.change(email, { target: { value: "ana@acme.com" } });
+    fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: "their-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    expect(await screen.findByRole("navigation", { name: /main/i }, { timeout: 800 })).toBeTruthy();
+  });
+
+  it("forgets the cart and the browser's old drafts when signing out or when the session ends", async () => {
+    const { cart } = await import("./cart");
+    for (const end of ["sign out", "session ends"]) {
+      cart.replace("payments", ["payments-ledger-refund"], [], { refund: { amount: 40 } });
+      localStorage.setItem("vertra.compose.drafts", JSON.stringify({ old: { name: "old", team: "payments" } }));
+      await renderAt("/", MEMBER, end === "sign out" ? {} : { "AuthService/GetMe": refused(401, "unauthenticated", "Session expired.") });
+      if (end === "sign out") {
+        (await screen.findByRole("button", { name: "Settings" })).click();
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
+      }
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(localStorage.getItem("vertra.cart")).toBeNull();
+      expect(localStorage.getItem("vertra.compose.drafts")).toBeNull();
+      // Nor does this page still hold it.
+      cart.add("growth-report");
+      expect(JSON.parse(localStorage.getItem("vertra.cart") ?? "{}")).toMatchObject({ team: null, actions: ["growth-report"] });
+      cart.forget();
+      cleanup();
+    }
+  });
+
   it("offers single sign-on only when the install has it", async () => {
     await renderAt("/login", null, { "AuthService/GetEnvironment": { label: "test", ssoLabel: "Google" } });
     expect(await screen.findByRole("button", { name: /sign in with google/i })).toBeTruthy();
