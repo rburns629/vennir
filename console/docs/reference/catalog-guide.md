@@ -177,9 +177,12 @@ keys, so a key that's missing is just a file that isn't there, and your
 action should say so plainly. `shareWith` says which other
 teams may run the action or put it in their templates, and `deprecated`
 says what to use instead while it keeps working: the console records both
-and shows them. `idempotent` and `maxAttempts` are your retry policy: a step
-of an idempotent action that fails on the platform's side (a reclaimed node,
-a lost Job, a timeout), or with an error your code marks `retryable`, runs
+and shows them. A shared action runs with your team's secrets whoever
+calls it, so an action that sends a secret to a destination its caller
+chooses (a URL, a host) must never be shared: the caller would choose
+where your secret goes. `idempotent` and `maxAttempts` are your retry
+policy: a step of an idempotent action that fails on the platform's side
+(a reclaimed node, a lost Job, a timeout), or with an error your code marks `retryable`, runs
 again after a growing pause, up to `maxAttempts` in all. A template or DAG
 may ask for fewer attempts, never more, and an action that isn't idempotent
 gets exactly one: write it to find what it would create first (as every
