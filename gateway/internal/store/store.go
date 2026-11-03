@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +49,31 @@ type API struct {
 	recorded bool
 	// Endpoints are its spec's operations, to name what a request matched.
 	Endpoints []Endpoint
+	// queryKeys are the query keys each operation ("METHOD /path") takes
+	// beyond its parameters' names, which strict mode counts as undeclared.
+	queryKeys map[string]queryKeys
+}
+
+// queryKeys: a deepObject parameter's `name[...]` keys (by prefix), and an
+// exploded object parameter's properties, sent as keys of their own.
+type queryKeys struct {
+	prefixes   []string
+	properties map[string]bool
+}
+
+// TakesQueryKey is whether an operation ("METHOD /path", Match's) takes a
+// query key its parameters name only through their style.
+func (a *API) TakesQueryKey(endpoint, key string) bool {
+	k := a.queryKeys[endpoint]
+	if k.properties[key] {
+		return true
+	}
+	for _, p := range k.prefixes {
+		if strings.HasPrefix(key, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // Endpoint is one operation: its method and its path as the spec writes it.
@@ -177,10 +203,10 @@ func (s *Store) Refresh(ctx context.Context) error {
 		}
 		if a.BackendURL, err = url.Parse(backendURL); err != nil {
 			a.Problem = "its backend URL can't be read"
-		} else if v, problem := build([]byte(spec)); problem != "" {
+		} else if v, keys, problem := build([]byte(spec)); problem != "" {
 			a.Problem = problem
 		} else {
-			a.Validator = v
+			a.Validator, a.queryKeys = v, keys
 			a.Endpoints = endpoints([]byte(spec))
 		}
 		if a.Problem != "" {
@@ -231,7 +257,7 @@ func (s *Store) record(ctx context.Context, a *API) {
 // Put adds an API whose spec is given, for tests.
 func (s *Store) Put(a *API, spec []byte) {
 	if a.Validator == nil {
-		a.Validator, a.Problem = build(spec)
+		a.Validator, a.queryKeys, a.Problem = build(spec)
 		a.Endpoints = endpoints(spec)
 	}
 	s.mu.Lock()
@@ -242,25 +268,61 @@ func (s *Store) Put(a *API, spec []byte) {
 	s.apis[a.Key()] = a
 }
 
-func build(spec []byte) (validator.Validator, string) {
+func build(spec []byte) (validator.Validator, map[string]queryKeys, string) {
 	doc, err := libopenapi.NewDocument(spec)
 	if err != nil {
-		return nil, "its OpenAPI document can't be read: " + err.Error()
+		return nil, nil, "its OpenAPI document can't be read: " + err.Error()
 	}
 	// Strict: what the document doesn't describe isn't forwarded. A body
 	// on an operation that declares none, or of a media type with a schema
-	// the validator can't decode, is refused, and so is an undeclared query
-	// parameter. Headers and cookies aren't held to it (clients and proxies
+	// the validator can't decode (it reads JSON, YAML, XML, forms,
+	// multipart, text, CSV and binary), is refused, and so is an undeclared
+	// query parameter. Headers and cookies aren't held to it (clients and proxies
 	// add their own), nor a body's properties beyond what its schema allows.
+	// (No dot before the stars: names with one are written in brackets.)
 	v, errs := validator.NewValidator(doc,
+		config.WithStandardBodyDecoders(),
 		config.WithRejectUndeclaredRequestBody(),
 		config.WithRejectUnsupportedBodyContent(),
 		config.WithStrictMode(),
-		config.WithStrictIgnorePaths("$.headers.**", "$.cookies.**", "$.body.**"))
+		config.WithStrictIgnorePaths("$.headers**", "$.cookies**", "$.body**"))
 	if len(errs) > 0 {
-		return nil, fmt.Sprintf("its OpenAPI document can't be used: %v", errs[0])
+		return nil, nil, fmt.Sprintf("its OpenAPI document can't be used: %v", errs[0])
 	}
-	return v, ""
+	model, err := doc.BuildV3Model()
+	if err != nil {
+		return nil, nil, "its OpenAPI document can't be used: " + err.Error()
+	}
+	keys := map[string]queryKeys{}
+	if model.Model.Paths != nil {
+		for path, item := range model.Model.Paths.PathItems.FromOldest() {
+			for method, op := range item.GetOperations().FromOldest() {
+				var k queryKeys
+				for _, p := range slices.Concat(item.Parameters, op.Parameters) {
+					if p.In != "query" {
+						continue
+					}
+					switch {
+					case p.Style == "deepObject":
+						k.prefixes = append(k.prefixes, p.Name+"[")
+					case (p.Style == "" || p.Style == "form") && (p.Explode == nil || *p.Explode) && p.Schema != nil:
+						if s := p.Schema.Schema(); s != nil && slices.Contains(s.Type, "object") && s.Properties != nil {
+							for name := range s.Properties.KeysFromOldest() {
+								if k.properties == nil {
+									k.properties = map[string]bool{}
+								}
+								k.properties[name] = true
+							}
+						}
+					}
+				}
+				if k.prefixes != nil || k.properties != nil {
+					keys[strings.ToUpper(method)+" "+path] = k
+				}
+			}
+		}
+	}
+	return v, keys, ""
 }
 
 // Run refreshes every interval until ctx ends; a failed refresh keeps

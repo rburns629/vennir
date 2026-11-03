@@ -30,7 +30,9 @@ const spec = `{
     "/orders/{orderId}": {
       "get": {
         "parameters": [{"name": "orderId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^ord_[a-z0-9]{8}$"}},
-          {"name": "expand", "in": "query", "schema": {"type": "string", "enum": ["items"]}}],
+          {"name": "expand", "in": "query", "schema": {"type": "string", "enum": ["items"]}},
+          {"name": "filter", "in": "query", "style": "deepObject", "schema": {"type": "object", "properties": {"status": {"type": "string"}}}},
+          {"name": "page", "in": "query", "schema": {"type": "object", "properties": {"num": {"type": "integer"}, "size": {"type": "integer"}}}}],
         "responses": {"200": {"description": "ok"}}
       }
     },
@@ -42,9 +44,21 @@ const spec = `{
         "responses": {"201": {"description": "created"}}
       }
     },
+    "/batch": {
+      "post": {
+        "requestBody": {"content": {"application/json": {"schema": {"type": "array", "items": {"type": "object", "properties": {"a": {"type": "integer"}}}}}}},
+        "responses": {"201": {"description": "created"}}
+      }
+    },
+    "/upload": {
+      "post": {
+        "requestBody": {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}},
+        "responses": {"201": {"description": "created"}}
+      }
+    },
     "/notes": {
       "post": {
-        "requestBody": {"content": {"multipart/form-data": {"schema": {"type": "object"}}}},
+        "requestBody": {"content": {"application/vnd.example.notes": {"schema": {"type": "object"}}}},
         "responses": {"201": {"description": "created"}}
       }
     }
@@ -211,7 +225,7 @@ func TestWhatTheSpecDoesntDescribeIsBlockedAndNeverForwarded(t *testing.T) {
 	if w := f.do("POST", "/payments/orders/orders", "web-person", `{"amount": "lots"}`, nil); w.Code != 400 || errorCode(t, w) != "INVALID_REQUEST" {
 		t.Errorf("no Content-Type: %d %s", w.Code, w.Body)
 	}
-	if w := f.do("POST", "/payments/orders/notes", "web-person", "--x--", map[string]string{"Content-Type": "multipart/form-data; boundary=x"}); w.Code != 400 || errorCode(t, w) != "INVALID_REQUEST" {
+	if w := f.do("POST", "/payments/orders/notes", "web-person", "--x--", map[string]string{"Content-Type": "application/vnd.example.notes"}); w.Code != 400 || errorCode(t, w) != "INVALID_REQUEST" {
 		t.Errorf("a body it can't check: %d %s", w.Code, w.Body)
 	}
 	if len(f.backend.got) != 0 {
@@ -228,6 +242,26 @@ func TestWhatTheSpecDoesntDescribeIsBlockedAndNeverForwarded(t *testing.T) {
 	}
 	if w := f.do("POST", "/payments/orders/orders", "web-person", `{"amount": 1, "note": "hi"}`, map[string]string{"Content-Type": "application/json"}); w.Code != 201 {
 		t.Errorf("an extra property its schema allows: %d %s", w.Code, w.Body)
+	}
+	for name, tc := range map[string]struct {
+		method, path, body string
+		headers            map[string]string
+	}{
+		"a header with a dot":        {"GET", "/payments/orders/orders/ord_abcdefgh", "", map[string]string{"X.Foo": "1"}},
+		"a browser's cookies":        {"GET", "/payments/orders/orders/ord_abcdefgh", "", map[string]string{"Cookie": ".AspNetCore.Cookies=x; next-auth.session-token=y"}},
+		"a property with a dot":      {"POST", "/payments/orders/orders", `{"amount": 1, "b.c": 2}`, map[string]string{"Content-Type": "application/json"}},
+		"extras in an array's items": {"POST", "/payments/orders/batch", `[{"a": 1, "b": 2}]`, map[string]string{"Content-Type": "application/json"}},
+		"a deepObject parameter":     {"GET", "/payments/orders/orders/ord_abcdefgh?filter[status]=open", "", nil},
+		"an exploded object":         {"GET", "/payments/orders/orders/ord_abcdefgh?num=1&size=2", "", nil},
+		"a binary upload":            {"POST", "/payments/orders/upload", "\x00\x01raw", map[string]string{"Content-Type": "application/octet-stream"}},
+	} {
+		if w := f.do(tc.method, tc.path, "web-person", tc.body, tc.headers); w.Code != 201 {
+			t.Errorf("%s: %d %s", name, w.Code, w.Body)
+		}
+	}
+	// A deepObject's key on an operation that has none is still refused.
+	if w := f.do("GET", "/payments/orders/orders/ord_abcdefgh?other[x]=1", "web-person", "", nil); w.Code != 400 {
+		t.Errorf("an undeclared styled key: %d %s", w.Code, w.Body)
 	}
 }
 
