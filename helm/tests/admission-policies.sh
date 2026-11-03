@@ -160,9 +160,9 @@ PY
 # Hardened as the executor makes a step's Job (scheduler.taskPodHardening),
 # unless the seventh argument is "unhardened" (neither), or "own" (the
 # container's securityContext is the sixth argument's).
-job() {  # namespace, image, action, serviceAccount, secret ("" for none), extra container JSON, hardening
-  local volumes='{"name":"x","emptyDir":{}}' mounts=""
-  local pod=',"automountServiceAccountToken":false,"securityContext":{"runAsNonRoot":true}'
+job() {  # namespace, image, action, serviceAccount, secret ("" for none), extra container JSON, hardening, extra volumes JSON
+  local volumes='{"name":"x","emptyDir":{}}'"${8:-}" mounts=""
+  local pod=',"automountServiceAccountToken":false,"securityContext":{"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}'
   local container=',"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"capabilities":{"drop":["ALL"]}}'
   if [ "${7:-}" = unhardened ]; then pod="" container=""; fi
   if [ "${7:-}" = own ]; then container=""; fi
@@ -215,6 +215,15 @@ expect "a namespace without the team label"   "not a Vertra team namespace" "$(j
 expect "the platform's own namespace"         "not a Vertra team namespace" "$(job "$PLATFORM_NS" $SOURCE/app:1 run default "")"
 expect "a Job not hardened"                   "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" unhardened)"
 expect "a Job that adds a capability"         "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"capabilities":{"drop":["ALL"],"add":["NET_ADMIN"]}}' own)"
+
+HARD='"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"capabilities":{"drop":["ALL"]}'
+expect "a command of its own"                 "its image's own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"command":["sh","-c","id"]')"
+expect "more than its action as arguments"    "its image's own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"args":["run","--and-more"]')"
+expect "an environment variable of its own"   "its image's own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"env":[{"name":"EXTRA","value":"x"}]')"
+expect "a Kubernetes API token"               "its image's own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ',{"name":"t","projected":{"sources":[{"serviceAccountToken":{"path":"t"}}]}}')"
+expect "a container as root"                  "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"securityContext":{'"$HARD"',"runAsUser":0}' own)"
+expect "a container without seccomp"          "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"securityContext":{'"$HARD"',"seccompProfile":{"type":"Unconfined"}}' own)"
+expect "a port on the node"                   "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"ports":[{"containerPort":80,"hostPort":80}]')"
 
 echo "Image sources:"
 expect "an image from another registry"       IMAGE_NOT_ALLOWED              "$(job "$TEAM_A" busybox:1.36 run default "")"

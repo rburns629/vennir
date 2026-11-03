@@ -761,6 +761,16 @@ that way (no API token, non-root, a read-only root filesystem, no
 capabilities or privilege, nothing of the host's: proven on kind
 2026-10-28), so a scheduler tricked into making another Job still can't.
 
+Whatever the hardening setting, the dispatch policy holds a step's container
+to what the executor builds: its image's own entrypoint (no `command`), the
+action as its one argument, no environment but the install's
+`scheduler.taskExtraEnvironment` (as values, never from a Secret or
+ConfigMap), and no projected token without an audience (the Kubernetes
+API's). So even a Job the scheduler was tricked into making can't run other
+code as a product's identity, with its Secrets, or carry a token for the
+cluster. With hardening on, each container is held to it too: non-root,
+never user 0, seccomp `RuntimeDefault`, no host port.
+
 **The network.** In, only Pods of its own namespace (and the gateway, to a
 team's API backends). Out, anything: the internet, its cloud, the
 Kubernetes API server (with no token to call it, while hardening is on),
