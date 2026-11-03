@@ -103,8 +103,8 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
         label: "The catalog",
         sections: [
           ["Set up", ["layout", "onboarding-a-team", "a-teams-secretstore", "removing-a-team"]],
-          ["Write products", ["productyaml", "templates-and-dags-dags", "api-products-apis"]],
-          ["Ship them", ["testing", "what-ci-blocks", "who-approves-what", "publishing"]],
+          ["Write products", ["productyaml", "the-container-contract", "templates-and-dags-dags", "api-products-apis"]],
+          ["Ship them", ["testing", "what-ci-blocks", "who-approves-what", "publishing", "updating-your-catalog"]],
         ],
       },
       ["reference-catalog-onboarding-with-ai", "Onboard with an AI assistant"],

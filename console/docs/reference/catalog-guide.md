@@ -470,8 +470,9 @@ A backend your team already runs (a Cloud Run service, a Service in your
 namespace) can be published through the install's gateway, without
 changing it. Its OpenAPI file is the allowlist: the gateway forwards a
 request only when its method and path are an operation in the file and it
-fits that operation's schemas, exactly as sent (headers, query and body),
-with the caller's credential swapped for the backend's. Declare every query
+fits that operation's schemas, with its query, headers and body as sent
+(less what's the gateway's own, below) and the caller's credential swapped
+for the backend's. Declare every query
 parameter and every body: an undeclared one is refused, and so is a body
 whose media type has a schema the gateway can't read (it reads JSON, YAML,
 XML, forms, multipart, text, CSV and binary). Anything else gets
@@ -532,7 +533,29 @@ cloud, checking `Vertra-Caller`), `samples/gcp/apis/hello-world` (Cloud
 Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
 `awsSigV4`).
 
-### The container contract
+What your backend gets, and what the gateway keeps to itself:
+
+- **Headers.** The caller's `Authorization`, any `Vertra-*`, hop-by-hop
+  headers, and what a caller could claim about where it's from
+  (`Forwarded`, `X-Forwarded-*`, `X-Real-Ip`) never reach you.
+  `X-Forwarded-For` is the address the gateway's connection came from:
+  behind the install's trusted proxies (`gateway.trustedProxies`, on its
+  internet listener), the caller's own.
+- **Cookies.** Every API is served from the gateway's one origin. A cookie
+  your backend sets is kept to your API's path (`/<team>/<api>/…`, any
+  `Domain` dropped), and a `__Host-` cookie isn't passed on (it must be
+  `Path=/`). A path isn't a boundary inside one origin, though: a page
+  another API serves can read your cookies that aren't HttpOnly, and send
+  requests to your API with them. Keep cookies HttpOnly, and never take a
+  cookie alone as who's calling: `Vertra-Caller` says that.
+- **Paths.** Encoded slashes, backslashes and dot segments (`..;` too) are
+  refused, so what's checked against your file is what you get.
+- **Who hears of it.** `visibility: hidden` keeps an API to your team (and
+  the install's admins): anyone else gets 404, as for no API at all. Before
+  a caller signs in, a hidden or paused API is 404 too, so its state and
+  pause message reach only those who can see it.
+
+## The container contract
 
 - The step's request is `/platform/input/request.json`; the action is the
   container's argument. `entrypoint.sh` runs `actions/<action>.*` by its
@@ -544,6 +567,10 @@ Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
   they aren't in yours; see `cleanup` above), `inputs` always an object, with every `$fromStep` already
   replaced by its value.
   `executionId` and `taskId` together make a good idempotency key.
+  A step's own inputs are at most 256 KiB as JSON (a run asking for more is
+  refused when it's submitted), and its whole request, with upstream
+  outputs filled in, must fit a ConfigMap's 1 MiB: pass references (names,
+  IDs, URIs), not data, in as well as out.
 - The action writes `/platform/output/result.json`, at most 4 KB, exactly
   one of:
   `{"status": "succeeded", "outputs": {...}}` (`outputs` may be left out)
@@ -816,3 +843,29 @@ other providers are designed but not yet proven.
   twice, once every install has retired the team. It needs a `purge`
   Environment with required reviewers, restricted to `main`, holding the
   registry identity that may delete (`PURGE_GCP_SERVICE_ACCOUNT`).
+
+## Updating your catalog
+
+Your catalog is a copy of this template, so a new Vertra release changes
+nothing in it by itself. Each release's notes say what a catalog changes
+with it. Then:
+
+1. **Pin the release's `./vertra`.** It's what runs your checks, tests and
+   publishing, with the catalog schemas built in, so a new check or fix
+   reaches your catalog only through this pin. From a platform checkout:
+   `.github/scripts/pin-vertra.sh <version> <your-catalog>/vertra` writes
+   the version and each platform's SHA-256, after checking each binary
+   downloads anonymously and matches the release. Merge it as any change.
+2. **Copy what the template changed at that release**, after comparing:
+   `.github/workflows/`, `.github/scripts/`, `.semgrep/`, `.gitignore`, and
+   `tools/` (the schemas your editor reads; `./vertra` has its own copy).
+   You may have changed some of these yourself.
+3. **Leave the rest:** `teams/` and `vertra.yaml` are yours, and
+   `samples/` and `templates/` are examples: take what's new from them by
+   hand, as you'd copy a starter.
+
+On AWS, the publish role trusts only jobs whose OIDC subject names `main`,
+so the repository's tokens carry their branch even in an Environment
+(subject claims `repo`, `context`, `ref`). `vertra catalog create` sets
+that, and `vertra apply` sets it on a catalog made before it did (with `gh`
+signed in as an admin of the repository), before it changes the role.

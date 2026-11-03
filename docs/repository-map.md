@@ -532,7 +532,7 @@ Fake products used by the demos and the kernel's integration tests. They deliber
 | `cmd/vertra/main.go` | The root command, its shared flags (`--config`, `-v`, `--non-interactive`) and loading an environment. |
 | `cmd/vertra/help.go` | Every command's help and examples, the `settings` and `sizes` help topics, and `vertra man`; a test checks every command has its help. |
 | `cmd/vertra/init.go` | `init <env>`: the questions (or flags), then `deploy/<env>/vertra.yaml`. |
-| `cmd/vertra/apply.go` | `apply`: the approval screen (what changed since `applied.yaml`, the add-ons only when missing or older), then registry, cluster, namespace, images and both releases. |
+| `cmd/vertra/apply.go` | `apply`: the approval screen (what changed since `applied.yaml`, the add-ons only when missing or older), then registry, cluster (on aws, the catalog repository's OIDC subject naming its branch first, `ensureCatalogSubject`), namespace, images and both releases. |
 | `cmd/vertra/operate.go` | `check`, `status`, `sleep`, `wake`, `console` and `destroy`. |
 | `cmd/vertra/backup.go` | `backup`, `backups` and `restore`. |
 | `cmd/vertra/logs.go` | `logs`: the platform's components' logs, or one execution's steps' from their team namespaces. |

@@ -725,10 +725,8 @@ func validateCatalog(ctx context.Context, dir string) error {
 // trustCatalogSubject reads the repository's OIDC subject prefix and, if the
 // publish role doesn't trust it yet, records it and updates the role's trust.
 func (a *app) trustCatalogSubject(ctx context.Context, out io.Writer, dir string, c *config.Config, gh *githost.GitHub, repo string) error {
-	// The publish role trusts a job of the catalog-publish Environment only
-	// on main: its tokens must say both (modules/aws publish_trust).
-	if err := gh.SetSubjectTemplate(ctx, repo); err != nil {
-		return fmt.Errorf("setting %s's OIDC subject to name its branch (the publish role trusts main only): %w", repo, err)
+	if err := ensureCatalogSubject(ctx, out, gh, repo); err != nil {
+		return err
 	}
 	prefix, err := gh.SubjectPrefix(ctx, repo)
 	if err != nil {
@@ -753,6 +751,22 @@ func (a *app) trustCatalogSubject(ctx context.Context, out io.Writer, dir string
 		return err
 	}
 	return tf.ApplyOnly(ctx, "aws_iam_role.publish[0]")
+}
+
+// ensureCatalogSubject has the catalog repository's OIDC tokens name their
+// branch even in an Environment: the AWS publish role trusts a job of the
+// catalog-publish Environment only on main, so its tokens must say both
+// (modules/aws publish_trust). A catalog made before that trust is fixed
+// by apply, before it changes the role (or its publishing would stop).
+func ensureCatalogSubject(ctx context.Context, out io.Writer, gh *githost.GitHub, repo string) error {
+	changed, err := gh.EnsureSubjectTemplate(ctx, repo)
+	if err != nil {
+		return fmt.Errorf("setting %s's OIDC subject to name its branch (the AWS publish role trusts main only): %w; with gh signed in as an admin of the repository, run this again, or set it yourself: gh api -X PUT repos/%s/actions/oidc/customization/sub -F use_default=false -f 'include_claim_keys[]=repo' -f 'include_claim_keys[]=context' -f 'include_claim_keys[]=ref'", repo, err, repo)
+	}
+	if changed {
+		fmt.Fprintf(out, "%s's OIDC tokens now name their branch too (repo, context, ref), as the publish role requires.\n", repo)
+	}
+	return nil
 }
 
 // changeGeneratedPassword has the admin choose their own password when the

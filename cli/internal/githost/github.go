@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/rburns629/vertra/cli/internal/run"
@@ -384,18 +385,41 @@ func (g *GitHub) DeleteVariable(ctx context.Context, repo, name string) error {
 // branch, so a job in an Environment says which branch it ran from too.
 var SubjectClaimKeys = []string{"repo", "context", "ref"}
 
-// SetSubjectTemplate has the repository's Actions OIDC tokens carry
-// SubjectClaimKeys in their subject: a role trusting a job of the
-// catalog-publish Environment can then require main as well, whether or
-// not the Environment exists with its main-only rule (GitHub makes one a
-// workflow names, unprotected, where the plan has Environments).
-func (g *GitHub) SetSubjectTemplate(ctx context.Context, repo string) error {
+// EnsureSubjectTemplate has the repository's Actions OIDC tokens carry
+// SubjectClaimKeys in their subject, unless they already do: a role
+// trusting a job of the catalog-publish Environment can then require main
+// as well, whether or not the Environment exists with its main-only rule
+// (GitHub makes one a workflow names, unprotected, where the plan has
+// Environments). It says whether it changed anything.
+func (g *GitHub) EnsureSubjectTemplate(ctx context.Context, repo string) (bool, error) {
+	current, err := g.api(ctx, "GET", "/repos/"+repo+"/actions/oidc/customization/sub", "")
+	if err != nil {
+		return false, err
+	}
+	if set, err := subjectTemplateSet(current); err != nil || set {
+		return false, err
+	}
 	body, err := json.Marshal(map[string]any{"use_default": false, "include_claim_keys": SubjectClaimKeys})
 	if err != nil {
-		return err
+		return false, err
 	}
-	_, err = g.api(ctx, "PUT", "/repos/"+repo+"/actions/oidc/customization/sub", string(body))
-	return err
+	if _, err := g.api(ctx, "PUT", "/repos/"+repo+"/actions/oidc/customization/sub", string(body)); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// subjectTemplateSet reads GitHub's answer for a repository's subject
+// template: whether its tokens carry exactly SubjectClaimKeys, in order.
+func subjectTemplateSet(body string) (bool, error) {
+	var sub struct {
+		UseDefault       bool     `json:"use_default"`
+		IncludeClaimKeys []string `json:"include_claim_keys"`
+	}
+	if err := json.Unmarshal([]byte(body), &sub); err != nil {
+		return false, fmt.Errorf("GitHub's subject template answer: %w", err)
+	}
+	return !sub.UseDefault && slices.Equal(sub.IncludeClaimKeys, SubjectClaimKeys), nil
 }
 
 // SubjectPrefix is how GitHub names the repository in its Actions OIDC

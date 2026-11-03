@@ -17,6 +17,7 @@ import (
 	"github.com/rburns629/vertra/cli/internal/cluster"
 	"github.com/rburns629/vertra/cli/internal/config"
 	"github.com/rburns629/vertra/cli/internal/gcp"
+	"github.com/rburns629/vertra/cli/internal/githost"
 	"github.com/rburns629/vertra/cli/internal/install"
 	"github.com/rburns629/vertra/cli/internal/plan"
 	"github.com/rburns629/vertra/cli/internal/platform"
@@ -155,6 +156,13 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 			return err
 		}
 	case "aws":
+		// Before the publish role's trust changes: a catalog made before it
+		// named only main needs its tokens to name their branch first.
+		if repo := c.Catalog.Repo(); repo != "" {
+			if err := ensureCatalogSubject(ctx, out, githost.NewGitHub(a.runner), repo); err != nil {
+				return err
+			}
+		}
 		var err error
 		if made, err = a.applyAWS(ctx, out, c, cloud, images); err != nil {
 			return err
