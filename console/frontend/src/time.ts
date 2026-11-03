@@ -32,3 +32,37 @@ export function useNow(live: boolean): number {
   }, [live]);
   return now;
 }
+
+/** A time zone as people name it: its city ("America/New_York" is "New York"), or "UTC". */
+export function zoneName(timeZone: string): string {
+  if (/^(Etc\/)?(UTC|GMT|Zulu|UCT|Universal)$/.test(timeZone)) return "UTC";
+  return (timeZone.split("/").pop() ?? timeZone).replace(/_/g, " ");
+}
+
+/** The viewer's own time zone. */
+export const localZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+/**
+ * A moment as it is in a time zone: its day ("Fri"), date ("31") and time
+ * ("02:00"). A zone the browser doesn't know is shown as the viewer's.
+ */
+export function inZone(iso: string, timeZone: string): { day: string; date: string; time: string } {
+  const at = new Date(iso);
+  const part = (options: Intl.DateTimeFormatOptions) => {
+    try {
+      return at.toLocaleString([], { ...options, timeZone });
+    } catch {
+      return at.toLocaleString([], options);
+    }
+  };
+  return { day: part({ weekday: "short" }), date: part({ day: "numeric" }), time: part({ hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) };
+}
+
+/** A schedule's next run in its own zone ("02:00 New York time"), and in the viewer's ("07:00 your time (London)"). */
+export function scheduleTimes(iso: string, timeZone: string, viewer = localZone()): { own: string; yours: string } {
+  const name = zoneName(timeZone);
+  return {
+    own: `${inZone(iso, timeZone).time} ${name === "UTC" ? "UTC" : `${name} time`}`,
+    yours: `${inZone(iso, viewer).time} your time (${zoneName(viewer)})`,
+  };
+}

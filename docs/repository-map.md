@@ -258,7 +258,7 @@ React 19, MUI, Vite, react-router. Its own `package.json`.
 | `vitest.config.ts`, `src/**/*.test.ts` | The frontend's tests (`npm test`); a test that renders opts into jsdom. |
 | `src/dagLayout.ts` | Arranges a DAG's tasks into columns for the execution graph. |
 | `src/usageText.ts` | How usage reads, the same on Observe's Usage tab and the Teams page's cards ("No team", "itself", who started runs). |
-| `src/time.ts` | Durations and times as people say them ("8m 05s", "today 14:02"), and a clock that ticks while something runs. |
+| `src/time.ts` | Durations and times as people say them ("8m 05s", "today 14:02"), a schedule's next run in its own time zone ("02:00 New York time") and the viewer's, and a clock that ticks while something runs. Tested in `time.test.ts`. |
 | `src/statusColor.ts` | Each state's color and label, shared by the status chips and the home charts. |
 | `src/runningNow.ts` | What a run is doing now ("app-hosting.create, attempt 2 of 3"), for Home's Running now and the Runs list. Tested in `runningNow.test.ts`. |
 | `src/auth/` | The signed-in user (`AuthContext`) and the guard that sends signed-out visitors to the login page. |
