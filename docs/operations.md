@@ -764,6 +764,17 @@ to know:
   other resources, its main Secret included, are updated only after it. The scheduler waits for
   them on a fresh install.
 
+**Settings the console now refuses or turns off** (since 2026-11-03):
+
+- A `jwtSecret` set by hand shorter than 32 bytes stops the console at
+  startup. Set a longer random one, or leave it empty for the generated
+  one. Changing it ends every session ([Rotating secrets](#rotating-secrets)).
+- An install with no console host (`ingress.host` or `gatewayApi.host`),
+  no `notifications.consoleUrl` and no `keyless.audience` has keyless bots
+  turned off. Before, it accepted CI tokens minted for the constant
+  audience `vertra`. To keep keyless sign-in, set `keyless.audience` (and
+  have each CI job request a token for it).
+
 **Images reused under the same tag.** With `pullPolicy: IfNotPresent` (the
 default) and a reused tag such as `:latest`, a node that already has the old
 image keeps it. Deploy by digest (`image.digest`) or a new tag, or set

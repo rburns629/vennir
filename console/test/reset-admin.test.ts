@@ -21,7 +21,7 @@ const accounts = rpcClient(() => app);
 
 function reset(email: string) {
   return run("npx", ["tsx", "src/db/resetAdmin.ts", email], {
-    env: { ...process.env, DATABASE_URL: process.env["TEST_DATABASE_URL"] ?? "postgresql://postgres@localhost/execution_console_test", JWT_SECRET: "x", KERNEL_API_URL: "http://unused.invalid" },
+    env: { ...process.env, DATABASE_URL: process.env["TEST_DATABASE_URL"] ?? "postgresql://postgres@localhost/execution_console_test", KERNEL_API_URL: "http://unused.invalid" },
   });
 }
 

@@ -503,7 +503,7 @@ test-db:
 	$(DOCKER) run --rm --network host -e DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(KERNEL_TEST_DB) \
 		-v "$(CURDIR)/kernel":/src -v vertra-gomod:/go/pkg/mod -w /src $(GO_IMAGE) go run ./cmd/kernel migrate
 	cd console && DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(CONSOLE_TEST_DB) \
-		JWT_SECRET=unused KERNEL_API_URL=http://unused npm run --silent db:migrate
+		JWT_SECRET=unused-by-migrations-but-32-bytes-long KERNEL_API_URL=http://unused npm run --silent db:migrate
 
 test: test-db
 	$(DOCKER) run --rm --network host -e TEST_DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(KERNEL_TEST_DB) \

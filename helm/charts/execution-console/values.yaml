@@ -484,7 +484,8 @@ installCloud: ""
 # -- Keyless bots: the OIDC issuers whose ID tokens a team's bot may sign in
 # with instead of a stored token (a CI job's own identity), and the audience
 # those tokens must name. Empty audience: the console's URL (see
-# notifications.consoleUrl), else "vertra".
+# notifications.consoleUrl, or the ingress host); with neither, keyless bots
+# are off.
 keyless:
   issuers:
     - https://token.actions.githubusercontent.com
@@ -547,6 +548,7 @@ secretSources:
 # kept stable across upgrades (see templates/secret.yaml's lookup against
 # the existing Secret) -- set explicitly only if you have a specific
 # reason to; there's nothing this needs to be shared with.
+# At least 32 bytes: the console refuses to start with a shorter one.
 jwtSecret: ""
 
 # -- How long a login session lasts before the user has to sign in again:
