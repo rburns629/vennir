@@ -8,7 +8,7 @@ import Card from "@mui/material/Card";
 import Link from "@mui/material/Link";
 import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
-import { ApiError, deleteSchedule, listSchedules, updateSchedule, type Schedule } from "../../api";
+import { errorMessage, deleteSchedule, listSchedules, updateSchedule, type Schedule } from "../../api";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { when } from "../../time";
@@ -29,7 +29,7 @@ export function SchedulesTab({ teamName, readOnly }: { teamName: string; readOnl
   const load = useCallback(() => {
     listSchedules(teamName)
       .then(setRows)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the schedules."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the schedules.")); });
   }, [teamName]);
   useEffect(load, [load]);
 
@@ -39,7 +39,7 @@ export function SchedulesTab({ teamName, readOnly }: { teamName: string; readOnl
       await action();
       load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     }
   }
 

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Alert, Box, Button, Link, Tab, Tabs, Typography } from "@mui/material";
 import {
-  ApiError,
+  errorMessage,
   getTeam,
   getTeamProfile,
   listApis,
@@ -156,7 +156,7 @@ export function TeamPage() {
       await action();
     } catch (err) {
       // A purge is refused (409) while runs are unfinished; its message says so.
-      setLifecycleError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setLifecycleError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setLifecycleBusy(false);
     }

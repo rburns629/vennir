@@ -7,7 +7,7 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import { Mono } from "../../components/Mono";
-import { ApiError, searchLogs, type LogLineView } from "../../api";
+import { ApiError, errorMessage, searchLogs, type LogLineView } from "../../api";
 import { LogLines } from "../observe/LogLines";
 
 const SHOWN = 20;
@@ -32,7 +32,7 @@ export function ApiLogs({ team, api }: { team: string; api: string }) {
       .catch((err: unknown) => {
         if (cancelled) return;
         if (err instanceof ApiError && err.code === "LOGS_OFF") setOff(true);
-        else setError(err instanceof ApiError ? err.message : "Failed to load its backend's logs.");
+        else setError(errorMessage(err, "Failed to load its backend's logs."));
       });
     return () => {
       cancelled = true;

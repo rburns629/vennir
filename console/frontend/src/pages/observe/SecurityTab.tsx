@@ -15,7 +15,7 @@ import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Pill, type PillTone } from "../../components/Pill";
 import { MetricCard } from "../../components/MetricCard";
 import { Mono } from "../../components/Mono";
-import { ApiError, getImageSbom, getSecurity, type SecurityView } from "../../api";
+import { ApiError, errorMessage, getImageSbom, getSecurity, type SecurityView } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
 import { when } from "../../time";
 
@@ -195,7 +195,7 @@ export function SecurityTab() {
         if (!cancelled) setView(v);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load the security checks.");
+        if (!cancelled) setError(errorMessage(err, "Failed to load the security checks."));
       });
     return () => {
       cancelled = true;

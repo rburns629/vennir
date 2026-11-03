@@ -9,7 +9,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import DownloadIcon from "@mui/icons-material/FileDownloadOutlined";
-import { ApiError, getApi, pauseApi, resumeApi, type ApiProduct } from "../api";
+import { errorMessage, getApi, pauseApi, resumeApi, type ApiProduct } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { HelpLink } from "../components/HelpLink";
 import { Mono } from "../components/Mono";
@@ -53,7 +53,7 @@ export function ApiPage() {
         setOpenapi(result.openapi);
       })
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Couldn't load the API.");
+        setError(errorMessage(err, "Couldn't load the API."));
       });
   }, [team, name]);
 
@@ -79,7 +79,7 @@ export function ApiPage() {
       load();
       return true;
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That didn't work.");
+      setError(errorMessage(err, "That didn't work."));
       return false;
     } finally {
       setBusy(false);

@@ -8,7 +8,7 @@ import SyncIcon from "@mui/icons-material/Sync";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
-import { ApiError, adoptCatalogTeam, getCatalogStatus, getInstall, syncCatalog, type CatalogCounts, type CatalogStatus } from "../../api";
+import { errorMessage, adoptCatalogTeam, getCatalogStatus, getInstall, syncCatalog, type CatalogCounts, type CatalogStatus } from "../../api";
 import { when } from "../../time";
 import { AdminCard, Dot, KeyValues, PILL_TONE, SrOnly, TONE_WORD, type Tone } from "./parts";
 import { catalogState, useAdminChanged } from "./summary";
@@ -65,7 +65,7 @@ export function CatalogCard() {
     getCatalogStatus()
       .then(setStatus)
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Failed to load the catalog's status.");
+        setError(errorMessage(err, "Failed to load the catalog's status."));
       });
     // Display only: without it, the signature isn't described.
     getInstall()
@@ -81,7 +81,7 @@ export function CatalogCard() {
       setStatus(await syncCatalog());
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setSyncing(false);
     }
@@ -95,7 +95,7 @@ export function CatalogCard() {
       setAdopting(null);
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setSyncing(false);
     }

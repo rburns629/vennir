@@ -70,6 +70,13 @@ export class ApiError extends Error {
   }
 }
 
+/** What to tell someone about a failure: the console's own message, or
+ * the fallback for anything else (whose message is the browser's, not
+ * written for them). */
+export function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof ApiError ? err.message : fallback;
+}
+
 /** Dispatched on `window` when an authenticated request comes back unauthenticated. */
 export const SESSION_EXPIRED_EVENT = "auth:session-expired";
 

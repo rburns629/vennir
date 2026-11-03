@@ -2,10 +2,11 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, Card, CardContent, Chip, Link, Stack, TextField, Typography } from "@mui/material";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import { getPlatform, type PlatformInfo } from "../../api";
-import { PROVIDERS, newFileUrl, type ProviderId } from "./providers";
+import { errorMessage, getPlatform, type PlatformInfo } from "../../api";
+import { PROVIDERS, newFileUrl, secretStoreFile, type ProviderId } from "./providers";
+import { catalogFileUrl } from "../../catalogFile";
 import { CodeBlock } from "../../components/CodeBlock";
-import { ChoiceCard, Facts, NotYetTested, Steps, errorMessage } from "./shared";
+import { ChoiceCard, Facts, NotYetTested, Steps } from "./shared";
 import { Mono } from "../../components/Mono";
 
 /**
@@ -189,7 +190,7 @@ export function ConnectSource({
                   <Mono>teams/{teamName}/secret-stores/secretstore.yaml</Mono> already exists in the catalog, GitHub won't
                   create it again:{" "}
                   <Link
-                    href={`https://github.com/${repo}/edit/main/teams/${teamName}/secret-stores/secretstore.yaml`}
+                    href={catalogFileUrl(repo, secretStoreFile(teamName), "edit")}
                     target="_blank"
                     rel="noopener"
                   >

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { useState } from "react";
 import { Alert, Box, Button, Card, CardContent, TextField, Typography } from "@mui/material";
-import { setSecretStoreCredential } from "../../api";
-import { errorMessage } from "./shared";
+import { errorMessage, setSecretStoreCredential } from "../../api";
 
 /**
  * The stored credential this team's SecretStores may use, for a provider

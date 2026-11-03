@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError,
+  errorMessage,
   getExecutionEvents,
   getExecutionLogs,
   watchExecution,
@@ -124,7 +125,7 @@ export function useExecutionWatch(id: string): ExecutionWatch {
             if (lasted < REOPEN_MIN_MS) await sleep(REOPEN_MIN_MS - lasted, signal);
           } else {
             failures += 1;
-            setError(err instanceof ApiError ? err.message : "Couldn't reach the console. Retrying.");
+            setError(errorMessage(err, "Couldn't reach the console. Retrying."));
             await sleep(Math.min(RETRY_MIN_MS * 2 ** (failures - 1), RETRY_MAX_MS), signal);
           }
         }

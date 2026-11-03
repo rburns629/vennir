@@ -12,7 +12,7 @@ import Typography from "@mui/material/Typography";
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { MetricCard } from "../../components/MetricCard";
 import { Mono } from "../../components/Mono";
-import { ApiError, getUsage, listAllTeams, type ProductUsageView, type TeamUsageView, type UsageView } from "../../api";
+import { errorMessage, getUsage, listAllTeams, type ProductUsageView, type TeamUsageView, type UsageView } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
 import { when } from "../../time";
 import { countsText, PERIOD, startedBy, usageTeam } from "../../usageText";
@@ -130,7 +130,7 @@ export function UsageTab() {
         if (!cancelled) setView(v);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load the usage.");
+        if (!cancelled) setError(errorMessage(err, "Failed to load the usage."));
       });
     return () => {
       cancelled = true;

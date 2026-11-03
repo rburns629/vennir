@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ApiError, cloudList, previewOrder, type OrderOption, type OrderProblem, type OrderSuggestion, type Runnable } from "./api";
+import { errorMessage, cloudList, previewOrder, type OrderOption, type OrderProblem, type OrderSuggestion, type Runnable } from "./api";
 import type { Check } from "./components/CheckStrip";
 import type { BuiltStep } from "./compose";
 
@@ -132,7 +132,7 @@ export function useOrderPlan(team: string | null, actions: string[], choices: Or
         if (!current) return;
         // The last plan was for other choices (another team, say): it isn't this order's.
         setPlan(null);
-        setError(err instanceof ApiError ? err.message : "Couldn't plan the order.");
+        setError(errorMessage(err, "Couldn't plan the order."));
       });
     return () => {
       current = false;

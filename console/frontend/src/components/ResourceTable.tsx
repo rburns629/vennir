@@ -7,7 +7,7 @@ import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
-import { ApiError, deleteResources, type MadeResource, type ResourceRef } from "../api";
+import { ApiError, errorMessage, deleteResources, type MadeResource, type ResourceRef } from "../api";
 import { when } from "../time";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { DataTable, type DataTableColumn } from "./DataTable";
@@ -90,7 +90,7 @@ export function useResourceDelete(onAsked?: () => void): { ask: (resources: Made
       if (err instanceof ApiError && err.code === "HAS_DEPENDENTS") {
         setAsked(err.message);
         onAsked?.();
-      } else setError(err instanceof ApiError ? err.message : "Couldn't delete it.");
+      } else setError(errorMessage(err, "Couldn't delete it."));
       setBusy(false);
       setConfirming(null);
     }

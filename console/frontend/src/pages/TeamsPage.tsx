@@ -16,7 +16,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
 import { TeamCard } from "../components/TeamCard";
 import {
-  ApiError,
+  errorMessage,
   createTeam,
   getCatalogStatus,
   getUsage,
@@ -119,7 +119,7 @@ export function TeamsPage() {
       // team anyway), so go straight to it to add its first members.
       void navigate(teamHref(team.name));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setSubmitting(false);
     }

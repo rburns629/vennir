@@ -5,7 +5,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { ApiError, previewStep, type TaskApproval } from "../../api";
+import { errorMessage, previewStep, type TaskApproval } from "../../api";
 import { PreviewResult } from "../../components/PreviewResult";
 import { when } from "../../time";
 
@@ -42,7 +42,7 @@ export function Approval({
     try {
       setPreview(await previewStep(executionId, taskId));
     } catch (err) {
-      setPreviewError(err instanceof ApiError ? err.message : "Couldn't preview it.");
+      setPreviewError(errorMessage(err, "Couldn't preview it."));
     } finally {
       setAsking(false);
     }

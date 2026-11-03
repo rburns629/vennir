@@ -5,7 +5,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { ApiError, getChatLimits, setChatLimits, type ChatLimits } from "../../api";
+import { errorMessage, getChatLimits, setChatLimits, type ChatLimits } from "../../api";
 import { useAdminChanged } from "./summary";
 import { AdminCard, Aside } from "./parts";
 
@@ -41,7 +41,7 @@ export function ChatLimitsCard() {
   useEffect(() => {
     getChatLimits()
       .then(show)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the limits."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the limits.")); });
   }, []);
 
   if (!saved) {
@@ -64,7 +64,7 @@ export function ChatLimitsCard() {
       setNotice(`Saved: ${h.toLocaleString("en-US")} an hour, ${d.toLocaleString("en-US")} a day.`);
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save them.");
+      setError(errorMessage(err, "Couldn't save them."));
     } finally {
       setBusy(false);
     }

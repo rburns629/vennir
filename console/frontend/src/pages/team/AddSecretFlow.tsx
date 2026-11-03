@@ -4,6 +4,7 @@ import { Alert, Box, Button, Card, CardContent, Chip, IconButton, Stack, TextFie
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
+  errorMessage,
   listTeamSecrets,
   registerExternalSecret,
   registerSecret,
@@ -13,7 +14,7 @@ import {
 import { secretStatus } from "./SecretsTab";
 import { gcpAccessFix, providerGuide } from "./providers";
 import { CodeBlock } from "../../components/CodeBlock";
-import { ChoiceCard, Steps, errorMessage } from "./shared";
+import { ChoiceCard, Steps } from "./shared";
 import { Mono } from "../../components/Mono";
 
 /** Pre-filled fields, e.g. when registering an ExternalSecret that was

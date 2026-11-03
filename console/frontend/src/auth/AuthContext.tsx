@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { ApiError, getMe, login as apiLogin, signOut as apiSignOut, SESSION_EXPIRED_EVENT, type Me } from "../api";
+import { ApiError, errorMessage, getMe, login as apiLogin, signOut as apiSignOut, SESSION_EXPIRED_EVENT, type Me } from "../api";
 import { cart } from "../cart";
 import { forgetBrowserDrafts } from "../pages/useComposeDrafts";
 
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (error: unknown) => {
           if (stopped || first.current.check !== check) return;
           if (!passing(error)) {
-            setTrouble({ retrying: false, message: error instanceof Error && error.message ? error.message : "The console couldn't say who's signed in." });
+            setTrouble({ retrying: false, message: errorMessage(error, "The console couldn't say who's signed in.") });
             return;
           }
           setTrouble({ retrying: true, message: UNREACHABLE });
