@@ -915,11 +915,19 @@ func ReadGoogleClient(path string) (*GoogleClient, error) {
 	return &GoogleClient{ID: file.Web.ClientID, Secret: file.Web.ClientSecret, RedirectURIs: file.Web.RedirectURIs}, nil
 }
 
+// localSSORedirect is a private console's sign-in callback: the
+// port-forward's (vertra console, at its default port).
+const localSSORedirect = "http://localhost:18080/api/auth/oidc/callback"
+
+func publicSSORedirect(host string) string {
+	return "https://" + host + "/api/auth/oidc/callback"
+}
+
 // SSORedirect is where Google sends people back: the console's public
 // address, or the port-forward's (vertra console) when it has none.
 func SSORedirect(ctx context.Context, r *run.Runner, c *config.Config) (string, error) {
 	if !c.Console.Public {
-		return "http://localhost:18080/api/auth/oidc/callback", nil
+		return localSSORedirect, nil
 	}
 	host := c.Console.Hostname
 	if host == "" {
@@ -930,7 +938,33 @@ func SSORedirect(ctx context.Context, r *run.Runner, c *config.Config) (string, 
 			return "", fmt.Errorf("the console's public address isn't known until it's installed: `vertra apply` first")
 		}
 	}
-	return "https://" + host + "/api/auth/oidc/callback", nil
+	return publicSSORedirect(host), nil
+}
+
+// CheckSSORedirect refuses an install whose saved sign-in callback isn't
+// where the console is reached now (made public or private, a new
+// hostname, a new address): Google would send people to the old one.
+// host is the console's public name once the cloud side is made, or ""
+// before it, when only a configured hostname is known.
+func CheckSSORedirect(c *config.Config, host string) error {
+	if c.SSO.Provider != "google" {
+		return nil
+	}
+	want := localSSORedirect
+	if c.Console.Public {
+		if host == "" {
+			host = c.Console.Hostname
+		}
+		if host == "" {
+			return nil
+		}
+		want = publicSSORedirect(host)
+	}
+	if c.SSO.RedirectURL == want {
+		return nil
+	}
+	return fmt.Errorf("Google sign-in sends people back to %s, but the console's callback is now %s: add it to the OAuth client's redirect URIs in Google's console, download its JSON again, and rerun `vertra sso google`, then apply",
+		c.SSO.RedirectURL, want)
 }
 
 // EnsureSSOSecret writes the OAuth client's secret into the console's
