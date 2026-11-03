@@ -11,13 +11,14 @@ import { like } from "drizzle-orm";
 import type { FastifyInstance, FastifyBaseLogger } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { countQuestion } from "../src/core/chatLimits.js";
 import { ask, askStream, CHARS_PER_TOKEN, NOT_FOUND, OFF_TOPIC, tokensOf, windowOf } from "../src/chat/agent.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { AnthropicMessages, ModelUnavailable, OpenAICompatible, quickCall, withoutThinking, type ChatMessage, type ChatModel, type CompleteOptions, type ModelReply } from "../src/chat/model.js";
 import type { AuthUser } from "../src/auth/plugin.js";
 import { db } from "../src/db/client.js";
 import { createTeam, upsertProduct } from "../src/db/queries.js";
-import { chatFeedback, products, resources, teams } from "../src/db/schema.js";
+import { chatFeedback, chatLimits, products, resources, teams } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { caller, rpcClient } from "./rpc.js";
 
@@ -352,10 +353,42 @@ describe("what it sees and does", () => {
 describe("who it answers", () => {
   it("refuses an ordering bot, someone outside the team, and says when the model's away", async () => {
     await expect(ask(person([mine], { orderTemplates: [] }), question("x"), log, new Scripted([]))).rejects.toMatchObject({ code: "ORDERS_ONLY" });
+    await expect(ask(person([mine], { isBot: true }), question("x"), log, new Scripted([]))).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(ask(person([theirs]), question("x", mine), log, new Scripted([]))).rejects.toMatchObject({ code: "FORBIDDEN" });
     const away: ChatModel = { name: "away", complete: () => Promise.reject(new ModelUnavailable("down")) };
     await expect(ask(person([mine]), question("x"), log, away)).rejects.toMatchObject({ code: "MODEL_UNAVAILABLE" });
     await expect(ask(person([mine]), question("x"), log, null)).rejects.toMatchObject({ code: "CHAT_OFF" });
+  });
+
+  it("counts each person's questions, by the limits an admin set", async () => {
+    const admin = await users.signIn((await users.makeUser({ admin: true })).email);
+    const someone = await users.signIn((await users.makeUser()).email);
+    try {
+      const defaults = await rpc<{ limits: { perHour: number; perDay: number } }>(admin, "ChatService/GetChatLimits", {});
+      expect(defaults.body.limits).toMatchObject({ perHour: 30, perDay: 200 });
+      expect((await rpc(someone, "ChatService/GetChatLimits", {})).failure).toBe("FORBIDDEN");
+      expect((await rpc(admin, "ChatService/SetChatLimits", { perHour: 10, perDay: 5 })).failure).toBe("BAD_CHAT_LIMITS");
+      expect((await rpc(admin, "ChatService/SetChatLimits", { perHour: 0, perDay: 5 })).failure).toBe("BAD_CHAT_LIMITS");
+      const set = await rpc<{ limits: { perHour: number; perDay: number; updatedBy: string } }>(admin, "ChatService/SetChatLimits", { perHour: 1, perDay: 5 });
+      expect(set.body.limits).toMatchObject({ perHour: 1, perDay: 5 });
+      expect(set.body.limits.updatedBy).toMatch(/@example\.com$/);
+      // Counted once the agent will answer it: a refused one doesn't count.
+      const asker = person([mine]);
+      const headers = { responseHeader: new Headers() };
+      const counted = () => countQuestion(asker, headers);
+      await expect(ask(asker, { team: mine, messages: [] }, log, new Scripted([]), { counted })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      await expect(ask(asker, question("x"), log, null, { counted })).rejects.toMatchObject({ code: "CHAT_OFF" });
+      await expect(ask(person([mine], { isBot: true }), question("x"), log, new Scripted([]), { counted })).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await countQuestion(asker, headers);
+      // The second is over the hour's.
+      await expect(countQuestion(asker, headers)).rejects.toThrow(/Too many questions/);
+      expect(headers.responseHeader.get("Retry-After")).toMatch(/^\d+$/);
+      await expect(ask(asker, question("x"), log, new Scripted([]), { counted })).rejects.toThrow(/Too many questions/);
+      // Each person's own.
+      await countQuestion(person([mine]), { responseHeader: new Headers() });
+    } finally {
+      await db.delete(chatLimits);
+    }
   });
 
   it("is off over the API when no model is set", async () => {
