@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -195,15 +196,19 @@ func (k *Kubernetes) Start(ctx context.Context, task ResolvedTask) (Handle, erro
 	}
 	uid, err := k.createJob(ctx, task.Team, job)
 	if err != nil {
+		if _, ok := IsDispatchRejected(err); ok {
+			return nil, err
+		}
 		if isRejection(err) {
 			return nil, dispatchRejection(err)
 		}
 		return nil, err
 	}
 	if err := k.createConfigMap(ctx, task.Team, name, uid, string(request)); err != nil {
-		if apierrors.IsForbidden(err) {
-			// Refused by policy: this attempt would never get its request,
-			// so its Job would wait for it forever.
+		if apierrors.IsForbidden(err) || apierrors.IsInvalid(err) || apierrors.IsRequestEntityTooLargeError(err) {
+			// Refused by policy, or too big for a ConfigMap (inputs over
+			// 1 MiB once resolved): this attempt would never get its
+			// request, so its Job would wait for it forever.
 			_ = k.deleteJob(ctx, task.Team, name)
 			return nil, dispatchRejection(err)
 		}
@@ -229,6 +234,13 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 			// Being deleted: nothing left to adopt; the next start retries.
 			return "", fmt.Errorf("job %s/%s is being deleted", namespace, job.Name)
 		}
+		if !sameAttempt(created, job) {
+			// The admission policies only check the Jobs the scheduler
+			// creates: one made any other way was never checked, and its
+			// result would become this step's outputs.
+			return "", &DispatchRejected{Code: "DISPATCH_REJECTED", Message: fmt.Sprintf(
+				"A Job named %s already exists in %s that the kernel didn't make for this attempt (its labels, image, command, ServiceAccount or Secrets differ), so it wasn't adopted.", job.Name, namespace)}
+		}
 		k.log.Info("adopting this attempt's existing Job", "namespace", namespace, "job", job.Name)
 		return string(created.UID), nil
 	}
@@ -238,10 +250,51 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 	return string(created.UID), nil
 }
 
+// sameAttempt says found is the Job jobFor built as want, as far as what
+// the step runs, as whom, and with which Secrets: what a Job made by
+// anyone else would change.
+func sameAttempt(found, want *batchv1.Job) bool {
+	for _, key := range []string{"app", "vertra.dev/execution-id", "vertra.dev/attempt"} {
+		if found.Labels[key] != want.Labels[key] {
+			return false
+		}
+	}
+	if found.Annotations["vertra.dev/task"] != want.Annotations["vertra.dev/task"] {
+		return false
+	}
+	f, w := found.Spec.Template.Spec, want.Spec.Template.Spec
+	if f.ServiceAccountName != w.ServiceAccountName || len(f.Containers) != 1 || len(f.InitContainers) != 0 {
+		return false
+	}
+	fc, wc := f.Containers[0], w.Containers[0]
+	if fc.Name != wc.Name || fc.Image != wc.Image || len(fc.Command) != 0 || !slices.Equal(fc.Args, wc.Args) {
+		return false
+	}
+	return slices.Equal(secretNames(f.Volumes), secretNames(w.Volumes))
+}
+
+func secretNames(volumes []corev1.Volume) []string {
+	var names []string
+	for _, v := range volumes {
+		if v.Secret != nil {
+			names = append(names, v.Secret.SecretName)
+		}
+	}
+	slices.Sort(names)
+	return names
+}
+
+// createConfigMap makes the attempt's request ConfigMap, immutable, so
+// nothing changes it once made. One already there under its name (an
+// earlier start of this attempt's, or anyone's: the scheduler may not read
+// ConfigMaps) is replaced, so once Start returns the step's request is the
+// one made here. Not before: a ConfigMap planted ahead of the Job could be
+// mounted by its Pod in the moment until it's replaced (TODO.md). The
+// dispatch policy lets the scheduler delete only ConfigMaps labelled as
+// its own: one that isn't is refused, and so is the attempt.
 func (k *Kubernetes) createConfigMap(ctx context.Context, namespace, name, jobUID, request string) error {
-	callCtx, cancel := k.call(ctx)
-	defer cancel()
-	_, err := k.client.CoreV1().ConfigMaps(namespace).Create(callCtx, &corev1.ConfigMap{
+	immutable := true
+	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: map[string]string{"app": "execution-kernel"},
@@ -249,12 +302,22 @@ func (k *Kubernetes) createConfigMap(ctx context.Context, namespace, name, jobUI
 				APIVersion: "batch/v1", Kind: "Job", Name: name, UID: typesUID(jobUID),
 			}},
 		},
-		Data: map[string]string{"request.json": request},
-	}, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) { // created along with an adopted Job
-		return nil
+		Immutable: &immutable,
+		Data:      map[string]string{"request.json": request},
 	}
-	return err
+	for range 2 {
+		callCtx, cancel := k.call(ctx)
+		_, err := k.client.CoreV1().ConfigMaps(namespace).Create(callCtx, configMap, metav1.CreateOptions{})
+		cancel()
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		if err := k.deleteConfigMap(ctx, namespace, name); err != nil {
+			return err
+		}
+	}
+	// Back again at once: retried as a start that failed for now.
+	return fmt.Errorf("configmap %s/%s was made again as it was replaced", namespace, name)
 }
 
 func (k *Kubernetes) resources(task ResolvedTask) (corev1.ResourceRequirements, error) {
@@ -400,6 +463,7 @@ func (k *Kubernetes) jobFor(name string, task ResolvedTask) (*batchv1.Job, error
 	// A backstop: a Job the scheduler lost track of mustn't run forever. It
 	// counts from the Job's creation, so it allows for waiting to start.
 	deadline := int64(task.TimeoutSeconds) + int64(k.opts.StartTimeout.Seconds()) + int64(k.opts.JobDeadlineGrace.Seconds())
+	terminationGrace := int64(PodTerminationGrace.Seconds())
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels, Annotations: annotations},
 		Spec: batchv1.JobSpec{
@@ -413,14 +477,15 @@ func (k *Kubernetes) jobFor(name string, task ResolvedTask) (*batchv1.Job, error
 						Env: env, VolumeMounts: mounts, TerminationMessagePath: resultFilePath,
 						TerminationMessagePolicy: corev1.TerminationMessageReadFile, SecurityContext: security, Resources: resources,
 					}},
-					AutomountServiceAccountToken: automount,
-					SecurityContext:              podSecurity,
-					ServiceAccountName:           task.ServiceAccount,
-					Volumes:                      volumes,
-					NodeSelector:                 placement.NodeSelector,
-					Tolerations:                  placement.Tolerations,
-					Affinity:                     k.opts.Affinity,
-					ImagePullSecrets:             pullSecrets,
+					TerminationGracePeriodSeconds: &terminationGrace,
+					AutomountServiceAccountToken:  automount,
+					SecurityContext:               podSecurity,
+					ServiceAccountName:            task.ServiceAccount,
+					Volumes:                       volumes,
+					NodeSelector:                  placement.NodeSelector,
+					Tolerations:                   placement.Tolerations,
+					Affinity:                      k.opts.Affinity,
+					ImagePullSecrets:              pullSecrets,
 				},
 			},
 		},
@@ -483,9 +548,12 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 	defer cancel()
 	job, err := k.client.BatchV1().Jobs(namespace).Get(callCtx, name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		// A Job is only deleted after its outcome is committed, and never
-		// polled after that: this one went another way (by hand, or its TTL
-		// while no scheduler ran). Its result is lost; a retry may make up.
+		// The kernel deletes a Job only once it knows its outcome: after
+		// it's committed (Release), or when it can't start (its failure
+		// cached here first), and never reads it after. This one went
+		// another way (by hand, or its TTL while no scheduler ran, or this
+		// scheduler restarted before committing a failure). Its result is
+		// lost; a retry may make up.
 		record := terminalRecord{status: Status{State: Failed, Error: &domain.StructuredError{
 			Code: "JOB_NOT_FOUND", Message: "The task's Job no longer exists, so its result was lost.", Retryable: true}}}
 		k.remember(name, record)
@@ -549,7 +617,15 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 			return Status{State: Running}, nil
 		}
 		k.log.Warn("task can't start", "namespace", namespace, "job", name, "code", failure.Code)
-		// Left in place until the failure is committed (Release).
+		if failure.Retryable {
+			// Its image may yet pull and the step run: stopped now, so a
+			// retry can't start beside it. A failure for good is left in
+			// place until it's committed (Release).
+			// Its ConfigMap goes with it (owned by the Job).
+			if err := k.deleteJob(ctx, namespace, name); err != nil {
+				return Status{}, err
+			}
+		}
 		record := terminalRecord{status: Status{State: Failed, Error: failure}}
 		k.remember(name, record)
 		return record.status, nil
@@ -713,6 +789,15 @@ func NeverFits(message string) string {
 var imageNotFound = regexp.MustCompile(`(?i)\bnot found\b|manifest unknown|NotFound`)
 
 const kubeletMessageLimit = 1000
+
+// PodTerminationGrace is how long a step's Pod has to stop once its Job is
+// deleted or past its deadline (SIGTERM, then SIGKILL): Kubernetes'
+// default, set on every step Pod so the scheduler can count on it.
+const PodTerminationGrace = 30 * time.Second
+
+// resultLimit is the most of a container's termination message (its
+// result.json) the kubelet keeps: a longer one arrives cut short.
+const resultLimit = 4096
 
 func truncate(s string, n int) string {
 	if r := []rune(s); len(r) > n {
@@ -882,6 +967,11 @@ func buildStatus(terminated *corev1.ContainerStateTerminated, logs []string) Sta
 			Message: fmt.Sprintf("Container exited with code %d without writing %s. Recent logs: %s", terminated.ExitCode, resultFilePath, joined)}}
 	}
 	result, err := domain.ParseTaskResult([]byte(terminated.Message))
+	if err != nil && len(terminated.Message) >= resultLimit {
+		// Cut short by the kubelet: the same step would write too much again.
+		return Status{State: Failed, Error: &domain.StructuredError{Code: "PRODUCT_RESULT_INVALID",
+			Message: fmt.Sprintf("Container's result.json was over the %d bytes Kubernetes keeps of it, so it was cut short. Output small values (IDs, names, URIs), and put large data in storage, outputting where it is.", resultLimit)}}
+	}
 	if err != nil {
 		// Claiming the cluster's own refusal is the step's code, not chance:
 		// it would write the same again.

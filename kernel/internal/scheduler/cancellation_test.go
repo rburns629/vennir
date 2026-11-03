@@ -4,6 +4,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -163,4 +164,71 @@ func TestACancelDuringDispatchLeavesTheTaskForTheSchedulerToStop(t *testing.T) {
 	committedTick()
 	equal(t, "cancelled", exec.Cancelled, []string{"2"})
 	equal(t, "deploy-application", tasksByKey(t, testPool, id)["deploy-application"].State, domain.TaskCancelled)
+}
+
+// Not known to have stopped, a cancelled execution's step stays RUNNING
+// and the cancel is tried again; only the Job's own deadline ends that.
+func TestACancelledExecutionsStepThatCantBeStoppedIsStoppedAgain(t *testing.T) {
+	tx := txFor(t)
+	id := submit(t, tx, "idem-cancel-unstoppable", task("create-project", timeout(30)))
+	exec := fake()
+	k := newTicker(t, tx, exec)
+	t0 := time.Now()
+	k.tick(t0)
+	handle := tasksByKey(t, tx, id)["create-project"].ExecutorHandle
+	cancelExecution(t, tx, id)
+
+	exec.CancelError = errors.New("delete timed out")
+	outcome := k.tick(t0.Add(time.Second))
+	tk := tasksByKey(t, tx, id)["create-project"]
+	equal(t, "state", tk.State, domain.TaskRunning)
+	equal(t, "lease renewed", tk.LeaseExpiresAt.After(t0.Add(time.Second)), true)
+	equal(t, "nothing to release", len(outcome.Finished), 0)
+
+	exec.CancelError = nil
+	outcome = k.tick(t0.Add(2 * time.Second))
+	equal(t, "state", tasksByKey(t, tx, id)["create-project"].State, domain.TaskCancelled)
+	equal(t, "cancelled", exec.Cancelled, []string{handle["fakeId"].(string)})
+	equal(t, "finished, to release", outcome.Finished, []executor.Handle{handle})
+}
+
+func TestACancelledExecutionsStepIsGivenUpOnPastItsJobsDeadline(t *testing.T) {
+	tx := txFor(t)
+	id := submit(t, tx, "idem-cancel-deadline", task("create-project", timeout(30)))
+	exec := fake()
+	k := newTicker(t, tx, exec)
+	t0 := time.Now()
+	k.tick(t0)
+	cancelExecution(t, tx, id)
+	exec.CancelError = errors.New("forbidden")
+	k.tick(t0.Add(30*time.Second + k.opts.StartTimeout + k.opts.JobDeadlineGrace + executor.PodTerminationGrace + time.Second))
+	equal(t, "state", tasksByKey(t, tx, id)["create-project"].State, domain.TaskCancelled)
+}
+
+// A step failing for now after its execution failed waits READY for the
+// failed step's retry, which resumes the execution; then both run.
+func TestARetryableFailureInAFailedExecutionRunsOnceItsResumed(t *testing.T) {
+	tx := txFor(t)
+	id := submit(t, tx, "idem-failed-sibling", task("a"), task("b", maxAttempts(2)))
+	exec := fake()
+	k := newTicker(t, tx, exec)
+	t0 := time.Now()
+	k.tick(t0)
+	tasks := tasksByKey(t, tx, id)
+	exec.Fail(tasks["a"].ExecutorHandle, domain.StructuredError{Code: "BOOM", Message: "failed"})
+	k.tick(t0.Add(time.Second))
+	equal(t, "execution", executionState(t, tx, id), domain.ExecutionFailed)
+
+	exec.Fail(tasks["b"].ExecutorHandle, domain.StructuredError{Code: "FLAKY", Message: "for now", Retryable: true})
+	k.tick(t0.Add(2 * time.Second))
+	equal(t, "b", tasksByKey(t, tx, id)["b"].State, domain.TaskReady)
+	k.tick(t0.Add(time.Hour)) // its backoff long past: still not claimed
+	equal(t, "b", tasksByKey(t, tx, id)["b"].State, domain.TaskReady)
+
+	retryTask(t, tx, id, "a", t0.Add(time.Hour))
+	k.tick(t0.Add(time.Hour + time.Second))
+	tasks = tasksByKey(t, tx, id)
+	equal(t, "a", tasks["a"].State, domain.TaskRunning)
+	equal(t, "b", tasks["b"].State, domain.TaskRunning)
+	equal(t, "b's attempts", tasks["b"].AttemptCount, 2)
 }

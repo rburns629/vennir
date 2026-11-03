@@ -100,7 +100,7 @@ A failed step shows a code, a message, what the code means and what to do. When 
 | `IMAGE_USER_NOT_ALLOWED` | Its image runs as a user the cluster can't confirm isn't root: a named `USER`, or root | No | Ask the product's team to end its Dockerfile with a numeric `USER`, such as `USER 65532:65532` |
 | `IMAGE_INVALID` | Its image name isn't a valid image reference | No | Fix the `image` in the DAG |
 | `PRODUCT_RESULT_MISSING` | It ended without writing its result | Yes | Ask the product's team; the message has the end of its logs |
-| `PRODUCT_RESULT_INVALID` | It wrote a result the platform couldn't read (not JSON, the wrong shape, or over 4 KB) | Yes | Ask the product's team |
+| `PRODUCT_RESULT_INVALID` | It wrote a result the platform couldn't read (not JSON, the wrong shape, or over 4 KB) | Yes, unless it was over 4 KB | Ask the product's team |
 | `OUTPUT_CONTAINS_CREDENTIAL` | Its outputs held something that looked like a credential, so they were discarded | No | Ask the product's team: outputs must never echo a secret |
 | `INPUT_INVALID` | Its inputs didn't fit the product's input schema, so it never started | No | Fix the inputs, or the earlier step whose output fed it, and run it again |
 | `OUTPUT_INVALID` | It finished, but its outputs didn't fit the product's output schema | No | Ask the product's team: their action returned something it doesn't promise |
@@ -146,6 +146,7 @@ The defaults; an admin can change most of them for an install.
 | Time a step waits for approval before `APPROVAL_EXPIRED` | 3 days |
 | Steps in one DAG | 500 |
 | A step's `result.json` | 4 KB |
+| A step's own inputs in the DAG, as JSON | 256 KiB |
 | A step's stored logs | Its last 5000 lines, at most 1 MiB |
 | A page of `ListExecutions` | 100 runs, at most 1000 |
 

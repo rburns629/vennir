@@ -33,7 +33,7 @@ flowchart TB
 - **Normally:** a container writes a short "why I stopped" note to `/dev/termination-log`.
 - **Here:** `terminationMessagePath` points at `/platform/output/result.json`, with `terminationMessagePolicy: File`. When the container exits, the kubelet copies the file into the Pod's status, where the scheduler reads it.
 - **Why:** it needs no sidecar, no shared disk, and no database password or network path back to the platform in the product. The product writes a file and exits. [How a value moves from one task to the next](07-how-data-moves.md) follows a real result through every step.
-- **Limit:** Kubernetes keeps at most **4096 bytes**, the whole file included. Products should output small values (IDs, names, URIs) and put large data in storage, outputting its URI. Today an oversized file is truncated and fails as `PRODUCT_RESULT_INVALID`.
+- **Limit:** Kubernetes keeps at most **4096 bytes**, the whole file included. Products should output small values (IDs, names, URIs) and put large data in storage, outputting its URI. An oversized file is cut short and fails as `PRODUCT_RESULT_INVALID`, which isn't retried: the step would write as much again.
 - **Code:** `jobFor`, `buildStatus`.
 
 ### An emptyDir as the only writable folder

@@ -134,7 +134,8 @@ cmd/kernel/main.go : main() → runScheduler()      [`kernel scheduler`]
   → internal/scheduler : (*Loop).Run(ctx)
       → migrate.Wait()                            [until schema_migrations is at migrate.Latest()]
       loop until SIGTERM/SIGINT:
-        → (*Loop).pass() : pgx.BeginFunc → RecordPass()   [phase C, committed first]
+        → (*Loop).pass() : pgx.BeginFunc → ExpireApprovals() [approvals that waited too long]
+                           pgx.BeginFunc → RecordPass()   [phase C, committed first]
                            pgx.BeginFunc → DispatchPass() [phases A and B, their own transaction]
         [committed?] → count its events (metrics)
                      → ReleaseFinished(outcome.Finished)  [only now: see below]
@@ -213,7 +214,7 @@ concurrently, then `recordStart()` each in order)
             → recordEvent(TASK_DISPATCH_RETRY)
         [at the limit] → exec.Discard() → handleFailure(EXECUTOR_START_FAILED, retryable=true)
 → dispatch_failures = 0; resolved_inputs and executor_handle saved; RUNNING
-→ the attempt's started_at = now
+→ the attempt's started_at = now (once Start returned: never before its Job was made)
 → markExecutionRunning()                           [PENDING → RUNNING on the first dispatch]
 → recordEvent(TASK_STARTED)
 ```
@@ -221,17 +222,22 @@ concurrently, then `recordStart()` each in order)
 **Phase C — Poll** (every RUNNING task this scheduler holds: all statuses
 read concurrently first, then `poll()` acts on each in order)
 ```
+→ SELECT its RUNNING tasks ... ORDER BY execution_id, id FOR UPDATE SKIP LOCKED
 → exec.Status(handle)                              [skipped (RUNNING) for a Job whose watch saw
                                                     no change since a read within the resync interval]
 → [execution CANCELLED?]
-    → exec.Cancel() → CANCELLED → recordEvent(TASK_CANCELLED) → done
+    → exec.Cancel()
+        [failed, and the Job's own deadline not yet passed?]
+            → renew the lease, try again next pass (it may still be running)
+    → CANCELLED → recordEvent(TASK_CANCELLED) → done
 → [the status isn't a finish, and either
      its container started (status.StartedAt) more than timeout_seconds ago, or
      it hasn't started and was dispatched more than the start timeout ago
      (TASK_START_TIMEOUT_SECONDS: waiting for a node isn't running), or
      its status couldn't be read and it was dispatched more than timeout_seconds ago?]
     → exec.Cancel()
-        [failed, and the Job's own deadline (timeout + start timeout + grace) not yet passed?]
+        [failed, and the Job's own deadline (timeout + start timeout + grace, plus the Pod's
+         30 s to stop, from when Start returned) not yet passed?]
             → renew the lease, try again next pass (no retry may run beside it)
     → handleFailure(TASK_TIMEOUT, or TASK_NOT_STARTED; retryable=true)
 → the status read above:
@@ -252,7 +258,22 @@ read concurrently first, then `poll()` acts on each in order)
                     tasks) at once are serialized, so the second sees the first's
                     commit. NO KEY UPDATE, not UPDATE: rows referencing these
                     (events, outputs) take FOR KEY SHARE, which UPDATE would
-                    conflict with. Lock order everywhere: tasks, then execution.
+                    conflict with. Between schedulers: a pass locks its
+                    running tasks (SKIP LOCKED: it never waits for them),
+                    goes through them by (execution_id, id), and before a
+                    finished one touches anything else takes its execution's
+                    settle: advisory lock (pg_advisory_xact_lock, once a
+                    transaction, held to commit); ExpireApprovals does the
+                    same, in its own transaction. One transaction at a time
+                    settles an execution, each takes those locks in one
+                    order, so settling passes never deadlock each other.
+                    Other writers to an execution can: a dispatch failing it
+                    (MISSING_UPSTREAM_OUTPUT, INPUT_INVALID, a refusal,
+                    EXECUTOR_START_FAILED, holding what it claimed in queue
+                    order, so it doesn't wait for settle:), and kernel-api's
+                    cancel and retry (tasks, then the execution). Postgres
+                    aborts one, and that pass is redone from the rows (a
+                    cancel or retry errs, and is sent again).
     Failed    → handleFailure(status.Error)
 → every task that finished goes into Outcome.Finished
 ```
@@ -274,15 +295,24 @@ Inside the executor (`internal/executor/kubernetes.go`, the one
 implementation of `Executor`; the scheduler only knows the interface):
 
 - `Start()` creates a Job whose Pod has an `emptyDir` at `/platform/output`,
-  then a ConfigMap holding `request.json` (mounted read-only at
+  then an immutable ConfigMap holding `request.json` (mounted read-only at
   `/platform/input`) that names the Job as its owner, so Kubernetes deletes
-  it with any Job the scheduler never releases. Names come from
+  it with any Job the scheduler never releases. One already there under
+  its name is replaced (the scheduler can't read ConfigMaps), so once
+  `Start()` returns the request is the kernel's; one the dispatch policy
+  won't let it delete (not labelled as its own) refuses the attempt. Names come from
   (execution, task, attempt) (`JobName`, the same as the Python kernel's
   was): a Job already there under its name is this same attempt's, from a
   pass that rolled back or a start that erred after making it, and is
-  adopted rather than started twice. Every Job has `activeDeadlineSeconds`
-  (the task's timeout plus a grace period), so Kubernetes stops one the
-  scheduler has lost track of. A 403 (or Sigstore's 400) is a
+  adopted rather than started twice, but only if it's the Job this start
+  would make (its labels, image, command, arguments, ServiceAccount and
+  Secrets): the admission policies only check the scheduler's own creates,
+  so one made otherwise is a `DISPATCH_REJECTED`. Every Job has
+  `activeDeadlineSeconds` (the task's timeout, plus the start timeout, plus
+  a grace period, from its creation), so Kubernetes stops one the scheduler
+  has lost track of. A ConfigMap too big for the API server (inputs over
+  1 MiB once resolved; kernel-api refuses more than 256 KiB of a task's own)
+  is refused too. A 403 (or Sigstore's 400) is a
   `DispatchRejected` with the policy's own code. `Discard()` deletes an
   attempt's Job and ConfigMap by name.
 - No sidecar: the container's `terminationMessagePath` is
@@ -291,7 +321,12 @@ implementation of `Executor`; the scheduler only knows the interface):
   redacts credentials from logs and error messages, fails outputs holding
   one (`OUTPUT_CONTAINS_CREDENTIAL`), and caches the result for 15 minutes;
   the Job and ConfigMap stay. A missing image fails at once
-  (`IMAGE_NOT_FOUND`); other pull errors get `IMAGE_PULL_GRACE_SECONDS`.
+  (`IMAGE_NOT_FOUND`); other pull errors get `IMAGE_PULL_GRACE_SECONDS`,
+  and then the Job is deleted at once, as the failure (`IMAGE_PULL_FAILED`)
+  is retried: its image might yet pull beside the retry. A `result.json`
+  over the 4096 bytes the kubelet keeps arrives cut short, and fails as
+  `PRODUCT_RESULT_INVALID` that isn't retried (the step would write as much
+  again).
 - The pass hands back what finished (`Outcome.Finished`), and the loop
   calls `Release()` on it only after the pass committed, so a pass that
   rolls back can read the same result again. One missed is removed by the
@@ -356,9 +391,10 @@ KernelService/DecideApproval → internal/api/approvals.go : DecideApproval()
                 the execution → FAILED → recordEvent(EXECUTION_FAILED)
         [no row?] → not_found, or failed_precondition if it isn't awaiting
 
-kernel-scheduler, at the start of every pass : expireApprovals()
+kernel-scheduler, at the start of every pass, in its own transaction : ExpireApprovals()
     → each task AWAITING_APPROVAL since before now − ApprovalTimeout
-      (SCHEDULER_APPROVAL_TIMEOUT_SECONDS, 3 days; 0 never), FOR NO KEY UPDATE SKIP LOCKED
+      (SCHEDULER_APPROVAL_TIMEOUT_SECONDS, 3 days; 0 never), by execution:
+      its execution's settle: lock, then the task FOR NO KEY UPDATE SKIP LOCKED
       → FAILED (APPROVAL_EXPIRED) → recordEvent(TASK_FAILED) → failExecution()
 ```
 
