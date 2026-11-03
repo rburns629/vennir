@@ -74,6 +74,12 @@ func TestAdminCreated(t *testing.T) {
 	if !strings.Contains(string(args), "logs --selector batch.kubernetes.io/job-name=console-execution-console-migrate --tail=-1") {
 		t.Errorf("not every attempt's log: %s", args)
 	}
+	// The console prints it lowercase, however it was given.
+	c.Admin.Email = "Admin@Example.com"
+	r, _ = fakeKubectl(t, "Migrations applied.\nBootstrap admin account created: admin@example.com\n")
+	if !AdminCreated(context.Background(), r, c) {
+		t.Error("created: an email in another case is the same account")
+	}
 	r, _ = fakeKubectl(t, "Migrations applied.\n")
 	if AdminCreated(context.Background(), r, c) {
 		t.Error("already there: its log doesn't say it was created")

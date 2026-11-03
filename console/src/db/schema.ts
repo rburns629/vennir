@@ -93,6 +93,15 @@ export interface TargetRule {
 /** When a product's steps wait for an approval (product.yaml's approval). */
 export type Approval = "always" | "otherTeams";
 
+/**
+ * An email as accounts keep it: lowercase, so Alice@x.com and alice@x.com
+ * are one account however it was typed (signing in, registering, an admin
+ * adding a member). Every write and lookup by email goes through it.
+ */
+export function normalEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
