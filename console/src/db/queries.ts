@@ -20,6 +20,7 @@ import {
   apis,
   catalogSync,
   schedules,
+  ssoGroupMappings,
   type Approval,
   type ErrorHelp,
   type ProductCleanup,
@@ -178,6 +179,10 @@ export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: num
       .returning({ userId: teamMemberships.userId });
     await tx.delete(secretGrants).where(eq(secretGrants.teamId, teamId));
     await tx.delete(products).where(eq(products.teamId, teamId));
+    // Nothing that would put people back in it, or run as it: its single
+    // sign-on group mappings, and its schedules.
+    await tx.delete(ssoGroupMappings).where(eq(ssoGroupMappings.teamId, teamId));
+    await tx.delete(schedules).where(eq(schedules.teamId, teamId));
 
     let revokedBotTokens = 0;
     for (const { userId } of members) {
@@ -329,7 +334,7 @@ export async function teamRolesForUser(userId: string): Promise<{ name: string; 
     .select({ name: teams.name, role: teamMemberships.role, requireSso: teams.requireSso })
     .from(teamMemberships)
     .innerJoin(teams, eq(teams.id, teamMemberships.teamId))
-    .where(eq(teamMemberships.userId, userId));
+    .where(and(eq(teamMemberships.userId, userId), isNull(teams.deletedAt)));
 }
 
 /** Idempotent: reuses the bot user if one with this email already exists
