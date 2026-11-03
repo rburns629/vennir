@@ -152,7 +152,9 @@ values: values.yaml          # optional: Helm values layered last, for anything 
 Next to it, the CLI keeps `tofu/` (the OpenTofu working directory and its
 state, unless a remote backend is configured), `last-plan.txt` (the approved
 approval screen), `applied.yaml` (the config as last applied, so the next
-screen names the settings changed since), `admin-password` (the first admin's password, which the first apply
+screen names the settings changed since), `add-ons` (the add-ons an apply
+installed because the cluster hadn't got them, which `destroy` offers to
+uninstall), `admin-password` (the first admin's password, which the first apply
 generates and gives the console in a Secret it then deletes, never through a log,
 0600, kept out of git by a `.gitignore` beside it; delete it once you've
 signed in), and nothing else. The state holds resource attributes and
@@ -499,6 +501,17 @@ the catalog repository. Everything else the CLI created (the cluster,
 identities, keys, the releases) is removed. `--all` removes the data too,
 without those questions; it still shows the plan and asks for one final
 confirmation unless `--yes` is also given.
+
+On an existing cluster, the cluster stays, and with it what isn't only
+this install's. The team namespaces it offers to delete are those the
+console made (labelled `app.kubernetes.io/managed-by: vertra-console`),
+named on the screen; one labelled `vertra/team` by hand is listed as kept.
+The add-ons it offers to uninstall (policy-controller, External Secrets
+Operator, cert-manager) are those an apply of this environment installed,
+recorded in `add-ons` beside the config when the cluster hadn't got them:
+apply upgrades one someone else installed, but destroy leaves it, and says
+so, with a warning when policy-controller would go on refusing Pods in
+team namespaces that are kept.
 
 On AWS, the account's IAM OIDC provider for GitHub's issuer stays, even
 with `--all`: an account has one, which every install's catalog CI in it
