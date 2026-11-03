@@ -16,7 +16,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { alpha, useTheme } from "@mui/material/styles";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
-import { ApiError, listDeleteRequests, listResources, type DeleteRequest, type MadeResource } from "../api";
+import { errorMessage, listDeleteRequests, listResources, type DeleteRequest, type MadeResource } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { HelpLink } from "../components/HelpLink";
 import { QuickTile, QuickTiles } from "../components/QuickTile";
@@ -61,7 +61,7 @@ export function ResourcesPage() {
     let current = true;
     listResources({ query: search, includeDeleted })
       .then((rows) => { if (current) { setFound(rows); setError(null); } })
-      .catch((err: unknown) => { if (current) setError(err instanceof ApiError ? err.message : "Couldn't load what runs made."); });
+      .catch((err: unknown) => { if (current) setError(errorMessage(err, "Couldn't load what runs made.")); });
     return () => {
       current = false;
     };
@@ -70,7 +70,7 @@ export function ResourcesPage() {
   const loadRequests = useCallback(() => {
     listDeleteRequests()
       .then(setRequests)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the deletes waiting for an admin."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the deletes waiting for an admin.")); });
   }, []);
   useEffect(loadRequests, [loadRequests]);
   // A delete sent to an admin shows under Waiting for an admin at once.

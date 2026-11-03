@@ -11,7 +11,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { ApiError, acceptImageScan, listImageScans, rescanImage, type ImageScan } from "../../api";
+import { errorMessage, acceptImageScan, listImageScans, rescanImage, type ImageScan } from "../../api";
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Mono } from "../../components/Mono";
 import { Pill, type PillTone } from "../../components/Pill";
@@ -95,7 +95,7 @@ function ScanDialog({ scan, onClose, onChanged }: { scan: ImageScan; onClose: ()
       setNote(changed ? done : "Scanning is off on this install.");
       setReason("");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That didn't work.");
+      setError(errorMessage(err, "That didn't work."));
     } finally {
       setBusy(false);
     }
@@ -197,7 +197,7 @@ export function ImageScansTab() {
   useEffect(() => {
     listImageScans()
       .then(setScans)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the scans."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the scans.")); });
   }, []);
 
   const counts = useMemo(() => {

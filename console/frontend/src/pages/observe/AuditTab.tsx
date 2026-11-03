@@ -19,7 +19,7 @@ import { Mono } from "../../components/Mono";
 import { useAuth } from "../../auth/AuthContext";
 import { Pill, type PillTone } from "../../components/Pill";
 import { when } from "../../time";
-import { ApiError, listAllTeams, listAudit, type AuditEntryView, getAuditCopy, type AuditCopy } from "../../api";
+import { errorMessage, listAllTeams, listAudit, type AuditEntryView, getAuditCopy, type AuditCopy } from "../../api";
 
 /** "vertra.console.v1.SecretService/PutSecret" → "Put secret", "catalog-sync" → "Catalog sync". */
 function actionName(route: string): { action: string; service: string } {
@@ -293,7 +293,7 @@ export function AuditTab() {
         setNextBefore(page.nextBefore);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load the audit log.");
+        if (!cancelled) setError(errorMessage(err, "Failed to load the audit log."));
       });
     return () => {
       cancelled = true;
@@ -309,7 +309,7 @@ export function AuditTab() {
       setEntries((shown) => [...(shown ?? []), ...page.entries]);
       setNextBefore(page.nextBefore);
     } catch (err) {
-      if (mineNow === listing.current) setError(err instanceof ApiError ? err.message : "Failed to load more.");
+      if (mineNow === listing.current) setError(errorMessage(err, "Failed to load more."));
     } finally {
       if (mineNow === listing.current) setLoadingMore(false);
     }

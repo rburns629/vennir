@@ -2,7 +2,7 @@
 import { useState, type FormEvent } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { Alert, Box, Button, Link, Stack, TextField, Typography } from "@mui/material";
-import { ApiError, PASSWORD_MIN_LENGTH, register } from "../api";
+import { errorMessage, PASSWORD_MIN_LENGTH, register } from "../api";
 import { SignInLayout } from "../layout/SignInLayout";
 
 export function RegisterPage() {
@@ -23,7 +23,7 @@ export function RegisterPage() {
       // is a normal login.
       navigate("/login");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setSubmitting(false);
     }

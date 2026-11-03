@@ -252,7 +252,8 @@ React 19, MUI, Vite, react-router. Its own `package.json`.
 | `index.html`, `src/main.tsx` | The page and the app's entry point. |
 | `src/App.tsx` | The routes; each page loads only when first opened. |
 | `src/app.test.tsx` | The whole app over a fake console API: every page renders, Admin only for admins, the sign-in rules (signed out, single sign-on offered, a password to change first, an expired session), a retired team read-only. |
-| `src/api.ts` | Every call to the backend, with its types: plain objects over the generated Connect clients (`src/gen/`), so pages never see the messages. |
+| `src/api.ts` | Every call to the backend, with its types: plain objects over the generated Connect clients (`src/gen/`), so pages never see the messages; and `errorMessage`, what a page says about a failure. |
+| `src/catalogFile.ts` | GitHub's pages to create or edit a file in the catalog repository (proposing a template, a team's SecretStore). |
 | `src/theme.ts`, `src/index.css` | MUI theme and base styles. `theme.ts` holds every color and the mono font as named tokens (`sidebar.*`, `code.*`, `fontFamilyMono`), plus the focus ring and reduced-motion rules. |
 | `src/dagCheck.ts` | Checks a pasted DAG live on the Submit page (JSON or YAML) and explains what's wrong. Tested in `dagCheck.test.ts`. |
 | `vitest.config.ts`, `src/**/*.test.ts` | The frontend's tests (`npm test`); a test that renders opts into jsdom. |

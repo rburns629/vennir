@@ -4,6 +4,7 @@ import { Alert, Box, Button, ButtonBase, Card, CardContent, Chip, Stack, Typogra
 import { alpha } from "@mui/material/styles";
 import AddIcon from "@mui/icons-material/Add";
 import {
+  errorMessage,
   listSecretStores,
   listTeamSecrets,
   revokeSecret,
@@ -15,7 +16,7 @@ import { ConnectSource } from "./ConnectSource";
 import { StoredCredential } from "./StoredCredential";
 import { gcpAccessFix } from "./providers";
 import { CodeBlock } from "../../components/CodeBlock";
-import { Facts, SectionHeader, TabIntro, errorMessage, relativeTime, shortDuration } from "./shared";
+import { Facts, SectionHeader, TabIntro, relativeTime, shortDuration } from "./shared";
 import { Mono } from "../../components/Mono";
 
 type View = { kind: "overview" } | { kind: "add"; prefill?: AddSecretPrefill } | { kind: "connect" };

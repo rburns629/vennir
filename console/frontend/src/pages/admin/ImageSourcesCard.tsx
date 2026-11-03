@@ -13,7 +13,7 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
-import { ApiError, getImagePolicy, updateImagePolicy, type ImagePolicy } from "../../api";
+import { errorMessage, getImagePolicy, updateImagePolicy, type ImagePolicy } from "../../api";
 import { when } from "../../time";
 import { AdminCard, Dot, SrOnly, TONE_WORD, type Tone } from "./parts";
 import { failingInUse, type AdminSummary, useAdminChanged } from "./summary";
@@ -156,7 +156,7 @@ export function ImageSourcesCard({ summary = null }: { summary?: AdminSummary | 
     getImagePolicy()
       .then(show)
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Failed to load image sources.");
+        setError(errorMessage(err, "Failed to load image sources."));
       });
   }, []);
 
@@ -175,7 +175,7 @@ export function ImageSourcesCard({ summary = null }: { summary?: AdminSummary | 
       summaryChanged();
       setSuccess("Saved. The cluster enforces the new list for every task from now on.");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setSaving(false);
       setConfirmingBroad(false);

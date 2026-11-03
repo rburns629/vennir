@@ -5,7 +5,7 @@ import { dump as dumpYaml, load as parseYaml } from "js-yaml";
 import { Alert, Autocomplete, Box, Button, Card, Link, TextField, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlineOutlined";
-import { ApiError, getImagePolicy, listProducts, submitExecution, type Product } from "../api";
+import { errorMessage, getImagePolicy, listProducts, submitExecution, type Product } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { checkDag } from "../dagCheck";
 
@@ -115,7 +115,7 @@ export function SubmitExecutionPage() {
       const result = await submitExecution(check.payload);
       navigate(`/runs/${encodeURIComponent(result.executionId)}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setSubmitting(false);
     }

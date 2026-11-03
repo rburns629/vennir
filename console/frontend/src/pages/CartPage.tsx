@@ -10,7 +10,7 @@ import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import ArrowIcon from "@mui/icons-material/ArrowForward";
-import { ApiError, cloudList, listRunnables, placeOrder, type OrderOption, type Runnable } from "../api";
+import { ApiError, errorMessage, cloudList, listRunnables, placeOrder, type OrderOption, type Runnable } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { cart, planChecks, useCart, useOrderPlan } from "../cart";
 import type { BuiltStep } from "../compose";
@@ -162,7 +162,7 @@ export function CartPage() {
       navigate(`/runs/${id}`);
     } catch (err) {
       if (isNotForThisInstall(err)) setRefusal(err);
-      else setError(err instanceof ApiError ? err.message : "Couldn't place the order.");
+      else setError(errorMessage(err, "Couldn't place the order."));
       setPlacing(false);
     }
   }

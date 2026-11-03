@@ -9,7 +9,7 @@ import Chip from "@mui/material/Chip";
 import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { ApiError, listChatFeedback, type ChatRating } from "../../api";
+import { errorMessage, listChatFeedback, type ChatRating } from "../../api";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
 import { when } from "../../time";
@@ -78,7 +78,7 @@ export function ChatTab() {
   useEffect(() => {
     listChatFeedback(null)
       .then(setRatings)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the ratings."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the ratings.")); });
   }, []);
 
   const counts = useMemo(() => {

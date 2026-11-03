@@ -21,7 +21,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import MoreIcon from "@mui/icons-material/MoreHoriz";
 import {
-  ApiError,
+  errorMessage,
   createAccount,
   deleteAccount,
   grantAdmin,
@@ -125,7 +125,7 @@ function AddPerson({ teams, onAdded }: { teams: Team[]; onAdded: () => void }) {
       onAdded();
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't add them.");
+      setError(errorMessage(err, "Couldn't add them."));
     } finally {
       setBusy(false);
     }
@@ -182,7 +182,7 @@ function ResetPasswordDialog({ email, onClose }: { email: string; onClose: (done
       await resetUserPassword(email, password);
       onClose(`${email}'s password is reset and their sessions signed out. They choose their own when they next sign in.`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't reset it.");
+      setError(errorMessage(err, "Couldn't reset it."));
       setBusy(false);
     }
   }
@@ -245,7 +245,7 @@ export function PeopleTab() {
   const load = useCallback(() => {
     listUsers()
       .then(setPeople)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the people."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the people.")); });
   }, []);
 
   useEffect(() => {
@@ -263,7 +263,7 @@ export function PeopleTab() {
       load();
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That didn't work.");
+      setError(errorMessage(err, "That didn't work."));
     } finally {
       setBusy(false);
       setPending(null);

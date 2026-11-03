@@ -12,7 +12,7 @@ import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
-import { ApiError, createSchedule, listBots, updateSchedule, type Bot, type Runnable, type Schedule } from "../../api";
+import { errorMessage, createSchedule, listBots, updateSchedule, type Bot, type Runnable, type Schedule } from "../../api";
 import { Mono } from "../../components/Mono";
 import { runLink } from "../RunFormPage";
 
@@ -83,7 +83,7 @@ export function ScheduleDialog({
       await createSchedule({ team, name, runnable, parameters: values, cron, timeZone, botId });
       navigate(`/teams/${encodeURIComponent(team)}?tab=schedules`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't make the schedule.");
+      setError(errorMessage(err, "Couldn't make the schedule."));
       setSaving(false);
     }
   }
@@ -191,7 +191,7 @@ export function EditScheduleDialog({ schedule, onClose, onSaved }: { schedule: S
     try {
       onSaved(await updateSchedule(schedule.id, { cron, timeZone, botId }));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save the schedule.");
+      setError(errorMessage(err, "Couldn't save the schedule."));
       setSaving(false);
     }
   }

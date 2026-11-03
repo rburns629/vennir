@@ -8,7 +8,7 @@ import Card from "@mui/material/Card";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
-import { ApiError, deleteRunResources, listResources, type MadeResource } from "../../api";
+import { ApiError, errorMessage, deleteRunResources, listResources, type MadeResource } from "../../api";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ResourceLinks, ResourceState, resourceName, useResourceDelete } from "../../components/ResourceTable";
 
@@ -54,7 +54,7 @@ export function WhatItMade({ executionId, watching, failed }: { executionId: str
     } catch (err) {
       // Something else still uses one: an admin has been asked (decision 25).
       if (err instanceof ApiError && err.code === "HAS_DEPENDENTS") setAsked(err.message);
-      else setError(err instanceof ApiError ? err.message : "Couldn't delete them.");
+      else setError(errorMessage(err, "Couldn't delete them."));
       setBusy(false);
       setConfirming(false);
     }

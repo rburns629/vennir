@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, deleteDraft, listDrafts, saveDraft, type StoredDraft } from "../api";
+import { ApiError, errorMessage, deleteDraft, listDrafts, saveDraft, type StoredDraft } from "../api";
 import type { Draft } from "../compose";
 
 /** Where drafts were kept before the console kept them. */
@@ -74,7 +74,7 @@ export function useComposeDrafts(current: Draft) {
 
   useEffect(() => {
     reload().catch((err: unknown) => {
-      setProblem(err instanceof ApiError ? err.message : "Couldn't load the drafts.");
+      setProblem(errorMessage(err, "Couldn't load the drafts."));
     });
   }, [reload]);
 
@@ -106,7 +106,7 @@ export function useComposeDrafts(current: Draft) {
           if (typeof theirs === "number") versions.current.set(key, theirs);
         } else {
           setStatus("error");
-          setProblem(err instanceof ApiError ? err.message : "Couldn't save the draft.");
+          setProblem(errorMessage(err, "Couldn't save the draft."));
         }
       }
     });

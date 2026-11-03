@@ -6,7 +6,7 @@ import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
-import { ApiError, getExecution, type ExecutionDetail, type NotPreviewed } from "../api";
+import { errorMessage, getExecution, type ExecutionDetail, type NotPreviewed } from "../api";
 import { Pill, type PillTone } from "./Pill";
 
 const POLL_MS = 2000;
@@ -60,7 +60,7 @@ export function PreviewResult({ executionId, notPreviewed = [] }: { executionId:
           setRun(found);
           if (!FINISHED.has(found.state)) timer = setTimeout(look, POLL_MS);
         })
-        .catch((err: unknown) => { if (current) setError(err instanceof ApiError ? err.message : "Couldn't read the preview."); });
+        .catch((err: unknown) => { if (current) setError(errorMessage(err, "Couldn't read the preview.")); });
     };
     look();
     return () => {

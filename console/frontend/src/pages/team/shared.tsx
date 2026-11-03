@@ -241,10 +241,6 @@ export function relativeTime(iso: string | null): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function errorMessage(err: unknown, fallback: string): string {
-  return err instanceof Error && err.message ? err.message : fallback;
-}
-
 /** ESO's Go durations ("1h0m0s") as people write them ("1h"). */
 export function shortDuration(value: string): string {
   const match = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?$/.exec(value);

@@ -10,6 +10,7 @@
  */
 import { dump as dumpYaml } from "js-yaml";
 import type { Product } from "./api";
+import { catalogFileUrl } from "./catalogFile";
 
 export type InputSource =
   | { kind: "value"; value: string }
@@ -233,8 +234,7 @@ export function dagOf(draft: Draft, products: Map<string, Product>): Record<stri
 /** GitHub's page for a new file in the catalog repository, filled in. Null when the repository isn't known. */
 export function proposeUrl(repository: string | null, draft: Draft, yaml: string): string | null {
   if (!repository) return null;
-  const params = new URLSearchParams({ filename: `teams/${draft.team}/dags/${draft.name}.yaml`, value: yaml });
-  return `${repository}/new/main?${params.toString()}`;
+  return catalogFileUrl(repository, `teams/${draft.team}/dags/${draft.name}.yaml`, "new", yaml);
 }
 
 /** A step as the order builder (OrderService/PreviewOrder) answers it. */

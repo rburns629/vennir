@@ -7,7 +7,7 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { Mono } from "../../components/Mono";
 import { MetricCard } from "../../components/MetricCard";
-import { ApiError, getApiTraffic, type ApiTraffic as Traffic } from "../../api";
+import { errorMessage, getApiTraffic, type ApiTraffic as Traffic } from "../../api";
 
 const num = (n: number | undefined) => (n === undefined ? "—" : n.toLocaleString());
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -26,7 +26,7 @@ export function useApiTraffic(team: string, name: string, hours: number, enabled
         if (!cancelled) setTraffic(t);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load its traffic.");
+        if (!cancelled) setError(errorMessage(err, "Failed to load its traffic."));
       });
     return () => {
       cancelled = true;

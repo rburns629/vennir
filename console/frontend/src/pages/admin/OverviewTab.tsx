@@ -8,7 +8,7 @@ import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import SyncIcon from "@mui/icons-material/Sync";
 import LinkIcon from "@mui/icons-material/LinkOutlined";
-import { ApiError, getAuditCopy, getPolicySync, getSecurity, syncPolicies, type AuditCopy, type PolicySync } from "../../api";
+import { errorMessage, getAuditCopy, getPolicySync, getSecurity, syncPolicies, type AuditCopy, type PolicySync } from "../../api";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
 import { when } from "../../time";
@@ -90,7 +90,7 @@ export function PoliciesCard() {
   useEffect(() => {
     getPolicySync()
       .then(setPolicies)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't read the policies."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't read the policies.")); });
   }, []);
 
   const changed = useAdminChanged();
@@ -101,7 +101,7 @@ export function PoliciesCard() {
       setPolicies(await syncPolicies());
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't write them.");
+      setError(errorMessage(err, "Couldn't write them."));
     } finally {
       setBusy(false);
     }
@@ -238,7 +238,7 @@ export function AuditCopyCard() {
   useEffect(() => {
     getAuditCopy()
       .then(setCopy)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't read the audit copy."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't read the audit copy.")); });
   }, []);
 
   const state = copy ? auditState(copy) : null;

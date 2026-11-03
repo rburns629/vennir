@@ -24,7 +24,7 @@ import { Pill } from "../components/Pill";
 import { QuickTile, QuickTiles } from "../components/QuickTile";
 import { StatusBadge } from "../components/StatusBadge";
 import {
-  ApiError,
+  errorMessage,
   listAllTeams,
   listExecutions,
   listPendingApprovals,
@@ -192,7 +192,7 @@ export function ExecutionsListPage() {
         setRetentionDays(page.runRetentionDays);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Couldn't load the runs.");
+        if (!cancelled) setError(errorMessage(err, "Couldn't load the runs."));
       });
     return () => { cancelled = true; };
   }, [query, teamFilter, whose]);
@@ -239,7 +239,7 @@ export function ExecutionsListPage() {
       setExecutions((loaded) => [...(loaded ?? []), ...page.executions]);
       setNextCursor(page.nextCursor);
     } catch (err) {
-      if (mine === listing.current) setError(err instanceof ApiError ? err.message : "Couldn't load more runs.");
+      if (mine === listing.current) setError(errorMessage(err, "Couldn't load more runs."));
     } finally {
       if (mine === listing.current) setLoadingMore(false);
     }
