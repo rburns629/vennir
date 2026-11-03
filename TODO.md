@@ -79,18 +79,14 @@ Released 0.6.0 on GKE Autopilot and EKS standard. Each item names where
 it was seen.
 
 Console and gateway:
-- [ ] **Observe's alerts with Google's managed Prometheus** said "not
-  configured": the console read `/api/v1/rules`, which GMP's query API
-  doesn't serve. Built (#72) and proven on GKE in the r7 run (2026-11-02):
-  the cluster's 8 Rules read, Google's query answered as the console
+- [x] **Observe's alerts with Google's managed Prometheus** (done
+  2026-11-02): the console read `/api/v1/rules`, which GMP's query API
+  doesn't serve. Built (#72) and proven on GKE in the r7 run: the cluster's
+  8 Rules read, Google's query answered as the console
   (`monitoring.viewer`), `VertraStepsUnschedulable` shown pending with
-  since when. Found there: GMP's in-cluster rule evaluator
-  (`rule-evaluator.gke-gmp-system.svc:19092`, `gmp-system` on a standard
-  cluster) serves `/api/v1/rules` itself, and the console reached it:
-  `prometheusUrl` set to it would give live states and each alert's own
-  text, with no grant, but it's an internal endpoint, not a published API.
-  To decide: keep #72's way, or have vertra set `prometheusUrl` to it
-  (keeping #72's as the fallback).
+  since when. GMP's in-cluster rule evaluator also serves
+  `/api/v1/rules`, but it's an internal endpoint, not a published API:
+  decided to keep #72's way (`docs/operations.md`).
 
 Kernel and alerts:
 - [ ] **Completion lag on GKE is policy-controller's webhook** (the r7 run,
