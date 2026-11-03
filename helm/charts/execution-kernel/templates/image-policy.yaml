@@ -82,9 +82,9 @@ spec:
   variables:
     # The two the console edits. Keep them first and in this order.
     - name: source
-      expression: {{ $sourceExpr | squote }}
+      expression: {{ $sourceExpr | toJson }}
     - name: additional
-      expression: {{ $additionalExpr | squote }}
+      expression: {{ $additionalExpr | toJson }}
     - name: prefixes
       expression: >-
         ([variables.source] + variables.additional).filter(p, p != "")
