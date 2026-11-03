@@ -455,7 +455,13 @@ alone decides, so list exactly the hosts each API may use. A caller's own `Vertr
 and so is what it says of where it's from (`Forwarded`, `X-Forwarded-*`,
 `X-Real-Ip`): `X-Forwarded-For` is the gateway's own peer. A cookie a
 backend sets is kept to its API's path, so one team's backend can't set or
-read another's on the gateway's shared origin.
+overwrite another's on the gateway's shared origin. A path isn't a
+boundary within an origin, though: script on a page one backend serves can
+read another API's cookies that aren't HttpOnly, and send requests to it
+with its cookies attached. So a backend that serves browsers keeps its
+cookies HttpOnly and doesn't take a cookie alone as sign-in (the gateway
+itself signs callers in by a bearer header only); a host for each API is in
+`TODO.md`.
 Paths with encoded slashes, backslashes or dot segments (`..;` too) are
 refused, so what's checked is what's forwarded. Before sign-in, an API
 that's hidden or paused is answered as one that isn't there (404), so its

@@ -1040,6 +1040,18 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   the gateway a trusted-proxy list (as the console's `trustProxy`) and keep
   the ingress's `X-Forwarded-For` only from those.
 
+- [ ] **Every API shares the gateway's origin** (found 2026-11-03, in the
+  review of the day's fixes): the gateway keeps a backend's cookies to its
+  API's path, so no backend can set or overwrite another's, but a path is
+  no boundary inside one origin. A page one team's backend serves can run
+  script that reads another API's cookies that aren't HttpOnly (through a
+  same-origin frame), and can fetch other APIs' paths with their cookies
+  attached. The gateway's own sign-in is a bearer header, so that fetch
+  gets the gateway's 401, but a backend that takes its own cookies as
+  sign-in would answer it. Until each API has an origin of its own (a host
+  per API, e.g. `<api>.<team>.<gateway host>`), a backend serving browsers
+  should keep its cookies HttpOnly and not take a cookie alone as sign-in.
+
 - [x] **Add the `v*` tag ruleset (admins only)** (decided 2026-11-02, X-6;
   done 2026-11-03): the repository's `release tags` ruleset lets only
   admins create, update or delete `v*` tags. A tag push runs the
