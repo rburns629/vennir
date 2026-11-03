@@ -705,8 +705,14 @@ That removes the platform's Pods, Services, RBAC and admission policies.
 It leaves:
 
 - **The databases' volumes.** `postgres.persistence.keepOnUninstall` (on by
-  default) keeps each PVC. Delete them when you mean to:
-  `kubectl -n vertra-system delete pvc -l 'app.kubernetes.io/instance in (kernel,console)'`.
+  default) keeps each PVC, and with it each chart's Secret of passwords
+  (`kernel-execution-kernel-db`, `console-execution-console`): the data
+  only opens with the passwords it was made with, and installing the same
+  release names again reads them back. Delete both when you mean to:
+  `kubectl -n vertra-system delete pvc -l 'app.kubernetes.io/instance in (kernel,console)'` and
+  `kubectl -n vertra-system delete secret kernel-execution-kernel-db console-execution-console`
+  (`vertra destroy` asks). Switching to `existingSecret` later leaves the
+  kernel's kept Secret behind too; delete it the same way.
 - **The team namespaces**, with their Secrets, ServiceAccounts and anything
   steps made there. The console created them, not Helm. Delete them with
   `kubectl delete namespace -l vertra/team` (retired ones included).
