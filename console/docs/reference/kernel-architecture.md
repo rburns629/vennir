@@ -217,10 +217,14 @@ concurrently, then `recordStart()` each in order)
 **Phase C — Poll** (every RUNNING task this scheduler holds: all statuses
 read concurrently first, then `poll()` acts on each in order)
 ```
+→ SELECT its RUNNING tasks ... ORDER BY execution_id, id FOR UPDATE SKIP LOCKED
 → exec.Status(handle)                              [skipped (RUNNING) for a Job whose watch saw
                                                     no change since a read within the resync interval]
 → [execution CANCELLED?]
-    → exec.Cancel() → CANCELLED → recordEvent(TASK_CANCELLED) → done
+    → exec.Cancel()
+        [failed, and the Job's own deadline not yet passed?]
+            → renew the lease, try again next pass (it may still be running)
+    → CANCELLED → recordEvent(TASK_CANCELLED) → done
 → [the status isn't a finish, and either
      its container started (status.StartedAt) more than timeout_seconds ago, or
      it hasn't started and was dispatched more than the start timeout ago
@@ -248,7 +252,10 @@ read concurrently first, then `poll()` acts on each in order)
                     tasks) at once are serialized, so the second sees the first's
                     commit. NO KEY UPDATE, not UPDATE: rows referencing these
                     (events, outputs) take FOR KEY SHARE, which UPDATE would
-                    conflict with. Lock order everywhere: tasks, then execution.
+                    conflict with. Lock order everywhere: tasks, then execution;
+                    and across executions, a pass takes its running tasks
+                    ordered by (execution_id, id), so two passes finishing tasks
+                    of two executions lock their rows in the same order.
     Failed    → handleFailure(status.Error)
 → every task that finished goes into Outcome.Finished
 ```
@@ -276,9 +283,15 @@ implementation of `Executor`; the scheduler only knows the interface):
   (execution, task, attempt) (`JobName`, the same as the Python kernel's
   was): a Job already there under its name is this same attempt's, from a
   pass that rolled back or a start that erred after making it, and is
-  adopted rather than started twice. Every Job has `activeDeadlineSeconds`
-  (the task's timeout plus a grace period), so Kubernetes stops one the
-  scheduler has lost track of. A 403 (or Sigstore's 400) is a
+  adopted rather than started twice, but only if it's the Job this start
+  would make (its labels, image, command, arguments, ServiceAccount and
+  Secrets): the admission policies only check the scheduler's own creates,
+  so one made otherwise is a `DISPATCH_REJECTED`. Every Job has
+  `activeDeadlineSeconds` (the task's timeout, plus the start timeout, plus
+  a grace period, from its creation), so Kubernetes stops one the scheduler
+  has lost track of. A ConfigMap too big for the API server (inputs over
+  1 MiB once resolved; kernel-api refuses more than 256 KiB of a task's own)
+  is refused too. A 403 (or Sigstore's 400) is a
   `DispatchRejected` with the policy's own code. `Discard()` deletes an
   attempt's Job and ConfigMap by name.
 - No sidecar: the container's `terminationMessagePath` is
@@ -287,7 +300,12 @@ implementation of `Executor`; the scheduler only knows the interface):
   redacts credentials from logs and error messages, fails outputs holding
   one (`OUTPUT_CONTAINS_CREDENTIAL`), and caches the result for 15 minutes;
   the Job and ConfigMap stay. A missing image fails at once
-  (`IMAGE_NOT_FOUND`); other pull errors get `IMAGE_PULL_GRACE_SECONDS`.
+  (`IMAGE_NOT_FOUND`); other pull errors get `IMAGE_PULL_GRACE_SECONDS`,
+  and then the Job is deleted at once, as the failure (`IMAGE_PULL_FAILED`)
+  is retried: its image might yet pull beside the retry. A `result.json`
+  over the 4096 bytes the kubelet keeps arrives cut short, and fails as
+  `PRODUCT_RESULT_INVALID` that isn't retried (the step would write as much
+  again).
 - The pass hands back what finished (`Outcome.Finished`), and the loop
   calls `Release()` on it only after the pass committed, so a pass that
   rolls back can read the same result again. One missed is removed by the

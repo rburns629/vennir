@@ -41,8 +41,9 @@ type Options struct {
 	MaxDispatchFailures int
 	// LogRefresh is how often a running task's logs are captured; 0, never.
 	LogRefresh time.Duration
-	// JobDeadlineGrace is how far past its timeout a Job's own deadline is:
-	// a timed-out task whose Job can't be stopped fails only after it.
+	// JobDeadlineGrace is how far past its timeout and StartTimeout a Job's
+	// own deadline is: a timed-out or cancelled task whose Job can't be
+	// stopped leaves RUNNING only after it.
 	JobDeadlineGrace time.Duration
 	// StartTimeout is how long an attempt may wait to start (for a node,
 	// under a quota) before it fails as TASK_NOT_STARTED; its timeout counts
@@ -150,8 +151,11 @@ func RecordPass(ctx context.Context, db DB, exec executor.Executor, opts Options
 	if err := p.expireApprovals(); err != nil {
 		return Outcome{}, fmt.Errorf("expiring approvals: %w", err)
 	}
+	// In one order, as every pass takes them: what finishes locks its
+	// dependents and then its execution, so passes taking two executions'
+	// rows in opposite orders could deadlock.
 	rows, err := db.Query(ctx, `SELECT `+taskColumns+` FROM execution_tasks
-		WHERE state = 'RUNNING' AND lease_owner = $1 FOR UPDATE SKIP LOCKED`, opts.Owner)
+		WHERE state = 'RUNNING' AND lease_owner = $1 ORDER BY execution_id, id FOR UPDATE SKIP LOCKED`, opts.Owner)
 	if err != nil {
 		return Outcome{}, err
 	}
@@ -489,7 +493,14 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 	if domain.ExecutionState(executionState) == domain.ExecutionCancelled {
 		// Cancelled through kernel-api, which only marks rows: only the
 		// scheduler can stop an in-flight attempt.
-		_ = p.exec.Cancel(p.ctx, handle)
+		if err := p.exec.Cancel(p.ctx, handle); err != nil && !p.pastJobDeadline(t, attempt) {
+			// Not known to have stopped: it stays ours, and the cancel is
+			// tried again, until the Job's own deadline has stopped it.
+			p.log.Warn("couldn't stop a cancelled execution's task; trying again next pass", "executionId", t.ExecutionID,
+				"taskKey", t.TaskKey, "attempt", t.AttemptCount, "error", err.Error())
+			t.LeaseExpiresAt = ptr(p.now.Add(p.opts.LeaseDuration))
+			return false, saveTask(p.ctx, p.db, t)
+		}
 		attempt.CompletedAt = ptr(p.clock())
 		if err := saveAttempt(p.ctx, p.db, attempt); err != nil {
 			return false, err
@@ -562,7 +573,7 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 			}
 		}
 		if elapsed > timeout {
-			if err := p.exec.Cancel(p.ctx, handle); err != nil && elapsed <= timeout+p.opts.JobDeadlineGrace {
+			if err := p.exec.Cancel(p.ctx, handle); err != nil && !p.pastJobDeadline(t, attempt) {
 				// Before the Job's own deadline the attempt may still be
 				// running: it stays ours, and the cancel is tried again.
 				p.log.Warn("couldn't stop a task past its timeout; trying again next pass", "executionId", t.ExecutionID,
@@ -596,6 +607,18 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 		}
 	}
 	return false, nil
+}
+
+// pastJobDeadline says the attempt's Job has passed its own deadline
+// (activeDeadlineSeconds: the task's timeout, plus StartTimeout, plus
+// JobDeadlineGrace, from its creation), so Kubernetes has stopped it. It
+// counts from the dispatch, which is never before the Job was made.
+func (p *pass) pastJobDeadline(t *Task, attempt *Attempt) bool {
+	if attempt.StartedAt == nil {
+		return true // not known: never waited for forever
+	}
+	deadline := time.Duration(t.TimeoutSeconds)*time.Second + p.opts.StartTimeout + p.opts.JobDeadlineGrace
+	return p.now.Sub(*attempt.StartedAt) > deadline
 }
 
 // captureLogs stores the attempt's output, replacing the last capture. Best

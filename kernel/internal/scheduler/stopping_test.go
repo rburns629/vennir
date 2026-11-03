@@ -85,8 +85,14 @@ func TestATimedOutTaskThatCantBeStoppedWaitsForItsJobsDeadline(t *testing.T) {
 	equal(t, "state", tasksByKey(t, tx, id)["provision"].State, domain.TaskRunning) // no retry beside it
 	equal(t, "starts", len(exec.StartCalls), 1)
 
-	// Past the timeout plus the grace, Kubernetes has stopped the Job itself.
-	k.tick(t0.Add(31*time.Second + grace))
+	// Short of the Job's deadline (it allows for the wait to start too), it
+	// may still be running.
+	deadline := 30*time.Second + k.opts.StartTimeout + grace
+	k.tick(t0.Add(deadline))
+	equal(t, "state", tasksByKey(t, tx, id)["provision"].State, domain.TaskRunning)
+
+	// Past it, Kubernetes has stopped the Job itself.
+	k.tick(t0.Add(deadline + time.Second))
 	tk := tasksByKey(t, tx, id)["provision"]
 	equal(t, "state", tk.State, domain.TaskReady)
 	equal(t, "attempts", tk.AttemptCount, 1)

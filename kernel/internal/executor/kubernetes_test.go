@@ -165,13 +165,61 @@ func TestTheConfigMapIsOwnedByItsJob(t *testing.T) {
 // attempt, so the same name: that Job is the one to keep polling.
 func TestAnExistingJobForThisAttemptIsAdopted(t *testing.T) {
 	task := stepTask()
-	name := JobName(task.ExecutionID, task.TaskKey, task.Attempt)
-	c := newCluster(options(), &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: task.Team, UID: "uid-of-the-earlier-job"}})
+	task.SecretRefs = []string{"api-key", "db"}
+	c, name := existingJob(t, task, nil)
 	if _, err := c.k.Start(context.Background(), task); err != nil {
 		t.Fatal(err)
 	}
 	cm, _ := c.CoreV1().ConfigMaps(task.Team).Get(context.Background(), name, metav1.GetOptions{})
 	check(t, "owner", string(cm.OwnerReferences[0].UID), "uid-of-the-earlier-job")
+}
+
+// existingJob is a cluster already holding the Job this attempt's start
+// would make, changed by change (nil: as it is).
+func existingJob(t *testing.T, task ResolvedTask, change func(*batchv1.Job)) (*cluster, string) {
+	t.Helper()
+	name := JobName(task.ExecutionID, task.TaskKey, task.Attempt)
+	job, err := newCluster(options()).k.jobFor(name, task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job.Namespace, job.UID = task.Team, "uid-of-the-earlier-job"
+	if change != nil {
+		change(job)
+	}
+	return newCluster(options(), job), name
+}
+
+// Only the scheduler's own creates are checked by the cluster's policies:
+// a Job someone else made under the attempt's name never was, and its
+// result would become the step's outputs.
+func TestAJobTheKernelDidntMakeIsntAdopted(t *testing.T) {
+	task := stepTask()
+	task.SecretRefs = []string{"api-key"}
+	for what, change := range map[string]func(*batchv1.Job){
+		"no labels":        func(j *batchv1.Job) { j.Labels = nil },
+		"another attempt":  func(j *batchv1.Job) { j.Labels["vertra.dev/attempt"] = "2" },
+		"another task":     func(j *batchv1.Job) { j.Annotations = nil },
+		"another image":    func(j *batchv1.Job) { j.Spec.Template.Spec.Containers[0].Image = "attacker:latest" },
+		"its own command":  func(j *batchv1.Job) { j.Spec.Template.Spec.Containers[0].Command = []string{"sh", "-c", "echo"} },
+		"another action":   func(j *batchv1.Job) { j.Spec.Template.Spec.Containers[0].Args = []string{"delete"} },
+		"another identity": func(j *batchv1.Job) { j.Spec.Template.Spec.ServiceAccountName = "cloud-admin" },
+		"another container": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.Containers = append(j.Spec.Template.Spec.Containers, corev1.Container{Name: "x"})
+		},
+		"an init container": func(j *batchv1.Job) { j.Spec.Template.Spec.InitContainers = []corev1.Container{{Name: "x"}} },
+		"another team's Secret": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.Volumes = append(j.Spec.Template.Spec.Volumes, corev1.Volume{Name: "s",
+				VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "other"}}})
+		},
+	} {
+		c, name := existingJob(t, task, change)
+		_, err := c.k.Start(context.Background(), task)
+		check(t, what, rejected(t, err).Code, "DISPATCH_REJECTED")
+		if _, err := c.CoreV1().ConfigMaps(task.Team).Get(context.Background(), name, metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+			t.Errorf("%s: its request was handed to it", what)
+		}
+	}
 }
 
 func TestAnExistingConfigMapIsLeftAsItIs(t *testing.T) {
@@ -218,10 +266,16 @@ func TestAConfigMapThatFailsForNowLeavesTheJobForRetry(t *testing.T) {
 
 // Refused for good, so its Pod would wait for request.json forever.
 func TestARefusedConfigMapTakesItsJobWithIt(t *testing.T) {
-	c := newCluster(options())
-	c.refuse("create", "configmaps", status(403, metav1.StatusReasonForbidden, policyMessage))
-	rejected(t, func() error { _, err := c.k.Start(context.Background(), stepTask()); return err }())
-	check(t, "deleted", len(c.deleted("jobs")), 1)
+	for what, refusal := range map[string]error{
+		"by policy": status(403, metav1.StatusReasonForbidden, policyMessage),
+		"too big":   status(422, metav1.StatusReasonInvalid, `ConfigMap "ek-env-1" is invalid: []: Too long: must have at most 1048576 bytes`),
+		"too large": status(413, metav1.StatusReasonRequestEntityTooLarge, "Request entity too large: limit is 3145728"),
+	} {
+		c := newCluster(options())
+		c.refuse("create", "configmaps", refusal)
+		check(t, what, rejected(t, func() error { _, err := c.k.Start(context.Background(), stepTask()); return err }()).Code, "DISPATCH_REJECTED")
+		check(t, what+": deleted", len(c.deleted("jobs")), 1)
+	}
 }
 
 // A backstop for a Job the scheduler loses track of, allowing for the wait
@@ -569,6 +623,16 @@ func TestAProductsOwnErrorMessageIsRedacted(t *testing.T) {
 	check(t, "message", s.Error.Message, "key [redacted AWS access key] was refused")
 }
 
+// The kubelet keeps the last 4096 bytes: a step that writes more always
+// will, so it isn't run again (a side-effecting one would repeat them).
+func TestAResultCutShortIsntRetried(t *testing.T) {
+	c, handle := finishedJob(t, strings.Repeat(" ", 100)+`"x"}`+strings.Repeat("y", resultLimit), options())
+	s, _ := c.k.Status(context.Background(), handle)
+	check(t, "code", s.Error.Code, "PRODUCT_RESULT_INVALID")
+	check(t, "retryable", s.Error.Retryable, false)
+	check(t, "names the limit", strings.Contains(s.Error.Message, "4096 bytes"), true)
+}
+
 func TestAMissingOrInvalidResultIsARetryableFailure(t *testing.T) {
 	for result, code := range map[string]string{"": "PRODUCT_RESULT_MISSING", "{not json": "PRODUCT_RESULT_INVALID"} {
 		c, handle := finishedJob(t, result, options())
@@ -692,6 +756,34 @@ func TestStatusFailsTheTaskWhenItsImageIsMissing(t *testing.T) {
 	check(t, "configmaps", c.deleted("configmaps"), []string{"ek-deploy-1"})
 	again, _ := c.k.Status(context.Background(), handle)
 	check(t, "cached", again, s)
+}
+
+// Retryable: its image may yet pull, so the attempt is stopped before a
+// retry can start beside it.
+func TestAPullThatFailedTooLongIsStoppedAtOnce(t *testing.T) {
+	c, handle := pullingJob("ImagePullBackOff", "dial tcp: i/o timeout")
+	c.k.opts.ImagePullGrace = time.Second
+	s, err := c.k.Status(context.Background(), handle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check(t, "code", s.Error.Code, "IMAGE_PULL_FAILED")
+	check(t, "deleted", c.deleted("jobs"), []string{"ek-deploy-1"})
+	again, _ := c.k.Status(context.Background(), handle)
+	check(t, "cached", again, s)
+}
+
+// Not stopped is not known to have stopped: read again (and stopped) next pass.
+func TestAPullFailureWhoseJobCantBeDeletedIsReadAgain(t *testing.T) {
+	c, handle := pullingJob("ImagePullBackOff", "dial tcp: i/o timeout")
+	c.k.opts.ImagePullGrace = time.Second
+	c.refuse("delete", "jobs", status(500, metav1.StatusReasonInternalError, "boom"))
+	if _, err := c.k.Status(context.Background(), handle); err == nil {
+		t.Fatal("failed without stopping it")
+	}
+	if _, ok := c.k.cached("ek-deploy-1"); ok {
+		t.Error("cached")
+	}
 }
 
 func TestStatusKeepsRunningWhileATransientPullErrorIsWithinGrace(t *testing.T) {

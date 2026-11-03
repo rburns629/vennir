@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -195,15 +196,19 @@ func (k *Kubernetes) Start(ctx context.Context, task ResolvedTask) (Handle, erro
 	}
 	uid, err := k.createJob(ctx, task.Team, job)
 	if err != nil {
+		if _, ok := IsDispatchRejected(err); ok {
+			return nil, err
+		}
 		if isRejection(err) {
 			return nil, dispatchRejection(err)
 		}
 		return nil, err
 	}
 	if err := k.createConfigMap(ctx, task.Team, name, uid, string(request)); err != nil {
-		if apierrors.IsForbidden(err) {
-			// Refused by policy: this attempt would never get its request,
-			// so its Job would wait for it forever.
+		if apierrors.IsForbidden(err) || apierrors.IsInvalid(err) || apierrors.IsRequestEntityTooLargeError(err) {
+			// Refused by policy, or too big for a ConfigMap (inputs over
+			// 1 MiB once resolved): this attempt would never get its
+			// request, so its Job would wait for it forever.
 			_ = k.deleteJob(ctx, task.Team, name)
 			return nil, dispatchRejection(err)
 		}
@@ -229,6 +234,13 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 			// Being deleted: nothing left to adopt; the next start retries.
 			return "", fmt.Errorf("job %s/%s is being deleted", namespace, job.Name)
 		}
+		if !sameAttempt(created, job) {
+			// The admission policies only check the Jobs the scheduler
+			// creates: one made any other way was never checked, and its
+			// result would become this step's outputs.
+			return "", &DispatchRejected{Code: "DISPATCH_REJECTED", Message: fmt.Sprintf(
+				"A Job named %s already exists in %s that the kernel didn't make for this attempt (its labels, image, command, ServiceAccount or Secrets differ), so it wasn't adopted.", job.Name, namespace)}
+		}
 		k.log.Info("adopting this attempt's existing Job", "namespace", namespace, "job", job.Name)
 		return string(created.UID), nil
 	}
@@ -236,6 +248,40 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 		return "", err
 	}
 	return string(created.UID), nil
+}
+
+// sameAttempt says found is the Job jobFor built as want, as far as what
+// the step runs, as whom, and with which Secrets: what a Job made by
+// anyone else would change.
+func sameAttempt(found, want *batchv1.Job) bool {
+	for _, key := range []string{"app", "vertra.dev/execution-id", "vertra.dev/attempt"} {
+		if found.Labels[key] != want.Labels[key] {
+			return false
+		}
+	}
+	if found.Annotations["vertra.dev/task"] != want.Annotations["vertra.dev/task"] {
+		return false
+	}
+	f, w := found.Spec.Template.Spec, want.Spec.Template.Spec
+	if f.ServiceAccountName != w.ServiceAccountName || len(f.Containers) != 1 || len(f.InitContainers) != 0 {
+		return false
+	}
+	fc, wc := f.Containers[0], w.Containers[0]
+	if fc.Name != wc.Name || fc.Image != wc.Image || len(fc.Command) != 0 || !slices.Equal(fc.Args, wc.Args) {
+		return false
+	}
+	return slices.Equal(secretNames(f.Volumes), secretNames(w.Volumes))
+}
+
+func secretNames(volumes []corev1.Volume) []string {
+	var names []string
+	for _, v := range volumes {
+		if v.Secret != nil {
+			names = append(names, v.Secret.SecretName)
+		}
+	}
+	slices.Sort(names)
+	return names
 }
 
 func (k *Kubernetes) createConfigMap(ctx context.Context, namespace, name, jobUID, request string) error {
@@ -549,7 +595,14 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 			return Status{State: Running}, nil
 		}
 		k.log.Warn("task can't start", "namespace", namespace, "job", name, "code", failure.Code)
-		// Left in place until the failure is committed (Release).
+		if failure.Retryable {
+			// Its image may yet pull and the step run: stopped now, so a
+			// retry can't start beside it. A failure for good is left in
+			// place until it's committed (Release).
+			if err := k.remove(ctx, namespace, name); err != nil {
+				return Status{}, err
+			}
+		}
 		record := terminalRecord{status: Status{State: Failed, Error: failure}}
 		k.remember(name, record)
 		return record.status, nil
@@ -713,6 +766,10 @@ func NeverFits(message string) string {
 var imageNotFound = regexp.MustCompile(`(?i)\bnot found\b|manifest unknown|NotFound`)
 
 const kubeletMessageLimit = 1000
+
+// resultLimit is the most of a container's termination message (its
+// result.json) the kubelet keeps: a longer one arrives cut short.
+const resultLimit = 4096
 
 func truncate(s string, n int) string {
 	if r := []rune(s); len(r) > n {
@@ -882,6 +939,11 @@ func buildStatus(terminated *corev1.ContainerStateTerminated, logs []string) Sta
 			Message: fmt.Sprintf("Container exited with code %d without writing %s. Recent logs: %s", terminated.ExitCode, resultFilePath, joined)}}
 	}
 	result, err := domain.ParseTaskResult([]byte(terminated.Message))
+	if err != nil && len(terminated.Message) >= resultLimit {
+		// Cut short by the kubelet: the same step would write too much again.
+		return Status{State: Failed, Error: &domain.StructuredError{Code: "PRODUCT_RESULT_INVALID",
+			Message: fmt.Sprintf("Container's result.json was over the %d bytes Kubernetes keeps of it, so it was cut short. Output small values (IDs, names, URIs), and put large data in storage, outputting where it is.", resultLimit)}}
+	}
 	if err != nil {
 		return Status{State: Failed, Error: &domain.StructuredError{Code: "PRODUCT_RESULT_INVALID", Retryable: true,
 			Message: domain.RedactText("Container's result.json was invalid: " + err.Error())}}
