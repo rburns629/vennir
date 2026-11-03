@@ -270,6 +270,25 @@ func (s *Store) Run(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// BackendNamespace is the namespace an in-cluster backend host names
+// (<service>.<namespace>.svc, with or without .cluster.local), or "" for any
+// other host. The gateway may reach every team's API backends, so an API
+// may only use one in its own team's namespace (the console's
+// core/apis.ts backendNamespace, kept in step).
+func BackendNamespace(u *url.URL) string {
+	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	host = strings.TrimSuffix(host, ".cluster.local")
+	rest, ok := strings.CutSuffix(host, ".svc")
+	if !ok {
+		return ""
+	}
+	labels := strings.Split(rest, ".")
+	if len(labels) < 2 {
+		return ""
+	}
+	return labels[len(labels)-1]
+}
+
 // BackendAllowed: the URL's host is one of hosts, exactly or below a "*."
 // pattern (the console's rule, console/src/core/apis.ts).
 func BackendAllowed(u *url.URL, hosts []string) bool {

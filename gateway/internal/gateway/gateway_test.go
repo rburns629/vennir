@@ -236,6 +236,15 @@ func TestPausedHeldAndClosedForwardNothing(t *testing.T) {
 	if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "API_HELD" {
 		t.Errorf("held: %d %s", w.Code, w.Body)
 	}
+	// Another team's in-cluster backend, though its host is allowed: held.
+	own := f.api.BackendURL
+	other, _ := url.Parse("http://orders.web.svc.cluster.local:8080")
+	f.api.BackendURL = other
+	f.gw.Settings.BackendHosts = []string{"*.svc.cluster.local"}
+	if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "API_HELD" || !strings.Contains(w.Body.String(), "another team's") {
+		t.Errorf("another team's backend: %d %s", w.Code, w.Body)
+	}
+	f.api.BackendURL = own
 	f.gw.Settings.BackendHosts = []string{"127.0.0.1"}
 	f.gw.Settings.Closed = true
 	if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "GATEWAY_CLOSED" {

@@ -209,6 +209,8 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, o.as("paused"), http.StatusServiceUnavailable, "API_PAUSED", *api.PausedMessage)
 	case !store.BackendAllowed(api.BackendURL, g.Settings.BackendHosts):
 		return g.refuse(w, o.as("held"), http.StatusServiceUnavailable, "API_HELD", "This API's backend isn't one this install allows yet.")
+	case store.BackendNamespace(api.BackendURL) != "" && store.BackendNamespace(api.BackendURL) != api.Team:
+		return g.refuse(w, o.as("held"), http.StatusServiceUnavailable, "API_HELD", "This API's backend is another team's: an API may only use its own team's.")
 	case api.Validator == nil:
 		return g.refuse(w, o.as("unavailable"), http.StatusServiceUnavailable, "API_UNAVAILABLE", "This API's OpenAPI document can't be used, so nothing is forwarded.")
 	}

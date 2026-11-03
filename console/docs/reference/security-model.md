@@ -440,7 +440,12 @@ may only order its listed templates.
 The caller's `Authorization` stops at the gateway; the backend gets its own
 credential instead, minted per request, and `Vertra-Caller`, an EdDSA JWT
 the gateway signs (its key at `/.vertra/jwks.json`) naming the caller,
-their team and the API. A caller's own `Vertra-*` headers are dropped.
+their team and the API. An API may only use an in-cluster backend in its
+own team's namespace (`<service>.<team>.svc`): one pointed at another
+team's is held, by the console and the gateway, whatever `backendHosts`
+allows, so no team can serve another's backend under its own spec and
+sharing; a backend should still check the token's `api` as well as its
+`aud` (the sample does). A caller's own `Vertra-*` headers are dropped.
 Paths with encoded slashes or dot segments are refused, so what's checked
 is what's forwarded.
 

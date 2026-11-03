@@ -36,6 +36,10 @@ spec:
             # Vertra-Caller token's audience.
             - name: AUDIENCE
               value: http://greetings.local.svc.cluster.local:8080
+            # The API it serves, <team>/<name>: a token for another API, even
+            # one at this origin, is refused.
+            - name: API
+              value: local/greetings
           ports: [{containerPort: 8080}]
           readinessProbe:
             httpGet: {path: /healthz, port: 8080}
