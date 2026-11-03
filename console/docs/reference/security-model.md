@@ -881,12 +881,22 @@ signed the same way, and a catalog's `./vertra` downloads its binary by
 SHA-256. Every pull request also runs Semgrep, gitleaks, and the same scan
 of the three platform images (`.github/workflows/security.yml`, `ci.yml`).
 
+The "only from `main`" check is the tagged commit's own: a tag push runs
+the `release.yml` in the commit it tags, so a branch commit whose
+`release.yml` leaves the check out would still be released, and signed as
+`release.yml@refs/tags/v…`. The guarantee holds only with a tag ruleset
+letting only admins create, update or delete `v*` tags (not yet in place:
+`TODO.md`); the check itself stops mistakes, such as tagging the wrong
+commit.
+
 Nothing verifies those signatures when installing: `vertra` pulls the
 charts by version, the charts run their images by tag unless
 `image.digest` pins them, and policy-controller doesn't cover the platform's
 own namespace. To check one by hand (a version tag's run only: the same
 workflow run from a branch signs as `release.yml@refs/heads/<branch>`,
-which this refuses; `make gke-verify-release` requires the exact tag):
+which this refuses; `make gke-verify-release` requires the exact tag).
+Either proves an image came from a version tag's run, which means reviewed
+code only with the `v*` tag ruleset above in place:
 
 ```console
 $ cosign verify ghcr.io/<owner>/<repo>/execution-kernel:<version> \
