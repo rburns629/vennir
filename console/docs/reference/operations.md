@@ -1086,9 +1086,10 @@ For the cloud destinations, the copy runs as `backup.serviceAccountName`
 (default `vertra-pg-backup`). Create it in the platform namespace and bind
 it to an identity that may write to the bucket and nothing else: on GCS,
 `roles/storage.objectCreator` and `roles/storage.objectViewer` on the bucket
-(`gsutil` lists before writing); on S3, `s3:PutObject`; on Azure, Storage Blob
-Data Contributor on the container. Keep dumps as long as you need with a
-lifecycle rule on the bucket. For `pvc`, create the claim yourself
+(`gsutil` lists before writing); on S3, `s3:PutObject`, on a versioned bucket
+so an overwrite can't destroy an earlier dump (vertra's aws module does
+this); on Azure, Storage Blob Data Contributor on the container. Keep dumps
+as long as you need with a lifecycle rule on the bucket. For `pvc`, create the claim yourself
 (`backup.pvc.claimName`): most storage classes bind a volume only once a Pod
 uses it, which would hang `helm upgrade --wait`.
 

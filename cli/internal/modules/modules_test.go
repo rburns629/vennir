@@ -30,3 +30,23 @@ func TestTheAWSPublishRoleTrustsOnlyMain(t *testing.T) {
 		}
 	}
 }
+
+// The AWS backup writer can't destroy an earlier dump: its bucket is
+// versioned, and the writer may put and read objects but delete none, nor
+// any version (as on gcp, where it can't replace one).
+func TestTheAWSBackupsCantBeOverwritten(t *testing.T) {
+	main, err := files.ReadFile("aws/main.tf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`(?s)resource "aws_s3_bucket_versioning" "backups" \{\n  count  = var\.backups \? 1 : 0\n  bucket = aws_s3_bucket\.backups\[0\]\.id\n  versioning_configuration \{\n    status = "Enabled"`).Match(main) {
+		t.Error("the backups bucket isn't versioned")
+	}
+	block := regexp.MustCompile(`(?s)data "aws_iam_policy_document" "backup" \{.*?\n\}`).Find(main)
+	if block == nil {
+		t.Fatal("no backup policy in aws/main.tf")
+	}
+	if regexp.MustCompile(`Delete|Lifecycle|Versioning|s3:\*`).Match(block) {
+		t.Errorf("the backup writer may delete or unversion: %s", block)
+	}
+}
