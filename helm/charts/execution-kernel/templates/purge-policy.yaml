@@ -16,11 +16,18 @@ so it holds however the purge is run. Off until purgers are configured.
 {{- if and .Values.purgePolicy.enabled .Values.purgePolicy.purgers }}
 {{- $label := .Values.dispatchPolicy.teamNamespaceLabel }}
 {{- $usernames := list }}
+{{- /* A Group purger is each of its members: the guard below matches them by
+     their groups, as the RoleBinding grants them by it. */}}
+{{- $groups := list }}
 {{- range .Values.purgePolicy.purgers }}
 {{- if eq .kind "ServiceAccount" }}
 {{- $usernames = append $usernames (printf "system:serviceaccount:%s:%s" .namespace .name) }}
-{{- else }}
+{{- else if eq .kind "User" }}
 {{- $usernames = append $usernames .name }}
+{{- else if eq .kind "Group" }}
+{{- $groups = append $groups .name }}
+{{- else }}
+{{- fail (printf "purgePolicy.purgers: kind %q: User, Group or ServiceAccount" .kind) }}
 {{- end }}
 {{- end }}
 {{- $protected := concat (list "default" "kube-system" "kube-public" "kube-node-lease" .Release.Namespace) .Values.purgePolicy.protectedNamespaces | uniq }}
@@ -75,7 +82,9 @@ spec:
         resources: ["namespaces"]
   matchConditions:
     - name: from-a-purger
-      expression: request.userInfo.username in {{ $usernames | toJson }}
+      expression: >-
+        request.userInfo.username in {{ $usernames | toJson }} ||
+        (has(request.userInfo.groups) && request.userInfo.groups.exists(g, g in {{ $groups | toJson }}))
   validations:
     - expression: >-
         !(oldObject.metadata.name in {{ $protected | toJson }}) &&
