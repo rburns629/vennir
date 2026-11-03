@@ -70,13 +70,14 @@ func (k *ConsoleKeys) Key(ctx context.Context, kid string) (ed25519.PublicKey, e
 	if k.refreshing || time.Since(k.fetched) < refetchAfter {
 		// Another request is reading them, or one just did.
 		usable := known && time.Since(k.good) < keptFor
+		unread := k.refreshing || k.good.Before(k.fetched)
 		k.mu.Unlock()
 		switch {
 		case usable:
 			return key, nil
 		case known:
 			return nil, errStale
-		case k.refreshing || k.good.Before(k.fetched):
+		case unread:
 			return nil, errUnread
 		}
 		return nil, ErrUnauthenticated

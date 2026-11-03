@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -123,5 +124,33 @@ func TestConsoleKeysDropAKeyTheConsoleNoLongerPublishes(t *testing.T) {
 	}
 	if _, err := k.Key(ctx, "two"); err != nil {
 		t.Fatalf("the new key: %v", err)
+	}
+}
+
+// Many requests at once while a slow read fails: each is told the keys
+// can't be checked (never "sign in"), and none races the read (-race).
+func TestConsoleKeysUnderConcurrentRequests(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		http.Error(w, "down", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	k := &ConsoleKeys{URL: server.URL}
+	var wg sync.WaitGroup
+	errs := make(chan error, 20)
+	for range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := k.Key(context.Background(), "one")
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err == nil || err == ErrUnauthenticated {
+			t.Errorf("while the console can't be read: %v", err)
+		}
 	}
 }
