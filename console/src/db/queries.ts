@@ -21,6 +21,9 @@ import {
   apis,
   catalogSync,
   schedules,
+  ssoGroupMappings,
+  teamCallbacks,
+  teamWebhooks,
   type Approval,
   type ErrorHelp,
   type ProductCleanup,
@@ -187,6 +190,13 @@ export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: num
       .returning({ userId: teamMemberships.userId });
     await tx.delete(secretGrants).where(eq(secretGrants.teamId, teamId));
     await tx.delete(products).where(eq(products.teamId, teamId));
+    // Nothing that would put people back in it, run as it, or post its
+    // news anywhere: its single sign-on group mappings, its schedules, and
+    // its webhook and order callback (their sealed URLs and secrets).
+    await tx.delete(ssoGroupMappings).where(eq(ssoGroupMappings.teamId, teamId));
+    await tx.delete(schedules).where(eq(schedules.teamId, teamId));
+    await tx.delete(teamWebhooks).where(eq(teamWebhooks.teamId, teamId));
+    await tx.delete(teamCallbacks).where(eq(teamCallbacks.teamId, teamId));
 
     let revokedBotTokens = 0;
     for (const { userId } of members) {
@@ -338,7 +348,7 @@ export async function teamRolesForUser(userId: string, exec: Db = db): Promise<{
     .select({ name: teams.name, role: teamMemberships.role, requireSso: teams.requireSso })
     .from(teamMemberships)
     .innerJoin(teams, eq(teams.id, teamMemberships.teamId))
-    .where(eq(teamMemberships.userId, userId));
+    .where(and(eq(teamMemberships.userId, userId), isNull(teams.deletedAt)));
 }
 
 /** Whether a bot has ever had a credential: a token (revoked or not) or a keyless identity. */
