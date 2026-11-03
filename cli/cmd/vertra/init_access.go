@@ -140,9 +140,10 @@ func (a *app) awsAccess(ctx context.Context, out io.Writer, c *config.Config, f 
 }
 
 // offerBudget offers a monthly budget, emailing the admin, when the account
-// has none.
+// has none (not when its budgets couldn't be read). A budget it couldn't
+// create is a warning: init's answers so far are kept.
 func (a *app) offerBudget(ctx context.Context, out io.Writer, c *config.Config, check *access.AWS) error {
-	if check == nil || check.Budgets > 0 || !a.ask.Interactive {
+	if check == nil || check.Budgets > 0 || check.BudgetsUnread || !a.ask.Interactive {
 		return nil
 	}
 	ok, err := a.ask.Confirm("This AWS account has no budget. Create one that emails "+c.Admin.Email+" before spending passes a monthly amount?", true)
@@ -175,7 +176,8 @@ func (a *app) offerBudget(ctx context.Context, out io.Writer, c *config.Config, 
 		args = append(args, "--profile", c.AWS.Profile)
 	}
 	if err := a.runner.Run(ctx, "aws", args...); err != nil {
-		return err
+		fmt.Fprintf(out, "  Warning: the budget wasn't created (%v); set one in the Billing console.\n", err)
+		return nil
 	}
 	fmt.Fprintf(out, "  Budget created: $%d a month; emails at 85%% and 100%%, and if the forecast passes it.\n", amount)
 	return nil
