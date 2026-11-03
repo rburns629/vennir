@@ -55,7 +55,9 @@ teams/
 ```
 
 A team's folder name is its identity everywhere: its console team, its
-namespace, and `team` in a DAG.
+namespace, and `team` in a DAG. It can't be `bases` or `catalog-release`
+(the catalog's own repositories in the registry, beside the teams'),
+`vertra-system` or `kube-*` (platform namespaces).
 
 ## Onboarding a team
 
