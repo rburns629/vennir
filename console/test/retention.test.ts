@@ -40,6 +40,9 @@ describe("retention", () => {
     await db.insert(imageScans).values([
       { digest: digest("old"), image: `${prefix}/old`, status: "passed", lastUsedAt: longAgo },
       { digest: digest("new"), image: `${prefix}/new`, status: "passed" },
+      // A failed verdict keeps the cluster refusing its digest however long it's unused; one accepted doesn't.
+      { digest: digest("failed"), image: `${prefix}/failed`, status: "failed", lastUsedAt: longAgo },
+      { digest: digest("accepted"), image: `${prefix}/accepted`, status: "failed", lastUsedAt: longAgo, acceptedAt: longAgo, acceptedReason: "Not reachable." },
     ]);
 
     await deleteExpired();
@@ -49,7 +52,7 @@ describe("retention", () => {
     const audit = await db.select().from(auditLog).where(like(auditLog.route, `/api/${prefix}%`));
     expect(audit.map((a) => a.route)).toEqual([`/api/${prefix}/new`]);
     const scans = await db.select().from(imageScans).where(like(imageScans.image, `${prefix}%`));
-    expect(scans.map((s) => s.image)).toEqual([`${prefix}/new`]);
+    expect(scans.map((s) => s.image).sort()).toEqual([`${prefix}/failed`, `${prefix}/new`]);
   });
 
 });

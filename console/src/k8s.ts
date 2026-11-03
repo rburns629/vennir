@@ -1270,30 +1270,47 @@ export interface ScanJobSpec {
   target: string;
   /** The target's registry speaks plain http (a mirror like kind's). */
   insecure: boolean;
-  /** Which image of a multi-platform index to scan, e.g. linux/arm64. */
-  platform: string;
+  /** Which images of a multi-platform index to scan, e.g. linux/arm64: one container each, side by side. */
+  platforms: string[];
   /** Trivy's --format template: one line per finding (scanning.ts parses it). */
   template: string;
 }
 
+/** What a scan container prints last when the image has no image for its platform. */
+export const NO_PLATFORM_MARKER = "NO_PLATFORM";
+
 /**
- * Starts a Trivy client Job scanning one image against the Trivy server.
+ * How a scan container runs Trivy (its arguments are the script's, never
+ * part of it): as Trivy would, except that an image with no image for the
+ * platform asked (Trivy's "no child with platform") is a clean exit, ending
+ * with NO_PLATFORM_MARKER, so it doesn't fail the Pod and rerun every
+ * platform's scan.
+ */
+export const SCAN_SCRIPT =
+  'out=$(trivy "$@" 2>&1); code=$?; printf \'%s\\n\' "$out"; ' +
+  `if [ "$code" -ne 0 ] && printf '%s' "$out" | grep -q 'no child with platform'; then echo ${NO_PLATFORM_MARKER}; exit 0; fi; ` +
+  'exit "$code"';
+
+/**
+ * Starts a Trivy client Job scanning one image against the Trivy server,
+ * a container per platform (the first named trivy, then trivy-1, ...).
  * Created if missing: one with this name already running is the same scan.
  * Hardened like nothing else needs to run here: no Kubernetes token, non-
  * root, read-only root filesystem, no privileges, a deadline.
  */
 export async function createScanJob(spec: ScanJobSpec): Promise<void> {
   const { batch } = getApis();
-  const args = [
+  // Each container its own cache: Trivy locks it.
+  const args = (platform: string, i: number) => [
     "image",
     "--server", spec.serverUrl,
     "--scanners", "vuln,secret",
     "--quiet",
     "--timeout", "10m",
-    "--cache-dir", "/tmp/trivy",
+    "--cache-dir", `/tmp/trivy-${String(i)}`,
     "--format", "template",
     "--template", spec.template,
-    "--platform", spec.platform,
+    "--platform", platform,
     ...(spec.insecure ? ["--insecure"] : []),
     spec.target,
   ];
@@ -1310,29 +1327,28 @@ export async function createScanJob(spec: ScanJobSpec): Promise<void> {
           serviceAccountName: spec.serviceAccount,
           automountServiceAccountToken: false,
           securityContext: { runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, seccompProfile: { type: "RuntimeDefault" } },
-          containers: [
-            {
-              name: "trivy",
-              image: spec.scannerImage,
-              args,
-              env: [
-                { name: "HOME", value: "/tmp" },
-                ...(spec.pullSecretName ? [{ name: "DOCKER_CONFIG", value: "/etc/docker-config" }] : []),
-              ],
-              securityContext: {
-                allowPrivilegeEscalation: false,
-                readOnlyRootFilesystem: true,
-                capabilities: { drop: ["ALL"] },
-              },
-              resources: { requests: { cpu: "100m", memory: "256Mi" }, limits: { memory: "2Gi" } },
-              volumeMounts: [
-                { name: "tmp", mountPath: "/tmp" },
-                ...(spec.pullSecretName ? [{ name: "docker-config", mountPath: "/etc/docker-config", readOnly: true }] : []),
-              ],
+          containers: spec.platforms.map((platform, i) => ({
+            name: i === 0 ? "trivy" : `trivy-${String(i)}`,
+            image: spec.scannerImage,
+            command: ["sh", "-c", SCAN_SCRIPT, "scan"],
+            args: args(platform, i),
+            env: [
+              { name: "HOME", value: "/tmp" },
+              ...(spec.pullSecretName ? [{ name: "DOCKER_CONFIG", value: "/etc/docker-config" }] : []),
+            ],
+            securityContext: {
+              allowPrivilegeEscalation: false,
+              readOnlyRootFilesystem: true,
+              capabilities: { drop: ["ALL"] },
             },
-          ],
+            resources: { requests: { cpu: "100m", memory: "256Mi" }, limits: { memory: "2Gi" } },
+            volumeMounts: [
+              { name: "tmp", mountPath: "/tmp" },
+              ...(spec.pullSecretName ? [{ name: "docker-config", mountPath: "/etc/docker-config", readOnly: true }] : []),
+            ],
+          })),
           volumes: [
-            { name: "tmp", emptyDir: { sizeLimit: "4Gi" } },
+            { name: "tmp", emptyDir: { sizeLimit: `${String(4 * spec.platforms.length)}Gi` } },
             ...(spec.pullSecretName
               ? [{ name: "docker-config", secret: { secretName: spec.pullSecretName, items: [{ key: ".dockerconfigjson", path: "config.json" }] } }]
               : []),
@@ -1418,10 +1434,14 @@ export async function createVerifyJob(spec: VerifyJobSpec): Promise<void> {
 export type ScanJobState =
   | { state: "running" }
   | { state: "missing" }
-  | { state: "succeeded"; output: string; unread?: string }
-  | { state: "failed"; output: string };
+  | { state: "succeeded"; output: string; outputs?: string[]; unread?: string }
+  | { state: "failed"; output: string; outputs?: string[] };
 
-/** Where a scan (or verification) Job is, with its Pod's output once it has finished. */
+/**
+ * Where a scan (or verification) Job is, with its Pod's output once it has
+ * finished: `container`'s, and in `outputs` also those of the containers
+ * named `<container>-N` beside it (a scan of several platforms), in order.
+ */
 export async function readScanJob(
   namespace: string,
   name: string,
@@ -1444,23 +1464,29 @@ export async function readScanJob(
   const pod = pods.items
     .filter((p) => (succeeded ? p.status?.phase === "Succeeded" : true))
     .sort((a, b) => String(b.metadata?.creationTimestamp).localeCompare(String(a.metadata?.creationTimestamp)))[0];
-  let output = "";
-  if (pod?.metadata?.name) {
-    try {
-      output = await core.readNamespacedPodLog({ name: pod.metadata.name, namespace, container });
-    } catch (error) {
-      if (!isNotFound(error)) throw error;
+  const names = (pod?.spec?.containers ?? []).map((c) => c.name).filter((n) => n === container || n.startsWith(`${container}-`));
+  const outputs: string[] = [];
+  for (const each of names.length > 0 ? names : [container]) {
+    let log = "";
+    if (pod?.metadata?.name) {
+      try {
+        log = await core.readNamespacedPodLog({ name: pod.metadata.name, namespace, container: each });
+      } catch (error) {
+        if (!isNotFound(error)) throw error;
+      }
     }
+    outputs.push(log);
   }
-  if (succeeded && expectOutput && output.trim() === "") {
+  const output = outputs[0] ?? "";
+  if (succeeded && expectOutput && outputs.some((log) => log.trim() === "")) {
     // A Job can say it succeeded a moment before its Pod does, or before
     // its log can be read: read it again next time, rather than calling an
     // empty output the result, for a few minutes after it finished.
     const finished = job.status?.completionTime ? new Date(job.status.completionTime).getTime() : Date.now();
     if (Date.now() - finished < OUTPUT_GRACE_MS) return { state: "running" };
-    return { state: "succeeded", output, unread: (pods.items.map((p) => `${p.metadata?.name ?? "?"}: ${p.status?.phase ?? "?"}`).join(", ") || "no Pod") };
+    return { state: "succeeded", output, outputs, unread: (pods.items.map((p) => `${p.metadata?.name ?? "?"}: ${p.status?.phase ?? "?"}`).join(", ") || "no Pod") };
   }
-  return succeeded ? { state: "succeeded", output } : { state: "failed", output };
+  return succeeded ? { state: "succeeded", output, outputs } : { state: "failed", output, outputs };
 }
 
 /** How long a finished Job's output may take to be readable. */

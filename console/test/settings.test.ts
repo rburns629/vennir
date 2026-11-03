@@ -33,6 +33,7 @@ describe("settings", () => {
       ["SMTP_PORT", "0"],
       ["AUDIT_EXPORT_PROVIDER", "azure"],
       ["DATABASE_POOL_SIZE", "1"], // a background pass's lock takes one of them
+      ["SCAN_PLATFORMS", "linux/amd64,arm64"],
     ] as const) {
       await expect(load({ [name]: value }), name).rejects.toThrow(name);
     }
@@ -44,5 +45,10 @@ describe("settings", () => {
     expect(config.scanning.idleMinutes).toBe(0);
     expect(config.scanning.waitSeconds).toBe(0);
     expect(config.metricsPort).toBe(0);
+  });
+
+  it("scan every platform listed, once each", async () => {
+    const { config } = await load({ SCAN_PLATFORMS: "linux/amd64, linux/arm64/v8,linux/amd64" });
+    expect(config.scanning.platforms).toEqual(["linux/amd64", "linux/arm64/v8"]);
   });
 });

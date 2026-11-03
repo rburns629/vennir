@@ -344,7 +344,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `catalog-sync.test.ts` | Applying a catalog release: what it makes, what it drops, a failed item, a bad signature, teams it didn't make, the API; the stored credential. |
 | `team-members.test.ts`, `team-lifecycle.test.ts` | Membership, retiring and purging teams. |
 | `team-namespaces.test.ts` | The console creating, relabelling and deleting team namespaces, and applying SecretStore files: what reaches Kubernetes, and who may. |
-| `image-scans.test.ts` | Reading Trivy's output, verdicts per digest, what a failed scan blocks, an admin accepting one, idling the scanner and waking it for a scan. |
+| `image-scans.test.ts`, `scan-job.test.ts` | Reading Trivy's output, verdicts per digest (every platform scanned), what a failed scan blocks, an admin accepting one, idling the scanner and waking it for a scan; the scan Job's container per platform. |
 | `registry-ecr.test.ts` | ECR's credential from the console's own AWS identity: fetched, sent as ECR's Basic challenge asks, kept for its lifetime. |
 | `client-ip.test.ts` | Who the client is behind a load balancer: only trusted proxies' X-Forwarded-For counts. |
 | `activity.test.ts` | Recording the console's last use: signed-in requests only, once a minute at most. |
