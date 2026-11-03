@@ -29,9 +29,13 @@ var printer = message.NewPrinter(language.English)
 
 // compile compiles a schema document (already JSON-shaped), against JSON
 // Schema 2020-12 unless it says otherwise. A schema that isn't valid JSON
-// Schema is refused.
+// Schema is refused. Only references within the document resolve: no
+// loader, so a pull request's schema can't make the check read a file
+// (file:///...) or a URL on the machine running it, and a reference the
+// console's validator couldn't follow either is refused here too.
 func compile(url string, doc any) (*jsonschema.Schema, error) {
 	c := jsonschema.NewCompiler()
+	c.UseLoader(jsonschema.SchemeURLLoader{})
 	c.DefaultDraft(jsonschema.Draft2020)
 	if err := c.AddResource(url, doc); err != nil {
 		return nil, err
