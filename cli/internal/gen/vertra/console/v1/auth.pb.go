@@ -66,7 +66,7 @@ type GetEnvironmentResponse struct {
 	Label            string `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
 	SelfRegistration bool   `protobuf:"varint,2,opt,name=self_registration,json=selfRegistration,proto3" json:"self_registration,omitempty"`
 	// Single sign-on, when on: the provider's name for its button ("Google").
-	// Sign in at /api/auth/oidc/start. Passwords still work, except for the
+	// Sign in from the sign-in page (/api/auth/oidc/start?tab=, the tab's own value). Passwords still work, except for the
 	// members of a team that requires single sign-on (Team.require_sso).
 	SsoLabel string `protobuf:"bytes,3,opt,name=sso_label,json=ssoLabel,proto3" json:"sso_label,omitempty"`
 	// The cloud this install is on (gcp, aws, azure, kind, existing), as
