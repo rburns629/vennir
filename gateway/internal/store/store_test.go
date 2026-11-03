@@ -95,3 +95,25 @@ func TestWhyAnAPICantBeServedIsRecordedUntilItCan(t *testing.T) {
 		t.Errorf("still recorded once it builds: %q", p)
 	}
 }
+
+// An in-cluster backend host names its namespace; any other host names none.
+func TestBackendNamespace(t *testing.T) {
+	for raw, want := range map[string]string{
+		"http://orders.team-b.svc.cluster.local:8080":  "team-b",
+		"http://orders.team-b.svc:8080":                "team-b",
+		"http://ORDERS.Team-B.svc.cluster.local.":      "team-b",
+		"http://pod-1.orders.team-b.svc.cluster.local": "team-b",
+		"http://orders:8080":                           "",
+		"http://orders.svc.cluster.local":              "",
+		"https://api.example.com":                      "",
+		"https://svc.example.com":                      "",
+	} {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := BackendNamespace(u); got != want {
+			t.Errorf("BackendNamespace(%s) = %q, want %q", raw, got, want)
+		}
+	}
+}
