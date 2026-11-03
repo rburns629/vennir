@@ -684,8 +684,7 @@ func (s *Service) RetryTask(ctx context.Context, req *connect.Request[kernelv1.R
 	key := req.Msg.GetTaskId()
 	notFound := connect.NewError(connect.CodeNotFound, errors.New("Not found."))
 	err = s.inTx(ctx, func(t *tx) error {
-		state, err := s.exists(ctx, t, id)
-		if err != nil {
+		if _, err := s.exists(ctx, t, id); err != nil {
 			return notFound
 		}
 		var taskID string
@@ -711,7 +710,13 @@ func (s *Service) RetryTask(ctx context.Context, req *connect.Request[kernelv1.R
 		}
 		// Only a failed or still-running execution's (the transaction
 		// undoes the update above): a cancelled one's tasks would come back
-		// READY or BLOCKED where nothing claims them.
+		// READY or BLOCKED where nothing claims them. Its state read locked,
+		// after the task's (tasks then executions, as cancelling takes
+		// them), so a cancel can't land between the check and the revival.
+		var state string
+		if err := t.QueryRow(ctx, `SELECT state FROM executions WHERE id = $1 FOR UPDATE`, id).Scan(&state); err != nil {
+			return err
+		}
 		if state != string(domain.ExecutionFailed) && state != string(domain.ExecutionRunning) {
 			return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("This execution is %s: only a failed or running execution's task can be retried.", state))
 		}
