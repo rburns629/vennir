@@ -16,17 +16,50 @@ var awsPlatformInstance = map[string]string{
 	"minimal": "c6a.large", "resilient": "c6a.large", "auto": "c6a.large", "scaled": "m6a.large",
 }
 
+// awsAllocatable is what kubelet leaves Pods on each platform instance,
+// vCPU and GiB, by EKS's reservations (its AMIs' bootstrap and Auto Mode's
+// alike): 70m of the two vCPUs; 255 MiB plus 11 MiB per Pod of max-pods
+// (29 on a .large) and 100 MiB of eviction threshold, out of the memory
+// the kernel reports (a little under the instance's 4 or 8 GiB).
+var awsAllocatable = map[string][2]float64{"c6a.large": {1.93, 3.2}, "m6a.large": {1.93, 7.0}}
+
+// What else needs room besides the platform's requests, vCPU and GiB.
+// Auto Mode runs its node agents (CNI, kube-proxy, CoreDNS, the EBS driver)
+// outside Pods, so only a small margin per node for Pods the floor doesn't
+// count. Standard mode's node groups run them as Pods: on every node
+// aws-node, kube-proxy, the EBS CSI node and the Pod Identity agent; once a
+// cluster, two CoreDNS, the EBS CSI controller and the Cluster Autoscaler.
+// Estimates, not yet checked against a live node.
+var (
+	awsAutoPerNode     = [2]float64{0.05, 0.1}
+	awsStandardPerNode = [2]float64{0.2, 0.3}
+	awsStandardSystem  = [2]float64{0.3, 0.4}
+)
+
+// awsRoom is what each node leaves the platform's Pods.
+func awsRoom(instance string, perNode [2]float64) [2]float64 {
+	a := awsAllocatable[instance]
+	return [2]float64{a[0] - perNode[0], a[1] - perNode[1]}
+}
+
 // awsNodeDiskGiB is Auto Mode's default ephemeral storage per node (gp3).
 const awsNodeDiskGiB = 80
 
 // AWS is the cost section of the approval screen for an aws install.
 func AWS(p *AWSPrices, c *config.Config, fetched string) []plan.Line {
 	f := plan.FloorOf(c)
-	platform := p.Instances[awsPlatformInstance[c.Size]]
+	instance := awsPlatformInstance[c.Size]
+	platform := p.Instances[instance]
 	nodeHour := func(i InstancePrice, price float64) float64 {
 		return price + i.Fee + p.PublicIP + awsNodeDiskGiB*p.GP3/hoursPerMonth
 	}
-	awake := nodeHour(platform, platform.OnDemand)
+	// As many of the instance as the platform's requests need. Auto Mode
+	// may pick one larger instance instead, at about the same price.
+	nodes := nodesFor(f, [2]float64{}, awsRoom(instance, awsAutoPerNode))
+	var awake [2]float64
+	for i := range awake {
+		awake[i] = float64(nodes[i]) * nodeHour(platform, platform.OnDemand)
+	}
 
 	// A step's share of a steps node: by whichever of CPU or memory it
 	// fills more.
@@ -69,18 +102,19 @@ func AWS(p *AWSPrices, c *config.Config, fetched string) []plan.Line {
 	if c.ScaleDown.Enabled {
 		awakeHours = lightAwakeHours
 	}
-	likely := always + awake*awakeHours + stepHour*lightStepHours
+	likely := always + stepHour*lightStepHours
 
 	return withRDS([]plan.Line{
 		{Label: "Estimated cost", Text: fmt.Sprintf("a month, list prices in USD, %s, %s", p.Region, fetched)},
 		{Label: "  Always", Text: fmt.Sprintf("%s: the EKS cluster fee (%s; EKS has no free tier), %s%s%s",
 			money(always), money(fee), database, awsConsoleNote(c), headroomNote(c))},
-		{Label: "  While awake", Text: fmt.Sprintf("%s a month if never asleep: about one %s (Auto Mode picks the instance), with its Auto Mode fee, public address and disk",
-			money(awake*hoursPerMonth), awsPlatformInstance[c.Size])},
+		{Label: "  While awake", Text: fmt.Sprintf("%s a month if never asleep: about %s for the platform's requests (Auto Mode picks the instances), each with its Auto Mode fee, public address and disk",
+			moneySpan(awake[0]*hoursPerMonth, awake[1]*hoursPerMonth), nodeWords(nodes, instance))},
 		{Label: "  While asleep", Text: "nothing more: Auto Mode removes nodes nothing runs on"},
 		{Label: "  Steps", Text: fmt.Sprintf("%s per step-hour at the default size (%s); %s a month at the cap of %d if always busy",
 			money(stepHour), capacity, money(stepHour*float64(f.StepCap)*hoursPerMonth), f.StepCap)},
-		{Label: "  Likely", Text: fmt.Sprintf("%s for light use (%s, %d step-hours)", money(likely), awakeWords(c), lightStepHours)},
+		{Label: "  Likely", Text: fmt.Sprintf("%s for light use (%s, %d step-hours)",
+			moneySpan(likely+awake[0]*awakeHours, likely+awake[1]*awakeHours), awakeWords(c), lightStepHours)},
 		{Label: "  Not included", Text: "discounts, credits, taxes, data transfer, backups and images in storage (cents a GB), your products' own AWS usage"},
 	}, p, c)
 }
@@ -89,13 +123,19 @@ func AWS(p *AWSPrices, c *config.Config, fetched string) []plan.Line {
 const awsStandardDiskGiB = 20
 
 // awsStandard is standard mode's estimate: node groups, no Auto Mode fee,
-// and the platform's node runs whether the platform sleeps or not.
+// and the platform's nodes run whether the platform sleeps or not.
 func awsStandard(p *AWSPrices, c *config.Config, f plan.Floor, fetched string, fee, always float64) []plan.Line {
 	nodeHour := func(price float64) float64 {
 		return price + p.PublicIP + awsStandardDiskGiB*p.GP3/hoursPerMonth
 	}
-	platform := p.Instances[awsPlatformInstance[c.Size]]
-	always += nodeHour(platform.OnDemand) * hoursPerMonth
+	instance := awsPlatformInstance[c.Size]
+	platform := p.Instances[instance]
+	// As many platform nodes as its requests and the cluster's own Pods
+	// need: the Cluster Autoscaler adds them.
+	nodes := nodesFor(f, awsStandardSystem, awsRoom(instance, awsStandardPerNode))
+	nodeMonth := nodeHour(platform.OnDemand) * hoursPerMonth
+	always += float64(nodes[0]) * nodeMonth
+	more := float64(nodes[1]-nodes[0]) * nodeMonth
 	steps := p.Instances["c6a.large"]
 	price, capacity := steps.Spot, "Spot"
 	switch {
@@ -112,12 +152,12 @@ func awsStandard(p *AWSPrices, c *config.Config, f plan.Floor, fetched string, f
 	likely := always + stepHour*lightStepHours
 	return []plan.Line{
 		{Label: "Estimated cost", Text: fmt.Sprintf("a month, list prices in USD, %s, %s", p.Region, fetched)},
-		{Label: "  Always", Text: fmt.Sprintf("%s: the EKS cluster fee (%s; EKS has no free tier), the platform's %s node and the volumes, awake or asleep",
-			money(always), money(fee), awsPlatformInstance[c.Size])},
+		{Label: "  Always", Text: fmt.Sprintf("%s: the EKS cluster fee (%s; EKS has no free tier), %s for the platform (as many as its requests need) and the volumes, awake or asleep",
+			moneySpan(always, always+more), money(fee), nodeWords(nodes, instance))},
 		{Label: "  Steps", Text: fmt.Sprintf("%s per step-hour at the default size (%s); %s a month at the cap of %d if always busy",
 			money(stepHour), capacity, money(stepHour*float64(f.StepCap)*hoursPerMonth), f.StepCap)},
-		{Label: "  Likely", Text: fmt.Sprintf("%s for light use (%d step-hours); sleeping saves nothing here, since the platform's node stays. While images are being scanned, a second platform node runs for the scanner (about %s an hour), gone about 20 minutes after the last scan",
-			money(likely), lightStepHours, money(nodeHour(platform.OnDemand)))},
+		{Label: "  Likely", Text: fmt.Sprintf("%s for light use (%d step-hours); sleeping saves nothing here, since the platform's nodes stay. While images are being scanned, another platform node runs for the scanner (about %s an hour), gone about 20 minutes after the last scan",
+			moneySpan(likely, likely+more), lightStepHours, money(nodeHour(platform.OnDemand)))},
 		{Label: "  Not included", Text: "discounts, credits, taxes, data transfer, backups and images in storage (cents a GB), your products' own AWS usage"},
 	}
 }

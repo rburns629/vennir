@@ -108,13 +108,53 @@ func TestStandardEstimateKeepsItsNode(t *testing.T) {
 	c.Console.Public = false
 	c.Size = "scaled" // on-demand steps
 	out := text(GCP(prices(), c, "fetched now"))
-	node := (2*0.022 + 8*0.003) * hoursPerMonth
-	disks := (100 + 50) * 0.1
-	if !strings.Contains(out, "Always: "+money(node+disks)+": the platform's node") {
-		t.Errorf("want the node and disks always:\n%s", out)
+	// scaled's 1.8 vCPU and GKE's own Pods need two e2-standard-2s.
+	node := (2*0.022+8*0.003)*hoursPerMonth + 50*0.1
+	disks := 100 * 0.1
+	if !strings.Contains(out, "Always: "+money(2*node+disks)+": 2 e2-standard-2 nodes for the platform") {
+		t.Errorf("want the nodes and disks always:\n%s", out)
 	}
 	if !strings.Contains(out, "(on-demand)") || strings.Contains(out, "While asleep") {
 		t.Errorf("scaled is on-demand, and standard doesn't save asleep:\n%s", out)
+	}
+}
+
+// The platform pool autoscales, so standard prices the nodes the platform's
+// requests and GKE's own Pods need.
+func TestStandardPricesTheNodesTheRequestsNeed(t *testing.T) {
+	for _, tc := range []struct {
+		size string
+		want string
+	}{
+		{"resilient", "one e2-standard-2 node for the platform"},
+		{"auto", "one e2-standard-2 node for the platform"},
+		// An e2-medium leaves about 0.7 vCPU after GKE's own Pods.
+		{"minimal", "2 e2-medium nodes for the platform"},
+	} {
+		c := config.Default("gcp")
+		c.Cluster.Mode, c.Console.Public, c.Size = "standard", false, tc.size
+		if out := text(GCP(prices(), c, "fetched now")); !strings.Contains(out, tc.want) {
+			t.Errorf("%s: want %q:\n%s", tc.size, tc.want, out)
+		}
+	}
+}
+
+func TestNodesFor(t *testing.T) {
+	room := [2]float64{1.88, 3.1}
+	for _, tc := range []struct {
+		cpu, mem [2]float64
+		want     [2]int
+	}{
+		{[2]float64{0.1, 0.1}, [2]float64{0.1, 0.1}, [2]int{1, 1}},       // at least one
+		{[2]float64{1.2, 1.2}, [2]float64{3.625, 3.625}, [2]int{2, 2}},   // by memory
+		{[2]float64{2, 2}, [2]float64{1, 1}, [2]int{2, 2}},               // by CPU
+		{[2]float64{0.95, 1.35}, [2]float64{2.625, 4.125}, [2]int{1, 2}}, // a range
+		{[2]float64{0.55 + 0.05, 0.6}, [2]float64{3.1, 3.1}, [2]int{1, 1}},
+	} {
+		f := plan.Floor{CPUCores: tc.cpu, MemGiB: tc.mem}
+		if got := nodesFor(f, [2]float64{}, room); got != tc.want {
+			t.Errorf("%v vCPU, %v GiB: %v, want %v", tc.cpu, tc.mem, got, tc.want)
+		}
 	}
 }
 
