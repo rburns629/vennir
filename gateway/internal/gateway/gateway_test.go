@@ -311,17 +311,25 @@ func TestOnlyServedAPIsGetTheirOwnMetricLabel(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	f.gw.Metrics = NewMetrics(reg)
 	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "web-person", "", nil)
+	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "", "", nil) // refused, but a served API
 	f.do("GET", "/made-up/api/x", "", "", nil)
+	f.do("GET", "/no-api-here", "", "", nil)
 	f.do("GET", "/another/one/x", "", "", nil)
 	f.gw.Public = true // not served on the internet listener
 	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "web-person", "", nil)
 	if got := testutil.ToFloat64(f.gw.Metrics.Requests.WithLabelValues("payments/orders", "forwarded")); got != 1 {
 		t.Errorf("payments/orders forwarded: %v", got)
 	}
-	if got := testutil.ToFloat64(f.gw.Metrics.Requests.WithLabelValues("-", "not_found")); got != 3 {
+	if got := testutil.ToFloat64(f.gw.Metrics.Requests.WithLabelValues("payments/orders", "unauthenticated")); got != 1 {
+		t.Errorf("payments/orders unauthenticated: %v", got)
+	}
+	if got := testutil.ToFloat64(f.gw.Metrics.Requests.WithLabelValues("-", "not_found")); got != 4 {
 		t.Errorf("not found under -: %v", got)
 	}
-	if n := testutil.CollectAndCount(f.gw.Metrics.Requests); n != 2 {
-		t.Errorf("%d request series, want 2", n)
+	if n := testutil.CollectAndCount(f.gw.Metrics.Requests); n != 3 {
+		t.Errorf("%d request series, want 3", n)
+	}
+	if n := testutil.CollectAndCount(f.gw.Metrics.Duration); n != 3 {
+		t.Errorf("%d duration histograms, want 3 (payments/orders by backend and gateway, and -)", n)
 	}
 }
