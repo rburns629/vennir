@@ -40,12 +40,53 @@ func (c *Catalog) Check(products []*Product) []*Product {
 	return passed
 }
 
+// withUnpublished is the products changed, and every other product whose
+// image for its commit isn't in the registry, or isn't signed, as a release
+// needs it (publishedImage). A change the diff nets out (changed, then
+// reverted) still moves the product's commit, and a run the concurrency
+// group skipped never published its products: this publishes them, rather
+// than every later release being refused until someone runs CI by hand.
+func (c *Catalog) withUnpublished(ctx context.Context, changed []*Product, s Settings) []*Product {
+	chosen := map[string]bool{}
+	for _, p := range changed {
+		chosen[p.Label()] = true
+	}
+	var out []*Product
+	for _, p := range c.AllProducts() {
+		if !chosen[p.Label()] && !p.IsTemplate() {
+			if _, problem := c.publishedImage(ctx, p, s); problem != "" {
+				c.info("Also publishing %s: %s", p.Label(), problem)
+				chosen[p.Label()] = true
+			}
+		}
+		if chosen[p.Label()] {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // Products runs validate, check or publish on the products named (or
 // changed since a ref, or all), and says whether every one passed.
 func (c *Catalog) Products(ctx context.Context, command string, names []string, changedSince *string) (bool, error) {
 	products, err := c.SelectProducts(names, changedSince)
 	if err != nil {
 		return false, err
+	}
+	var settings Settings
+	if command == "publish" {
+		if settings, err = c.Settings(); err != nil {
+			return false, err
+		}
+		if problems := settings.Problems(); len(problems) > 0 {
+			for _, p := range problems {
+				c.errorAt(c.path("vertra.yaml"), p)
+			}
+			return false, nil
+		}
+		if changedSince != nil && c.Getenv("GITHUB_SHA") != "" {
+			products = c.withUnpublished(ctx, products, settings)
+		}
 	}
 	if len(products) == 0 {
 		c.info("No products to check.")
@@ -67,17 +108,7 @@ func (c *Catalog) Products(ctx context.Context, command string, names []string, 
 		return ok, nil
 	}
 
-	var settings Settings
 	if command == "publish" {
-		if settings, err = c.Settings(); err != nil {
-			return false, err
-		}
-		if problems := settings.Problems(); len(problems) > 0 {
-			for _, p := range problems {
-				c.errorAt(c.path("vertra.yaml"), p)
-			}
-			return false, nil
-		}
 		var templates []string
 		var publishable []*Product
 		for _, p := range products {

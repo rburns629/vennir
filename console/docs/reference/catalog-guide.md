@@ -630,13 +630,19 @@ vault its namespace can read. `./vertra catalog validate` checks this layout, an
 ## Publishing
 
 `./vertra catalog publish` checks each product, then pushes its image tagged with
-the commit (or the time, from a laptop) and `:latest`, signs it if the
+the commit that last changed it (its folder, `tools/`, `vertra.yaml` or
+`vertra`; the time, from a laptop), signs it if the
 catalog signs, and attaches its software bill of materials (CycloneDX, from
 its scan) as an attestation signed the same way, which each install's
-Observe page offers for download. `./vertra catalog release` then pushes the catalog's release to
-`<registry>/catalog-release` (tagged with the commit and `latest`) and signs it
-the same way: every team, its SecretStore files, and every action as
-`<team>-<product>-<action>`, its image pinned by digest. It's complete, not a
+Observe page offers for download; only then does it move `:latest` to it. `./vertra catalog release` then pushes the catalog's release to
+`<registry>/catalog-release`, signs it the same way and only then tags it
+with the commit and `latest`: every team, its SecretStore files, and every action as
+`<team>-<product>-<action>`, its image pinned by digest to the image tagged
+with the product's commit (`:latest`, from a laptop). A product whose image
+for that commit is missing, or unsigned when the catalog signs (its publish
+failed), fails the release. In CI, `publish --changed` therefore also
+publishes every product whose image for its commit is missing or unsigned,
+so the next run on `main` (or rerunning the failed one) puts it right. It's complete, not a
 change: an install unregisters what a release no longer has, and retires a
 team whose folder is gone. Each console reads it every few minutes (an admin
 can press **Sync now**), verifies its signature, and applies it.
