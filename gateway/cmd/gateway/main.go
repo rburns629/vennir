@@ -144,7 +144,7 @@ func run(log *slog.Logger) error {
 			Limiter: limits.New(),
 			Minter:  &credentials.Minter{TokenRequest: tokenRequest, GCPAudience: s.GCPAudience, GCPTokenAudience: s.GCPTokenAudience},
 			Settings: gateway.Settings{BackendHosts: s.BackendHosts, InternetTeams: s.InternetTeams,
-				DefaultPerMinute: s.DefaultPerMinute, Closed: s.Closed},
+				TrustedProxies: s.TrustedProxies, DefaultPerMinute: s.DefaultPerMinute, Closed: s.Closed},
 			Log: log, Metrics: metrics, Traffic: recorder, Public: public,
 		}
 	}

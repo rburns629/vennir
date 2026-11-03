@@ -294,22 +294,26 @@ read concurrently first, then `poll()` acts on each in order)
 Inside the executor (`internal/executor/kubernetes.go`, the one
 implementation of `Executor`; the scheduler only knows the interface):
 
-- `Start()` creates a Job whose Pod has an `emptyDir` at `/platform/output`,
-  then an immutable ConfigMap holding `request.json` (mounted read-only at
-  `/platform/input`) that names the Job as its owner, so Kubernetes deletes
-  it with any Job the scheduler never releases. One already there under
-  its name is replaced (the scheduler can't read ConfigMaps), so once
-  `Start()` returns the request is the kernel's; one the dispatch policy
-  won't let it delete (not labelled as its own) refuses the attempt. Names come from
+- `Start()` creates a Job, suspended, whose Pod has an `emptyDir` at
+  `/platform/output`; then an immutable ConfigMap holding `request.json`
+  (mounted read-only at `/platform/input`) that names the Job as its owner,
+  so Kubernetes deletes it with any Job the scheduler never releases; then
+  resumes the Job, which only then makes its Pod. One ConfigMap already
+  there under its name is replaced (the scheduler can't read ConfigMaps),
+  so the Pod of a Job the kernel made only ever mounts its request; one the dispatch policy
+  won't let it delete (not labelled as its own) refuses the attempt, as
+  does a resume it refuses. Resuming is the one change the dispatch policy
+  lets the scheduler make to a Job (its own, suspended, nothing else
+  changed). Names come from
   (execution, task, attempt) (`JobName`, the same as the Python kernel's
   was): a Job already there under its name is this same attempt's, from a
   pass that rolled back or a start that erred after making it, and is
-  adopted rather than started twice, but only if it's the Job this start
+  adopted (and resumed, if it's still suspended) rather than started twice, but only if it's the Job this start
   would make (its labels, image, command, arguments, ServiceAccount and
   Secrets): the admission policies only check the scheduler's own creates,
   so one made otherwise is a `DISPATCH_REJECTED`. Every Job has
   `activeDeadlineSeconds` (the task's timeout, plus the start timeout, plus
-  a grace period, from its creation), so Kubernetes stops one the scheduler
+  a grace period, from its resume), so Kubernetes stops one the scheduler
   has lost track of. A ConfigMap too big for the API server (inputs over
   1 MiB once resolved; kernel-api refuses more than 256 KiB of a task's own)
   is refused too. A 403 (or Sigstore's 400) is a
