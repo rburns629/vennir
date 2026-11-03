@@ -103,10 +103,10 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | `internal/executor/watch.go` | Informers on the kernel's Jobs and Pods: wake the loop on a change, and skip re-reading a step that hasn't changed. |
 | `internal/executor/executortest/` | `Fake`: an in-memory executor, to test the scheduler without a cluster. |
 | **`internal/scheduler/`** | **The scheduling pass and the loop.** |
-| `internal/scheduler/tick.go` | One pass: expire undecided approvals, claim, start each task, poll running ones, save results, retry or fail, release dependents, finish executions. |
+| `internal/scheduler/tick.go` | One pass, in two parts: `RecordPass` (expire undecided approvals, poll running tasks, save results, retry or fail, release dependents, finish executions, renew the rest's leases) and `DispatchPass` (claim, start each task); `RunTick` runs both in one transaction, for tests. |
 | `internal/scheduler/claiming.go` | Takes READY tasks with `FOR UPDATE SKIP LOCKED` and a lease, within the running caps (the platform's, each team's, each product's) and concurrency keys; recovers tasks whose lease expired; releases a stopping scheduler's leases. |
 | `internal/scheduler/rows.go` | The task and attempt rows, events, and compare-and-set execution transitions. |
-| `internal/scheduler/run.go` | The loop: a pass per transaction, finished Jobs released after the commit (held `ReleaseAfter` first, for the log collector), housekeeping, the queue gauges (`kernel_tasks`, the oldest ready task's age), the heartbeat, leases released on stop. |
+| `internal/scheduler/run.go` | The loop: each pass records what finished and commits it, then dispatches in a transaction of its own, finished Jobs released after the commit (held `ReleaseAfter` first, for the log collector), housekeeping, the queue gauges (`kernel_tasks`, the oldest ready task's age), the heartbeat, leases released on stop. |
 | `internal/scheduler/retention.go` | Deletes finished executions past their retention (with everything of theirs). |
 | `internal/scheduler/orphans.go` | Every few minutes, removes attempts' Jobs no task can use any more (a pass that rolled back, a release that failed, a deleted execution). |
 | **`internal/migrate/`** | **The schema.** |
