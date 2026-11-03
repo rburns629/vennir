@@ -67,9 +67,14 @@ Grant each product's role only what it calls:
 
 | Product | IAM actions |
 |---|---|
-| `s3-bucket` | `s3:ListBucket` (for HeadBucket), `s3:CreateBucket`, `s3:PutBucketPublicAccessBlock`, `s3:PutBucketTagging`, `s3:GetBucketTagging`, and for delete `s3:DeleteBucket`, on `arn:aws:s3:::<prefix>*` |
+| `s3-bucket` | `s3:ListBucket` (for HeadBucket), `s3:CreateBucket`, `s3:PutBucketPublicAccessBlock`, `s3:TagResource` (it's created tagged), `s3:GetBucketTagging`, and for delete `s3:DeleteBucket`, on `arn:aws:s3:::<prefix>*` |
 | `app-runner` | `apprunner:ListServices`, `apprunner:DescribeService`, `apprunner:CreateService`, `apprunner:TagResource`, `apprunner:ListTagsForResource`, and for delete `apprunner:DeleteService`; `iam:PassRole` on the ECR access role if you use one |
 | `rds-postgres` | `rds:DescribeDBInstances`, `rds:CreateDBInstance`, `rds:AddTagsToResource`, and for delete `rds:DeleteDBInstance` and `rds:CreateDBSnapshot` (its final snapshot), plus `secretsmanager:CreateSecret`, `secretsmanager:TagResource` and `kms:DescribeKey` for the managed password (and `secretsmanager:DeleteSecret`, which RDS uses to remove it) |
+
+Upgrading: `s3-bucket` used to tag a bucket after making it, with
+`s3:PutBucketTagging`; it now makes it tagged, which needs `s3:TagResource`.
+Add that to a role granted from an older copy of this table, or every
+create fails with an AccessDenied that names it.
 
 The first App Runner service or RDS instance in an account also makes that
 service's service-linked role. Either create it once yourself (`aws iam
