@@ -83,20 +83,35 @@ func TestConsoleKeysDropAKeyTheConsoleNoLongerPublishes(t *testing.T) {
 	}
 	// The console restarting: the last set is still used for a while.
 	down.Store(true)
-	k.fetched = time.Now().Add(-keysFor)
+	k.good = time.Now().Add(-keysFor)
+	k.fetched = k.good
 	if _, err := k.Key(ctx, "one"); err != nil {
 		t.Fatalf("while the console can't be read: %v", err)
 	}
-	k.fetched, k.good = time.Now().Add(-keysFor), time.Now().Add(-keptFor)
+	// Too old: refused, and still refused by the next request (the failed
+	// read doesn't make the set fresh again).
+	k.good, k.fetched = time.Now().Add(-keptFor), time.Now().Add(-keptFor)
 	if _, err := k.Key(ctx, "one"); err == nil || err == ErrUnauthenticated {
 		t.Fatalf("once the last set is too old: %v", err)
 	}
-	// JWT_SECRET rotated: with no new session to ask about, the old key
-	// still stops working once the set is due again.
+	if _, err := k.Key(ctx, "one"); err == nil || err == ErrUnauthenticated {
+		t.Fatalf("the request after: %v", err)
+	}
+	// A caller that gives up doesn't spoil the read for everyone.
 	down.Store(false)
 	current.Store("two")
-	k.fetched = time.Now().Add(-keysFor)
+	k.fetched = time.Now().Add(-refetchAfter)
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := k.Key(canceled, "made-up"); err != ErrUnauthenticated || time.Since(k.good) > time.Second {
+		t.Fatalf("a canceled caller's read: %v, read %v ago", err, time.Since(k.good))
+	}
+	// JWT_SECRET rotated: with no new session to ask about, the old key
+	// stops working once the set is read again.
 	if _, err := k.Key(ctx, "one"); err != ErrUnauthenticated {
 		t.Fatalf("the rotated-out key: %v", err)
+	}
+	if _, err := k.Key(ctx, "two"); err != nil {
+		t.Fatalf("the new key: %v", err)
 	}
 }
