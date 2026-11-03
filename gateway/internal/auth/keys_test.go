@@ -55,9 +55,19 @@ func TestConsoleKeysSayWhenTheConsoleCantBeRead(t *testing.T) {
 		http.Error(w, "down", http.StatusServiceUnavailable)
 	}))
 	defer server.Close()
-	_, err := (&ConsoleKeys{URL: server.URL}).Key(context.Background(), "one")
+	k := &ConsoleKeys{URL: server.URL}
+	_, err := k.Key(context.Background(), "one")
 	if err == nil || err == ErrUnauthenticated {
 		t.Fatalf("an unreadable console is the gateway's problem, not the caller's: %v", err)
+	}
+	// Nor is it for the requests after, before the set may be read again,
+	// or while another request is reading it: they can't say who's signed in.
+	if _, err := k.Key(context.Background(), "one"); err != errUnread {
+		t.Fatalf("just after a failed read: %v", err)
+	}
+	k.fetched, k.refreshing = time.Time{}, true
+	if _, err := k.Key(context.Background(), "one"); err != errUnread {
+		t.Fatalf("while another request reads the set: %v", err)
 	}
 }
 

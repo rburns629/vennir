@@ -53,6 +53,12 @@ type ConsoleKeys struct {
 // errStale is a known key whose set is too old to trust any longer.
 var errStale = errors.New("the console's session keys: not read for too long")
 
+// errUnread is a key id the gateway can't look up yet: the set is being
+// read, or the last read failed. Not the caller's fault (a 503, not "sign
+// in"): right after a rotation, or the gateway's start, a valid session
+// may name it.
+var errUnread = errors.New("the console's session keys: being read, or couldn't be")
+
 // Key is the public key with this id.
 func (k *ConsoleKeys) Key(ctx context.Context, kid string) (ed25519.PublicKey, error) {
 	k.mu.Lock()
@@ -70,6 +76,8 @@ func (k *ConsoleKeys) Key(ctx context.Context, kid string) (ed25519.PublicKey, e
 			return key, nil
 		case known:
 			return nil, errStale
+		case k.refreshing || k.good.Before(k.fetched):
+			return nil, errUnread
 		}
 		return nil, ErrUnauthenticated
 	}
