@@ -544,8 +544,9 @@ export const submittedExecutions = pgTable("submitted_executions", {
   submittedBy: uuid("submitted_by").references(() => users.id, { onDelete: "set null" }),
   // Who may not approve its steps, worked out when it was submitted
   // (core/approvals.ts notDeciders): its submitter and, for a bot, whoever
-  // made it something to act with. Empty for a run from before.
-  notDeciders: uuid("not_deciders").array().notNull().default(sql`'{}'::uuid[]`),
+  // made it something to act with. Null for a run from before, whose are
+  // worked out when asked.
+  notDeciders: uuid("not_deciders").array(),
   name: text("external_reference").notNull(),
   // The exact body forwarded to kernel-api's `POST /v1/executions` (see
   // core/executions.ts) -- kept so a later rerun can resubmit the same

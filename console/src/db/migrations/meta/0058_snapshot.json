@@ -1,5 +1,5 @@
 {
-  "id": "9fd960b3-2841-44d9-a055-3687064c7776",
+  "id": "63c4f017-b90d-4fd8-81dc-bd177e9eda21",
   "prevId": "69f99432-93f7-447f-b4e7-28f23bc786db",
   "version": "7",
   "dialect": "postgresql",
@@ -3218,8 +3218,7 @@
           "name": "not_deciders",
           "type": "uuid[]",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::uuid[]"
+          "notNull": false
         },
         "external_reference": {
           "name": "external_reference",

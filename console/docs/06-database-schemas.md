@@ -663,7 +663,7 @@ The console's record of every execution submitted through it, and who may see it
 | `execution_id` | uuid | no | The kernel's execution id. |
 | `teams` | text[] | no | Every team named by a task in the DAG. Members of any of them can see the execution. |
 | `submitted_by` | uuid | yes | The user or bot. Emptied if that account is deleted; the record stays. |
-| `not_deciders` | uuid[] | no | Who may not approve its steps, worked out when it was submitted: its submitter and, for a bot, whoever made it a token, keyless identity or schedule (and so on through bots). Empty for a run from before, whose are worked out when asked. |
+| `not_deciders` | uuid[] | yes | Who may not approve its steps, worked out when it was submitted: its submitter and, for a bot, whoever made it a token, keyless identity or schedule (and so on through bots). Empty for a run from before, whose are worked out when asked. |
 | `external_reference` | text | no | The DAG's `name`. |
 | `payload` | jsonb | yes | The DAG as sent to the kernel, so **Rerun** can resubmit it. Empty for rows from before this column existed. |
 | `template` | text | yes | Run from a template (`TemplateService`): `<team>/<template>`, or `<team>/<product>.<action>` for an action run alone, or `cleanup` for a run deleting resources (`ResourceService`), or `preview` for a run of plan actions (Preview), or `check` for a product's readiness check (run by the console: no `submitted_by`). Whoever ran it can see, cancel, retry and rerun it (not a cleanup's: it's asked for again from the resources); a rerun runs the template again. Empty for a DAG submitted as such. |

@@ -1118,7 +1118,14 @@ export async function rerun(caller: AuthUser | undefined, executionId: string, l
 
   const result = await submitExecution(scopeRequestId(rerunPayload, submitted.teams), requester(caller));
   await recordOrCancel(
-    { executionId: result.executionId, teams: submitted.teams, submittedBy: caller?.id ?? "", name: submitted.name, payload: recordable(rerunPayload) },
+    {
+      executionId: result.executionId,
+      teams: submitted.teams,
+      submittedBy: caller?.id ?? "",
+      notDeciders: await notDeciders(caller?.id ?? null),
+      name: submitted.name,
+      payload: recordable(rerunPayload),
+    },
     result.created,
     log,
   );

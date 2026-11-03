@@ -911,8 +911,8 @@ export interface SubmittedExecution {
   teams: string[];
   /** Null once the submitter's account was deleted (history outlives it). */
   submittedBy: string | null;
-  /** Who may not approve its steps, as worked out at submission (core/approvals.ts). */
-  notDeciders: string[];
+  /** Who may not approve its steps, as worked out at submission (core/approvals.ts); null for a run from before. */
+  notDeciders: string[] | null;
   name: string;
   // The exact body originally forwarded to kernel-api -- `null` only for
   // rows recorded before this column existed (see schema.ts). This is
@@ -940,7 +940,8 @@ export async function recordSubmittedExecution(input: {
   teams: string[];
   /** Null: the console itself (readiness checks). */
   submittedBy: string | null;
-  notDeciders?: string[];
+  /** Who may not approve its steps (core/approvals.ts notDeciders): every run records it. */
+  notDeciders: string[];
   scheduleId?: string | undefined;
   name: string;
   payload: unknown;

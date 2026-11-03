@@ -173,6 +173,7 @@ export async function callerForUser(userId: string): Promise<AuthUser | undefine
     teamNames: roles.map((row) => row.name),
     maintainerOf: roles.filter((row) => row.role === "maintainer").map((row) => row.name),
     isAdmin: user.isAdmin,
+    ...(user.isBot ? { isBot: true } : {}),
     scopes: [],
     mustChangePassword: false,
   };

@@ -69,8 +69,8 @@ export async function notDeciders(submittedBy: string | null): Promise<string[]>
 }
 
 /** Who mayn't decide on this run: as kept when it was submitted, or, for one from before, as it'd be now. */
-export async function notDecidersOf(submitted: { submittedBy: string | null; notDeciders: string[] }): Promise<string[]> {
-  return submitted.notDeciders.length > 0 ? submitted.notDeciders : notDeciders(submitted.submittedBy);
+export async function notDecidersOf(submitted: { submittedBy: string | null; notDeciders: string[] | null }): Promise<string[]> {
+  return submitted.notDeciders ?? notDeciders(submitted.submittedBy);
 }
 
 /** Who mayn't decide on each of these runs' waiting steps, by execution id. */

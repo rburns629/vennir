@@ -1,6 +1,6 @@
 ALTER TABLE "api_tokens" ADD COLUMN "created_by" uuid;--> statement-breakpoint
 ALTER TABLE "schedules" ADD COLUMN "updated_by" uuid;--> statement-breakpoint
-ALTER TABLE "submitted_executions" ADD COLUMN "not_deciders" uuid[] DEFAULT '{}'::uuid[] NOT NULL;--> statement-breakpoint
+ALTER TABLE "submitted_executions" ADD COLUMN "not_deciders" uuid[];--> statement-breakpoint
 ALTER TABLE "api_tokens" ADD CONSTRAINT "api_tokens_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "schedules" ADD CONSTRAINT "schedules_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 -- Who made each team bot's token so far, from its audit entry: the
