@@ -2,10 +2,11 @@ name: release
 
 # On a version tag (v1.2.3, or v1.2.3-rc.1 for a pre-release):
 #
-#   preflight  refuses a tag whose commit isn't on main, and a version
-#              that's already published, even in part. A tag push runs the
-#              tagged commit's own copy of this file, so the main check
-#              stops mistakes. That only reviewed code is released (and
+#   preflight  refuses a tag whose commit isn't on main, a tag whose vertra
+#              code reaches a known vulnerability (govulncheck, as CI), and
+#              a version that's already published, even in part. A tag push
+#              runs the tagged commit's own copy of this file, so the main
+#              check stops mistakes. That only reviewed code is released (and
 #              signed with the release's identity) holds only with the v*
 #              tag ruleset: admins only (TODO.md, docs/security-model.md).
 #   images     builds the kernel, console and gateway images for
@@ -73,6 +74,13 @@ jobs:
             echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) isn't on main: only a commit on main is released."
             exit 1
           fi
+      - name: vertra's code reaches no known vulnerability
+        # As CI's govulncheck job, in the Go image vertra is built with. The
+        # version is pinned in both (here and ci.yml): bump them together.
+        run: |
+          image=$(sed -n 's/^GO_IMAGE ?= *//p' Makefile)
+          docker run --rm -v "$PWD":/repo -w /repo/cli -e CGO_ENABLED=0 "$image" \
+            go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - run: bash .github/scripts/install-scanners.sh oras
       - name: The version isn't published yet
         # A re-run of every job would build new bytes under a version that

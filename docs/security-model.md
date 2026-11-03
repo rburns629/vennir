@@ -927,8 +927,10 @@ have passed tags them as the version. A version's tags are written once:
 a run refuses a version already published, and a re-run of its failed jobs
 keeps what an earlier attempt published. The charts and the `vertra` binaries are
 signed the same way, and a catalog's `./vertra` downloads its binary by
-SHA-256. Every pull request also runs Semgrep, gitleaks, and the same scan
-of the three platform images (`.github/workflows/security.yml`, `ci.yml`).
+SHA-256; the release checks it with govulncheck before pushing it. Every
+pull request also runs Semgrep (Go rules included), gitleaks, govulncheck
+over the CLI, the kernel and the gateway, and the same scan of the three
+platform images (`.github/workflows/security.yml`, `ci.yml`).
 
 The "only from `main`" check is the tagged commit's own: a tag push runs
 the `release.yml` in the commit it tags, so a branch commit whose
