@@ -21,7 +21,7 @@ import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { productLookup, productOfTask } from "./core/executions.js";
 import { db } from "./db/client.js";
 import { products, resourceDeleteRequests, resourceLinks, resources, submittedExecutions, type Provided } from "./db/schema.js";
-import { getExecution, getExecutionStates, type KernelExecution } from "./kernel/client.js";
+import { getExecution, getExecutionStates, type ExecutionStateEntry, type KernelExecution } from "./kernel/client.js";
 import { runFinished } from "./notifier.js";
 import { runFinishedCallbacks } from "./callbacks.js";
 import { recordCheck } from "./readiness.js";
@@ -306,8 +306,29 @@ export async function recordRun(run: Run, detail: KernelExecution): Promise<numb
   return rows.length;
 }
 
-/** One pass: finished runs not yet recorded, oldest first. */
-export async function recordFinishedRuns(): Promise<{ runs: number; resources: number }> {
+/**
+ * Where the last pass stopped in the runs not yet recorded (created_at as
+ * Postgres writes it, to the microsecond, and execution id), so the next
+ * goes on from there: runs that haven't finished, however many and however
+ * old, are passed over instead of filling every pass ahead of newer ones.
+ * Back to the oldest once a pass reaches the end. Each replica keeps its
+ * own; a run two replicas both record is recorded the same twice and told
+ * once (its news has keys).
+ */
+let cursor: { time: string; id: string } | null = null;
+
+/**
+ * Passes in a row each run's recording failed in. A run that fails every
+ * time is passed over after STRIKES, so it can't hold up every run after
+ * it; it comes round again once the cursor does. The error still ends the
+ * pass, and is logged.
+ */
+const failures = new Map<string, number>();
+const STRIKES = 3;
+
+/** One pass: finished runs not yet recorded, oldest first from where the last pass stopped. */
+export async function recordFinishedRuns({ perPass = PER_PASS }: { perPass?: number } = {}): Promise<{ runs: number; resources: number }> {
+  const after = cursor;
   const pending = await db
     .select({
       executionId: submittedExecutions.executionId,
@@ -317,56 +338,113 @@ export async function recordFinishedRuns(): Promise<{ runs: number; resources: n
       payload: submittedExecutions.payload,
       template: submittedExecutions.template,
       onBehalfOf: submittedExecutions.onBehalfOf,
+      cursorTime: sql<string>`${submittedExecutions.createdAt}::text`,
     })
     .from(submittedExecutions)
-    .where(isNull(submittedExecutions.resourcesRecordedAt))
-    .orderBy(asc(submittedExecutions.createdAt))
-    .limit(PER_PASS);
-  if (pending.length === 0) return { runs: 0, resources: 0 };
+    .where(
+      and(
+        isNull(submittedExecutions.resourcesRecordedAt),
+        after ? sql`(${submittedExecutions.createdAt}, ${submittedExecutions.executionId}) > (${after.time}::timestamptz, ${after.id}::uuid)` : undefined,
+      ),
+    )
+    .orderBy(asc(submittedExecutions.createdAt), asc(submittedExecutions.executionId))
+    .limit(perPass);
+  if (pending.length === 0) {
+    cursor = null;
+    return { runs: 0, resources: 0 };
+  }
   const states = new Map((await getExecutionStates(pending.map((r) => r.executionId))).map((s) => [s.executionId, s]));
   let runs = 0;
   let recorded = 0;
+  let stopped = false;
   for (const run of pending) {
-    const { state, updatedAt } = states.get(run.executionId) ?? {};
-    if (state === undefined) {
-      // The kernel no longer has it (past its retention): nothing to read.
-      await db
-        .update(submittedExecutions)
-        .set({ resourcesRecordedAt: sql`now()` })
-        .where(and(eq(submittedExecutions.executionId, run.executionId), isNull(submittedExecutions.resourcesRecordedAt)));
-      continue;
-    }
-    if (!FINISHED.has(state) || runs === READ_PER_PASS) continue;
-    if (run.template === "check") {
-      // A readiness check: its answer is the product's (readiness.ts).
-      await recordCheck(run.executionId, await getExecution(run.executionId));
-      await db.update(submittedExecutions).set({ resourcesRecordedAt: sql`now()` }).where(eq(submittedExecutions.executionId, run.executionId));
-      runs += 1;
-      continue;
-    }
-    if (run.template === "preview") {
-      // A preview changes nothing and says so itself: no resources, no news.
-      await db.update(submittedExecutions).set({ resourcesRecordedAt: sql`now()` }).where(eq(submittedExecutions.executionId, run.executionId));
-      runs += 1;
-      continue;
-    }
-    const detail = await getExecution(run.executionId);
-    // Told first: if recording fails, the next pass tells again, which its key makes a no-op.
-    const failed = detail.tasks.find((t) => t.state === "FAILED");
-    await runFinished({
-      executionId: run.executionId,
-      name: run.name,
-      state,
-      submittedBy: run.submittedBy,
-      teams: run.template !== null ? (run.onBehalfOf ? [run.onBehalfOf] : []) : run.teams,
-      finishedAt: updatedAt ?? null,
-      failedStep: failed ? { taskId: failed.taskId, code: typeof failed.failure?.["code"] === "string" ? failed.failure["code"] : "an error" } : undefined,
+    // Done with: the next pass goes on after it. One that throws isn't, so
+    // the next pass starts with it (until its STRIKES).
+    const passed = () => {
+      cursor = { time: run.cursorTime, id: run.executionId };
+      failures.delete(run.executionId);
+    };
+    const step = await recordOne(run, states, runs, passed).catch((error: unknown) => {
+      const n = (failures.get(run.executionId) ?? 0) + 1;
+      if (n >= STRIKES) passed();
+      else failures.set(run.executionId, n);
+      throw error;
     });
-    await runFinishedCallbacks({ ...run, state, finishedAt: updatedAt ?? null, tasks: detail.tasks });
-    recorded += await recordRun(run, detail);
-    runs += 1;
+    if (step === "stop") {
+      stopped = true;
+      break;
+    }
+    if (step === "read") runs += 1;
+    else if (typeof step === "number") {
+      runs += 1;
+      recorded += step;
+    }
   }
+  // Reached the end of what's not recorded: from the oldest again next pass.
+  if (!stopped && pending.length < perPass) cursor = null;
   return { runs, resources: recorded };
+}
+
+type Pending = Run & Pick<typeof submittedExecutions.$inferSelect, "name" | "teams"> & { cursorTime: string };
+
+/**
+ * One run: "skipped" (not finished, or gone), "stop" (enough read this
+ * pass), "read" (a check or preview), or how many resources it recorded.
+ */
+async function recordOne(
+  run: Pending,
+  states: Map<string, ExecutionStateEntry>,
+  runs: number,
+  passed: () => void,
+): Promise<"skipped" | "stop" | "read" | number> {
+  const { state, updatedAt } = states.get(run.executionId) ?? {};
+  if (state === undefined) {
+    // The kernel no longer has it (past its retention): nothing to read.
+    await db
+      .update(submittedExecutions)
+      .set({ resourcesRecordedAt: sql`now()` })
+      .where(and(eq(submittedExecutions.executionId, run.executionId), isNull(submittedExecutions.resourcesRecordedAt)));
+    passed();
+    return "skipped";
+  }
+  if (!FINISHED.has(state)) {
+    // Not finished yet: looked at again when the cursor comes round.
+    passed();
+    return "skipped";
+  }
+  if (runs === READ_PER_PASS) {
+    // Enough read for one pass: this one and what's after it, next pass.
+    return "stop";
+  }
+  if (run.template === "check") {
+    // A readiness check: its answer is the product's (readiness.ts).
+    await recordCheck(run.executionId, await getExecution(run.executionId));
+    await db.update(submittedExecutions).set({ resourcesRecordedAt: sql`now()` }).where(eq(submittedExecutions.executionId, run.executionId));
+    passed();
+    return "read";
+  }
+  if (run.template === "preview") {
+    // A preview changes nothing and says so itself: no resources, no news.
+    await db.update(submittedExecutions).set({ resourcesRecordedAt: sql`now()` }).where(eq(submittedExecutions.executionId, run.executionId));
+    passed();
+    return "read";
+  }
+  const detail = await getExecution(run.executionId);
+  // Told first: if recording fails, the next pass tells again, which its key makes a no-op.
+  const failed = detail.tasks.find((t) => t.state === "FAILED");
+  await runFinished({
+    executionId: run.executionId,
+    name: run.name,
+    state,
+    submittedBy: run.submittedBy,
+    teams: run.template !== null ? (run.onBehalfOf ? [run.onBehalfOf] : []) : run.teams,
+    finishedAt: updatedAt ?? null,
+    failedStep: failed ? { taskId: failed.taskId, code: typeof failed.failure?.["code"] === "string" ? failed.failure["code"] : "an error" } : undefined,
+  });
+  await runFinishedCallbacks({ ...run, state, finishedAt: updatedAt ?? null, tasks: detail.tasks });
+  const made = await recordRun(run, detail);
+  passed();
+  return made;
 }
 
 export function startResourceRecorder(log: FastifyBaseLogger): void {
