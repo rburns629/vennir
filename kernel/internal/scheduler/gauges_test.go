@@ -33,4 +33,14 @@ func TestSampleTasksCountsUnfinishedTasks(t *testing.T) {
 	equal(t, "claimed", gauge("CLAIMED")-claimed, 1.0)
 	equal(t, "running reported though 0", testutil.CollectAndCount(metrics.Tasks) >= 5, true)
 	equal(t, "oldest ready waited about an hour", testutil.ToFloat64(metrics.OldestReady) >= 3599, true)
+
+	// A failed execution's READY task waits for a retry, not in the queue.
+	failed := submit(t, tx, "idem-gauges-failed", numbered(2)...)
+	if _, err := tx.Exec(ctx, `UPDATE executions SET state = 'FAILED' WHERE id = $1::uuid`, failed); err != nil {
+		t.Fatal(err)
+	}
+	if err := SampleTasks(ctx, tx, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	equal(t, "a failed execution's not counted", gauge("READY")-ready, 2.0)
 }

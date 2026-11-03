@@ -692,7 +692,7 @@ func (s *Service) RetryTask(ctx context.Context, req *connect.Request[kernelv1.R
 		// Conditional, like every state change here: the scheduler may be
 		// changing the same row.
 		requestedBy := nullable(req.Msg.GetRequestedBy())
-		err := t.QueryRow(ctx, `UPDATE execution_tasks SET state = `+domain.ReadyOrAwaitingSQL+`, lease_owner = NULL, lease_expires_at = NULL,
+		err = t.QueryRow(ctx, `UPDATE execution_tasks SET state = `+domain.ReadyOrAwaitingSQL+`, lease_owner = NULL, lease_expires_at = NULL,
 			executor_handle = NULL, failure = NULL, available_at = now(), next_attempt_requested_by = $3, updated_at = now()
 			WHERE execution_id = $1 AND task_key = $2 AND state = 'FAILED' RETURNING id::text, attempt_count`, id, key, requestedBy).Scan(&taskID, &attempts)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -707,6 +707,18 @@ func (s *Service) RetryTask(ctx context.Context, req *connect.Request[kernelv1.R
 		}
 		if err != nil {
 			return err
+		}
+		// Only a failed or still-running execution's (the transaction
+		// undoes the update above): a cancelled one's tasks would come back
+		// READY or BLOCKED where nothing claims them. Its state read locked,
+		// after the task's (tasks then executions, as cancelling takes
+		// them), so a cancel can't land between the check and the revival.
+		var state string
+		if err := t.QueryRow(ctx, `SELECT state FROM executions WHERE id = $1 FOR UPDATE`, id).Scan(&state); err != nil {
+			return err
+		}
+		if state != string(domain.ExecutionFailed) && state != string(domain.ExecutionRunning) {
+			return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("This execution is %s: only a failed or running execution's task can be retried.", state))
 		}
 		if err := t.recordEvent(ctx, id, &taskID, domain.EventTaskRetried, map[string]any{"taskKey": key, "attempt": attempts}); err != nil {
 			return err
