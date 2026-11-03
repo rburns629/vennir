@@ -186,8 +186,8 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 		dirs[filepath.Base(d)] = d
 	}
 	for _, team := range c.TeamNames() {
-		if team == ReleaseRepositoryName {
-			problems = append(problems, fmt.Sprintf("teams/%s: %s is the release's own repository; rename the team", team, team))
+		if why := reservedTeamName(team); why != "" {
+			problems = append(problems, fmt.Sprintf("teams/%s: no team may be called %s: %s; rename the team", team, team, why))
 			continue
 		}
 		t := &catalogv1.Team{Name: team}

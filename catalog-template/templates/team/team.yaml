@@ -3,7 +3,8 @@
 # Environment in this repo, all named after the folder.
 #
 # CHANGE every value. The folder name is your team's name everywhere:
-# lowercase letters, digits and dashes, never used before.
+# lowercase letters, digits and dashes, never used before, and not bases,
+# catalog-release, vertra-system or kube-*.
 apiVersion: vertra.dev/v2
 kind: Team
 name: try-anna                 # CHANGE: must match the folder name
