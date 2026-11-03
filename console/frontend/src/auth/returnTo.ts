@@ -9,9 +9,18 @@ const SSO_RETURN_KEY = "vertra_sso_return";
 
 /** A path of this console's (not another site's, not the sign-in pages), or Home. */
 function ownPath(path: unknown): string {
-  if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return "/";
-  if (/^\/(login|choose-password)(?=[/?#]|$)/.test(path)) return "/";
-  return path;
+  // Taken as the browser would take it (which drops tabs and newlines, and
+  // reads \ as /), so "/\t/elsewhere" can't pass for one of ours.
+  if (typeof path !== "string" || !path.startsWith("/")) return "/";
+  let url: URL;
+  try {
+    url = new URL(path, window.location.origin);
+  } catch {
+    return "/";
+  }
+  if (url.origin !== window.location.origin) return "/";
+  if (/^\/(login|choose-password)(?=\/|$)/.test(url.pathname)) return "/";
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 /** The redirect state of a page that needs a session: where it was. */

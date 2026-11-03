@@ -4,6 +4,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import { useAuth } from "../auth/AuthContext";
+import { SessionChecking } from "../auth/ProtectedRoute";
 import { returnPath } from "../auth/returnTo";
 import { PasswordChangeForm } from "../components/PasswordChangeForm";
 import { SignInLayout } from "../layout/SignInLayout";
@@ -19,7 +20,7 @@ export function ChoosePasswordPage() {
   const navigate = useNavigate();
   const { state } = useLocation();
 
-  if (loading) return null;
+  if (loading) return <SessionChecking />;
   if (!user) return <Navigate to="/login" replace state={state} />;
   if (!user.mustChangePassword) return <Navigate to={returnPath(state)} replace />;
 

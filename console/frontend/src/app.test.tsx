@@ -1780,6 +1780,48 @@ describe("signing in", () => {
     expect(localStorage.getItem("token")).toBe("a-session");
   });
 
+  it("says it can't reach the console while it waits, and asks again at once on Retry now", async () => {
+    let up = false;
+    await renderAt("/observe", MEMBER, { "AuthService/GetMe": () => (up ? MEMBER : refused(503, "unavailable", "Restarting.")) });
+    expect(await screen.findByText("Can't reach the console. Trying again…")).toBeTruthy();
+    up = true;
+    fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
+    // Well before the next try (a second after the first).
+    expect(await screen.findByRole("navigation", { name: /main/i }, { timeout: 800 })).toBeTruthy();
+  });
+
+  it("doesn't ask again a console without the method (501): it says so", async () => {
+    let asked = 0;
+    await renderAt("/observe", MEMBER, {
+      "AuthService/GetMe": () => {
+        asked += 1;
+        return refused(501, "unimplemented", "No such method here.");
+      },
+    });
+    expect(await screen.findByText("No such method here.")).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(asked).toBe(1);
+    expect(screen.queryByText("Can't reach the console. Trying again…")).toBeNull();
+  });
+
+  it("opens the console when someone signs in while the first check is still trying", async () => {
+    let signedIn = false;
+    await renderAt("/login", MEMBER, {
+      "AuthService/GetMe": () => (signedIn ? MEMBER : refused(503, "unavailable", "Restarting.")),
+      "AuthService/Login": () => {
+        signedIn = true;
+        return { token: "a-new-session" };
+      },
+    });
+    const email = await screen.findByLabelText(/email/i);
+    // Past the second try, so the next is two seconds off.
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    fireEvent.change(email, { target: { value: "ana@acme.com" } });
+    fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: "their-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    expect(await screen.findByRole("navigation", { name: /main/i }, { timeout: 800 })).toBeTruthy();
+  });
+
   it("forgets the cart and the browser's old drafts when signing out or when the session ends", async () => {
     const { cart } = await import("./cart");
     for (const end of ["sign out", "session ends"]) {

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // SPDX-License-Identifier: MIT
 import { describe, expect, it } from "vitest";
 import { returnPath } from "./returnTo";
@@ -10,7 +11,7 @@ describe("where signing in goes back to", () => {
   });
 
   it("is Home for anything else: another site, the sign-in pages, nothing", () => {
-    for (const from of ["//evil.example/x", "/\\evil.example", "https://evil.example/", "runs/r1", "/login", "/login?x=1", "/choose-password", 7]) {
+    for (const from of ["//evil.example/x", "/\\evil.example", "/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "/\\\\evil.example", "https://evil.example/", "runs/r1", "/login", "/login?x=1", "/choose-password", 7]) {
       expect(returnPath({ from })).toBe("/");
     }
     expect(returnPath(null)).toBe("/");
