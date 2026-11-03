@@ -164,10 +164,61 @@ func TestCheckGCP(t *testing.T) {
 	}
 }
 
-func TestLocationAllowed(t *testing.T) {
-	if !locationAllowed([]string{"in:us-locations"}, "us-east1") || locationAllowed([]string{"in:eu-locations"}, "us-east1") ||
-		!locationAllowed([]string{"in:us-central1-locations"}, "us-central1") {
-		t.Error("location matching")
+func TestRegionInLocations(t *testing.T) {
+	for _, c := range []struct {
+		values []string
+		region string
+		want   location
+	}{
+		{[]string{"in:us-locations"}, "us-east1", locationAllowed},
+		{[]string{"in:us-central1-locations"}, "us-central1", locationAllowed},
+		{[]string{"us-central1"}, "us-central1", locationAllowed},
+		{[]string{"is:us-central1"}, "us-central1", locationAllowed},
+		{[]string{"in:northamerica-locations"}, "us-central1", locationAllowed},
+		{[]string{"in:northamerica-locations"}, "northamerica-northeast1", locationAllowed},
+		{[]string{"in:asia-locations", "in:europe-locations"}, "europe-west12", locationAllowed},
+		{[]string{"in:europe-locations"}, "us-central1", locationRefused},
+		{[]string{"in:us-locations"}, "northamerica-northeast1", locationRefused},
+		{[]string{"in:us-east1-locations", "europe-west1"}, "us-central1", locationRefused},
+		{[]string{"us-east1"}, "me-west1", locationRefused},
+		// Groups named after a jurisdiction can't be read from a region's name.
+		{[]string{"in:eu-locations"}, "europe-west1", locationUnknown},
+		{[]string{"in:eu-locations"}, "us-east1", locationUnknown},
+		{[]string{"in:canada-locations"}, "northamerica-northeast1", locationUnknown},
+		{[]string{"in:japan-locations", "in:us-locations"}, "asia-northeast1", locationUnknown},
+		// Nor can a region outside the prefix groups be ruled out of them.
+		{[]string{"in:europe-locations"}, "me-west1", locationUnknown},
+		// A zone, or global, says nothing sure about the region.
+		{[]string{"in:us-central1-a-locations"}, "us-central1", locationUnknown},
+		{[]string{"global"}, "us-central1", locationUnknown},
+	} {
+		if got := regionInLocations(c.values, c.region); got != c.want {
+			t.Errorf("%v, %s: %d, want %d", c.values, c.region, got, c.want)
+		}
+	}
+}
+
+// A group the check can't read is a line, not a problem that stops init
+// and apply.
+func TestCheckGCPCantTellIsNotAProblem(t *testing.T) {
+	exec := func(_ context.Context, name string, args ...string) (string, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(joined, "auth list"):
+			return `[{"account":"me@example.com","status":"ACTIVE"}]`, nil
+		case strings.HasPrefix(joined, "auth application-default print-access-token"):
+			return "ya29.token", nil
+		case strings.Contains(joined, "gcp.resourceLocations"):
+			return `{"listPolicy":{"allowedValues":["in:eu-locations"]}}`, nil
+		}
+		return "", nil
+	}
+	g := CheckGCP(context.Background(), exec, func(context.Context, string) string { return "me@example.com" }, "my-project", "europe-west1")
+	if len(g.Problems) > 0 {
+		t.Errorf("problems: %+v", g.Problems)
+	}
+	if out := report(g.Report); !strings.Contains(out, "Policy: your organization's policy allows only in:eu-locations: Vertra can't tell whether that includes europe-west1") {
+		t.Errorf("no line saying so in:\n%s", out)
 	}
 }
 
