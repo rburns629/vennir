@@ -7,7 +7,7 @@ product has to. Running them costs money.
 |---|---|
 | [`project`](products/project/) | Finds a project by id, or creates it under `parent` (a folder: a workload identity has no default), linking billing |
 | [`build-image`](products/build-image/) | Builds an image with Cloud Build from a source archive in GCS (with a Dockerfile at its root), unless that image already exists |
-| [`app-hosting`](products/app-hosting/) | Deploys an image to Cloud Run, or returns the existing service's URL; optionally connects a Cloud SQL instance |
+| [`app-hosting`](products/app-hosting/) | Deploys an image from the team's registry to Cloud Run, as the team's runtime account, or returns the existing service's URL; optionally connects a Cloud SQL instance |
 | [`cloud-sql`](products/cloud-sql/) | Finds a Cloud SQL instance by name, or creates it (several minutes; set `timeoutSeconds` to 900 or more, and delete it after) |
 
 Every action looks before it creates, so a retried step is harmless.
@@ -57,12 +57,14 @@ gcloud resource-manager folders add-iam-policy-binding $FOLDER --role roles/reso
 gcloud projects add-iam-policy-binding $TARGET --role roles/cloudbuild.builds.editor --member "$(member build-image)"
 gcloud storage buckets add-iam-policy-binding gs://$SOURCES --role roles/storage.objectViewer --member "$(member build-image)"
 gcloud artifacts repositories add-iam-policy-binding $REPO --location $REGION --role roles/artifactregistry.reader --member "$(member build-image)"
-# app-hosting: Cloud Run services, run as the project's default compute account,
-# from images it may read (Cloud Run checks the deployer can, not just itself).
+# app-hosting: Cloud Run services, from images it may read (Cloud Run checks
+# the deployer can, not just itself), run as an account made for the team's
+# services: it may act as that one alone, never the default compute account.
 gcloud projects add-iam-policy-binding $TARGET --role roles/run.developer --member "$(member app-hosting)"
 gcloud artifacts repositories add-iam-policy-binding $REPO --location $REGION --role roles/artifactregistry.reader --member "$(member app-hosting)"
-TARGET_NUMBER=$(gcloud projects describe $TARGET --format='value(projectNumber)')
-gcloud iam service-accounts add-iam-policy-binding $TARGET_NUMBER-compute@developer.gserviceaccount.com --project $TARGET \
+gcloud iam service-accounts create gcp-services --project $TARGET   # no roles: grant it what the services need
+RUNTIME=gcp-services@$TARGET.iam.gserviceaccount.com
+gcloud iam service-accounts add-iam-policy-binding $RUNTIME --project $TARGET \
   --role roles/iam.serviceAccountUser --member "$(member app-hosting)"
 # cloud-sql: Cloud SQL instances.
 gcloud projects add-iam-policy-binding $TARGET --role roles/cloudsql.admin --member "$(member cloud-sql)"
@@ -70,6 +72,14 @@ gcloud projects add-iam-policy-binding $TARGET --role roles/cloudsql.admin --mem
 
 So `project` can't touch Cloud Run, and `app-hosting` can't make projects.
 Don't grant anything to `default`: every unregistered image runs as it.
+
+`app-hosting` deploys only what the team chose, as whom it chose: register
+a team secret `app-hosting` with the key `image-registry`, the registry
+every image must be under (`$REGION-docker.pkg.dev/$PROJECT/$REPO`; any
+other image is refused, `IMAGE_NOT_ALLOWED`), and `runtime-service-account`,
+`$RUNTIME`. Grant that account only what the services need (say
+`roles/cloudsql.client` for one using `cloud-sql`): whoever may run
+`create` runs code as it.
 
 Optionally, the actions impersonate a second service account, using their
 own identity only to mint its tokens: register a team secret `gcp-target`
@@ -103,7 +113,7 @@ through those its identity can see (at most 20) for one where it may:
 |---|---|---|
 | `project` | create, get and delete projects under a folder or organization, and link a billing account | `roles/browser`, `roles/resourcemanager.projectCreator`, `roles/resourcemanager.projectDeleter` on the folder; `roles/billing.user` |
 | `build-image` | create, get and list builds in a project (a retry waits on the build an earlier attempt left running) | `roles/cloudbuild.builds.editor`. Its source bucket and image repository are per run: only a create finds out |
-| `app-hosting` | get, create and delete Cloud Run services in a project, and act as its default compute account | `roles/run.developer`; `roles/iam.serviceAccountUser` on that account. Reading the image's repository (`roles/artifactregistry.reader`) is per run: only a create finds out |
+| `app-hosting` | get, create and delete Cloud Run services in a project, and act as the runtime account its `app-hosting` secret names | `roles/run.developer`; `roles/iam.serviceAccountUser` on that account; the secret itself. Reading the image's repository (`roles/artifactregistry.reader`) is per run: only a create finds out |
 | `cloud-sql` | get, create and delete Cloud SQL instances in a project | `roles/cloudsql.admin` |
 
 With no Workload Identity it isn't ready, and says so. A project, folder or
