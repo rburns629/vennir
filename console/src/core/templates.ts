@@ -545,7 +545,7 @@ export async function runProductSteps(
   name: string,
   list: ProductStep[],
   forTeam: string | undefined,
-  run: { template: string; parameters: Record<string, unknown>; forTeam?: string | undefined },
+  run: { template: string; parameters: Record<string, unknown>; forTeams?: Record<string, string> | undefined },
   options: { chained: boolean; eachShared: boolean },
   log: FastifyBaseLogger,
 ): Promise<{ executionId: string }> {
@@ -652,26 +652,26 @@ export async function previewTemplate(caller: AuthUser | undefined, team: string
 
 /**
  * Runs cleanup steps one after another, newest first (core/resources.ts):
- * for `forTeam` (the caller's, or none), and each step for `madeFor`, the
- * team what it deletes was made for, so its product deletes only that
+ * for `forTeam` (the caller's, or none), and each step for its `madeFor`,
+ * the team what it deletes was made for, so its product deletes only that
  * team's.
  */
 export async function runCleanup(
   who: AuthUser,
   name: string,
-  cleanups: Omit<ProductStep, "id">[],
+  cleanups: (Omit<ProductStep, "id"> & { madeFor: string })[],
   forTeam: string | undefined,
-  madeFor: string,
   resourceIds: string[],
   log: FastifyBaseLogger,
 ): Promise<{ executionId: string; stepIds: string[] }> {
-  const list = cleanups.map((c, i) => ({ ...c, id: `delete-${String(i + 1)}` }));
+  const list = cleanups.map((c, i) => ({ id: `delete-${String(i + 1)}`, product: c.product, inputs: c.inputs, label: c.label }));
+  const forTeams = Object.fromEntries(cleanups.map((c, i) => [list[i]?.id ?? "", c.madeFor] as const).filter(([, team]) => team !== ""));
   const { executionId } = await runProductSteps(
     who,
     name,
     list,
     forTeam,
-    { template: CLEANUP_RUN, parameters: { resources: resourceIds }, forTeam: madeFor },
+    { template: CLEANUP_RUN, parameters: { resources: resourceIds }, forTeams },
     { chained: true, eachShared: true },
     log,
   );

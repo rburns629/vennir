@@ -26,7 +26,8 @@ delete refuses anything without the tag (`NOT_MADE_BY_VERTRA`), so a
 bucket, service or database that was only found, never made, is never
 deleted; and anything whose `vertra-team` isn't the run's `forTeam`
 (`NOT_THIS_TEAMS`), so one team's delete, even run directly, can't remove
-another team's. A run for no team (`MISSING_TEAM`) is refused. A create
+another team's. A request with no `forTeam` (a person's run for no team,
+by someone outside this team) is refused (`MISSING_TEAM`). A create
 reports what it finds as made only when both tags match the same way. One
 already gone counts as deleted.
 The console lets only the team it was made for, whoever ran it, and admins

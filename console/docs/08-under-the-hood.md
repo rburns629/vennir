@@ -25,7 +25,7 @@ flowchart TB
 
 ### A ConfigMap as a one-off input file
 - **Normally:** a ConfigMap holds an application's settings.
-- **Here:** each task gets a ConfigMap named after its Job, holding a single file, `request.json` (execution id, task id, `team` (the namespace it runs in), `forTeam` (the team the run is for, which for a shared product's run is the consumer's; left out for a run for no team), action, attempt, and the inputs with every `$fromTask` reference already replaced by a real value). It's mounted read-only at `/platform/input` and deleted with the Job.
+- **Here:** each task gets a ConfigMap named after its Job, holding a single file, `request.json` (execution id, task id, `team` (the namespace it runs in), `forTeam` (the team the run is for, which for a shared product's run is the consumer's; left out for a person's run for no team when they aren't in the step's team), action, attempt, and the inputs with every `$fromTask` reference already replaced by a real value). It's mounted read-only at `/platform/input` and deleted with the Job.
 - **Why:** a team's inputs never pass through a shell command, so they can't inject one, and a product in any language only has to read a file. The ConfigMap is created after its Job and owned by it, so deleting the Job deletes it too, and a start that fails leaves nothing behind.
 - **Code:** `kernel/internal/executor/kubernetes.go` (`Start`, `createConfigMap`, and `Discard` for the clean-up).
 

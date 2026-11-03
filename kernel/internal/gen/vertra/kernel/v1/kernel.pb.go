@@ -204,9 +204,10 @@ type Task struct {
 	// (scheduler.capacityPlacements); empty, or one the install has none for:
 	// the install's own (scheduler.taskPlacement).
 	Capacity string `protobuf:"bytes,18,opt,name=capacity,proto3" json:"capacity,omitempty"`
-	// The team the step runs for: whose run it is (a template's, action's,
-	// order's or cleanup's onBehalfOf; a team's own DAG, its team), which may
-	// not be the team it runs in. In request.json as forTeam, so a product
+	// The team the step runs for: whose run it is (a template's, action's or
+	// order's onBehalfOf; a cleanup's, the team the resource it deletes was
+	// made for; a person's run for no team, its team when they're in it, else
+	// none; a team's own DAG, its team), which may not be the team it runs in. In request.json as forTeam, so a product
 	// can mark what it makes as that team's and clean up only that team's.
 	// A Kubernetes namespace name; empty: request.json has none.
 	ForTeam       string `protobuf:"bytes,19,opt,name=for_team,json=forTeam,proto3" json:"for_team,omitempty"`

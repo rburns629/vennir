@@ -23,8 +23,9 @@ runs made**) runs it. A delete refuses anything without the label
 (`NOT_MADE_BY_VERTRA`), so a project or service that was only found, never
 made, is never deleted; and anything whose `vertra-team` isn't the run's
 `forTeam` (`NOT_THIS_TEAMS`), so one team's delete, even run directly,
-can't remove another team's project. A run for no team (`MISSING_TEAM`) is
-refused. A create reports what it finds as made only when both labels match
+can't remove another team's project. A request with no `forTeam` (a
+person's run for no team, by someone outside this team) is refused
+(`MISSING_TEAM`). A create reports what it finds as made only when both labels match
 the same way. One already gone counts as deleted. A project this product can't see fails
 (`PROJECT_NOT_VISIBLE`) rather than being reported deleted: Google answers
 403 alike for a purged project and a missing permission. The console lets only the team it was

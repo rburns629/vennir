@@ -62,6 +62,7 @@ vi.mock("../src/imagePolicy.js", async (importOriginal) => ({
 
 const prefix = `res-${randomUUID().slice(0, 6)}`;
 const prov = `${prefix}-prov`;
+const prov2 = `${prefix}-prov2`;
 const cons = `${prefix}-cons`;
 
 let app: FastifyInstance;
@@ -140,6 +141,19 @@ beforeAll(async () => {
       ...extra,
     });
   await register("thing", "create", { cleanup: { action: "delete", inputs: null } });
+  // Another team's, the same.
+  const prov2Team = await createTeam(prov2);
+  for (const action of ["create", "delete"]) {
+    await upsertProduct({
+      name: `${prov2}-thing-${action}`,
+      image: `registry.example/${prov2}/thing:1`,
+      action,
+      teamId: prov2Team.id,
+      shareWith: ["*"],
+      inputSchema: anyObject,
+      ...(action === "create" ? { cleanup: { action: "delete", inputs: null } } : {}),
+    });
+  }
   await register("thing", "delete", { inputSchema: { type: "object", required: ["resource"], properties: { resource: { type: "object" } } } });
   await register("project", "create", { cleanup: { action: "remove", inputs: { project: { $input: "project" }, id: { $resource: "id" }, zone: { $output: "zone" }, force: true } } });
   await register("project", "remove");
@@ -310,6 +324,25 @@ describe("what runs made", () => {
     const admin = await users.signIn((await users.makeUser({ admin: true })).email);
     expect((await call(admin, "ResourceService/DeleteResources", { resourceIds: [made?.id] })).code).toBe("ok");
     expect(lastSubmitted().dag.tasks[0]).toMatchObject({ team: prov, forTeam: cons });
+  });
+
+  it("deletes each of a person's resources for its own product's team", async () => {
+    // Made for the consumer alone (no team), by two teams' products: each
+    // cleanup step for its own product's team, as its run's step was.
+    const made: string[] = [];
+    for (const [product, id] of [[`${prov}-thing-create`, `${prefix}-solo-a`], [`${prov2}-thing-create`, `${prefix}-solo-b`]] as const) {
+      const run = await call<{ executionId: string }>(consumerToken, "TemplateService/RunAction", { product, inputs: {} });
+      const executionId = run.body.executionId;
+      kernelRuns.set(executionId, { executionId, name: "x", state: "SUCCEEDED", tasks: [step("create", "SUCCEEDED", { resources: [{ type: "demo/thing", id }] })] });
+      await recorded(executionId);
+      made.push(...(await list(consumerToken, { executionId })).map((r) => r.id));
+    }
+    expect((await call(consumerToken, "ResourceService/DeleteResources", { resourceIds: made })).code).toBe("ok");
+    const steps = lastSubmitted().dag.tasks.map((t) => [t["team"], t["forTeam"]]);
+    expect(steps.sort()).toEqual([
+      [prov, prov],
+      [prov2, prov2],
+    ]);
   });
 
   it("is only its person's when the run was for no team", async () => {

@@ -252,8 +252,9 @@ and off anything made some other way. `forTeam` is the team the run is
 for, which the console sets and nobody can choose outside their own teams:
 a consumer's run of your shared product is for the consumer's team, a
 cleanup run from **What runs made** for the team the resource was made for,
-your own team's run for your team. A run for no team (a person's own) has
-none: refuse what needs one. A create that finds what it would make
+your own team's run for your team. A person's run for no team is for your
+team when they're in it, and otherwise has no `forTeam`: refuse what needs
+one. A create that finds what it would make
 reports it in `resources` only when it carries both marks for this team.
 A team name is a Kubernetes namespace name (lowercase letters, digits and
 `-`, at most 63), so it's a valid GCP label value and Azure or AWS tag value
@@ -534,8 +535,8 @@ Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
   entirely in the Dockerfile. The request is
   `{"executionId", "taskId", "team", "forTeam", "action", "attempt",
   "inputs"}`: `team` the namespace it runs in (your team), `forTeam` the
-  team the run is for (left out for a run for no team; see `cleanup`
-  above), `inputs` always an object, with every `$fromStep` already
+  team the run is for (left out for a person's run for no team when
+  they aren't in yours; see `cleanup` above), `inputs` always an object, with every `$fromStep` already
   replaced by its value.
   `executionId` and `taskId` together make a good idempotency key.
 - The action writes `/platform/output/result.json`, at most 4 KB, exactly

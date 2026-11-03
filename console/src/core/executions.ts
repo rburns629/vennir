@@ -846,8 +846,12 @@ export interface TemplateRun {
   template: string;
   parameters: Record<string, unknown>;
   onBehalfOf: string | undefined;
-  /** The team its steps run for, when that isn't onBehalfOf: a cleanup's, the team what it deletes was made for. */
-  forTeam?: string | undefined;
+  /**
+   * The team each step runs for, by its id, when that isn't onBehalfOf: a
+   * cleanup's, the team what it deletes was made for; an approver's
+   * preview, the team the step it previews runs for.
+   */
+  forTeams?: Record<string, string> | undefined;
   /** The schedule that started it (scheduler.ts). */
   scheduleId?: string | undefined;
 }
@@ -855,7 +859,7 @@ export interface TemplateRun {
 /**
  * The submission with each task's forTeam, the team it runs for
  * (request.json's forTeam, which a product marks what it makes with, and
- * cleans up only that team's): a run's forTeam or onBehalfOf; for a run
+ * cleans up only that team's): a run's forTeams or onBehalfOf; for a run
  * for its person alone, the task's own team when the caller is in it, else
  * none; a team's own DAG, the task's team, whose member submits it. Never
  * the submitter's to choose: whatever a task carries is replaced.
@@ -869,8 +873,11 @@ function withForTeam(submission: Record<string, unknown>, caller: AuthUser | und
       if (!isRecord(task)) return task;
       const rest = Object.fromEntries(Object.entries(task).filter(([key]) => key !== "forTeam"));
       const team = optionalString(task["team"]);
+      const id = optionalString(task["id"]);
       const forTeam =
-        run === undefined ? team : (run.forTeam ?? run.onBehalfOf ?? (team !== undefined && caller?.teamNames.includes(team) ? team : undefined));
+        run === undefined
+          ? team
+          : ((id !== undefined ? run.forTeams?.[id] : undefined) ?? run.onBehalfOf ?? (team !== undefined && caller?.teamNames.includes(team) ? team : undefined));
       return forTeam ? { ...rest, forTeam } : rest;
     }),
   };
@@ -1143,11 +1150,16 @@ export async function rerun(caller: AuthUser | undefined, executionId: string, l
   // from before pinning has tags; they're pinned now.
   const pinnedReplay = await pinned(replayed as Record<string, unknown>, context);
   await refuseUnscanned(taskImages(pinnedReplay), context);
-  const rerunPayload = await withProductContract(await withProductResources({ ...pinnedReplay, requestId: randomUUID() }), {
-    teamNames: caller?.teamNames ?? [],
-    forTeam: submitted.onBehalfOf ?? undefined,
-    isAdmin: caller?.isAdmin,
-  });
+  // A team's own DAG again: each step for its team, whatever the stored one says.
+  const rerunPayload = withForTeam(
+    await withProductContract(await withProductResources({ ...pinnedReplay, requestId: randomUUID() }), {
+      teamNames: caller?.teamNames ?? [],
+      forTeam: submitted.onBehalfOf ?? undefined,
+      isAdmin: caller?.isAdmin,
+    }),
+    caller,
+    undefined,
+  );
 
   const excluded = await notDeciders(caller?.id ?? null); // before the kernel has it (see submitChecked)
   const result = await submitExecution(scopeRequestId(rerunPayload, submitted.teams), requester(caller));

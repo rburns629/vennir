@@ -409,6 +409,18 @@ describe("SubmitExecution: name and requestId", () => {
     expect(forwarded()).not.toHaveProperty("idempotencyKey");
     expect(forwarded()["requestId"]).not.toBe(`${teamName}/old-2`);
   });
+
+  it("reruns a team's DAG for its team, whatever the stored one says", async () => {
+    const first = await post({ name: "stored-for-team", tasks: [task()] });
+    const id = first.body.executionId;
+    await db
+      .update(submittedExecutions)
+      .set({ payload: { name: "stored-for-team", tasks: [{ ...task(), forTeam: "someone-else" }] } })
+      .where(inArray(submittedExecutions.executionId, [id]));
+    vi.mocked(submitExecution).mockClear();
+    expect((await call(token, "ExecutionService/RerunExecution", { executionId: id })).code).toBe("ok");
+    expect((forwarded()["tasks"] as Record<string, unknown>[])[0]?.["forTeam"]).toBe(teamName);
+  });
 });
 
 describe("retry and cancel check access again, over every team", () => {
