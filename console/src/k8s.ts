@@ -1276,6 +1276,21 @@ export interface ScanJobSpec {
   template: string;
 }
 
+/** What a scan container prints last when the image has no image for its platform. */
+export const NO_PLATFORM_MARKER = "NO_PLATFORM";
+
+/**
+ * How a scan container runs Trivy (its arguments are the script's, never
+ * part of it): as Trivy would, except that an image with no image for the
+ * platform asked (Trivy's "no child with platform") is a clean exit, ending
+ * with NO_PLATFORM_MARKER, so it doesn't fail the Pod and rerun every
+ * platform's scan.
+ */
+export const SCAN_SCRIPT =
+  'out=$(trivy "$@" 2>&1); code=$?; printf \'%s\\n\' "$out"; ' +
+  `if [ "$code" -ne 0 ] && printf '%s' "$out" | grep -q 'no child with platform'; then echo ${NO_PLATFORM_MARKER}; exit 0; fi; ` +
+  'exit "$code"';
+
 /**
  * Starts a Trivy client Job scanning one image against the Trivy server,
  * a container per platform (the first named trivy, then trivy-1, ...).
@@ -1315,6 +1330,7 @@ export async function createScanJob(spec: ScanJobSpec): Promise<void> {
           containers: spec.platforms.map((platform, i) => ({
             name: i === 0 ? "trivy" : `trivy-${String(i)}`,
             image: spec.scannerImage,
+            command: ["sh", "-c", SCAN_SCRIPT, "scan"],
             args: args(platform, i),
             env: [
               { name: "HOME", value: "/tmp" },

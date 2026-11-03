@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 /**
  * The scan Job k8s.ts builds and reads back: a container per platform
- * scanned, each one's output read. The Kubernetes API is faked at the
+ * scanned, each one's output read, and the script each runs Trivy with. The Kubernetes API is faked at the
  * client's methods; what a real Job does is proven on kind.
  */
 import * as k8s from "@kubernetes/client-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createScanJob, readScanJob } from "../src/k8s.js";
+import { spawnSync } from "node:child_process";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createScanJob, NO_PLATFORM_MARKER, readScanJob, SCAN_SCRIPT } from "../src/k8s.js";
 
 beforeEach(() => {
   // No cluster: the client's methods are faked below.
@@ -39,6 +43,37 @@ describe("a scan Job", () => {
     const flag = (args: string[] | undefined, name: string) => args?.[args.indexOf(name) + 1];
     expect(containers.map((c) => flag(c.args, "--platform"))).toEqual(["linux/amd64", "linux/arm64"]);
     expect(new Set(containers.map((c) => flag(c.args, "--cache-dir"))).size).toBe(2);
+    expect(containers.every((c) => c.command?.join(" ") === `sh -c ${SCAN_SCRIPT} scan`)).toBe(true);
+  });
+
+  it("runs Trivy as it would, except that a platform the image hasn't is a clean exit, marked", async () => {
+    // A stand-in trivy on PATH: says what it was given, and fails as asked.
+    const bin = mkdtempSync(join(tmpdir(), "fake-trivy-"));
+    writeFileSync(
+      join(bin, "trivy"),
+      '#!/bin/sh\nprintf "%s\\n" "$@"\ncase "$FAKE" in\n  absent) echo "remote error: no child with platform linux/arm64 in index x" >&2; exit 1;;\n  down) echo "dial tcp: connection refused" >&2; exit 1;;\nesac\necho END\n',
+    );
+    chmodSync(join(bin, "trivy"), 0o755);
+    const run = (fake: string) => {
+      const result = spawnSync("sh", ["-c", SCAN_SCRIPT, "scan", "image", "--platform", "linux/arm64", "a b;$(x)"], {
+        env: { PATH: `${bin}:/usr/bin:/bin`, FAKE: fake },
+        encoding: "utf8",
+      });
+      return { code: result.status, out: result.stdout };
+    };
+    try {
+      // Arguments reach Trivy as they are, never as shell.
+      expect(run("ok")).toEqual({ code: 0, out: "image\n--platform\nlinux/arm64\na b;$(x)\nEND\n" });
+      const absent = run("absent");
+      expect(absent.code).toBe(0);
+      expect(absent.out.trim().split("\n").at(-1)).toBe(NO_PLATFORM_MARKER);
+      const down = run("down");
+      expect(down.code).toBe(1);
+      expect(down.out).toContain("connection refused");
+      expect(down.out).not.toContain(NO_PLATFORM_MARKER);
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
   });
 
   it("is read back with every platform's output, in order", async () => {

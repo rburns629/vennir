@@ -23,7 +23,7 @@ import { config } from "./config.js";
 import { db } from "./db/client.js";
 import { imageScans } from "./db/schema.js";
 import { normalizeImage } from "./imageRef.js";
-import { createScanJob, deleteScanJob, readScanJob, readScanner, scaleScanner, updateScanPolicy } from "./k8s.js";
+import { createScanJob, deleteScanJob, NO_PLATFORM_MARKER, readScanJob, readScanner, scaleScanner, updateScanPolicy } from "./k8s.js";
 import { scansFinished } from "./metrics.js";
 
 export type ScanRow = typeof imageScans.$inferSelect;
@@ -91,8 +91,10 @@ export function parseScanOutput(output: string): ScanFindings | null {
   return result;
 }
 
-/** Trivy's answer for a platform an image index has no image for: no node of that platform can run it either. */
-const NO_SUCH_PLATFORM = /no child with platform/;
+/** Whether a scan container found no image for its platform (k8s.ts's SCAN_SCRIPT): no node of that platform can run it either. */
+function noSuchPlatform(output: string): boolean {
+  return output.trim().split("\n").at(-1)?.trim() === NO_PLATFORM_MARKER;
+}
 
 /**
  * One scan's findings from its platforms' outputs (one each): those of
@@ -104,7 +106,7 @@ export function combineScanOutputs(outputs: string[]): { findings: ScanFindings 
   let scanned = 0;
   for (const output of outputs) {
     if (parseScanOutput(output) === null) {
-      if (NO_SUCH_PLATFORM.test(output)) continue;
+      if (noSuchPlatform(output)) continue;
       return { error: output.trim().split("\n").slice(-5).join("\n") || "The scan failed." };
     }
     scanned++;
@@ -271,8 +273,8 @@ export async function reconcileScans(): Promise<boolean> {
       changed = true;
       continue;
     }
-    // A Job one platform's container failed in (that platform not in the
-    // index) still has the others' complete scans.
+    // A failed Job may still have complete scans in its other containers
+    // (one that failed for its own reason is an error all the same).
     const scan: { findings: ScanFindings } | { error: string } =
       job.state === "missing"
         ? { error: "The scan Job disappeared." }

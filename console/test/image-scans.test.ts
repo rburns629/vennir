@@ -128,7 +128,7 @@ describe("reading a scan", () => {
   });
 
   it("skips a platform the image has no image for, but not every one, nor an incomplete scan", () => {
-    const absent = "FATAL\tremote error: no child with platform linux/arm64 in index registry.example/app";
+    const absent = "FATAL\tremote error: no child with platform linux/arm64 in index registry.example/app\nNO_PLATFORM\n";
     expect(combineScanOutputs([CLEAN, absent])).toMatchObject({ findings: { fixable: 0, unfixable: 1 } });
     expect(combineScanOutputs([absent])).toHaveProperty("error");
     expect(combineScanOutputs([CLEAN, "dial tcp 10.0.0.9:5000: i/o timeout"])).toEqual({ error: "dial tcp 10.0.0.9:5000: i/o timeout" });
@@ -317,7 +317,7 @@ describe("what a verdict allows", () => {
       expect((await scanBlocker([img]))?.error).toBe("IMAGE_SCAN_PENDING");
       expect(vi.mocked(createScanJob).mock.calls.at(-1)?.[0].platforms).toEqual(["linux/amd64", "linux/arm64", "linux/s390x"]);
       vi.mocked(readScanJob).mockImplementation(() =>
-        Promise.resolve({ state: "failed", output: CLEAN, outputs: [CLEAN, LEAKY, "no child with platform linux/s390x in index"] }),
+        Promise.resolve({ state: "succeeded", output: CLEAN, outputs: [CLEAN, LEAKY, "no child with platform linux/s390x in index\nNO_PLATFORM\n"] }),
       );
       await reconcileScans();
       const [row] = await db.select().from(imageScans).where(eq(imageScans.digest, digest));

@@ -170,6 +170,9 @@ scanning:
   # whichever its node pulls. An image fails if any of them does; a platform
   # the image has no image for is skipped. Empty: the console's own platform.
   platforms: []
+  # -- Deprecated: one platform, as platforms was before. Used only while
+  # platforms is empty.
+  platform: ""
   # On the scan Jobs' ServiceAccount, e.g. a cloud identity that may read a
   # private registry (GKE: iam.gke.io/gcp-service-account). For a pull
   # Secret, registryCheck.pullSecretName is used.
