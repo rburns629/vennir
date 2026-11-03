@@ -357,7 +357,7 @@ long it held each create, and when the API server gave up on one, so aim
 
 ## On GKE and EKS (2026-10-31 and 2026-11-01)
 
-The billed proof run (TODO.md, item 7): released 0.6.0, size `minimal`,
+The billed proof run: released 0.6.0, size `minimal`,
 steps on Spot nodes, `-context` naming each cluster. Every run was correct.
 
 | | GKE Autopilot | EKS standard |
@@ -384,8 +384,8 @@ c6a.large.
 Autopilot couldn't add nodes (`SSD_TOTAL_GB`, 500 in the project): 0.41
 steps a second, container start p95 146 s, completion lag p50 11.7 s and
 p95 31 s, as Pods waited to be scheduled. `vertra apply` had warned of the
-quota. Nothing alerts on dispatched steps whose Pods can't be scheduled
-(TODO.md), and completion lag rising with them is worth a look (it was:
+quota. Nothing alerted on dispatched steps whose Pods couldn't be scheduled
+(one does now, #65), and completion lag rising with them is worth a look (it was:
 below).
 
 **4. Losing a Pod retries the step.** A step's Pod evicted through the

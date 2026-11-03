@@ -9,8 +9,8 @@ records the agreed direction for the work after the installer CLI.
 
 Everything here was checked against the code on 2026-10-19; file and line
 references are to that state. Status words: **built** (implemented and
-tested), **partial**, **missing**, **planned** (agreed, not built). The
-actionable items are in [`TODO.md`](../TODO.md) under "Agreed direction";
+tested), **partial**, **missing**, **planned** (agreed, not built). What's
+still open is in [`TODO.md`](../TODO.md);
 the decisions are summarized in [architecture.md](architecture.md#agreed-direction).
 
 ## Contents
@@ -220,7 +220,7 @@ register new ones. The marketplace model (a consumer runs the GCP team's
 steps without choosing its identities) can't be expressed. **Do:** a
 consumer role that may run published templates with inputs only; secret
 references fixed in the owning team's template. **API done 2026-10-21**
-(`TemplateService`); the Run page the same day (`TODO.md`).
+(`TemplateService`); the Run page the same day.
 
 **M1. One catalog repository serves one install.** Architectural
 limitation; high. The catalog's workflows push to one
@@ -233,8 +233,7 @@ main-only CI identity, and registers products, templates, teams and
 SecretStores itself. CI builds, tests, scans, signs and pushes. Adding an
 install changes nothing in the repository. **Done 2026-10-20**, with one
 change: consoles read a signed release artifact CI pushes beside the
-images, not `main` itself, so an install needs registry access only (see
-`TODO.md`).
+images, not `main` itself, so an install needs registry access only.
 
 **M2. One registry per catalog.** Medium. CI publishes to one registry;
 other installs pull from it through their allowed sources. An install on
@@ -276,7 +275,7 @@ after it. Across teams, one service's outputs are another's inputs.
 **Do:** check literal inputs at submit; check resolved inputs before each
 step starts (the console attaches the schema to the task, so the kernel
 checks a schema it's given and stays product-agnostic, failing with
-`INPUT_INVALID`); check outputs against the output schema. **Done 2026-10-21** (`TODO.md`).
+`INPUT_INVALID`); check outputs against the output schema. **Done 2026-10-21**.
 
 **C2. No versions or compatibility checks.** Missing capability; medium.
 Other teams' templates depend on a product's outputs. **Do:** `vertra catalog
@@ -295,7 +294,7 @@ work because they bring their own (GKE's metadata server, EKS Pod
 Identity's webhook). **Do:** a product declares the token audiences it
 needs (`tokenAudiences: [sts.amazonaws.com]`); the kernel adds a projected,
 short-lived token for those only; the identity policy allows that volume
-and nothing more. **Done 2026-10-20** (`TODO.md`).
+and nothing more. **Done 2026-10-20**.
 
 **I2. AKS Workload Identity needs a Pod label the kernel can't set.**
 Blocker for Azure. **Done 2026-10-21:** `scheduler.taskPodLabels` (the
