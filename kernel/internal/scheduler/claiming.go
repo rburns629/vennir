@@ -77,6 +77,10 @@ func ReleaseLeases(ctx context.Context, db DB, owner string, now time.Time) (int
 // How many candidates to read per claimable slot when a per-team cap applies.
 const perTeamCandidates = 4
 
+// maxClaimScan bounds the READY rows one pass reads looking past held
+// ones, so a long queue of held steps costs a bounded pass.
+const maxClaimScan = 2000
+
 func (p *pass) runningPerTeam() (map[string]int, error) {
 	rows, err := p.db.Query(p.ctx, `SELECT team, count(*) FROM execution_tasks
 		WHERE state IN ('CLAIMED', 'RUNNING') GROUP BY team`)
@@ -132,57 +136,77 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 		// more keeps one busy team from starving the rest.
 		candidates = limit * perTeamCandidates
 	}
-	rows, err := p.db.Query(p.ctx, `SELECT `+taskColumnsOf("t")+` FROM execution_tasks t
-		JOIN executions e ON e.id = t.execution_id
-		WHERE t.state = 'READY' AND t.available_at <= $1 AND e.state IN ('PENDING', 'RUNNING')
-		ORDER BY t.available_at LIMIT $2 FOR UPDATE OF t SKIP LOCKED`, p.now, candidates)
-	if err != nil {
-		return nil, err
-	}
-	ready, err := scanTasks(rows)
-	if err != nil {
-		return nil, err
-	}
-
+	// Held steps (a team or product at its cap, a concurrency key in use)
+	// stay READY and keep their place, so a page of them alone isn't the
+	// end: read the next page, by (available_at, id), until enough are
+	// claimed, none are left, or maxClaimScan have been read this pass.
 	var claimed []*Task
 	keys := map[string]bool{}
 	capped := map[string]int{}
-	for _, t := range ready {
-		if len(claimed) == limit {
-			break
+	var after *Task
+	for scanned := 0; len(claimed) < limit && scanned < maxClaimScan; {
+		page := min(candidates, maxClaimScan-scanned)
+		// The first page has no cursor: the oldest (zero time, nil uuid) would do.
+		var afterAt time.Time
+		afterID := "00000000-0000-0000-0000-000000000000"
+		if after != nil {
+			afterAt, afterID = after.AvailableAt, after.ID
 		}
-		if p.opts.MaxRunningPerTeam > 0 && perTeam[t.Team] >= p.opts.MaxRunningPerTeam {
-			continue
-		}
-		if held, err := p.capHold(t, capped); err != nil {
-			return nil, err
-		} else if held {
-			continue // stays READY; GetExecution says it waits for its product's cap
-		}
-		key, held, err := p.concurrencyHold(t, keys)
+		rows, err := p.db.Query(p.ctx, `SELECT `+taskColumnsOf("t")+` FROM execution_tasks t
+			JOIN executions e ON e.id = t.execution_id
+			WHERE t.state = 'READY' AND t.available_at <= $1 AND e.state IN ('PENDING', 'RUNNING')
+			AND ($5 OR (t.available_at, t.id) > ($3, $4::uuid))
+			ORDER BY t.available_at, t.id LIMIT $2 FOR UPDATE OF t SKIP LOCKED`, p.now, page, afterAt, afterID, after == nil)
 		if err != nil {
 			return nil, err
 		}
-		if held {
-			// Stays READY; the next pass looks again. Its key says what
-			// it's waiting for (kernel-api's TaskStatus.waiting_for).
-			if _, err := p.db.Exec(p.ctx, `UPDATE execution_tasks SET concurrency_key = $1
-				WHERE id = $2::uuid AND concurrency_key IS DISTINCT FROM $1`, key, t.ID); err != nil {
+		ready, err := scanTasks(rows)
+		if err != nil {
+			return nil, err
+		}
+		scanned += len(ready)
+		for _, t := range ready {
+			if len(claimed) == limit {
+				break
+			}
+			if p.opts.MaxRunningPerTeam > 0 && perTeam[t.Team] >= p.opts.MaxRunningPerTeam {
+				continue
+			}
+			if held, err := p.capHold(t, capped); err != nil {
+				return nil, err
+			} else if held {
+				continue // stays READY; GetExecution says it waits for its product's cap
+			}
+			key, held, err := p.concurrencyHold(t, keys)
+			if err != nil {
 				return nil, err
 			}
-			continue
+			if held {
+				// Stays READY; the next pass looks again. Its key says what
+				// it's waiting for (kernel-api's TaskStatus.waiting_for).
+				if _, err := p.db.Exec(p.ctx, `UPDATE execution_tasks SET concurrency_key = $1
+					WHERE id = $2::uuid AND concurrency_key IS DISTINCT FROM $1`, key, t.ID); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			if key != "" {
+				keys[key] = true
+				t.ConcurrencyKey = &key
+			}
+			if t.CapScope != nil {
+				capped[*t.CapScope]++
+			}
+			if p.opts.MaxRunningPerTeam > 0 {
+				perTeam[t.Team]++
+			}
+			claimed = append(claimed, t)
 		}
-		if key != "" {
-			keys[key] = true
-			t.ConcurrencyKey = &key
+
+		if len(ready) < page {
+			break
 		}
-		if t.CapScope != nil {
-			capped[*t.CapScope]++
-		}
-		if p.opts.MaxRunningPerTeam > 0 {
-			perTeam[t.Team]++
-		}
-		claimed = append(claimed, t)
+		after = ready[len(ready)-1]
 	}
 	for _, t := range claimed {
 		t.State = domain.TaskClaimed
