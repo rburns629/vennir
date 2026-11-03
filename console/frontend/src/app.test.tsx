@@ -1746,6 +1746,16 @@ describe("signing in", () => {
     expect(localStorage.getItem("token")).toBeNull();
   });
 
+  it("treats a watch the console ends as unauthenticated as signed out", async () => {
+    // The stream opens, then the console ends it: the session went (signed
+    // out elsewhere, a password reset) while the run was being watched.
+    await renderAt("/runs/0b6f6a1e-6c64-4d39-9a0d-7d4c1f6c2a11", ADMIN, {
+      "ExecutionService/WatchExecution": refused(401, "unauthenticated", "Invalid, expired, or revoked credential."),
+    });
+    expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+    expect(localStorage.getItem("token")).toBeNull();
+  });
+
   it("offers single sign-on only when the install has it", async () => {
     await renderAt("/login", null, { "AuthService/GetEnvironment": { label: "test", ssoLabel: "Google" } });
     expect(await screen.findByRole("button", { name: /sign in with google/i })).toBeTruthy();

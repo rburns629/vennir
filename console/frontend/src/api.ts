@@ -94,19 +94,37 @@ const HTTP_STATUS: Partial<Record<Code, number>> = {
  * *carried* one means the session is over (expired, or revoked by a
  * password change): AuthContext signs the user out instead of every page
  * showing its own error. Without a token (a failed login) it's just that.
+ * A stream's too: WatchExecution ends with it once the session goes while
+ * it's open.
  */
 const session: Interceptor = (next) => async (req) => {
   const token = localStorage.getItem("token");
   if (token) req.header.set("Authorization", `Bearer ${token}`);
-  try {
-    return await next(req);
-  } catch (error) {
+  const ended = (error: unknown) => {
     if (token && ConnectError.from(error).code === Code.Unauthenticated) {
       localStorage.removeItem("token");
       window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
-    throw error;
+    return error;
+  };
+  let res;
+  try {
+    res = await next(req);
+  } catch (error) {
+    throw ended(error);
   }
+  if (!res.stream) return res;
+  const messages = res.message;
+  return {
+    ...res,
+    message: (async function* () {
+      try {
+        yield* messages;
+      } catch (error) {
+        throw ended(error);
+      }
+    })(),
+  };
 };
 
 // Every API route lives under /api (see ../../src/index.ts), so it can never
