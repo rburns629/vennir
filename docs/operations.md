@@ -38,7 +38,7 @@ Every day:
 | `make logs` | Tails kernel-api, the scheduler and the console together (any install: `vertra logs <env> -f`) |
 | `make catalog-publish` | Publishes `catalog-template/` with its `local` sample team (one product in five languages); `CATALOG=<folder>` publishes your own catalog, `SAMPLES=` other samples |
 | `make kind-deploy` | Rebuilds both platform images and upgrades both releases (`kind-deploy-kernel`, `kind-deploy-console` for one) |
-| `make test` | Starts a throwaway Postgres on `127.0.0.1:55432` and runs both projects' tests |
+| `make test` | Starts a throwaway Postgres on `127.0.0.1:55432` and runs the kernel's, gateway's, console's and frontend's tests |
 
 To try it: publish the samples, then paste the DAG from
 `catalog-template/samples/local/README.md` into **Executions → Submit new**.
@@ -271,7 +271,9 @@ client's downloaded JSON (checking it's a web client with that URI), asks
 which Workspace domains may sign in, and saves the settings (the file's
 path, never its secret). `vertra apply` then writes the secret into a
 Kubernetes Secret through stdin and turns it on; `vertra sso off` turns it
-off. By hand, with Helm:
+off. If the console's address changes later (made public, a new hostname or
+address), `apply` stops until the new URI is added to the client and
+`vertra sso google` is rerun. By hand, with Helm:
 
 1. In the Google Cloud console for a project in your Workspace
    organization, set up the OAuth consent screen (Google Auth Platform) with
@@ -598,6 +600,7 @@ The metrics, for alerts and dashboards of your own:
 | --- | --- | --- |
 | `kernel_tasks` | `state` | Unfinished steps by state (`BLOCKED`, `READY`, `AWAITING_APPROVAL`, `CLAIMED`, `RUNNING`); `READY` only of running executions (a failed one's wait for a retry) |
 | `kernel_oldest_ready_task_age_seconds` | | How long the longest-waiting `READY` step of a running execution has waited; 0 when none is |
+| `kernel_unschedulable_steps` | | Step Pods no node has room for now (the cluster full, or unable to grow), from the scheduler's watch; the chart's unschedulable alert fires on it |
 | `kernel_scheduler_tick_duration_seconds` | | One scheduler pass |
 | `kernel_scheduler_tick_errors_total` | | Passes that failed (logged, retried next pass) |
 | `kernel_scheduler_status_read_errors_total` | | Failed reads of a running step's status (read again) |
@@ -614,8 +617,10 @@ process is up) and `GET /health/ready` on their API ports: kernel-api's is
 ready once its database answers and is at the schema its code expects, the
 console's once its database answers. The charts' probes use them. The
 scheduler serves no health endpoint: its loop touches a heartbeat file each
-time round, and its liveness probe restarts it when the file is older than
-`scheduler.livenessSeconds` (120).
+time round and between the phases of a pass, and its liveness probe
+restarts it when the file is older than `scheduler.livenessSeconds` (300;
+keep it above the slowest phase a slow Kubernetes API can make, as its
+comment in the chart's values works out).
 
 **Log format.** One JSON object per line on stdout. The kernel's carry
 `timestamp`, `severity` (`INFO`, `WARNING`, `ERROR`), `logger`, `message`
@@ -726,6 +731,19 @@ It leaves:
 - **The team namespaces**, with their Secrets, ServiceAccounts and anything
   steps made there. The console created them, not Helm. Delete them with
   `kubectl delete namespace -l vertra/team` (retired ones included).
+- **The migration hooks' leftovers.** Helm doesn't delete hook resources
+  on uninstall. The console's last migrate Job (kept for its log) and its
+  `<console>-execution-console-migrate-config` ConfigMap stay. The kernel's
+  `<kernel>-execution-kernel-db-migrate` Secret (the database superuser's
+  URL) is deleted once its hook succeeds, even if a later hook then fails;
+  it stays only if Helm was interrupted before that, or creating it
+  failed. An upgrade that times out while the migrate Job is still
+  retrying deletes the Secret under it, so the Job's later attempts can't
+  start: run the upgrade again. Delete what's left with
+  `kubectl -n <namespace> delete job/<console>-execution-console-migrate configmap/<console>-execution-console-migrate-config secret/<kernel>-execution-kernel-db-migrate --ignore-not-found`
+  (`<console>` and `<kernel>` are the release names, `console` and
+  `kernel`; `<namespace>` is the platform's, `vertra-system`, or `default`
+  on the GKE values' existing install).
 - Anything outside the charts: buckets, cloud identities, the registry, and
   the platform namespace itself.
 
@@ -1086,9 +1104,13 @@ For the cloud destinations, the copy runs as `backup.serviceAccountName`
 (default `vertra-pg-backup`). Create it in the platform namespace and bind
 it to an identity that may write to the bucket and nothing else: on GCS,
 `roles/storage.objectCreator` and `roles/storage.objectViewer` on the bucket
-(`gsutil` lists before writing); on S3, `s3:PutObject`; on Azure, Storage Blob
-Data Contributor on the container. Keep dumps as long as you need with a
-lifecycle rule on the bucket. For `pvc`, create the claim yourself
+(`gsutil` lists before writing); on S3, `s3:PutObject`, on a versioned bucket
+so an overwrite can't destroy an earlier dump. vertra's aws module does
+this, and expires noncurrent versions as long after as current ones: an
+overwritten dump stays the full retention after the overwrite, but every
+dump is stored (and billed) for twice the retention, since expiring a
+version only makes it noncurrent. On Azure, Storage Blob Data Contributor on the container. Keep dumps
+as long as you need with a lifecycle rule on the bucket. For `pvc`, create the claim yourself
 (`backup.pvc.claimName`): most storage classes bind a volume only once a Pod
 uses it, which would hang `helm upgrade --wait`.
 
@@ -1177,8 +1199,8 @@ Both charts ship NetworkPolicies (`networkPolicy.enabled`, on by default):
 
 | Pod | Accepts connections from |
 | --- | --- |
-| Kernel Postgres | The kernel release's Pods, and the console's when it holds the console's database |
-| kernel-api | The console (`networkPolicy.consoleSelector`), and `networkPolicy.metricsFrom` |
+| Kernel Postgres | The kernel release's Pods, and, when it holds the console's database, the console, its migrations and the gateway (`networkPolicy.consoleDatabaseSelector`) |
+| kernel-api | The console's own Pods, not its gateway (`networkPolicy.consoleSelector`), and `networkPolicy.metricsFrom` |
 | Scheduler | `networkPolicy.metricsFrom` only |
 | Console | Anyone on its port; its metrics port, `networkPolicy.metricsFrom` only |
 | Gateway | Anyone on its ports; its metrics port, `networkPolicy.metricsFrom` only |

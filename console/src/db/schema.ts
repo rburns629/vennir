@@ -922,6 +922,11 @@ export const schedules = pgTable(
     lastExecutionId: uuid("last_execution_id"),
     // Why its last start was refused, if it was.
     lastError: text("last_error"),
+    // A time a console claimed (moving nextRunAt on) and hasn't started yet,
+    // and when it claimed it: one that stopped before starting it leaves
+    // these, and another console starts that time.
+    claimedRunAt: timestamp("claimed_run_at", { withTimezone: true }),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     // Who last changed it: it runs as its bot, so they too don't approve its runs.
     updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),

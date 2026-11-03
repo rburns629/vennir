@@ -43,6 +43,7 @@ const WHY: Record<string, string> = {
   IMAGE_SCAN_FAILED: "Its image failed the security scan.",
   IMAGE_NOT_SIGNED: "Its image isn't signed by the catalog's CI.",
   IDENTITY_NOT_ALLOWED: "It asked for an identity or secrets its product isn't registered for.",
+  RESOURCES_NOT_ALLOWED: "It asks for more memory or CPU than its team may ever use.",
 };
 
 type Check = { name: string; state: "enforced" | "off" | "not_yet"; text: string };

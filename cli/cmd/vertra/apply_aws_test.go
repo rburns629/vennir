@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rburns629/vertra/cli/internal/access"
 	"github.com/rburns629/vertra/cli/internal/config"
+	"github.com/rburns629/vertra/cli/internal/prompt"
 	"github.com/rburns629/vertra/cli/internal/run"
 	"github.com/rburns629/vertra/cli/internal/tofu"
 )
@@ -103,5 +105,36 @@ func TestWriteAWSVarsLeavesTheGitHubProviderToTheAccount(t *testing.T) {
 				t.Errorf("github_oidc_provider_arn = %v, want %q", got, tc.wantsProvider)
 			}
 		})
+	}
+}
+
+// The budget offer: not made when the account's budgets couldn't be read,
+// and a budget that couldn't be created is a warning, not init's end.
+func TestOfferBudget(t *testing.T) {
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls")
+	aws := "#!/bin/sh\necho \"aws $*\" >> \"" + log + "\"\necho 'An error occurred (AccessDeniedException)' >&2\nexit 254\n"
+	if err := os.WriteFile(filepath.Join(dir, "aws"), []byte(aws), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r := &run.Runner{Out: os.Stderr, Err: os.Stderr, Resolve: func(name string) string { return filepath.Join(dir, name) }}
+	c := config.Default("aws")
+	c.Admin.Email = "admin@example.com"
+
+	var out strings.Builder
+	a := &app{runner: r, ask: prompt.New(strings.NewReader(""), &out, true)}
+	if err := a.offerBudget(context.Background(), &out, c, &access.AWS{Account: "111111111111", BudgetsUnread: true}); err != nil || out.Len() != 0 {
+		t.Fatalf("offered with the budgets unread: %v\n%s", err, out.String())
+	}
+
+	// Yes, and the default amount.
+	out.Reset()
+	a.ask = prompt.New(strings.NewReader("y\n\n"), &out, true)
+	if err := a.offerBudget(context.Background(), &out, c, &access.AWS{Account: "111111111111"}); err != nil {
+		t.Fatalf("a failed create ended init: %v", err)
+	}
+	calls, _ := os.ReadFile(log)
+	if !strings.Contains(string(calls), "budgets create-budget") || !strings.Contains(out.String(), "Warning: the budget wasn't created") {
+		t.Errorf("want a create, then a warning; calls:\n%s\nout:\n%s", calls, out.String())
 	}
 }

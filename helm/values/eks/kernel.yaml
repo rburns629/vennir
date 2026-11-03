@@ -3,7 +3,7 @@
 # when installing with Helm by hand. Account 123456789012, us-east-2,
 # install `vertra`, platform namespace vertra-system:
 #   helm upgrade --install kernel oci://ghcr.io/rburns629/vertra/charts/execution-kernel --version <x.y.z> \
-#     -n vertra-system --create-namespace --force-conflicts \
+#     -n vertra-system --create-namespace --reset-values --force-conflicts \
 #     --kube-context <context> -f helm/values/eks/kernel.yaml
 # The release's own image (appVersion): no image block.
 backup:

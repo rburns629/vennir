@@ -8,7 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 )
+
+// refusalCodes are the cluster's refusals to start a step, which only the
+// kernel may set (domain.RefusalCodes, kept in step).
+var refusalCodes = []string{"DISPATCH_REJECTED", "TEAM_RETIRED", "IMAGE_NOT_ALLOWED", "IMAGE_NOT_PINNED", "IMAGE_SCAN_FAILED",
+	"IMAGE_NOT_SIGNED", "IDENTITY_NOT_ALLOWED", "RESOURCES_NOT_ALLOWED"}
 
 // maxResultBytes is all of result.json the platform reads: Kubernetes keeps
 // at most this much of a container's termination message.
@@ -56,6 +62,9 @@ func resultProblem(data []byte) string {
 		}
 		if e.Code == nil || *e.Code == "" || e.Message == nil || *e.Message == "" {
 			return invalid("error: code and message are required, and not empty")
+		}
+		if slices.Contains(refusalCodes, *e.Code) {
+			return invalid("error: code " + *e.Code + " is the cluster's own (it refused to start a step), not a step's")
 		}
 	}
 	if *raw.Status == "failed" && !hasError {

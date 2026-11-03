@@ -150,7 +150,7 @@ describe("an email", () => {
     expect(await db.select().from(users).where(like(users.email, `${prefix}-mixed%`))).toEqual([]);
   });
 
-  it("is lowercased by 0062 for accounts from before, one per address", async () => {
+  it("is lowercased by 0063 for accounts from before, one per address", async () => {
     // As Register used to store them (raw inserts: the code lowercases now).
     const at = (minutes: number) => new Date(Date.UTC(2026, 0, 1, 0, minutes));
     const rows = [
@@ -161,7 +161,7 @@ describe("an email", () => {
       { email: `${prefix}-Fay@x.com`, createdAt: at(3) }, // left as typed, though older
     ];
     const made = await db.insert(users).values(rows).returning({ id: users.id, email: users.email });
-    const file = readFileSync(new URL("../src/db/migrations/0062_lowercase_emails.sql", import.meta.url), "utf8");
+    const file = readFileSync(new URL("../src/db/migrations/0063_lowercase_emails.sql", import.meta.url), "utf8");
     await db.execute(sql.raw(file));
     const after = new Map(
       (await db.select({ id: users.id, email: users.email }).from(users).where(inArray(users.id, made.map((m) => m.id)))).map((u) => [u.id, u.email]),

@@ -883,7 +883,10 @@ func buildStatus(terminated *corev1.ContainerStateTerminated, logs []string) Sta
 	}
 	result, err := domain.ParseTaskResult([]byte(terminated.Message))
 	if err != nil {
-		return Status{State: Failed, Error: &domain.StructuredError{Code: "PRODUCT_RESULT_INVALID", Retryable: true,
+		// Claiming the cluster's own refusal is the step's code, not chance:
+		// it would write the same again.
+		var reserved *domain.ReservedCodeError
+		return Status{State: Failed, Error: &domain.StructuredError{Code: "PRODUCT_RESULT_INVALID", Retryable: !errors.As(err, &reserved),
 			Message: domain.RedactText("Container's result.json was invalid: " + err.Error())}}
 	}
 	if result.Status == "succeeded" {

@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -114,6 +115,22 @@ func TestCallersSignInAsTheyDoAtTheConsole(t *testing.T) {
 		t.Fatalf("a bot token: %+v, %v", bot, err)
 	}
 
+	// Its use is kept, as the console keeps it: at most every few minutes.
+	var used time.Time
+	must(db.QueryRow(ctx, `SELECT last_used_at FROM api_tokens WHERE user_id = $1`, botID).Scan(&used))
+	if time.Since(used) > time.Minute {
+		t.Fatalf("a token's use: last used %v", used)
+	}
+	_, err = db.Exec(ctx, `UPDATE api_tokens SET last_used_at = now() - interval '1 minute' WHERE user_id = $1`, botID)
+	must(err)
+	_, err = r.Resolve(ctx, "Bearer "+token)
+	must(err)
+	var again time.Time
+	must(db.QueryRow(ctx, `SELECT last_used_at FROM api_tokens WHERE user_id = $1`, botID).Scan(&again))
+	if time.Since(again) < 50*time.Second {
+		t.Fatalf("a token used a minute ago isn't written again: last used %v", again)
+	}
+
 	for name, header := range map[string]string{
 		"nothing":            "",
 		"not a bearer":       "Basic " + session,
@@ -124,6 +141,7 @@ func TestCallersSignInAsTheyDoAtTheConsole(t *testing.T) {
 		"alg none":           "Bearer " + jwt(t, secret, "none", map[string]any{"userId": userID, "iat": now.Unix(), "exp": now.Unix() + 60}),
 		"an unknown token":   "Bearer " + APITokenPrefix + "nope",
 		"an unknown account": "Bearer " + jwt(t, secret, "EdDSA", map[string]any{"userId": "00000000-0000-0000-0000-000000000000", "iat": now.Unix(), "exp": now.Unix() + 60}),
+		"not a user id":      "Bearer " + jwt(t, secret, "EdDSA", map[string]any{"userId": "' OR true --", "iat": now.Unix(), "exp": now.Unix() + 60}),
 	} {
 		if _, err := r.Resolve(ctx, header); err != ErrUnauthenticated {
 			t.Errorf("%s: %v", name, err)
@@ -265,5 +283,36 @@ func TestAnOrderingBotCallsNoAPI(t *testing.T) {
 	session := "Bearer " + jwt(t, secret, "EdDSA", map[string]any{"userId": botID, "iat": now.Unix(), "exp": now.Unix() + 60, "sso": true})
 	if _, err := r.Resolve(ctx, session); err != ErrOrdersOnly {
 		t.Errorf("its keyless session: %v", err)
+	}
+}
+
+// A retired team is read-only in the console, so its members and bots call
+// as their other teams, never as it; the teams come back in byte order, as
+// the console's teamRolesForUser gives them.
+func TestARetiredTeamCallsAsNobody(t *testing.T) {
+	db := tx(t)
+	ctx := context.Background()
+	var userID string
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(db.QueryRow(ctx, `INSERT INTO users (email) VALUES ('gw-retired@example.com') RETURNING id::text`).Scan(&userID))
+	for _, team := range []string{"gw-z", "gw-retired", "gw-a-b", "gw-ab"} {
+		var teamID string
+		must(db.QueryRow(ctx, `INSERT INTO teams (name) VALUES ($1) RETURNING id::text`, team).Scan(&teamID))
+		_, err := db.Exec(ctx, `INSERT INTO team_memberships (user_id, team_id, role) VALUES ($1, $2, 'member')`, userID, teamID)
+		must(err)
+	}
+	_, err := db.Exec(ctx, `UPDATE teams SET retired_at = now() WHERE name = 'gw-retired'`)
+	must(err)
+	now := time.Now()
+	r := &Resolver{DB: db, Keys: keys, Now: func() time.Time { return now }}
+	who, err := r.Resolve(ctx, "Bearer "+jwt(t, secret, "EdDSA", map[string]any{"userId": userID, "iat": now.Unix(), "exp": now.Unix() + 60}))
+	must(err)
+	if got := strings.Join(who.Teams, ","); got != "gw-a-b,gw-ab,gw-z" {
+		t.Fatalf("the calling teams: %s", got)
 	}
 }

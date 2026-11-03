@@ -273,8 +273,8 @@ gateway:
   # -- Run the gateway (gateway/): its Deployment and Service here, reading
   # this console's database. Off: API products are listed but not served.
   enabled: false
-  # -- The gateway's own database role, granted only what it reads
-  # (console/src/db/gatewayAccess.ts), so it never holds the console's
+  # -- The gateway's own database role, granted only what it reads and
+  # writes (console/src/db/gatewayAccess.ts), so it never holds the console's
   # credentials. existingSecret holds its `database-url` (and `password`):
   # the kernel chart's <release>-execution-kernel-gateway-db when the
   # console's database is on the kernel's Postgres (it makes the role too).
@@ -291,7 +291,10 @@ gateway:
   serviceAccountAnnotations: {}
   image:
     repository: ghcr.io/rburns629/vertra/execution-gateway
+    # -- Defaults to the chart's appVersion, as image.tag does.
     tag: ""
+    # -- Pin by digest ("sha256:…"), as image.digest does.
+    digest: ""
     pullPolicy: IfNotPresent
   replicaCount: 1
   # -- A second listener (the Service's port public) for APIs reachable

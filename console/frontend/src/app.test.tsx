@@ -737,6 +737,38 @@ describe("the docs", () => {
     expect(calls.filter((c) => c === "GuideService/ListGuides").length).toBe(listed);
   });
 
+  it("forgets a guide that failed to load once another opens", async () => {
+    await renderAt("/docs/old-guide", MEMBER, {
+      ...DOCS,
+      "GuideService/GetGuide": (request: Record<string, unknown>) =>
+        request["id"] === "old-guide" ? refused(404, "not_found", "No such guide.") : { markdown: "# Try Vertra end to end\n\nIts text." },
+    });
+    expect((await screen.findByRole("alert")).textContent).toContain("No such guide.");
+    screen.getByRole("button", { name: "Settings" }).click();
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Help and guides" }));
+    const start = await screen.findByRole("region", { name: "New here? Start with these two" });
+    expect(screen.queryByText("No such guide.")).toBeNull();
+    fireEvent.click(within(start).getAllByRole("link").find((l) => l.getAttribute("href") === "/docs/01-getting-started")!);
+    expect(await screen.findByRole("heading", { level: 1, name: "Try Vertra end to end" })).toBeTruthy();
+  });
+
+  it("shows the guide that's open, not one whose answer came late", async () => {
+    let answerFirst: (value: unknown) => void = () => {};
+    await renderAt("/docs/03-what-is-a-dag", MEMBER, {
+      ...DOCS,
+      "GuideService/GetGuide": (request: Record<string, unknown>) =>
+        request["id"] === "03-what-is-a-dag"
+          ? new Promise((resolve) => { answerFirst = resolve; })
+          : { markdown: "# Try Vertra end to end\n\nIts text." },
+    });
+    const contents = await screen.findByRole("navigation", { name: "Docs contents" });
+    fireEvent.click(within(contents).getByRole("link", { name: "Try Vertra end to end" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Try Vertra end to end" })).toBeTruthy();
+    await act(async () => { answerFirst({ markdown: "# What's a DAG\n\nToo late." }); await Promise.resolve(); });
+    expect(screen.queryByText("Too late.")).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "Try Vertra end to end" })).toBeTruthy();
+  });
+
   it("sets a troubleshooting guide by symptom: what you see, why, and what to do", async () => {
     await renderAt("/docs/15-troubleshooting", MEMBER, {
       "GuideService/ListGuides": { guides: [{ id: "15-troubleshooting", title: "Troubleshooting", section: "guides", kind: "guide" }] },

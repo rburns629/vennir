@@ -351,7 +351,9 @@ export async function teamRolesForUser(userId: string, exec: Db = db): Promise<{
     .select({ name: teams.name, role: teamMemberships.role, requireSso: teams.requireSso })
     .from(teamMemberships)
     .innerJoin(teams, eq(teams.id, teamMemberships.teamId))
-    .where(and(eq(teamMemberships.userId, userId), isNull(teams.deletedAt)));
+    .where(and(eq(teamMemberships.userId, userId), isNull(teams.deletedAt)))
+    // Byte order, as the gateway reads them: both pick the same calling team.
+    .orderBy(sql`${teams.name} COLLATE "C"`);
 }
 
 /** Whether a bot has ever had a credential: a token (revoked or not) or a keyless identity. */

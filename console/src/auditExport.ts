@@ -13,8 +13,8 @@
  * The chain shows a change only if it wasn't rewritten after the change:
  * someone who can write the database could change an entry and every hash
  * after it. So the database is also compared with what was shipped
- * (compareWithCopy): each copied entry against its row, serialized the same
- * way, a few objects an hour, round and round.
+ * (compareWithCopy): each copied entry against its row, field by field
+ * (COMPARED), a few objects an hour, round and round.
  */
 import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { and, asc, count, eq, gt, gte, lte, sql } from "drizzle-orm";
@@ -135,15 +135,27 @@ async function readCopy(name: string): Promise<string> {
   return (await object.Body?.transformToString()) ?? "";
 }
 
+/**
+ * What the comparison compares: what chainHash hashes, and the id and hash.
+ * Not the whole row, so a column added to audit_log later doesn't make
+ * every entry already copied differ.
+ */
+const COMPARED = ["id", "at", "actorId", "method", "route", "target", "status", "requestId", "hash"] as const;
+
+/** An entry (a row, or a copied line parsed) as the comparison sees it: its COMPARED fields, in order (a Date as JSON writes it). */
+export function compared(entry: Record<string, unknown>): string {
+  return JSON.stringify(COMPARED.map((field) => entry[field] ?? null));
+}
+
 /** How many copies one look compares. */
 const COPIES_A_LOOK = 10;
 
 /**
  * One look comparing the database with its copy: the next few copies after
  * the last one compared (from the first again once it reaches the end).
- * Each copied entry must be its row, serialized as the export serialized
- * it; the first that isn't (changed, or gone from the database) is
- * recorded, loudly, and the look stops there.
+ * Each copied entry must be its row (compared); the first that isn't
+ * (changed, or gone from the database) is recorded, loudly, and the look
+ * stops there.
  */
 export async function compareWithCopy(log: FastifyBaseLogger): Promise<void> {
   if (!config.audit.export.bucket) return;
@@ -176,14 +188,15 @@ export async function compareWithCopy(log: FastifyBaseLogger): Promise<void> {
       .from(auditLog)
       .where(and(gte(auditLog.id, copy.first), lte(auditLog.id, copy.last)))
       .orderBy(asc(auditLog.id));
-    const stored = new Map(rows.map((row) => [row.id, JSON.stringify(row)]));
+    const stored = new Map(rows.map((row) => [row.id, compared(row)]));
     // Retention deletes what's older than auditDays (retention.ts): an
     // entry gone from the database for that is as expected.
     const kept = config.retention.auditDays ? now.getTime() - config.retention.auditDays * 86_400_000 : null;
     for (const line of lines) {
-      const { id, at } = JSON.parse(line) as { id: number; at: string };
+      const copied = JSON.parse(line) as { id: number; at: string };
+      const { id, at } = copied;
       const row = stored.get(id);
-      if (row === line) continue;
+      if (row === compared(copied)) continue;
       if (row === undefined && kept !== null && new Date(at).getTime() < kept) continue;
       const how = row === undefined ? "is gone from the database" : "differs in the database";
       const problem = `audit entry ${String(id)} ${how} from its write-once copy (${copy.name}): it was changed after it was copied.`;

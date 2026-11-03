@@ -104,7 +104,7 @@ class CreateActionTest(unittest.TestCase):
                     self.assertEqual(self.module.main(), 1)
                 client_cls.assert_not_called()
                 error = self._result()["error"]
-                self.assertEqual((error["code"], error["retryable"]), ("IMAGE_NOT_ALLOWED", False))
+                self.assertEqual((error["code"], error["retryable"]), ("IMAGE_OUTSIDE_REGISTRY", False))
 
     def test_existing_service_skips_deployment(self) -> None:
         self._write_request(_VALID_INPUTS)

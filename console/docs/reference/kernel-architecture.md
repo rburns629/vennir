@@ -174,6 +174,10 @@ write is in order, in its transaction.
      100) is read until ClaimLimit are claimed, none are left, or 2000 have
      been read; a cap scope or key found held is passed over for the rest of
      the pass; index ix_execution_tasks_ready_order]
+→ capHold() for a task with a product cap (its product's maxRunning): it
+    stays READY while CapLimit tasks of its cap scope are CLAIMED or RUNNING,
+    counting those claimed earlier in this pass, or another scheduler holds
+    the scope's pg_try_advisory_xact_lock (until its pass commits)
 → concurrencyHold() for a task with a concurrency scope: its key from its
     resolved inputs; it stays READY while a task with that key is CLAIMED
     or RUNNING, was claimed earlier in this pass, or another scheduler holds
