@@ -8,6 +8,11 @@ namespaces) and nothing else: its ClusterRole's one verb, fenced by the
 admission policy below.
 */}}
 {{- if .Values.gateway.enabled }}
+{{- /* A trusted proxy's X-Forwarded-For is taken as who the caller is, so
+only what reaches the public listener from those proxies alone may be one. */}}
+{{- if and .Values.gateway.trustedProxies (not (and .Values.gateway.publicListener .Values.networkPolicy.enabled .Values.gateway.publicListenerFrom)) }}
+{{- fail "gateway.trustedProxies needs gateway.publicListener, networkPolicy.enabled and gateway.publicListenerFrom: without them any Pod reaching the public listener from a trusted address could say it's anyone" }}
+{{- end }}
 {{- $name := printf "%s-gateway" (include "execution-console.fullname" .) }}
 {{- $signing := printf "%s-signing" $name }}
 {{- /* The Google service account it signs in to the database as, with IAM auth. */}}
@@ -194,6 +199,8 @@ spec:
               value: {{ join "," .Values.gateway.backendHosts | quote }}
             - name: INTERNET_TEAMS
               value: {{ join "," .Values.gateway.internetTeams | quote }}
+            - name: TRUSTED_PROXIES
+              value: {{ join "," .Values.gateway.trustedProxies | quote }}
             - name: DEFAULT_PER_MINUTE
               value: {{ .Values.gateway.defaultPerMinute | quote }}
             - name: CLOSED
@@ -287,9 +294,17 @@ spec:
   ingress:
     - ports:
         - {port: 8080, protocol: TCP}
-        {{- if .Values.gateway.publicListener }}
+        {{- if and .Values.gateway.publicListener (not .Values.gateway.publicListenerFrom) }}
         - {port: 8081, protocol: TCP}
         {{- end }}
+    {{- if and .Values.gateway.publicListener .Values.gateway.publicListenerFrom }}
+    # The public listener, from its proxies only (gateway.publicListenerFrom):
+    # what reaches it there may say who the caller is (trustedProxies).
+    - from:
+        {{- toYaml .Values.gateway.publicListenerFrom | nindent 8 }}
+      ports:
+        - {port: 8081, protocol: TCP}
+    {{- end }}
     {{- with .Values.networkPolicy.metricsFrom }}
     - from:
         {{- toYaml . | nindent 8 }}

@@ -161,6 +161,69 @@ func TestTheConfigMapIsOwnedByItsJob(t *testing.T) {
 	check(t, "request", request, map[string]any{"executionId": stepTask().ExecutionID, "taskId": "env", "team": stepTask().Team, "action": "create", "attempt": 1.0, "inputs": map[string]any{}})
 }
 
+// No Pod before the request is the kernel's: the Job is made suspended,
+// then its ConfigMap (replacing any planted one), then it's resumed.
+func TestTheJobIsResumedOnlyOnceItsConfigMapIsMade(t *testing.T) {
+	c := newCluster(options())
+	if _, err := c.k.Start(context.Background(), stepTask()); err != nil {
+		t.Fatal(err)
+	}
+	var calls []string
+	for _, a := range c.Actions() {
+		if a.GetVerb() == "create" || a.GetVerb() == "patch" {
+			calls = append(calls, a.GetVerb()+" "+a.GetResource().Resource)
+		}
+		if a.GetVerb() == "create" && a.GetResource().Resource == "jobs" {
+			job := a.(k8stesting.CreateAction).GetObject().(*batchv1.Job)
+			check(t, "made suspended", job.Spec.Suspend != nil && *job.Spec.Suspend, true)
+		}
+		if a.GetVerb() == "patch" {
+			check(t, "the patch", string(a.(k8stesting.PatchAction).GetPatch()), `{"spec":{"suspend":false}}`)
+		}
+	}
+	check(t, "order", calls, []string{"create jobs", "create configmaps", "patch jobs"})
+	check(t, "running", *c.job(t).Spec.Suspend, false)
+}
+
+// A start that stopped before resuming its Job is retried: the retry
+// adopts it, makes its ConfigMap and resumes it. One already resumed is
+// left as it is.
+func TestAnAdoptedJobIsResumedOnlyIfItsStillSuspended(t *testing.T) {
+	for what, suspended := range map[string]bool{"suspended": true, "running": false} {
+		task := stepTask()
+		c, _ := existingJob(t, task, func(j *batchv1.Job) { j.Spec.Suspend = &suspended })
+		if _, err := c.k.Start(context.Background(), task); err != nil {
+			t.Fatal(err)
+		}
+		patched := 0
+		for _, a := range c.Actions() {
+			if a.GetVerb() == "patch" {
+				patched++
+			}
+		}
+		check(t, what+": patched", patched, map[bool]int{true: 1, false: 0}[suspended])
+		check(t, what+": running", *c.job(t).Spec.Suspend, false)
+	}
+}
+
+// Resuming refused by the dispatch policy: the attempt never runs, so its
+// Job goes. One that fails for now is left for the retry to resume.
+func TestAResumeThatsRefusedTakesItsJobWithIt(t *testing.T) {
+	c := newCluster(options())
+	c.refuse("patch", "jobs", status(403, metav1.StatusReasonForbidden, "the scheduler may only resume its own suspended Jobs"))
+	_, err := c.k.Start(context.Background(), stepTask())
+	check(t, "code", rejected(t, err).Code, "DISPATCH_REJECTED")
+	check(t, "its Job deleted", len(c.deleted("jobs")), 1)
+
+	c = newCluster(options())
+	c.refuse("patch", "jobs", status(503, metav1.StatusReasonServiceUnavailable, "try again"))
+	_, err = c.k.Start(context.Background(), stepTask())
+	if _, ok := IsDispatchRejected(err); err == nil || ok {
+		t.Fatalf("a resume that failed for now: %v, want an error to retry", err)
+	}
+	check(t, "its Job kept", c.deleted("jobs"), []string(nil))
+}
+
 // A pass that created the Job and then rolled back retries the same
 // attempt, so the same name: that Job is the one to keep polling.
 func TestAnExistingJobForThisAttemptIsAdopted(t *testing.T) {

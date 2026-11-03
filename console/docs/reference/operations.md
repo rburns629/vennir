@@ -618,7 +618,7 @@ ready once its database answers and is at the schema its code expects, the
 console's once its database answers. The charts' probes use them. The
 scheduler serves no health endpoint: its loop touches a heartbeat file each
 time round and between the phases of a pass, and its liveness probe
-restarts it when the file is older than `scheduler.livenessSeconds` (300;
+restarts it when the file is older than `scheduler.livenessSeconds` (420;
 keep it above the slowest phase a slow Kubernetes API can make, as its
 comment in the chart's values works out).
 

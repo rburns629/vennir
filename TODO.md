@@ -1020,25 +1020,49 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
 
 ## Security
 
-- [ ] **A ConfigMap planted ahead of a step's Job could be mounted for a
-  moment** (K-8 follow-up, found 2026-11-03). The executor creates the
-  Job, then its request ConfigMap (immutable, owned by the Job); one
-  already under that name is replaced, so once `Start` returns the
-  request is the kernel's, but a Pod scheduled in between could mount
-  the planted one. It needs Job- or ConfigMap-create rights in a team
-  namespace, which teams and hardened steps don't have. Closing it means
-  the ConfigMap first, then the Job, then the ConfigMap's owner set (RBAC
-  `patch` on ConfigMaps and the dispatch policy fencing `UPDATE`), or a
-  Job created suspended and resumed once its ConfigMap is checked; either
-  is proven on kind first.
+- [x] **A ConfigMap planted ahead of a step's Job could be mounted for a
+  moment** (K-8 follow-up, found 2026-11-03; done 2026-11-03): the executor
+  creates each Job suspended, makes or replaces its request ConfigMap, then
+  resumes it, so no Pod exists until the ConfigMap is the kernel's. The
+  scheduler may `patch` Jobs, and the dispatch policy lets that be only a
+  resume of its own suspended Job in a live team namespace with nothing else
+  changed (nine admission cases; proven on kind). What's left needs
+  rights in a team namespace that teams and steps don't have: deleting the
+  kernel's ConfigMap and making another in the moment before the kubelet
+  mounts it; or making a Job under the attempt's name before the kernel
+  does, exactly as the kernel would (so it's adopted) but already resumed,
+  with a ConfigMap of their own, which its Pod mounts before the kernel
+  replaces it.
 
-- [ ] **The gateway's backends see the ingress, not the client, behind
-  its public listener** (found 2026-11-03, G-10): the gateway sets
-  `X-Forwarded-For` to its own peer and drops what callers send, since its
-  listeners are reachable from inside the cluster too. Behind an ingress,
-  that peer is the ingress. If a backend needs the client's address, give
-  the gateway a trusted-proxy list (as the console's `trustProxy`) and keep
-  the ingress's `X-Forwarded-For` only from those.
+- [ ] **Only the scheduler makes `ek-` Jobs and ConfigMaps in team
+  namespaces** (found 2026-11-03, reviewing the suspended start): an
+  admission policy refusing anyone else's create of a Job or ConfigMap
+  named `ek-` in a namespace labelled `vertra/team`, which would close both
+  of the above; check first that nothing else (an admin's tooling, the
+  kernel's kind tests) makes such names there.
+
+- [x] **The gateway's backends see the ingress, not the client, behind
+  its public listener** (found 2026-11-03, G-10; done 2026-11-03): the
+  console chart's `gateway.trustedProxies` (addresses or CIDR ranges) lists
+  the proxies in front of the public listener; from one of those, the
+  gateway reads its `X-Forwarded-For` back past every trusted hop and
+  passes the first address that isn't one as the backend's
+  `X-Forwarded-For`. From any other peer, and always on the in-cluster
+  listener, it's the peer's own address, as before. It needs
+  `gateway.publicListenerFrom`, a NetworkPolicy letting only those proxies
+  reach the public listener (the chart refuses it without).
+
+- [ ] **Every API shares the gateway's origin** (found 2026-11-03, in the
+  review of the day's fixes): the gateway keeps a backend's cookies to its
+  API's path, so no backend can set or overwrite another's, but a path is
+  no boundary inside one origin. A page one team's backend serves can run
+  script that reads another API's cookies that aren't HttpOnly (through a
+  same-origin frame), and can fetch other APIs' paths with their cookies
+  attached. The gateway's own sign-in is a bearer header, so that fetch
+  gets the gateway's 401, but a backend that takes its own cookies as
+  sign-in would answer it. Until each API has an origin of its own (a host
+  per API, e.g. `<api>.<team>.<gateway host>`), a backend serving browsers
+  should keep its cookies HttpOnly and not take a cookie alone as sign-in.
 
 - [x] **Add the `v*` tag ruleset (admins only)** (decided 2026-11-02, X-6;
   done 2026-11-03): the repository's `release tags` ruleset lets only

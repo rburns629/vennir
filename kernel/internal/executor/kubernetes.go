@@ -24,6 +24,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/rburns629/vertra/kernel/internal/domain"
@@ -180,10 +181,14 @@ func isRejection(err error) bool {
 	return apierrors.IsForbidden(err) || (apierrors.IsBadRequest(err) && strings.Contains(apiMessage(err), signatureWebhookMarker))
 }
 
-// Start creates the attempt's Job, then its request ConfigMap (owned by the
-// Job, so Kubernetes removes it with the Job). Idempotent per attempt: a Job
-// already there under this attempt's name was made for this same attempt
-// (by a pass that rolled back, or a start that raised), and is adopted.
+// Start creates the attempt's Job, suspended, then its request ConfigMap
+// (owned by the Job, so Kubernetes removes it with the Job), then resumes
+// the Job: its Pod is made only once the ConfigMap under its name is the
+// kernel's, so it never mounts one planted ahead of it (an adopted Job
+// already resumed may have: TODO.md). Idempotent per
+// attempt: a Job already there under this attempt's name was made for this
+// same attempt (by a pass that rolled back, or a start that raised), and is
+// adopted, and resumed if it's still suspended.
 func (k *Kubernetes) Start(ctx context.Context, task ResolvedTask) (Handle, error) {
 	name := JobName(task.ExecutionID, task.TaskKey, task.Attempt)
 	request, err := json.Marshal(task.ProductRequest())
@@ -194,7 +199,7 @@ func (k *Kubernetes) Start(ctx context.Context, task ResolvedTask) (Handle, erro
 	if err != nil {
 		return nil, &DispatchRejected{Code: "DISPATCH_REJECTED", Message: err.Error()}
 	}
-	uid, err := k.createJob(ctx, task.Team, job)
+	made, err := k.createJob(ctx, task.Team, job)
 	if err != nil {
 		if _, ok := IsDispatchRejected(err); ok {
 			return nil, err
@@ -204,7 +209,7 @@ func (k *Kubernetes) Start(ctx context.Context, task ResolvedTask) (Handle, erro
 		}
 		return nil, err
 	}
-	if err := k.createConfigMap(ctx, task.Team, name, uid, string(request)); err != nil {
+	if err := k.createConfigMap(ctx, task.Team, name, string(made.UID), string(request)); err != nil {
 		if apierrors.IsForbidden(err) || apierrors.IsInvalid(err) || apierrors.IsRequestEntityTooLargeError(err) {
 			// Refused by policy, or too big for a ConfigMap (inputs over
 			// 1 MiB once resolved): this attempt would never get its
@@ -216,10 +221,30 @@ func (k *Kubernetes) Start(ctx context.Context, task ResolvedTask) (Handle, erro
 		// adopts the Job and creates the ConfigMap, or discards both.
 		return nil, err
 	}
+	if made.Spec.Suspend != nil && *made.Spec.Suspend {
+		if err := k.resumeJob(ctx, task.Team, name); err != nil {
+			if apierrors.IsForbidden(err) || apierrors.IsInvalid(err) {
+				_ = k.deleteJob(ctx, task.Team, name)
+				return nil, dispatchRejection(err)
+			}
+			// As above: the retry adopts the suspended Job and resumes it.
+			return nil, err
+		}
+	}
 	return Handle{"namespace": task.Team, "jobName": name}, nil
 }
 
-func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batchv1.Job) (string, error) {
+// resumeJob lets a suspended Job make its Pod: the one change the dispatch
+// policy lets the scheduler make to a Job.
+func (k *Kubernetes) resumeJob(ctx context.Context, namespace, name string) error {
+	callCtx, cancel := k.call(ctx)
+	defer cancel()
+	_, err := k.client.BatchV1().Jobs(namespace).Patch(callCtx, name, types.MergePatchType, []byte(`{"spec":{"suspend":false}}`), metav1.PatchOptions{})
+	return err
+}
+
+// createJob creates job, or returns this attempt's that's already there.
+func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batchv1.Job) (*batchv1.Job, error) {
 	callCtx, cancel := k.call(ctx)
 	defer cancel()
 	created, err := k.client.BatchV1().Jobs(namespace).Create(callCtx, job, metav1.CreateOptions{})
@@ -228,26 +253,26 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 		defer cancel()
 		created, err = k.client.BatchV1().Jobs(namespace).Get(callCtx, job.Name, metav1.GetOptions{})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if created.DeletionTimestamp != nil {
 			// Being deleted: nothing left to adopt; the next start retries.
-			return "", fmt.Errorf("job %s/%s is being deleted", namespace, job.Name)
+			return nil, fmt.Errorf("job %s/%s is being deleted", namespace, job.Name)
 		}
 		if !sameAttempt(created, job) {
 			// The admission policies only check the Jobs the scheduler
 			// creates: one made any other way was never checked, and its
 			// result would become this step's outputs.
-			return "", &DispatchRejected{Code: "DISPATCH_REJECTED", Message: fmt.Sprintf(
+			return nil, &DispatchRejected{Code: "DISPATCH_REJECTED", Message: fmt.Sprintf(
 				"A Job named %s already exists in %s that the kernel didn't make for this attempt (its labels, image, command, ServiceAccount or Secrets differ), so it wasn't adopted.", job.Name, namespace)}
 		}
 		k.log.Info("adopting this attempt's existing Job", "namespace", namespace, "job", job.Name)
-		return string(created.UID), nil
+		return created, nil
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(created.UID), nil
+	return created, nil
 }
 
 // sameAttempt says found is the Job jobFor built as want, as far as what
@@ -287,10 +312,9 @@ func secretNames(volumes []corev1.Volume) []string {
 // createConfigMap makes the attempt's request ConfigMap, immutable, so
 // nothing changes it once made. One already there under its name (an
 // earlier start of this attempt's, or anyone's: the scheduler may not read
-// ConfigMaps) is replaced, so once Start returns the step's request is the
-// one made here. Not before: a ConfigMap planted ahead of the Job could be
-// mounted by its Pod in the moment until it's replaced (TODO.md). The
-// dispatch policy lets the scheduler delete only ConfigMaps labelled as
+// ConfigMaps) is replaced, so the step's request is the one made here, and
+// it's made while the Job is still suspended, before there's a Pod to mount
+// one planted ahead of it. The dispatch policy lets the scheduler delete only ConfigMaps labelled as
 // its own: one that isn't is refused, and so is the attempt.
 func (k *Kubernetes) createConfigMap(ctx context.Context, namespace, name, jobUID, request string) error {
 	immutable := true
@@ -461,13 +485,17 @@ func (k *Kubernetes) jobFor(name string, task ResolvedTask) (*batchv1.Job, error
 	backoff := int32(0) // one attempt per Job: the scheduler owns retries
 	ttl := int32(k.opts.JobTTL.Seconds())
 	// A backstop: a Job the scheduler lost track of mustn't run forever. It
-	// counts from the Job's creation, so it allows for waiting to start.
+	// counts from when it starts (its resume), so it allows for waiting for a node.
 	deadline := int64(task.TimeoutSeconds) + int64(k.opts.StartTimeout.Seconds()) + int64(k.opts.JobDeadlineGrace.Seconds())
 	terminationGrace := int64(PodTerminationGrace.Seconds())
+	suspended := true
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels, Annotations: annotations},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: &backoff, TTLSecondsAfterFinished: &ttl, ActiveDeadlineSeconds: &deadline,
+			// Started suspended, so no Pod is made until Start has made its
+			// request ConfigMap; Start resumes it.
+			Suspend: &suspended,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: podLabels, Annotations: annotations},
 				Spec: corev1.PodSpec{
