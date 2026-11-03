@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 /**
- * ProductService through Connect: a team's members (or catalog CI's
- * products:register token) register its products, platform products are
- * admins', a name or repository another team owns is refused, and the
+ * ProductService through Connect: catalog CI's products:register token or
+ * an admin registers a team's products (never its maintainers), platform
+ * products are admins', a name or repository another team owns is refused, and the
  * wiring types are replaced only by whoever may register products. The
  * rules are tested in depth elsewhere, through the same
  * core/products.ts.

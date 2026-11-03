@@ -86,7 +86,7 @@ describe("product names", () => {
     expect(stored?.image).toBe(`${repo("deploy")}:1`);
   });
 
-  it("its own team can still update it", async () => {
+  it("can still be updated for its own team", async () => {
     const name = `${prefix}-update`;
     expect((await register(catalogCi, { name, image: `${repo("update")}:1`, action: "run", team: teamA })).code).toBe("ok");
     const updated = await register(catalogCi, { name, image: `${repo("update")}@sha256:${"a".repeat(64)}`, action: "run", team: teamA });
