@@ -924,19 +924,20 @@ func publicSSORedirect(host string) string {
 }
 
 // SSORedirect is where Google sends people back: the console's public
-// address, or the port-forward's (vertra console) when it has none.
-func SSORedirect(ctx context.Context, r *run.Runner, c *config.Config) (string, error) {
+// address, or the port-forward's (vertra console) when it has none. host
+// is the public name the cloud side gave it (gcp's nip.io name for its
+// reserved address, aws's in its zone), or "" when there's none yet; then
+// a configured hostname. Nothing in the cluster is read, so it's known as
+// soon as the cloud side is made, before the console is installed.
+func SSORedirect(c *config.Config, host string) (string, error) {
 	if !c.Console.Public {
 		return localSSORedirect, nil
 	}
-	host := c.Console.Hostname
 	if host == "" {
-		// gcp's nip.io name: on the console's Ingress once applied.
-		out, err := r.Output(ctx, "kubectl", "--context", cluster.Context(c), "--namespace", c.Namespace,
-			"get", "ingress", ConsoleRelease+"-execution-console", "--ignore-not-found", "-o", "jsonpath={.spec.rules[0].host}")
-		if host = strings.TrimSpace(out); err != nil || host == "" {
-			return "", fmt.Errorf("the console's public address isn't known until it's installed: `vertra apply` first")
-		}
+		host = c.Console.Hostname
+	}
+	if host == "" {
+		return "", fmt.Errorf("the console's public address isn't known until the cloud side is made: `vertra apply` first")
 	}
 	return publicSSORedirect(host), nil
 }
@@ -944,23 +945,13 @@ func SSORedirect(ctx context.Context, r *run.Runner, c *config.Config) (string, 
 // CheckSSORedirect refuses an install whose saved sign-in callback isn't
 // where the console is reached now (made public or private, a new
 // hostname, a new address): Google would send people to the old one.
-// host is the console's public name once the cloud side is made, or ""
-// before it, when only a configured hostname is known.
+// host is as SSORedirect's; a public address not yet known isn't checked.
 func CheckSSORedirect(c *config.Config, host string) error {
 	if c.SSO.Provider != "google" {
 		return nil
 	}
-	want := localSSORedirect
-	if c.Console.Public {
-		if host == "" {
-			host = c.Console.Hostname
-		}
-		if host == "" {
-			return nil
-		}
-		want = publicSSORedirect(host)
-	}
-	if c.SSO.RedirectURL == want {
+	want, err := SSORedirect(c, host)
+	if err != nil || c.SSO.RedirectURL == want {
 		return nil
 	}
 	return fmt.Errorf("Google sign-in sends people back to %s, but the console's callback is now %s: add it to the OAuth client's redirect URIs in Google's console, download its JSON again, and rerun `vertra sso google`, then apply",
