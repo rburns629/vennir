@@ -115,7 +115,7 @@ func AWS(p *AWSPrices, c *config.Config, fetched string) []plan.Line {
 			money(stepHour), capacity, money(stepHour*float64(f.StepCap)*hoursPerMonth), f.StepCap)},
 		{Label: "  Likely", Text: fmt.Sprintf("%s for light use (%s, %d step-hours)",
 			moneySpan(likely+awake[0]*awakeHours, likely+awake[1]*awakeHours), awakeWords(c), lightStepHours)},
-		{Label: "  Not included", Text: "discounts, credits, taxes, data transfer, backups and images in storage (cents a GB), your products' own AWS usage"},
+		{Label: "  Not included", Text: notIncluded("discounts, credits, taxes, data transfer, backups and images in storage (cents a GB)", "your products' own AWS usage", awsUnpriced(c)...)},
 	}, p, c)
 }
 
@@ -158,8 +158,24 @@ func awsStandard(p *AWSPrices, c *config.Config, f plan.Floor, fetched string, f
 			money(stepHour), capacity, money(stepHour*float64(f.StepCap)*hoursPerMonth), f.StepCap)},
 		{Label: "  Likely", Text: fmt.Sprintf("%s for light use (%d step-hours); sleeping saves nothing here, since the platform's nodes stay. While images are being scanned, another platform node runs for the scanner (about %s an hour), gone about 20 minutes after the last scan",
 			moneySpan(likely, likely+more), lightStepHours, money(nodeHour(platform.OnDemand)))},
-		{Label: "  Not included", Text: "discounts, credits, taxes, data transfer, backups and images in storage (cents a GB), your products' own AWS usage"},
+		{Label: "  Not included", Text: notIncluded("discounts, credits, taxes, data transfer, backups and images in storage (cents a GB)", "your products' own AWS usage", awsUnpriced(c)...)},
 	}
+}
+
+// awsUnpriced is what c makes on aws that the estimate doesn't price:
+// billed per use, or a small monthly fee.
+func awsUnpriced(c *config.Config) []string {
+	var more []string
+	if c.Monitoring.Enabled && c.Monitoring.ProviderName() == "amazon" {
+		more = append(more, "Amazon Managed Prometheus (per sample ingested and stored)")
+	}
+	if c.ModuleSigning() == "kms" && c.Catalog.Repo() != "" {
+		more = append(more, "the KMS signing key (a monthly fee)")
+	}
+	if c.Database.Type == "managed" {
+		more = append(more, "the Secrets Manager secret RDS keeps its master password in (a monthly fee)")
+	}
+	return more
 }
 
 func awsConsoleNote(c *config.Config) string {
