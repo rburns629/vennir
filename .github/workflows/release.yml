@@ -7,8 +7,9 @@ name: release
 #              a version that's already published, even in part. A tag push
 #              runs the tagged commit's own copy of this file, so the main
 #              check stops mistakes. That only reviewed code is released (and
-#              signed with the release's identity) holds only with the v*
-#              tag ruleset: admins only (TODO.md, docs/security-model.md).
+#              signed with the release's identity) rests on the repository's
+#              `release tags` ruleset: only admins create, move or delete v*
+#              tags (docs/security-model.md).
 #   images     builds the kernel, console and gateway images for
 #              linux/amd64 and linux/arm64 and pushes them, by digest only,
 #              to ghcr.io/<owner>/<repo>/execution-{kernel,console,gateway},
