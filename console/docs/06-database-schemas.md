@@ -446,7 +446,7 @@ Which team owns each image repository: the first team to register a product from
 
 ### audit_log
 
-Who changed what (`src/audit.ts`): one row per call that tried to change something (any method not marked as only reading), allowed or refused, recorded once it's answered, signing in and changing a password included. Admins read it with `AdminService/ListAuditEntries`; each entry is also logged (`event: "audit"`).
+Who changed what (`src/audit.ts`): one row per call that tried to change something (any method not marked as only reading), allowed or refused, recorded once it's answered, signing in and changing a password included (not a call with no one signed in to a method that needs someone: that is only logged). Admins read it with `AdminService/ListAuditEntries`; each entry is also logged (`event: "audit"`).
 
 | Column | Type | Null | Meaning |
 | --- | --- | --- | --- |

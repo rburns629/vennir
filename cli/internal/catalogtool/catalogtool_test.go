@@ -123,6 +123,26 @@ func TestContainsAllKeepsJSONTypes(t *testing.T) {
 	}
 }
 
+// An action's schema resolves only references within itself: one to a
+// file or a URL is refused, never read, on the machine running the check.
+func TestSchemasReadNothingOutside(t *testing.T) {
+	local := filepath.Join(t.TempDir(), "outside.json")
+	if err := os.WriteFile(local, []byte(`{"type":"string"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, ref := range []string{"file://" + local, "outside.json", "https://example.com/schema.json"} {
+		doc := map[string]any{"type": "object", "properties": map[string]any{"x": map[string]any{"$ref": ref}}}
+		if schemaProblem(doc) == "" {
+			t.Errorf("%s: resolved", ref)
+		}
+	}
+	inside := map[string]any{"type": "object", "$defs": map[string]any{"name": map[string]any{"type": "string"}},
+		"properties": map[string]any{"x": map[string]any{"$ref": "#/$defs/name"}}}
+	if problem := schemaProblem(inside); problem != "" {
+		t.Errorf("a reference within the document: %s", problem)
+	}
+}
+
 func TestSecretStoreProblems(t *testing.T) {
 	store := map[string]any{
 		"apiVersion": "external-secrets.io/v1", "kind": "SecretStore", "metadata": map[string]any{"name": "s"},

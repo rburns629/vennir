@@ -17,7 +17,8 @@ import (
 // Settings are every setting.
 type Settings struct {
 	// The console's database, as the gateway's own role: published APIs and
-	// who callers are, read; its traffic counts, written.
+	// who callers are, read; its traffic counts and what it can't serve,
+	// written.
 	DatabaseURL string
 	// Most connections it holds: each request checks who's calling there.
 	DatabaseMaxConnections int
@@ -83,6 +84,15 @@ func Load(getenv func(string) string) (*Settings, error) {
 		}
 		return n
 	}
+	// At least 1: 0 would stop the refresh (a ticker of 0 panics) or refuse
+	// every API with no limit of its own (the console counts 0 as unset).
+	positive := func(name string, fallback int) int {
+		n := number(name, fallback)
+		if n == 0 {
+			problems = append(problems, fmt.Sprintf("%s: at least 1, got 0", name))
+		}
+		return n
+	}
 	s := &Settings{
 		DatabaseURL:            need("DATABASE_URL"),
 		DatabaseMaxConnections: number("DATABASE_MAX_CONNECTIONS", 10),
@@ -99,11 +109,11 @@ func Load(getenv func(string) string) (*Settings, error) {
 		MetricsListen:          or("METRICS_LISTEN", ":9090"),
 		BackendHosts:           list(getenv("BACKEND_HOSTS")),
 		InternetTeams:          list(getenv("INTERNET_TEAMS")),
-		DefaultPerMinute:       number("DEFAULT_PER_MINUTE", 600),
+		DefaultPerMinute:       positive("DEFAULT_PER_MINUTE", 600),
 		GCPAudience:            getenv("GCP_STS_AUDIENCE"),
 		GCPTokenAudience:       getenv("GCP_TOKEN_AUDIENCE"),
 		Closed:                 getenv("CLOSED") == "true",
-		Refresh:                time.Duration(number("REFRESH_SECONDS", 5)) * time.Second,
+		Refresh:                time.Duration(positive("REFRESH_SECONDS", 5)) * time.Second,
 	}
 	if (s.DatabaseIAMAccount == "") != (s.DatabaseIAMTokenFile == "") {
 		problems = append(problems, "DATABASE_IAM_ACCOUNT and DATABASE_IAM_TOKEN_FILE: both, or neither")

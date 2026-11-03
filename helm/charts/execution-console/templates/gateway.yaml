@@ -1,7 +1,8 @@
 {{/*
 The API gateway (gateway/, decision 20): forwards to each API product's
 backend exactly what its OpenAPI document describes. It reads this console's
-database (published APIs, and who callers are) and never writes it. It may
+database (published APIs, and who callers are), writing only api_traffic and
+api_problems (its traffic counts, and why an API can't be served). It may
 mint ServiceAccount tokens for API ServiceAccounts (*-api, in team
 namespaces) and nothing else: its ClusterRole's one verb, fenced by the
 admission policy below.
@@ -144,7 +145,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: gateway
-          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "execution-console.image" (dict "repository" .Values.gateway.image.repository "tag" (.Values.gateway.image.tag | default .Chart.AppVersion) "digest" .Values.gateway.image.digest) | quote }}
           imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
@@ -157,7 +158,8 @@ spec:
             {{- end }}
             - {name: metrics, containerPort: 9090}
           env:
-            # Its own role, granted only what it reads (gateway.database).
+            # Its own role, granted only what it reads and the two tables it
+            # writes, api_traffic and api_problems (gateway.database).
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

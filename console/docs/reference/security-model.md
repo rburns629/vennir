@@ -943,7 +943,7 @@ tagging the wrong commit.
 Nothing verifies those signatures when installing: `vertra` checks the
 charts against the SHA-256s each release records (each cosign-verified
 once), but the charts run their images by tag unless
-`image.digest` pins them, and policy-controller doesn't cover the platform's
+`image.digest` (and `gateway.image.digest`) pins them, and policy-controller doesn't cover the platform's
 own namespace. To check one by hand (a version tag's run only: the same
 workflow run from a branch signs as `release.yml@refs/heads/<branch>`,
 which this refuses; `make gke-verify-release` requires the exact tag).
@@ -965,7 +965,10 @@ who (a user or bot id), the method, the fields that name what it acted on
 and the outcome, with the request's id and the client's address. Signing
 in is recorded the same way, allowed or refused (the email tried, never
 the password; a successful one's actor is who signed in), as are keyless
-and single sign-on sign-ins, registering and changing a password. Each
+and single sign-on sign-ins, registering and changing a password. A call
+with no one signed in to a method that needs someone is refused before it
+does anything and only logged (`event: "rpc_unauthenticated"`), so
+anyone who can reach the console can't fill the audit log. Each
 entry is in the `audit_log`
 table, hash-chained so a change or removal shows, and in the console's log
 as `event: "audit"`. A catalog release's changes are recorded too.
