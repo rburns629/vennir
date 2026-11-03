@@ -541,19 +541,23 @@ def system_page() -> Page:
     ):
         workflows[name] = p.titled(35, 600 + i * 84, 260, 70, name, what, GREY)
 
-    p.vertex(340, 80, 1600, 1050, "GCP project · my-gcp-project", frame(BLUE, dashed=False))
-    p.vertex(360, 120, 1150, 990, "GKE Autopilot · vertra-gke (us-central1)", frame(BLUE))
+    p.vertex(340, 80, 1600, 1180, "GCP project · my-gcp-project", frame(BLUE, dashed=False))
+    p.vertex(360, 120, 1150, 1120, "GKE Autopilot · vertra-gke (us-central1)", frame(BLUE))
     lb = p.titled(380, 230, 150, 80, "Service console", "LoadBalancer, public IP\nplain HTTP :80", BLUE)
 
-    p.vertex(560, 160, 500, 500, "namespace default  (the platform; vertra-system on kind)", frame(ORANGE))
+    p.vertex(560, 160, 500, 630, "namespace default  (the platform; vertra-system on kind)", frame(ORANGE))
     console = p.titled(590, 210, 200, 90, "execution-console", "Fastify /api + React SPA\nconsole/", ORANGE)
     console_db = p.vertex(610, 360, 160, 90, "Postgres\nexecution_console", database(YELLOW))
     kernel_api = p.titled(830, 210, 200, 90, "kernel-api", "Go, Connect, ClusterIP only\naccepts only the console's token", ORANGE)
     kernel_db = p.vertex(850, 360, 160, 90, "Postgres\nexecution_kernel", database(YELLOW))
     scheduler = p.titled(830, 500, 200, 90, "kernel-scheduler", "poll, then claim → dispatch\nevery second", ORANGE)
     p.titled(590, 500, 200, 90, "pg-backup CronJobs", "daily pg_dump of both\ndatabases → Cloud Storage", GREY)
+    gateway = p.titled(
+        590, 640, 200, 90, "execution-gateway", "API products: forwards what an\nAPI's OpenAPI document allows\n(gateway.enabled; on in kind's)",
+        ORANGE,
+    )
 
-    p.vertex(1090, 160, 400, 500, "namespace <team>  (label vertra/team=true)", frame(GREEN))
+    p.vertex(1090, 160, 400, 630, "namespace <team>  (label vertra/team=true)", frame(GREEN))
     config_map = p.titled(1110, 200, 170, 80, "ConfigMap ek-…", "request.json\n→ /platform/input", GREEN)
     service_account = p.titled(1300, 200, 170, 80, "ServiceAccount", "one per product", GREEN)
     job = p.titled(
@@ -563,8 +567,9 @@ def system_page() -> Page:
     )
     secret = p.titled(1110, 480, 170, 100, "Secret", "the team's: mounted only by\nits registered products,\nwhen a step lists it", GREEN)
     eso_objects = p.titled(1300, 480, 170, 100, "SecretStore +\nExternalSecret", "\nwhich cloud secret\n→ which Secret (ESO)", GREEN)
+    backend = p.titled(1110, 645, 170, 80, "Service <api>", "an API product's\nbackend", GREEN)
 
-    api_server = p.titled(380, 700, 1110, 60, "Kubernetes API server", "every write below passes the admission policies", BLUE)
+    api_server = p.titled(380, 830, 1110, 60, "Kubernetes API server", "every write below passes the admission policies", BLUE)
     for i, (name, what) in enumerate(
         [
             ("dispatch-policy", "scheduler may create Jobs only\nin vertra/team=true namespaces"),
@@ -574,13 +579,13 @@ def system_page() -> Page:
             ("purge-policy", "only the purge identity may\ndelete a team's namespace"),
         ]
     ):
-        p.titled(380 + i * 224, 790, 214, 80, name, what, RED)
+        p.titled(380 + i * 224, 920, 214, 80, name, what, RED)
     p.vertex(
-        560, 920, 280, 80, "Admission policies are cluster-wide\nValidatingAdmissionPolicies,\ninstalled by the kernel chart.",
+        560, 1050, 280, 80, "Admission policies are cluster-wide\nValidatingAdmissionPolicies,\ninstalled by the kernel chart.",
         f"text;align=left;verticalAlign=middle;{FONT}fontSize=11;fontColor=#555555;",
     )
-    eso = p.titled(870, 920, 280, 80, "External Secrets Operator", "namespace external-secrets", PURPLE)
-    policy_controller = p.titled(1180, 920, 280, 80, "Sigstore policy-controller", "namespace cosign-system", PURPLE)
+    eso = p.titled(870, 1050, 280, 80, "External Secrets Operator", "namespace external-secrets", PURPLE)
+    policy_controller = p.titled(1180, 1050, 280, 80, "Sigstore policy-controller", "namespace cosign-system", PURPLE)
 
     cloud_build = p.titled(1600, 160, 320, 70, "Cloud Build", "make gke-deploy builds platform images", BLUE)
     registry = p.titled(1600, 290, 320, 110, "Artifact Registry", "catalog-products: signed product images\nand catalog-release\nplatform-images: console, kernel", BLUE)
@@ -604,7 +609,7 @@ def system_page() -> Page:
     p.edge(kernel_api, kernel_db, "")
     p.edge(scheduler, kernel_db, "③ claim READY tasks\n(SKIP LOCKED, leases)")
     p.edge(scheduler, api_server, "④ ConfigMap + Job", EDGE + ends(0.5, 1, x_on(930, 380, 1110), 0))
-    p.edge(api_server, job, "⑤ admitted:\nPod runs", EDGE + ends(x_on(1290, 380, 1110), 0, x_on(1290, 1110, 360), 1), label_offset=(0, 95))
+    p.edge(api_server, job, "⑤ admitted:\nPod runs", EDGE + ends(x_on(1290, 380, 1110), 0, x_on(1290, 1110, 360), 1), label_offset=(0, 180))
     p.edge(config_map, job, "mounted", EDGE + ends(0.5, 1, x_on(1195, 1110, 360), 0))
     p.edge(service_account, job, "runs as", EDGE + ends(0.5, 1, x_on(1385, 1110, 360), 0))
     p.edge(secret, job, "mounted", EDGE + ends(0.5, 0, x_on(1195, 1110, 360), 1))
@@ -617,6 +622,11 @@ def system_page() -> Page:
         console, registry, "image exists? catalog release\n(registry.ts, catalogSync.ts)", EDGE + ends(0.5, 0, 0, 0.27),
         points=[(690, 145), (1580, 145), (1580, 320)],
     )
+    p.edge(
+        gateway, console_db, "reads, as\nvertra_gateway", EDGE + ends(0, 0.5, 0, 0.5),
+        points=[(575, 685), (575, 405)], label_offset=(10, 70),
+    )
+    p.edge(gateway, backend, "forwards checked\nrequests", EDGE + ends(1, 0.5, 0, 0.5), label_offset=(-90, 0))
     p.edge(job, registry, "pull image", EDGE + ends(1, (365 - 320) / 110, 0, (365 - 290) / 110))
     p.edge(cloud_build, registry, "push", EDGE + ends(0.5, 1, 0.5, 0))
     p.edge(
@@ -625,14 +635,14 @@ def system_page() -> Page:
     )
     p.edge(eso, api_server, "writes Secrets", EDGE + ends(x_on(1025, 870, 280), 0, x_on(1025, 380, 1110), 1), label_offset=(0, 55))
     p.edge(api_server, policy_controller, "signature webhook", EDGE + ends(x_on(1260, 380, 1110), 1, x_on(1260, 1180, 280), 0), label_offset=(0, 55))
-    p.edge(policy_controller, kms, "verify signature", EDGE + ends(1, 0.5, 0, 0.5), points=[(1560, 960), (1560, 485)])
+    p.edge(policy_controller, kms, "verify signature", EDGE + ends(1, 0.5, 0, 0.5), points=[(1560, 1090), (1560, 485)])
     p.edge(
         eso, secret_manager, "read (Workload Identity)", EDGE + ends(0.5, 1, 0, 0.5),
-        points=[(1010, 1060), (1575, 1060), (1575, 595)],
+        points=[(1010, 1190), (1575, 1190), (1575, 595)],
     )
 
     p.vertex(
-        20, 1150, 1920, 76,
+        20, 1280, 1920, 76,
         wrap(
             "One execution, in order: ① A person or pipeline calls the console, which checks team membership, identity, team secrets "
             "and images. ② The console forwards the DAG to kernel-api, which validates it and stores it (PENDING). ③ kernel-scheduler "
@@ -640,7 +650,8 @@ def system_page() -> Page:
             "whose admission policies can refuse them (DISPATCH_REJECTED, IMAGE_NOT_ALLOWED, IMAGE_NOT_SIGNED, IDENTITY_NOT_ALLOWED). ⑤ The Pod "
             "runs as its product's ServiceAccount with the team Secrets its step lists and writes result.json; the scheduler reads it, stores outputs and logs, "
             "releases the tasks that waited on it, and once that's committed deletes the Job. kernel-api and kernel-scheduler never call each other: "
-            "Postgres rows are their only channel.",
+            "Postgres rows are their only channel. An API product is called through execution-gateway instead, which forwards only what its reviewed "
+            "OpenAPI document describes, to its backend in its team's namespace.",
             260,
         ),
         NOTE,
@@ -660,16 +671,18 @@ def pieces_page() -> Page:
     registry = p.vertex(345, 30, 170, 95, "Registry\nproduct images\nsigned catalog-release", database(BLUE))
     people = p.titled(570, 40, 170, 70, "People and bots", "the console, its API,\nteams' pipelines", WHITE)
 
-    p.vertex(0, 185, 760, 395, "Kubernetes cluster", frame(BLUE, dashed=False))
+    p.vertex(0, 185, 760, 465, "Kubernetes cluster", frame(BLUE, dashed=False))
     p.vertex(20, 220, 720, 215, "vertra-system · the platform", frame(ORANGE))
     scheduler = p.titled(40, 255, 190, 72, "kernel-scheduler", "claims ready steps,\nstarts and watches them", ORANGE)
     kernel_api = p.titled(285, 255, 190, 72, "kernel-api", "validates and stores DAGs;\nanswers only the console", ORANGE)
     console = p.titled(530, 255, 190, 72, "console", "UI + API: signs people in,\nauthorizes every request", ORANGE)
     kernel_db = p.vertex(178, 350, 155, 72, "kernel\nPostgres", database(YELLOW))
     console_db = p.vertex(548, 350, 155, 72, "console\nPostgres", database(YELLOW))
+    gateway = p.titled(375, 350, 150, 72, "gateway", "serves API products,\nas their OpenAPI allows", ORANGE)
 
-    p.vertex(20, 455, 420, 110, "Team namespaces · labelled vertra/team=true", frame(GREEN))
+    p.vertex(20, 455, 420, 180, "Team namespaces · labelled vertra/team=true", frame(GREEN))
     job = p.titled(40, 490, 380, 62, "One Job per step attempt", "its product's image · its inputs as a\nConfigMap · the secrets it lists", GREEN)
+    backend = p.titled(40, 567, 380, 55, "API backends", "each API product's own Service", GREEN)
     policies = p.titled(530, 472, 210, 90, "Admission policies", "where steps may run, which\nimages (pinned, scanned,\nsigned), identity and secrets", RED)
 
     p.edge(ci, registry, "push", EDGE + ends(1, 0.5, 0, 0.6))
@@ -681,6 +694,8 @@ def pieces_page() -> Page:
     p.edge(scheduler, kernel_db, "", EDGE + ends(0.75, 1, 0.25, 0) + "startArrow=block;startFill=1;")
     p.edge(scheduler, job, "creates Jobs", EDGE + ends(0.5, 1, x_of(135, 40, 380), 0))
     p.edge(policies, job, "check every Job", EDGE + ends(0, 0.6, 1, 0.5) + "dashed=1;")
+    p.edge(gateway, console_db, "", EDGE + ends(1, 0.5, 0, 0.5))
+    p.edge(gateway, backend, "", EDGE + ends(0.5, 1, 1, 0.5), points=[(450, 595)])
     return p
 
 
