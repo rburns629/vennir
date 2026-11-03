@@ -144,6 +144,35 @@ func (d Dir) Outputs(ctx context.Context) (map[string]json.RawMessage, error) {
 	return values, nil
 }
 
+// Attribute is a string attribute of a resource in the state (the module's
+// own, not a child module's), or "" when the state doesn't hold it.
+func (d Dir) Attribute(ctx context.Context, address, name string) (string, error) {
+	out, err := d.r.Output(ctx, "tofu", "-chdir="+d.Path, "show", "-json")
+	if err != nil {
+		return "", fmt.Errorf("tofu show: %w", err)
+	}
+	var state struct {
+		Values struct {
+			RootModule struct {
+				Resources []struct {
+					Address string         `json:"address"`
+					Values  map[string]any `json:"values"`
+				} `json:"resources"`
+			} `json:"root_module"`
+		} `json:"values"`
+	}
+	if err := json.Unmarshal([]byte(out), &state); err != nil {
+		return "", fmt.Errorf("tofu show: %w", err)
+	}
+	for _, r := range state.Values.RootModule.Resources {
+		if r.Address == address {
+			value, _ := r.Values[name].(string)
+			return value, nil
+		}
+	}
+	return "", nil
+}
+
 // Forget removes resources from the state without deleting them, so a
 // destroy leaves them (a backup bucket, the task registry you chose to keep).
 // An address the state doesn't have is skipped: `state rm` refuses one, and

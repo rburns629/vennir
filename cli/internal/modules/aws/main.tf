@@ -757,6 +757,9 @@ resource "aws_iam_openid_connect_provider" "cluster" {
 
 # --- the catalog's CI: pushes images from main, by GitHub's OIDC token -------
 
+# The account has at most one, which every install in it uses: made here
+# when it has none, and forgotten by vertra on the install's next run, so no
+# install's destroy deletes it (writeAWSVars).
 resource "aws_iam_openid_connect_provider" "github" {
   count          = var.catalog_repository != "" && var.github_oidc_provider_arn == "" ? 1 : 0
   url            = "https://token.actions.githubusercontent.com"

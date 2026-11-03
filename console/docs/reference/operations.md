@@ -256,7 +256,7 @@ of the values it writes):
 | policy-controller (`policy-controller-webhook`) | The same, read-only on the products' registry | The same, by Pod Identity |
 | A team's `eso-<cloud>` (its SecretStore) | Its Google service account, by the annotation in the store file | IRSA: the `eks.amazonaws.com/role-arn` annotation, a role trusting the cluster's OIDC issuer (registered in IAM once per cluster) for `system:serviceaccount:<team>:eso-aws` only. Pod Identity doesn't work for a store |
 | A product's own | Its Google service account, by the annotation an admin adds | A Pod Identity association for `<team>/<serviceAccount>`, which an admin adds |
-| Catalog CI (GitHub Actions) | Workload Identity Federation, main only | An IAM OIDC provider for GitHub's issuer, a role trusting the repository's main only |
+| Catalog CI (GitHub Actions) | Workload Identity Federation, main only | An IAM OIDC provider for GitHub's issuer (the account's one, shared by its installs: `vertra destroy` leaves it), a role trusting the repository's main only |
 
 ### Signing in with Google
 

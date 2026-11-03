@@ -443,15 +443,38 @@ func parentDomain(zone string) string {
 	return zone
 }
 
+// githubProvider is the module's GitHub OIDC provider, made when the account
+// has none.
+const githubProvider = "aws_iam_openid_connect_provider.github[0]"
+
 // writeAWSVars writes the module's variables, after Init (it reads the
-// state): a GitHub OIDC provider this install made stays its own, and one
-// the account already had is only used.
+// state). The account's GitHub OIDC provider is every install's there, so
+// no install keeps it in its state: the one that made it forgets it on its
+// next run (before any plan, a destroy's included), and then uses it like
+// the others. So neither a destroy nor clearing the catalog deletes it from
+// under another install. The ARN of one it forgets comes from the state:
+// IAM's list may not show a provider made moments ago (the catalog step
+// runs right after the apply that made it), and a missing one would be
+// made again.
 func (a *app) writeAWSVars(ctx context.Context, c *config.Config, tf tofu.Dir, deleteData bool) error {
 	github := ""
-	if c.Catalog.Repo() != "" {
+	if tf.Has(ctx, githubProvider) {
 		var err error
-		own := tf.Has(ctx, "aws_iam_openid_connect_provider.github[0]")
-		if github, err = awscloud.GitHubProvider(ctx, a.runner, c, own); err != nil {
+		if github, err = tf.Attribute(ctx, githubProvider, "arn"); err != nil {
+			return err
+		}
+		if github == "" {
+			return fmt.Errorf("the state holds %s without its ARN", githubProvider)
+		}
+		if err := tf.Forget(ctx, githubProvider); err != nil {
+			return err
+		}
+	}
+	if c.Catalog.Repo() == "" {
+		github = ""
+	} else if github == "" {
+		var err error
+		if github, err = awscloud.GitHubProvider(ctx, a.runner, c); err != nil {
 			return err
 		}
 	}
