@@ -165,9 +165,11 @@ scanning:
   # for it, about a minute, and the database download). 0: always running.
   idleMinutes: 15
   rescanHours: 24
-  # -- Which image of a multi-platform index to scan, e.g. linux/amd64:
-  # what the cluster's nodes run. Empty: the console's own platform.
-  platform: ""
+  # -- Which images of a multi-platform index to scan, e.g. [linux/amd64,
+  # linux/arm64]: every platform the cluster's nodes run, since a step runs
+  # whichever its node pulls. An image fails if any of them does; a platform
+  # the image has no image for is skipped. Empty: the console's own platform.
+  platforms: []
   # On the scan Jobs' ServiceAccount, e.g. a cloud identity that may read a
   # private registry (GKE: iam.gke.io/gcp-service-account). For a pull
   # Secret, registryCheck.pullSecretName is used.
