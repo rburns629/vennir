@@ -10,7 +10,8 @@ V2, Calico, Cilium, ...); elsewhere they're accepted and silently ignored.
 {{- if .Values.networkPolicy.enabled }}
 {{- if .Values.postgres.enabled }}
 # Postgres: this release's own Pods (kernel-api, the scheduler, migrations,
-# backups) and, when it hosts the console's database, the console's.
+# backups) and, when it hosts the console's database, the console's that
+# use it (the console, its migrations, the gateway).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -31,8 +32,7 @@ spec:
               {{- include "execution-kernel.selectorLabels" . | nindent 14 }}
         {{- if .Values.postgres.consoleDatabase.enabled }}
         - podSelector:
-            matchLabels:
-              {{- toYaml .Values.networkPolicy.consoleSelector | nindent 14 }}
+            {{- toYaml .Values.networkPolicy.consoleDatabaseSelector | nindent 12 }}
         {{- end }}
       ports:
         - port: 5432
@@ -40,7 +40,8 @@ spec:
 ---
 {{- end }}
 # kernel-api: the console (which is also all it accepts, by token), plus
-# any metrics scrapers listed.
+# any metrics scrapers listed; not the console chart's other Pods (the
+# gateway among them).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
