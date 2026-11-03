@@ -690,6 +690,16 @@ without going through the console:
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
 | Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own) | console chart, `templates/write-fence-policy.yaml` |
 
+An install whose platform namespace is also a team's (`allowReleaseNamespace`,
+as the GKE reference values' `default` is) loses more than the dispatch
+guardrail there: the console's write fence counts that namespace as a
+team's, so it may write the platform's own Secrets (the databases', the
+session key); policy-controller has to exclude it, so that team's steps run
+unsigned images; and the gateway's token fence matches the platform's own
+`*-api` ServiceAccounts there. Every install `vertra` makes uses a
+namespace of its own (`vertra-system`), and so will the GKE reference
+install's next one (`TODO.md`).
+
 The dispatch, image, scan and identity policies check the scheduler's own
 requests and nobody else's (their `matchConditions`). Anyone else the
 cluster lets create Pods in a team namespace, such as a cluster
