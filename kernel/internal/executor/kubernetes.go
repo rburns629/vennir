@@ -205,10 +205,6 @@ func (k *Kubernetes) Start(ctx context.Context, task ResolvedTask) (Handle, erro
 		return nil, err
 	}
 	if err := k.createConfigMap(ctx, task.Team, name, uid, string(request)); err != nil {
-		if _, ok := IsDispatchRejected(err); ok {
-			_ = k.deleteJob(ctx, task.Team, name)
-			return nil, err
-		}
 		if apierrors.IsForbidden(err) || apierrors.IsInvalid(err) || apierrors.IsRequestEntityTooLargeError(err) {
 			// Refused by policy, or too big for a ConfigMap (inputs over
 			// 1 MiB once resolved): this attempt would never get its
@@ -288,10 +284,17 @@ func secretNames(volumes []corev1.Volume) []string {
 	return names
 }
 
+// createConfigMap makes the attempt's request ConfigMap, immutable, so
+// nothing changes it once made. One already there under its name (an
+// earlier start of this attempt's, or anyone's: the scheduler may not read
+// ConfigMaps) is replaced, so once Start returns the step's request is the
+// one made here. Not before: a ConfigMap planted ahead of the Job could be
+// mounted by its Pod in the moment until it's replaced (TODO.md). The
+// dispatch policy lets the scheduler delete only ConfigMaps labelled as
+// its own: one that isn't is refused, and so is the attempt.
 func (k *Kubernetes) createConfigMap(ctx context.Context, namespace, name, jobUID, request string) error {
-	callCtx, cancel := k.call(ctx)
-	defer cancel()
-	_, err := k.client.CoreV1().ConfigMaps(namespace).Create(callCtx, &corev1.ConfigMap{
+	immutable := true
+	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: map[string]string{"app": "execution-kernel"},
@@ -299,29 +302,22 @@ func (k *Kubernetes) createConfigMap(ctx context.Context, namespace, name, jobUI
 				APIVersion: "batch/v1", Kind: "Job", Name: name, UID: typesUID(jobUID),
 			}},
 		},
-		Data: map[string]string{"request.json": request},
-	}, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		// Created along with an adopted Job, by an earlier start of this
-		// attempt: it holds the same request, and names this Job. Anything
-		// else would hand the step a request the kernel didn't make.
+		Immutable: &immutable,
+		Data:      map[string]string{"request.json": request},
+	}
+	for range 2 {
 		callCtx, cancel := k.call(ctx)
-		defer cancel()
-		existing, err := k.client.CoreV1().ConfigMaps(namespace).Get(callCtx, name, metav1.GetOptions{})
-		if err != nil {
+		_, err := k.client.CoreV1().ConfigMaps(namespace).Create(callCtx, configMap, metav1.CreateOptions{})
+		cancel()
+		if !apierrors.IsAlreadyExists(err) {
 			return err
 		}
-		owned := false
-		for _, owner := range existing.OwnerReferences {
-			owned = owned || (owner.Kind == "Job" && owner.Name == name && string(owner.UID) == jobUID)
+		if err := k.deleteConfigMap(ctx, namespace, name); err != nil {
+			return err
 		}
-		if !owned || len(existing.Data) != 1 || existing.Data["request.json"] != request || len(existing.BinaryData) != 0 {
-			return &DispatchRejected{Code: "DISPATCH_REJECTED", Message: fmt.Sprintf(
-				"A ConfigMap named %s already exists in %s that the kernel didn't make for this attempt (its owner or request differs), so it wasn't used.", name, namespace)}
-		}
-		return nil
 	}
-	return err
+	// Back again at once: retried as a start that failed for now.
+	return fmt.Errorf("configmap %s/%s was made again as it was replaced", namespace, name)
 }
 
 func (k *Kubernetes) resources(task ResolvedTask) (corev1.ResourceRequirements, error) {

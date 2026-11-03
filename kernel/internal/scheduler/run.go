@@ -150,21 +150,31 @@ func (l *Loop) Run(ctx context.Context) error {
 	return nil
 }
 
-// pass runs one tick: what finished is recorded and committed, then ready
+// pass runs one tick: expired approvals failed and committed, what
+// finished recorded and committed, then ready
 // tasks claimed and dispatched in a transaction of their own, so this
 // scheduler's slow dispatch never holds a finished task's record (another
 // scheduler's can, on a row they both need). A recorded half stands
 // even if the dispatch half fails: its handles are still released.
 func (l *Loop) pass(ctx context.Context) (Outcome, error) {
-	var recorded, dispatched Outcome
+	var expired, recorded, dispatched Outcome
 	err := pgx.BeginFunc(ctx, l.Pool, func(tx pgx.Tx) error {
 		var err error
-		recorded, err = RecordPass(ctx, tx, l.Executor, l.Options, time.Now(), l.Log)
+		expired, err = ExpireApprovals(ctx, tx, l.Executor, l.Options, time.Now(), l.Log)
 		return err
 	})
 	if err != nil {
 		return Outcome{}, err
 	}
+	err = pgx.BeginFunc(ctx, l.Pool, func(tx pgx.Tx) error {
+		var err error
+		recorded, err = RecordPass(ctx, tx, l.Executor, l.Options, time.Now(), l.Log)
+		return err
+	})
+	if err != nil {
+		return expired, err
+	}
+	recorded = expired.and(recorded)
 	err = pgx.BeginFunc(ctx, l.Pool, func(tx pgx.Tx) error {
 		var err error
 		dispatched, err = DispatchPass(ctx, tx, l.Executor, l.Options, time.Now(), l.Log)

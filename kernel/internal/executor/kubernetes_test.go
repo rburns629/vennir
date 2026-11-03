@@ -222,58 +222,37 @@ func TestAJobTheKernelDidntMakeIsntAdopted(t *testing.T) {
 	}
 }
 
-// A start that erred after making both is retried: the same attempt's
-// ConfigMap, naming its Job and holding its request, is used as it is.
-func TestAnExistingConfigMapForThisAttemptIsLeftAsItIs(t *testing.T) {
-	c := newCluster(options())
-	for range 2 {
-		if _, err := c.k.Start(context.Background(), stepTask()); err != nil {
-			t.Fatal(err)
-		}
-	}
-	check(t, "deleted", c.deleted("jobs"), []string(nil))
-}
-
-// One the kernel didn't make would hand the step a request it never sent.
-func TestAConfigMapTheKernelDidntMakeIsntUsed(t *testing.T) {
+// A start that erred after making both is retried: the ConfigMap there is
+// replaced (the scheduler can't read it), so the step gets this request.
+func TestAnExistingConfigMapIsReplacedWithThisAttemptsRequest(t *testing.T) {
 	task := stepTask()
 	name := JobName(task.ExecutionID, task.TaskKey, task.Attempt)
-	for what, change := range map[string]func(*corev1.ConfigMap){
-		"another request": func(cm *corev1.ConfigMap) { cm.Data["request.json"] = `{"inputs": {"forged": true}}` },
-		"another owner":   func(cm *corev1.ConfigMap) { cm.OwnerReferences[0].UID = "someone-elses" },
-		"no owner":        func(cm *corev1.ConfigMap) { cm.OwnerReferences = nil },
-		"more data":       func(cm *corev1.ConfigMap) { cm.Data["extra"] = "x" },
-	} {
-		c := newCluster(options())
-		if _, err := c.k.Start(context.Background(), task); err != nil {
-			t.Fatal(err)
-		}
-		cm, err := c.CoreV1().ConfigMaps(task.Team).Get(context.Background(), name, metav1.GetOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		change(cm)
-		if _, err := c.CoreV1().ConfigMaps(task.Team).Update(context.Background(), cm, metav1.UpdateOptions{}); err != nil {
-			t.Fatal(err)
-		}
-		_, err = c.k.Start(context.Background(), task)
-		check(t, what, rejected(t, err).Code, "DISPATCH_REJECTED")
-		check(t, what+": its Job deleted", c.deleted("jobs"), []string{name})
+	planted := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: task.Team, Labels: map[string]string{"app": "execution-kernel"}},
+		Data: map[string]string{"request.json": `{"inputs": {"forged": true}}`}}
+	c := newCluster(options(), planted)
+	if _, err := c.k.Start(context.Background(), task); err != nil {
+		t.Fatal(err)
 	}
+	cm, err := c.CoreV1().ConfigMaps(task.Team).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check(t, "forged", strings.Contains(cm.Data["request.json"], "forged"), false)
+	check(t, "owner", string(cm.OwnerReferences[0].UID), jobUID)
+	check(t, "immutable", cm.Immutable != nil && *cm.Immutable, true)
+	check(t, "replaced", c.deleted("configmaps"), []string{name})
+	check(t, "its Job kept", c.deleted("jobs"), []string(nil))
 }
 
-func TestAJobBeingDeletedIsntAdopted(t *testing.T) {
-	task := stepTask()
-	now := metav1.Now()
-	c := newCluster(options(), &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: JobName(task.ExecutionID, task.TaskKey, task.Attempt),
-		Namespace: task.Team, UID: "old", DeletionTimestamp: &now, Finalizers: []string{"x"}}})
-	_, err := c.k.Start(context.Background(), task)
-	if err == nil {
-		t.Fatal("adopted")
-	}
-	if _, ok := IsDispatchRejected(err); ok {
-		t.Fatal("a Job being deleted is retried, not refused")
-	}
+// One the scheduler may not delete (not labelled as its own: the dispatch
+// policy refuses) can't be replaced, so the attempt is refused.
+func TestAConfigMapThatCantBeReplacedRefusesTheAttempt(t *testing.T) {
+	c := newCluster(options())
+	c.refuse("create", "configmaps", apierrors.NewAlreadyExists(corev1.Resource("configmaps"), "x"))
+	c.refuse("delete", "configmaps", status(403, metav1.StatusReasonForbidden, "the scheduler may delete only its own Jobs and ConfigMaps"))
+	_, err := c.k.Start(context.Background(), stepTask())
+	check(t, "code", rejected(t, err).Code, "DISPATCH_REJECTED")
+	check(t, "its Job deleted", len(c.deleted("jobs")), 1)
 }
 
 // The scheduler retries this same attempt, whose start adopts the Job and

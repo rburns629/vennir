@@ -57,6 +57,14 @@ func TestAnUndecidedApprovalExpiresAndFailsTheExecution(t *testing.T) {
 	equal(t, "after", tasks["after"].State, domain.TaskCancelled)
 	equal(t, "execution", executionState(t, tx, id), domain.ExecutionFailed)
 	equal(t, "events", eventTypes(t, tx, id), []string{"EXECUTION_CREATED", "TASK_FAILED", "EXECUTION_FAILED"})
+
+	// Failing it, the pass settles the execution as a finishing one does,
+	// so it can't deadlock with another scheduler's settling.
+	var free bool
+	if err := testPool.QueryRow(context.Background(), `SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0))`, "settle:"+id).Scan(&free); err != nil {
+		t.Fatal(err)
+	}
+	equal(t, "another scheduler may settle it", free, false)
 }
 
 func TestNoTimeoutNeverExpires(t *testing.T) {

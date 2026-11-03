@@ -1012,6 +1012,18 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
 
 ## Security
 
+- [ ] **A ConfigMap planted ahead of a step's Job could be mounted for a
+  moment** (K-8 follow-up, found 2026-11-03). The executor creates the
+  Job, then its request ConfigMap (immutable, owned by the Job); one
+  already under that name is replaced, so once `Start` returns the
+  request is the kernel's, but a Pod scheduled in between could mount
+  the planted one. It needs Job- or ConfigMap-create rights in a team
+  namespace, which teams and hardened steps don't have. Closing it means
+  the ConfigMap first, then the Job, then the ConfigMap's owner set (RBAC
+  `patch` on ConfigMaps and the dispatch policy fencing `UPDATE`), or a
+  Job created suspended and resumed once its ConfigMap is checked; either
+  is proven on kind first.
+
 - [x] **Add the `v*` tag ruleset (admins only)** (decided 2026-11-02, X-6;
   done 2026-11-03): the repository's `release tags` ruleset lets only
   admins create, update or delete `v*` tags. A tag push runs the

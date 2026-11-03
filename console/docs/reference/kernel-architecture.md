@@ -134,7 +134,8 @@ cmd/kernel/main.go : main() → runScheduler()      [`kernel scheduler`]
   → internal/scheduler : (*Loop).Run(ctx)
       → migrate.Wait()                            [until schema_migrations is at migrate.Latest()]
       loop until SIGTERM/SIGINT:
-        → (*Loop).pass() : pgx.BeginFunc → RecordPass()   [phase C, committed first]
+        → (*Loop).pass() : pgx.BeginFunc → ExpireApprovals() [approvals that waited too long]
+                           pgx.BeginFunc → RecordPass()   [phase C, committed first]
                            pgx.BeginFunc → DispatchPass() [phases A and B, their own transaction]
         [committed?] → count its events (metrics)
                      → ReleaseFinished(outcome.Finished)  [only now: see below]
@@ -253,19 +254,22 @@ read concurrently first, then `poll()` acts on each in order)
                     tasks) at once are serialized, so the second sees the first's
                     commit. NO KEY UPDATE, not UPDATE: rows referencing these
                     (events, outputs) take FOR KEY SHARE, which UPDATE would
-                    conflict with. Between schedulers, the order is: a pass
-                    locks its running tasks (SKIP LOCKED: it never waits for
-                    them), then goes through them by (execution_id, id), and
-                    before a finished one touches anything else it takes its
-                    execution's settle: advisory lock (pg_advisory_xact_lock,
-                    once a pass, held to commit). One pass at a time settles
-                    an execution, and passes take those locks in one order,
-                    so they never deadlock. kernel-api's cancel and retry lock
-                    tasks, then the execution; a pass finishing two tasks of
-                    one execution locks the execution between them, so one
-                    landing just then can still deadlock with it: Postgres
-                    aborts one, and the pass is redone from the rows (a
-                    cancel errs, and is sent again).
+                    conflict with. Between schedulers: a pass locks its
+                    running tasks (SKIP LOCKED: it never waits for them),
+                    goes through them by (execution_id, id), and before a
+                    finished one touches anything else takes its execution's
+                    settle: advisory lock (pg_advisory_xact_lock, once a
+                    transaction, held to commit); ExpireApprovals does the
+                    same, in its own transaction. One transaction at a time
+                    settles an execution, each takes those locks in one
+                    order, so settling passes never deadlock each other.
+                    Other writers to an execution can: a dispatch failing it
+                    (MISSING_UPSTREAM_OUTPUT, INPUT_INVALID, a refusal,
+                    EXECUTOR_START_FAILED, holding what it claimed in queue
+                    order, so it doesn't wait for settle:), and kernel-api's
+                    cancel and retry (tasks, then the execution). Postgres
+                    aborts one, and that pass is redone from the rows (a
+                    cancel or retry errs, and is sent again).
     Failed    → handleFailure(status.Error)
 → every task that finished goes into Outcome.Finished
 ```
@@ -287,18 +291,19 @@ Inside the executor (`internal/executor/kubernetes.go`, the one
 implementation of `Executor`; the scheduler only knows the interface):
 
 - `Start()` creates a Job whose Pod has an `emptyDir` at `/platform/output`,
-  then a ConfigMap holding `request.json` (mounted read-only at
+  then an immutable ConfigMap holding `request.json` (mounted read-only at
   `/platform/input`) that names the Job as its owner, so Kubernetes deletes
-  it with any Job the scheduler never releases. Names come from
+  it with any Job the scheduler never releases. One already there under
+  its name is replaced (the scheduler can't read ConfigMaps), so once
+  `Start()` returns the request is the kernel's; one the dispatch policy
+  won't let it delete (not labelled as its own) refuses the attempt. Names come from
   (execution, task, attempt) (`JobName`, the same as the Python kernel's
   was): a Job already there under its name is this same attempt's, from a
   pass that rolled back or a start that erred after making it, and is
   adopted rather than started twice, but only if it's the Job this start
   would make (its labels, image, command, arguments, ServiceAccount and
   Secrets): the admission policies only check the scheduler's own creates,
-  so one made otherwise is a `DISPATCH_REJECTED`; so is an existing
-  ConfigMap that doesn't name this Job as its owner and hold this
-  attempt's request. Every Job has
+  so one made otherwise is a `DISPATCH_REJECTED`. Every Job has
   `activeDeadlineSeconds` (the task's timeout, plus the start timeout, plus
   a grace period, from its creation), so Kubernetes stops one the scheduler
   has lost track of. A ConfigMap too big for the API server (inputs over
@@ -382,9 +387,10 @@ KernelService/DecideApproval → internal/api/approvals.go : DecideApproval()
                 the execution → FAILED → recordEvent(EXECUTION_FAILED)
         [no row?] → not_found, or failed_precondition if it isn't awaiting
 
-kernel-scheduler, at the start of every pass : expireApprovals()
+kernel-scheduler, at the start of every pass, in its own transaction : ExpireApprovals()
     → each task AWAITING_APPROVAL since before now − ApprovalTimeout
-      (SCHEDULER_APPROVAL_TIMEOUT_SECONDS, 3 days; 0 never), FOR NO KEY UPDATE SKIP LOCKED
+      (SCHEDULER_APPROVAL_TIMEOUT_SECONDS, 3 days; 0 never), by execution:
+      its execution's settle: lock, then the task FOR NO KEY UPDATE SKIP LOCKED
       → FAILED (APPROVAL_EXPIRED) → recordEvent(TASK_FAILED) → failExecution()
 ```
 
