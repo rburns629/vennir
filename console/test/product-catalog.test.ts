@@ -77,7 +77,7 @@ beforeAll(async () => {
   member = await newUser(false);
   const botEmail = `${prefix}-ci@bots.vertra.local`;
   emails.push(botEmail);
-  const bot = await createBotUser(botEmail);
+  const { user: bot } = await createBotUser(botEmail);
   const token = generateApiToken();
   await createApiToken(bot.id, "catalog CI", hashApiToken(token), ["products:register"]);
   catalogCi = token;

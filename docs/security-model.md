@@ -309,7 +309,16 @@ it was last used, to within five minutes. A token works until it expires
 (`api_tokens.expires_at`: 90 days unless its maker chose 30 days, a year,
 two years, or until revoked), it's revoked (`TokenService/RevokeToken`, by
 a maintainer of a team its bot is in, or an admin), or its bot is deleted.
-The console and the gateway both refuse an expired one. What a leaked token can
+The console and the gateway both refuse an expired one. A bot belongs to the
+one team that made it: a token or keyless identity asked for at another
+team's bot's address, or an automation bot's, is refused, and a bot can't
+be added to another team as a member (`teamBot` in `console/src/core/tokens.ts`,
+`addMember` in `teams.ts`). An upgrade leaves a bot already in several teams
+in its earliest one, its maker's: every token, keyless identity and order
+callback made for it since a second team joined is revoked or removed, and
+an ordering bot's templates are cleared for its team to list again
+(console migration 0058).
+What a leaked token can
 do depends on its kind:
 
 - **A team's bot** is a maintainer of its team (`console/src/core/tokens.ts`),

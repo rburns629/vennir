@@ -407,6 +407,13 @@
       "when": 1793587443121,
       "tag": "0057_product_clouds",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793672565748,
+      "tag": "0058_bots_belong_to_one_team",
+      "breakpoints": true
     }
   ]
 }

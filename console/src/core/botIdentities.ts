@@ -15,7 +15,7 @@ import { db } from "../db/client.js";
 import { findTeamById, findTeamByName } from "../db/queries.js";
 import { botIdentities, teamMemberships, users } from "../db/schema.js";
 import { ensureNotRetired } from "./retired.js";
-import { teamBot } from "./tokens.js";
+import { ensureTeamsBot, teamBot } from "./tokens.js";
 
 function signedIn(caller: AuthUser | undefined): AuthUser {
   if (!caller) throw new ApiError(401, "UNAUTHORIZED", "Sign in first.", Code.Unauthenticated);
@@ -58,6 +58,7 @@ export async function addBotIdentity(caller: AuthUser | undefined, teamName: str
   ensureNotRetired(team);
   const bot = (await teamBots(team.id)).find((b) => b.id === botId);
   if (!bot) throw new ApiError(400, "BAD_IDENTITY", `That isn't one of team "${teamName}"'s bots.`);
+  await ensureTeamsBot(teamName, bot.email, bot.id);
   const problem = identityProblem(issuer, claims);
   if (problem) throw new ApiError(400, "BAD_IDENTITY", problem);
   const [row] = await db.insert(botIdentities).values({ botId, issuer, claims, createdBy: who.id }).onConflictDoNothing().returning();

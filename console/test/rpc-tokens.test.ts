@@ -6,12 +6,14 @@
  * no new token, and a raw token is shown once and never audited.
  */
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, like } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { and, desc, eq, inArray, like, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../src/db/client.js";
-import { addTeamMember, createTeam, setTeamRetired } from "../src/db/queries.js";
-import { auditLog, teams, users } from "../src/db/schema.js";
+import { addTeamMember, createApiToken, createBotUser, createTeam, setTeamRetired } from "../src/db/queries.js";
+import { generateApiToken, hashApiToken } from "../src/auth/apiToken.js";
+import { apiTokens, auditLog, botCallbacks, botIdentities, teamMemberships, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { failureCode, rpcClient, type RpcError } from "./rpc.js";
 
@@ -94,6 +96,90 @@ describe("a team's bots", () => {
     );
     expect(response.json<RpcError>().code).toBe("failed_precondition");
     expect(failureCode(response.json<RpcError>())).toBe("TEAM_RETIRED");
+  });
+
+  it("belong to the team that made them: another team can't take one, or an automation bot", async () => {
+    const owner = await memberOfNewTeam();
+    const taker = await memberOfNewTeam();
+    const email = `bot-${randomUUID()}@example.com`;
+    botEmails.push(email);
+    expect((await rpc("TokenService", "CreateBotToken", { team: owner.team.name, email, label: "ci" }, { token: owner.token })).statusCode).toBe(200);
+
+    const taken = await rpc("TokenService", "CreateBotToken", { team: taker.team.name, email, label: "x" }, { token: taker.token });
+    expect(taken.json<RpcError>().code).toBe("already_exists");
+    expect(failureCode(taken.json<RpcError>())).toBe("CONFLICT");
+    const theirs = await rpc("TokenService", "ListBots", { team: taker.team.name }, { token: taker.token });
+    expect(theirs.json<{ bots?: { email: string }[] }>().bots ?? []).not.toContainEqual(expect.objectContaining({ email }));
+
+    // A bot in no team that has a token, as an admin's automation bot has, isn't anyone's to take.
+    const automation = `automation-${randomUUID().slice(0, 8)}@bot.internal`;
+    botEmails.push(automation);
+    const { user: automationBot } = await createBotUser(automation);
+    await createApiToken(automationBot.id, "catalog CI", hashApiToken(generateApiToken()), ["products:register"], null);
+    const orphan = await rpc("TokenService", "CreateBotToken", { team: taker.team.name, email: automation, label: "x" }, { token: taker.token });
+    expect(failureCode(orphan.json<RpcError>())).toBe("CONFLICT");
+
+    // Its own team still gets new tokens for it.
+    expect((await rpc("TokenService", "CreateBotToken", { team: owner.team.name, email, label: "again" }, { token: owner.token })).statusCode).toBe(200);
+  });
+
+  it("asked for at one new address by two teams at once, go to one of them", async () => {
+    const first = await memberOfNewTeam();
+    const second = await memberOfNewTeam();
+    const email = `bot-${randomUUID()}@example.com`;
+    botEmails.push(email);
+    const answers = await Promise.all(
+      [first, second].map((t) => rpc("TokenService", "CreateBotToken", { team: t.team.name, email, label: "ci" }, { token: t.token })),
+    );
+    expect(answers.map((a) => a.statusCode).sort()).toEqual([200, 409]);
+    const [bot] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+    expect(await db.select().from(teamMemberships).where(eq(teamMemberships.userId, bot!.id))).toHaveLength(1);
+  });
+
+  it("can be finished by the team that started one, when making it stopped before its team", async () => {
+    const { team, token } = await memberOfNewTeam();
+    const email = `bot-${randomUUID()}@example.com`;
+    botEmails.push(email);
+    await createBotUser(email); // made, with no team, token or identity yet
+    expect((await rpc("TokenService", "CreateBotToken", { team: team.name, email, label: "ci" }, { token })).statusCode).toBe(200);
+  });
+
+  it("in two teams from before bots had one are left with their maker's team (migration 0058)", async () => {
+    const owner = await memberOfNewTeam();
+    const taker = await memberOfNewTeam();
+    const email = `bot-${randomUUID()}@example.com`;
+    botEmails.push(email);
+    const { user: bot } = await createBotUser(email);
+    const at = (seconds: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, seconds));
+    await db.insert(teamMemberships).values({ userId: bot.id, teamId: owner.team.id, role: "maintainer", createdAt: at(0) });
+    const before = await createApiToken(bot.id, "owner's", hashApiToken(generateApiToken()), [], null);
+    await db.update(apiTokens).set({ createdAt: at(1) }).where(eq(apiTokens.id, before.id));
+    await db.insert(teamMemberships).values({ userId: bot.id, teamId: taker.team.id, role: "maintainer", createdAt: at(10) });
+    const after = await createApiToken(bot.id, "taker's", hashApiToken(generateApiToken()), [], null);
+    await db.update(apiTokens).set({ createdAt: at(20) }).where(eq(apiTokens.id, after.id));
+    await db.insert(botIdentities).values({ botId: bot.id, issuer: "https://ci.example", claims: { sub: `repo:x/${randomUUID()}` }, createdAt: at(20) });
+
+    await db.insert(botCallbacks).values({ botId: bot.id, urlEncrypted: "x", host: "taker.example", secretEncrypted: "x", updatedAt: at(20) });
+    await db.update(users).set({ orderTemplates: ["deploy"] }).where(eq(users.id, bot.id));
+
+    // In a transaction that's rolled back, so other test files never see it.
+    const migration = readFileSync(new URL("../src/db/migrations/0058_bots_belong_to_one_team.sql", import.meta.url), "utf8");
+    const checked = Symbol("checked");
+    await expect(
+      db.transaction(async (tx) => {
+        for (const statement of migration.split("--> statement-breakpoint")) await tx.execute(sql.raw(statement));
+        const memberships = await tx.select({ teamId: teamMemberships.teamId }).from(teamMemberships).where(eq(teamMemberships.userId, bot.id));
+        expect(memberships).toEqual([{ teamId: owner.team.id }]);
+        const tokens = await tx.select({ id: apiTokens.id, revokedAt: apiTokens.revokedAt }).from(apiTokens).where(eq(apiTokens.userId, bot.id));
+        expect(tokens.find((t) => t.id === before.id)?.revokedAt).toBeNull();
+        expect(tokens.find((t) => t.id === after.id)?.revokedAt).not.toBeNull();
+        expect(await tx.select().from(botIdentities).where(eq(botIdentities.botId, bot.id))).toEqual([]);
+        expect(await tx.select().from(botCallbacks).where(eq(botCallbacks.botId, bot.id))).toEqual([]);
+        const [after_] = await tx.select({ orderTemplates: users.orderTemplates }).from(users).where(eq(users.id, bot.id));
+        expect(after_?.orderTemplates).toEqual([]);
+        throw checked;
+      }),
+    ).rejects.toBe(checked);
   });
 
   it("can only be revoked by a member of one of the bot's teams, or an admin", async () => {
