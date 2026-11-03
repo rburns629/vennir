@@ -648,7 +648,11 @@ branch ruleset**, targeting the default branch, with:
   | `codeowners` | `check-codeowners.yml` | every owner in CODEOWNERS exists |
 
   Each of these runs on every pull request (no paths filter), so none can
-  leave one waiting forever. A check shows up in the list once it has run
+  leave one waiting forever. `secret-stores` (`check-secret-stores.yml`)
+  is deliberately not on the list: it runs only on pull requests that touch
+  a `secret-stores/` folder, so requiring it would block every other one;
+  it still fails the pull request it runs on, and the release on `main`
+  refuses SecretStore files that fail it. A check shows up in the list once it has run
   in the repository at least once.
 - No bypass list, or only the catalog admins, and only for pull requests.
 
