@@ -68,6 +68,7 @@ class CreateActionTest(unittest.TestCase):
         self.service.instances.return_value.get.return_value.execute.return_value = {
             "connectionName": "demo-project:us-central1:already-exists",
             "ipAddresses": [{"ipAddress": "10.0.0.1"}],
+            "state": "RUNNABLE",
         }
 
         exit_code = self.module.main()
@@ -84,6 +85,47 @@ class CreateActionTest(unittest.TestCase):
                 },
             },
         )
+
+    def test_an_existing_instance_still_being_made_is_waited_for(self) -> None:
+        # A retry finding the instance its last attempt was still creating.
+        self._write_request({"projectId": "demo-project", "instanceName": "made"})
+        made = {"name": "made", "connectionName": "demo-project:us-central1:made", "settings": {"userLabels": {"vertra-made": "true"}}}
+        self.service.instances.return_value.get.return_value.execute.side_effect = [
+            {**made, "state": "PENDING_CREATE"},
+            {**made, "state": "PENDING_CREATE"},
+            {**made, "state": "RUNNABLE", "ipAddresses": [{"ipAddress": "10.0.0.3"}]},
+        ]
+        with patch.object(self.module.time, "sleep") as slept:
+            self.assertEqual(self.module.main(), 0)
+        self.assertEqual(slept.call_count, 2)
+        self.service.instances.return_value.insert.assert_not_called()
+        outputs = self._result()["outputs"]
+        self.assertEqual(outputs["ipAddress"], "10.0.0.3")
+        self.assertEqual(outputs["resources"][0]["id"], "demo-project:us-central1:made")
+
+    def test_an_existing_instance_still_not_ready_is_a_retryable_failure(self) -> None:
+        self._write_request({"projectId": "demo-project", "instanceName": "slow"})
+        self.module.OPERATION_TIMEOUT_SECONDS = 0
+        self.service.instances.return_value.get.return_value.execute.return_value = {
+            "name": "slow", "connectionName": "demo-project:us-central1:slow", "state": "PENDING_CREATE",
+        }
+        self.assertEqual(self.module.main(), 1)
+        error = self._result()["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("INSTANCE_NOT_READY", True))
+
+    def test_a_failed_existing_instance_fails_for_good(self) -> None:
+        for state in ("FAILED", "SUSPENDED", "PENDING_DELETE"):
+            with self.subTest(state=state):
+                self._write_request({"projectId": "demo-project", "instanceName": "broken"})
+                self.service.instances.return_value.get.return_value.execute.return_value = {
+                    "name": "broken", "connectionName": "demo-project:us-central1:broken", "state": state,
+                }
+                with patch.object(self.module.time, "sleep") as slept:
+                    self.assertEqual(self.module.main(), 1)
+                slept.assert_not_called()
+                error = self._result()["error"]
+                self.assertEqual((error["code"], error["retryable"]), ("INSTANCE_NOT_USABLE", False))
+                self.assertNotIn("outputs", self._result())
 
     def test_new_instance_is_created_and_waits_for_operation(self) -> None:
         self._write_request({"projectId": "demo-project", "instanceName": "brand-new"})
