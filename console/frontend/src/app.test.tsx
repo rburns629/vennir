@@ -1402,13 +1402,55 @@ describe("admin", () => {
     expect(await screen.findByText(/claude-haiku-5-5 answered in 3.2 s, citing 1 section/)).toBeTruthy();
     expect(tried[0]?.["config"]).toMatchObject({ provider: "anthropic", model: "claude-haiku-5-5", apiKey: "sk-ant-typed" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(within(screen.getByRole("region", { name: "The model" })).getByRole("button", { name: "Save" }));
     expect(await screen.findByText(/Saved: in effect within seconds/)).toBeTruthy();
     expect(saved[0]?.["config"]).toMatchObject({ enabled: true, provider: "anthropic", model: "claude-haiku-5-5", apiKey: "sk-ant-typed" });
     // Saved, the key is never shown again: kept, and the field empty.
     expect((screen.getByLabelText("API key") as HTMLInputElement).value).toBe("");
     expect(screen.getByText(/One is kept \(encrypted, never shown\)/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Use the install's" })).toBeTruthy();
+  });
+
+  it("sets how many questions each person may ask, an hour's no more than a day's", async () => {
+    const saved: Record<string, unknown>[] = [];
+    await renderAt("/admin/chat", ADMIN, {
+      "ChatService/GetChatLimits": { limits: { perHour: 30, perDay: 200 } },
+      "ChatService/SetChatLimits": (request: Record<string, unknown>) => {
+        saved.push(request);
+        if (request["perHour"] === 9) return refused(400, "invalid_argument", "No more questions an hour than a day.", "BAD_CHAT_LIMITS");
+        return { limits: { perHour: request["perHour"], perDay: request["perDay"], updatedBy: "ana@acme.com", updatedAt: "2026-10-30T09:00:00Z" } };
+      },
+      "ChatService/ListChatFeedback": { ratings: [] },
+    });
+    const card = await screen.findByRole("region", { name: "Questions per person" }, { timeout: 5000 });
+    const hour = await within(card).findByLabelText("An hour");
+    expect((hour as HTMLInputElement).value).toBe("30");
+    // The defaults: nobody set them.
+    expect(within(card).queryByText(/^Set by/)).toBeNull();
+
+    const save = within(card).getByRole("button", { name: "Save" });
+    fireEvent.change(within(card).getByLabelText("A day"), { target: { value: "20" } });
+    expect(within(card).getByText("At least the hour's")).toBeTruthy();
+    expect(save.hasAttribute("disabled")).toBe(true);
+    fireEvent.change(within(card).getByLabelText("A day"), { target: { value: "20000" } });
+    expect(within(card).getByText("1 to 10,000")).toBeTruthy();
+    expect(save.hasAttribute("disabled")).toBe(true);
+
+    fireEvent.change(within(card).getByLabelText("A day"), { target: { value: "100" } });
+    fireEvent.change(hour, { target: { value: "10" } });
+    fireEvent.click(save);
+    expect(await within(card).findByText("Saved: 10 an hour, 100 a day.")).toBeTruthy();
+    expect(saved[0]).toMatchObject({ perHour: 10, perDay: 100 });
+    expect(within(card).getByText(/^Set by ana@acme\.com · /)).toBeTruthy();
+
+    // What the server refuses is said too.
+    fireEvent.change(hour, { target: { value: "9" } });
+    fireEvent.click(save);
+    expect(await within(card).findByText("No more questions an hour than a day.")).toBeTruthy();
+
+    fireEvent.click(within(card).getByRole("button", { name: "Use the defaults" }));
+    await waitFor(() => { expect(saved.at(-1)).toMatchObject({ perHour: 30, perDay: 200 }); });
+    expect(await within(card).findByText("Saved: 30 an hour, 200 a day.")).toBeTruthy();
   });
 });
 

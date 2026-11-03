@@ -18,6 +18,7 @@ import type { InstallInfo } from "../api";
 import { useEnvironment } from "../environment";
 import { AdminChannelCard } from "./admin/AdminChannelCard";
 import { AutomationTokensCard } from "./admin/AutomationTokensCard";
+import { ChatLimitsCard } from "./admin/ChatLimitsCard";
 import { ChatSettingsCard } from "./admin/ChatSettingsCard";
 import { ChatTab } from "./admin/ChatTab";
 import { GatewayTab } from "./admin/GatewayTab";
@@ -253,6 +254,7 @@ const GROUPS: { name: string; sections: Section[] }[] = [
         content: () => (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <ChatSettingsCard />
+            <ChatLimitsCard />
             <ChatTab />
           </Box>
         ),
