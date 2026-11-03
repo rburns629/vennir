@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { useMemo, useState, type FormEvent } from "react";
+import { useId, useMemo, useState, type FormEvent } from "react";
 import { Alert, Box, Button, Card, CardContent, Chip, IconButton, Stack, TextField, Typography } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -239,15 +239,10 @@ export function AddSecretFlow({
                             }}
                             sx={{ maxWidth: 320 }}
                           />
-                          <TextField
-                            label="Value"
-                            size="small"
-                            multiline
-                            minRows={2}
-                            maxRows={10}
+                          <SecretValueField
                             value={file.value}
-                            onChange={(event) => {
-                              setFiles((current) => current.map((f, i) => (i === index ? { ...f, value: event.target.value } : f)));
+                            onChange={(value) => {
+                              setFiles((current) => current.map((f, i) => (i === index ? { ...f, value } : f)));
                             }}
                           />
                         </Stack>
@@ -341,6 +336,68 @@ export function AddSecretFlow({
         </CardContent>
       </Card>
     </Box>
+  );
+}
+
+/**
+ * A secret's value (review F-7): masked as it's pasted, still multi-line
+ * for a whole file such as a key.json, and never spell-checked, corrected
+ * or remembered by the browser (enhanced spell check sends what it checks
+ * to its vendor). Show unmasks it to check it.
+ *
+ * Masking is -webkit-text-security, which Chrome, Edge and Safari support
+ * but Firefox doesn't: there the value shows as typed, so the field says so
+ * and offers no Show (still never spell-checked or remembered).
+ */
+function SecretValueField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const id = useId();
+  const [canMask] = useState(() => typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("-webkit-text-security", "disc"));
+  const [shown, setShown] = useState(false);
+  const masked = canMask && !shown;
+  return (
+    <Stack spacing={0.5}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+        <Typography component="label" htmlFor={id} variant="body2" sx={{ fontWeight: 500 }}>
+          Value
+        </Typography>
+        {canMask && (
+          <Button
+            size="small"
+            variant="outlined"
+            aria-pressed={shown}
+            aria-controls={id}
+            onClick={() => {
+              setShown((s) => !s);
+            }}
+          >
+            {shown ? "Hide" : "Show"}
+          </Button>
+        )}
+      </Box>
+      <TextField
+        id={id}
+        size="small"
+        multiline
+        minRows={2}
+        maxRows={10}
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+        helperText={`${masked ? "Hidden as you paste, and never" : canMask ? "Never" : "This browser can't hide it as you paste. It's never"} spell-checked or suggested. Kept encrypted; nobody can read it back here.`}
+        slotProps={{
+          htmlInput: {
+            spellCheck: false,
+            autoComplete: "off",
+            autoCorrect: "off",
+            autoCapitalize: "off",
+            "data-gramm": "false",
+          },
+        }}
+        // Masked yet multi-line: a textarea can't be type="password".
+        sx={masked ? { "& textarea": { WebkitTextSecurity: "disc" } } : undefined}
+      />
+    </Stack>
   );
 }
 
