@@ -879,6 +879,19 @@ func TestAStepWaitingForANodeIsReadWhenItsPodChanges(t *testing.T) {
 	check(t, "reads", reads(), 2)
 }
 
+// Changes to Jobs this scheduler never asks about again (released, or
+// another scheduler's) aren't kept for ever.
+func TestChangesNoOneAsksAboutAreForgotten(t *testing.T) {
+	c := newCluster(options())
+	c.k.watch = healthyWatch()
+	c.k.watch.markChanged("jobs", "ek-released")
+	c.k.watch.markChanged("jobs", "ek-recent")
+	c.k.watch.changed["ek-released"] = time.Now().Add(-11 * c.k.opts.WatchResync)
+	c.k.WaitForChange(context.Background(), time.Millisecond)
+	check(t, "released", c.k.watch.takeChanged("ek-released"), false)
+	check(t, "recent", c.k.watch.takeChanged("ek-recent"), true)
+}
+
 func TestTheWatchWakesAWaitingScheduler(t *testing.T) {
 	w := newJobWatch()
 	woke := make(chan struct{})
