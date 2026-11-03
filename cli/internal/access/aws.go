@@ -31,6 +31,9 @@ type AWS struct {
 	Allowed []string
 	Denied  map[string]string
 	Budgets int
+	// BudgetsUnread: describe-budgets failed (no budgets:ViewBudget, or an
+	// organization's policy), so Budgets says nothing.
+	BudgetsUnread bool
 }
 
 type awsCLI struct {
@@ -139,13 +142,17 @@ func CheckAWS(ctx context.Context, exec Exec, profile, region string) *AWS {
 	}
 
 	// Money: budgets, and whether Spot prices can be read here.
-	if out, err := cli.call(ctx, region, "budgets", "describe-budgets", "--account-id", id.Account); err == nil {
-		var b struct{ Budgets []json.RawMessage }
-		_ = json.Unmarshal([]byte(out), &b)
-		a.Budgets = len(b.Budgets)
+	var b struct{ Budgets []json.RawMessage }
+	out, err = cli.call(ctx, region, "budgets", "describe-budgets", "--account-id", id.Account)
+	if err == nil {
+		err = json.Unmarshal([]byte(out), &b)
 	}
+	a.Budgets, a.BudgetsUnread = len(b.Budgets), err != nil
 	budget := fmt.Sprintf("%d in this account", a.Budgets)
-	if a.Budgets == 0 {
+	switch {
+	case a.BudgetsUnread:
+		budget = "couldn't read them (budgets:ViewBudget): check the account has one in the Billing console"
+	case a.Budgets == 0:
 		budget = "none in this account: set one so a forgotten cluster can't surprise you"
 	}
 	a.line("Budgets", budget)
