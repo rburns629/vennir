@@ -306,6 +306,20 @@ gateway:
   # -- A second listener (the Service's port public) for APIs reachable
   # from the internet; put an Ingress or load balancer in front of it.
   publicListener: false
+  # -- The proxies in front of the public listener (an Ingress controller's
+  # Pods, a load balancer), as addresses or CIDR ranges, whose
+  # X-Forwarded-For says who the caller is: a backend then gets the caller's
+  # address as X-Forwarded-For, the last one the trusted proxies saw (never
+  # what the caller wrote before it). From any other peer, and always on the
+  # in-cluster listener, X-Forwarded-For is the peer's own address and what
+  # was sent is dropped. Empty: every peer is the caller, so behind an
+  # Ingress a backend sees the Ingress. List only what really is a proxy:
+  # anything listed that reaches the public listener can say it's anyone.
+  # E.g. an in-cluster controller: its Pods' range (kind's 10.244.0.0/16);
+  # an AWS ALB: the VPC's range; Google's load balancer appends its own
+  # address after the client's, so its address too, with 35.191.0.0/16 and
+  # 130.211.0.0/22 (where it connects from).
+  trustedProxies: []
   # -- An Ingress in front of the public listener (publicListener on), at
   # host, for publicUrl.
   ingress:

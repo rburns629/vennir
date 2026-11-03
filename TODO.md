@@ -1032,13 +1032,14 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   Job created suspended and resumed once its ConfigMap is checked; either
   is proven on kind first.
 
-- [ ] **The gateway's backends see the ingress, not the client, behind
-  its public listener** (found 2026-11-03, G-10): the gateway sets
-  `X-Forwarded-For` to its own peer and drops what callers send, since its
-  listeners are reachable from inside the cluster too. Behind an ingress,
-  that peer is the ingress. If a backend needs the client's address, give
-  the gateway a trusted-proxy list (as the console's `trustProxy`) and keep
-  the ingress's `X-Forwarded-For` only from those.
+- [x] **The gateway's backends see the ingress, not the client, behind
+  its public listener** (found 2026-11-03, G-10; done 2026-11-03): the
+  console chart's `gateway.trustedProxies` (addresses or CIDR ranges) lists
+  the proxies in front of the public listener; from one of those, the
+  gateway reads its `X-Forwarded-For` back past every trusted hop and
+  passes the first address that isn't one as the backend's
+  `X-Forwarded-For`. From any other peer, and always on the in-cluster
+  listener, it's the peer's own address, as before.
 
 - [x] **Add the `v*` tag ruleset (admins only)** (decided 2026-11-02, X-6;
   done 2026-11-03): the repository's `release tags` ruleset lets only

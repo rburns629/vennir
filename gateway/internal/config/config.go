@@ -8,6 +8,7 @@ package config
 import (
 	"crypto/ed25519"
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -47,7 +48,12 @@ type Settings struct {
 	// public listener), and for metrics.
 	Listen, PublicListen, MetricsListen string
 	BackendHosts, InternetTeams         []string
-	DefaultPerMinute                    int
+	// TrustedProxies are the peers (an ingress, a load balancer) whose
+	// X-Forwarded-For says who the caller is, on the public listener; from
+	// anyone else, and on the in-cluster listener, it's dropped, and the
+	// peer is the caller.
+	TrustedProxies   []netip.Prefix
+	DefaultPerMinute int
 	// Minting Google ID tokens: the STS audience API ServiceAccounts'
 	// tokens are exchanged for (GKE: the cluster's Workload Identity
 	// pool; elsewhere a provider trusting its issuer), and the audience
@@ -114,6 +120,18 @@ func Load(getenv func(string) string) (*Settings, error) {
 		GCPTokenAudience:       getenv("GCP_TOKEN_AUDIENCE"),
 		Closed:                 getenv("CLOSED") == "true",
 		Refresh:                time.Duration(positive("REFRESH_SECONDS", 5)) * time.Second,
+	}
+	for _, item := range list(getenv("TRUSTED_PROXIES")) {
+		prefix, err := netip.ParsePrefix(item)
+		if err != nil {
+			addr, addrErr := netip.ParseAddr(item)
+			if addrErr != nil {
+				problems = append(problems, fmt.Sprintf("TRUSTED_PROXIES: an address or CIDR range, got %q", item))
+				continue
+			}
+			prefix = netip.PrefixFrom(addr, addr.BitLen())
+		}
+		s.TrustedProxies = append(s.TrustedProxies, prefix.Masked())
 	}
 	if (s.DatabaseIAMAccount == "") != (s.DatabaseIAMTokenFile == "") {
 		problems = append(problems, "DATABASE_IAM_ACCOUNT and DATABASE_IAM_TOKEN_FILE: both, or neither")

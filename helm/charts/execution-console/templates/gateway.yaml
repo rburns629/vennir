@@ -194,6 +194,8 @@ spec:
               value: {{ join "," .Values.gateway.backendHosts | quote }}
             - name: INTERNET_TEAMS
               value: {{ join "," .Values.gateway.internetTeams | quote }}
+            - name: TRUSTED_PROXIES
+              value: {{ join "," .Values.gateway.trustedProxies | quote }}
             - name: DEFAULT_PER_MINUTE
               value: {{ .Values.gateway.defaultPerMinute | quote }}
             - name: CLOSED

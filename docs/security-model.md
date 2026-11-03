@@ -453,7 +453,9 @@ sharing; a backend should still check the token's `api` as well as its
 pod IPs or anything else that reaches inside the cluster, `backendHosts`
 alone decides, so list exactly the hosts each API may use. A caller's own `Vertra-*` headers are dropped,
 and so is what it says of where it's from (`Forwarded`, `X-Forwarded-*`,
-`X-Real-Ip`): `X-Forwarded-For` is the gateway's own peer. A cookie a
+`X-Real-Ip`): `X-Forwarded-For` is the gateway's own peer, or, on the
+public listener behind a proxy listed in `gateway.trustedProxies`, the last
+address those trusted proxies saw (never one the caller wrote before it). A cookie a
 backend sets is kept to its API's path, so one team's backend can't set or
 read another's on the gateway's shared origin.
 Paths with encoded slashes, backslashes or dot segments (`..;` too) are
