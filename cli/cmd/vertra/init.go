@@ -173,7 +173,7 @@ func (a *app) runInit(cmd *cobra.Command, env string, f *initFlags) error {
 		}
 		if c.Cluster.Mode, err = a.ask.Choose("Cluster mode:", []prompt.Option{
 			{Value: "auto", Label: "auto", Note: "GKE Autopilot: billed per Pod, nothing for a sleeping platform"},
-			{Value: "standard", Label: "standard", Note: "node pools sized for you: billed per node, the platform's node always"},
+			{Value: "standard", Label: "standard", Note: "node pools sized for you: billed per node, the platform's nodes always"},
 		}, orDefault(f.mode, "auto")); err != nil {
 			return err
 		}
@@ -189,7 +189,7 @@ func (a *app) runInit(cmd *cobra.Command, env string, f *initFlags) error {
 		}
 		if c.Cluster.Mode, err = a.ask.Choose("Cluster mode:", []prompt.Option{
 			{Value: "auto", Label: "auto", Note: "EKS Auto Mode: nodes follow the Pods, none while asleep; a fee per node"},
-			{Value: "standard", Label: "standard", Note: "node groups and the Cluster Autoscaler: the platform's node always runs"},
+			{Value: "standard", Label: "standard", Note: "node groups and the Cluster Autoscaler: the platform's nodes always run"},
 		}, orDefault(f.mode, "auto")); err != nil {
 			return err
 		}

@@ -134,6 +134,10 @@ func (c *Catalog) usableBase(base string) bool {
 	return err == nil
 }
 
+// republishPaths are what every product is checked and published again
+// for when it changes: the tooling, its settings and the pinned vertra.
+var republishPaths = []string{"tools", "vertra.yaml", "vertra"}
+
 // ChangedProducts are the product folders changed since base (committed or
 // not).
 // Everything, when there's no usable base (a first push, a force-push, a
@@ -159,8 +163,10 @@ func (c *Catalog) ChangedProducts(base string, products []*Product) []string {
 	}
 	names := strings.Split(strings.TrimSpace(out+"\n"+untracked), "\n")
 	for _, n := range names {
-		if strings.HasPrefix(n, "tools/") || strings.HasPrefix(n, "vertra.yaml") || n == "vertra" {
-			return labels
+		for _, path := range republishPaths {
+			if n == path || strings.HasPrefix(n, path+"/") {
+				return labels
+			}
 		}
 	}
 	changed := []string{}

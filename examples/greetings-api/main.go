@@ -79,9 +79,10 @@ func (k *keys) get(kid string) (ed25519.PublicKey, error) {
 }
 
 // caller checks the Vertra-Caller token: the gateway's signature, not
-// expired, and for this backend (aud: its origin, as the API's
-// backend.url has it).
-func (k *keys) caller(r *http.Request, audience string) (*claims, error) {
+// expired, for this backend (aud: its origin, as the API's backend.url has
+// it), and for this API (api: <team>/<name>), so another API pointed at the
+// same origin can't call it under its own spec and sharing.
+func (k *keys) caller(r *http.Request, audience, api string) (*claims, error) {
 	parts := strings.Split(r.Header.Get("Vertra-Caller"), ".")
 	if len(parts) != 3 {
 		return nil, errors.New("no Vertra-Caller token: call it through the gateway")
@@ -109,6 +110,9 @@ func (k *keys) caller(r *http.Request, audience string) (*claims, error) {
 	if c.Audience != audience {
 		return nil, fmt.Errorf("for %s, not this backend", c.Audience)
 	}
+	if c.API != api {
+		return nil, fmt.Errorf("for the API %s, not %s", c.API, api)
+	}
 	return &c, nil
 }
 
@@ -120,9 +124,9 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	jwks, audience := os.Getenv("GATEWAY_JWKS_URL"), os.Getenv("AUDIENCE")
-	if jwks == "" || audience == "" {
-		log.Error("GATEWAY_JWKS_URL and AUDIENCE (this backend's origin, as backend.url names it) are required")
+	jwks, audience, api := os.Getenv("GATEWAY_JWKS_URL"), os.Getenv("AUDIENCE"), os.Getenv("API")
+	if jwks == "" || audience == "" || api == "" {
+		log.Error("GATEWAY_JWKS_URL, AUDIENCE (this backend's origin, as backend.url names it) and API (<team>/<name>) are required")
 		os.Exit(1)
 	}
 	k := &keys{url: jwks}
@@ -130,7 +134,7 @@ func main() {
 	// Not in openapi.yaml, so the gateway never forwards it: the kubelet's.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	mux.HandleFunc("GET /greetings/{name}", func(w http.ResponseWriter, r *http.Request) {
-		c, err := k.caller(r, audience)
+		c, err := k.caller(r, audience, api)
 		if err != nil {
 			log.Warn("refused", "reason", err.Error())
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": err.Error()})

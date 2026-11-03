@@ -4,6 +4,7 @@ package pricing
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/rburns629/vertra/cli/internal/config"
 	"github.com/rburns629/vertra/cli/internal/plan"
@@ -21,11 +22,61 @@ const (
 
 // gkeStandardNodes are standard mode's platform node per size, as the gcp
 // module sizes them (keep in step with modules/gcp/main.tf's pools).
-var gkeStandardNodes = map[string]struct{ cores, ramGiB float64 }{
-	"minimal":   {1, 4}, // e2-medium: billed as one core and 4 GiB
-	"resilient": {2, 8}, // e2-standard-2
-	"scaled":    {2, 8},
-	"auto":      {2, 8},
+var gkeStandardNodes = map[string]struct {
+	machine       string
+	cores, ramGiB float64
+}{
+	"minimal":   {"e2-medium", 1, 4}, // billed as one core and 4 GiB
+	"resilient": {"e2-standard-2", 2, 8},
+	"scaled":    {"e2-standard-2", 2, 8},
+	"auto":      {"e2-standard-2", 2, 8},
+}
+
+// gkeStandardRoom is what one standard platform node leaves the platform's
+// Pods, vCPU and GiB: its allocatable after GKE's reservations
+// (cloud.google.com/kubernetes-engine/docs/concepts/plan-node-sizes:
+// e2-medium about 0.94 vCPU and 2.8 GiB, e2-standard-2 1.93 vCPU and 6.1
+// GiB), less GKE's own Pods on every node (Dataplane V2's anetd,
+// fluentbit-gke, gke-metrics-agent, pdcsi-node, netd), estimated at 0.25
+// vCPU and 0.35 GiB. Not yet checked against a live node.
+var gkeStandardRoom = map[string][2]float64{
+	"minimal":   {0.94 - 0.25, 2.8 - 0.35},
+	"resilient": {1.93 - 0.25, 6.1 - 0.35},
+	"scaled":    {1.93 - 0.25, 6.1 - 0.35},
+	"auto":      {1.93 - 0.25, 6.1 - 0.35},
+}
+
+// gkeSystemPods are GKE's Pods that run once a cluster, on the platform
+// pool since the steps pool is tainted (kube-dns and its autoscaler,
+// metrics-server, konnectivity-agent, event-exporter), estimated at 0.35
+// vCPU and 0.35 GiB of requests.
+var gkeSystemPods = [2]float64{0.35, 0.35}
+
+// nodesFor is how many nodes the platform's requests (and extra, what else
+// runs beside them once a cluster) need, lowest and highest (auto scales):
+// by CPU or by memory, whichever needs more, room being what each node
+// leaves them. The node pool, or Auto Mode, adds nodes until they fit.
+func nodesFor(f plan.Floor, extra, room [2]float64) [2]int {
+	var n [2]int
+	for i := range n {
+		// Less a hair, so a sum like 0.55+0.05 can't round up a node.
+		cpu := math.Ceil((f.CPUCores[i]+extra[0])/room[0] - 1e-9)
+		mem := math.Ceil((f.MemGiB[i]+extra[1])/room[1] - 1e-9)
+		n[i] = int(max(1, cpu, mem))
+	}
+	return n
+}
+
+// nodeWords says how many nodes of a type.
+func nodeWords(n [2]int, instance string) string {
+	switch {
+	case n[0] != n[1]:
+		return fmt.Sprintf("%d–%d %s nodes", n[0], n[1], instance)
+	case n[0] == 1:
+		return "one " + instance + " node"
+	default:
+		return fmt.Sprintf("%d %s nodes", n[0], instance)
+	}
 }
 
 // nodeDiskGiB is each standard node's boot disk (the module's disk_size_gb).
@@ -44,7 +95,9 @@ func GCP(p *GCPPrices, c *config.Config, fetched string) []plan.Line {
 
 	var stepHour float64
 	var platformHour [2]float64
-	var always float64 // besides the fee
+	var always float64     // besides the fee
+	var alwaysMore float64 // more at the top of auto's range
+	var platformNodes [2]int
 	capacity := "Spot"
 	if !f.Spot {
 		capacity = "on-demand"
@@ -56,9 +109,12 @@ func GCP(p *GCPPrices, c *config.Config, fetched string) []plan.Line {
 			core, ram = p.E2Core, p.E2Ram
 		}
 		stepHour = f.StepCPU*core + f.StepMemGiB*ram
-		disks += nodeDiskGiB * p.BalancedDisk
-		// The platform's node runs whether or not the platform sleeps.
-		always = (node.cores*p.E2Core + node.ramGiB*p.E2Ram) * hoursPerMonth
+		// The platform's nodes, as many as its requests need (the pool
+		// autoscales), run whether or not the platform sleeps.
+		platformNodes = nodesFor(f, gkeSystemPods, gkeStandardRoom[c.Size])
+		nodeMonth := (node.cores*p.E2Core+node.ramGiB*p.E2Ram)*hoursPerMonth + nodeDiskGiB*p.BalancedDisk
+		always = float64(platformNodes[0]) * nodeMonth
+		alwaysMore = float64(platformNodes[1]-platformNodes[0]) * nodeMonth
 		if c.StepHeadroom > 0 {
 			// The steps pool keeps one node (e2-standard-4) for it.
 			always += (4*core + 16*ram) * hoursPerMonth
@@ -95,7 +151,7 @@ func GCP(p *GCPPrices, c *config.Config, fetched string) []plan.Line {
 		awakeHours = lightAwakeHours
 	}
 	likelyLow := always + platformHour[0]*awakeHours + stepHour*lightStepHours
-	likelyHigh := likelyLow + fee + (platformHour[1]-platformHour[0])*awakeHours
+	likelyHigh := likelyLow + fee + (platformHour[1]-platformHour[0])*awakeHours + alwaysMore
 
 	lines := []plan.Line{
 		{Label: "Estimated cost", Text: fmt.Sprintf("a month, %s in USD, %s, %s", orList(p.Basis), p.Region, fetched)},
@@ -105,7 +161,8 @@ func GCP(p *GCPPrices, c *config.Config, fetched string) []plan.Line {
 		lines = append(lines, plan.Line{Label: "  Database", Text: fmt.Sprintf("%s: Cloud SQL, its %d GB of SSD and backups' first copy, awake or asleep (in Always below)", money(sqlMonth), sqlDiskGiB)})
 	}
 	if standard {
-		lines = append(lines, plan.Line{Label: "  Always", Text: fmt.Sprintf("%s: the platform's node and %s%s, awake or asleep", money(always), alwaysWhat(c), lbNote(c))})
+		lines = append(lines, plan.Line{Label: "  Always", Text: fmt.Sprintf("%s: %s for the platform (as many as its requests need) and %s%s, awake or asleep",
+			moneySpan(always, always+alwaysMore), nodeWords(platformNodes, gkeStandardNodes[c.Size].machine), alwaysWhat(c), lbNote(c))})
 	} else {
 		lines = append(lines,
 			plan.Line{Label: "  Always", Text: fmt.Sprintf("%s: %s%s%s", money(always), alwaysWhat(c), lbNote(c), headroomNote(c))},
@@ -190,6 +247,14 @@ func money(v float64) string {
 	default:
 		return fmt.Sprintf("$%.0f", v)
 	}
+}
+
+// moneySpan is one amount, or a range when they differ.
+func moneySpan(lo, hi float64) string {
+	if hi-lo < 0.005 {
+		return money(lo)
+	}
+	return money(lo) + "–" + money(hi)
 }
 
 func moneyRange(lo, hi float64) string {

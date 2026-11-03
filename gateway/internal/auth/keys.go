@@ -24,35 +24,71 @@ type Keys interface {
 // can't make the gateway hammer the console.
 const refetchAfter = 30 * time.Second
 
+// keysFor is how long a fetched set is used before it's fetched again, so a
+// key the console stopped publishing (JWT_SECRET rotated to end every
+// session) stops working here within it, even where no new session comes.
+const keysFor = time.Minute
+
+// keptFor is how long the last set fetched is still used while the console
+// can't be read (a restart), rather than refusing every session.
+const keptFor = 10 * time.Minute
+
 // ConsoleKeys reads the console's session keys from its JWKS
-// (GET /api/auth/jwks, console/src/sessionKeys.ts), and keeps them until a
-// session names one it doesn't know.
+// (GET /api/auth/jwks, console/src/sessionKeys.ts). A set is used for
+// keysFor after it was read; then, or when a session names a key it doesn't
+// know, it's read again (at most every refetchAfter, one read at a time,
+// outside the lock so other requests aren't held up). One is shared by
+// every listener.
 type ConsoleKeys struct {
 	URL    string
 	Client *http.Client
 
-	mu      sync.Mutex
-	keys    map[string]ed25519.PublicKey
-	fetched time.Time
+	mu         sync.Mutex
+	keys       map[string]ed25519.PublicKey
+	fetched    time.Time // the last attempt
+	good       time.Time // the last read that worked
+	refreshing bool
 }
 
-// Key is the public key with this id, fetching the set again when it's
-// unknown (at most every refetchAfter).
+// errStale is a known key whose set is too old to trust any longer.
+var errStale = errors.New("the console's session keys: not read for too long")
+
+// Key is the public key with this id.
 func (k *ConsoleKeys) Key(ctx context.Context, kid string) (ed25519.PublicKey, error) {
 	k.mu.Lock()
-	defer k.mu.Unlock()
-	if key, ok := k.keys[kid]; ok {
+	key, known := k.keys[kid]
+	if known && time.Since(k.good) < keysFor {
+		k.mu.Unlock()
 		return key, nil
 	}
-	if time.Since(k.fetched) < refetchAfter {
+	if k.refreshing || time.Since(k.fetched) < refetchAfter {
+		// Another request is reading them, or one just did.
+		usable := known && time.Since(k.good) < keptFor
+		k.mu.Unlock()
+		switch {
+		case usable:
+			return key, nil
+		case known:
+			return nil, errStale
+		}
 		return nil, ErrUnauthenticated
 	}
-	k.fetched = time.Now()
-	keys, err := k.fetch(ctx)
+	k.refreshing, k.fetched = true, time.Now()
+	k.mu.Unlock()
+
+	// Not the caller's to cancel: every request relies on this read.
+	keys, err := k.fetch(context.WithoutCancel(ctx))
+
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.refreshing = false
 	if err != nil {
+		if known && time.Since(k.good) < keptFor {
+			return key, nil
+		}
 		return nil, err
 	}
-	k.keys = keys
+	k.keys, k.good = keys, time.Now()
 	if key, ok := k.keys[kid]; ok {
 		return key, nil
 	}

@@ -11,12 +11,9 @@ Deliberately NOT "hook-succeeded" in the delete policy, unlike execution-
 kernel's otherwise-identical migrate Job: confirmed directly, against a
 real cluster, that a hook-succeeded Job (and the Pod it owns, along with
 that Pod's logs) is gone essentially immediately after `helm install`
-returns -- which would silently destroy the one and only copy of a
-freshly generated BOOTSTRAP_ADMIN_PASSWORD before an operator running the
-ordinary, documented `kubectl logs` steps in this chart's NOTES.txt could
-ever read it. Keeping the Job around (cleaned up only right before the
-*next* install/upgrade creates a new one) trades a harmless leftover
-completed Job for that password actually being retrievable.
+returns. Its log says whether this install created the first admin
+(`vertra apply` reads that; never a password, which no log ever holds),
+so the Job is kept until the *next* install/upgrade creates a new one.
 */}}
 apiVersion: batch/v1
 kind: Job
@@ -91,7 +88,13 @@ spec:
                   key: gateway-db-password
             {{- end }}
             {{- end }}
-            {{- if .Values.bootstrapAdmin.password }}
+            {{- if .Values.bootstrapAdmin.existingSecret }}
+            - name: BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bootstrapAdmin.existingSecret | quote }}
+                  key: {{ .Values.bootstrapAdmin.existingSecretKey | quote }}
+            {{- else if .Values.bootstrapAdmin.password }}
             - name: BOOTSTRAP_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:

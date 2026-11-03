@@ -196,7 +196,21 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 	if err != nil {
 		return err
 	}
-	consoleValues, err := install.WriteValues(dir, "console", install.ConsoleValues(c, envName(dir), images, made))
+	generated := install.ConsoleValues(c, envName(dir), images, made)
+	var password string // the first admin's, until an apply has finished
+	if firstAdminPending(dir, installed[install.ConsoleRelease]) {
+		// Saved first, so it can't be lost, then given to the console in a
+		// Secret (never through a log, which the cluster may keep). One
+		// saved already (an install that stopped part way) is used again.
+		if password = savedPassword(dir); password == "" {
+			password = install.NewPassword()
+			if _, err := savePassword(dir, password); err != nil {
+				return fmt.Errorf("the first admin's password couldn't be saved in %s: %w", dir, err)
+			}
+		}
+		install.WithFirstAdmin(generated)
+	}
+	consoleValues, err := install.WriteValues(dir, "console", generated)
 	if err != nil {
 		return err
 	}
@@ -234,10 +248,17 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 			return err
 		}
 	}
+	if password != "" {
+		if err := install.GivePassword(ctx, a.runner, c, password); err != nil {
+			return fmt.Errorf("giving the console the first admin's password: %w", err)
+		}
+	}
 	fmt.Fprintln(out, "Installing execution-console...")
 	if err := install.Upgrade(ctx, a.runner, c, dir, install.ConsoleRelease, consoleChart, consoleValues); err != nil {
 		return err
 	}
+	// Its account has it now (or had one): the saved file is the only copy.
+	install.ForgetPassword(ctx, a.runner, c)
 	if now.move {
 		fmt.Fprintln(out, "Starting the platform on the managed database...")
 		if err := backup.FinishMove(ctx, a.runner, c); err != nil {
@@ -299,19 +320,27 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 	if err := c.SaveApplied(dir); err != nil {
 		return err
 	}
-	if installed[install.ConsoleRelease] == "" {
-		if pw := install.Password(ctx, a.runner, c); pw != "" {
-			path, err := savePassword(dir, pw)
-			if err != nil {
-				return fmt.Errorf("installed, but the first admin's password couldn't be saved (%w): once %s can be written to, `vertra admin reset-password %s` makes a new one", err, dir, envName(dir))
-			}
-			// Saved: the migrate Job's log is the only other copy.
-			install.ForgetPassword(ctx, a.runner, c)
+	if password != "" {
+		path := filepath.Join(dir, "admin-password")
+		if install.AdminCreated(ctx, a.runner, c) {
 			fmt.Fprintf(out, "  Sign in as %s with the password in %s (only you can read it).\n", c.Admin.Email, path)
 			fmt.Fprintln(out, "  "+passwordThen)
+		} else {
+			// Its data was kept from before: the password is what it was.
+			fmt.Fprintf(out, "  %s already had an account, so its password is unchanged (not necessarily the one in %s): `vertra admin reset-password %s` if it's lost.\n", c.Admin.Email, path, envName(dir))
 		}
 	}
 	return nil
+}
+
+// firstAdminPending: the first admin's password is still to be given to the
+// console. A fresh install, or one whose first apply stopped part way (a
+// failed release is still listed, and its next upgrade's migrate may be the
+// one that creates the account): a password is saved and no apply has
+// finished (applied.yaml). Given again to an account that exists, it's
+// harmless: the console leaves that account alone.
+func firstAdminPending(dir, consoleChart string) bool {
+	return consoleChart == "" || (savedPassword(dir) != "" && config.Applied(dir) == nil)
 }
 
 // current is what apply finds installed, beyond the releases.

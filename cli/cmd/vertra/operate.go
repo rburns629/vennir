@@ -319,6 +319,13 @@ func (a *app) destroyCmd() *cobra.Command {
 						steps = append(steps, "keep the task registry "+c.TaskImages.Name)
 					}
 				}
+				if c.Target == "aws" && c.Catalog.Repo() != "" {
+					// Never, not even with --all: every install in the account
+					// uses the one provider, and vertra can't tell whether
+					// another does.
+					steps = append(steps, "keep the account's IAM OIDC provider for GitHub (free), which every install's catalog CI in the account signs in with: "+
+						"`aws iam delete-open-id-connect-provider` deletes it once none does")
+				}
 			case "kind":
 				if !st.ClusterExists {
 					fmt.Fprintln(out, "The kind cluster", c.Cluster.Name, "doesn't exist.")
@@ -404,6 +411,12 @@ func (a *app) destroyCmd() *cobra.Command {
 				if deleteData {
 					if err := a.runner.Run(ctx, "kubectl", "--context", kctx, "--namespace", c.Namespace, "delete", "pvc",
 						"-l", "app.kubernetes.io/instance in ("+install.KernelRelease+","+install.ConsoleRelease+")"); err != nil {
+						return err
+					}
+					// And the Secrets kept with them, of their passwords (not the
+					// gateway's signing key, kept for its backends' sake).
+					if err := a.runner.Run(ctx, "kubectl", "--context", kctx, "--namespace", c.Namespace, "delete", "secret", "--ignore-not-found",
+						install.KernelRelease+"-execution-kernel-db", install.ConsoleRelease+"-execution-console"); err != nil {
 						return err
 					}
 				}

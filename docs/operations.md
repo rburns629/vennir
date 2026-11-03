@@ -88,7 +88,12 @@ on AKS a network policy engine). Without it, no policy below holds.
    hand lingers. At minimum: the image source tasks may use
    (`imagePolicy.sourceRegistry`), the console's `kernelApiUrl`
    (`http://<kernel release>-execution-kernel-api.<namespace>.svc.cluster.local:8000`),
-   and the first admin's email.
+   and the first admin's email. Give the first admin a password in a
+   Secret of yours (`bootstrapAdmin.existingSecret`; `mustChangePassword:
+   true` to have it changed at the first sign-in), or leave it unset: the
+   account then gets a random password that is shown nowhere, not even in
+   the migrate Job's log (which the cluster's logging may ship and keep),
+   and you give it one with `resetAdmin.js` below.
 5. **Install**, kernel first, with a size preset under your values (see
    [Sizes, sleeping and headroom](#sizes-sleeping-and-headroom)). Not
    `--wait` on a first install: each chart migrates its database in a
@@ -102,8 +107,8 @@ on AKS a network policy engine). Without it, no policy below holds.
    helm install kernel ./execution-kernel -n vertra-system -f execution-kernel/sizes/$SIZE.yaml -f <values>/kernel.yaml
    helm install console ./execution-console -n vertra-system -f execution-console/sizes/$SIZE.yaml -f <values>/console.yaml
    kubectl -n vertra-system rollout status deployment -l 'app.kubernetes.io/instance in (kernel,console)'
-   kubectl -n vertra-system logs job/console-execution-console-migrate   # the first admin's password; changed at the first sign-in
-   kubectl -n vertra-system delete job console-execution-console-migrate # then its log doesn't keep it (vertra does this)
+   # No password set: give the first admin one (printed only to you; changed at the first sign-in)
+   kubectl -n vertra-system exec deploy/console-execution-console -- node dist/db/resetAdmin.js <email>
    ```
 
    Upgrades (`helm upgrade`) can use `--wait`: they migrate before the
@@ -116,8 +121,8 @@ on AKS a network policy engine). Without it, no policy below holds.
    mint the catalog's automation token, and set the allowed image sources.
    Keep the first admin's account. Every install and upgrade creates an
    admin with `bootstrapAdmin.email` if no account has that email, so if
-   you delete it or change the setting, the next upgrade makes a new admin.
-   Its generated password is then in the migrate Job's log
+   you delete it or change the setting, the next upgrade makes a new admin,
+   with a random password no one has
    ([Troubleshooting](#troubleshooting)).
 
 `make gke-deploy VERSION=v<x.y.z>` (and `gke-deploy-kernel`, `-console`)
@@ -256,7 +261,7 @@ of the values it writes):
 | policy-controller (`policy-controller-webhook`) | The same, read-only on the products' registry | The same, by Pod Identity |
 | A team's `eso-<cloud>` (its SecretStore) | Its Google service account, by the annotation in the store file | IRSA: the `eks.amazonaws.com/role-arn` annotation, a role trusting the cluster's OIDC issuer (registered in IAM once per cluster) for `system:serviceaccount:<team>:eso-aws` only. Pod Identity doesn't work for a store |
 | A product's own | Its Google service account, by the annotation an admin adds | A Pod Identity association for `<team>/<serviceAccount>`, which an admin adds |
-| Catalog CI (GitHub Actions) | Workload Identity Federation, main only | An IAM OIDC provider for GitHub's issuer, a role trusting the repository's main only |
+| Catalog CI (GitHub Actions) | Workload Identity Federation, main only | An IAM OIDC provider for GitHub's issuer (the account's one, shared by its installs: `vertra destroy` leaves it), a role trusting the repository's main only |
 
 ### Signing in with Google
 
@@ -705,8 +710,14 @@ That removes the platform's Pods, Services, RBAC and admission policies.
 It leaves:
 
 - **The databases' volumes.** `postgres.persistence.keepOnUninstall` (on by
-  default) keeps each PVC. Delete them when you mean to:
-  `kubectl -n vertra-system delete pvc -l 'app.kubernetes.io/instance in (kernel,console)'`.
+  default) keeps each PVC, and with it each chart's Secret of passwords
+  (`kernel-execution-kernel-db`, `console-execution-console`): the data
+  only opens with the passwords it was made with, and installing the same
+  release names again reads them back. Delete both when you mean to:
+  `kubectl -n vertra-system delete pvc -l 'app.kubernetes.io/instance in (kernel,console)'` and
+  `kubectl -n vertra-system delete secret kernel-execution-kernel-db console-execution-console`
+  (`vertra destroy` asks). Switching to `existingSecret` later leaves the
+  kernel's kept Secret behind too; delete it the same way.
 - **The team namespaces**, with their Secrets, ServiceAccounts and anything
   steps made there. The console created them, not Helm. Delete them with
   `kubectl delete namespace -l vertra/team` (retired ones included).
@@ -1040,7 +1051,9 @@ kubectl -n vertra-system rollout restart deployment console-execution-console
 
 A changed Secret restarts nothing by itself, hence the restart. The
 gateway needs none: it reads the new public key the first time a session
-names it. Then:
+names it, and drops the old one within a minute (it reads the console's
+keys every minute; while the console can't be read, it keeps using the
+last ones it read for up to ten). Then:
 
 - every session ends, so everyone signs in again;
 - every sealed value becomes unreadable and has to be entered again: each
@@ -1283,8 +1296,12 @@ seconds, not after TCP's two minutes of retries. Seen on kind (2026-10-31,
 `perf/README.md`): deleting the kernel's Postgres Pod mid-run cost about
 ten seconds, and every run ended as expected.
 
-**The first admin's password is lost.** It's printed once, by the first
-migrate Job, and the next upgrade replaces that log. `vertra admin
+**The first admin's password is lost**, or was never known (a chart
+install that set none: the account gets a random one that is never printed,
+since a Job's log may be shipped to Cloud Logging or Loki and kept there).
+`vertra apply` gives a fresh install's first admin a password it generates,
+in a Secret it deletes once the console is installed, and saves it to
+`admin-password`; nothing logs it. `vertra admin
 reset-password <env>` gives that admin (or `--email` another) a new random
 password from inside the console's Pod, saved to `admin-password` in the
 environment's folder (readable only by you, never printed): only someone
@@ -1295,13 +1312,17 @@ else does (a new account's, or an admin's reset of theirs). Without vertra: `kub
 deploy/console-execution-console -n vertra-system -- node
 dist/db/resetAdmin.js <email>`.
 
+**Installed before 2026-11-03, and the first admin hasn't signed in yet?**
+Its generated password was printed to the migrate Job's log, which the
+cluster's logging may still keep, and it still works: run `vertra admin
+reset-password <env>` (or `resetAdmin.js` above) now.
+
 **An admin account appeared after an upgrade.** Every console install and
 upgrade creates an admin with the console chart's `bootstrapAdmin.email`
 (`admin.email` in vertra.yaml) when no account has that email: the first
-admin's account was deleted, or the setting changed. Its password is in the
-migrate Job's log (`kubectl -n vertra-system logs
-job/console-execution-console-migrate`), kept until the next upgrade, and
-must be changed at its first sign-in. Delete the account on the Admin page
+admin's account was deleted, or the setting changed. Its password is
+random and shown nowhere: give it one as for a lost password (above), if
+it's to be used. Delete the account on the Admin page
 only after setting `bootstrapAdmin.email` to an admin who stays, or it comes
 back with the next upgrade.
 

@@ -11,7 +11,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { applyApis } from "../src/catalogSync.js";
 import { config } from "../src/config.js";
-import { backendAllowed } from "../src/core/apis.js";
+import { apiState, backendAllowed, backendNamespace } from "../src/core/apis.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, findTeamByName } from "../src/db/queries.js";
 import { apiProblems, apiTraffic, apis, gatewayState, teams } from "../src/db/schema.js";
@@ -222,6 +222,28 @@ describe("who sees what", () => {
     expect(backendAllowed("https://xexample.run.app", ["*.example.run.app"])).toBe(false);
   });
 
+  it("holds an API whose in-cluster backend is another team's, whatever backendHosts allows", () => {
+    for (const [url, ns] of [
+      ["http://orders.team-b.svc.cluster.local:8080", "team-b"],
+      ["http://orders.team-b.svc:8080", "team-b"],
+      ["http://pod-1.orders.team-b.svc.cluster.local", "team-b"],
+      ["http://orders:8080", null],
+      ["https://api.example.com", null],
+    ] as const) {
+      expect(backendNamespace(url), url).toBe(ns);
+    }
+    const before = [...config.gateway.backendHosts];
+    config.gateway.backendHosts.splice(0, Infinity, "*.svc.cluster.local");
+    try {
+      const own = apiState({ backendUrl: "http://orders.team-a.svc.cluster.local:8080", pausedMessage: null, teamName: "team-a" });
+      expect(own.state).toBe("live");
+      const theirs = apiState({ backendUrl: "http://orders.team-b.svc.cluster.local:8080", pausedMessage: null, teamName: "team-a" });
+      expect(theirs).toMatchObject({ state: "held", heldReason: expect.stringContaining("team-b") as string });
+    } finally {
+      config.gateway.backendHosts.splice(0, Infinity, ...before);
+    }
+  });
+
   it("gives the spec to whoever may see it", async () => {
     const got = await call<{ openapi: string }>(tokens.consumer, "ApiService/GetApi", { team: owner, name: "orders" });
     expect((JSON.parse(got.body.openapi) as { info: { title: string } }).info.title).toBe("Orders");
@@ -294,5 +316,19 @@ describe("the gateway's settings", () => {
     }
     const [state] = await db.select().from(gatewayState);
     expect(state?.closedMessage ?? null).toBeNull();
+  });
+});
+
+describe("an API's identity, which the gateway mints tokens for", () => {
+  it("must end in -api, and its token audience may not be the cluster's own", async () => {
+    problems.length = 0;
+    await apply([
+      api("wrong-account", { serviceAccount: "deployer" }),
+      api("cluster-audience", { backendAuth: { kind: { case: "serviceAccountToken" as const, value: { audience: "https://kubernetes.default.svc" } } } }),
+    ]);
+    expect(problems).toEqual([
+      expect.stringContaining("must end in -api"),
+      expect.stringContaining("is this cluster's own"),
+    ]);
   });
 });

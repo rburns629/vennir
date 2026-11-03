@@ -673,6 +673,8 @@ The console's record of every execution submitted through it, and who may see it
 | `schedule_id` | uuid | yes | The schedule that started it, if one did. |
 | `resources_recorded_at` | timestamptz | yes | When what it made, and deleted, was recorded in `resources`, once it finished. Emptied when it's retried, to be recorded again. |
 
+Indexed on `(created_at, execution_id)` (the execution list's order and cursor), on `teams`, on `(submitted_by, created_at)` (an ordering bot's rate), and on `(created_at, execution_id)` for the rows whose `resources_recorded_at` is empty: the resource recorder's order and cursor, which goes on each pass from where the last stopped, so runs that haven't finished can't keep newer ones from being recorded.
+
 ### resources
 
 What runs made: each resource a step reported in its outputs (`resources: [{type, id, name, link}]`), copied when its run finished with that step's resolved inputs and outputs, so it can be deleted after the run itself is gone. References only: whether it still exists is for its product's cloud to say. A later step reporting the same one updates it.

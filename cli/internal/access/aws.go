@@ -12,11 +12,12 @@ import (
 )
 
 // AWSRegions are the regions offered when choosing one: those every account
-// has without opting in.
+// has without opting in. A region the account opted in to is asked too when
+// it's the one chosen.
 var AWSRegions = []string{
 	"us-east-1", "us-east-2", "us-west-1", "us-west-2", "ca-central-1",
 	"eu-west-1", "eu-west-2", "eu-west-3", "eu-central-1", "eu-north-1",
-	"ap-south-1", "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "ap-northeast-2", "sa-east-1",
+	"ap-south-1", "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "ap-northeast-2", "ap-northeast-3", "sa-east-1",
 }
 
 // AWS is what the AWS check found, beyond the report.
@@ -117,7 +118,11 @@ func CheckAWS(ctx context.Context, exec Exec, profile, region string) *AWS {
 	a.line("Signed in", fmt.Sprintf("%s in %s, %s", who, account, org))
 
 	// Regions: which answer at all. An organization may allow only some.
-	a.probeRegions(ctx, cli)
+	regions := AWSRegions
+	if region != "" && !contains(regions, region) {
+		regions = append(regions[:len(regions):len(regions)], region)
+	}
+	a.probeRegions(ctx, cli, regions)
 	switch {
 	case region == "":
 	case contains(a.Allowed, region):
@@ -153,11 +158,17 @@ func CheckAWS(ctx context.Context, exec Exec, profile, region string) *AWS {
 	return a
 }
 
-// probeRegions asks every candidate region for its zones, in parallel.
-func (a *AWS) probeRegions(ctx context.Context, cli awsCLI) {
+// ProbeRegion asks one more region (one outside AWSRegions), adding it to
+// Allowed or Denied by its own answer.
+func (a *AWS) ProbeRegion(ctx context.Context, exec Exec, profile, region string) {
+	a.probeRegions(ctx, awsCLI{exec: exec, profile: profile}, []string{region})
+}
+
+// probeRegions asks each region for its zones, in parallel.
+func (a *AWS) probeRegions(ctx context.Context, cli awsCLI, regions []string) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	for _, r := range AWSRegions {
+	for _, r := range regions {
 		wg.Add(1)
 		go func(r string) {
 			defer wg.Done()

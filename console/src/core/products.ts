@@ -243,6 +243,11 @@ export async function registerProduct(caller: AuthUser | undefined, input: Regis
   if (audienceProblems.length > 0) {
     throw new ApiError(422, "UNPROCESSABLE_ENTITY", `${input.name}: ${audienceProblems.join("; ")}.`);
   }
+  // -api is an API product's ServiceAccount: the gateway may mint tokens
+  // for those (its admission policy), so no product may run as one.
+  if (input.serviceAccount?.endsWith("-api")) {
+    throw new ApiError(422, "UNPROCESSABLE_ENTITY", `${input.name}: a serviceAccount ending in -api is an API's (the gateway mints its tokens); choose another.`);
+  }
   if (input.hidden && (input.shareWith ?? []).length > 0) {
     throw new ApiError(422, "UNPROCESSABLE_ENTITY", `${input.name}: a hidden action can't be shared (shareWith).`);
   }

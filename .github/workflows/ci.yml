@@ -300,7 +300,7 @@ jobs:
     env:
       CGO_ENABLED: "0"
       # Pinned; go run checks the module against the Go checksum database.
-      # release.yml's govulncheck job pins it too: bump them together.
+      # release.yml's preflight job pins it too: bump them together.
       GOVULNCHECK: golang.org/x/vuln/cmd/govulncheck@v1.9.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -354,8 +354,8 @@ jobs:
           console/node_modules/.bin/buf breaking --against ".git#tag=$release"
       - name: The committed code matches the protos
         run: |
-          git add -N console/src/gen console/frontend/src/gen cli/internal/gen
-          git diff --exit-code -- console/src/gen console/frontend/src/gen cli/internal/gen || {
+          git add -N console/src/gen console/frontend/src/gen cli/internal/gen kernel/internal/gen
+          git diff --exit-code -- console/src/gen console/frontend/src/gen cli/internal/gen kernel/internal/gen || {
             echo "::error::Generated code is out of date: run make proto and commit it."
             exit 1
           }

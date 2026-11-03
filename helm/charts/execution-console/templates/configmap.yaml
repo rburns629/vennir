@@ -203,4 +203,5 @@ data:
   # server never does. Not secret by itself (an email address); the
   # matching password, if set, lives in the Secret instead.
   BOOTSTRAP_ADMIN_EMAIL: {{ .Values.bootstrapAdmin.email | quote }}
+  BOOTSTRAP_ADMIN_MUST_CHANGE_PASSWORD: {{ .Values.bootstrapAdmin.mustChangePassword | quote }}
 {{- end }}

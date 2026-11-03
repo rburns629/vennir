@@ -1,6 +1,11 @@
 # A product shaped like real work: it calls an API, can authenticate with a
 # secret, and tells the platform which failures are worth retrying.
 # Copy to teams/<your-team>/products/http-check/.
+#
+# Never share check (no shareWith) while it can send the token: a shared
+# action runs with your team's secrets whoever calls it, and the caller
+# picks the URL, so they'd choose where your token goes. To share it, drop
+# useToken and the secretRefs, or fix the host in the code.
 apiVersion: vertra.dev/v2
 kind: Product
 name: http-check
@@ -28,7 +33,9 @@ actions:
           description: The status code that counts as healthy. Default 200.
         useToken:
           type: boolean
-          description: Send the http-check-token secret as a bearer token.
+          description: >-
+            Send the http-check-token secret as a bearer token. Redirects
+            then aren't followed, so the token goes only to this URL.
     output:
       type: object
       required: [status, healthy]

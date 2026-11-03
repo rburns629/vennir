@@ -144,13 +144,62 @@ func (d Dir) Outputs(ctx context.Context) (map[string]json.RawMessage, error) {
 	return values, nil
 }
 
+// Attribute is a string attribute of a resource in the state (the module's
+// own, not a child module's), or "" when the state doesn't hold it.
+func (d Dir) Attribute(ctx context.Context, address, name string) (string, error) {
+	out, err := d.r.Output(ctx, "tofu", "-chdir="+d.Path, "show", "-json")
+	if err != nil {
+		return "", fmt.Errorf("tofu show: %w", err)
+	}
+	var state struct {
+		Values struct {
+			RootModule struct {
+				Resources []struct {
+					Address string         `json:"address"`
+					Values  map[string]any `json:"values"`
+				} `json:"resources"`
+			} `json:"root_module"`
+		} `json:"values"`
+	}
+	if err := json.Unmarshal([]byte(out), &state); err != nil {
+		return "", fmt.Errorf("tofu show: %w", err)
+	}
+	for _, r := range state.Values.RootModule.Resources {
+		if r.Address == address {
+			value, _ := r.Values[name].(string)
+			return value, nil
+		}
+	}
+	return "", nil
+}
+
 // Forget removes resources from the state without deleting them, so a
 // destroy leaves them (a backup bucket, the task registry you chose to keep).
+// An address the state doesn't have is skipped: `state rm` refuses one, and
+// destroy names what the config could have made (a managed database's
+// install has no backup bucket; a setting may postdate the last apply).
 func (d Dir) Forget(ctx context.Context, addresses ...string) error {
 	if len(addresses) == 0 {
 		return nil
 	}
-	return d.r.Run(ctx, "tofu", append([]string{"-chdir=" + d.Path, "state", "rm"}, addresses...)...)
+	out, err := d.r.Output(ctx, "tofu", "-chdir="+d.Path, "state", "list")
+	if err != nil {
+		return fmt.Errorf("tofu state list: %w", err)
+	}
+	inState := map[string]bool{}
+	for _, a := range strings.Split(out, "\n") {
+		inState[strings.TrimSpace(a)] = true
+	}
+	var there []string
+	for _, a := range addresses {
+		if inState[a] {
+			there = append(there, a)
+		}
+	}
+	if len(there) == 0 {
+		return nil
+	}
+	return d.r.Run(ctx, "tofu", append([]string{"-chdir=" + d.Path, "state", "rm"}, there...)...)
 }
 
 // HasState reports whether anything has been applied.

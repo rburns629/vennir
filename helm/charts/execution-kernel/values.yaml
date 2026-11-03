@@ -145,6 +145,7 @@ purgePolicy:
   enabled: true
   # e.g. [{kind: User, name: "catalog-purge-ci@<project>.iam.gserviceaccount.com"}]
   #   or [{kind: ServiceAccount, name: vertra-purger, namespace: vertra-system}]
+  #   or [{kind: Group, name: platform-admins}]: each member, limited the same
   purgers: []
   # Anything else that must never be purged, e.g. [external-secrets].
   protectedNamespaces: []

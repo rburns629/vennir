@@ -18,7 +18,12 @@ async function main(): Promise<void> {
   await migrate(db, { migrationsFolder: "./src/db/migrations" });
   console.log("Migrations applied.");
 
-  await seedBootstrapAdmin(db, config.bootstrapAdminEmail, config.bootstrapAdminPassword);
+  await seedBootstrapAdmin(
+    db,
+    config.bootstrapAdminEmail,
+    config.bootstrapAdminPassword,
+    config.bootstrapAdminMustChangePassword,
+  );
 
   if (config.gatewayDatabase.role) {
     await ensureGatewayAccess(pool, config.gatewayDatabase.role, config.gatewayDatabase.password);
