@@ -775,6 +775,22 @@ to know:
   audience `vertra`. To keep keyless sign-in, set `keyless.audience` (and
   have each CI job request a token for it).
 
+**Changes an upgrade must carry together** (since 2026-11-03):
+
+- **The kernel's image and chart.** A step's Job is now created suspended
+  and resumed once its request is the kernel's, which needs the chart's
+  `patch` on Jobs and its dispatch policy's rule for it. A newer kernel
+  image under an older chart refuses every step (`DISPATCH_REJECTED`).
+  A release's chart runs its own images, so upgrading by release keeps
+  them together.
+- **An AWS install's catalog repository.** The catalog publish role now
+  trusts only jobs whose OIDC subject names `main`, so the repository's
+  tokens must carry their branch even in an Environment (subject claims
+  `repo`, `context`, `ref`). `vertra apply` sets that before it changes the
+  role, with `gh` signed in as an admin of the repository; without `gh` it
+  stops and gives the one command that sets it. Until it's set, publishing
+  from the `catalog-publish` Environment is refused.
+
 **Images reused under the same tag.** With `pullPolicy: IfNotPresent` (the
 default) and a reused tag such as `:latest`, a node that already has the old
 image keeps it. Deploy by digest (`image.digest`) or a new tag, or set

@@ -50,3 +50,22 @@ func TestHasItems(t *testing.T) {
 		}
 	}
 }
+
+// Only exactly repo, context and ref, in that order, is the template the
+// AWS publish role's trust is written for.
+func TestTheSubjectTemplateIsReadAsGitHubAnswers(t *testing.T) {
+	for body, want := range map[string]bool{
+		`{"use_default":false,"include_claim_keys":["repo","context","ref"]}`: true,
+		`{"use_default":true}`: false,
+		`{"use_default":false,"include_claim_keys":["repo","context"]}`:       false,
+		`{"use_default":false,"include_claim_keys":["repo","ref","context"]}`: false,
+		`{"use_default":true,"include_claim_keys":["repo","context","ref"]}`:  false,
+	} {
+		if got, err := subjectTemplateSet(body); err != nil || got != want {
+			t.Errorf("%s: %v, %v; want %v", body, got, err, want)
+		}
+	}
+	if _, err := subjectTemplateSet("not json"); err == nil {
+		t.Error("an answer that isn't JSON should be an error")
+	}
+}
