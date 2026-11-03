@@ -3,7 +3,7 @@
 #
 # Proves the charts' admission policies on a real cluster: dispatch (team
 # namespaces only), image sources, step identity (kernel chart) and the
-# console's write fence (console chart). Every case is a server-side dry run,
+# console's write fence and its Jobs (console chart). Every case is a server-side dry run,
 # so nothing is created, made as the identity the policy guards (impersonated).
 #
 # Renders the policies under their own release name, "policytest", so they
@@ -56,8 +56,13 @@ render() {
       --set kernelApiUrl=http://unused \
       --set teamNamespaces.schedulerLogs.clusterRole=$RELEASE-execution-kernel-scheduler-logs \
       --set teamNamespaces.schedulerLogs.serviceAccount=$PLATFORM_NS/$RELEASE-execution-kernel \
+      --set scanning.image.repository=example.com/trivy --set scanning.image.tag=1 --set scanning.image.digest= \
+      --set catalog.verifier.image.repository=example.com/cosign --set catalog.verifier.image.tag=2 \
+      --set catalog.verifier.image.digest=sha256:$(printf 'c%.0s' $(seq 64)) \
+      --set registryCheck.pullSecretName=pull-secret \
       --show-only templates/write-fence-policy.yaml \
-      --show-only templates/namespace-policy.yaml
+      --show-only templates/namespace-policy.yaml \
+      --show-only templates/console-jobs-policy.yaml
   }
 }
 
@@ -131,6 +136,26 @@ for variable in policy["spec"]["variables"]:
         variable["expression"] = json.dumps([sys.argv[1]])
 print(json.dumps(policy))' "$BLOCKED_DIGEST" \
   | k replace -f - > /dev/null
+
+# A Job as the console makes an image scan (console/src/k8s.ts), with one
+# change made by the python expression given (to s, the Pod spec).
+console_job() {  # change, namespace (the platform's)
+  python3 - "$1" "$RELEASE-execution-console-scanner" <<'PY' | as_console -n "${2:-$PLATFORM_NS}" create -f -
+import json, sys
+s = {"restartPolicy": "Never", "serviceAccountName": sys.argv[2], "automountServiceAccountToken": False,
+     "securityContext": {"runAsNonRoot": True, "runAsUser": 65532},
+     "containers": [{"name": "trivy", "image": "example.com/trivy:1", "args": ["image", "x"],
+                     "env": [{"name": "HOME", "value": "/tmp"}],
+                     "securityContext": {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}},
+                     "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}]}],
+     "volumes": [{"name": "tmp", "emptyDir": {}}, {"name": "docker-config", "secret": {"secretName": "pull-secret"}}]}
+c = s["containers"][0]
+labels = {"app.kubernetes.io/managed-by": "vertra-console", "app.kubernetes.io/component": "image-scan"}
+exec(sys.argv[1])
+print(json.dumps({"apiVersion": "batch/v1", "kind": "Job", "metadata": {"name": "policy-check"},
+                  "spec": {"template": {"metadata": {"labels": labels}, "spec": s}}}))
+PY
+}
 
 # Hardened as the executor makes a step's Job (scheduler.taskPodHardening),
 # unless the seventh argument is "unhardened" (neither), or "own" (the
@@ -237,6 +262,29 @@ expect "kube-system (Kubernetes itself refuses)" "forbidden"                  "$
 echo "Console ServiceAccounts:"
 expect "update ESO's (eso-*)"                    allowed                      "$(as_console -n "$TEAM_A" annotate serviceaccount eso-gcp iam.gke.io/gcp-service-account=x)"
 expect "update a product's"                      "only update the ServiceAccounts ESO" "$(as_console -n "$TEAM_A" annotate serviceaccount db-sa iam.gke.io/gcp-service-account=x)"
+
+echo "Console Jobs (image scans and catalog verifications):"
+expect "a scan as the console makes it"          allowed                   "$(console_job 'pass')"
+expect "as another ServiceAccount"               "runs as"                 "$(console_job 's["serviceAccountName"] = "'"$RELEASE"'-execution-kernel"')"
+expect "with a Kubernetes token"                 "runs as"                 "$(console_job 's["automountServiceAccountToken"] = True')"
+expect "a verification, by digest"               allowed                   "$(console_job 'c["image"] = "example.com/cosign:2@sha256:" + "c" * 64; labels["app.kubernetes.io/component"] = "catalog-verify"')"
+expect "another image"                           "scanner or verifier image" "$(console_job 'c["image"] = "busybox"')"
+expect "the console's own labels"                "only its own labels"     "$(console_job 'labels.update({"app.kubernetes.io/name": "execution-console", "app.kubernetes.io/instance": "'"$RELEASE"'"})')"
+expect "another component"                       "only its own labels"     "$(console_job 'labels["app.kubernetes.io/component"] = "app"')"
+expect "a ServiceAccount token volume"           "only scratch space"      "$(console_job 's["volumes"].append({"name": "t", "projected": {"sources": [{"serviceAccountToken": {"path": "t"}}]}})')"
+expect "an init container"                       "scanner or verifier image" "$(console_job 's["initContainers"] = [dict(c, name="init")]')"
+expect "another Secret"                          "only scratch space"      "$(console_job 's["volumes"].append({"name": "db", "secret": {"secretName": "'"$RELEASE"'-execution-kernel-db"}})')"
+expect "the node's filesystem"                   "only scratch space"      "$(console_job 's["volumes"].append({"name": "root", "hostPath": {"path": "/"}})')"
+expect "privileged"                              "unprivileged"            "$(console_job 'c["securityContext"] = {"privileged": True, "allowPrivilegeEscalation": True}')"
+expect "privilege escalation"                    "unprivileged"            "$(console_job 'c["securityContext"]["allowPrivilegeEscalation"] = True')"
+expect "a container as root"                     "unprivileged"            "$(console_job 'c["securityContext"]["runAsUser"] = 0')"
+expect "added capabilities"                      "unprivileged"            "$(console_job 'c["securityContext"]["capabilities"]["add"] = ["NET_RAW"]')"
+expect "a port on the node"                      "unprivileged"            "$(console_job 'c["ports"] = [{"containerPort": 80, "hostPort": 80}]')"
+expect "SELinux options"                         "unprivileged"            "$(console_job 'c["securityContext"]["seLinuxOptions"] = {"type": "spc_t"}')"
+expect "no seccomp"                              "unprivileged"            "$(console_job 's["securityContext"]["seccompProfile"] = {"type": "Unconfined"}')"
+expect "the host's network"                      "unprivileged"            "$(console_job 's["hostNetwork"] = True')"
+expect "a Secret in its environment"             "no Secret or ConfigMap"  "$(console_job 'c["env"].append({"name": "P", "valueFrom": {"secretKeyRef": {"name": "x", "key": "y"}}})')"
+expect "in a team namespace"                     "platform's namespace"    "$(console_job 'pass' "$TEAM_A")"
 
 echo "Console RBAC (the scheduler's log reading, per team namespace):"
 LOGS_ROLE=$RELEASE-execution-kernel-scheduler-logs

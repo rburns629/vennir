@@ -805,7 +805,12 @@ taken, and what would still hold.
   beyond one fixed RoleBinding per team namespace (the scheduler reading
   its steps' logs; the write fence refuses any other subject, role or
   name), or read a Secret through the API; policy-controller's signature check, where
-  installed; Pod Security in the namespaces it created.
+  installed; Pod Security in the namespaces it created; and the only Jobs it
+  may run in the platform's namespace are its image scans and catalog
+  verifications, as the scanning identity with no token, this release's
+  Trivy or cosign image, no Secret but the registry pull Secret, non-root
+  and with nothing from the node (`console-jobs-policy.yaml`), so a Job
+  can't read the platform's Secrets or run as another of its identities.
 - **kernel-api**'s ServiceAccount may only ask the API server who a token
   belongs to (`system:auth-delegator`). It holds the kernel's database: every run's
   inputs, outputs and logs, and the task rows the scheduler runs. A task it

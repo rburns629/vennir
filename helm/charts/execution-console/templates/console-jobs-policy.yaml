@@ -1,0 +1,105 @@
+{{/*
+The Jobs the console may run in the platform's namespace: its image scans
+(console/src/scanning.ts) and catalog verifications (catalogSync.ts), and
+nothing else. Its Role may create any Job there (the scans need it), and
+the Job controller makes the Pod, so nothing in RBAC limits what that Pod
+runs as or mounts. This holds every Job the console's ServiceAccount
+creates to the shape k8s.ts builds: the scanning identity with no token,
+the Trivy or cosign image this release runs, no Secret but the registry
+pull Secret, non-root, nothing from the node. A compromised console can't
+use a Job to read the platform's Secrets or become another identity.
+*/}}
+{{- if .Values.scanning.enabled }}
+{{- $console := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-console.serviceAccountName" .) }}
+{{- $name := printf "%s-console-jobs" (include "execution-console.fullname" .) }}
+{{- $scanner := printf "%s-scanner" (include "execution-console.fullname" .) }}
+{{- $images := list (include "execution-console.image" .Values.scanning.image) (include "execution-console.image" .Values.catalog.verifier.image) }}
+{{- $pullSecret := ternary "vertra-registry-token" .Values.registryCheck.pullSecretName (ne (include "execution-console.registryFederationAudience" .) "") }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "execution-console.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs"]
+  matchConditions:
+    - name: from-the-console
+      expression: request.userInfo.username == {{ $console | quote }}
+  variables:
+    - name: pod
+      expression: object.spec.template.spec
+    - name: containers
+      expression: >-
+        object.spec.template.spec.containers +
+        (has(object.spec.template.spec.initContainers) ? object.spec.template.spec.initContainers : [])
+  validations:
+    - expression: request.namespace == {{ .Release.Namespace | quote }}
+      message: "The console runs Jobs only in the platform's namespace."
+      reason: Forbidden
+    # Only the labels k8s.ts gives them, and those the API server adds to a
+    # Job's Pods: none a NetworkPolicy admits (a database's, kernel-api's)
+    # or a Service selects (taking its traffic).
+    - expression: >-
+        has(object.spec.template.metadata) && has(object.spec.template.metadata.labels) &&
+        object.spec.template.metadata.labels.all(k, k in ["app.kubernetes.io/managed-by", "app.kubernetes.io/component",
+          "job-name", "controller-uid", "batch.kubernetes.io/job-name", "batch.kubernetes.io/controller-uid"]) &&
+        object.spec.template.metadata.labels[?"app.kubernetes.io/managed-by"].orValue("") == "vertra-console" &&
+        object.spec.template.metadata.labels[?"app.kubernetes.io/component"].orValue("") in ["image-scan", "catalog-verify"]
+      message: "A console Job's Pod carries only its own labels (managed-by vertra-console, an image-scan or catalog-verify component)."
+      reason: Forbidden
+    - expression: >-
+        has(variables.pod.serviceAccountName) && variables.pod.serviceAccountName == {{ $scanner | quote }} &&
+        has(variables.pod.automountServiceAccountToken) && variables.pod.automountServiceAccountToken == false
+      message: {{ printf "A console Job runs as %s, with no Kubernetes token." $scanner | quote }}
+      reason: Forbidden
+    - expression: >-
+        !has(variables.pod.initContainers) && !has(variables.pod.ephemeralContainers) &&
+        variables.containers.all(c, c.image in {{ $images | toJson }})
+      message: "A console Job runs only this release's scanner or verifier image, and no other container."
+      reason: Forbidden
+    - expression: >-
+        (!has(variables.pod.hostNetwork) || !variables.pod.hostNetwork) &&
+        (!has(variables.pod.hostPID) || !variables.pod.hostPID) &&
+        (!has(variables.pod.hostIPC) || !variables.pod.hostIPC) &&
+        has(variables.pod.securityContext) && has(variables.pod.securityContext.runAsNonRoot) && variables.pod.securityContext.runAsNonRoot &&
+        variables.containers.all(c,
+          has(c.securityContext) && has(c.securityContext.allowPrivilegeEscalation) && !c.securityContext.allowPrivilegeEscalation &&
+          (!has(c.securityContext.privileged) || !c.securityContext.privileged) &&
+          (!has(c.securityContext.runAsNonRoot) || c.securityContext.runAsNonRoot) &&
+          (!has(c.securityContext.runAsUser) || c.securityContext.runAsUser != 0) &&
+          (!has(c.securityContext.capabilities) || !has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.size() == 0) &&
+          !has(c.securityContext.seLinuxOptions) && !has(c.securityContext.appArmorProfile) &&
+          (!has(c.securityContext.seccompProfile) || c.securityContext.seccompProfile.type == "RuntimeDefault") &&
+          (!has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0))) &&
+        (!has(variables.pod.securityContext.seLinuxOptions)) && (!has(variables.pod.securityContext.appArmorProfile)) &&
+        (!has(variables.pod.securityContext.seccompProfile) || variables.pod.securityContext.seccompProfile.type == "RuntimeDefault")
+      message: "A console Job runs as non-root, unprivileged, with nothing from the node."
+      reason: Forbidden
+    - expression: >-
+        !has(variables.pod.volumes) || variables.pod.volumes.all(v,
+          has(v.emptyDir) || (has(v.secret) && v.secret.secretName == {{ $pullSecret | quote }}))
+      message: "A console Job mounts only scratch space and the registry pull Secret."
+      reason: Forbidden
+    - expression: >-
+        variables.containers.all(c, !has(c.envFrom) &&
+          (!has(c.env) || c.env.all(e, !has(e.valueFrom))))
+      message: "A console Job reads no Secret or ConfigMap into its environment."
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "execution-console.labels" . | nindent 4 }}
+spec:
+  policyName: {{ $name }}
+  validationActions: [Deny]
+{{- end }}
