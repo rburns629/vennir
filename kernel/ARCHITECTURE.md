@@ -170,8 +170,10 @@ write is in order, in its transaction.
 → SELECT ... FOR UPDATE OF t SKIP LOCKED, a page at a time by (available_at, id)
     WHERE state = READY AND available_at <= now
       AND execution.state IN (PENDING, RUNNING)     [a dead execution gets no more claims]
-    [held tasks (a cap, a key) stay READY in place: the next page is read
-     until ClaimLimit are claimed, none are left, or 2000 have been read]
+    [held tasks (a cap, a key) stay READY in place: the next page (at least
+     100) is read until ClaimLimit are claimed, none are left, or 2000 have
+     been read; a cap scope or key found held is passed over for the rest of
+     the pass; index ix_execution_tasks_ready_order]
 → concurrencyHold() for a task with a concurrency scope: its key from its
     resolved inputs; it stays READY while a task with that key is CLAIMED
     or RUNNING, was claimed earlier in this pass, or another scheduler holds

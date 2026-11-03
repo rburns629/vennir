@@ -78,8 +78,12 @@ func ReleaseLeases(ctx context.Context, db DB, owner string, now time.Time) (int
 const perTeamCandidates = 4
 
 // maxClaimScan bounds the READY rows one pass reads looking past held
-// ones, so a long queue of held steps costs a bounded pass.
-const maxClaimScan = 2000
+// ones, so a long queue of held steps costs a bounded pass; minClaimPage is
+// the fewest read at once, so few slots left doesn't mean many queries.
+const (
+	maxClaimScan = 2000
+	minClaimPage = 100
+)
 
 func (p *pass) runningPerTeam() (map[string]int, error) {
 	rows, err := p.db.Query(p.ctx, `SELECT team, count(*) FROM execution_tasks
@@ -143,20 +147,26 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 	var claimed []*Task
 	keys := map[string]bool{}
 	capped := map[string]int{}
+	// A cap scope or key found held stays held for the rest of the pass
+	// (what's claimed only grows, a lock not taken stays not taken): its
+	// other tasks are passed over without asking again.
+	heldScopes := map[string]bool{}
+	heldKeys := map[string]bool{}
 	var after *Task
 	for scanned := 0; len(claimed) < limit && scanned < maxClaimScan; {
-		page := min(candidates, maxClaimScan-scanned)
-		// The first page has no cursor: the oldest (zero time, nil uuid) would do.
-		var afterAt time.Time
+		page := min(max(candidates, minClaimPage), maxClaimScan-scanned)
+		// The first page's cursor is before every task: -infinity, so the
+		// cursor is always an index bound (ix_execution_tasks_ready_order).
+		var afterAt *time.Time
 		afterID := "00000000-0000-0000-0000-000000000000"
 		if after != nil {
-			afterAt, afterID = after.AvailableAt, after.ID
+			afterAt, afterID = &after.AvailableAt, after.ID
 		}
 		rows, err := p.db.Query(p.ctx, `SELECT `+taskColumnsOf("t")+` FROM execution_tasks t
 			JOIN executions e ON e.id = t.execution_id
 			WHERE t.state = 'READY' AND t.available_at <= $1 AND e.state IN ('PENDING', 'RUNNING')
-			AND ($5 OR (t.available_at, t.id) > ($3, $4::uuid))
-			ORDER BY t.available_at, t.id LIMIT $2 FOR UPDATE OF t SKIP LOCKED`, p.now, page, afterAt, afterID, after == nil)
+			AND (t.available_at, t.id) > (COALESCE($3::timestamptz, '-infinity'), $4::uuid)
+			ORDER BY t.available_at, t.id LIMIT $2 FOR UPDATE OF t SKIP LOCKED`, p.now, page, afterAt, afterID)
 		if err != nil {
 			return nil, err
 		}
@@ -172,12 +182,16 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 			if p.opts.MaxRunningPerTeam > 0 && perTeam[t.Team] >= p.opts.MaxRunningPerTeam {
 				continue
 			}
+			if t.CapScope != nil && heldScopes[*t.CapScope] {
+				continue
+			}
 			if held, err := p.capHold(t, capped); err != nil {
 				return nil, err
 			} else if held {
+				heldScopes[*t.CapScope] = true
 				continue // stays READY; GetExecution says it waits for its product's cap
 			}
-			key, held, err := p.concurrencyHold(t, keys)
+			key, held, err := p.concurrencyHold(t, keys, heldKeys)
 			if err != nil {
 				return nil, err
 			}
@@ -281,7 +295,7 @@ func (p *pass) capHold(t *Task, claimedNow map[string]int) (bool, error) {
 // commits, after which the claimed row says so). A task with no scope, or
 // whose inputs can't be resolved yet (its dispatch then fails it as
 // usual), has no key and never waits.
-func (p *pass) concurrencyHold(t *Task, claimedNow map[string]bool) (string, bool, error) {
+func (p *pass) concurrencyHold(t *Task, claimedNow, heldNow map[string]bool) (string, bool, error) {
 	if t.ConcurrencyScope == nil || *t.ConcurrencyScope == "" || len(t.ConcurrencyInputs) == 0 {
 		return "", false, nil
 	}
@@ -294,7 +308,7 @@ func (p *pass) concurrencyHold(t *Task, claimedNow map[string]bool) (string, boo
 		return "", false, err
 	}
 	key := domain.ConcurrencyKey(*t.ConcurrencyScope, t.ConcurrencyInputs, inputs)
-	if claimedNow[key] {
+	if claimedNow[key] || heldNow[key] {
 		return key, true, nil
 	}
 	var locked, busy bool
@@ -302,11 +316,15 @@ func (p *pass) concurrencyHold(t *Task, claimedNow map[string]bool) (string, boo
 		return "", false, err
 	}
 	if !locked {
+		heldNow[key] = true
 		return key, true, nil
 	}
 	if err := p.db.QueryRow(p.ctx, `SELECT EXISTS (SELECT 1 FROM execution_tasks
 		WHERE concurrency_key = $1 AND state IN ('CLAIMED', 'RUNNING') AND id <> $2::uuid)`, key, t.ID).Scan(&busy); err != nil {
 		return "", false, err
+	}
+	if busy {
+		heldNow[key] = true
 	}
 	return key, busy, nil
 }
