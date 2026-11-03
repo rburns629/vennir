@@ -965,7 +965,10 @@ who (a user or bot id), the method, the fields that name what it acted on
 and the outcome, with the request's id and the client's address. Signing
 in is recorded the same way, allowed or refused (the email tried, never
 the password; a successful one's actor is who signed in), as are keyless
-and single sign-on sign-ins, registering and changing a password. Each
+and single sign-on sign-ins, registering and changing a password. A call
+with no one signed in to a method that needs someone is refused before it
+does anything and only logged (`event: "rpc_unauthenticated"`), so
+anyone who can reach the console can't fill the audit log. Each
 entry is in the `audit_log`
 table, hash-chained so a change or removal shows, and in the console's log
 as `event: "audit"`. A catalog release's changes are recorded too.

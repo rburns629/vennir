@@ -73,6 +73,20 @@ describe("the audit log", () => {
     expect(refused).toMatchObject({ status: 403, target: { name: `${prefix}-nope` } });
   });
 
+  it("doesn't record a call with no one signed in, but does a public method's", async () => {
+    const team = `${prefix}-anon`;
+    expect((await call(undefined, "SecretService/PutSecret", { team, secretName: "db-key", data: { value: "x" } })).code).toBe("unauthenticated");
+    expect((await call("not-a-session", "SecretService/PutSecret", { team, secretName: "db-key", data: { value: "x" } })).code).toBe("unauthenticated");
+    const anonymous = await db.select().from(auditLog).where(eq(auditLog.route, route("SecretService/PutSecret")));
+    expect(anonymous.filter((e) => (e.target as { team?: string }).team === team)).toEqual([]);
+    const email = `${prefix}-nobody@example.com`;
+    await call(undefined, "AuthService/Login", { email, password: "wrong-password" });
+    const logins = await db.select().from(auditLog).where(eq(auditLog.route, route("AuthService/Login")));
+    const ours = logins.filter((e) => (e.target as { email?: string }).email === email);
+    expect(ours).toHaveLength(1);
+    await db.delete(auditLog).where(inArray(auditLog.id, ours.map((e) => e.id)));
+  });
+
   it("doesn't record reads, but does record a password change, never the password", async () => {
     await call(member.token, "AuthService/GetMe");
     await call(member.token, "AuthService/ChangePassword", {
