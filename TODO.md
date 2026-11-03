@@ -1026,10 +1026,20 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   resumes it, so no Pod exists until the ConfigMap is the kernel's. The
   scheduler may `patch` Jobs, and the dispatch policy lets that be only a
   resume of its own suspended Job in a live team namespace with nothing else
-  changed (nine admission cases; proven on kind). Someone who could delete
-  the kernel's ConfigMap in a team namespace and make another in the moment
-  before the kubelet mounts it still could: teams and steps have no such
-  right.
+  changed (nine admission cases; proven on kind). What's left needs
+  rights in a team namespace that teams and steps don't have: deleting the
+  kernel's ConfigMap and making another in the moment before the kubelet
+  mounts it; or making a Job under the attempt's name before the kernel
+  does, exactly as the kernel would (so it's adopted) but already resumed,
+  with a ConfigMap of their own, which its Pod mounts before the kernel
+  replaces it.
+
+- [ ] **Only the scheduler makes `ek-` Jobs and ConfigMaps in team
+  namespaces** (found 2026-11-03, reviewing the suspended start): an
+  admission policy refusing anyone else's create of a Job or ConfigMap
+  named `ek-` in a namespace labelled `vertra/team`, which would close both
+  of the above; check first that nothing else (an admin's tooling, the
+  kernel's kind tests) makes such names there.
 
 - [ ] **The gateway's backends see the ingress, not the client, behind
   its public listener** (found 2026-11-03, G-10): the gateway sets

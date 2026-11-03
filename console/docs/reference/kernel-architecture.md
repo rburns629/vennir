@@ -300,7 +300,7 @@ implementation of `Executor`; the scheduler only knows the interface):
   so Kubernetes deletes it with any Job the scheduler never releases; then
   resumes the Job, which only then makes its Pod. One ConfigMap already
   there under its name is replaced (the scheduler can't read ConfigMaps),
-  so the Pod only ever mounts the kernel's request; one the dispatch policy
+  so the Pod of a Job the kernel made only ever mounts its request; one the dispatch policy
   won't let it delete (not labelled as its own) refuses the attempt, as
   does a resume it refuses. Resuming is the one change the dispatch policy
   lets the scheduler make to a Job (its own, suspended, nothing else

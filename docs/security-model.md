@@ -818,8 +818,11 @@ code as a product's identity, with its Secrets, or carry a token for the
 cluster. The one change it may make to a Job is resuming one of its own:
 each is created suspended, and resumed only once its request ConfigMap is
 the kernel's (one planted ahead of it under its name is replaced first), so
-a step's Pod never mounts a request the kernel didn't write (proven on kind
-2026-11-03). With hardening on, each container is held to it too: non-root,
+a Job the kernel made never mounts a request it didn't write (proven on kind
+2026-11-03). A Job someone else made first under the attempt's name, exactly
+as the kernel would and already resumed, is still adopted; making one needs
+Job-create rights in a team namespace, which teams and steps don't have
+(`TODO.md`). With hardening on, each container is held to it too: non-root,
 never user 0, seccomp `RuntimeDefault`, no host port.
 
 **The network.** In, only Pods of its own namespace (and the gateway, to a

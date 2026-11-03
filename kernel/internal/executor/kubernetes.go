@@ -184,7 +184,8 @@ func isRejection(err error) bool {
 // Start creates the attempt's Job, suspended, then its request ConfigMap
 // (owned by the Job, so Kubernetes removes it with the Job), then resumes
 // the Job: its Pod is made only once the ConfigMap under its name is the
-// kernel's, so it never mounts one planted ahead of it. Idempotent per
+// kernel's, so it never mounts one planted ahead of it (an adopted Job
+// already resumed may have: TODO.md). Idempotent per
 // attempt: a Job already there under this attempt's name was made for this
 // same attempt (by a pass that rolled back, or a start that raised), and is
 // adopted, and resumed if it's still suspended.
