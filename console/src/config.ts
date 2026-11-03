@@ -76,6 +76,20 @@ function wholeNumber(name: string, fallback: number): number {
   return n;
 }
 
+/** Where the audit log is copied: gcs or s3; anything else fails startup (it would copy to the wrong cloud). */
+function auditExportProvider(): "gcs" | "s3" {
+  const value = process.env["AUDIT_EXPORT_PROVIDER"] || "gcs";
+  if (value !== "gcs" && value !== "s3") throw new Error(`Invalid AUDIT_EXPORT_PROVIDER "${value}": gcs or s3.`);
+  return value;
+}
+
+/** A TCP port (or, where `off` allows it, 0 for none), or the default when unset; anything else fails startup. */
+function port(name: string, fallback: number, off = false): number {
+  const n = off ? wholeNumber(name, fallback) : positiveInt(name, fallback);
+  if (n > 65535) throw new Error(`Invalid ${name} "${String(n)}": expected a port, up to 65535.`);
+  return n;
+}
+
 /** Vertex's model unless another's named: the one scored (decision 24, 2026-10-28). */
 export const VERTEX_MODEL = "google/gemini-3.5-flash";
 /** Bedrock's unless another's named: a Claude open to every Bedrock account. */
@@ -328,7 +342,7 @@ function loadRegistryCredentials(path: string | undefined): RegistryCredentials 
 function loadEmail() {
   const email = {
     host: process.env["SMTP_HOST"] ?? "",
-    port: Number(process.env["SMTP_PORT"] ?? "587"),
+    port: port("SMTP_PORT", 587),
     // "tls" (implicit, port 465), "starttls" (upgraded, 587, required), or
     // "none" (a local test server only).
     tls: (process.env["SMTP_TLS"] ?? "starttls") as "tls" | "starttls" | "none",
@@ -386,10 +400,12 @@ function httpUrl(name: string): string {
 }
 
 export const config = {
-  port: Number(process.env["PORT"] ?? 8080),
+  port: port("PORT", 8080),
+  // The guides and the platform's docs, copied into the image (guides.ts).
+  docsDir: process.env["DOCS_DIR"] || "/app/docs",
   // /metrics for Prometheus, on a port of its own so the console's Ingress
   // never serves it (metrics.ts). 0 turns it off.
-  metricsPort: Number(process.env["METRICS_PORT"] ?? 9090),
+  metricsPort: port("METRICS_PORT", 9090, true),
   databaseUrl: requireEnv("DATABASE_URL"),
   // Most connections this process holds (each request it serves may take
   // one); the size keeps every process's sum under Postgres's limit.
@@ -566,15 +582,15 @@ export const config = {
   identityPolicyName: process.env["IDENTITY_POLICY_NAME"] ?? "",
   // How often the identity and scan policies are rewritten from the
   // database whatever changed (policySync.ts), so drift doesn't last.
-  policySyncIntervalSeconds: Number(process.env["POLICY_SYNC_INTERVAL_SECONDS"] ?? "300"),
+  policySyncIntervalSeconds: positiveInt("POLICY_SYNC_INTERVAL_SECONDS", 300),
   // How long things are kept, in days (retention.ts); 0 keeps them forever.
   retention: {
     // Submitted-execution records; set it as the kernel's
     // execution_retention_days, which deletes the executions themselves.
-    executionDays: Number(process.env["EXECUTION_RETENTION_DAYS"] ?? "90"),
-    auditDays: Number(process.env["AUDIT_RETENTION_DAYS"] ?? "365"),
+    executionDays: wholeNumber("EXECUTION_RETENTION_DAYS", 90),
+    auditDays: wholeNumber("AUDIT_RETENTION_DAYS", 365),
     // Scan verdicts of images not used for this long.
-    scanDays: Number(process.env["SCAN_RETENTION_DAYS"] ?? "90"),
+    scanDays: wholeNumber("SCAN_RETENTION_DAYS", 90),
   },
   // The platform's registry pull Secret (a .dockerconfigjson file, mounted
   // from the chart's registryCheck.pullSecretName), which the console copies
@@ -598,16 +614,16 @@ export const config = {
     pullSecretName: process.env["SCANNER_PULL_SECRET"] ?? "",
     // How long a submission waits for an image's first scan before asking
     // the caller to try again.
-    waitSeconds: Number(process.env["SCAN_WAIT_SECONDS"] ?? "60"),
+    waitSeconds: wholeNumber("SCAN_WAIT_SECONDS", 60),
     // Images in use are scanned again once their verdict is this old.
-    rescanHours: Number(process.env["SCAN_RESCAN_HOURS"] ?? "24"),
+    rescanHours: positiveInt("SCAN_RESCAN_HOURS", 24),
     // The kernel chart's scan admission policy, which holds the failed digests.
     policyName: process.env["SCAN_POLICY_NAME"] ?? "",
     // The Trivy server's Deployment, which the console scales to zero after
     // idleMinutes with no scans and back up when one is wanted. Empty: it's
     // left running.
     scannerDeployment: process.env["SCANNER_DEPLOYMENT"] ?? "",
-    idleMinutes: Number(process.env["SCANNER_IDLE_MINUTES"] ?? "15"),
+    idleMinutes: wholeNumber("SCANNER_IDLE_MINUTES", 15),
     // Which image of a multi-platform index to scan: what the cluster runs.
     // Defaults to the console's own (its nodes'), as Trivy would otherwise
     // pick linux/amd64 whatever the cluster is.
@@ -620,11 +636,11 @@ export const config = {
       bucket: process.env["AUDIT_EXPORT_BUCKET"] ?? "",
       // gcs (the console's Workload Identity) or s3 (its AWS identity, or
       // AWS_* credentials and an endpoint for an S3-compatible store).
-      provider: (process.env["AUDIT_EXPORT_PROVIDER"] ?? "gcs") === "s3" ? ("s3" as const) : ("gcs" as const),
+      provider: auditExportProvider(),
       region: process.env["AUDIT_EXPORT_REGION"] ?? "",
       endpoint: process.env["AUDIT_EXPORT_ENDPOINT"] ?? "",
       prefix: process.env["AUDIT_EXPORT_PREFIX"] ?? "vertra-audit/",
-      minutes: Number(process.env["AUDIT_EXPORT_MINUTES"] ?? "5"),
+      minutes: positiveInt("AUDIT_EXPORT_MINUTES", 5),
       // What the bucket keeps, as the install says it made it (vertra.yaml's
       // audit.keepDays and audit.lock), for the Admin page only, which
       // labels them "as configured": the bucket enforces them, and the
@@ -658,7 +674,7 @@ export const config = {
   // Older than searchDays, logs are archived and not searched.
   logs: {
     lokiUrl: process.env["LOKI_URL"] ?? "",
-    searchDays: Number(process.env["LOG_SEARCH_DAYS"] ?? "30"),
+    searchDays: positiveInt("LOG_SEARCH_DAYS", 30),
   },
   // The catalog this console registers from (catalogSync.ts): its release,
   // <registry>/catalog-release:latest, read through the same registry

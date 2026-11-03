@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { config } from "./config.js";
 import { Type } from "@sinclair/typebox";
 
 // console/docs/*.md, copied into the image (see the Dockerfile): the guides
@@ -11,7 +12,7 @@ import { Type } from "@sinclair/typebox";
 // repository (`make console-docs`), since the chat agent answers from them
 // too (decision 24). The repository is public, so none of it is news; none
 // of it holds a credential.
-const DOCS_DIR = process.env["DOCS_DIR"] ?? "/app/docs";
+const DOCS_DIR = config.docsDir;
 const REFERENCE = "reference-";
 
 /** What a doc is (decision 24): a guide to using Vertra; how it works now;
