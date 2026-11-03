@@ -174,9 +174,9 @@ func structOf(value any) (*structpb.Struct, error) {
 
 // BuildRelease is the catalog as of this commit: every team, with its
 // checked SecretStore documents, and every product's actions, each image
-// pinned to what <registry>/<team>/<product>:latest names now (what this
-// run or an earlier one published). A product that doesn't validate, or was
-// never published, fails it: left out, every install would unregister it.
+// pinned to the one published for it as of this commit (publishedImage). A
+// product that doesn't validate, or whose image isn't there or isn't
+// signed, fails it: left out, every install would unregister it.
 func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, repository string) (*catalogv1.Release, error) {
 	release := &catalogv1.Release{Commit: commit, Repository: repository, CreatedAt: timestamppb.Now()}
 	var problems []string
@@ -239,9 +239,9 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 			continue
 		}
 		repository := p.Repository(s)
-		digest, err := latestDigest(ctx, repository)
-		if err != nil {
-			problems = append(problems, fmt.Sprintf("%s: no published image (%s:latest): publish it first", p.Label(), repository))
+		digest, problem := c.publishedImage(ctx, p, s)
+		if problem != "" {
+			problems = append(problems, fmt.Sprintf("%s: %s", p.Label(), problem))
 			continue
 		}
 		actions, err := p.ReleaseActions(repository + "@" + digest)
@@ -375,10 +375,42 @@ func whole(v any) (int32, bool) {
 	return 0, false
 }
 
-// latestDigest is the digest <repository>:latest names now (an index's,
-// for a multi-platform image). Registry sign-in is Docker's, as for pushing.
-func latestDigest(ctx context.Context, repository string) (string, error) {
-	ref, err := name.NewTag(repository + ":latest")
+// publishedImage is the digest a release pins a product to, or what's
+// wrong. In CI, the image tagged with its commit (productCommit), as
+// publish pushed it for that commit, not whatever :latest names: a failed
+// or skipped publish leaves that tag missing, or unsigned, and the release
+// is refused rather than naming an old image under newer product.yaml. From
+// a laptop, :latest: what it just published (its tags are times).
+func (c *Catalog) publishedImage(ctx context.Context, p *Product, s Settings) (string, string) {
+	tag, how := "latest", "publish it first"
+	if c.Getenv("GITHUB_SHA") != "" {
+		commit, err := c.productCommit(p)
+		if err != nil {
+			return "", err.Error()
+		}
+		tag, how = commit, "its publish failed or never ran: rerun catalog-ci by hand on main, which publishes every product"
+	}
+	reference := p.Repository(s) + ":" + tag
+	digest, err := tagDigest(ctx, reference)
+	if err != nil {
+		return "", fmt.Sprintf("no published image (%s): %s", reference, how)
+	}
+	if s.SigningMode == "none" {
+		return digest, ""
+	}
+	// cosign's legacy format (signingArgs) keeps a signature beside the
+	// image, tagged after its digest. That it verifies is each install's
+	// check; this is that publish got as far as signing it.
+	if _, err := tagDigest(ctx, p.Repository(s)+":"+strings.Replace(digest, ":", "-", 1)+".sig"); err != nil {
+		return "", fmt.Sprintf("%s@%s isn't signed: %s", p.Repository(s), digest, how)
+	}
+	return digest, ""
+}
+
+// tagDigest is the digest a tag names now (an index's, for a
+// multi-platform image). Registry sign-in is Docker's, as for pushing.
+func tagDigest(ctx context.Context, tagged string) (string, error) {
+	ref, err := name.NewTag(tagged)
 	if err != nil {
 		return "", err
 	}
@@ -389,10 +421,12 @@ func latestDigest(ctx context.Context, repository string) (string, error) {
 	return desc.Digest.String(), nil
 }
 
-// pushRelease pushes a release as an OCI artifact, tagged with its commit
-// and latest, and returns its digest reference. Registry sign-in is
-// Docker's (docker login, or a credential helper such as gcloud's).
-func pushRelease(ctx context.Context, s Settings, release *catalogv1.Release, tag string) (string, error) {
+// pushRelease pushes a release as an OCI artifact by its digest, has sign
+// sign that, and only then tags it with its commit and latest, so a failed
+// sign leaves both tags where they were. It returns the digest reference.
+// Registry sign-in is Docker's (docker login, or a credential helper such
+// as gcloud's).
+func pushRelease(ctx context.Context, s Settings, release *catalogv1.Release, tag string, sign func(reference string) error) (string, error) {
 	data, err := protojson.MarshalOptions{Indent: "  "}.Marshal(release)
 	if err != nil {
 		return "", err
@@ -416,16 +450,27 @@ func pushRelease(ctx context.Context, s Settings, release *catalogv1.Release, ta
 		return "", err
 	}
 	options := []remote.Option{remote.WithContext(ctx), remote.WithAuthFromKeychain(authn.DefaultKeychain)}
+	reference := s.ReleaseRepository() + "@" + digest.String()
+	ref, err := name.NewDigest(reference)
+	if err != nil {
+		return "", err
+	}
+	if err := remote.Write(ref, artifact, options...); err != nil {
+		return "", fmt.Errorf("pushing %s: %w", ref, err)
+	}
+	if err := sign(reference); err != nil {
+		return "", err
+	}
 	for _, t := range []string{tag, "latest"} {
 		ref, err := name.NewTag(s.ReleaseRepository() + ":" + t)
 		if err != nil {
 			return "", err
 		}
-		if err := remote.Write(ref, artifact, options...); err != nil {
-			return "", fmt.Errorf("pushing %s: %w", ref, err)
+		if err := remote.Tag(ref, artifact, options...); err != nil {
+			return "", fmt.Errorf("tagging %s: %w", ref, err)
 		}
 	}
-	return s.ReleaseRepository() + "@" + digest.String(), nil
+	return reference, nil
 }
 
 // Release builds the catalog's release, pushes it and signs it (as the
@@ -460,10 +505,7 @@ func (c *Catalog) Release(ctx context.Context) (bool, error) {
 		c.errorAt(c.path("vertra.yaml"), err.Error())
 		return false, nil
 	}
-	reference, err := pushRelease(ctx, s, release, c.versionTag())
-	if err == nil {
-		err = c.sign(reference, s)
-	}
+	reference, err := pushRelease(ctx, s, release, c.versionTag(), func(reference string) error { return c.sign(reference, s) })
 	if err != nil {
 		c.errorAt(c.path("vertra.yaml"), "releasing failed: "+err.Error())
 		return false, nil

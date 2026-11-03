@@ -22,17 +22,40 @@ func (c *Catalog) versionTag() string {
 	return time.Now().UTC().Format("local-20060102T150405Z")
 }
 
-// push pushes the checked image, tagged with its version and latest (so a
-// DAG can name <registry>/<team>/<product>:latest; the console pins
-// whatever that names to its digest at submission), and returns the digest
-// reference, which is what's registered.
+// productCommit is the newest commit that changed what a product is
+// published from: its folder, or what republishes every product
+// (republishPaths). CI tags its image with it, so the release of any later
+// commit knows which image is the product's as of that commit.
+func (c *Catalog) productCommit(p *Product) (string, error) {
+	out, err := c.git(append([]string{"log", "-1", "--format=%H", "--", p.Label()}, republishPaths...)...)
+	commit := strings.TrimSpace(out)
+	if err != nil || commit == "" {
+		return "", fmt.Errorf("found no commit that changed %s (git log)", p.Label())
+	}
+	return commit, nil
+}
+
+// imageTag is what a product's image is tagged with: in CI, its commit
+// (productCommit); from a laptop, whose tree may hold edits no commit has,
+// the time.
+func (c *Catalog) imageTag(p *Product) (string, error) {
+	if c.Getenv("GITHUB_SHA") == "" {
+		return c.versionTag(), nil
+	}
+	return c.productCommit(p)
+}
+
+// push pushes the checked image, tagged with imageTag, and returns the
+// digest reference, which is what's signed and released. Not :latest yet:
+// that waits until it's signed (tagLatest).
 func (c *Catalog) push(p *Product, s Settings) (string, error) {
 	repository := p.Repository(s)
-	tagged := repository + ":" + c.versionTag()
-	for _, args := range [][]string{
-		{"tag", p.LocalImage(), tagged}, {"push", tagged},
-		{"tag", p.LocalImage(), repository + ":latest"}, {"push", repository + ":latest"},
-	} {
+	tag, err := c.imageTag(p)
+	if err != nil {
+		return "", err
+	}
+	tagged := repository + ":" + tag
+	for _, args := range [][]string{{"tag", p.LocalImage(), tagged}, {"push", tagged}} {
 		if _, err := c.docker(false, args...); err != nil {
 			return "", err
 		}
@@ -50,6 +73,20 @@ func (c *Catalog) push(p *Product, s Settings) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("pushed %s but found no digest for it", tagged)
+}
+
+// tagLatest moves <repository>:latest to the image (so a DAG can name
+// <registry>/<team>/<product>:latest; the console pins whatever that names
+// to its digest at submission), once it's signed and its SBOM attached: a
+// failed sign leaves :latest where it was.
+func (c *Catalog) tagLatest(p *Product, s Settings) error {
+	latest := p.Repository(s) + ":latest"
+	for _, args := range [][]string{{"tag", p.LocalImage(), latest}, {"push", latest}} {
+		if _, err := c.docker(false, args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // sign signs by digest: a tag can move, a digest is the bytes that passed.
@@ -143,7 +180,7 @@ func text(m map[string]any, key string) string {
 	return s
 }
 
-// Publish pushes and signs a checked product. Nothing is registered: the
+// Publish pushes and signs a checked product, then tags it :latest.Nothing is registered: the
 // catalog's release (release.go) names it, and each console pulls that.
 func (c *Catalog) Publish(p *Product, s Settings) bool {
 	reference, err := c.push(p, s)
@@ -152,6 +189,9 @@ func (c *Catalog) Publish(p *Product, s Settings) bool {
 	}
 	if err == nil {
 		err = c.attestSBOM(p, reference, s)
+	}
+	if err == nil {
+		err = c.tagLatest(p, s)
 	}
 	if err != nil {
 		c.errorAt(p.Dir, "publishing failed: "+err.Error())

@@ -7,11 +7,15 @@ import (
 	"errors"
 	"io"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -31,7 +35,7 @@ func TestAReleaseIsPushedAsAnArtifactAConsoleCanRead(t *testing.T) {
 		Teams:    []*catalogv1.Team{{Name: "platform"}},
 		Products: []*catalogv1.ProductAction{{Name: "platform-hello-greet", Image: host + "/catalog-products/platform/hello@sha256:" + strings.Repeat("a", 64), Action: "greet", Team: "platform"}}}
 
-	reference, err := pushRelease(context.Background(), s, release, "abc123")
+	reference, err := pushRelease(context.Background(), s, release, "abc123", unsigned)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,6 +63,120 @@ func TestAReleaseIsPushedAsAnArtifactAConsoleCanRead(t *testing.T) {
 	}
 }
 
+func unsigned(string) error { return nil }
+
+// A release is pushed by digest and signed before it's tagged: a failed
+// sign leaves its commit's tag and latest where they were.
+func TestAReleaseIsTaggedOnlyOnceSigned(t *testing.T) {
+	server := httptest.NewServer(registry.New())
+	defer server.Close()
+	host := strings.TrimPrefix(server.URL, "http://")
+	s := Settings{Registry: host + "/catalog-products"}
+	ctx := context.Background()
+	first, err := pushRelease(ctx, s, &catalogv1.Release{Commit: "c1"}, "c1", unsigned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var signing string
+	_, err = pushRelease(ctx, s, &catalogv1.Release{Commit: "c2"}, "c2", func(reference string) error {
+		signing = reference
+		return errors.New("the KMS key said no")
+	})
+	if err == nil || !strings.Contains(err.Error(), "the KMS key said no") {
+		t.Fatalf("a failed sign: %v", err)
+	}
+	if !strings.HasPrefix(signing, s.ReleaseRepository()+"@sha256:") || signing == first {
+		t.Errorf("signed %s, not the new release's digest", signing)
+	}
+	ref, _ := name.ParseReference(s.ReleaseRepository()+":latest", name.Insecure)
+	if desc, err := remote.Head(ref); err != nil || s.ReleaseRepository()+"@"+desc.Digest.String() != first {
+		t.Errorf("latest names %v (%v), not the signed %s", desc, err, first)
+	}
+	ref, _ = name.ParseReference(s.ReleaseRepository()+":c2", name.Insecure)
+	if _, err := remote.Head(ref); !notFound(err) {
+		t.Errorf("c2 is tagged though unsigned: %v", err)
+	}
+}
+
+// In CI a release pins each product to the image tagged with the commit
+// that last changed it, not :latest, and refuses one that's missing or,
+// when the catalog signs, unsigned.
+func TestInCIAReleasePinsEachProductsOwnCommit(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	server := httptest.NewServer(registry.New())
+	defer server.Close()
+	host := strings.TrimPrefix(server.URL, "http://")
+	s := Settings{Registry: host + "/catalog-products", SigningMode: "key"}
+	ctx := context.Background()
+
+	files := product("mine", "[]")
+	files["teams/a/team.yaml"] = "apiVersion: vertra.dev/v2\nkind: Team\nname: a\ndisplayName: A\ndescription: A\nowner: \"@acme/team-a\"\ncontact: a@acme.com\n"
+	c := catalogWith(t, files)
+	git := func(args ...string) string {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = c.Root
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("init", "-q")
+	git("add", "-A")
+	git("commit", "-qm", "mine")
+	changed := git("rev-parse", "HEAD")
+	if err := os.WriteFile(filepath.Join(c.Root, "README.md"), []byte("not a product\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git("add", "-A")
+	git("commit", "-qm", "docs")
+	head := git("rev-parse", "HEAD")
+	c.Getenv = func(key string) string {
+		if key == "GITHUB_SHA" {
+			return head
+		}
+		return ""
+	}
+	if tag, err := c.imageTag(c.AllProducts()[0]); err != nil || tag != changed {
+		t.Fatalf("publish tags it %s (%v), not %s", tag, err, changed)
+	}
+
+	write := func(tag string) v1.Image {
+		image, err := random.Image(64, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ref, _ := name.NewTag(s.Registry + "/a/mine:" + tag)
+		if err := remote.Write(ref, image); err != nil {
+			t.Fatal(err)
+		}
+		return image
+	}
+	release := func() (*catalogv1.Release, error) { return c.BuildRelease(ctx, s, head, "") }
+
+	// Only :latest, as a run that failed to sign leaves it: refused.
+	write("latest")
+	if _, err := release(); err == nil || !strings.Contains(err.Error(), "no published image ("+s.Registry+"/a/mine:"+changed+")") {
+		t.Fatalf("no image for its commit: %v", err)
+	}
+	image := write(changed)
+	digest, _ := image.Digest()
+	if _, err := release(); err == nil || !strings.Contains(err.Error(), "isn't signed") {
+		t.Fatalf("an unsigned image: %v", err)
+	}
+	write(strings.Replace(digest.String(), ":", "-", 1) + ".sig")
+	got, err := release()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image := got.GetProducts()[0].GetImage(); image != s.Registry+"/a/mine@"+digest.String() {
+		t.Errorf("pinned %s, not its commit's %s", image, digest)
+	}
+}
+
 // product is a valid product of team a: its product.yaml, Dockerfile and a test.
 func product(name, shareWith string) map[string]string {
 	dir := "teams/a/products/" + name + "/"
@@ -70,14 +188,15 @@ func product(name, shareWith string) map[string]string {
 	}
 }
 
-// A release names every product action at the digest its :latest has now,
+// From a laptop, a release names every product action at the digest its
+// :latest has now,
 // with its schemas read from product.yaml, and refuses to leave out a
 // product that was never published.
 func TestBuildReleasePinsEachPublishedProduct(t *testing.T) {
 	server := httptest.NewServer(registry.New())
 	defer server.Close()
 	host := strings.TrimPrefix(server.URL, "http://")
-	s := Settings{Registry: host + "/catalog-products"}
+	s := Settings{Registry: host + "/catalog-products", SigningMode: "none"}
 	image, err := random.Image(64, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -193,11 +312,11 @@ func TestAVersionNamesACommitsReleaseAndNeverMoves(t *testing.T) {
 	host := strings.TrimPrefix(server.URL, "http://")
 	s := Settings{Registry: host + "/catalog-products"}
 	ctx := context.Background()
-	first, err := pushRelease(ctx, s, &catalogv1.Release{Commit: "c1"}, "c1")
+	first, err := pushRelease(ctx, s, &catalogv1.Release{Commit: "c1"}, "c1", unsigned)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := pushRelease(ctx, s, &catalogv1.Release{Commit: "c2"}, "c2")
+	second, err := pushRelease(ctx, s, &catalogv1.Release{Commit: "c2"}, "c2", unsigned)
 	if err != nil {
 		t.Fatal(err)
 	}
