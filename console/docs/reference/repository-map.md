@@ -63,6 +63,7 @@ Around them: `helm/` packages both for Kubernetes, with each cluster's settings,
 | `scripts/catalog-template.sh` | Runs `vertra catalog` (vertra built from this checkout) in `catalog-template/` with its samples (all, or `SAMPLES=`) installed as teams: CI's `validate` and `check`, and `make catalog-publish`'s `publish -- release` (commands separated by `--` run in the same assembled catalog). |
 | `scripts/build-vertra.sh` | Builds `vertra` for this machine in the pinned Go image (no Go needed) into `cli/bin/`, and prints its path, for `VERTRA_BIN`. |
 | `scripts/scan-image.sh` | Scans one built platform image and fails if it must not ship (fixable high or critical vulnerabilities, and more). |
+| `scripts/published.sh` | Whether a tag is in the registry (its digest), for the release workflow, which writes each version's tags once. |
 | `ISSUE_TEMPLATE/bug_report.yml`, `feature_request.yml` | Issue forms for bugs and feature requests. |
 | `ISSUE_TEMPLATE/config.yml` | Turns off blank issues and points security reports to private reporting. |
 | `pull_request_template.md` | What every pull request describes, and its checklist. |

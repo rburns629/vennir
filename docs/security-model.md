@@ -873,8 +873,10 @@ arm64) and pushes them to GHCR by digest. It scans each platform's image,
 as pushed, with CI's gate (`.github/scripts/scan-image.sh`: a HIGH or
 CRITICAL vulnerability with a fix, a secret in a layer, or a
 known-malicious package fails the release), signs each digest with cosign,
-keyless, as the workflow's own GitHub identity, and only then tags it as
-the version. The charts and the `vertra` binaries are
+keyless, as the workflow's own GitHub identity, and only once all three
+have passed tags them as the version. A version's tags are written once:
+a run refuses a version already published, and a re-run of its failed jobs
+keeps what an earlier attempt published. The charts and the `vertra` binaries are
 signed the same way, and a catalog's `./vertra` downloads its binary by
 SHA-256. Every pull request also runs Semgrep, gitleaks, and the same scan
 of the three platform images (`.github/workflows/security.yml`, `ci.yml`).
