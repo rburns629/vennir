@@ -318,3 +318,17 @@ describe("the gateway's settings", () => {
     expect(state?.closedMessage ?? null).toBeNull();
   });
 });
+
+describe("an API's identity, which the gateway mints tokens for", () => {
+  it("must end in -api, and its token audience may not be the cluster's own", async () => {
+    problems.length = 0;
+    await apply([
+      api("wrong-account", { serviceAccount: "deployer" }),
+      api("cluster-audience", { backendAuth: { kind: { case: "serviceAccountToken" as const, value: { audience: "https://kubernetes.default.svc" } } } }),
+    ]);
+    expect(problems).toEqual([
+      expect.stringContaining("must end in -api"),
+      expect.stringContaining("is this cluster's own"),
+    ]);
+  });
+});
