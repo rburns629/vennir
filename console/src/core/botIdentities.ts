@@ -51,6 +51,22 @@ export async function listBotIdentities(caller: AuthUser | undefined, teamName: 
   };
 }
 
+/**
+ * Whether another bot already signs in with an identity one token could
+ * match as well as these claims (every claim they share has the same
+ * value): a sign-in matching two bots is refused (keyless.ts botForToken),
+ * so such a one would stop that bot's sign-ins, another team's included.
+ */
+async function overlapsAnotherBot(issuer: string, claims: Record<string, string>, botId: string | null): Promise<boolean> {
+  const others = await db.select({ botId: botIdentities.botId, claims: botIdentities.claims }).from(botIdentities).where(eq(botIdentities.issuer, issuer));
+  return others.some(
+    (other) => other.botId !== botId && Object.entries(other.claims).every(([name, value]) => !(name in claims) || claims[name] === value),
+  );
+}
+
+const overlapping = () =>
+  new ApiError(409, "IDENTITY_OVERLAPS", "Another bot already signs in with an identity a token matching these claims would match too: name more of what the token is for (its repository, branch or environment).", Code.AlreadyExists);
+
 export async function addBotIdentity(caller: AuthUser | undefined, teamName: string, botId: string, issuer: string, claims: Record<string, string>) {
   const who = signedIn(caller);
   ensureTeamMaintainer(who, teamName);
@@ -61,6 +77,7 @@ export async function addBotIdentity(caller: AuthUser | undefined, teamName: str
   await ensureTeamsBot(teamName, bot.email, bot.id);
   const problem = identityProblem(issuer, claims);
   if (problem) throw new ApiError(400, "BAD_IDENTITY", problem);
+  if (await overlapsAnotherBot(issuer, claims, botId)) throw overlapping();
   const [row] = await db.insert(botIdentities).values({ botId, issuer, claims, createdBy: who.id }).onConflictDoNothing().returning();
   if (!row) throw new ApiError(409, "ALREADY_EXISTS", "A bot already signs in with exactly these claims.", Code.AlreadyExists);
   return { ...row, botEmail: bot.email };
@@ -87,6 +104,8 @@ export async function createKeylessBot(
     .from(botIdentities)
     .where(and(eq(botIdentities.issuer, input.issuer), eq(botIdentities.claims, input.claims)));
   if (taken) throw new ApiError(409, "ALREADY_EXISTS", "A bot already signs in with exactly these claims.", Code.AlreadyExists);
+  // Before any bot is made: a refused identity leaves none behind.
+  if (await overlapsAnotherBot(input.issuer, input.claims, null)) throw overlapping();
   const bot = await teamBot(team, input);
   return { email: bot.email, identity: await addBotIdentity(who, teamName, bot.id, input.issuer, input.claims) };
 }
