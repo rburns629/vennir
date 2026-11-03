@@ -761,7 +761,8 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
     (`<reader>:<subject>`), or a reader's service accounts, on gcp; an IAM
     OIDC provider and a role `vertra-reader-<reader>` reading only
     `<prefix>/*` on aws. Shows, asks, changes only what differs,
-    `--revoke`. apply prints it in place of the gcloud commands. Tested
+    `--revoke`; on aws, a role trusting another reader's issuer or subject
+    is refused unless `--replace`. apply prints it in place of the gcloud commands. Tested
     against a faked gcloud and AWS CLI only.
   - To prove (one billed run): a GKE reader of an EKS owner's ECR and an
     EKS reader in a second account (release applied, step pulled by the

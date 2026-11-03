@@ -258,7 +258,9 @@ exactly that install's identity, with no key stored anywhere. The reader's
   that subject alone, given roles/artifactregistry.reader on the
   repository. aws: an IAM OIDC provider for the issuer, and a role
   (vertra-reader-NAME) only that subject may assume by web identity,
-  which may pull and list tags in the catalog's repositories alone.
+  which may pull and list tags in the catalog's repositories alone. When
+  that role already trusts another issuer or subject (another reader of
+  the same name), it refuses, on --revoke too, unless --replace.
   --service-account: a reader on Google Cloud reading an Artifact
   Registry, by its own service accounts, each given read on the
   repository.

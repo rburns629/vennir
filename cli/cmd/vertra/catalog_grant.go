@@ -19,8 +19,8 @@ import (
 
 // grantOptions are `vertra catalog grant`'s flags.
 type grantOptions struct {
-	reader                grant.Reader
-	revoke, yes, planOnly bool
+	reader                         grant.Reader
+	revoke, replace, yes, planOnly bool
 }
 
 func (a *app) catalogGrantCmd() *cobra.Command {
@@ -43,6 +43,7 @@ func (a *app) catalogGrantCmd() *cobra.Command {
 	f.StringVar(&o.reader.Subject, "subject", "", "the reader's console ServiceAccount, as its tokens name it (`SUBJECT`)")
 	f.StringArrayVar(&o.reader.ServiceAccounts, "service-account", nil, "a reader on Google Cloud: one of its service accounts (`EMAIL`; repeat it)")
 	f.BoolVar(&o.revoke, "revoke", false, "take the grant away instead")
+	f.BoolVar(&o.replace, "replace", false, "aws: change (or with --revoke, delete) the reader's role even when it trusts another issuer or subject (another reader of the same name)")
 	f.BoolVarP(&o.yes, "yes", "y", false, "approve without asking")
 	f.BoolVar(&o.planOnly, "plan-only", false, "show what it would do and stop")
 	_ = cmd.MarkFlagRequired("reader")
@@ -72,7 +73,7 @@ func (a *app) catalogGrant(ctx context.Context, out io.Writer, env string, c *co
 		if c.TaskImages.Name == "" {
 			return errors.New("taskImages.name is empty: the ECR prefix the catalog publishes under")
 		}
-		p, err = grant.PlanAWS(ctx, a.runner.Output, grant.AWSOwner{Region: c.AWS.Region, Prefix: c.TaskImages.Name, Args: awscloud.Args(c)}, o.reader, o.revoke)
+		p, err = grant.PlanAWS(ctx, a.runner.Output, grant.AWSOwner{Region: c.AWS.Region, Prefix: c.TaskImages.Name, Args: awscloud.Args(c)}, o.reader, o.revoke, o.replace)
 	}
 	if err != nil {
 		return err
