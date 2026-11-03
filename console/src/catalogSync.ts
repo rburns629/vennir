@@ -327,6 +327,12 @@ export async function apply(release: Release, log: FastifyBaseLogger): Promise<C
   for (const p of release.products) {
     released.add(p.name);
     if (foreign.has(p.team)) continue;
+    // Only into a team this release names (and so made, or will): never
+    // into one it leaves out, which may be a team no release made.
+    if (!named.has(p.team)) {
+      problems.push({ item: `product ${p.name}`, message: `its team ${p.team} isn't one of this release's teams, so it wasn't registered.` });
+      continue;
+    }
     await attempt(`product ${p.name}`, async () => {
       // A cloud this console doesn't know would keep it from running anywhere.
       const unknown = p.clouds.filter((c) => !CLOUDS.includes(c));
