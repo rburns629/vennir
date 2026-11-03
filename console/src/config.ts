@@ -379,12 +379,12 @@ function jwtSecret(): string {
  * name (KEYLESS_AUDIENCE, else the console's URL). With neither set, no
  * issuer is allowed: a constant audience would accept tokens minted for
  * any other service that uses it. (A console with no address CI can reach
- * has no use for keyless bots anyway.)
+ * has no use for keyless bots anyway.) noAudience says that's why it's off.
  */
-function keyless(): { issuers: string[]; audience: string } {
+function keyless(): { issuers: string[]; audience: string; noAudience: boolean } {
   const audience = process.env["KEYLESS_AUDIENCE"] || (process.env["CONSOLE_URL"] ?? "").replace(/\/+$/, "");
   const issuers = audience ? list(process.env["KEYLESS_ISSUERS"] ?? "https://token.actions.githubusercontent.com,https://gitlab.com") : [];
-  return { issuers, audience };
+  return { issuers, audience, noAudience: !audience };
 }
 
 /** INSTALL_CLOUD: one of the catalog's clouds, or "" when not known. */

@@ -28,7 +28,8 @@ const IDENTIFYING: Record<string, string[]> = {
 
 /** Why these claims can't be a bot's identity at this issuer, or null. */
 export function identityProblem(issuer: string, claims: Record<string, string>): string | null {
-  if (config.keyless.issuers.length === 0) return "Keyless sign-in is off on this install: it needs keyless.audience, or the console's address, to check tokens against.";
+  if (config.keyless.noAudience) return "Keyless sign-in is off on this install: it needs keyless.audience, or the console's address, to check tokens against.";
+  if (config.keyless.issuers.length === 0) return "Keyless sign-in is off on this install: keyless.issuers is empty.";
   if (!config.keyless.issuers.includes(issuer)) return `Bots may only sign in through ${config.keyless.issuers.join(", ")} (the install's keyless.issuers).`;
   const entries = Object.entries(claims);
   if (entries.length === 0 || entries.length > 8) return "Give 1 to 8 claims the token must carry.";
