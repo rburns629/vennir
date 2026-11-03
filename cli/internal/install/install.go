@@ -8,6 +8,7 @@ package install
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/rburns629/vertra/cli/internal/gcp"
 	"github.com/rburns629/vertra/cli/internal/plan"
 	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vertra/cli/internal/tools"
 )
 
 // Cloud is what a cloud target's OpenTofu module made, for the values.
@@ -173,15 +175,75 @@ func Charts(c *config.Config, dir string) (kernel, console Chart) {
 		Chart{Dir: filepath.Join(pulled, "execution-console"), Remote: ReleaseCharts + "/execution-console", Version: c.Vertra}
 }
 
-// Pull fetches a released chart into its Dir, once per version.
+// releaseChartSums are each released chart's SHA-256 (sha256sum's format:
+// "<sum>  execution-kernel-0.8.0.tgz"), the package its release pushed. The
+// release workflow adds its own to the vertra it builds, and to main in its
+// pin pull request, so a vertra knows every release up to its own.
+//
+//go:embed release-charts.sha256
+var releaseChartSums string
+
+// releaseChartSum is a released chart's SHA-256, or "" for a version this
+// vertra doesn't know.
+func releaseChartSum(name, version string) string {
+	for line := range strings.Lines(releaseChartSums) {
+		if sum, file, ok := strings.Cut(strings.TrimSpace(line), "  "); ok && file == name+"-"+version+".tgz" {
+			return sum
+		}
+	}
+	return ""
+}
+
+// KnownRelease refuses a release whose charts this vertra can't check: one
+// newer than itself.
+func KnownRelease(version string) error {
+	for _, name := range []string{"execution-kernel", "execution-console"} {
+		if releaseChartSum(name, version) == "" {
+			return fmt.Errorf("this vertra doesn't know release %s's charts, so it can't check them: install with vertra %s or newer (`vertra version`)", version, version)
+		}
+	}
+	return nil
+}
+
+// Pull fetches a released chart into its Dir, once per version: the package
+// is checked against the release's SHA-256 before it's unpacked, and kept
+// beside it, checked again on each apply (one that doesn't match, or a
+// chart pulled before vertra kept it, is pulled again).
 func Pull(ctx context.Context, r *run.Runner, chart Chart) error {
 	if chart.Remote == "" {
 		return nil
 	}
-	if _, err := os.Stat(filepath.Join(chart.Dir, "Chart.yaml")); err == nil {
+	name, parent := filepath.Base(chart.Dir), filepath.Dir(chart.Dir)
+	sum := releaseChartSum(name, chart.Version)
+	if sum == "" {
+		return KnownRelease(chart.Version)
+	}
+	archive := filepath.Join(parent, name+"-"+chart.Version+".tgz")
+	if _, err := os.Stat(filepath.Join(chart.Dir, "Chart.yaml")); err == nil && tools.CheckSHA256(archive, sum) == nil {
 		return nil
 	}
-	return r.Run(ctx, "helm", "pull", chart.Remote, "--version", chart.Version, "--untar", "--untardir", filepath.Dir(chart.Dir))
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.MkdirTemp(parent, ".pull-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
+	pulled, err := tools.PullChartTo(ctx, r, tmp, sum, chart.Remote, "--version", chart.Version)
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(chart.Dir); err != nil {
+		return err
+	}
+	if err := tools.Untar(pulled, tmp); err != nil {
+		return err
+	}
+	if err := os.Rename(filepath.Join(tmp, name), chart.Dir); err != nil {
+		return err
+	}
+	return os.Rename(pulled, archive)
 }
 
 // SizeValues is the chart's preset for the config's size.
@@ -691,15 +753,19 @@ func DatabaseVolume(ctx context.Context, r *run.Runner, c *config.Config) string
 // MetricsServer installs the cluster's metrics API on kind (the auto size's
 // autoscalers need it; the clouds have their own). Pinned.
 func MetricsServer(ctx context.Context, r *run.Runner, c *config.Config) error {
-	return r.Run(ctx, "helm", "upgrade", "--install", "metrics-server", "metrics-server",
-		"--repo", "https://kubernetes-sigs.github.io/metrics-server/", "--version", MetricsServerChart,
+	chart, done, err := tools.PullChart(ctx, r, "metrics-server")
+	if err != nil {
+		return err
+	}
+	defer done()
+	return r.Run(ctx, "helm", "upgrade", "--install", "metrics-server", chart,
 		"--kube-context", cluster.Context(c), "--namespace", "kube-system",
 		// kind's kubelets serve self-signed certificates.
 		"--set", "args={--kubelet-insecure-tls}", "--wait", "--timeout", "5m")
 }
 
 // MetricsServerChart is the metrics-server chart version installed on kind.
-const MetricsServerChart = "3.14.0"
+var MetricsServerChart = tools.ChartVersion("metrics-server")
 
 // Prometheus is a Prometheus Operator's Prometheus in the cluster: where it
 // runs, and the labels it selects PodMonitors and rules by.
@@ -869,7 +935,7 @@ func EnsureSSOSecret(ctx context.Context, r *run.Runner, c *config.Config) error
 
 // CertManagerChart is the cert-manager chart version vertra installs, on an
 // existing cluster that hasn't got it, for the console's certificate.
-const CertManagerChart = "v1.21.2"
+var CertManagerChart = tools.ChartVersion("cert-manager")
 
 // CertManagerInstalled is whether the cluster has cert-manager's
 // Certificate resource (whoever installed it).
@@ -881,8 +947,12 @@ func CertManagerInstalled(ctx context.Context, r *run.Runner, c *config.Config) 
 
 // CertManager installs cert-manager, pinned, with its resource definitions.
 func CertManager(ctx context.Context, r *run.Runner, c *config.Config) error {
-	return r.Run(ctx, "helm", "upgrade", "--install", "cert-manager", "cert-manager",
-		"--repo", "https://charts.jetstack.io", "--version", CertManagerChart,
+	chart, done, err := tools.PullChart(ctx, r, "cert-manager")
+	if err != nil {
+		return err
+	}
+	defer done()
+	return r.Run(ctx, "helm", "upgrade", "--install", "cert-manager", chart,
 		"--kube-context", cluster.Context(c), "--namespace", "cert-manager", "--create-namespace",
 		"--set", "crds.enabled=true", "--wait", "--timeout", "10m")
 }
@@ -890,13 +960,17 @@ func CertManager(ctx context.Context, r *run.Runner, c *config.Config) error {
 // ExternalSecretsChart is External Secrets Operator's chart vertra installs
 // (externalSecrets), the same as `make kind-deploy-eso`: teams' SecretStores
 // sync their vaults' secrets through it.
-const ExternalSecretsChart = "2.10.0"
+var ExternalSecretsChart = tools.ChartVersion("external-secrets")
 
 // ExternalSecrets installs External Secrets Operator, pinned, with its
 // resource definitions, before the console, which writes SecretStores.
 func ExternalSecrets(ctx context.Context, r *run.Runner, c *config.Config) error {
-	return r.Run(ctx, "helm", "upgrade", "--install", "external-secrets", "external-secrets",
-		"--repo", "https://charts.external-secrets.io", "--version", ExternalSecretsChart,
+	chart, done, err := tools.PullChart(ctx, r, "external-secrets")
+	if err != nil {
+		return err
+	}
+	defer done()
+	return r.Run(ctx, "helm", "upgrade", "--install", "external-secrets", chart,
 		"--kube-context", cluster.Context(c), "--namespace", "external-secrets", "--create-namespace",
 		"--wait", "--timeout", "10m")
 }
@@ -1168,7 +1242,7 @@ func CatalogSignerTrust(c *config.Config) map[string]any {
 // PolicyControllerChart is Sigstore's policy-controller chart vertra
 // installs when the catalog is signed; it enforces the kernel chart's
 // imageSignature.
-const PolicyControllerChart = "0.10.8"
+var PolicyControllerChart = tools.ChartVersion("policy-controller")
 
 // PolicyControllerServiceAccount is its webhook's ServiceAccount, which the
 // cloud binds to an identity that may read the task registry.
@@ -1178,8 +1252,12 @@ const PolicyControllerServiceAccount = "policy-controller-webhook"
 // team namespaces only: in every namespace it covers it refuses any image it
 // can't resolve, so never the platform's own.
 func PolicyController(ctx context.Context, r *run.Runner, c *config.Config, cloud *Cloud) error {
-	args := []string{"upgrade", "--install", "policy-controller", "policy-controller",
-		"--repo", "https://sigstore.github.io/helm-charts", "--version", PolicyControllerChart,
+	chart, done, err := tools.PullChart(ctx, r, "policy-controller")
+	if err != nil {
+		return err
+	}
+	defer done()
+	args := []string{"upgrade", "--install", "policy-controller", chart,
 		"--kube-context", cluster.Context(c), "--namespace", "cosign-system", "--create-namespace",
 		"--set", "webhook.serviceAccount.name=" + PolicyControllerServiceAccount,
 		"--set-json", `webhook.namespaceSelector={"matchExpressions":[{"key":"vertra/team","operator":"Exists"}]}`,
@@ -1197,7 +1275,6 @@ func PolicyController(ctx context.Context, r *run.Runner, c *config.Config, clou
 	// reach its webhook yet (GKE: "No agent available"), and the kernel
 	// chart's policy would fail. A server-side dry run goes through the
 	// webhook and stores nothing: wait until it answers.
-	var err error
 	for deadline := time.Now().Add(5 * time.Minute); ; {
 		if _, err = r.OutputInput(ctx, policyControllerProbe, "kubectl", "--context", cluster.Context(c), "apply", "--dry-run=server", "-f", "-"); err == nil {
 			return nil

@@ -13,7 +13,8 @@ name: release
 #           oci://ghcr.io/<owner>/<repo>/charts, signs them, and creates the
 #           GitHub release with the packaged charts attached.
 #   cli     builds vertra for linux and darwin, amd64 and arm64, from this
-#           tag (with its catalog template inside, for `catalog create`), pushes each binary to ghcr.io/<owner>/<repo>/cli as one
+#           tag (with its catalog template inside, for `catalog create`,
+#           and the charts' SHA-256s, which it checks them against), pushes each binary to ghcr.io/<owner>/<repo>/cli as one
 #           blob (tag <version>-<os>-<arch>; its digest is the binary's
 #           SHA-256), signs each, and attaches the binaries and
 #           vertra-checksums.txt and the manual pages (vertra-man.tar.gz)
@@ -90,6 +91,10 @@ jobs:
   charts:
     needs: images
     runs-on: ubuntu-latest
+    outputs:
+      # Each package's SHA-256, sha256sum's lines: what vertra checks a
+      # pulled chart against (cli/internal/install/release-charts.sha256).
+      sums: ${{ steps.package.outputs.sums }}
     permissions:
       contents: write   # the GitHub release
       packages: write
@@ -110,6 +115,7 @@ jobs:
           echo "$TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Package, push and sign the charts
+        id: package
         run: |
           version="${TAG#v}"
           registry="ghcr.io/${GITHUB_REPOSITORY,,}/charts"
@@ -120,6 +126,7 @@ jobs:
             digest=$(grep -o 'sha256:[0-9a-f]\{64\}' "$RUNNER_TEMP/push.log" | tail -1)
             cosign sign --yes "$registry/$chart@$digest"
           done
+          { echo "sums<<EOF"; (cd dist && sha256sum execution-*.tgz); echo EOF; } >> "$GITHUB_OUTPUT"
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -129,7 +136,7 @@ jobs:
           gh release create "$TAG" dist/*.tgz --verify-tag --generate-notes "${prerelease[@]}"
 
   cli:
-    needs: charts   # the GitHub release it attaches to
+    needs: charts   # the GitHub release it attaches to, and its charts' sums
     runs-on: ubuntu-latest
     permissions:
       contents: write   # attach to the GitHub release
@@ -142,9 +149,14 @@ jobs:
       - run: bash .github/scripts/install-scanners.sh oras cosign
       - name: Build vertra for each platform
         # In the Go image CI uses, pinned by digest (the Makefile's GO_IMAGE).
+        env:
+          CHART_SUMS: ${{ needs.charts.outputs.sums }}
         run: |
           image=$(sed -n 's/^GO_IMAGE ?= *//p' Makefile)
           mkdir -p dist
+          # This release's charts' sums, so this vertra can check them too
+          # (it knows the earlier releases' already).
+          printf '%s\n' "$CHART_SUMS" >> cli/internal/install/release-charts.sha256
           # The catalog template it makes catalogs from (`catalog create`),
           # this tag's tracked files with their modes.
           git archive --format=tar.gz HEAD catalog-template -o cli/internal/catalogtemplate/template.tgz
@@ -197,7 +209,7 @@ jobs:
   # on a first release, make it public, then re-run this job. A pull
   # request this token opens doesn't start CI: close and reopen it.
   pin:
-    needs: cli   # the checksums it pins, and the public blobs it checks
+    needs: [charts, cli]   # the checksums it pins and the charts' sums it records, and the public blobs it checks
     if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     permissions:
@@ -211,18 +223,25 @@ jobs:
         with:
           ref: main
       - name: Open the pin's pull request
+        env:
+          CHART_SUMS: ${{ needs.charts.outputs.sums }}
         run: |
           version="${TAG#v}"
           branch="pin-vertra-$version"
           bash .github/scripts/pin-vertra.sh "$version"
+          # And its charts' sums, for every vertra built after it.
+          sums=cli/internal/install/release-charts.sha256
+          while IFS= read -r line; do
+            grep -qxF "$line" "$sums" || printf '%s\n' "$line" >> "$sums"
+          done <<< "$CHART_SUMS"
           if git diff --quiet; then
-            echo "catalog-template/vertra already pins $version"
+            echo "catalog-template/vertra already pins $version, and its charts' sums are recorded"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
-          git commit -am "chore: pin vertra $version in the catalog template"
+          git commit -am "chore: pin vertra $version in the catalog template, and record its charts' sums"
           # A re-run (the setting was off, say) replaces its own branch.
           git push --force origin "$branch"
           if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
@@ -230,4 +249,4 @@ jobs:
             exit 0
           fi
           gh pr create --base main --head "$branch" --title "chore: pin vertra $version in the catalog template" \
-            --body "The catalog template's \`./vertra\` pinned to the release just made, by \`.github/scripts/pin-vertra.sh $version\` (each platform's binary checked to download anonymously and match \`vertra-checksums.txt\`). Opened by the release workflow: close and reopen it to run CI."
+            --body "The catalog template's \`./vertra\` pinned to the release just made, by \`.github/scripts/pin-vertra.sh $version\` (each platform's binary checked to download anonymously and match \`vertra-checksums.txt\`), and its charts' SHA-256s added to \`cli/internal/install/release-charts.sha256\`, which vertra checks a pulled chart against. Opened by the release workflow: close and reopen it to run CI."

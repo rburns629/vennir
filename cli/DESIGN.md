@@ -506,6 +506,16 @@ confirmation unless `--yes` is also given.
   job (registry pull, one bucket, one vault, signing).
 - **Verified tools:** pinned versions and checksums; released CLI binaries
   are signed like the images.
+- **Verified charts:** every chart is checked before Helm installs it. The
+  third-party ones (metrics-server, cert-manager, External Secrets,
+  policy-controller, the Cluster Autoscaler) are pinned by their package's
+  SHA-256 (`internal/tools/pins.go`) and installed from the checked file,
+  never the repository. A release's own are checked against the SHA-256s
+  its release recorded (`internal/install/release-charts.sha256`, which the
+  release workflow adds to each release's vertra and to main), before
+  they're unpacked into `deploy/<env>/charts/<version>/`, where the package
+  is kept and checked again on each apply; a release the running vertra
+  doesn't know (a newer one) is refused before the approval screen. kind's local registry runs `registry` by digest.
 - **The OpenTofu state** can contain resource details: it stays next to the
   config, gitignored, or in a remote backend you control.
 

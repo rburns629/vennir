@@ -147,6 +147,11 @@ containerdConfigPatches:
       config_path = "/etc/containerd/certs.d"
 `
 
+// RegistryImage is the local registry's image, pinned by digest (the
+// Makefile's kind-registry runs the same). To upgrade it: take the new
+// tag's digest from `docker buildx imagetools inspect registry:<tag>`.
+const RegistryImage = "registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
+
 // EnsureKind starts or creates the local registry and the kind cluster,
 // joins them up, and waits for the node.
 func EnsureKind(ctx context.Context, r *run.Runner, c *config.Config, s State) error {
@@ -159,7 +164,7 @@ func EnsureKind(ctx context.Context, r *run.Runner, c *config.Config, s State) e
 		}
 	default:
 		if err := r.Run(ctx, "docker", "run", "-d", "--restart=always",
-			"-p", fmt.Sprintf("127.0.0.1:%d:5000", c.Kind.RegistryPort), "--name", reg, "registry:2"); err != nil {
+			"-p", fmt.Sprintf("127.0.0.1:%d:5000", c.Kind.RegistryPort), "--name", reg, RegistryImage); err != nil {
 			return err
 		}
 	}
