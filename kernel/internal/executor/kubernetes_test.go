@@ -569,6 +569,15 @@ func TestAProductsOwnErrorMessageIsRedacted(t *testing.T) {
 	check(t, "message", s.Error.Message, "key [redacted AWS access key] was refused")
 }
 
+// Only the kernel sets the cluster's refusal codes; a step that uses one
+// would again.
+func TestAResultClaimingARefusalIsntRetried(t *testing.T) {
+	c, handle := finishedJob(t, `{"status": "failed", "error": {"code": "IMAGE_NOT_ALLOWED", "message": "no"}}`, options())
+	s, _ := c.k.Status(context.Background(), handle)
+	check(t, "code", s.Error.Code, "PRODUCT_RESULT_INVALID")
+	check(t, "retryable", s.Error.Retryable, false)
+}
+
 func TestAMissingOrInvalidResultIsARetryableFailure(t *testing.T) {
 	for result, code := range map[string]string{"": "PRODUCT_RESULT_MISSING", "{not json": "PRODUCT_RESULT_INVALID"} {
 		c, handle := finishedJob(t, result, options())

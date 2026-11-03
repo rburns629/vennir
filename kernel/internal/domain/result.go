@@ -35,6 +35,14 @@ func (e StructuredError) AsMap() map[string]any {
 var RefusalCodes = []string{"DISPATCH_REJECTED", "TEAM_RETIRED", "IMAGE_NOT_ALLOWED", "IMAGE_NOT_PINNED", "IMAGE_SCAN_FAILED",
 	"IMAGE_NOT_SIGNED", "IDENTITY_NOT_ALLOWED", "RESOURCES_NOT_ALLOWED"}
 
+// ReservedCodeError is a result whose error code is one of RefusalCodes:
+// the same step would write it again, so it's no use retrying.
+type ReservedCodeError struct{ Code string }
+
+func (e *ReservedCodeError) Error() string {
+	return fmt.Sprintf("error: code %s is the cluster's own (it refused to start a step), not a step's", e.Code)
+}
+
 // TaskResult is what a step writes to /platform/output/result.json.
 type TaskResult struct {
 	Status  string           `json:"status"`
@@ -86,7 +94,7 @@ func ParseTaskResult(data []byte) (TaskResult, error) {
 			return TaskResult{}, errors.New("error: code and message are required, and not empty")
 		}
 		if slices.Contains(RefusalCodes, *e.Code) {
-			return TaskResult{}, fmt.Errorf("error: code %s is the cluster's own (it refused to start a step), not a step's", *e.Code)
+			return TaskResult{}, &ReservedCodeError{Code: *e.Code}
 		}
 		result.Error = &StructuredError{Code: *e.Code, Message: *e.Message, Retryable: e.Retryable != nil && *e.Retryable}
 	}

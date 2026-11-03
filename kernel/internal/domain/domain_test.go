@@ -156,6 +156,12 @@ func TestParseTaskResult(t *testing.T) {
 	}
 	same(t, "error", *failed.Error, StructuredError{Code: "QUOTA", Message: "no", Retryable: true})
 
+	_, err = ParseTaskResult([]byte(`{"status": "failed", "error": {"code": "IMAGE_NOT_ALLOWED", "message": "m"}}`))
+	var reserved *ReservedCodeError
+	if !errors.As(err, &reserved) || reserved.Code != "IMAGE_NOT_ALLOWED" {
+		t.Errorf("a reserved code: %v", err)
+	}
+
 	for _, bad := range []string{
 		``, `[]`, `{}`, `{"status": "done"}`,
 		`{"status": "succeeded", "extra": 1}`,
