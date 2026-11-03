@@ -11,7 +11,7 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import GlobeIcon from "@mui/icons-material/LanguageOutlined";
-import { ApiError, SSO_START } from "../api";
+import { ApiError, errorMessage, SSO_START } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { keepForSso, returnPath, takeAfterSso } from "../auth/returnTo";
 import { useEnvironment } from "../environment";
@@ -110,7 +110,7 @@ export function LoginPage() {
       navigate(returnTo);
     } catch (err) {
       if (err instanceof ApiError && err.code === "SSO_REQUIRED") setSsoRequired(err.message);
-      else setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      else setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setSubmitting(false);
     }

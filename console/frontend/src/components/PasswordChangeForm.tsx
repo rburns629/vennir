@@ -5,7 +5,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
-import { ApiError, changePassword, PASSWORD_MIN_LENGTH } from "../api";
+import { ApiError, errorMessage, changePassword, PASSWORD_MIN_LENGTH } from "../api";
 import { useAuth } from "../auth/AuthContext";
 
 /**
@@ -56,7 +56,7 @@ export function PasswordChangeForm({
       if (err instanceof ApiError && err.problems.length > 0) {
         setProblems(Object.fromEntries(err.problems.map((p) => [p.field, p.message])));
       } else {
-        setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+        setError(errorMessage(err, "Something went wrong. Try again."));
       }
     } finally {
       setSubmitting(false);

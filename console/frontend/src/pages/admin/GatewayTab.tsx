@@ -8,7 +8,7 @@ import Card from "@mui/material/Card";
 import Link from "@mui/material/Link";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { ApiError, getGateway, setGatewayClosed, type GatewayInfo } from "../../api";
+import { errorMessage, getGateway, setGatewayClosed, type GatewayInfo } from "../../api";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Mono } from "../../components/Mono";
 import { when } from "../../time";
@@ -59,7 +59,7 @@ export function GatewayTab() {
   const load = useCallback(() => {
     getGateway()
       .then(setGateway)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the gateway."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the gateway.")); });
   }, []);
   useEffect(load, [load]);
 
@@ -75,7 +75,7 @@ export function GatewayTab() {
       load();
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That didn't work.");
+      setError(errorMessage(err, "That didn't work."));
       // The dialog closes, so the error shows on the page, not behind it.
       setConfirming(false);
     } finally {

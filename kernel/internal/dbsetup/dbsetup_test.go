@@ -52,6 +52,10 @@ func TestEachServiceGetsItsOwnDatabaseAndNoOther(t *testing.T) {
 	connect := func(ctx context.Context, database string) (*pgx.Conn, error) {
 		return as(admin.Config().User, database)
 	}
+	// As an earlier setup granted it: everything passable on.
+	if _, err := admin.Exec(ctx, "GRANT CONNECT, CREATE, TEMPORARY ON DATABASE "+consoleDB+" TO "+console+" WITH GRANT OPTION"); err != nil {
+		t.Fatal(err)
+	}
 	setup := Setup{Grants: []Grant{{Database: kernelDB, Role: kernel}, {Database: consoleDB, Role: console, Regrant: true}}}
 	for range 2 { // again: no change, no error
 		if err := Run(ctx, connect, admin.Config().Database, setup); err != nil {
@@ -88,6 +92,31 @@ func TestEachServiceGetsItsOwnDatabaseAndNoOther(t *testing.T) {
 	}
 	if err := run(gateway, consoleDB, "SELECT * FROM users"); err != nil {
 		t.Fatalf("the gateway reading what it was given: %v", err)
+	}
+	// The console may pass on what it gives the gateway, and nothing more.
+	inConsoleDB, err := as(admin.Config().User, consoleDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer inConsoleDB.Close(ctx)
+	for privilege, want := range map[string]bool{
+		"database CONNECT": true, "database CREATE": false, "database TEMPORARY": false,
+		"schema USAGE": true, "schema CREATE": false,
+	} {
+		kind, name, _ := strings.Cut(privilege, " ")
+		var can, has bool
+		query := "SELECT has_database_privilege($1, $2, $3 || ' WITH GRANT OPTION'), has_database_privilege($1, $2, $3)"
+		args := []any{console, consoleDB, name}
+		if kind == "schema" {
+			query = "SELECT has_schema_privilege($1, 'public', $2 || ' WITH GRANT OPTION'), has_schema_privilege($1, 'public', $2)"
+			args = []any{console, name}
+		}
+		if err := inConsoleDB.QueryRow(ctx, query, args...).Scan(&can, &has); err != nil {
+			t.Fatal(err)
+		}
+		if can != want || !has {
+			t.Errorf("%s: passable on %v (want %v), held %v", privilege, can, want, has)
+		}
 	}
 	// And no one in anyone else's.
 	for _, c := range []struct{ role, database string }{{console, kernelDB}, {gateway, kernelDB}, {kernel, consoleDB}} {

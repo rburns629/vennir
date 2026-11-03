@@ -98,6 +98,8 @@ func newBackend(t *testing.T) *backend {
 		b.bodies = append(b.bodies, string(body))
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Backend", "yes")
+		w.Header().Add("Set-Cookie", "sid=1; Path=/; Domain=example.com; HttpOnly")
+		w.Header().Add("Set-Cookie", "pref=dark")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
@@ -127,9 +129,11 @@ func setup(t *testing.T, basePath string) *fixture {
 	gw := &Gateway{
 		Store: st,
 		Callers: callers{
-			"web-person": {UserID: "u1", Email: "web@example.com", Teams: []string{"web"}},
-			"outsider":   {UserID: "u2", Teams: []string{"data"}},
-			"two-teams":  {UserID: "u3", Teams: []string{"data", "web"}},
+			"web-person":      {UserID: "u1", Email: "web@example.com", Teams: []string{"web"}},
+			"outsider":        {UserID: "u2", Teams: []string{"data"}},
+			"two-teams":       {UserID: "u3", Teams: []string{"data", "web"}},
+			"admin":           {UserID: "u4", IsAdmin: true, Teams: []string{"data"}},
+			"payments-person": {UserID: "u5", Teams: []string{"payments"}},
 		},
 		Signer:   &caller.Signer{Key: key, Issuer: "https://api.example.com"},
 		Limiter:  limits.New(),
@@ -163,7 +167,9 @@ func errorCode(t *testing.T, w *httptest.ResponseRecorder) string {
 func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 	f := setup(t, "")
 	w := f.do("POST", "/payments/orders/orders?dry=true", "web-person", `{"amount": 1200}`, map[string]string{
-		"Content-Type": "application/json", "Idempotency-Key": "k1", "Vertra-Caller": "forged", "Connection": "close"})
+		"Content-Type": "application/json", "Idempotency-Key": "k1", "Vertra-Caller": "forged", "Connection": "close, X-Hop",
+		"X-Hop": "for the next hop only", "Proxy-Authorization": "Basic cHJveHk=", "X-Forwarded-For": "10.0.0.66", "X-Forwarded-Host": "evil.example",
+		"Forwarded": "for=10.0.0.66", "X-Real-Ip": "10.0.0.66"})
 	if w.Code != http.StatusCreated || w.Header().Get(AnsweredBy) != "backend" || w.Header().Get("X-Backend") != "yes" || w.Body.String() != `{"ok":true}` {
 		t.Fatalf("answer = %d %v %s", w.Code, w.Header(), w.Body)
 	}
@@ -176,6 +182,21 @@ func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 	}
 	if got.Header.Get("Authorization") != "Bearer backend-credential" {
 		t.Errorf("the backend's credential, not the caller's: %q", got.Header.Get("Authorization"))
+	}
+	// Nothing for one hop only, and nothing the caller says about where
+	// it's from: X-Forwarded-For is the gateway's peer (httptest's).
+	for _, h := range []string{"X-Hop", "Proxy-Authorization", "X-Forwarded-Host", "Forwarded", "X-Real-Ip"} {
+		if v := got.Header.Get(h); v != "" {
+			t.Errorf("%s reached the backend: %q", h, v)
+		}
+	}
+	if v := got.Header.Values("X-Forwarded-For"); len(v) != 1 || v[0] != "192.0.2.1" {
+		t.Errorf("X-Forwarded-For = %q", v)
+	}
+	// Every API shares the gateway's origin: a cookie its backend sets is
+	// kept to the API's path, and to the gateway's host.
+	if cookies := w.Header().Values("Set-Cookie"); len(cookies) != 2 || cookies[0] != "sid=1; Path=/payments/orders/; HttpOnly" || cookies[1] != "pref=dark; Path=/payments/orders/" {
+		t.Errorf("Set-Cookie = %q", cookies)
 	}
 	claims := verify(t, got.Header.Get(caller.Header), f.public)
 	if claims.Subject != "user:u1" || claims.Team != "web" || claims.API != "payments/orders" || claims.Email != "web@example.com" {
@@ -211,6 +232,9 @@ func TestWhatTheSpecDoesntDescribeIsBlockedAndNeverForwarded(t *testing.T) {
 		"a body unfit":                  {"POST", "/payments/orders/orders", `{"amount": "lots"}`, "INVALID_REQUEST", 400},
 		"a dot segment":                 {"GET", "/payments/orders/orders/../admin", "", "NOT_FOUND", 404},
 		"an encoded slash":              {"GET", "/payments/orders/orders%2Fx", "", "NOT_FOUND", 404},
+		"a dot segment with a ;":        {"GET", "/payments/orders/orders/..;/admin", "", "NOT_FOUND", 404},
+		"a dot with a ;":                {"GET", "/payments/orders/orders/.;x/ord_abcdefgh", "", "NOT_FOUND", 404},
+		"an encoded backslash":          {"GET", "/payments/orders/orders/x%5c..%5cadmin", "", "NOT_FOUND", 404},
 		"no such API":                   {"GET", "/payments/ledger/orders", "", "NOT_FOUND", 404},
 		"a body over the limit":         {"POST", "/payments/orders/orders", `{"amount": 1}` + strings.Repeat(" ", 2000), "TOO_LARGE", 413},
 		"a body it declares none for":   {"GET", "/payments/orders/orders/ord_abcdefgh", `{"admin": true}`, "INVALID_REQUEST", 400},
@@ -284,6 +308,9 @@ func TestWhoMayCall(t *testing.T) {
 	}
 	if w := f.do("GET", path, "two-teams", "", map[string]string{TeamHeader: "data"}); w.Code != 403 {
 		t.Errorf("calling as a team it isn't shared with: %d", w.Code)
+	}
+	if w := f.do("GET", path, "web-person", "", map[string]string{TeamHeader: "payments"}); w.Code != 403 || errorCode(t, w) != "NOT_SHARED" {
+		t.Errorf("calling as a team the caller isn't in: %d", w.Code)
 	}
 	if len(f.backend.got) != 1 {
 		t.Errorf("forwarded %d", len(f.backend.got))
@@ -405,5 +432,66 @@ func TestOnlyServedAPIsGetTheirOwnMetricLabel(t *testing.T) {
 	}
 	if n := testutil.CollectAndCount(f.gw.Metrics.Duration); n != 3 {
 		t.Errorf("%d duration histograms, want 3 (payments/orders by backend and gateway, and -)", n)
+	}
+}
+
+// Before sign-in, a hidden or paused API is as one that isn't there; once
+// signed in, a hidden one is only for its team, those it's shared with and
+// admins (the console's sees()), and only they hear its state.
+func TestWhatsToldBeforeSignIn(t *testing.T) {
+	f := setup(t, "")
+	path := "/payments/orders/orders/ord_abcdefgh"
+	missing := f.do("GET", "/payments/ledger/orders", "", "", nil)
+	msg := "Incident 42: back by 14:00"
+	f.api.PausedMessage = &msg
+	paused := f.do("GET", path, "", "", nil)
+	if paused.Code != 404 || paused.Body.String() != missing.Body.String() || paused.Header().Get("WWW-Authenticate") != "" {
+		t.Errorf("paused, before sign-in: %d %s", paused.Code, paused.Body)
+	}
+	if w := f.do("GET", path, "outsider", "", nil); w.Code != 503 || !strings.Contains(w.Body.String(), msg) {
+		t.Errorf("paused, signed in: %d %s", w.Code, w.Body)
+	}
+	f.api.PausedMessage = nil
+	f.api.Hidden = true
+	if w := f.do("GET", path, "", "", nil); w.Code != 404 || w.Body.String() != missing.Body.String() {
+		t.Errorf("hidden, before sign-in: %d %s", w.Code, w.Body)
+	}
+	if w := f.do("GET", path, "outsider", "", nil); w.Code != 404 || w.Body.String() != missing.Body.String() {
+		t.Errorf("hidden, from a team it isn't shared with: %d %s", w.Code, w.Body)
+	}
+	if w := f.do("GET", path, "admin", "", nil); w.Code != 403 || errorCode(t, w) != "NOT_SHARED" {
+		t.Errorf("hidden, an admin: %d %s", w.Code, w.Body)
+	}
+	if w := f.do("GET", path, "web-person", "", nil); w.Code != 404 || w.Body.String() != missing.Body.String() {
+		t.Errorf("hidden, from a team it's shared with (as the console, only its own team's): %d %s", w.Code, w.Body)
+	}
+	if w := f.do("GET", path, "payments-person", "", nil); w.Code != 201 {
+		t.Errorf("hidden, from its own team: %d %s", w.Code, w.Body)
+	}
+	// A live one says only "sign in", whatever its state.
+	f.api.Hidden = false
+	f.gw.Settings.Closed = true
+	if w := f.do("GET", path, "", "", nil); w.Code != 401 {
+		t.Errorf("closed, before sign-in: %d %s", w.Code, w.Body)
+	}
+}
+
+func TestABackendsCookiesAreKeptToItsAPI(t *testing.T) {
+	for name, tc := range map[string]struct{ setCookie, backendPath, want string }{
+		"no path":                    {"a=1", "", "a=1; Path=/payments/orders/"},
+		"a path":                     {"a=1; Path=/orders", "", "a=1; Path=/payments/orders/orders"},
+		"a domain":                   {"a=1; Path=/; Domain=example.com", "", "a=1; Path=/payments/orders/"},
+		"under the backend's base":   {"a=1; Path=/v1/orders", "/v1", "a=1; Path=/payments/orders/orders"},
+		"the backend's base itself":  {"a=1; Path=/v1", "/v1/", "a=1; Path=/payments/orders/"},
+		"outside the backend's base": {"a=1; Path=/other", "/v1", "a=1; Path=/payments/orders/"},
+		"not quite the base":         {"a=1; Path=/v10/x", "/v1", "a=1; Path=/payments/orders/"},
+		"attributes it knows":        {"a=1; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=60", "", "a=1; Path=/payments/orders/; Max-Age=60; HttpOnly; Secure; SameSite=Strict"},
+		"attributes it doesn't":      {"a=1; Path=/; Priority=High", "", "a=1; Path=/payments/orders/; Priority=High"},
+		"a __Host- cookie":           {"__Host-sid=1; Path=/; Secure", "", ""},
+		"not a cookie":               {"=", "", ""},
+	} {
+		if got := scopeCookie(tc.setCookie, "/payments/orders", tc.backendPath); got != tc.want {
+			t.Errorf("%s: %q, want %q", name, got, tc.want)
+		}
 	}
 }

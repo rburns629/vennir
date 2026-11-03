@@ -4,7 +4,7 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
-import { ApiError, listAlerts, type AlertRuleView, type AlertsView } from "../../api";
+import { errorMessage, listAlerts, type AlertRuleView, type AlertsView } from "../../api";
 import { Mono } from "../../components/Mono";
 import { Pill, type PillTone } from "../../components/Pill";
 import { when } from "../../time";
@@ -40,7 +40,7 @@ export function AlertsCard() {
         if (!cancelled) setAlerts(found);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Couldn't read the alerts.");
+        if (!cancelled) setError(errorMessage(err, "Couldn't read the alerts."));
       });
     return () => {
       cancelled = true;

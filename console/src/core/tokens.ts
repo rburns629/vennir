@@ -30,6 +30,7 @@ import {
   findTeamByName,
   listAutomationTokens,
   listBotsForTeam,
+  normalEmail,
   revokeApiToken,
   setOrderTemplates,
   teamNamesForUser,
@@ -134,7 +135,7 @@ export async function ensureTeamsBot(teamName: string, email: string, botId: str
 export async function setBotOrders(caller: AuthUser | undefined, teamName: string, email: string, templates: string[]) {
   const team = await teamForMaintainer(caller, teamName);
   ensureNotRetired(team);
-  const bot = (await listBotsForTeam(team.id)).find((b) => b.email === email);
+  const bot = (await listBotsForTeam(team.id)).find((b) => b.email === normalEmail(email));
   if (!bot) throw new ApiError(404, "NOT_FOUND", `No bot "${email}" in team "${teamName}".`);
   if (bot.orderTemplates === null) {
     throw new ApiError(409, "NOT_ORDERING", `"${email}" is a pipeline's bot, not an ordering bot.`, Code.FailedPrecondition);
@@ -156,7 +157,7 @@ export async function setBotCallback(
 ): Promise<{ host: string; signingSecret: string }> {
   const team = await teamForMaintainer(caller, teamName);
   ensureNotRetired(team);
-  const bot = (await listBotsForTeam(team.id)).find((b) => b.email === email);
+  const bot = (await listBotsForTeam(team.id)).find((b) => b.email === normalEmail(email));
   if (!bot) throw new ApiError(404, "NOT_FOUND", `No bot "${email}" in team "${teamName}".`);
   if (bot.orderTemplates === null) {
     throw new ApiError(409, "NOT_ORDERING", `"${email}" is a pipeline's bot, not an ordering bot.`, Code.FailedPrecondition);

@@ -17,7 +17,7 @@ import ComposeIcon from "@mui/icons-material/AccountTreeOutlined";
 import ObserveIcon from "@mui/icons-material/InsightsOutlined";
 import WarningIcon from "@mui/icons-material/WarningAmberOutlined";
 import {
-  ApiError,
+  errorMessage,
   getApiTraffic,
   getCatalogStatus,
   getChatSettings,
@@ -914,7 +914,7 @@ export function HomePage() {
     listExecutions({ mine: true, since, limit: 1000 })
       .then((p) => p.executions)
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Couldn't load your runs.");
+        setError(errorMessage(err, "Couldn't load your runs."));
         throw err;
       }),
   );

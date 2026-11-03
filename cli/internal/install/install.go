@@ -1173,7 +1173,8 @@ func AdminCreated(ctx context.Context, r *run.Runner, c *config.Config) bool {
 		"logs", "--selector", "batch.kubernetes.io/job-name="+ConsoleRelease+"-execution-console-migrate",
 		"--tail=-1", "--max-log-requests=20")
 	// No Pod at all (the Job gone) says nothing either way.
-	return err != nil || out == "" || strings.Contains(out, "Bootstrap admin account created: "+c.Admin.Email)
+	// The console keeps emails lowercase (console/src/db/schema.ts normalEmail).
+	return err != nil || out == "" || strings.Contains(strings.ToLower(out), strings.ToLower("Bootstrap admin account created: "+strings.TrimSpace(c.Admin.Email)))
 }
 
 // ForgetPassword deletes GivePassword's Secret once the console is

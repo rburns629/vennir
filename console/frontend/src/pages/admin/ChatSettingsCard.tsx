@@ -10,7 +10,7 @@ import MenuItem from "@mui/material/MenuItem";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { ApiError, getChatConfig, resetChatConfig, setChatConfig, testChatConfig, type ChatConfig, type ChatConfigInput, type ChatTestResult } from "../../api";
+import { errorMessage, getChatConfig, resetChatConfig, setChatConfig, testChatConfig, type ChatConfig, type ChatConfigInput, type ChatTestResult } from "../../api";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
@@ -112,7 +112,7 @@ export function ChatSettingsCard() {
   useEffect(() => {
     getChatConfig()
       .then(show)
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the chat agent's settings."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the chat agent's settings.")); });
   }, []);
 
   if (!saved || !form) {
@@ -134,7 +134,7 @@ export function ChatSettingsCard() {
       await run();
       if (what !== "test") changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : failed);
+      setError(errorMessage(err, failed));
     } finally {
       setBusy(null);
     }

@@ -19,7 +19,7 @@ import { HelpLink } from "../components/HelpLink";
 import { Mono } from "../components/Mono";
 import { PageHeader } from "../components/PageHeader";
 import { Pill } from "../components/Pill";
-import { ApiError, listApis, type ApiProduct } from "../api";
+import { errorMessage, listApis, type ApiProduct } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { size } from "./api/ApiOverview";
 import { ApiStatePill } from "./api/ApiStatePill";
@@ -210,7 +210,7 @@ export function ApisPage() {
         if (!cancelled) setApis(list);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Failed to load APIs.");
+        if (!cancelled) setError(errorMessage(err, "Failed to load APIs."));
       });
     return () => {
       cancelled = true;

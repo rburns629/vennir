@@ -71,13 +71,15 @@ spec:
         "The console may only update the ServiceAccounts ESO signs in as (eso-*), not " +
         object.metadata.name + "."
       reason: Forbidden
-    # Its NetworkPolicies are each team's default deny (teamNetwork.ts),
-    # never deleted, and only ever refusing more (the no-metadata one may
-    # only let out everything, less what it excepts): every Pod selected, and
-    # connections let in from this namespace's own Pods alone. So the
-    # console can't open a team namespace to anything outside it, except,
-    # with the gateway on, exactly one opening: this release's gateway Pods
-    # to the Pods the team itself labels vertra/api-backend=true.
+    # Its NetworkPolicies are each team's default deny (k8s.ts,
+    # writeTeamNetworkPolicy), never deleted, and only ever refusing more:
+    # every Pod selected, and connections let in from this namespace's own
+    # Pods alone, with no egress rule (NetworkPolicy allows add up, so one
+    # would undo vertra-no-metadata). So the console can't open a team
+    # namespace to anything outside it, except, with the gateway on, exactly
+    # one opening: this release's gateway Pods to the Pods the team itself
+    # labels vertra/api-backend=true. The no-metadata one may only let out
+    # everything less the metadata server's address.
     {{- $gatewayIngress := and .Values.gateway.enabled .Values.teamNamespaces.manage .Values.teamNamespaces.defaultDenyIngress }}
     - expression: >-
         request.resource.resource != "networkpolicies" || (
@@ -85,7 +87,8 @@ spec:
           object.metadata.name == "vertra-default-deny" &&
           (!has(object.spec.podSelector.matchLabels) || size(object.spec.podSelector.matchLabels) == 0) &&
           !has(object.spec.podSelector.matchExpressions) &&
-          object.spec.policyTypes.exists(t, t == "Ingress") &&
+          object.spec.policyTypes == ["Ingress"] &&
+          !has(object.spec.egress) &&
           (!has(object.spec.ingress) || object.spec.ingress.all(rule,
             has(rule.from) && size(rule.from) > 0 && rule.from.all(peer,
               has(peer.podSelector) && !has(peer.namespaceSelector) && !has(peer.ipBlock))))
@@ -95,6 +98,7 @@ spec:
           object.spec.podSelector.matchLabels == {"vertra/api-backend": "true"} &&
           !has(object.spec.podSelector.matchExpressions) &&
           object.spec.policyTypes == ["Ingress"] &&
+          !has(object.spec.egress) &&
           has(object.spec.ingress) && size(object.spec.ingress) == 1 &&
           !has(object.spec.ingress[0].ports) &&
           has(object.spec.ingress[0].from) && size(object.spec.ingress[0].from) == 1 &&
@@ -116,14 +120,16 @@ spec:
           has(object.spec.egress) && object.spec.egress.all(rule,
             !has(rule.ports) && has(rule.to) && rule.to.all(peer,
               has(peer.ipBlock) && !has(peer.podSelector) && !has(peer.namespaceSelector) &&
-              peer.ipBlock.cidr == "0.0.0.0/0"))
+              peer.ipBlock.cidr == "0.0.0.0/0" &&
+              has(peer.ipBlock.except) && "169.254.169.254/32" in peer.ipBlock.except))
           ){{ end }}))
       message: >-
         The console's NetworkPolicies are a team namespace's vertra-default-deny, selecting every
         Pod and letting in nothing from outside the namespace, and (with the gateway on)
         vertra-gateway-ingress, letting only the gateway's Pods reach the team's API backends, and
-        (with teamNamespaces.blockMetadata) vertra-no-metadata, letting out everything but what
-        it excepts; it never deletes one.
+        (with teamNamespaces.blockMetadata) vertra-no-metadata, letting out everything but the
+        metadata server (169.254.169.254); none but that one has an egress rule, and it never
+        deletes one.
       reason: Forbidden
     # Its only RoleBinding written is each team namespace's
     # vertra-scheduler-logs (schedulerLogs.ts): the kernel's logs-only

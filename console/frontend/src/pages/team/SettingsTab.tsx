@@ -8,7 +8,7 @@ import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
-import { ApiError, listTeamMembers, setTeamSignIn, type Team, type TeamMember, type TeamProfile } from "../../api";
+import { errorMessage, listTeamMembers, setTeamSignIn, type Team, type TeamMember, type TeamProfile } from "../../api";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Mono } from "../../components/Mono";
 import { useAuth } from "../../auth/AuthContext";
@@ -84,7 +84,7 @@ export function SettingsTab({
       await setTeamSignIn(team.name, requireSso);
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't change how it signs in.");
+      setError(errorMessage(err, "Couldn't change how it signs in."));
     } finally {
       setSaving(false);
     }

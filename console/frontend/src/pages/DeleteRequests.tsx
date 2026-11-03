@@ -8,7 +8,7 @@ import Card from "@mui/material/Card";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import { alpha } from "@mui/material/styles";
-import { ApiError, decideDeleteRequest, type DeleteRequest, type ResourceRef } from "../api";
+import { errorMessage, decideDeleteRequest, type DeleteRequest, type ResourceRef } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { when } from "../time";
 import { DataTable, type DataTableColumn } from "../components/DataTable";
@@ -36,7 +36,7 @@ export function DeleteRequests({ requests, onDecided }: { requests: DeleteReques
       if (run) navigate(`/runs/${run}`);
       else onDecided();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't decide it.");
+      setError(errorMessage(err, "Couldn't decide it."));
       onDecided();
     } finally {
       setBusy(null);

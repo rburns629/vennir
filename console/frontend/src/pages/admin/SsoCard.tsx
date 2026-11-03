@@ -17,7 +17,7 @@ import Typography from "@mui/material/Typography";
 import CopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import {
-  ApiError,
+  errorMessage,
   deleteSsoGroupMapping,
   getSsoSettings,
   listAllTeams,
@@ -33,8 +33,6 @@ import { Pill } from "../../components/Pill";
 import { useAdminChanged } from "./summary";
 import { AdminCard, Aside, Dot, SrOnly, TABLE_SX } from "./parts";
 
-const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
-
 /** Which group makes whom a member of which team: listed, added, removed; and the teams nothing maps. */
 function GroupMappings({ teams }: { teams: Team[] }) {
   const [mappings, setMappings] = useState<SsoGroupMapping[] | null>(null);
@@ -46,7 +44,7 @@ function GroupMappings({ teams }: { teams: Team[] }) {
   const load = () => {
     listSsoGroupMappings()
       .then(setMappings)
-      .catch((err: unknown) => { setError(message(err, "Couldn't load the mappings.")); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the mappings.")); });
   };
   useEffect(load, []);
 
@@ -60,7 +58,7 @@ function GroupMappings({ teams }: { teams: Team[] }) {
       load();
       changed();
     } catch (err) {
-      setError(message(err, "Couldn't map it."));
+      setError(errorMessage(err, "Couldn't map it."));
     }
   }
 
@@ -115,7 +113,7 @@ function GroupMappings({ teams }: { teams: Team[] }) {
                       onClick={() => {
                         deleteSsoGroupMapping(m.id)
                           .then(() => { load(); changed(); })
-                          .catch((err: unknown) => { setError(message(err, "Couldn't unmap it.")); });
+                          .catch((err: unknown) => { setError(errorMessage(err, "Couldn't unmap it.")); });
                       }}
                     >
                       <DeleteIcon fontSize="small" />
@@ -182,7 +180,7 @@ export function SsoCard() {
   useEffect(() => {
     getSsoSettings()
       .then(show)
-      .catch((err: unknown) => { setError(message(err, "Couldn't load the single sign-on settings.")); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the single sign-on settings.")); });
     listAllTeams()
       .then(setTeams)
       .catch(() => undefined);
@@ -213,7 +211,7 @@ export function SsoCard() {
       setNote("Saved: every console uses it within seconds.");
       changed();
     } catch (err) {
-      setError(message(err, "Couldn't save it."));
+      setError(errorMessage(err, "Couldn't save it."));
     } finally {
       setSaving(false);
     }

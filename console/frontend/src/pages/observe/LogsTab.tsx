@@ -17,7 +17,7 @@ import Typography from "@mui/material/Typography";
 import { LoadFailed, loadFailure } from "../../components/LoadFailed";
 import { Mono } from "../../components/Mono";
 import { useAuth } from "../../auth/AuthContext";
-import { ApiError, listAllTeams, listApis, searchLogs, type LogLineView } from "../../api";
+import { ApiError, errorMessage, listAllTeams, listApis, searchLogs, type LogLineView } from "../../api";
 import { LEVEL, LogLines } from "./LogLines";
 
 type Source = "step" | "api" | "platform";
@@ -143,7 +143,7 @@ export function LogsTab({
       setSearchDays(found.searchDays);
     } catch (err) {
       if (err instanceof ApiError && err.code === "LOGS_OFF") setOff(true);
-      else setError(err instanceof ApiError ? err.message : "Failed to search the logs.");
+      else setError(errorMessage(err, "Failed to search the logs."));
     } finally {
       setSearching(false);
     }

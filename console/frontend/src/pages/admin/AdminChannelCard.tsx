@@ -9,7 +9,7 @@ import Typography from "@mui/material/Typography";
 import { Pill } from "../../components/Pill";
 import { AdminCard } from "./parts";
 import { useAdminChanged } from "./summary";
-import { ApiError, getAdminChannel, listAllTeams, setAdminChannel, type Team } from "../../api";
+import { errorMessage, getAdminChannel, listAllTeams, setAdminChannel, type Team } from "../../api";
 
 /**
  * Where admins' alerts are posted in chat: one team's webhook (set on its
@@ -30,7 +30,7 @@ export function AdminChannelCard() {
         setChosen(team);
         setSaved(team);
       })
-      .catch((err: unknown) => { setError(err instanceof ApiError ? err.message : "Couldn't load the admins' channel."); });
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the admins' channel.")); });
   }, []);
 
   const changed = useAdminChanged();
@@ -41,7 +41,7 @@ export function AdminChannelCard() {
       setSaved(await setAdminChannel(chosen));
       changed();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(errorMessage(err, "Something went wrong. Try again."));
     } finally {
       setBusy(false);
     }

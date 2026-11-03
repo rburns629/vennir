@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
-import { ApiError } from "../api";
+import { errorMessage } from "../api";
 
 /** Why a load failed, as LoadFailed says it: the console's own message, or that it didn't answer. */
-export const loadFailure = (err: unknown): string => (err instanceof ApiError ? err.message : "the console didn't answer.");
+export const loadFailure = (err: unknown): string => errorMessage(err, "the console didn't answer.");
 
 /**
  * A load that failed, said as one, never as an empty list: "Couldn't load

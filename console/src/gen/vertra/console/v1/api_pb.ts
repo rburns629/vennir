@@ -839,9 +839,9 @@ export const ApiService: GenService<{
     output: typeof GetApiResponseSchema;
   },
   /**
-   * Stops an API for an incident: every request gets 503 with the message
-   * until it's resumed, and nothing reaches the backend. A maintainer of its
-   * team, or an admin.
+   * Stops an API for an incident: every signed-in caller gets 503 with its
+   * message (anyone else, 404) until it's resumed, and nothing reaches the
+   * backend. A maintainer of its team, or an admin.
    *
    * @generated from rpc vertra.console.v1.ApiService.PauseApi
    */

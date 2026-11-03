@@ -161,6 +161,61 @@ func TestWhatFinishedIsCommittedBeforeASlowDispatch(t *testing.T) {
 	equal(t, "second", tasksByKey(t, testPool, second)["only"].State, domain.TaskRunning)
 }
 
+// poisonedStart starts this test's tasks with a handle the database can't
+// store (jsonb refuses \u0000), so the dispatch half's transaction fails
+// after it started them; any other ready task passes straight on.
+type poisonedStart struct {
+	*executortest.Fake
+	ours map[string]bool
+}
+
+func (p *poisonedStart) Start(ctx context.Context, task executor.ResolvedTask) (executor.Handle, error) {
+	handle, err := p.Fake.Start(ctx, task)
+	if err == nil && p.ours[task.ExecutionID] {
+		handle["poison"] = "\x00"
+	}
+	return handle, err
+}
+
+// A dispatch that fails after what finished was committed: that stands,
+// and its handle is still handed back for release; the claim rolls back.
+func TestAFailedDispatchKeepsWhatWasRecordedAndHandsItBack(t *testing.T) {
+	ctx := context.Background()
+	exec := &poisonedStart{Fake: fake(), ours: map[string]bool{}}
+	submitted := func(name string) string {
+		var id string
+		if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+			id = submit(t, tx, fmt.Sprintf("%s-%d", name, time.Now().UnixNano()), task("only"))
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _, _ = testPool.Exec(ctx, `DELETE FROM executions WHERE id = $1`, id) })
+		return id
+	}
+	loop := &Loop{Pool: testPool, Executor: exec, Options: DefaultOptions(fmt.Sprintf("loop-failed-%d", time.Now().UnixNano())), Log: quietLog}
+
+	first := submitted("loop-recorded")
+	if _, err := loop.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	handle := tasksByKey(t, testPool, first)["only"].ExecutorHandle
+	exec.Complete(handle, map[string]any{})
+
+	second := submitted("loop-poisoned")
+	exec.ours[second] = true
+	outcome, err := loop.pass(ctx)
+	if err == nil {
+		t.Fatal("the dispatch didn't fail")
+	}
+	equal(t, "handed back", outcome.Finished, []executor.Handle{handle})
+	equal(t, "first", tasksByKey(t, testPool, first)["only"].State, domain.TaskSucceeded)
+	equal(t, "first's execution", executionState(t, testPool, first), domain.ExecutionSucceeded)
+	tk := tasksByKey(t, testPool, second)["only"]
+	equal(t, "second", tk.State, domain.TaskReady)
+	equal(t, "second's attempts", tk.AttemptCount, 0)
+}
+
 // The heartbeat is touched between a pass's phases too, so the probe
 // bounds the slowest phase rather than their sum.
 func TestAPassTouchesTheHeartbeatBetweenItsPhases(t *testing.T) {

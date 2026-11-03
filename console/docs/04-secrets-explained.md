@@ -27,7 +27,9 @@ The simple, common path: open the console's Secrets tab (or call
 no approval, no PR, no waiting. The only requirement is that you're a
 maintainer of the team you're registering it for (or a platform admin).
 A member who isn't a maintainer sees the team's secrets' names, but can't
-add or change them.
+add or change them. The value is hidden as you paste it (**Show** reveals
+it; Firefox can't hide it, and the field says so), and the browser never
+spell-checks, corrects or remembers it.
 
 ## Step 2 — where it actually goes (not hand-waved)
 

@@ -7,7 +7,7 @@ import BotIcon from "@mui/icons-material/SmartToyOutlined";
 import CartIcon from "@mui/icons-material/ShoppingCartOutlined";
 import KeyIcon from "@mui/icons-material/VpnKeyOutlined";
 import LinkIcon from "@mui/icons-material/LinkOutlined";
-import { createBot, createKeylessBot, listBotIdentities, listBots, revokeToken, setBotCallback, setBotOrders, type Bot, type BotIdentity } from "../../api";
+import { errorMessage, createBot, createKeylessBot, listBotIdentities, listBots, revokeToken, setBotCallback, setBotOrders, type Bot, type BotIdentity } from "../../api";
 import { CI, KeylessSection } from "./KeylessSection";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { CodeBlock } from "../../components/CodeBlock";
@@ -16,7 +16,7 @@ import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
 import { SignedCallback } from "../../components/SignedCallback";
 import { DEFAULT_TOKEN_DAYS, expiryText, TokenLifetime } from "../../components/TokenLifetime";
-import { BotPart, CardTitle, SectionLabel, errorMessage, relativeTime } from "./shared";
+import { BotPart, CardTitle, SectionLabel, relativeTime } from "./shared";
 
 /** Templates as typed: <team>/<name>, one per line or comma-separated. */
 function templateList(text: string): string[] {

@@ -5,7 +5,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { ApiError, setTeamQuota, type Team, type TeamQuota } from "../../api";
+import { errorMessage, setTeamQuota, type Team, type TeamQuota } from "../../api";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
 import { SettingsCard } from "./shared";
@@ -39,7 +39,7 @@ export function QuotaSection({ team, isAdmin, onChanged }: { team: Team; isAdmin
       await setTeamQuota(team.name, quota);
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't change the limits.");
+      setError(errorMessage(err, "Couldn't change the limits."));
     } finally {
       setSaving(false);
     }
