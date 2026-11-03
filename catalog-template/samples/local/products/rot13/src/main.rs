@@ -12,8 +12,11 @@ use std::{env, fs, process};
 
 const INPUT_PATH: &str = "/platform/input/request.json";
 const OUTPUT_PATH: &str = "/platform/output/result.json";
-// result.json is limited to 4 KB, and the output carries the text back.
+// The output carries the text back, and result.json is limited to 4 KB: a
+// limit in characters, and the encoded result measured too, since JSON
+// writes a control character as six bytes and UTF-8 others as up to four.
 const MAX_LENGTH: usize = 1000;
+const MAX_RESULT_BYTES: usize = 4096;
 
 fn write_result(result: &Value) {
     if let Err(error) = fs::write(OUTPUT_PATH, result.to_string()) {
@@ -63,13 +66,21 @@ fn run(action: Option<String>) -> i32 {
         );
     }
 
+    let result = json!({
+        "status": "succeeded",
+        "outputs": { "text": rot13(text), "language": "Rust" }
+    });
+    if result.to_string().len() > MAX_RESULT_BYTES {
+        return fail(
+            "TEXT_TOO_LONG",
+            &format!("inputs.text would make a result over {MAX_RESULT_BYTES} bytes."),
+        );
+    }
+
     // A JSON line with level info: what everyone who can see the run sees.
     // Anything else (debug, warn, error, plain) only this team sees.
     println!("{{\"level\":\"info\",\"msg\":\"rotated {length} characters\"}}");
-    write_result(&json!({
-        "status": "succeeded",
-        "outputs": { "text": rot13(text), "language": "Rust" }
-    }));
+    write_result(&result);
     0
 }
 
