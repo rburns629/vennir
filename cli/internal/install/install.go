@@ -8,6 +8,8 @@ package install
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -422,7 +424,7 @@ func ConsoleValues(c *config.Config, env string, img Images, cloud *Cloud) map[s
 		"postgres":          map[string]any{"enabled": false},
 		"existingSecret":    KernelRelease + "-execution-kernel-console-db",
 		"existingSecretKey": "database-url",
-		// No password: one is generated and saved (Password).
+		// No password: a fresh install's is given in a Secret (WithFirstAdmin).
 		"bootstrapAdmin": map[string]any{"email": c.Admin.Email},
 	}
 	if cloud != nil && cloud.Database != nil {
@@ -998,27 +1000,57 @@ func Releases(ctx context.Context, r *run.Runner, c *config.Config) map[string]s
 	return map[string]string{KernelRelease: kernel, ConsoleRelease: console}
 }
 
-// Password returns the first admin's generated password, from the console's
-// migration Job's log, if this install created it.
-func Password(ctx context.Context, r *run.Runner, c *config.Config) string {
-	out, err := r.Output(ctx, "kubectl", "--context", cluster.Context(c), "--namespace", c.Namespace,
-		"logs", "job/"+ConsoleRelease+"-execution-console-migrate")
-	if err != nil {
-		return ""
-	}
-	m := regexp.MustCompile(`one was generated: (\S+)`).FindStringSubmatch(out)
-	if m == nil {
-		return ""
-	}
-	return m[1]
+// FirstAdminSecret holds the first admin's password, which vertra
+// generates, for the console's migrate Job, during a fresh install only.
+const FirstAdminSecret = "vertra-first-admin"
+
+// NewPassword is a random password for the first admin.
+func NewPassword() string {
+	b := make([]byte, 18)
+	_, _ = rand.Read(b) // never fails (crypto/rand)
+	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-// ForgetPassword deletes the console's migrate Job once its generated
-// password is saved, so its log doesn't keep it (the next upgrade makes the
-// Job again, without one). Best effort: the next upgrade replaces it anyway.
+// GivePassword puts the first admin's password where a fresh install's
+// migrate Job reads it (WithFirstAdmin): a Secret, written through stdin, so
+// it's never in an argument list, and never printed by the console, whose
+// logs the cluster may ship and keep.
+func GivePassword(ctx context.Context, r *run.Runner, c *config.Config, password string) error {
+	manifest := fmt.Sprintf(`apiVersion: v1
+kind: Secret
+metadata:
+  name: %s
+  labels: {app.kubernetes.io/managed-by: vertra}
+stringData:
+  password: %q
+`, FirstAdminSecret, password)
+	return r.RunInput(ctx, manifest, "kubectl", "--context", cluster.Context(c), "--namespace", c.Namespace, "apply", "-f", "-")
+}
+
+// WithFirstAdmin has a fresh install's console create the first admin with
+// the password GivePassword gave it, to be changed at the first sign-in.
+func WithFirstAdmin(consoleValues map[string]any) {
+	admin := consoleValues["bootstrapAdmin"].(map[string]any)
+	admin["existingSecret"] = FirstAdminSecret
+	admin["mustChangePassword"] = true
+}
+
+// AdminCreated reports whether this install's migrate Job created the first
+// admin (with GivePassword's password), from the line its log has for that
+// (never a password). False only when the log was read and hasn't it: the
+// account was already there, its data kept from before.
+func AdminCreated(ctx context.Context, r *run.Runner, c *config.Config) bool {
+	out, err := r.Output(ctx, "kubectl", "--context", cluster.Context(c), "--namespace", c.Namespace,
+		"logs", "job/"+ConsoleRelease+"-execution-console-migrate")
+	return err != nil || strings.Contains(out, "Bootstrap admin account created: "+c.Admin.Email)
+}
+
+// ForgetPassword deletes GivePassword's Secret once the console is
+// installed: the account has the password by then, and the file apply saved
+// is the only other copy. Best effort: every apply tries again.
 func ForgetPassword(ctx context.Context, r *run.Runner, c *config.Config) {
 	_ = r.Succeeds(ctx, "kubectl", "--context", cluster.Context(c), "--namespace", c.Namespace,
-		"delete", "job", ConsoleRelease+"-execution-console-migrate", "--ignore-not-found")
+		"delete", "secret", FirstAdminSecret, "--ignore-not-found")
 }
 
 // Uninstall removes a release. The database volume stays: the charts mark

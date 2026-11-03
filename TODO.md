@@ -776,6 +776,13 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   `vertra admin reset-password` runs the console's `dist/db/resetAdmin.js`
   in its Pod (cluster access required): a new random password for an
   admin, printed once, every session revoked, audited. Proven on kind.
+  Since 2026-11-03 no first admin's password is ever in a log (a Job's log
+  is shipped to Cloud Logging or Loki and kept): `vertra apply` generates
+  it, saves it, and gives it to the console in the `vertra-first-admin`
+  Secret (`bootstrapAdmin.existingSecret`), deleted once installed; a chart
+  install that sets none gets a random one, never printed, and resets it.
+  To prove in the billed run: a fresh gcp install's `admin-password` signs
+  in, and Cloud Logging has no password from the migrate Job.
 - [x] **Cross-building on Apple silicon** (done 2026-10-27): the console's
   npm stages, and now the Node sample's (reverse) build stage, run on the
   build platform, so publishing for amd64 from a Mac doesn't run npm under

@@ -152,7 +152,8 @@ values: values.yaml          # optional: Helm values layered last, for anything 
 Next to it, the CLI keeps `tofu/` (the OpenTofu working directory and its
 state, unless a remote backend is configured), `last-plan.txt` (the approved
 approval screen), `applied.yaml` (the config as last applied, so the next
-screen names the settings changed since), `admin-password` (the first admin's generated password,
+screen names the settings changed since), `admin-password` (the first admin's password, which the first apply
+generates and gives the console in a Secret it then deletes, never through a log,
 0600, kept out of git by a `.gitignore` beside it; delete it once you've
 signed in), and nothing else. The state holds resource attributes and
 must be treated like the config's private companion: gitignored here, and
@@ -201,7 +202,10 @@ the sign-in that follows.
 7. Wait until both are ready; print where the console is and how to reach
    it, and where the first admin's password is: `admin-password` in the
    environment's folder, readable only by you and listed in a
-   `.gitignore` there (never printed: it would land in CI logs).
+   `.gitignore` there (never printed: it would land in CI logs; and never
+   in the console's logs, which the cluster may ship and keep: vertra
+   generates it, saves it first, and hands it over in the
+   `vertra-first-admin` Secret, deleted once the console is installed).
 
 ### Values composition
 

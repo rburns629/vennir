@@ -88,7 +88,12 @@ on AKS a network policy engine). Without it, no policy below holds.
    hand lingers. At minimum: the image source tasks may use
    (`imagePolicy.sourceRegistry`), the console's `kernelApiUrl`
    (`http://<kernel release>-execution-kernel-api.<namespace>.svc.cluster.local:8000`),
-   and the first admin's email.
+   and the first admin's email. Give the first admin a password in a
+   Secret of yours (`bootstrapAdmin.existingSecret`; `mustChangePassword:
+   true` to have it changed at the first sign-in), or leave it unset: the
+   account then gets a random password that is shown nowhere, not even in
+   the migrate Job's log (which the cluster's logging may ship and keep),
+   and you give it one with `resetAdmin.js` below.
 5. **Install**, kernel first, with a size preset under your values (see
    [Sizes, sleeping and headroom](#sizes-sleeping-and-headroom)). Not
    `--wait` on a first install: each chart migrates its database in a
@@ -102,8 +107,8 @@ on AKS a network policy engine). Without it, no policy below holds.
    helm install kernel ./execution-kernel -n vertra-system -f execution-kernel/sizes/$SIZE.yaml -f <values>/kernel.yaml
    helm install console ./execution-console -n vertra-system -f execution-console/sizes/$SIZE.yaml -f <values>/console.yaml
    kubectl -n vertra-system rollout status deployment -l 'app.kubernetes.io/instance in (kernel,console)'
-   kubectl -n vertra-system logs job/console-execution-console-migrate   # the first admin's password; changed at the first sign-in
-   kubectl -n vertra-system delete job console-execution-console-migrate # then its log doesn't keep it (vertra does this)
+   # No password set: give the first admin one (printed only to you; changed at the first sign-in)
+   kubectl -n vertra-system exec deploy/console-execution-console -- node dist/db/resetAdmin.js <email>
    ```
 
    Upgrades (`helm upgrade`) can use `--wait`: they migrate before the
@@ -116,8 +121,8 @@ on AKS a network policy engine). Without it, no policy below holds.
    mint the catalog's automation token, and set the allowed image sources.
    Keep the first admin's account. Every install and upgrade creates an
    admin with `bootstrapAdmin.email` if no account has that email, so if
-   you delete it or change the setting, the next upgrade makes a new admin.
-   Its generated password is then in the migrate Job's log
+   you delete it or change the setting, the next upgrade makes a new admin,
+   with a random password no one has
    ([Troubleshooting](#troubleshooting)).
 
 `make gke-deploy VERSION=v<x.y.z>` (and `gke-deploy-kernel`, `-console`)
@@ -1283,8 +1288,12 @@ seconds, not after TCP's two minutes of retries. Seen on kind (2026-10-31,
 `perf/README.md`): deleting the kernel's Postgres Pod mid-run cost about
 ten seconds, and every run ended as expected.
 
-**The first admin's password is lost.** It's printed once, by the first
-migrate Job, and the next upgrade replaces that log. `vertra admin
+**The first admin's password is lost**, or was never known (a chart
+install that set none: the account gets a random one that is never printed,
+since a Job's log may be shipped to Cloud Logging or Loki and kept there).
+`vertra apply` gives a fresh install's first admin a password it generates,
+in a Secret it deletes once the console is installed, and saves it to
+`admin-password`; nothing logs it. `vertra admin
 reset-password <env>` gives that admin (or `--email` another) a new random
 password from inside the console's Pod, saved to `admin-password` in the
 environment's folder (readable only by you, never printed): only someone
@@ -1298,10 +1307,9 @@ dist/db/resetAdmin.js <email>`.
 **An admin account appeared after an upgrade.** Every console install and
 upgrade creates an admin with the console chart's `bootstrapAdmin.email`
 (`admin.email` in vertra.yaml) when no account has that email: the first
-admin's account was deleted, or the setting changed. Its password is in the
-migrate Job's log (`kubectl -n vertra-system logs
-job/console-execution-console-migrate`), kept until the next upgrade, and
-must be changed at its first sign-in. Delete the account on the Admin page
+admin's account was deleted, or the setting changed. Its password is
+random and shown nowhere: give it one as for a lost password (above), if
+it's to be used. Delete the account on the Admin page
 only after setting `bootstrapAdmin.email` to an admin who stays, or it comes
 back with the next upgrade.
 
