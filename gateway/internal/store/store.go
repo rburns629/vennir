@@ -33,7 +33,8 @@ type API struct {
 	BackendAuth    map[string]map[string]string
 	ServiceAccount string
 	ShareWith      []string
-	// Hidden: only its own team (and those it's shared with) hears of it.
+	// Hidden: only its own team, and admins, hear of it, whatever it's
+	// shared with (the console's sees()).
 	Hidden        bool
 	Internet      bool
 	PerMinute     map[string]int

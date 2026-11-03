@@ -98,7 +98,7 @@ async function submit(check: TeamProduct, log: FastifyBaseLogger): Promise<void>
       .update(productReadiness)
       .set({ state: "failed", detail: why.slice(0, 1000), checkedAt: sql`now()` })
       .where(eq(productReadiness.product, check.name));
-    log.warn({ event: "readiness_check_refused", product: check.name, err: error },"couldn't run a product's check");
+    log.warn({ event: "readiness_check_refused", product: check.name, err: error }, "couldn't run a product's check");
   }
 }
 
