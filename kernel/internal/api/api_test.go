@@ -557,6 +557,18 @@ func TestOnlyAFailedTaskCanBeRetried(t *testing.T) {
 	code(t, err, connect.CodeNotFound)
 	_, err = retry(c, uuid.NewString(), "create-project")
 	code(t, err, connect.CodeNotFound)
+
+	// A failed task of an execution since cancelled: its siblings would come
+	// back where nothing claims them.
+	cancelled := submit(t, c, chain(unique("retry-cancelled"))).ExecutionId
+	exec(t, `UPDATE execution_tasks SET state = 'FAILED', attempt_count = 1 WHERE execution_id = $1 AND task_key = 'create-project'`, cancelled)
+	exec(t, `UPDATE execution_tasks SET state = 'CANCELLED' WHERE execution_id = $1 AND task_key = 'deploy-application'`, cancelled)
+	exec(t, `UPDATE executions SET state = 'CANCELLED' WHERE id = $1`, cancelled)
+	_, err = retry(c, cancelled, "create-project")
+	code(t, err, connect.CodeFailedPrecondition)
+	if tasks := tasksByID(get(t, c, cancelled)); tasks["deploy-application"].State != kernelv1.TaskState_TASK_STATE_CANCELLED {
+		t.Errorf("a sibling revived: %v", tasks["deploy-application"].State)
+	}
 }
 
 // --- the rest of the server ---
