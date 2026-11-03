@@ -343,6 +343,9 @@ describe("what runs made", () => {
   it("passes over a run whose recording fails every time, after a few tries", async () => {
     // Long ago and finished, but kernel-api won't give it: every pass threw on
     // it, and nothing after it was ever recorded.
+    // A pass to the end first: the cursor (kept between passes, and so
+    // between tests) then starts from the oldest, the stuck run.
+    await recordFinishedRuns();
     const stuck = randomUUID();
     kernelRuns.set(stuck, { executionId: stuck, name: "stuck", state: "SUCCEEDED", tasks: [] });
     await db.insert(submittedExecutions).values({ executionId: stuck, teams: [cons], name: "stuck", onBehalfOf: cons, template: `${cons}/stuck`, createdAt: new Date(Date.UTC(2000, 0, 2)) });
