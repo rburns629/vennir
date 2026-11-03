@@ -6,10 +6,12 @@ name: security
 #
 #   secrets          gitleaks over the commits a PR or push adds, and over
 #                    the whole history on the weekly run.
-#   code             Semgrep: Python, Dockerfile, GitHub Actions and secret
-#                    rules from the Semgrep registry, plus this repo's own
+#   code             Semgrep: Python, TypeScript, JavaScript, Go, Rust,
+#                    Dockerfile, GitHub Actions and secret rules from the
+#                    Semgrep registry, plus this repo's own
 #                    .semgrep/malicious.yml (reverse shells, piping downloads to a shell,
-#                    hidden payloads, mining, calls to bare IPs).
+#                    hidden payloads, mining, calls to bare IPs), which also
+#                    covers PowerShell (Semgrep has no PowerShell rules).
 #
 # GitHub Advanced Security isn't enabled on this repo, so results go to each
 # run's summary and annotations rather than the Security tab. Any finding
@@ -93,7 +95,8 @@ jobs:
         run: |
           set +e
           semgrep scan --metrics=off --disable-version-check --error \
-            --config p/python --config p/dockerfile --config p/github-actions --config p/secrets \
+            --config p/python --config p/typescript --config p/javascript --config p/golang --config p/rust \
+            --config p/dockerfile --config p/github-actions --config p/secrets \
             --config .semgrep/ \
             --json --output semgrep.json .
           status=$?

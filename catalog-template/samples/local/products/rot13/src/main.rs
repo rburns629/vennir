@@ -74,5 +74,7 @@ fn run(action: Option<String>) -> i32 {
 }
 
 fn main() {
-    process::exit(run(env::args().nth(1)));
+    // The action, which the platform passes as the first argument: only
+    // compared with "transform", never trusted for anything else.
+    process::exit(run(env::args().nth(1))); // nosemgrep: rust.lang.security.args.args
 }

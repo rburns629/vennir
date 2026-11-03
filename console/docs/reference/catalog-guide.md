@@ -626,9 +626,13 @@ Per product (`./vertra catalog check`, in `ci.yml`):
 | A base image not pinned by digest | `./vertra catalog bases` pins it; `./vertra catalog bases --update` moves every pin to its tag's current image |
 
 Across the repository (`security.yml`): committed secrets (gitleaks; rotate
-anything it finds), and Semgrep: its Dockerfile rules (including the
-final `USER` being non-root, though not that it's numeric) plus the
-catalog's own [.semgrep/malicious.yml](.semgrep/malicious.yml).
+anything it finds), and Semgrep: its Python, TypeScript, JavaScript, Go,
+Rust and Dockerfile rules (including the final `USER` being non-root,
+though not that it's numeric) plus the catalog's own
+[.semgrep/malicious.yml](.semgrep/malicious.yml), which also covers shell
+and PowerShell. A product in another language gets only the malicious-code
+patterns that are plain text (a download piped to a shell, a bare IP) and
+the secret scans.
 
 What blocks a merge is what `main`'s ruleset requires ([Protecting
 main](#protecting-main)). Publishing is gated either way: on `main`,
