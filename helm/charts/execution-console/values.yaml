@@ -580,10 +580,21 @@ sso:
 
 bootstrapAdmin:
   email: "admin@example.com"
-  # -- Leave empty to have migrate.ts generate one and print it exactly
-  # once to the migration Job's own logs (see console/src/db/migrate.ts) --
-  # deliberately never a hardcoded default password.
+  # -- The first admin's password, used only when the account is created.
+  # Leave it and existingSecret empty for a random one that is never
+  # printed (a Job's log is kept wherever the cluster ships logs): give it
+  # one with `vertra admin reset-password`, or `kubectl exec
+  # deploy/<release>-execution-console -- node dist/db/resetAdmin.js
+  # <email>`. Deliberately never a hardcoded default password.
   password: ""
+  # -- Or a Secret you create, in the release's namespace, holding it
+  # (vertra apply makes one for a fresh install, then deletes it). Read
+  # only by the migrate Job; it must exist whenever that runs while set.
+  existingSecret: ""
+  existingSecretKey: password
+  # -- The password must be changed at the first sign-in (a generated one
+  # always must). Set it when the password was generated for someone.
+  mustChangePassword: false
 
 # console/'s own ServiceAccount needs a ClusterRole, for the same reason
 # execution-kernel-scheduler's does (see that chart's values.yaml): it

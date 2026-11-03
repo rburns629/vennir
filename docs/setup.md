@@ -64,8 +64,9 @@ Many DNS providers add the domain themselves: then the record's name is just
 `vertra`. The certificate is issued once the name resolves; `vertra status`
 shows both.
 
-**The admin's password** is printed once at the end of the first apply. Sign
-in with it and choose your own: nothing else opens until you do. If it's lost,
+**The admin's password** is in `deploy/<env>/admin-password`, readable only
+by you: the first apply generates it and gives it to the console without
+printing or logging it anywhere. Sign in with it and choose your own: nothing else opens until you do. If it's lost,
 `vertra admin reset-password <env>` makes a new one, which then has to be
 changed at the next sign-in.
 

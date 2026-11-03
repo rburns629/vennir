@@ -438,10 +438,11 @@ export const config = {
   jwtTtl: parseSessionTtl(process.env["JWT_TTL"] ?? "8h"),
   // Only read by db/migrate.ts's one-time bootstrap seed, never by the
   // running server. Deliberately no hardcoded default password: if
-  // BOOTSTRAP_ADMIN_PASSWORD isn't set, migrate.ts generates a random one
-  // instead of falling back to anything guessable — see its own comment.
+  // BOOTSTRAP_ADMIN_PASSWORD isn't set, the account gets a random one, never
+  // printed, instead of anything guessable — see db/bootstrapAdmin.ts.
   bootstrapAdminEmail: process.env["BOOTSTRAP_ADMIN_EMAIL"] ?? "admin@example.com",
   bootstrapAdminPassword: process.env["BOOTSTRAP_ADMIN_PASSWORD"],
+  bootstrapAdminMustChangePassword: parseBoolean("BOOTSTRAP_ADMIN_MUST_CHANGE_PASSWORD"),
   // kernel-api knows nothing of users or teams: this service is its only
   // accepted caller (kernelApiTokenFile below) and authorizes every request
   // first (core/executions.ts). Reachable only from inside the cluster.

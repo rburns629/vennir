@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 /**
- * Gives an admin a new password, for when the first admin's is lost: the
- * migrate Job prints a generated one only once, and the next upgrade
- * replaces that log. Run inside the console's own Pod, so only someone the
- * cluster lets exec there can (`vertra admin reset-password`, or
- * `kubectl exec deploy/<release>-execution-console -- node
- * dist/db/resetAdmin.js <email>`). The new password is random and printed
- * once; every session the account had is revoked (password_changed_at),
+ * Gives an admin a new password, for when the first admin's is lost, or was
+ * never known (an install that set no bootstrapAdmin password: the migrate
+ * Job gives it a random one it never prints). Run inside the console's own
+ * Pod, so only someone the cluster lets exec there can (`vertra admin
+ * reset-password`, or `kubectl exec deploy/<release>-execution-console --
+ * node dist/db/resetAdmin.js <email>`). The new password is random and
+ * printed once, to the exec's own output, which no Pod log keeps; every
+ * session the account had is revoked (password_changed_at),
  * and the reset is in the audit log. Only an admin's password: anyone
  * else's is an admin's to reset in the console.
  */

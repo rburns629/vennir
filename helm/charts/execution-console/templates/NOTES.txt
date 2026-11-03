@@ -7,10 +7,13 @@ bootstrap admin account on first install:
 
   kubectl get jobs -n {{ .Release.Namespace }} {{ include "execution-console.fullname" . }}-migrate
 
-If BOOTSTRAP_ADMIN_PASSWORD wasn't set, its generated password was printed
-exactly once to that Job's own logs and is not recoverable any other way:
+{{- if not (or .Values.bootstrapAdmin.password .Values.bootstrapAdmin.existingSecret) }}
 
-  kubectl logs -n {{ .Release.Namespace }} job/{{ include "execution-console.fullname" . }}-migrate
+No bootstrapAdmin password was set, so the first admin's is random and shown
+nowhere (not even in that Job's log). Give it one, printed only to you:
+
+  kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "execution-console.fullname" . }} -- node dist/db/resetAdmin.js {{ .Values.bootstrapAdmin.email }}
+{{- end }}
 
 Port-forward it to try locally:
 
