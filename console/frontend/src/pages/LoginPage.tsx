@@ -22,11 +22,38 @@ const SSO_ERRORS: Record<string, string> = {
   EMAIL_NOT_VERIFIED: "Your provider hasn't verified that account's email.",
   ACCOUNT_LINKED_ELSEWHERE: "This email's Vertra account signs in with a different account. Ask an admin if that's wrong.",
   SIGN_IN_EXPIRED: "That sign-in took too long or was started elsewhere. Try again.",
+  NOT_STARTED_HERE: "That sign-in link wasn't started from this window, so it wasn't used. Sign in here.",
   SIGN_IN_CANCELLED: "Sign-in was cancelled.",
   SIGN_IN_FAILED: "Sign-in didn't work. Try again, or ask an admin.",
   SSO_OFF: "Single sign-on isn't on here any more: sign in with your password, or ask an admin.",
   GROUPS_UNAVAILABLE: "Your groups couldn't be read, so your teams can't be checked. Try again shortly, or ask an admin.",
 };
+
+/** Where the sign-in page keeps the value it gives single sign-on for this tab. */
+const SSO_TAB_KEY = "vertra_sso_tab";
+
+/** Starts single sign-on from this tab: a value only it knows, which must come back with the session. */
+function startSso(): void {
+  const tab = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  try {
+    sessionStorage.setItem(SSO_TAB_KEY, tab);
+  } catch {
+    // Storage blocked: the session coming back is refused, and says so.
+  }
+  window.location.assign(`${SSO_START}?tab=${tab}`);
+}
+
+/** Whether a session came back from the sign-in this tab started; its value is used once. */
+function startedHere(tab: string | null): boolean {
+  let mine: string | null = null;
+  try {
+    mine = sessionStorage.getItem(SSO_TAB_KEY);
+    sessionStorage.removeItem(SSO_TAB_KEY);
+  } catch {
+    return false;
+  }
+  return mine !== null && tab === mine;
+}
 
 export function LoginPage() {
   const { login, sessionExpired, adoptToken, refresh } = useAuth();
@@ -56,6 +83,12 @@ export function LoginPage() {
       return;
     }
     if (token) {
+      // A session in a link someone else made isn't taken: it would sign
+      // this browser in as them (login CSRF).
+      if (!startedHere(fragment.get("tab"))) {
+        setError(SSO_ERRORS["NOT_STARTED_HERE"] ?? null);
+        return;
+      }
       adoptToken(token);
       void refresh().then(() => {
         navigate("/");
@@ -99,7 +132,7 @@ export function LoginPage() {
         )}
         {sso && (
           <>
-            <Button variant="outlined" size="large" href={SSO_START} startIcon={<GlobeIcon />} sx={{ color: "text.primary", borderColor: "divider" }}>
+            <Button variant="outlined" size="large" onClick={startSso} startIcon={<GlobeIcon />} sx={{ color: "text.primary", borderColor: "divider" }}>
               Sign in with {sso}
             </Button>
             <Divider>

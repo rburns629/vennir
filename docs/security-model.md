@@ -603,7 +603,12 @@ address is the connection's unless `trustProxy` names the load balancer.
 (`console/src/sessionKeys.ts`; EdDSA, any other algorithm refused), lasting `JWT_TTL`
 (8 hours by default; single sign-on's too, a keyless bot's an hour). The
 browser keeps one in `localStorage` and sends it as a bearer header, never
-a cookie, so there's no cross-site request forgery to defend. The token
+a cookie, so there's no cross-site request forgery to defend, save one:
+single sign-on hands the session back in `/login`'s fragment, and the page
+takes it only back from a sign-in this tab started (a random value it
+keeps in `sessionStorage`, carried through the provider in the flow's
+signed cookie and echoed with the session), so a link carrying someone
+else's session can't sign a person in as them. The token
 only says who you are: teams, roles and admin come from the database on
 every request, so removing someone from a team takes effect at once.
 Each session has its own id (`sid`). Signing out (`AuthService/SignOut`)
