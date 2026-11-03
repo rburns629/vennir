@@ -170,10 +170,10 @@ TypeScript, Fastify 5, Drizzle (Postgres), `@kubernetes/client-node`. One proces
 | `schedulerLogs.ts` | Binds the kernel scheduler's log reading in each team namespace (one RoleBinding to its logs-only ClusterRole, the console's only RBAC write), with the namespace and on every policy resync. |
 | `teamNetwork.ts` | Keeps the default-deny NetworkPolicy (`vertra-default-deny`) in every team namespace, so teams' steps can't reach each other. |
 | `retention.ts` | Deletes, hourly, submitted-execution records, audit entries, unused scan verdicts and chat ratings (90 days) past their retention. |
-| `notifier.ts` | Notifications: making each event once (a run that failed or finished, a step waiting for an approval, the catalog not pulled, a product not ready, a step the cluster refused, a platform alert), fanning it out to inboxes, email (SMTP, the kinds each person chooses) and teams' chat webhooks, and sending those (webhook URLs encrypted, allowed hosts only). |
+| `notifier.ts` | Notifications: making each event once (a run that failed or finished, a step waiting for an approval, the catalog not pulled, a product not ready, a step the cluster refused, a platform alert), fanning it out to inboxes, email (SMTP, the kinds each person chooses) and teams' chat webhooks, and sending those, one console at a time (webhook URLs encrypted, allowed hosts only). |
 | `readiness.ts` | Whether each product is ready on this install: runs its check action (as the console, as the product) when it's new or changed, daily or on Check now, and records the answer. |
 | `scheduleRunner.ts`, `cron.ts` | Starting teams' schedules when they're due, each as its bot (claimed by moving its next run on, so one console starts it), and the cron expressions they use (five fields, IANA time zones). |
-| `callbacks.ts` | Callbacks for systems (decision 23): a finished run queued for its ordering bot's callback (`order.finished`) and its owning teams' outcome webhooks (`run.finished`, with steps' outputs), posted signed (`Vertra-Signature`), allowed hosts only, five tries. |
+| `callbacks.ts` | Callbacks for systems (decision 23): a finished run queued for its ordering bot's callback (`order.finished`) and its owning teams' outcome webhooks (`run.finished`, with steps' outputs), posted signed (`Vertra-Signature`), allowed hosts only, five tries, one console at a time. |
 | `resourceRecorder.ts` | Every 30 seconds, copies what finished runs' steps reported as `resources` (with each step's inputs and outputs) into the `resources` table, and marks what cleanup runs deleted. |
 | `productPolicy.ts` | Writes the registered products into the cluster's identity policy, after every product change and at startup. |
 | `gcpMetadata.ts` | The console's own Google access token, from the node's metadata server (Workload Identity): the registry's, the audit export's, single sign-on's, Vertex's and the database's. |
@@ -231,7 +231,7 @@ TypeScript, Fastify 5, Drizzle (Postgres), `@kubernetes/client-node`. One proces
 | **`db/`** | **The console's Postgres.** |
 | `db/schema.ts` | The tables: teams, users, memberships, tokens, products and releases, secret grants, submitted executions, wiring types. |
 | `db/queries.ts` | Every database query the routes use. |
-| `db/client.ts` | The database connection. |
+| `db/client.ts` | The database connection, and `whileHolding`: work one console at a time does under an advisory lock (the notifier's and callbacks' delivery passes). |
 | `db/migrate.ts` | Applies migrations, creates the first admin and grants the gateway's role; run by the migration Job on deploy. |
 | `db/connection.ts` | How every pool connects: `DATABASE_URL`, and with `DATABASE_IAM_AUTH` a short-lived token as each connection's password (gcp: its Workload Identity's; aws: `db/rds.ts`, an RDS token its role signs). |
 | `awsSha256.ts` | SHA-256 for AWS's SigV4 signer: the Bedrock chat's requests and RDS tokens. |

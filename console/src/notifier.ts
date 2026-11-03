@@ -37,7 +37,7 @@ import { and, asc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { config } from "./config.js";
 import { seal, unseal } from "./sealed.js";
 import { backendAllowed } from "./core/apis.js";
-import { db } from "./db/client.js";
+import { db, whileHolding } from "./db/client.js";
 import {
   catalogSync,
   emailDeliveries,
@@ -392,8 +392,22 @@ function message(event: { title: string; body: string; link: string | null }): s
   return `${event.title}${event.body ? `\n${event.body}` : ""}${link}`;
 }
 
-/** Posts what's waiting to be posted, oldest first. */
+/**
+ * Constants no one else uses (callbacks.ts's is 4_170_225_613): one console
+ * at a time makes each kind of delivery pass, so replicas don't post or
+ * email the same one twice. Each is marked sent as soon as it went, so a
+ * console that stops between sending and marking may still send it again
+ * (at least once).
+ */
+const WEBHOOK_LOCK = 4_170_225_611;
+const EMAIL_LOCK = 4_170_225_612;
+
+/** Posts what's waiting to be posted, oldest first; 0 while another console is posting. */
 export async function deliverWebhooks(log: FastifyBaseLogger): Promise<number> {
+  return (await whileHolding(WEBHOOK_LOCK, () => postWaiting(log))) ?? 0;
+}
+
+async function postWaiting(log: FastifyBaseLogger): Promise<number> {
   const pending = await db
     .select({
       eventId: webhookDeliveries.eventId,
@@ -452,9 +466,13 @@ async function mailer(): Promise<Transporter> {
   return transport;
 }
 
-/** Emails what's waiting to be sent, oldest first. */
+/** Emails what's waiting to be sent, oldest first; 0 while another console is sending. */
 export async function deliverEmails(log: FastifyBaseLogger): Promise<number> {
   if (!config.notifications.email.host) return 0;
+  return (await whileHolding(EMAIL_LOCK, () => sendWaiting(log))) ?? 0;
+}
+
+async function sendWaiting(log: FastifyBaseLogger): Promise<number> {
   const pending = await db
     .select({
       eventId: emailDeliveries.eventId,
