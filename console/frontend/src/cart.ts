@@ -92,6 +92,15 @@ export const cart = {
   clear(): void {
     write({ team: current.team, actions: [], choices: [], values: {} });
   },
+  /** Forgets it, team and all, when its person's session ends: the next to sign in here starts empty. */
+  forget(): void {
+    write(EMPTY);
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      // Storage blocked: nothing was kept.
+    }
+  },
 };
 
 /** A cart planned for a team (OrderService/PreviewOrder): its steps wired, what it couldn't settle, what's suggested. */

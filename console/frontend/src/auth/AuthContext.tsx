@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { ApiError, getMe, login as apiLogin, signOut as apiSignOut, SESSION_EXPIRED_EVENT, type Me } from "../api";
+import { cart } from "../cart";
+import { forgetBrowserDrafts } from "../pages/useComposeDrafts";
 
 interface AuthState {
   user: Me | null;
@@ -22,6 +24,17 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/** What this browser keeps for the person signed in (the cart, drafts from
+ * before the console kept them): forgotten when their session ends, so the
+ * next person to sign in here doesn't get it. */
+function forgetKept(): void {
+  cart.forget();
+  forgetBrowserDrafts();
+}
+
+/** A failure the console may get over by itself (restarting, the network), not an answer about the session. */
+const passing = (error: unknown) => !(error instanceof ApiError) || error.status >= 500 || error.status === 429;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // it just means there's no session, same as never having logged in.
       if (error instanceof ApiError && error.status === 401) {
         localStorage.removeItem("token");
+        forgetKept();
         setUser(null);
         return;
       }
@@ -46,10 +60,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // The first check, asked again while the console can't answer (a rolling
+  // restart, the network): still loading, not signed out, since the token
+  // may well be good. Any other refusal is a sign-in page, as no session is.
   useEffect(() => {
-    refresh().finally(() => {
-      setLoading(false);
-    });
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    function check(wait: number): void {
+      refresh().then(
+        () => {
+          if (!stopped) setLoading(false);
+        },
+        (error: unknown) => {
+          if (stopped) return;
+          if (passing(error)) timer = setTimeout(() => { check(Math.min(wait * 2, 30_000)); }, wait);
+          else setLoading(false);
+        },
+      );
+    }
+    check(1000);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, on mount only
   }, []);
 
@@ -57,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // `user` is what makes ProtectedRoute send the browser to /login.
   useEffect(() => {
     function onSessionExpired(): void {
+      forgetKept();
       setSessionExpired(true);
       setUser(null);
     }
@@ -81,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         localStorage.removeItem("token");
       });
+    forgetKept();
     setSessionExpired(false);
     setUser(null);
   }
