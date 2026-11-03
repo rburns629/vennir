@@ -897,7 +897,9 @@ There are no database passwords. The kernel, the console and the gateway
 each sign in as their own Google service account (Cloud SQL's IAM database
 authentication): the password is the workload's access token, an hour long,
 from GKE Workload Identity (`database.iamAuth: gcp` in the charts, which
-mount the CA from `database.caSecret`). Before the charts, every apply runs
+mount the CA from `database.caSecret`). Their Cloud SQL roles (Client and
+Instance User) hold for this instance only, by an IAM condition, not for
+every instance in the project. Before the charts, every apply runs
 `kernel database-setup` once as a fourth identity, the database
 administrator (`vertra-db-admin`), the only one in `cloudsqlsuperuser`: it
 opens `execution_kernel` to the kernel alone and `execution_console` to the
