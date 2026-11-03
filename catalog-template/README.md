@@ -545,8 +545,9 @@ Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
   or `{"status": "failed", "error": {"code": "...", "message": "...",
   "retryable": false}}` (`code` and `message` not empty; `retryable`
   optional, false if left out). Nothing else: any other field, at the top
-  or in `error`, anything after the object, or a `failed` without an
-  `error`, fails the step as `PRODUCT_RESULT_INVALID`. Output references
+  or in `error`, anything after the object, a `failed` without an
+  `error`, or a `code` that's the cluster's own refusal (such as
+  `IMAGE_NOT_ALLOWED`), fails the step as `PRODUCT_RESULT_INVALID`. Output references
   (IDs, names, URIs), not data. What a step made goes in
   `outputs.resources` (see `cleanup` above).
 - The exit code doesn't matter once result.json is written: it decides.

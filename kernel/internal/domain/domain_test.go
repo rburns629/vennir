@@ -165,6 +165,8 @@ func TestParseTaskResult(t *testing.T) {
 		`{"status": "failed", "error": {"code": "C", "message": "m", "detail": 1}}`,
 		`{"status": "succeeded", "error": {"code": "C", "message": "m"}}`,
 		`{"status": "succeeded"} {}`,
+		`{"status": "failed", "error": {"code": "IMAGE_NOT_ALLOWED", "message": "a refusal it didn't get"}}`,
+		`{"status": "failed", "error": {"code": "RESOURCES_NOT_ALLOWED", "message": "m"}}`,
 	} {
 		if _, err := ParseTaskResult([]byte(bad)); err == nil {
 			t.Errorf("%q was accepted", bad)

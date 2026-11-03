@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 )
 
 // StructuredError is a failure a caller can act on: a stable code, a
@@ -26,6 +27,13 @@ func (e StructuredError) Error() string { return e.Code + ": " + e.Message }
 func (e StructuredError) AsMap() map[string]any {
 	return map[string]any{"code": e.Code, "message": e.Message, "retryable": e.Retryable}
 }
+
+// RefusalCodes are the cluster's refusals to start an attempt: its
+// admission policies', policy-controller's (IMAGE_NOT_SIGNED), and a Pod
+// that can never fit its team's limits (RESOURCES_NOT_ALLOWED). Only the
+// kernel sets them: a step's own result may not use one.
+var RefusalCodes = []string{"DISPATCH_REJECTED", "TEAM_RETIRED", "IMAGE_NOT_ALLOWED", "IMAGE_NOT_PINNED", "IMAGE_SCAN_FAILED",
+	"IMAGE_NOT_SIGNED", "IDENTITY_NOT_ALLOWED", "RESOURCES_NOT_ALLOWED"}
 
 // TaskResult is what a step writes to /platform/output/result.json.
 type TaskResult struct {
@@ -76,6 +84,9 @@ func ParseTaskResult(data []byte) (TaskResult, error) {
 		}
 		if e.Code == nil || *e.Code == "" || e.Message == nil || *e.Message == "" {
 			return TaskResult{}, errors.New("error: code and message are required, and not empty")
+		}
+		if slices.Contains(RefusalCodes, *e.Code) {
+			return TaskResult{}, fmt.Errorf("error: code %s is the cluster's own (it refused to start a step), not a step's", *e.Code)
 		}
 		result.Error = &StructuredError{Code: *e.Code, Message: *e.Message, Retryable: e.Retryable != nil && *e.Retryable}
 	}
