@@ -470,6 +470,12 @@ resource "google_project_iam_member" "database" {
     title      = "only ${google_sql_database_instance.this[0].name}"
     expression = "resource.name == \"projects/${var.project}/instances/${google_sql_database_instance.this[0].name}\" && resource.service == \"sqladmin.googleapis.com\""
   }
+  # A changed condition replaces the binding: the new one first (a binding
+  # with another condition is another binding), so sign-ins don't stop
+  # while IAM propagates the change.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Which Kubernetes ServiceAccounts sign in as which: every kernel Pod that
