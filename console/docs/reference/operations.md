@@ -376,7 +376,12 @@ rather than a repository policy: ECR creates each product's repository on
 its first push, and a role scoped to the prefix covers those too.
 
 Running the grant again changes nothing; `--revoke` takes it away (the
-binding and the provider; the role and its policy). The pool, and an IAM
+binding and the provider; the role and its policy). On aws the role is
+named by `--reader` alone, so when `vertra-reader-<reader>` already trusts
+another issuer or subject (another reader with the same cluster name,
+`vertra` by default), the grant and the revoke both refuse and say whom it
+trusts: give this reader another `--reader`, or pass `--replace` to change
+(or delete) that role anyway. The pool, and an IAM
 OIDC provider, stay: neither lets anyone in by itself. Readers set up with
 the gcloud commands earlier versions printed (the bare subject, shared by
 every reader in the pool) keep working; the grant moves a reader's
