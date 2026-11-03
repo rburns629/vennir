@@ -221,7 +221,9 @@ its own directory.
 - **`_local/`** (gitignored): personal scratch space, such as a clone of
   your own catalog repository.
 - `examples/`: fake demo products (`project-product`,
-  `application-product`, `hello-world-app`) that deliberately share no code.
+  `application-product`, `hello-world-app`), the local API sample's backend
+  (`greetings-api`) and a reference order-callback receiver
+  (`order-receiver`), which deliberately share no code.
 
 ## Core contracts worth knowing before touching code
 
