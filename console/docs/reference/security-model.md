@@ -536,7 +536,10 @@ console as its audience, this sign-in's nonce, a verified email, and a
 Workspace domain listed in `sso.allowedDomains` (a personal Google account
 has none, so it can't sign in). The first sign-in binds the account to the
 provider's identity (`users.oidc_subject`): from then on, a different
-provider account given the same email is refused. The session comes back in
+provider account given the same email is refused. Binding an account that
+already existed makes single sign-on its only way in: its password goes,
+and every session from before ends (anyone may register an unclaimed email
+with a password of their own, where self-registration is on). The session comes back in
 the URL's fragment, which browsers never send to a server.
 
 Turning single sign-on on changes nothing else: passwords still work. A team

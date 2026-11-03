@@ -161,6 +161,21 @@ describe("single sign-on", () => {
     expect((await signInWith(person("existing"))).error).toBe("");
   });
 
+  it("makes single sign-on the only way into an account it links: its password, and every session from before, stop working", async () => {
+    // Someone registered the email first, with a password of their own.
+    await createUser(emailOf("squatted"), await hashPassword(PASSWORD));
+    const squatter = await rpc("AuthService", "Login", { email: emailOf("squatted"), password: PASSWORD });
+    const before = squatter.json<{ token: string }>().token;
+    expect((await me(before)).email).toBe(emailOf("squatted"));
+    await new Promise((resolve) => setTimeout(resolve, 1100)); // a session's time is to the second
+
+    const linked = await signInWith(person("squatted"));
+    expect((await me(linked.token)).email).toBe(emailOf("squatted"));
+    expect((await rpc("AuthService", "GetMe", {}, { token: before })).statusCode).toBe(401);
+    expect((await rpc("AuthService", "Login", { email: emailOf("squatted"), password: PASSWORD })).statusCode).toBe(401);
+    expect(await me(linked.token)).toMatchObject({ hasPassword: false, usesSso: true });
+  });
+
   it("refuses another domain, an unverified email and a bot's", async () => {
     expect((await signInWith(person("outsider", { hd: "elsewhere.example.com", email: "x@elsewhere.example.com" }))).error).toBe("DOMAIN_NOT_ALLOWED");
     expect((await signInWith(person("unverified", { email_verified: false }))).error).toBe("EMAIL_NOT_VERIFIED");
