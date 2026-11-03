@@ -135,11 +135,16 @@ function inEffect(): Oidc {
 export async function registerOidc(api: FastifyInstance): Promise<void> {
   await api.register(fastifyCookie, { secret: config.jwtSecret });
 
-  api.get("/auth/oidc/start", async (request, reply) => {
+  api.get<{ Querystring: { tab?: string } }>("/auth/oidc/start", async (request, reply) => {
     try {
       const oidc = inEffect();
+      // The sign-in page's own value for this browser tab, echoed with the
+      // session at the end: the page takes a session only back from a
+      // sign-in it started, not one in a link someone else made.
+      const tab = request.query.tab ?? "";
+      if (!/^[a-f0-9]{32}$/.test(tab)) throw new SignInRefused("SIGN_IN_EXPIRED", "Start single sign-on from the sign-in page.");
       const { discovery } = await provider(oidc);
-      const flow = { state: random(), nonce: random(), verifier: random() };
+      const flow = { state: random(), nonce: random(), verifier: random(), tab };
       reply.setCookie(COOKIE, JSON.stringify(flow), {
         signed: true,
         httpOnly: true,
@@ -174,7 +179,7 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
     try {
       const unsigned = raw ? request.unsignCookie(raw) : undefined;
       if (!unsigned?.valid || !unsigned.value) throw new SignInRefused("SIGN_IN_EXPIRED", "This sign-in wasn't started here, or took too long.");
-      const flow = JSON.parse(unsigned.value) as { state: string; nonce: string; verifier: string };
+      const flow = JSON.parse(unsigned.value) as { state: string; nonce: string; verifier: string; tab?: string };
       const { state, code, error } = request.query;
       if (error) throw new SignInRefused("SIGN_IN_CANCELLED", `The provider answered ${error}.`);
       if (!state || state !== flow.state || !code) throw new SignInRefused("SIGN_IN_EXPIRED", "The provider's answer isn't for this sign-in.");
@@ -218,7 +223,7 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
         status: 200,
         requestId: request.id,
       });
-      return await reply.redirect(`/login#token=${encodeURIComponent(api.jwt.sign(newSession(user.id, true)))}`);
+      return await reply.redirect(`/login#token=${encodeURIComponent(api.jwt.sign(newSession(user.id, true)))}&tab=${encodeURIComponent(flow.tab ?? "")}`);
     } catch (error) {
       await writeAuditEntry(request.log, {
         actorId: null,

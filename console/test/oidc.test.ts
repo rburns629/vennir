@@ -101,9 +101,12 @@ afterAll(async () => {
   await app.close();
 });
 
+/** The sign-in page's value for its tab, which comes back with the session. */
+const TAB = "0123456789abcdef0123456789abcdef";
+
 /** A whole sign-in as a browser does it; the session, or /login's error code. */
 async function signInWith(claims: Record<string, unknown>, options: { key?: CryptoKey; tamper?: "state" | "nonce" | "cookie" } = {}) {
-  const start = await app.inject({ method: "GET", url: "/api/auth/oidc/start" });
+  const start = await app.inject({ method: "GET", url: `/api/auth/oidc/start?tab=${TAB}` });
   expect(start.statusCode).toBe(302);
   const authorize = new URL(start.headers.location as string);
   expect(authorize.origin + authorize.pathname).toBe(`${issuer}/authorize`);
@@ -122,6 +125,7 @@ async function signInWith(claims: Record<string, unknown>, options: { key?: Cryp
   });
   expect(callback.statusCode).toBe(302);
   const fragment = new URLSearchParams((callback.headers.location as string).split("#")[1]);
+  if (fragment.get("token")) expect(fragment.get("tab")).toBe(TAB);
   return { token: fragment.get("token") ?? "", error: fragment.get("error") ?? "" };
 }
 
@@ -179,6 +183,18 @@ describe("single sign-on", () => {
     expect((await signInWith(person("csrf"), { tamper: "state" })).error).toBe("SIGN_IN_EXPIRED");
     expect((await signInWith(person("csrf"), { tamper: "cookie" })).error).toBe("SIGN_IN_EXPIRED");
     expect(tokenRequests).toBe(0);
+  });
+});
+
+describe("starting single sign-on", () => {
+  it("needs the sign-in page's value for its tab, which comes back only with that sign-in's session", async () => {
+    for (const url of ["/api/auth/oidc/start", "/api/auth/oidc/start?tab=x", `/api/auth/oidc/start?tab=${TAB}&tab=${TAB}`]) {
+      const refused = await app.inject({ method: "GET", url });
+      expect(refused.statusCode).toBe(302);
+      expect(refused.headers.location).toBe("/login#error=SIGN_IN_EXPIRED");
+    }
+    // A whole sign-in echoes it (signInWith checks).
+    expect((await signInWith(person("tabbed"))).token).not.toBe("");
   });
 });
 

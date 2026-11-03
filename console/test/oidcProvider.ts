@@ -54,7 +54,7 @@ export async function startProvider() {
 
   /** A whole sign-in as a browser does it: the session, or /login's error code. */
   async function signIn(app: FastifyInstance, idClaims: Record<string, unknown>): Promise<{ token: string; error: string }> {
-    const start = await app.inject({ method: "GET", url: "/api/auth/oidc/start" });
+    const start = await app.inject({ method: "GET", url: "/api/auth/oidc/start?tab=0123456789abcdef0123456789abcdef" });
     const location = String(start.headers.location ?? "");
     if (location.startsWith("/login")) return { token: "", error: new URLSearchParams(location.split("#")[1]).get("error") ?? "" };
     const authorize = new URL(location);
