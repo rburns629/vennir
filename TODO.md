@@ -1012,6 +1012,14 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
 
 ## Security
 
+- [ ] **The gateway's backends see the ingress, not the client, behind
+  its public listener** (found 2026-11-03, G-10): the gateway sets
+  `X-Forwarded-For` to its own peer and drops what callers send, since its
+  listeners are reachable from inside the cluster too. Behind an ingress,
+  that peer is the ingress. If a backend needs the client's address, give
+  the gateway a trusted-proxy list (as the console's `trustProxy`) and keep
+  the ingress's `X-Forwarded-For` only from those.
+
 - [x] **Add the `v*` tag ruleset (admins only)** (decided 2026-11-02, X-6;
   done 2026-11-03): the repository's `release tags` ruleset lets only
   admins create, update or delete `v*` tags. A tag push runs the

@@ -104,7 +104,7 @@
     },
     {
      "name": "PauseApi",
-     "comment": "Stops an API for an incident: every request gets 503 with the message\nuntil it's resumed, and nothing reaches the backend. A maintainer of its\nteam, or an admin.",
+     "comment": "Stops an API for an incident: every signed-in caller gets 503 with its\nmessage (anyone else, 404) until it's resumed, and nothing reaches the\nbackend. A maintainer of its team, or an admin.",
      "input": "vertra.console.v1.PauseApiRequest",
      "output": "vertra.console.v1.PauseApiResponse",
      "streaming": false,
