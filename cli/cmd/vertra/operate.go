@@ -406,6 +406,12 @@ func (a *app) destroyCmd() *cobra.Command {
 						"-l", "app.kubernetes.io/instance in ("+install.KernelRelease+","+install.ConsoleRelease+")"); err != nil {
 						return err
 					}
+					// And the Secrets kept with them, of their passwords (not the
+					// gateway's signing key, kept for its backends' sake).
+					if err := a.runner.Run(ctx, "kubectl", "--context", kctx, "--namespace", c.Namespace, "delete", "secret", "--ignore-not-found",
+						install.KernelRelease+"-execution-kernel-db", install.ConsoleRelease+"-execution-console"); err != nil {
+						return err
+					}
 				}
 				if deleteTeams {
 					if err := a.runner.Run(ctx, "kubectl", "--context", kctx, "delete", "namespace", "-l", "vertra/team"); err != nil {

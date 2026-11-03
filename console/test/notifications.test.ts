@@ -172,6 +172,26 @@ describe("a finished run", () => {
     expect(await db.select().from(webhookDeliveries).where(eq(webhookDeliveries.eventId, event?.id ?? ""))).toEqual([]);
   });
 
+  it("is posted once when two consoles' passes run at once", async () => {
+    const executionId = randomUUID();
+    await runFinished({ executionId, name: `${prefix} overlap`, state: "FAILED", submittedBy: member.id, teams: [team], finishedAt: new Date().toISOString() });
+    const posted: string[] = [];
+    // Slow enough that the second pass starts while the first is posting.
+    vi.stubGlobal("fetch", vi.fn((_url: string, init: { body: string }) => new Promise<Response>((resolve) => {
+      setTimeout(() => {
+        posted.push(init.body);
+        resolve(new Response("ok"));
+      }, 200);
+    })));
+    const counts = await Promise.all([deliverWebhooks(silent), deliverWebhooks(silent)]);
+    expect(posted.filter((body) => body.includes(`${prefix} overlap`))).toHaveLength(1);
+    // One pass posted; the other found it posting and left.
+    expect(counts.filter((n) => n === 0)).toHaveLength(1);
+    // The pass that left doesn't post it later.
+    await deliverWebhooks(silent);
+    expect(posted.filter((body) => body.includes(`${prefix} overlap`))).toHaveLength(1);
+  });
+
   it("leaves a failed post to be tried again, and says why", async () => {
     await runFinished({ executionId: randomUUID(), name: `${prefix} again`, state: "FAILED", submittedBy: member.id, teams: [team], finishedAt: new Date().toISOString() });
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("no", { status: 404 }))));
@@ -352,7 +372,8 @@ describe("email", () => {
       await runFinished({ executionId, name: `${prefix} mailed`, state: "FAILED", submittedBy: member.id, teams: [], finishedAt: new Date().toISOString() });
       await runFinished({ executionId: randomUUID(), name: `${prefix} unmailed`, state: "FAILED", submittedBy: maintainer.id, teams: [], finishedAt: new Date().toISOString() });
       sent.length = 0;
-      await deliverEmails(silent);
+      // Two consoles' passes at once, then another: each is sent once.
+      await Promise.all([deliverEmails(silent), deliverEmails(silent)]);
       await deliverEmails(silent);
       const ours = sent.filter((m) => m.subject.startsWith(prefix));
       expect(ours.map((m) => [m.to, m.subject])).toEqual([[member.email, `${prefix} mailed failed`]]);

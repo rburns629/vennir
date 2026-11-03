@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/rburns629/vertra/gateway/internal/auth"
 	"github.com/rburns629/vertra/gateway/internal/caller"
 	"github.com/rburns629/vertra/gateway/internal/limits"
@@ -29,14 +31,36 @@ const spec = `{
   "paths": {
     "/orders/{orderId}": {
       "get": {
-        "parameters": [{"name": "orderId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^ord_[a-z0-9]{8}$"}}],
+        "parameters": [{"name": "orderId", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^ord_[a-z0-9]{8}$"}},
+          {"name": "expand", "in": "query", "schema": {"type": "string", "enum": ["items"]}},
+          {"name": "filter", "in": "query", "style": "deepObject", "schema": {"type": "object", "properties": {"status": {"type": "string"}}}},
+          {"name": "page", "in": "query", "schema": {"type": "object", "properties": {"num": {"type": "integer"}, "size": {"type": "integer"}}}}],
         "responses": {"200": {"description": "ok"}}
       }
     },
     "/orders": {
       "post": {
+        "parameters": [{"name": "dry", "in": "query", "schema": {"type": "boolean"}}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {
           "type": "object", "required": ["amount"], "properties": {"amount": {"type": "integer"}}}}}},
+        "responses": {"201": {"description": "created"}}
+      }
+    },
+    "/batch": {
+      "post": {
+        "requestBody": {"content": {"application/json": {"schema": {"type": "array", "items": {"type": "object", "properties": {"a": {"type": "integer"}}}}}}},
+        "responses": {"201": {"description": "created"}}
+      }
+    },
+    "/upload": {
+      "post": {
+        "requestBody": {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}},
+        "responses": {"201": {"description": "created"}}
+      }
+    },
+    "/notes": {
+      "post": {
+        "requestBody": {"content": {"application/vnd.example.notes": {"schema": {"type": "object"}}}},
         "responses": {"201": {"description": "created"}}
       }
     }
@@ -138,7 +162,7 @@ func errorCode(t *testing.T, w *httptest.ResponseRecorder) string {
 
 func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 	f := setup(t, "")
-	w := f.do("POST", "/payments/orders/orders?dry=1", "web-person", `{"amount": 1200}`, map[string]string{
+	w := f.do("POST", "/payments/orders/orders?dry=true", "web-person", `{"amount": 1200}`, map[string]string{
 		"Content-Type": "application/json", "Idempotency-Key": "k1", "Vertra-Caller": "forged", "Connection": "close"})
 	if w.Code != http.StatusCreated || w.Header().Get(AnsweredBy) != "backend" || w.Header().Get("X-Backend") != "yes" || w.Body.String() != `{"ok":true}` {
 		t.Fatalf("answer = %d %v %s", w.Code, w.Header(), w.Body)
@@ -147,7 +171,7 @@ func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 		t.Fatalf("backend got %d requests", len(f.backend.got))
 	}
 	got := f.backend.got[0]
-	if got.URL.Path != "/orders" || got.URL.RawQuery != "dry=1" || f.backend.bodies[0] != `{"amount": 1200}` || got.Header.Get("Idempotency-Key") != "k1" {
+	if got.URL.Path != "/orders" || got.URL.RawQuery != "dry=true" || f.backend.bodies[0] != `{"amount": 1200}` || got.Header.Get("Idempotency-Key") != "k1" {
 		t.Errorf("forwarded %s %s?%s %q %v", got.Method, got.URL.Path, got.URL.RawQuery, f.backend.bodies[0], got.Header)
 	}
 	if got.Header.Get("Authorization") != "Bearer backend-credential" {
@@ -181,22 +205,65 @@ func TestWhatTheSpecDoesntDescribeIsBlockedAndNeverForwarded(t *testing.T) {
 		method, path, body, code string
 		status                   int
 	}{
-		"a path not in it":      {"GET", "/payments/orders/admin/users", "", "NOT_IN_SPEC", 404},
-		"a method not in it":    {"DELETE", "/payments/orders/orders/ord_abcdefgh", "", "NOT_IN_SPEC", 404},
-		"a parameter unfit":     {"GET", "/payments/orders/orders/42", "", "INVALID_REQUEST", 400},
-		"a body unfit":          {"POST", "/payments/orders/orders", `{"amount": "lots"}`, "INVALID_REQUEST", 400},
-		"a dot segment":         {"GET", "/payments/orders/orders/../admin", "", "NOT_FOUND", 404},
-		"an encoded slash":      {"GET", "/payments/orders/orders%2Fx", "", "NOT_FOUND", 404},
-		"no such API":           {"GET", "/payments/ledger/orders", "", "NOT_FOUND", 404},
-		"a body over the limit": {"POST", "/payments/orders/orders", `{"amount": 1}` + strings.Repeat(" ", 2000), "TOO_LARGE", 413},
+		"a path not in it":              {"GET", "/payments/orders/admin/users", "", "NOT_IN_SPEC", 404},
+		"a method not in it":            {"DELETE", "/payments/orders/orders/ord_abcdefgh", "", "NOT_IN_SPEC", 404},
+		"a parameter unfit":             {"GET", "/payments/orders/orders/42", "", "INVALID_REQUEST", 400},
+		"a body unfit":                  {"POST", "/payments/orders/orders", `{"amount": "lots"}`, "INVALID_REQUEST", 400},
+		"a dot segment":                 {"GET", "/payments/orders/orders/../admin", "", "NOT_FOUND", 404},
+		"an encoded slash":              {"GET", "/payments/orders/orders%2Fx", "", "NOT_FOUND", 404},
+		"no such API":                   {"GET", "/payments/ledger/orders", "", "NOT_FOUND", 404},
+		"a body over the limit":         {"POST", "/payments/orders/orders", `{"amount": 1}` + strings.Repeat(" ", 2000), "TOO_LARGE", 413},
+		"a body it declares none for":   {"GET", "/payments/orders/orders/ord_abcdefgh", `{"admin": true}`, "INVALID_REQUEST", 400},
+		"an undeclared query parameter": {"GET", "/payments/orders/orders/ord_abcdefgh?debug=1", "", "INVALID_REQUEST", 400},
+		"a declared one, unfit":         {"GET", "/payments/orders/orders/ord_abcdefgh?expand=everything", "", "INVALID_REQUEST", 400},
 	} {
 		w := f.do(tc.method, tc.path, "web-person", tc.body, map[string]string{"Content-Type": "application/json"})
 		if w.Code != tc.status || errorCode(t, w) != tc.code || w.Header().Get(AnsweredBy) != "gateway" {
 			t.Errorf("%s: %d %s %s", name, w.Code, errorCode(t, w), w.Body)
 		}
 	}
+	// A body with no Content-Type, and one of a media type the document
+	// has a schema for but the gateway can't check.
+	if w := f.do("POST", "/payments/orders/orders", "web-person", `{"amount": "lots"}`, nil); w.Code != 400 || errorCode(t, w) != "INVALID_REQUEST" {
+		t.Errorf("no Content-Type: %d %s", w.Code, w.Body)
+	}
+	if w := f.do("POST", "/payments/orders/notes", "web-person", "--x--", map[string]string{"Content-Type": "application/vnd.example.notes"}); w.Code != 400 || errorCode(t, w) != "INVALID_REQUEST" {
+		t.Errorf("a body it can't check: %d %s", w.Code, w.Body)
+	}
 	if len(f.backend.got) != 0 {
 		t.Errorf("forwarded %d requests that should have been stopped", len(f.backend.got))
+	}
+	w := f.do("GET", "/payments/orders/orders/ord_abcdefgh?debug=1", "web-person", "", nil)
+	if !strings.Contains(w.Body.String(), "debug: not a query parameter its OpenAPI document takes") {
+		t.Errorf("an undeclared query parameter, described: %s", w.Body)
+	}
+	// What it does describe still goes through: a declared query parameter,
+	// headers it doesn't mention, a body's extra properties its schema allows.
+	if w := f.do("GET", "/payments/orders/orders/ord_abcdefgh?expand=items", "web-person", "", map[string]string{"X-Trace": "1"}); w.Code != 201 {
+		t.Errorf("a declared query parameter: %d %s", w.Code, w.Body)
+	}
+	if w := f.do("POST", "/payments/orders/orders", "web-person", `{"amount": 1, "note": "hi"}`, map[string]string{"Content-Type": "application/json"}); w.Code != 201 {
+		t.Errorf("an extra property its schema allows: %d %s", w.Code, w.Body)
+	}
+	for name, tc := range map[string]struct {
+		method, path, body string
+		headers            map[string]string
+	}{
+		"a header with a dot":        {"GET", "/payments/orders/orders/ord_abcdefgh", "", map[string]string{"X.Foo": "1"}},
+		"a browser's cookies":        {"GET", "/payments/orders/orders/ord_abcdefgh", "", map[string]string{"Cookie": ".AspNetCore.Cookies=x; next-auth.session-token=y"}},
+		"a property with a dot":      {"POST", "/payments/orders/orders", `{"amount": 1, "b.c": 2}`, map[string]string{"Content-Type": "application/json"}},
+		"extras in an array's items": {"POST", "/payments/orders/batch", `[{"a": 1, "b": 2}]`, map[string]string{"Content-Type": "application/json"}},
+		"a deepObject parameter":     {"GET", "/payments/orders/orders/ord_abcdefgh?filter[status]=open", "", nil},
+		"an exploded object":         {"GET", "/payments/orders/orders/ord_abcdefgh?num=1&size=2", "", nil},
+		"a binary upload":            {"POST", "/payments/orders/upload", "\x00\x01raw", map[string]string{"Content-Type": "application/octet-stream"}},
+	} {
+		if w := f.do(tc.method, tc.path, "web-person", tc.body, tc.headers); w.Code != 201 {
+			t.Errorf("%s: %d %s", name, w.Code, w.Body)
+		}
+	}
+	// A deepObject's key on an operation that has none is still refused.
+	if w := f.do("GET", "/payments/orders/orders/ord_abcdefgh?other[x]=1", "web-person", "", nil); w.Code != 400 {
+		t.Errorf("an undeclared styled key: %d %s", w.Code, w.Body)
 	}
 }
 
@@ -236,6 +303,15 @@ func TestPausedHeldAndClosedForwardNothing(t *testing.T) {
 	if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "API_HELD" {
 		t.Errorf("held: %d %s", w.Code, w.Body)
 	}
+	// Another team's in-cluster backend, though its host is allowed: held.
+	own := f.api.BackendURL
+	other, _ := url.Parse("http://orders.web.svc.cluster.local:8080")
+	f.api.BackendURL = other
+	f.gw.Settings.BackendHosts = []string{"*.svc.cluster.local"}
+	if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "API_HELD" || !strings.Contains(w.Body.String(), "another team's") {
+		t.Errorf("another team's backend: %d %s", w.Code, w.Body)
+	}
+	f.api.BackendURL = own
 	f.gw.Settings.BackendHosts = []string{"127.0.0.1"}
 	f.gw.Settings.Closed = true
 	if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "GATEWAY_CLOSED" {
@@ -301,5 +377,33 @@ func TestItsOwnPaths(t *testing.T) {
 	x, _ := base64.RawURLEncoding.DecodeString(jwks.Keys[0]["x"])
 	if !ed25519.PublicKey(x).Equal(f.public) {
 		t.Error("the JWKS key isn't the signing key's public half")
+	}
+}
+
+func TestOnlyServedAPIsGetTheirOwnMetricLabel(t *testing.T) {
+	f := setup(t, "")
+	reg := prometheus.NewRegistry()
+	f.gw.Metrics = NewMetrics(reg)
+	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "web-person", "", nil)
+	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "", "", nil) // refused, but a served API
+	f.do("GET", "/made-up/api/x", "", "", nil)
+	f.do("GET", "/no-api-here", "", "", nil)
+	f.do("GET", "/another/one/x", "", "", nil)
+	f.gw.Public = true // not served on the internet listener
+	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "web-person", "", nil)
+	if got := testutil.ToFloat64(f.gw.Metrics.Requests.WithLabelValues("payments/orders", "forwarded")); got != 1 {
+		t.Errorf("payments/orders forwarded: %v", got)
+	}
+	if got := testutil.ToFloat64(f.gw.Metrics.Requests.WithLabelValues("payments/orders", "unauthenticated")); got != 1 {
+		t.Errorf("payments/orders unauthenticated: %v", got)
+	}
+	if got := testutil.ToFloat64(f.gw.Metrics.Requests.WithLabelValues("-", "not_found")); got != 4 {
+		t.Errorf("not found under -: %v", got)
+	}
+	if n := testutil.CollectAndCount(f.gw.Metrics.Requests); n != 3 {
+		t.Errorf("%d request series, want 3", n)
+	}
+	if n := testutil.CollectAndCount(f.gw.Metrics.Duration); n != 3 {
+		t.Errorf("%d duration histograms, want 3 (payments/orders by backend and gateway, and -)", n)
 	}
 }

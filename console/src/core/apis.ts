@@ -45,6 +45,24 @@ export function backendAllowed(url: string, hosts: string[] = config.gateway.bac
   });
 }
 
+/**
+ * The namespace an in-cluster backend host names (<service>.<namespace>.svc,
+ * with or without .cluster.local), or null for any other host. The gateway
+ * may reach every team's API backends, so an API may only use one in its
+ * own team's namespace: another team's would be served under this API's
+ * spec and sharing (the gateway's store.BackendNamespace, kept in step).
+ */
+export function backendNamespace(url: string): string | null {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
+  } catch {
+    return null;
+  }
+  const match = /^(?:[^.]+\.)+?([^.]+)\.svc(?:\.cluster\.local)?$/.exec(host);
+  return match?.[1] ?? null;
+}
+
 /** Why the gateway can't serve an API, as it recorded it (api_problems). */
 export interface Problem {
   problem: string;
@@ -53,7 +71,7 @@ export interface Problem {
 
 /** Live, held, paused, or unavailable (the gateway can't use its spec), and why: in the gateway's order. */
 export function apiState(
-  api: Pick<Api, "backendUrl" | "pausedMessage">,
+  api: Pick<Api, "backendUrl" | "pausedMessage" | "teamName">,
   problem: Problem | null = null,
 ): { state: "live" | "held" | "paused" | "unavailable"; heldReason: string; problem: string; problemFoundAt: Date | null } {
   const none = { heldReason: "", problem: "", problemFoundAt: null };
@@ -63,6 +81,14 @@ export function apiState(
       state: "held",
       ...none,
       heldReason: `Its backend's host, ${hostOf(api.backendUrl)}, isn't one this install's admins allow (the gateway's backendHosts).`,
+    };
+  }
+  const namespace = backendNamespace(api.backendUrl);
+  if (namespace !== null && namespace !== api.teamName) {
+    return {
+      state: "held",
+      ...none,
+      heldReason: `Its backend is in namespace ${namespace}, not its team's (${api.teamName}): an API may only use a backend of its own team.`,
     };
   }
   if (problem) return { state: "unavailable", ...none, problem: problem.problem, problemFoundAt: problem.foundAt };

@@ -122,10 +122,12 @@ func run(log *slog.Logger) error {
 	go recorder.Run(ctx, 30*time.Second)
 	registry := prometheus.NewRegistry()
 	metrics := gateway.NewMetrics(registry)
+	// One set of the console's keys, so both listeners drop a rotated one alike.
+	consoleKeys := &auth.ConsoleKeys{URL: s.ConsoleURL + "/api/auth/jwks"}
 	newGateway := func(public bool) *gateway.Gateway {
 		return &gateway.Gateway{
 			Store:   apis,
-			Callers: &auth.Resolver{DB: pool, Keys: &auth.ConsoleKeys{URL: s.ConsoleURL + "/api/auth/jwks"}, SSO: s.SSO},
+			Callers: &auth.Resolver{DB: pool, Keys: consoleKeys, SSO: s.SSO},
 			Signer:  &caller.Signer{Key: s.SigningKey, Issuer: s.Issuer},
 			Limiter: limits.New(),
 			Minter:  &credentials.Minter{TokenRequest: tokenRequest, GCPAudience: s.GCPAudience, GCPTokenAudience: s.GCPTokenAudience},

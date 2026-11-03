@@ -1,0 +1,1 @@
+CREATE INDEX "submitted_executions_unrecorded_idx" ON "submitted_executions" USING btree ("created_at","execution_id") WHERE "submitted_executions"."resources_recorded_at" IS NULL;

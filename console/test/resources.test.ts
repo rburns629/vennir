@@ -19,7 +19,7 @@ import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, upsertProduct } from "../src/db/queries.js";
 import { notificationEvents, products, resourceDeleteRequests, resources, submittedExecutions, teams } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
-import { submitExecution, type KernelExecution } from "../src/kernel/client.js";
+import { getExecution, submitExecution, type KernelExecution } from "../src/kernel/client.js";
 import { providedBy, recordFinishedRuns, recordRun, refreshProvides, reportedResources, resolvedInputs } from "../src/resourceRecorder.js";
 import { caller, rpcClient } from "./rpc.js";
 
@@ -102,11 +102,11 @@ const lastSubmitted = () => {
 };
 
 /** Records finished runs until this one is. */
-async function recorded(executionId: string): Promise<void> {
+async function recorded(executionId: string, pass: { perPass?: number } = {}): Promise<void> {
   for (let i = 0; i < 50; i++) {
     const [row] = await db.select({ at: submittedExecutions.resourcesRecordedAt }).from(submittedExecutions).where(eq(submittedExecutions.executionId, executionId));
     if (row?.at) return;
-    await recordFinishedRuns();
+    await recordFinishedRuns(pass);
   }
   throw new Error(`${executionId} was never recorded`);
 }
@@ -312,6 +312,59 @@ describe("what runs made", () => {
     const refused = await call(consumerToken, "ResourceService/DeleteResources", { resourceIds: [note?.id] });
     expect(refused.failure).toBe("NO_CLEANUP");
     expect(vi.mocked(submitExecution)).toHaveBeenCalledTimes(1); // only the run that made it
+  });
+
+  it("is recorded behind more unfinished runs, older than it, than a pass looks at", async () => {
+    // Three passes' worth of runs from long ago that haven't finished: once
+    // they filled every pass, and nothing newer was ever looked at.
+    const perPass = 5;
+    const waiting = Array.from({ length: perPass * 3 }, (_, i) => ({
+      executionId: randomUUID(),
+      teams: [cons],
+      name: "waiting",
+      onBehalfOf: cons,
+      template: `${cons}/waiting`,
+      createdAt: new Date(Date.UTC(2000, 0, 1, 0, 0, i)),
+    }));
+    for (const run of waiting) kernelRuns.set(run.executionId, { executionId: run.executionId, name: "waiting", state: "RUNNING", tasks: [] });
+    await db.insert(submittedExecutions).values(waiting);
+    try {
+      const run = await call<{ executionId: string }>(consumerToken, "TemplateService/RunAction", { product: `${prov}-thing-create`, inputs: {}, onBehalfOf: cons });
+      const executionId = run.body.executionId;
+      kernelRuns.set(executionId, { executionId, name: "x", state: "SUCCEEDED", tasks: [step("create", "SUCCEEDED", { resources: [{ type: "demo/thing", id: `${prefix}-behind` }] })] });
+      await recorded(executionId, { perPass });
+      expect((await list(consumerToken, { executionId })).map((r) => r.externalId)).toEqual([`${prefix}-behind`]);
+    } finally {
+      await db.delete(submittedExecutions).where(inArray(submittedExecutions.executionId, waiting.map((r) => r.executionId)));
+      for (const run of waiting) kernelRuns.delete(run.executionId);
+    }
+  });
+
+  it("passes over a run whose recording fails every time, after a few tries", async () => {
+    // Long ago and finished, but kernel-api won't give it: every pass threw on
+    // it, and nothing after it was ever recorded.
+    const stuck = randomUUID();
+    kernelRuns.set(stuck, { executionId: stuck, name: "stuck", state: "SUCCEEDED", tasks: [] });
+    await db.insert(submittedExecutions).values({ executionId: stuck, teams: [cons], name: "stuck", onBehalfOf: cons, template: `${cons}/stuck`, createdAt: new Date(Date.UTC(2000, 0, 2)) });
+    const getting = vi.mocked(getExecution).getMockImplementation();
+    vi.mocked(getExecution).mockImplementation((id: string) => (id === stuck ? Promise.reject(new Error("unavailable")) : getting!(id)));
+    try {
+      const run = await call<{ executionId: string }>(consumerToken, "TemplateService/RunAction", { product: `${prov}-thing-create`, inputs: {}, onBehalfOf: cons });
+      const executionId = run.body.executionId;
+      kernelRuns.set(executionId, { executionId, name: "x", state: "SUCCEEDED", tasks: [step("create", "SUCCEEDED", { resources: [{ type: "demo/thing", id: `${prefix}-after-stuck` }] })] });
+      let failed = 0;
+      for (let i = 0; i < 20; i++) {
+        const [row] = await db.select({ at: submittedExecutions.resourcesRecordedAt }).from(submittedExecutions).where(eq(submittedExecutions.executionId, executionId));
+        if (row?.at) break;
+        await recordFinishedRuns().catch(() => (failed += 1));
+      }
+      expect(failed).toBeGreaterThanOrEqual(3);
+      expect((await list(consumerToken, { executionId })).map((r) => r.externalId)).toEqual([`${prefix}-after-stuck`]);
+    } finally {
+      vi.mocked(getExecution).mockImplementation(getting!);
+      await db.delete(submittedExecutions).where(eq(submittedExecutions.executionId, stuck));
+      kernelRuns.delete(stuck);
+    }
   });
 });
 

@@ -27,7 +27,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql, type SQL } from 
 import { ApiError } from "./apiError.js";
 import { config } from "./config.js";
 import { backendAllowed } from "./core/apis.js";
-import { db } from "./db/client.js";
+import { db, whileHolding } from "./db/client.js";
 import { botCallbacks, callbackDeliveries, teamCallbacks, teams } from "./db/schema.js";
 import type { KernelTaskStatus } from "./kernel/client.js";
 import { seal, unseal } from "./sealed.js";
@@ -170,8 +170,20 @@ export async function postCallback(url: string, secret: string, body: string): P
   if (!response.ok) throw new Error(`The callback answered ${String(response.status)}.`);
 }
 
-/** Posts what's waiting to be posted, oldest first. */
+/**
+ * A constant no one else uses: one console at a time posts callbacks, so
+ * replicas don't post the same one twice. Each is marked sent as soon as it
+ * went, so a console that stops between posting and marking may still post
+ * it again (at least once).
+ */
+const DELIVERY_LOCK = 4_170_225_613;
+
+/** Posts what's waiting to be posted, oldest first; 0 while another console is posting. */
 export async function deliverCallbacks(log: FastifyBaseLogger): Promise<number> {
+  return (await whileHolding(DELIVERY_LOCK, () => postWaiting(log))) ?? 0;
+}
+
+async function postWaiting(log: FastifyBaseLogger): Promise<number> {
   const pending = await db
     .select({
       key: callbackDeliveries.key,

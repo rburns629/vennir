@@ -272,6 +272,7 @@ func (a *app) destroyAWS(ctx context.Context, out io.Writer, dir string, c *conf
 		} else if vols, _ := a.runner.Output(ctx, "kubectl", "--context", kctx, "get", "pv",
 			"-o", "jsonpath={range .items[*]}{.spec.csi.volumeHandle}{\"\\n\"}{end}"); vols != "" {
 			fmt.Fprintln(out, "Keeping the database's EBS volume:", strings.ReplaceAll(vols, "\n", ", "))
+			fmt.Fprintln(out, "Its passwords were in the cluster, which goes with it: a new install can open it only after resetting them in Postgres by hand.")
 		}
 		// The console's load balancer (made by Auto Mode, outside OpenTofu's
 		// state) goes with its Ingress: wait, or it holds the network.

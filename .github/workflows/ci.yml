@@ -330,8 +330,8 @@ jobs:
           console/node_modules/.bin/buf breaking --against ".git#tag=$release"
       - name: The committed code matches the protos
         run: |
-          git add -N console/src/gen console/frontend/src/gen cli/internal/gen
-          git diff --exit-code -- console/src/gen console/frontend/src/gen cli/internal/gen || {
+          git add -N console/src/gen console/frontend/src/gen cli/internal/gen kernel/internal/gen
+          git diff --exit-code -- console/src/gen console/frontend/src/gen cli/internal/gen kernel/internal/gen || {
             echo "::error::Generated code is out of date: run make proto and commit it."
             exit 1
           }

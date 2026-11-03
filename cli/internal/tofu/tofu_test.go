@@ -3,11 +3,16 @@
 package tofu
 
 import (
+	"context"
+	"io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/rburns629/vertra/cli/internal/modules"
+	"github.com/rburns629/vertra/cli/internal/run"
 )
 
 // A trimmed `tofu show -json` of a first gcp plan.
@@ -74,5 +79,64 @@ func TestEveryResourceTypeIsNamed(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// fakeTofu answers `state list` with the given state and, as OpenTofu does,
+// refuses a `state rm` of anything that isn't in it. It records what rm
+// removed in the returned file.
+func fakeTofu(t *testing.T, state ...string) (*run.Runner, string) {
+	t.Helper()
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state")
+	removed := filepath.Join(dir, "removed")
+	if err := os.WriteFile(stateFile, []byte(strings.Join(state, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	script := `#!/bin/sh
+shift # -chdir
+case "$1 $2" in
+"state list") cat "` + stateFile + `" ;;
+"state rm")
+  shift 2
+  for a in "$@"; do
+    grep -qxF "$a" "` + stateFile + `" || { echo "No matching objects found" >&2; exit 1; }
+  done
+  for a in "$@"; do echo "$a" >> "` + removed + `"; done ;;
+*) exit 2 ;;
+esac
+`
+	bin := filepath.Join(dir, "tofu")
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return &run.Runner{Out: io.Discard, Err: io.Discard, Resolve: func(string) string { return bin }}, removed
+}
+
+// A managed database's install has no backup bucket, though destroy keeps
+// it: Forget leaves out what the state doesn't have.
+func TestForgetSkipsWhatTheStateDoesntHave(t *testing.T) {
+	r, removed := fakeTofu(t, "google_container_cluster.this", "google_sql_database_instance.this[0]",
+		`google_sql_database.this["execution_kernel"]`)
+	if err := In(r, t.TempDir()).Forget(context.Background(), "google_storage_bucket.backups[0]",
+		"google_sql_database_instance.this[0]", `google_sql_database.this["execution_kernel"]`); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(removed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "google_sql_database_instance.this[0]\ngoogle_sql_database.this[\"execution_kernel\"]\n"; string(got) != want {
+		t.Errorf("removed %q, want %q", got, want)
+	}
+}
+
+func TestForgetWithNothingInStateRemovesNothing(t *testing.T) {
+	r, removed := fakeTofu(t, "google_container_cluster.this")
+	if err := In(r, t.TempDir()).Forget(context.Background(), "aws_s3_bucket.backups[0]"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(removed); !os.IsNotExist(err) {
+		t.Errorf("state rm ran: %v", err)
 	}
 }

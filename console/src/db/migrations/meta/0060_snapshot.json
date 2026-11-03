@@ -1,5 +1,5 @@
 {
-  "id": "14349787-c671-4656-a15e-11acb41ba09b",
+  "id": "074d2fc6-6a2d-4f28-aa83-9aa18e13122b",
   "prevId": "e9a27f23-b073-476a-bb97-c0e2e3fec9e0",
   "version": "7",
   "dialect": "postgresql",
@@ -1078,70 +1078,6 @@
         "chat_feedback_rating": {
           "name": "chat_feedback_rating",
           "value": "\"chat_feedback\".\"rating\" IN ('up', 'down')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.chat_limits": {
-      "name": "chat_limits",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "default": 1
-        },
-        "per_hour": {
-          "name": "per_hour",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "per_day": {
-          "name": "per_day",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "chat_limits_updated_by_users_id_fk": {
-          "name": "chat_limits_updated_by_users_id_fk",
-          "tableFrom": "chat_limits",
-          "tableTo": "users",
-          "columnsFrom": [
-            "updated_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "chat_limits_one_row": {
-          "name": "chat_limits_one_row",
-          "value": "\"chat_limits\".\"id\" = 1"
         }
       },
       "isRLSEnabled": false
@@ -3388,6 +3324,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "submitted_executions_unrecorded_idx": {
+          "name": "submitted_executions_unrecorded_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "execution_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"submitted_executions\".\"resources_recorded_at\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
