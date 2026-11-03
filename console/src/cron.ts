@@ -102,6 +102,22 @@ function dayMatches(cron: Cron, t: ReturnType<typeof local>): boolean {
 
 const MINUTE = 60_000;
 
+/**
+ * Whether this wall-clock minute already happened (the clocks went back,
+ * by an hour or, in a few zones, half of one): only its first time runs.
+ */
+function repeated(at: Date, parts: ReturnType<typeof local>, timeZone: string): boolean {
+  return [30, 60].some((back) => {
+    const earlier = local(new Date(at.getTime() - back * MINUTE), timeZone);
+    return (
+      earlier.month === parts.month &&
+      earlier.day === parts.day &&
+      earlier.hour === parts.hour &&
+      earlier.minute === parts.minute
+    );
+  });
+}
+
 /** The first time after `after` that the schedule runs, within about five years; null if never. */
 export function nextRun(cron: Cron, after: Date, timeZone: string): Date | null {
   let t = new Date(Math.floor(after.getTime() / MINUTE) * MINUTE + MINUTE);
@@ -118,7 +134,7 @@ export function nextRun(cron: Cron, after: Date, timeZone: string): Date | null 
       t = new Date(t.getTime() + (60 - parts.minute) * MINUTE);
       continue;
     }
-    if (cron.minutes.has(parts.minute)) return t;
+    if (cron.minutes.has(parts.minute) && !repeated(t, parts, timeZone)) return t;
     t = new Date(t.getTime() + MINUTE);
   }
   return null;
