@@ -128,6 +128,12 @@ def main() -> int:
             made_here = _create(s3, bucket, region)
             if made_here is None:
                 return _failure("BUCKET_NAME_TAKEN", f"Bucket name '{bucket}' is taken. Choose another.")
+            if made_here == "denied":
+                return _failure(
+                    "AWS_API_ERROR",
+                    f"AccessDenied creating bucket '{bucket}' with its tag: the role needs s3:CreateBucket and "
+                    "s3:TagResource (one granted from an older aws README has s3:PutBucketTagging instead).",
+                )
             print(f"created bucket '{bucket}' in {region}")
 
         if made_here:
@@ -147,9 +153,9 @@ def main() -> int:
     return 0
 
 
-def _create(s3: Any, bucket: str, region: str) -> bool | None:
-    """Creates the bucket, tagged: whether it's this product's, or None if
-    the name is another account's."""
+def _create(s3: Any, bucket: str, region: str) -> bool | None | str:
+    """Creates the bucket, tagged: whether it's this product's, None if the
+    name is another account's, or "denied" if this role may not."""
     configuration: dict[str, Any] = {"Tags": [{"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}]}
     if region != "us-east-1":  # us-east-1 refuses a LocationConstraint
         configuration["LocationConstraint"] = region
@@ -159,6 +165,8 @@ def _create(s3: Any, bucket: str, region: str) -> bool | None:
         code = error.response.get("Error", {}).get("Code")
         if code == "BucketAlreadyExists":
             return None
+        if code == "AccessDenied":
+            return "denied"
         if code != "BucketAlreadyOwnedByYou":
             raise
         # Made a moment ago, by a run that got there first: its tag says whose.

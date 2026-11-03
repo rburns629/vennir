@@ -108,6 +108,17 @@ class CreateActionTest(unittest.TestCase):
             self.assertEqual("resources" in result["outputs"], made)
             self.assertEqual(s3.put_public_access_block.called, made)
 
+    def test_a_create_denied_names_tag_resource(self) -> None:
+        # A role granted from the older README: s3:PutBucketTagging, not s3:TagResource.
+        def configure(s3):
+            s3.head_bucket.side_effect = _client_error("404", 404)
+            s3.create_bucket.side_effect = _client_error("AccessDenied", 403)
+        self.configure = configure
+        exit_code, result, _ = self._run({"bucketName": "b", "region": "eu-west-1"})
+        self.assertEqual(exit_code, 1)
+        self.assertFalse(result["error"]["retryable"])
+        self.assertIn("s3:TagResource", result["error"]["message"])
+
     def test_another_accounts_name_found_at_create_is_refused(self) -> None:
         def configure(s3):
             s3.head_bucket.side_effect = _client_error("404", 404)
