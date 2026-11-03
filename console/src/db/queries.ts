@@ -9,6 +9,7 @@ import {
   users,
   teamMemberships,
   apiTokens,
+  botIdentities,
   revokedSessions,
   botCallbacks,
   products,
@@ -361,13 +362,24 @@ export async function createApiToken(
   tokenHash: string,
   scopes: string[] = [],
   expiresAt: Date | null = null,
+  createdBy: string | null = null,
 ): Promise<ApiTokenMeta> {
   const [token] = await db
     .insert(apiTokens)
-    .values({ userId, label, tokenHash, scopes, expiresAt })
+    .values({ userId, label, tokenHash, scopes, expiresAt, createdBy })
     .returning();
   if (!token) throw new Error("Insert returned no row");
   return token;
+}
+
+/** Everyone who made a bot something to act with: a token, a keyless
+ * identity, or a schedule that runs as it. */
+export async function botMakers(botId: string): Promise<string[]> {
+  const rows = await db.execute<{ id: string }>(sql`
+    SELECT created_by AS id FROM ${apiTokens} WHERE user_id = ${botId} AND created_by IS NOT NULL
+    UNION SELECT created_by FROM ${botIdentities} WHERE bot_id = ${botId} AND created_by IS NOT NULL
+    UNION SELECT created_by FROM ${schedules} WHERE bot_id = ${botId} AND created_by IS NOT NULL`);
+  return rows.rows.map((r) => r.id);
 }
 
 export interface AutomationToken extends ApiTokenMeta {

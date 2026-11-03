@@ -55,7 +55,7 @@ import {
 } from "../kernel/client.js";
 import { UNREGISTERED_SERVICE_ACCOUNT } from "../productPolicy.js";
 import { ensureStillRunnable, rerunTemplate } from "./templates.js";
-import { mayDecide, taskTeams } from "./approvals.js";
+import { mayDecide, notDeciders, taskTeams } from "./approvals.js";
 import { visibleLines } from "../logLevels.js";
 import { failureCodeOnly, runView, visibleEvent, visiblePayload } from "./runView.js";
 import { errorMessage, errorPath, schemaErrors } from "../jsonSchema.js";
@@ -927,8 +927,9 @@ export async function executionDetail(caller: AuthUser | undefined, executionId:
   }
   const helped = await failuresExplained(detail.tasks, submitted.payload);
   const teamOf = taskTeams(submitted.payload);
+  const excluded = detail.tasks.some((t) => t.state === "AWAITING_APPROVAL") ? await notDeciders(submitted.submittedBy) : [];
   const deciding = (t: { taskId: string; state: string }) =>
-    t.state === "AWAITING_APPROVAL" && caller !== undefined && mayDecide(caller, teamOf.get(t.taskId) ?? "", submitted.submittedBy);
+    t.state === "AWAITING_APPROVAL" && caller !== undefined && mayDecide(caller, teamOf.get(t.taskId) ?? "", excluded);
   // Who may decide on a waiting step can preview it, when its product has a plan.
   const previewable = new Set<string>();
   const products = productLookup();

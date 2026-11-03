@@ -10,7 +10,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, upsertProduct } from "../src/db/queries.js";
-import { products, submittedExecutions, teams } from "../src/db/schema.js";
+import { products, submittedExecutions, teams, users as usersTable } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { decideApproval, getExecution, listAwaitingApproval, submitExecution, type KernelExecution } from "../src/kernel/client.js";
 import { targetsNeedApproval } from "../src/targets.js";
@@ -106,6 +106,7 @@ afterAll(async () => {
   await db.delete(products).where(like(products.name, `${prefix}%`));
   const ours = await db.select({ id: teams.id }).from(teams).where(like(teams.name, `${prefix}%`));
   if (ours.length > 0) await db.delete(teams).where(inArray(teams.id, ours.map((t) => t.id)));
+  await db.delete(usersTable).where(like(usersTable.email, `${prefix}-ci-%@bots.vertra.local`));
   await users.cleanUp();
   await app.close();
 });
@@ -221,6 +222,26 @@ describe("deciding", () => {
     expect(refused.message).toContain("another maintainer");
     expect((await decide("maintainer2", executionId, false)).code).toBe("ok");
     expect(decideApproval).toHaveBeenCalledWith(executionId, "run", false, `user:${ids["maintainer2"] ?? ""}`, "not now");
+  });
+
+  it("never the maintainer who made the bot that submitted it", async () => {
+    const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vertra.local`;
+    const minted = await call<{ token: string }>(tokens["maintainer"], "TokenService/CreateBotToken", { team: owner, email, label: "ci" });
+    expect(minted.code).toBe("ok");
+    const asBot = await call<{ executionId: string }>(minted.body.token, "TemplateService/RunAction", { product: wipe, inputs: { projectId: `${apps}-dev` } });
+    expect(asBot.code).toBe("ok");
+    const executionId = asBot.body.executionId;
+    vi.mocked(getExecution).mockResolvedValue(awaiting(executionId));
+
+    const refused = await decide("maintainer", executionId);
+    expect(refused.code).toBe("permission_denied");
+    expect(refused.message).toContain("another maintainer");
+    type Detail = { execution: { tasks: { approval?: { canDecide?: boolean } }[] } };
+    const canDecide = async (who: keyof typeof tokens) =>
+      (await call<Detail>(tokens[who], "ExecutionService/GetExecution", { executionId })).body.execution.tasks[0]?.approval?.canDecide ?? false;
+    expect(await canDecide("maintainer")).toBe(false);
+    expect(await canDecide("maintainer2")).toBe(true);
+    expect((await decide("maintainer2", executionId)).code).toBe("ok");
   });
 
   it("only a step awaiting approval", async () => {

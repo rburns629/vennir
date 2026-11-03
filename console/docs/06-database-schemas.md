@@ -344,6 +344,7 @@ Tokens for bots: a team's bots (Team page → Automation) and the catalog's auto
 | `token_hash` | text | no, unique | SHA-256 of the token. The token itself is shown once and never stored. |
 | `label` | text | no | What uses it, for people reading the Team page. |
 | `scopes` | text[] | no | For an automation token only, its platform-wide permissions, such as `teams:create` or `products:register`. Empty for a team's bot, whose access comes from its team. |
+| `created_by` | uuid | yes | Who made it. A run its bot submits isn't approved by them, so two people agree (`core/approvals.ts`). Empty when not known, such as for a token from before this was recorded whose maker the audit log doesn't name. |
 | `created_at` | timestamptz | no | |
 | `revoked_at` | timestamptz | yes | Set when revoked; the token stops working at once. |
 | `last_used_at` | timestamptz | yes | When it last signed a request in (updated at most every few minutes). |

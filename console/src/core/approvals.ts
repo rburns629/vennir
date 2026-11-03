@@ -15,7 +15,7 @@ import { ApiError } from "../apiError.js";
 import { canMaintainTeam, loadExecution } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
 import type { FastifyBaseLogger } from "fastify";
-import { findRunnableProduct, findTeamByName, findUserById, listAllTeams } from "../db/queries.js";
+import { botMakers, findRunnableProduct, findTeamByName, findUserById, listAllTeams } from "../db/queries.js";
 import { decideApproval, getExecution, listAwaitingApproval } from "../kernel/client.js";
 import { resolvedInputs } from "../resourceRecorder.js";
 import { productLookup, productOfTask } from "./executions.js";
@@ -41,9 +41,21 @@ export function taskTeams(payload: unknown): Map<string, string> {
   return out;
 }
 
-/** Whether the caller may decide on a step of `team` in a run `submittedBy` submitted. */
-export function mayDecide(caller: AuthUser, team: string, submittedBy: string | null): boolean {
-  return canMaintainTeam(caller, team) && submittedBy !== caller.id;
+/**
+ * Who mayn't decide on a run `submittedBy` submitted, so that two people
+ * agree before it runs: its submitter, and for a bot's run whoever made the
+ * bot something to act with (a token, a keyless identity, a schedule), who
+ * could have submitted through it.
+ */
+export async function notDeciders(submittedBy: string | null): Promise<string[]> {
+  if (!submittedBy) return [];
+  const submitter = await findUserById(submittedBy);
+  return submitter?.isBot ? [submittedBy, ...(await botMakers(submittedBy))] : [submittedBy];
+}
+
+/** Whether the caller may decide on a step of `team` in a run whose `notDeciders` are these. */
+export function mayDecide(caller: AuthUser, team: string, excluded: string[]): boolean {
+  return canMaintainTeam(caller, team) && !excluded.includes(caller.id);
 }
 
 export async function decide(
@@ -63,6 +75,9 @@ export async function decide(
   if (submitted.submittedBy === who.id) {
     throw new ApiError(403, "FORBIDDEN", `You submitted this run, so another maintainer of ${team} decides.`);
   }
+  if ((await notDeciders(submitted.submittedBy)).includes(who.id)) {
+    throw new ApiError(403, "FORBIDDEN", `This run was submitted by a bot you gave a token, identity or schedule, so another maintainer of ${team} decides.`);
+  }
   const owner = await findTeamByName(team);
   if (owner) ensureNotRetired(owner);
   const task = (await getExecution(executionId)).tasks.find((t) => t.taskId === taskId);
@@ -81,10 +96,14 @@ export async function pendingApprovals(caller: AuthUser | undefined) {
   for (const id of new Set(awaiting.map((a) => a.requestedBy).filter((r) => r.startsWith("user:")))) {
     emails.set(id, (await findUserById(id.slice("user:".length)))?.email ?? "(deleted account)");
   }
+  const excluded = new Map<string, string[]>();
+  for (const id of new Set(awaiting.map((a) => a.requestedBy))) {
+    excluded.set(id, id.startsWith("user:") ? await notDeciders(id.slice("user:".length)) : []);
+  }
   return awaiting.map((a) => ({
     ...a,
     requestedBy: emails.get(a.requestedBy) ?? "",
-    canDecide: a.requestedBy !== `user:${who.id}`,
+    canDecide: !(excluded.get(a.requestedBy) ?? []).includes(who.id),
   }));
 }
 
@@ -98,7 +117,7 @@ export async function previewStep(caller: AuthUser | undefined, executionId: str
   const submitted = await loadExecution(executionId, who, "any");
   const team = taskTeams(submitted.payload).get(taskId);
   if (!team) throw new ApiError(404, "NOT_FOUND", `No step "${taskId}" in this run.`);
-  if (!mayDecide(who, team, submitted.submittedBy)) {
+  if (!mayDecide(who, team, await notDeciders(submitted.submittedBy))) {
     throw new ApiError(403, "FORBIDDEN", `Only who may approve step "${taskId}" (a maintainer of team "${team}", not whoever ran it) previews it.`);
   }
   const detail = await getExecution(executionId);

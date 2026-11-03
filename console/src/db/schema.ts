@@ -173,6 +173,9 @@ export const apiTokens = pgTable("api_tokens", {
   // membership like any human's. An automation token's bot belongs to no
   // team, so these scopes are the only things it can do.
   scopes: text("scopes").array().notNull().default(sql`'{}'::text[]`),
+  // Who made it: a bot's run then isn't approved by whoever holds its
+  // tokens (core/approvals.ts). Null for one whose maker isn't known.
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   // When the token last authenticated a request, at most a few minutes

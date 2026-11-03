@@ -79,7 +79,7 @@ export async function createBotToken(
   ensureNotRetired(team);
   const bot = await teamBot(team, input);
   const rawToken = generateApiToken();
-  const tokenMeta = await createApiToken(bot.id, input.label, hashApiToken(rawToken), [], expiryAfter(input.expiresInDays ?? DEFAULT_TOKEN_DAYS));
+  const tokenMeta = await createApiToken(bot.id, input.label, hashApiToken(rawToken), [], expiryAfter(input.expiresInDays ?? DEFAULT_TOKEN_DAYS), caller?.id ?? null);
   return { email: bot.email, token: rawToken, tokenId: tokenMeta.id };
 }
 
@@ -187,6 +187,7 @@ export async function createAutomationToken(
     hashApiToken(rawToken),
     input.scopes,
     expiryAfter(input.expiresInDays ?? DEFAULT_TOKEN_DAYS),
+    caller?.id ?? null,
   );
   log?.info({ tokenId: tokenMeta.id, scopes: input.scopes, createdBy: caller?.id }, "automation token created");
   return { tokenId: tokenMeta.id, label: tokenMeta.label, scopes: input.scopes, token: rawToken };

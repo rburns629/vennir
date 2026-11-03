@@ -236,8 +236,10 @@ the teams whose runs need one), or an
 `approvalRequired` (a submitter can't set or clear it), and the kernel holds
 it in `AWAITING_APPROVAL`, never claimed, until a maintainer of the step's
 team approves it. The person who submitted the run can't decide, even as a
-maintainer, so two people agree before it runs (`console/src/core/
-approvals.ts`). Each decision is in the audit log and, with who decided, in
+maintainer, and nor can, for a bot's run, whoever made the bot a token, a
+keyless identity or a schedule, so two people agree before it runs
+(`console/src/core/approvals.ts`; a token from before its maker was recorded
+names them only when the audit log does). Each decision is in the audit log and, with who decided, in
 the step's events; a declined or expired step fails (`APPROVAL_DECLINED`,
 `APPROVAL_EXPIRED`), and retrying it asks again. The check is the console's:
 kernel-api trusts its caller, as it does for everything else.
