@@ -3,7 +3,10 @@ Sleeping when idle (values.yaml's scaleDown, kernel/internal/sleeper). The
 sleeper's identity can change only the replica count of the platform's own
 Deployments, by name and through the scale subresource, and the one
 ConfigMap where it keeps the counts to wake to: nothing that changes what
-any Deployment runs. The ConfigMap exists whatever scaleDown says, since
+any Deployment runs. It may also patch two CronJobs (its own, and the wake
+one), but only to suspend or resume them and set when they run: the
+admission policy below refuses any other change it makes to a CronJob, such
+as to the Job it runs. The ConfigMap exists whatever scaleDown says, since
 `vertra sleep` uses it too.
 */}}
 {{- $fullname := include "execution-kernel.fullname" . }}
@@ -68,6 +71,56 @@ rules:
     resources: ["cronjobs"]
     resourceNames: [{{ $name | quote }}, {{ $wake | quote }}]
     verbs: ["get", "patch"]
+---
+# RBAC can name the CronJobs but not the fields; a patch to jobTemplate
+# would run anything as any ServiceAccount here.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["batch"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["cronjobs"]
+  matchConditions:
+    - name: from-the-sleeper
+      expression: request.userInfo.username == {{ printf "system:serviceaccount:%s:%s" .Release.Namespace $name | quote }}
+  validations:
+    - expression: >-
+        request.operation == "UPDATE" &&
+        object.spec.jobTemplate == oldObject.spec.jobTemplate &&
+        has(object.spec.concurrencyPolicy) == has(oldObject.spec.concurrencyPolicy) &&
+        (!has(object.spec.concurrencyPolicy) || object.spec.concurrencyPolicy == oldObject.spec.concurrencyPolicy) &&
+        has(object.spec.startingDeadlineSeconds) == has(oldObject.spec.startingDeadlineSeconds) &&
+        (!has(object.spec.startingDeadlineSeconds) || object.spec.startingDeadlineSeconds == oldObject.spec.startingDeadlineSeconds) &&
+        has(object.spec.successfulJobsHistoryLimit) == has(oldObject.spec.successfulJobsHistoryLimit) &&
+        (!has(object.spec.successfulJobsHistoryLimit) || object.spec.successfulJobsHistoryLimit == oldObject.spec.successfulJobsHistoryLimit) &&
+        has(object.spec.failedJobsHistoryLimit) == has(oldObject.spec.failedJobsHistoryLimit) &&
+        (!has(object.spec.failedJobsHistoryLimit) || object.spec.failedJobsHistoryLimit == oldObject.spec.failedJobsHistoryLimit)
+      message: >-
+        The sleeper may only suspend or resume a CronJob and set its schedule
+        and time zone.
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  policyName: {{ $name }}
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ .Release.Namespace | quote }}
+  validationActions: [Deny]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

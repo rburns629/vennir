@@ -732,8 +732,11 @@ subresource (which can't change what a Deployment runs), on Deployments
 named in their Roles: the kernel's sleeper (`scaleDown`, the platform's
 own Deployments, plus its own `-sleep` ConfigMap and a read of the
 console's `-activity` one) and the console (only the image scanner's, to
-idle it, and its own `-activity` ConfigMap). A stolen token of either can
-stop the platform, not change it.
+idle it, and its own `-activity` ConfigMap). The sleeper also patches two
+CronJobs, its own and the wake one, and an admission policy in
+`sleeper.yaml` lets it change only their `suspend`, `schedule` and
+`timeZone`, never the Job they run. A stolen token of either can stop the
+platform, not change it.
 
 And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api: a step's Pod can reach neither. Every team namespace also holds `vertra-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vertra-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vertra/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vertra-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vertra-team-quota`) and LimitRange (`vertra-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators. The bundled databases' passwords are generated on install.
 

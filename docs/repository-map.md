@@ -411,7 +411,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `Chart.yaml`, `values.yaml`, `.helmignore` | The chart, its defaults (with resource requests), and what to leave out. |
 | `sizes/{minimal,resilient,scaled,auto}.yaml` | The size presets: copies, step caps and default step size, retention, the database volume. |
 | `templates/autoscaling.yaml` | kernel-api's HorizontalPodAutoscaler (`auto`), and PodDisruptionBudgets for whatever runs two or more copies. |
-| `templates/sleeper.yaml` | Sleeping when idle: the sleeper's CronJobs, its narrow identity (replica counts of named Deployments only), and the ConfigMap of counts to wake to. |
+| `templates/sleeper.yaml` | Sleeping when idle: the sleeper's CronJobs, its narrow identity (replica counts of named Deployments only, and an admission policy that lets it only suspend, resume and reschedule its CronJobs), and the ConfigMap of counts to wake to. |
 | `templates/step-headroom.yaml` | Warm headroom: low-priority placeholder Pods the size of a default step, and their PriorityClass. |
 | `templates/kernel-api-deployment.yaml`, `kernel-api-service.yaml` | kernel-api, reachable only inside the cluster. |
 | `templates/monitoring.yaml` | Monitoring (`monitoring.provider`): a PodMonitor (operator) or PodMonitoring (google) for kernel-api and the scheduler, and alerts (scheduler down or failing, steps waiting) as a PrometheusRule, Rules, or a rule file for the console chart's bundled Prometheus. |
