@@ -2,27 +2,42 @@ name: release
 
 # On a version tag (v1.2.3, or v1.2.3-rc.1 for a pre-release):
 #
-#   images  builds the kernel and console images, scans them with the same
-#           gate CI uses (.github/scripts/scan-image.sh), then builds them
-#           for linux/amd64 and linux/arm64, pushes them to
-#           ghcr.io/<owner>/<repo>/execution-{kernel,console,gateway} as the version
-#           (and as latest, unless it's a pre-release), and signs each by
-#           digest, keyless, with this workflow's own identity.
-#   charts  packages both Helm charts at that version (their appVersion
-#           too, so they run the images just pushed), pushes them to
-#           oci://ghcr.io/<owner>/<repo>/charts, signs them, and creates the
-#           GitHub release with the packaged charts attached.
-#   cli     builds vertra for linux and darwin, amd64 and arm64, from this
-#           tag (with its catalog template inside, for `catalog create`), pushes each binary to ghcr.io/<owner>/<repo>/cli as one
-#           blob (tag <version>-<os>-<arch>; its digest is the binary's
-#           SHA-256), signs each, and attaches the binaries and
-#           vertra-checksums.txt and the manual pages (vertra-man.tar.gz)
-#           to the release. A catalog's ./vertra
-#           downloads its platform's blob anonymously by that SHA-256:
-#           pin a release with .github/scripts/pin-vertra.sh <version>.
+#   preflight  refuses a tag whose commit isn't on main, and a version
+#              that's already published, even in part. A tag push runs the
+#              tagged commit's own copy of this file, so the main check
+#              stops mistakes. That only reviewed code is released (and
+#              signed with the release's identity) holds only with the v*
+#              tag ruleset: admins only (TODO.md, docs/security-model.md).
+#   images     builds the kernel, console and gateway images for
+#              linux/amd64 and linux/arm64 and pushes them, by digest only,
+#              to ghcr.io/<owner>/<repo>/execution-{kernel,console,gateway},
+#              then scans each platform's image, as pushed, with the same
+#              gate CI uses (.github/scripts/scan-image.sh).
+#   publish    once all three have passed, signs each by digest, keyless,
+#              with this workflow's own identity, then tags each as the
+#              version, then as latest (unless it's a pre-release).
+#   charts     packages both Helm charts at that version (their appVersion
+#              too, so they run the images just published), pushes them to
+#              oci://ghcr.io/<owner>/<repo>/charts, signs them, and creates
+#              the GitHub release with the packaged charts attached.
+#   cli        builds vertra for linux and darwin, amd64 and arm64, from this
+#              tag (with its catalog template inside, for `catalog create`),
+#              pushes each binary to ghcr.io/<owner>/<repo>/cli as one blob
+#              (tag <version>-<os>-<arch>; its digest is the binary's
+#              SHA-256), signs each, and attaches the binaries and
+#              vertra-checksums.txt and the manual pages (vertra-man.tar.gz)
+#              to the release. A catalog's ./vertra downloads its platform's
+#              blob anonymously by that SHA-256: pin a release with
+#              .github/scripts/pin-vertra.sh <version>.
+#
+# A version's tags are written once (.github/scripts/published.sh checks).
+# If a run fails part-way, finish it with "Re-run failed jobs": each job
+# keeps what an earlier attempt published, and refuses a tag that names
+# anything else. "Re-run all jobs", or the tag pushed again, stops at
+# preflight; to release again, tag a new version.
 #
 # Verify an image: cosign verify ghcr.io/<owner>/<repo>/execution-kernel:<v> \
-#   --certificate-identity-regexp 'https://github.com/<owner>/<repo>/.github/workflows/release.yml@.*' \
+#   --certificate-identity-regexp '^https://github.com/<owner>/<repo>/.github/workflows/release.yml@refs/tags/v.*' \
 #   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 #
 # The packages are private on first push: make them public on GitHub (the
@@ -40,55 +55,169 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read   # whether the version is in the registry already
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # main's history, to find the tag's commit in it
+      - name: The tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) isn't on main: only a commit on main is released."
+            exit 1
+          fi
+      - run: bash .github/scripts/install-scanners.sh oras
+      - name: The version isn't published yet
+        # A re-run of every job would build new bytes under a version that
+        # may already have been verified; re-running the failed jobs only
+        # doesn't run this one again.
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${TAG#v}"
+          registry="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "$TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          found=()
+          for ref in execution-kernel:$version execution-console:$version execution-gateway:$version \
+              charts/execution-kernel:$version charts/execution-console:$version \
+              cli:$version-linux-amd64 cli:$version-linux-arm64 cli:$version-darwin-amd64 cli:$version-darwin-arm64; do
+            status=0
+            bash .github/scripts/published.sh "$registry/$ref" > /dev/null || status=$?
+            case "$status" in 0) found+=("$registry/$ref") ;; 1) ;; *) exit 1 ;; esac
+          done
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            found+=("the GitHub release $TAG")
+          fi
+          if [ "${#found[@]}" -gt 0 ]; then
+            echo "::error::$version is already published: ${found[*]}"
+            echo "To finish a run that failed part-way, re-run its failed jobs only. To release again, tag a new version."
+            exit 1
+          fi
+
   images:
+    needs: preflight
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-      id-token: write   # keyless signing
     strategy:
       fail-fast: true
       matrix:
         component: [kernel, console, gateway]
+    # Each leg sets its own: the image it pushed and scanned, by digest.
+    outputs:
+      kernel: ${{ steps.scan.outputs.kernel }}
+      console: ${{ steps.scan.outputs.console }}
+      gateway: ${{ steps.scan.outputs.gateway }}
     env:
       COMPONENT: ${{ matrix.component }}
       TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: bash .github/scripts/install-scanners.sh trivy osv-scanner cosign
-      - name: Build for the scan
-        run: docker build --pull -t "vertra-release/$COMPONENT:scan" "$COMPONENT/"
-      - name: Scan
-        # The amd64 build; the arm64 one is built from the same Dockerfile
-        # and base image, by digest.
-        run: bash .github/scripts/scan-image.sh "vertra-release/$COMPONENT:scan" "$COMPONENT"
+      - run: bash .github/scripts/install-scanners.sh trivy osv-scanner
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Sign in to GHCR
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-      - name: Build and push (amd64, arm64)
+      - name: Build and push by digest (amd64, arm64)
+        # No tag: nothing names it until every image has passed its scan.
         id: push
         run: |
           version="${TAG#v}"
           image="ghcr.io/${GITHUB_REPOSITORY,,}/execution-$COMPONENT"
-          tags=(-t "$image:$version")
-          case "$version" in *-*) ;; *) tags+=(-t "$image:latest") ;; esac
           docker buildx build --platform linux/amd64,linux/arm64 --pull \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.version=$version" \
             --label "org.opencontainers.image.licenses=MIT" \
-            "${tags[@]}" --metadata-file "$RUNNER_TEMP/meta.json" --push "$COMPONENT/"
+            --output "type=image,name=$image,push-by-digest=true,name-canonical=true,push=true" \
+            --metadata-file "$RUNNER_TEMP/meta.json" "$COMPONENT/"
           digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/meta.json")
           echo "ref=$image@$digest" >> "$GITHUB_OUTPUT"
-      - name: Sign
+      - name: Scan what was pushed, each platform
+        # The very bytes pushed, pulled back by each platform's own digest
+        # (not the index's, which a daemon resolves to its own platform),
+        # with the gate CI uses.
+        id: scan
         env:
           REF: ${{ steps.push.outputs.ref }}
-        run: cosign sign --yes "$REF"
+        run: |
+          image="${REF%@*}"
+          docker buildx imagetools inspect --raw "$REF" \
+            | jq -r '.manifests[] | select(.platform.os != "unknown") | "\(.platform.os)-\(.platform.architecture) \(.digest)"' \
+            > "$RUNNER_TEMP/platforms"
+          cat "$RUNNER_TEMP/platforms"
+          [ "$(cut -d' ' -f1 "$RUNNER_TEMP/platforms" | sort | tr '\n' ' ')" = "linux-amd64 linux-arm64 " ] \
+            || { echo "::error::$REF doesn't hold exactly linux/amd64 and linux/arm64."; exit 1; }
+          failed=0
+          mapfile -t platforms < "$RUNNER_TEMP/platforms"
+          for line in "${platforms[@]}"; do
+            platform="${line% *}" digest="${line#* }"
+            docker pull -q --platform "${platform/-//}" "$image@$digest"
+            docker tag "$image@$digest" "vertra-release/$COMPONENT:$platform"
+            bash .github/scripts/scan-image.sh "vertra-release/$COMPONENT:$platform" "$COMPONENT" || failed=1
+          done
+          if [ "$failed" != 0 ]; then exit 1; fi
+          echo "$COMPONENT=$REF" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # keyless signing
+    env:
+      TAG: ${{ github.ref_name }}
+      KERNEL: ${{ needs.images.outputs.kernel }}
+      CONSOLE: ${{ needs.images.outputs.console }}
+      GATEWAY: ${{ needs.images.outputs.gateway }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: bash .github/scripts/install-scanners.sh cosign oras
+      - name: Sign in to GHCR
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # cosign reads Docker's credentials.
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "$TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Sign and tag the images
+        # Every check first, then every signature, then the version tags,
+        # then latest: a failure part-way leaves no version tag on an image
+        # that isn't signed. One an earlier attempt already tagged with this
+        # run's image is kept (and was signed before it was tagged).
+        run: |
+          version="${TAG#v}"
+          refs=("$KERNEL" "$CONSOLE" "$GATEWAY")
+          todo=()
+          for ref in "${refs[@]}"; do
+            [[ "$ref" =~ ^ghcr\.io/[^@]+@sha256:[0-9a-f]{64}$ ]] \
+              || { echo "::error::An image's digest is missing ('$ref'): re-run the failed jobs."; exit 1; }
+            status=0
+            tagged=$(bash .github/scripts/published.sh "${ref%@*}:$version") || status=$?
+            case "$status" in
+              0) [ "$tagged" = "${ref#*@}" ] \
+                   || { echo "::error::${ref%@*}:$version is already $tagged, not this run's ${ref#*@}."; exit 1; }
+                 echo "${ref%@*}:$version is already this run's image" ;;
+              1) todo+=("$ref") ;;
+              *) exit 1 ;;
+            esac
+          done
+          for ref in "${todo[@]}"; do cosign sign --yes "$ref"; done
+          for ref in "${todo[@]}"; do oras tag "$ref" "$version"; done
+          case "$version" in *-*) ;; *) for ref in "${refs[@]}"; do oras tag "$ref" latest; done ;; esac
 
   charts:
-    needs: images
+    needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: write   # the GitHub release
@@ -101,7 +230,7 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: v4.3.0
-      - run: bash .github/scripts/install-scanners.sh cosign
+      - run: bash .github/scripts/install-scanners.sh cosign oras
       - name: Sign in to GHCR
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -109,21 +238,36 @@ jobs:
         run: |
           echo "$TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "$TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Package, push and sign the charts
+        # A chart an earlier attempt pushed is kept, and pulled for the
+        # GitHub release, not packaged again (a new package is new bytes);
+        # signing it again only adds a signature.
         run: |
           version="${TAG#v}"
           registry="ghcr.io/${GITHUB_REPOSITORY,,}/charts"
           mkdir -p dist
           for chart in execution-kernel execution-console; do
-            helm package "helm/charts/$chart" --version "$version" --app-version "$version" -d dist
-            helm push "dist/$chart-$version.tgz" "oci://$registry" 2>&1 | tee "$RUNNER_TEMP/push.log"
-            digest=$(grep -o 'sha256:[0-9a-f]\{64\}' "$RUNNER_TEMP/push.log" | tail -1)
+            status=0
+            digest=$(bash .github/scripts/published.sh "$registry/$chart:$version") || status=$?
+            case "$status" in
+              0) echo "$chart $version is already published: keeping it"
+                 helm pull "oci://$registry/$chart" --version "$version" -d dist ;;
+              1) helm package "helm/charts/$chart" --version "$version" --app-version "$version" -d dist
+                 helm push "dist/$chart-$version.tgz" "oci://$registry"
+                 digest=$(bash .github/scripts/published.sh "$registry/$chart:$version") ;;
+              *) exit 1 ;;
+            esac
             cosign sign --yes "$registry/$chart@$digest"
           done
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.tgz --clobber
+            exit 0
+          fi
           prerelease=()
           case "$TAG" in *-*) prerelease=(--prerelease) ;; esac
           gh release create "$TAG" dist/*.tgz --verify-tag --generate-notes "${prerelease[@]}"
@@ -163,9 +307,12 @@ jobs:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Push and sign each binary
+        # A binary an earlier attempt pushed is kept if it's these bytes (the
+        # build is reproducible), and refused if it isn't.
         run: |
           version="${TAG#v}"
           registry="ghcr.io/${GITHUB_REPOSITORY,,}/cli"
+          published="$PWD/.github/scripts/published.sh"
           cd dist
           {
             echo "### vertra $TAG"
@@ -176,12 +323,23 @@ jobs:
             echo '| --- | --- |'
           } >> "$GITHUB_STEP_SUMMARY"
           for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
-            oras push "$registry:$version-$platform" \
-              --artifact-type application/vnd.vertra.cli.v1 \
-              "vertra-$platform:application/vnd.vertra.cli.binary.v1"
-            digest=$(oras resolve "$registry:$version-$platform")
+            ref="$registry:$version-$platform"
+            sum=$(sha256sum "vertra-$platform" | cut -d' ' -f1)
+            status=0
+            bash "$published" "$ref" > /dev/null || status=$?
+            case "$status" in
+              0) blob=$(oras manifest fetch "$ref" | jq -r '.layers[0].digest')
+                 [ "$blob" = "sha256:$sum" ] \
+                   || { echo "::error::$ref is already published as $blob, not this build's sha256:$sum."; exit 1; }
+                 echo "$ref is already this build's binary" ;;
+              1) oras push "$ref" \
+                   --artifact-type application/vnd.vertra.cli.v1 \
+                   "vertra-$platform:application/vnd.vertra.cli.binary.v1" ;;
+              *) exit 1 ;;
+            esac
+            digest=$(oras resolve "$ref")
             cosign sign --yes "$registry@$digest"
-            echo "| $platform | \`$(sha256sum "vertra-$platform" | cut -d' ' -f1)\` |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| $platform | \`$sum\` |" >> "$GITHUB_STEP_SUMMARY"
           done
       - name: Attach to the GitHub release
         env:

@@ -1003,6 +1003,14 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
 
 ## Security
 
+- [ ] **Add the `v*` tag ruleset (admins only)** (decided 2026-11-02, X-6):
+  a GitHub repository ruleset letting only admins create, update or delete
+  `v*` tags. A tag push runs the `release.yml` of the tagged commit, so a
+  branch commit whose `release.yml` drops the preflight check would still
+  sign as `release.yml@refs/tags/v…`; until the ruleset is in place, the
+  preflight's "on main" check only stops mistakes
+  (`docs/security-model.md`, Vertra's own supply chain).
+
 - [x] **Gaps the 2026-10-28 docs audit found** (closed 2026-10-29; documented in
   `docs/security-model.md`): the scheduler may read every Pod's logs
   cluster-wide (fixed 2026-10-29: a logs-only ClusterRole the console

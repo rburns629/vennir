@@ -916,23 +916,40 @@ taken, and what would still hold.
 ## Vertra's own supply chain
 
 On each version tag, the release workflow (`.github/workflows/release.yml`)
-builds the kernel, console and gateway images, scans them with CI's gate
-(`.github/scripts/scan-image.sh`: a HIGH or CRITICAL vulnerability with a
-fix, a secret in a layer, or a known-malicious package fails the release),
-pushes them to GHCR and signs each digest with cosign, keyless, as the
-workflow's own GitHub identity. The charts and the `vertra` binaries are
+refuses a tag whose commit isn't on `main` (which takes only reviewed pull
+requests), then builds the kernel, console and gateway images (amd64 and
+arm64) and pushes them to GHCR by digest. It scans each platform's image,
+as pushed, with CI's gate (`.github/scripts/scan-image.sh`: a HIGH or
+CRITICAL vulnerability with a fix, a secret in a layer, or a
+known-malicious package fails the release), signs each digest with cosign,
+keyless, as the workflow's own GitHub identity, and only once all three
+have passed tags them as the version. A version's tags are written once:
+a run refuses a version already published, and a re-run of its failed jobs
+keeps what an earlier attempt published. The charts and the `vertra` binaries are
 signed the same way, and a catalog's `./vertra` downloads its binary by
 SHA-256. Every pull request also runs Semgrep, gitleaks, and the same scan
 of the three platform images (`.github/workflows/security.yml`, `ci.yml`).
 
+The "only from `main`" check is the tagged commit's own: a tag push runs
+the `release.yml` in the commit it tags, so a branch commit whose
+`release.yml` leaves the check out would still be released, and signed as
+`release.yml@refs/tags/v…`. The guarantee holds only with a tag ruleset
+letting only admins create, update or delete `v*` tags (not yet in place:
+`TODO.md`); the check itself stops mistakes, such as tagging the wrong
+commit.
+
 Nothing verifies those signatures when installing: `vertra` pulls the
 charts by version, the charts run their images by tag unless
 `image.digest` pins them, and policy-controller doesn't cover the platform's
-own namespace. To check one by hand:
+own namespace. To check one by hand (a version tag's run only: the same
+workflow run from a branch signs as `release.yml@refs/heads/<branch>`,
+which this refuses; `make gke-verify-release` requires the exact tag).
+Either proves an image came from a version tag's run, which means reviewed
+code only with the `v*` tag ruleset above in place:
 
 ```console
 $ cosign verify ghcr.io/<owner>/<repo>/execution-kernel:<version> \
-    --certificate-identity-regexp 'https://github.com/<owner>/<repo>/.github/workflows/release.yml@.*' \
+    --certificate-identity-regexp '^https://github.com/<owner>/<repo>/.github/workflows/release.yml@refs/tags/v.*' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
