@@ -218,6 +218,9 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		w.Header().Set("WWW-Authenticate", `Bearer realm="vertra"`)
 		return g.refuse(w, o.as("unauthenticated"), http.StatusUnauthorized, "UNAUTHENTICATED", "Sign in: Authorization: Bearer <a session or bot token>.")
 	}
+	if errors.Is(err, auth.ErrOrdersOnly) {
+		return g.refuse(w, o.as("forbidden"), http.StatusForbidden, "ORDERS_ONLY", "This bot places orders in the console: it calls no API.")
+	}
 	if err != nil {
 		g.Log.Error("couldn't sign a caller in", "error", err)
 		return g.refuse(w, o.as("unavailable"), http.StatusServiceUnavailable, "UNAVAILABLE", "The gateway can't check who you are right now.")

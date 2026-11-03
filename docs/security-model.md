@@ -331,7 +331,8 @@ do depends on its kind:
   the team's secrets, submit raw DAGs, retry and cancel the team's runs,
   and manage its people and bots.
 - **An ordering bot** is a member, and may only order the templates its
-  maintainers list for it ([Ordering bots](#ordering-bots)).
+  maintainers list for it ([Ordering bots](#ordering-bots)); it calls no API
+  through the gateway.
 - **An automation token** (admins only) belongs to no team and can do
   exactly what its scopes say (`console/src/auth/scopes.ts`): create teams,
   register any team's products, retire or purge teams, apply SecretStores.
@@ -425,7 +426,13 @@ and path are an operation in the API's reviewed OpenAPI document and it fits
 that operation's schemas; anything else is answered by the gateway (404 or
 400) and never reaches the backend. Callers sign in as at the console (a
 session or a bot token, checked against the console's database the same
-way), and may call an API only when it's shared with one of their teams.
+way: a team requiring single sign-on refuses a password's session whether
+the install's settings or an admin in the console turned it on (if the
+saved client secret can't be unsealed, the console counts it off and the
+gateway, which never reads it, on), and a
+purged team counts for nobody), and may call an API only when it's shared
+with one of their teams. An ordering bot calls none (403 `ORDERS_ONLY`): it
+may only order its listed templates.
 The caller's `Authorization` stops at the gateway; the backend gets its own
 credential instead, minted per request, and `Vertra-Caller`, an EdDSA JWT
 the gateway signs (its key at `/.vertra/jwks.json`) naming the caller,

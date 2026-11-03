@@ -16,11 +16,13 @@
 import type { Pool, PoolClient } from "pg";
 
 const GRANTS = [
-  "GRANT SELECT (id, email, is_admin, is_bot, password_changed_at, must_change_password) ON users TO %I",
+  "GRANT SELECT (id, email, is_admin, is_bot, password_changed_at, must_change_password, order_templates) ON users TO %I",
   "GRANT SELECT (user_id, token_hash, revoked_at, expires_at) ON api_tokens TO %I",
   "GRANT SELECT (user_id, team_id) ON team_memberships TO %I",
   "GRANT SELECT (id, name, require_sso, retired_at, deleted_at) ON teams TO %I",
   "GRANT SELECT ON apis, gateway_state, revoked_sessions TO %I",
+  // Whether an admin turned single sign-on on: never its client secret.
+  "GRANT SELECT (id, enabled, issuer, client_id, redirect_url) ON sso_settings TO %I",
   "GRANT SELECT, INSERT, UPDATE ON api_traffic TO %I",
   "GRANT SELECT, INSERT, UPDATE, DELETE ON api_problems TO %I",
 ];

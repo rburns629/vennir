@@ -40,6 +40,11 @@ type Caller struct {
 // ErrUnauthenticated is a missing, malformed, expired or revoked credential.
 var ErrUnauthenticated = errors.New("missing, invalid, expired or revoked credential")
 
+// ErrOrdersOnly is an ordering bot's credential: it may only order its
+// listed templates in the console (auth/access.ts ensureMayOrder), so it
+// calls no API.
+var ErrOrdersOnly = errors.New("an ordering bot calls no API")
+
 // DB is what the lookups run on (a pool).
 type DB interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
@@ -51,9 +56,11 @@ type Resolver struct {
 	DB DB
 	// The console's session keys (ConsoleKeys).
 	Keys Keys
-	// SSO: the console signs people in with single sign-on, so a password's
+	// SSO: the install's settings turn single sign-on on, so a password's
 	// session is refused for someone a team requires it of (as the
-	// console's auth/plugin.ts does; admins are exempt).
+	// console's auth/plugin.ts does; admins are exempt). Single sign-on an
+	// admin turns on in the console (sso_settings) counts too, read when
+	// it matters.
 	SSO bool
 	Now func() time.Time
 }
@@ -66,14 +73,14 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	}
 	var c Caller
 	var passwordChanged *time.Time
-	var mustChangePassword bool
+	var mustChangePassword, ordering bool
 	passwordSession := false
 	if strings.HasPrefix(bearer, APITokenPrefix) {
 		sum := sha256.Sum256([]byte(bearer))
-		err := r.DB.QueryRow(ctx, `SELECT u.id::text, u.email, u.is_admin, u.is_bot FROM api_tokens t
+		err := r.DB.QueryRow(ctx, `SELECT u.id::text, u.email, u.is_admin, u.is_bot, u.order_templates IS NOT NULL FROM api_tokens t
 			JOIN users u ON u.id = t.user_id WHERE t.token_hash = $1 AND t.revoked_at IS NULL
 			AND (t.expires_at IS NULL OR t.expires_at > now())`, hex.EncodeToString(sum[:])).
-			Scan(&c.UserID, &c.Email, &c.IsAdmin, &c.IsBot)
+			Scan(&c.UserID, &c.Email, &c.IsAdmin, &c.IsBot, &ordering)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUnauthenticated
 		}
@@ -89,8 +96,9 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 			// The console's keys couldn't be read: not the caller's fault.
 			return nil, err
 		}
-		err = r.DB.QueryRow(ctx, `SELECT id::text, email, is_admin, is_bot, password_changed_at, must_change_password FROM users WHERE id::text = $1`, claims.UserID).
-			Scan(&c.UserID, &c.Email, &c.IsAdmin, &c.IsBot, &passwordChanged, &mustChangePassword)
+		err = r.DB.QueryRow(ctx, `SELECT id::text, email, is_admin, is_bot, password_changed_at, must_change_password, order_templates IS NOT NULL
+			FROM users WHERE id::text = $1`, claims.UserID).
+			Scan(&c.UserID, &c.Email, &c.IsAdmin, &c.IsBot, &passwordChanged, &mustChangePassword, &ordering)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUnauthenticated
 		}
@@ -119,8 +127,11 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 			return nil, ErrUnauthenticated
 		}
 	}
+	if ordering {
+		return nil, ErrOrdersOnly
+	}
 	rows, err := r.DB.Query(ctx, `SELECT t.name, t.require_sso FROM team_memberships m JOIN teams t ON t.id = m.team_id
-		WHERE m.user_id::text = $1 ORDER BY t.name`, c.UserID)
+		WHERE m.user_id::text = $1 AND t.deleted_at IS NULL ORDER BY t.name`, c.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -138,10 +149,32 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if r.SSO && passwordSession && ssoRequired && !c.IsAdmin {
-		return nil, ErrUnauthenticated
+	if passwordSession && ssoRequired && !c.IsAdmin {
+		on, err := r.ssoOn(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if on {
+			return nil, ErrUnauthenticated
+		}
 	}
 	return &c, nil
+}
+
+// ssoOn: single sign-on is on, by the install's settings or as an admin
+// saved it in the console (sso.ts refreshSso: on, and complete). One
+// difference, on the side of refusing: the console also needs the saved
+// client secret to unseal, which the gateway, granted no part of it, can't
+// check; while it can't (JWT_SECRET changed), the console treats single
+// sign-on as off and the gateway as on, until an admin saves it again.
+func (r *Resolver) ssoOn(ctx context.Context) (bool, error) {
+	if r.SSO {
+		return true, nil
+	}
+	var on bool
+	err := r.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM sso_settings WHERE id = 1 AND enabled
+		AND issuer <> '' AND client_id <> '' AND redirect_url <> '')`).Scan(&on)
+	return on, err
 }
 
 type claims struct {
