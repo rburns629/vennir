@@ -8,12 +8,9 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/rburns629/vertra/kernel/internal/domain"
 	kernelv1 "github.com/rburns629/vertra/kernel/internal/gen/vertra/kernel/v1"
 )
-
-// RefusalCodes are the admission policies' failures: the cluster refused
-// to start an attempt.
-var RefusalCodes = []string{"DISPATCH_REJECTED", "TEAM_RETIRED", "IMAGE_NOT_ALLOWED", "IMAGE_NOT_PINNED", "IMAGE_SCAN_FAILED", "IMAGE_NOT_SIGNED", "IDENTITY_NOT_ALLOWED"}
 
 // MaxRefusals is the most ListRefusals answers with.
 const MaxRefusals = 500
@@ -29,7 +26,7 @@ func (s *Service) ListRefusals(ctx context.Context, req *connect.Request[kernelv
 			a.failure->>'code', coalesce(a.failure->>'message', ''), a.completed_at
 		FROM task_attempts a JOIN execution_tasks t ON t.id = a.task_id
 		WHERE a.completed_at >= $1 AND a.failure->>'code' = ANY($2)
-		ORDER BY a.completed_at DESC LIMIT $3`, since, RefusalCodes, MaxRefusals)
+		ORDER BY a.completed_at DESC LIMIT $3`, since, domain.RefusalCodes, MaxRefusals)
 	if err != nil {
 		return nil, err
 	}

@@ -25,6 +25,7 @@ func TestResultsAreReadAsTheKernelReadsThem(t *testing.T) {
 		"an empty code":             {`{"status":"failed","error":{"code":"","message":"b"}}`, false},
 		"another status":            {`{"status":"done"}`, false},
 		"something after it":        {`{"status":"succeeded"} {}`, false},
+		"the cluster's own code":    {`{"status":"failed","error":{"code":"IMAGE_NOT_ALLOWED","message":"no"}}`, false},
 		"over 4 KB":                 {`{"status":"succeeded","outputs":{"x":"` + strings.Repeat("a", 4100) + `"}}`, false},
 	} {
 		if got := resultProblem([]byte(c.result)) == ""; got != c.ok {

@@ -90,7 +90,7 @@ Don't grant anything to `default`: every unregistered image runs as it.
 `app-hosting` deploys only what the team chose, as whom it chose: register
 a team secret `app-hosting` with the key `image-registry`, the registry
 every image must be under (`$REGION-docker.pkg.dev/$PROJECT/$REPO`; any
-other image is refused, `IMAGE_NOT_ALLOWED`), and `runtime-service-account`,
+other image is refused, `IMAGE_OUTSIDE_REGISTRY`), and `runtime-service-account`,
 `$RUNTIME`. Grant that account only what the services need (say
 `roles/cloudsql.client` for one using `cloud-sql`): whoever may run
 `create` runs code as it.
