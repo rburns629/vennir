@@ -360,7 +360,10 @@ token's signature with the issuer's published keys (an issuer not on the
 list is never contacted), its issuer, its audience (`keyless.audience`,
 the console's URL by default, so a token minted for another service can't
 be replayed here) and expiry, and returns an hour's ordinary session for
-the one bot whose claims it carries; two or none is a refusal. Each sign-in
+the one bot whose claims it carries; two or none is a refusal. So no bot's
+identity may overlap another bot's (one token could match both: every claim
+they share has the same value), or one team could stop another team's bot
+signing in by adding a broader identity. Each sign-in
 is logged with the bot, issuer and subject, and the identity's last use is
 kept.
 
