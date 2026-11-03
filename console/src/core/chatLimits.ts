@@ -4,7 +4,9 @@
  * 2026-11-02, review D-5): every question can cost many model calls on a
  * billed model, so each person's are counted, an hour's and a day's, in
  * Postgres (rate_limit_windows), the same on every console. By default 30
- * an hour and 200 a day; admins set their own on the Admin page.
+ * an hour and 200 a day; admins set their own (ChatService/SetChatLimits).
+ * Only a question the agent will answer counts: one refused (a bot's, one
+ * that isn't valid, chat off) doesn't.
  */
 import type { HandlerContext } from "@connectrpc/connect";
 import { eq } from "drizzle-orm";
@@ -60,8 +62,8 @@ export async function setChatLimits(
 }
 
 /** Counts a question of the caller's; refuses (RATE_LIMITED, with Retry-After) one over either limit. */
-export async function countQuestion(caller: AuthUser | undefined, ctx: HandlerContext): Promise<void> {
-  if (!caller) return; // refused as unauthenticated by the agent
+export async function countQuestion(caller: AuthUser | undefined, ctx: Pick<HandlerContext, "responseHeader">): Promise<void> {
+  if (!caller) return; // the agent refused it already
   const { perHour, perDay } = await current();
   await new FixedWindowLimit(perHour, HOUR, "questions").take(`chat-hour:${caller.id}`, ctx);
   await new FixedWindowLimit(perDay, 24 * HOUR, "questions").take(`chat-day:${caller.id}`, ctx);

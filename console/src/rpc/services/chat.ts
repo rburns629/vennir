@@ -159,13 +159,13 @@ export function chatService(): ServiceImpl<typeof ChatService> {
     },
 
     async ask(req, ctx) {
-      await countQuestion(callerOf(ctx), ctx);
-      return response(await ask(callerOf(ctx), asked(req), logOf(ctx), chatModel(), { signal: ctx.signal }));
+      const counted = () => countQuestion(callerOf(ctx), ctx);
+      return response(await ask(callerOf(ctx), asked(req), logOf(ctx), chatModel(), { signal: ctx.signal, counted }));
     },
 
     async *askStream(req, ctx) {
-      await countQuestion(callerOf(ctx), ctx);
-      for await (const event of askStream(callerOf(ctx), asked(req), logOf(ctx), chatModel(), ctx.signal)) {
+      const counted = () => countQuestion(callerOf(ctx), ctx);
+      for await (const event of askStream(callerOf(ctx), asked(req), logOf(ctx), chatModel(), ctx.signal, counted)) {
         yield "step" in event ? { event: { case: "step" as const, value: event.step } } : { event: { case: "answer" as const, value: response(event.answer) } };
       }
     },

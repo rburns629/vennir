@@ -11,6 +11,7 @@ import { like } from "drizzle-orm";
 import type { FastifyInstance, FastifyBaseLogger } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { countQuestion } from "../src/core/chatLimits.js";
 import { ask, askStream, CHARS_PER_TOKEN, NOT_FOUND, OFF_TOPIC, tokensOf, windowOf } from "../src/chat/agent.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { AnthropicMessages, ModelUnavailable, OpenAICompatible, quickCall, withoutThinking, type ChatMessage, type ChatModel, type CompleteOptions, type ModelReply } from "../src/chat/model.js";
@@ -371,11 +372,20 @@ describe("who it answers", () => {
       const set = await rpc<{ limits: { perHour: number; perDay: number; updatedBy: string } }>(admin, "ChatService/SetChatLimits", { perHour: 1, perDay: 5 });
       expect(set.body.limits).toMatchObject({ perHour: 1, perDay: 5 });
       expect(set.body.limits.updatedBy).toMatch(/@example\.com$/);
-      // The first is counted (and answered: chat is off here); the second is over the hour's.
-      expect((await rpc(someone, "ChatService/Ask", { messages: [{ role: "user", content: "hi" }] })).failure).toBe("CHAT_OFF");
-      expect((await rpc(someone, "ChatService/Ask", { messages: [{ role: "user", content: "hi" }] })).failure).toBe("RATE_LIMITED");
-      // Each person's own: another's first question is still answered.
-      expect((await rpc(admin, "ChatService/Ask", { messages: [{ role: "user", content: "hi" }] })).failure).toBe("CHAT_OFF");
+      // Counted once the agent will answer it: a refused one doesn't count.
+      const asker = person([mine]);
+      const headers = { responseHeader: new Headers() };
+      const counted = () => countQuestion(asker, headers);
+      await expect(ask(asker, { team: mine, messages: [] }, log, new Scripted([]), { counted })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      await expect(ask(asker, question("x"), log, null, { counted })).rejects.toMatchObject({ code: "CHAT_OFF" });
+      await expect(ask(person([mine], { isBot: true }), question("x"), log, new Scripted([]), { counted })).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await countQuestion(asker, headers);
+      // The second is over the hour's.
+      await expect(countQuestion(asker, headers)).rejects.toThrow(/Too many questions/);
+      expect(headers.responseHeader.get("Retry-After")).toMatch(/^\d+$/);
+      await expect(ask(asker, question("x"), log, new Scripted([]), { counted })).rejects.toThrow(/Too many questions/);
+      // Each person's own.
+      await countQuestion(person([mine]), { responseHeader: new Headers() });
     } finally {
       await db.delete(chatLimits);
     }

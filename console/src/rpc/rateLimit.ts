@@ -26,7 +26,7 @@ export class FixedWindowLimit {
    * Counts an attempt for `key`; throws resource_exhausted, with a
    * Retry-After header, once more than `max` were made this window.
    */
-  async take(key: string, ctx: HandlerContext, now = Date.now()): Promise<void> {
+  async take(key: string, ctx: Pick<HandlerContext, "responseHeader">, now = Date.now()): Promise<void> {
     const at = new Date(now);
     const resets = new Date(now + this.windowMs);
     // One statement: a window that has ended starts again at 1.

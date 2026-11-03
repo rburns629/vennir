@@ -242,7 +242,7 @@ These change with `vertra apply`, not here. See [operations](operations.md#the-a
 
 What the agent is sent reaches the model's provider. On a cloud, choose the install's own cloud.
 
-**Questions per person.** Each question can take several model calls, so each person may ask 30 an hour and 200 a day by default; one more is refused (`RATE_LIMITED`) until their hour or day is up. Bots can't ask at all. Admins change the limits with `ChatService/SetChatLimits` (`perHour`, `perDay`: 1 to 10,000 each, no more an hour than a day); they apply on every console at once.
+**Questions per person.** Each question can take several model calls, so each person may ask 30 an hour and 200 a day by default; one more is refused (`RATE_LIMITED`) until their hour or day is up. Only questions the agent answers count. Bots can't ask at all. This page doesn't show the limits yet: admins change them with the API, `ChatService/SetChatLimits` (`perHour`, `perDay`: 1 to 10,000 each, no more an hour than a day), and they apply on every console at once.
 
 **Chat answers** lists what people rated in Ask, filtered by **Wrong**, **Good** or **All**, with the question, comment, answer and the docs it cited. A wrong answer is usually a doc to fix, because the agent answers from the docs. Ratings are kept 90 days.
 
