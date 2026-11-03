@@ -33,10 +33,32 @@ export function useNow(live: boolean): number {
   return now;
 }
 
-/** A time zone as people name it: its city ("America/New_York" is "New York"), or "UTC". */
-export function zoneName(timeZone: string): string {
-  if (/^(Etc\/)?(UTC|GMT|Zulu|UCT|Universal)$/.test(timeZone)) return "UTC";
-  return (timeZone.split("/").pop() ?? timeZone).replace(/_/g, " ");
+/** The IANA areas whose zones are named for a city ("America/New_York"). */
+const CITY_AREAS = /^(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific)\//;
+
+/** The zone's own name, its case as IANA spells it ("america/new_york" is "America/New_York"); null if the browser doesn't know it. */
+function knownZone(timeZone: string): string | null {
+  try {
+    const canonical = new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions().timeZone;
+    // A link the browser renames (Asia/Kolkata to Asia/Calcutta) keeps the name given.
+    return canonical.toLowerCase() === timeZone.toLowerCase() ? canonical : timeZone;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A time zone as people name it: its city ("America/New_York" is "New
+ * York"), else its offset at that moment ("Etc/GMT+5" is "GMT-5", "EST"
+ * is "GMT-5", "+05:30" is "GMT+5:30"), or "UTC". Null for a zone the
+ * browser doesn't know.
+ */
+export function zoneName(timeZone: string, at: Date = new Date()): string | null {
+  const zone = knownZone(timeZone);
+  if (!zone) return null;
+  if (CITY_AREAS.test(zone)) return (zone.split("/").pop() ?? zone).replace(/_/g, " ");
+  const offset = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "shortOffset" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value ?? "";
+  return /^GMT([+-]0(:00)?)?$/.test(offset) || !offset ? "UTC" : offset;
 }
 
 /** The viewer's own time zone. */
@@ -44,25 +66,24 @@ export const localZone = (): string => Intl.DateTimeFormat().resolvedOptions().t
 
 /**
  * A moment as it is in a time zone: its day ("Fri"), date ("31") and time
- * ("02:00"). A zone the browser doesn't know is shown as the viewer's.
+ * ("02:00"), each from its own part so no locale adds to them. A zone the
+ * browser doesn't know is shown as the viewer's.
  */
 export function inZone(iso: string, timeZone: string): { day: string; date: string; time: string } {
-  const at = new Date(iso);
-  const part = (options: Intl.DateTimeFormatOptions) => {
-    try {
-      return at.toLocaleString([], { ...options, timeZone });
-    } catch {
-      return at.toLocaleString([], options);
-    }
-  };
-  return { day: part({ weekday: "short" }), date: part({ day: "numeric" }), time: part({ hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) };
+  const options: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+  const zone = knownZone(timeZone);
+  const parts = new Intl.DateTimeFormat([], zone ? { ...options, timeZone: zone } : options).formatToParts(new Date(iso));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return { day: part("weekday"), date: part("day"), time: `${part("hour")}:${part("minute")}` };
 }
 
-/** A schedule's next run in its own zone ("02:00 New York time"), and in the viewer's ("07:00 your time (London)"). */
+/** A schedule's next run in its own zone ("02:00 New York time", "02:00 GMT-5"), and in the viewer's ("07:00 your time (London)"). */
 export function scheduleTimes(iso: string, timeZone: string, viewer = localZone()): { own: string; yours: string } {
-  const name = zoneName(timeZone);
-  return {
-    own: `${inZone(iso, timeZone).time} ${name === "UTC" ? "UTC" : `${name} time`}`,
-    yours: `${inZone(iso, viewer).time} your time (${zoneName(viewer)})`,
-  };
+  const at = new Date(iso);
+  const mine = zoneName(viewer, at);
+  const yours = `${inZone(iso, viewer).time} your time${mine ? ` (${mine})` : ""}`;
+  const name = zoneName(timeZone, at);
+  // A zone the browser doesn't know: say the viewer's time as theirs, not under the schedule's name.
+  if (!name) return { own: yours, yours };
+  return { own: `${inZone(iso, timeZone).time} ${/^(UTC|GMT)/.test(name) ? name : `${name} time`}`, yours };
 }

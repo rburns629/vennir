@@ -778,8 +778,10 @@ function ComingUp({ schedules }: { schedules: Schedule[] }) {
                 <Typography sx={{ fontWeight: 500, fontSize: 13, overflowWrap: "anywhere" }}>{s.name}</Typography>
                 <Muted>
                   {s.team} ·{" "}
-                  <Tooltip title={times.yours}>
-                    <span>{times.own}</span>
+                  <Tooltip title={times.yours} describeChild>
+                    <Box component="span" sx={{ textDecoration: "underline dotted", textUnderlineOffset: "3px" }}>
+                      {times.own}
+                    </Box>
                   </Tooltip>
                 </Muted>
               </Box>
