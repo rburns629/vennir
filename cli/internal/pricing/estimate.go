@@ -5,6 +5,7 @@ package pricing
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/rburns629/vertra/cli/internal/config"
 	"github.com/rburns629/vertra/cli/internal/plan"
@@ -30,6 +31,13 @@ var gkeStandardNodes = map[string]struct {
 	"resilient": {"e2-standard-2", 2, 8},
 	"scaled":    {"e2-standard-2", 2, 8},
 	"auto":      {"e2-standard-2", 2, 8},
+}
+
+// gkeStepsNodes are standard mode's steps node per size, vCPU and GiB, as
+// the gcp module sizes them (its pools' steps_type): e2-standard-2 at
+// minimal, e2-standard-4 otherwise.
+var gkeStepsNodes = map[string][2]float64{
+	"minimal": {2, 8}, "resilient": {4, 16}, "scaled": {4, 16}, "auto": {4, 16},
 }
 
 // gkeStandardRoom is what one standard platform node leaves the platform's
@@ -116,8 +124,9 @@ func GCP(p *GCPPrices, c *config.Config, fetched string) []plan.Line {
 		always = float64(platformNodes[0]) * nodeMonth
 		alwaysMore = float64(platformNodes[1]-platformNodes[0]) * nodeMonth
 		if c.StepHeadroom > 0 {
-			// The steps pool keeps one node (e2-standard-4) for it.
-			always += (4*core + 16*ram) * hoursPerMonth
+			// The steps pool keeps one node for it.
+			steps := gkeStepsNodes[c.Size]
+			always += (steps[0]*core + steps[1]*ram) * hoursPerMonth
 			disks += nodeDiskGiB * p.BalancedDisk
 		}
 	} else {
@@ -175,9 +184,28 @@ func GCP(p *GCPPrices, c *config.Config, fetched string) []plan.Line {
 			money(stepHour), capacity, money(stepHour*float64(f.StepCap)*hoursPerMonth), f.StepCap)},
 		plan.Line{Label: "  Likely", Text: fmt.Sprintf("%s for light use (%s, %d step-hours; the low end if the free tier covers the cluster fee)",
 			moneyRange(likelyLow, likelyHigh), awakeWords(c), lightStepHours)},
-		plan.Line{Label: "  Not included", Text: "discounts, taxes, network egress, backups and images in storage (cents a GB), your products' own cloud usage"},
+		plan.Line{Label: "  Not included", Text: notIncluded("discounts, taxes, network egress, backups and images in storage (cents a GB)", "your products' own cloud usage", gcpUnpriced(c)...)},
 	)
 	return lines
+}
+
+// gcpUnpriced is what c makes on gcp that the estimate doesn't price:
+// billed per use, or a small monthly fee.
+func gcpUnpriced(c *config.Config) []string {
+	var more []string
+	if c.Monitoring.Enabled && c.Monitoring.ProviderName() == "google" {
+		more = append(more, "Managed Prometheus (per sample ingested)")
+	}
+	if c.ModuleSigning() == "kms" {
+		more = append(more, "the Cloud KMS signing key (a monthly fee per key version)")
+	}
+	return more
+}
+
+// notIncluded is the "Not included" line: what every estimate leaves out,
+// then what this install makes that isn't priced, then the products' own.
+func notIncluded(head, tail string, more ...string) string {
+	return strings.Join(append(append([]string{head}, more...), tail), ", ")
 }
 
 // sqlDiskGiB is the managed database's disk as the gcp module makes it
