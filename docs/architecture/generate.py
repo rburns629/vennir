@@ -110,10 +110,13 @@ class Page:
         return cell_id
 
     def titled(
-        self, x: float, y: float, w: float, h: float, title: str, description: str, color: tuple[str, str]
+        self, x: float, y: float, w: float, h: float, title: str, description: str, color: tuple[str, str],
+        dashed: bool = False,
     ) -> str:
-        """A box with a bold title and a smaller description under it."""
-        outer = self.vertex(x, y, w, h, title, box(color, "verticalAlign=top;spacingTop=6;fontStyle=1;"))
+        """A box with a bold title and a smaller description under it; dashed for what isn't deployed there."""
+        outer = self.vertex(
+            x, y, w, h, title, box(color, "verticalAlign=top;spacingTop=6;fontStyle=1;" + ("dashed=1;" if dashed else ""))
+        )
         self.vertex(
             0, 26, w, h - 26, description,
             f"text;strokeColor=none;fillColor=none;align=center;verticalAlign=top;{FONT}fontSize=11;",
@@ -553,8 +556,8 @@ def system_page() -> Page:
     scheduler = p.titled(830, 500, 200, 90, "kernel-scheduler", "poll, then claim → dispatch\nevery second", ORANGE)
     p.titled(590, 500, 200, 90, "pg-backup CronJobs", "daily pg_dump of both\ndatabases → Cloud Storage", GREY)
     gateway = p.titled(
-        590, 640, 200, 90, "execution-gateway", "API products: forwards what an\nAPI's OpenAPI document allows\n(gateway.enabled; on in kind's)",
-        ORANGE,
+        590, 640, 200, 90, "execution-gateway", "API products: forwards what an\nAPI's OpenAPI document allows\noff on vertra-gke (gateway.enabled)",
+        ORANGE, dashed=True,
     )
 
     p.vertex(1090, 160, 400, 630, "namespace <team>  (label vertra/team=true)", frame(GREEN))
@@ -567,7 +570,7 @@ def system_page() -> Page:
     )
     secret = p.titled(1110, 480, 170, 100, "Secret", "the team's: mounted only by\nits registered products,\nwhen a step lists it", GREEN)
     eso_objects = p.titled(1300, 480, 170, 100, "SecretStore +\nExternalSecret", "\nwhich cloud secret\n→ which Secret (ESO)", GREEN)
-    backend = p.titled(1110, 645, 170, 80, "Service <api>", "an API product's\nbackend", GREEN)
+    backend = p.titled(1110, 645, 170, 80, "Service <api>", "an API product's\nbackend (none here)", GREEN, dashed=True)
 
     api_server = p.titled(380, 830, 1110, 60, "Kubernetes API server", "every write below passes the admission policies", BLUE)
     for i, (name, what) in enumerate(
@@ -608,7 +611,7 @@ def system_page() -> Page:
     p.edge(console, kernel_api, "② /v1/executions")
     p.edge(kernel_api, kernel_db, "")
     p.edge(scheduler, kernel_db, "③ claim READY tasks\n(SKIP LOCKED, leases)")
-    p.edge(scheduler, api_server, "④ ConfigMap + Job", EDGE + ends(0.5, 1, x_on(930, 380, 1110), 0))
+    p.edge(scheduler, api_server, "④ ConfigMap + Job", EDGE + ends(0.5, 1, x_on(930, 380, 1110), 0), label_offset=(0, -90))
     p.edge(api_server, job, "⑤ admitted:\nPod runs", EDGE + ends(x_on(1290, 380, 1110), 0, x_on(1290, 1110, 360), 1), label_offset=(0, 180))
     p.edge(config_map, job, "mounted", EDGE + ends(0.5, 1, x_on(1195, 1110, 360), 0))
     p.edge(service_account, job, "runs as", EDGE + ends(0.5, 1, x_on(1385, 1110, 360), 0))
@@ -626,7 +629,11 @@ def system_page() -> Page:
         gateway, console_db, "reads, as\nvertra_gateway", EDGE + ends(0, 0.5, 0, 0.5),
         points=[(575, 685), (575, 405)], label_offset=(10, 70),
     )
-    p.edge(gateway, backend, "forwards checked\nrequests", EDGE + ends(1, 0.5, 0, 0.5), label_offset=(-90, 0))
+    p.edge(gateway, backend, "forwards checked\nrequests", EDGE + ends(1, 0.5, 0, 0.5) + "dashed=1;", label_offset=(-90, 0))
+    p.edge(
+        pipeline, gateway, "API calls\n(not exposed here)", EDGE + ends(1, 0.9, 0.5, 1) + "dashed=1;",
+        points=[(345, 424), (345, 775), (690, 775)], label_offset=(125, 105),
+    )
     p.edge(job, registry, "pull image", EDGE + ends(1, (365 - 320) / 110, 0, (365 - 290) / 110))
     p.edge(cloud_build, registry, "push", EDGE + ends(0.5, 1, 0.5, 0))
     p.edge(
@@ -650,8 +657,8 @@ def system_page() -> Page:
             "whose admission policies can refuse them (DISPATCH_REJECTED, IMAGE_NOT_ALLOWED, IMAGE_NOT_SIGNED, IDENTITY_NOT_ALLOWED). ⑤ The Pod "
             "runs as its product's ServiceAccount with the team Secrets its step lists and writes result.json; the scheduler reads it, stores outputs and logs, "
             "releases the tasks that waited on it, and once that's committed deletes the Job. kernel-api and kernel-scheduler never call each other: "
-            "Postgres rows are their only channel. An API product is called through execution-gateway instead, which forwards only what its reviewed "
-            "OpenAPI document describes, to its backend in its team's namespace.",
+            "Postgres rows are their only channel. Where the gateway is on (the kind values; not vertra-gke, so it's dashed), an API product is called "
+            "through execution-gateway instead, which forwards only what its reviewed OpenAPI document describes, to its backend.",
             260,
         ),
         NOTE,
@@ -682,7 +689,7 @@ def pieces_page() -> Page:
 
     p.vertex(20, 455, 420, 180, "Team namespaces · labelled vertra/team=true", frame(GREEN))
     job = p.titled(40, 490, 380, 62, "One Job per step attempt", "its product's image · its inputs as a\nConfigMap · the secrets it lists", GREEN)
-    backend = p.titled(40, 567, 380, 55, "API backends", "each API product's own Service", GREEN)
+    backend = p.titled(40, 567, 380, 55, "API backends", "an API product's in-cluster Service", GREEN)
     policies = p.titled(530, 472, 210, 90, "Admission policies", "where steps may run, which\nimages (pinned, scanned,\nsigned), identity and secrets", RED)
 
     p.edge(ci, registry, "push", EDGE + ends(1, 0.5, 0, 0.6))
@@ -695,6 +702,10 @@ def pieces_page() -> Page:
     p.edge(scheduler, job, "creates Jobs", EDGE + ends(0.5, 1, x_of(135, 40, 380), 0))
     p.edge(policies, job, "check every Job", EDGE + ends(0, 0.6, 1, 0.5) + "dashed=1;")
     p.edge(gateway, console_db, "", EDGE + ends(1, 0.5, 0, 0.5))
+    p.edge(
+        people, gateway, "call APIs", EDGE + ends(0, 0.85, x_of(520, 375, 150), 0),
+        points=[(520, 100)], label_offset=(0, 10),
+    )
     p.edge(gateway, backend, "", EDGE + ends(0.5, 1, 1, 0.5), points=[(450, 595)])
     return p
 
