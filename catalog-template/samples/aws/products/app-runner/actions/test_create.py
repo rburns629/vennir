@@ -33,8 +33,8 @@ class CreateActionTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
 
-    def _run(self, inputs: dict, configure) -> tuple[int, dict, object]:
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": inputs}))
+    def _run(self, inputs: dict, configure, team: str | None = "web") -> tuple[int, dict, object]:
+        self.module.INPUT_PATH.write_text(json.dumps({"forTeam": team, "inputs": inputs} if team else {"inputs": inputs}))
         with patch.object(self.module.boto3.session, "Session") as session_cls:
             client = session_cls.return_value.client.return_value
             configure(client)
@@ -62,15 +62,25 @@ class CreateActionTest(unittest.TestCase):
     def test_a_service_it_made_is_reported_when_found_again(self) -> None:
         def configure(client):
             client.list_services.return_value = {"ServiceSummaryList": [RUNNING]}
-            client.list_tags_for_resource.return_value = {"Tags": [{"Key": "vertra-made", "Value": "true"}]}
+            client.list_tags_for_resource.return_value = {"Tags": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
         _, result, _ = self._run({"serviceName": "web", "image": "i", "region": "eu-west-1"}, configure)
         self.assertEqual(result["outputs"]["resources"][0]["id"], "arn:svc")
+        # Made by this product for another team: not this team's to delete.
+        _, result, _ = self._run({"serviceName": "web", "image": "i", "region": "eu-west-1"}, configure, team="data")
+        self.assertNotIn("resources", result["outputs"])
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        def configure(client):
+            client.list_services.return_value = {"ServiceSummaryList": []}
+        exit_code, result, client = self._run({"serviceName": "web", "image": "i", "region": "eu-west-1"}, configure, team=None)
+        self.assertEqual((exit_code, result["error"]["code"]), (1, "MISSING_TEAM"))
+        client.create_service.assert_not_called()
 
     def test_an_existing_service_still_starting_is_waited_for(self) -> None:
         # A retry finding the service its last attempt was still creating.
         def configure(client):
             client.list_services.return_value = {"ServiceSummaryList": [{**RUNNING, "Status": "OPERATION_IN_PROGRESS"}]}
-            client.list_tags_for_resource.return_value = {"Tags": [{"Key": "vertra-made", "Value": "true"}]}
+            client.list_tags_for_resource.return_value = {"Tags": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
             client.describe_service.side_effect = [
                 {"Service": {**RUNNING, "Status": "OPERATION_IN_PROGRESS"}},
                 {"Service": RUNNING},
@@ -129,7 +139,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(repository["ImageRepositoryType"], "ECR_PUBLIC")
         self.assertEqual(repository["ImageConfiguration"]["RuntimeEnvironmentVariables"], {"BUCKET": "b"})
         self.assertEqual(result["outputs"]["serviceUrl"], "https://abc.awsapprunner.com")
-        self.assertEqual(kwargs["Tags"], [{"Key": "vertra-made", "Value": "true"}])
+        self.assertEqual(kwargs["Tags"], [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}])
         self.assertEqual(result["outputs"]["resources"][0], {
             "type": "aws/app-runner-service", "id": "arn:svc", "name": "web",
             "link": "https://eu-west-1.console.aws.amazon.com/apprunner/home?region=eu-west-1#/services",
@@ -148,7 +158,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertFalse(result["error"]["retryable"])
 
     def test_non_string_environment_values_are_refused(self) -> None:
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {
+        self.module.INPUT_PATH.write_text(json.dumps({"forTeam": "web", "inputs": {
             "serviceName": "web", "image": "i", "region": "r", "environment": {"PORT": 8080}}}))
         with patch.object(self.module.boto3.session, "Session") as session_cls:
             self.assertEqual(self.module.main(), 1)

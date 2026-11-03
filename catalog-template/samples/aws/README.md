@@ -17,11 +17,19 @@ Every action looks before it creates, so a retried step is harmless.
 
 ## Deleting what they made
 
-Each `create` tags what it makes `vertra-made=true` and reports it as
-`resources`, with a `delete` action as its `cleanup`: Delete on the run page
-(or **What runs made**) runs it. A delete refuses anything without the tag
-(`NOT_MADE_BY_VERTRA`), so a bucket, service or database that was only
-found, never made, is never deleted, and one already gone counts as deleted.
+Each `create` tags what it makes `vertra-made=true` and
+`vertra-team=<the team it was made for>` (the request's `forTeam`: the
+team the run is for, which for a shared product's run is the consumer's,
+not this one's), and reports it as `resources`, with a `delete` action as
+its `cleanup`: Delete on the run page (or **What runs made**) runs it. A
+delete refuses anything without the tag (`NOT_MADE_BY_VERTRA`), so a
+bucket, service or database that was only found, never made, is never
+deleted; and anything whose `vertra-team` isn't the run's `forTeam`
+(`NOT_THIS_TEAMS`), so one team's delete, even run directly, can't remove
+another team's. A request with no `forTeam` (a person's run for no team,
+by someone outside this team) is refused (`MISSING_TEAM`). A create
+reports what it finds as made only when both tags match the same way. One
+already gone counts as deleted.
 The console lets only the team it was made for, whoever ran it, and admins
 delete it. Some deletes are careful on purpose:
 
@@ -32,6 +40,14 @@ delete it. Some deletes are careful on purpose:
   it's billed as storage.
 - App Runner and RDS finish a delete on their own once it's accepted, so
   the step doesn't wait for it.
+
+Made before they were tagged with a team (before 2026-11-03), a bucket,
+service or instance has `vertra-made` but no `vertra-team`, so its delete
+refuses it (`NOT_THIS_TEAMS`). Tag it by hand with the team it was made for
+(`vertra-team=<team>`: `aws s3api put-bucket-tagging`, which replaces every
+tag, so give `vertra-made=true` again too; `aws apprunner tag-resource`;
+`aws rds add-tags-to-resource`), then delete it again, or delete it outside
+Vertra.
 
 Proven on EKS Auto Mode (2026-10-25): each made by one team's member,
 refused to another team's, the bucket refused while it held an object, and

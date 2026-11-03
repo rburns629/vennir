@@ -203,7 +203,14 @@ type Task struct {
 	// "onDemand", each a placement the install sets
 	// (scheduler.capacityPlacements); empty, or one the install has none for:
 	// the install's own (scheduler.taskPlacement).
-	Capacity      string `protobuf:"bytes,18,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	Capacity string `protobuf:"bytes,18,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	// The team the step runs for: whose run it is (a template's, action's or
+	// order's onBehalfOf; a cleanup's, the team the resource it deletes was
+	// made for; a person's run for no team, its team when they're in it, else
+	// none; a team's own DAG, its team), which may not be the team it runs in. In request.json as forTeam, so a product
+	// can mark what it makes as that team's and clean up only that team's.
+	// A Kubernetes namespace name; empty: request.json has none.
+	ForTeam       string `protobuf:"bytes,19,opt,name=for_team,json=forTeam,proto3" json:"for_team,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -360,6 +367,13 @@ func (x *Task) GetProductCap() *ProductCap {
 func (x *Task) GetCapacity() string {
 	if x != nil {
 		return x.Capacity
+	}
+	return ""
+}
+
+func (x *Task) GetForTeam() string {
+	if x != nil {
+		return x.ForTeam
 	}
 	return ""
 }
@@ -2840,7 +2854,7 @@ var File_vertra_kernel_v1_kernel_proto protoreflect.FileDescriptor
 
 const file_vertra_kernel_v1_kernel_proto_rawDesc = "" +
 	"\n" +
-	"\x1dvertra/kernel/v1/kernel.proto\x12\x10vertra.kernel.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9e\x06\n" +
+	"\x1dvertra/kernel/v1/kernel.proto\x12\x10vertra.kernel.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb9\x06\n" +
 	"\x04Task\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05image\x18\x02 \x01(\tR\x05image\x12\x16\n" +
@@ -2863,7 +2877,8 @@ const file_vertra_kernel_v1_kernel_proto_rawDesc = "" +
 	"\x11approval_required\x18\x10 \x01(\bR\x10approvalRequired\x12=\n" +
 	"\vproduct_cap\x18\x11 \x01(\v2\x1c.vertra.kernel.v1.ProductCapR\n" +
 	"productCap\x12\x1a\n" +
-	"\bcapacity\x18\x12 \x01(\tR\bcapacityB\x12\n" +
+	"\bcapacity\x18\x12 \x01(\tR\bcapacity\x12\x19\n" +
+	"\bfor_team\x18\x13 \x01(\tR\aforTeamB\x12\n" +
 	"\x10_timeout_secondsB\x0f\n" +
 	"\r_max_attempts\"C\n" +
 	"\n" +

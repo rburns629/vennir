@@ -110,7 +110,7 @@ The scheduler finds make-name `READY`, claims it, and asks the Kubernetes API se
 
   ```json
   {"executionId": "cdf0f66e-3789-47ea-9bab-782e2153b499", "taskId": "make-name",
-   "action": "make", "attempt": 1, "inputs": {"last": "Berg", "first": "Anna"}}
+   "team": "team-a", "forTeam": "team-a", "action": "make", "attempt": 1, "inputs": {"last": "Berg", "first": "Anna"}}
   ```
 
 - a **Job** that runs the product's image. The parts that matter, from the real Pod:
@@ -210,7 +210,7 @@ say-hello's `request.json` therefore carries a plain value, and say-hello never 
 
 ```json
 {"executionId": "cdf0f66e-3789-47ea-9bab-782e2153b499", "taskId": "say-hello",
- "action": "greet", "attempt": 1, "inputs": {"name": "Anna Berg"}}
+ "team": "team-a", "forTeam": "team-a", "action": "greet", "attempt": 1, "inputs": {"name": "Anna Berg"}}
 ```
 
 If the output it needs isn't there (make-name didn't output `name`), say-hello fails with `MISSING_UPSTREAM_OUTPUT` and isn't retried. If it's there but doesn't fit say-hello's input schema, say-hello fails with `INPUT_INVALID` before it starts; and a step whose outputs don't fit its own output schema fails with `OUTPUT_INVALID`. Inputs given as values are checked when the DAG is submitted.

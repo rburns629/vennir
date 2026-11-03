@@ -154,6 +154,12 @@ func taskDefs(tasks []*kernelv1.Task) ([]domain.TaskDef, []domain.ValidationIssu
 		if problem := domain.ProductCapProblem(def.CapScope, def.CapLimit); problem != "" {
 			bad("product_cap", problem)
 		}
+		def.ForTeam = t.GetForTeam()
+		if def.ForTeam != "" {
+			if problem := domain.NamespaceNameProblem(def.ForTeam); problem != "" {
+				bad("for_team", problem)
+			}
+		}
 		def.Capacity = t.GetCapacity()
 		if def.Capacity != "" && !slices.Contains(domain.Capacities, def.Capacity) {
 			bad("capacity", "must be one of "+strings.Join(domain.Capacities, ", ")+" (or empty)")
@@ -301,11 +307,11 @@ func (s *Service) insert(ctx context.Context, db pgx.Tx, id, name, requestID, re
 		}
 		if _, err := db.Exec(ctx, `INSERT INTO execution_tasks (id, execution_id, task_key, image, action, team, service_account,
 			secret_refs, token_audiences, resources, state, original_inputs, timeout_seconds, max_attempts, attempt_count,
-			input_schema, output_schema, concurrency_scope, concurrency_inputs, approval_required, cap_scope, cap_limit, capacity)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 0, $15, $16, $17, $18, $19, $20, $21, $22)`,
+			input_schema, output_schema, concurrency_scope, concurrency_inputs, approval_required, cap_scope, cap_limit, capacity, for_team)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 0, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
 			ids[d.ID], id, d.ID, d.Image, d.Action, d.Team, d.ServiceAccount, d.SecretRefs, d.TokenAudiences, resources,
 			string(d.InitialState()), inputs, d.TimeoutSeconds, d.MaxAttempts, inputSchema, outputSchema,
-			nullable(d.ConcurrencyScope), d.ConcurrencyInputs, d.ApprovalRequired, nullable(d.CapScope), d.CapLimit, nullable(d.Capacity)); err != nil {
+			nullable(d.ConcurrencyScope), d.ConcurrencyInputs, d.ApprovalRequired, nullable(d.CapScope), d.CapLimit, nullable(d.Capacity), nullable(d.ForTeam)); err != nil {
 			return err
 		}
 	}

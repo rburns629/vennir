@@ -6,8 +6,9 @@ No password ever passes through the step: RDS generates the master password
 and keeps it in AWS Secrets Manager (ManageMasterUserPassword), and the
 output is that secret's ARN, a reference an app's own identity may be
 granted to read. New instances are encrypted and not publicly accessible.
-One it creates is tagged vertra-made=true and reported as a resource, which
-delete (its cleanup) removes; one it only found is neither.
+One it creates is tagged vertra-made=true and vertra-team=<the run's team> and
+reported as a resource, which delete (its cleanup) removes; one it only
+found is neither, unless an earlier attempt made it for this team.
 Credentials as in the aws team's README.md: boto3's default chain (EKS Pod
 Identity or IRSA), optionally assuming the aws-target role.
 """
@@ -30,6 +31,10 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 # What marks an instance this product made: delete removes no other.
 MADE_BY_TAG = ("vertra-made", "true")
+# And for which team (the request's forTeam, the team the run is for, not
+# the one it runs in), so it's reported, and deleted, only for that team:
+# another team's instance, even one this product made, isn't theirs.
+TEAM_TAG = "vertra-team"
 RETRYABLE_CODES = {
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
     "ServiceUnavailable", "InternalError", "InternalFailure",
@@ -91,7 +96,7 @@ def _describe(rds: Any, instance_id: str) -> dict[str, Any] | None:
         raise
 
 
-def _outputs(instance: dict[str, Any], region: str, made_here: bool) -> dict[str, Any]:
+def _outputs(instance: dict[str, Any], region: str, made_here: bool, team: str) -> dict[str, Any]:
     endpoint = instance.get("Endpoint") or {}
     outputs: dict[str, Any] = {
         "instanceId": instance["DBInstanceIdentifier"],
@@ -101,7 +106,8 @@ def _outputs(instance: dict[str, Any], region: str, made_here: bool) -> dict[str
     secret = (instance.get("MasterUserSecret") or {}).get("SecretArn")
     if secret:
         outputs["masterUserSecretArn"] = secret
-    made = made_here or {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]} in instance.get("TagList", [])
+    tags = instance.get("TagList", [])
+    made = made_here or ({"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]} in tags and {"Key": TEAM_TAG, "Value": team} in tags)
     if made and instance.get("DBInstanceArn"):
         outputs["resources"] = [
             {
@@ -115,10 +121,14 @@ def _outputs(instance: dict[str, Any], region: str, made_here: bool) -> dict[str
 
 
 def main() -> int:
-    inputs = json.loads(INPUT_PATH.read_text()).get("inputs", {})
+    request = json.loads(INPUT_PATH.read_text())
+    inputs = request.get("inputs", {})
     instance_id, region = inputs.get("instanceId"), inputs.get("region")
     if not instance_id or not region:
         return _failure("MISSING_INPUT", "inputs.instanceId and inputs.region are required")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
     if not INSTANCE_ID.match(instance_id):
         return _failure(
             "INVALID_INPUT",
@@ -141,7 +151,7 @@ def main() -> int:
                 "PubliclyAccessible": False,
                 "BackupRetentionPeriod": 7,
                 "CopyTagsToSnapshot": True,
-                "Tags": [{"Key": "managed-by", "Value": "vertra"}, {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}],
+                "Tags": [{"Key": "managed-by", "Value": "vertra"}, {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}, {"Key": TEAM_TAG, "Value": team}],
             }
             if inputs.get("engineVersion"):
                 create["EngineVersion"] = inputs["engineVersion"]
@@ -149,7 +159,7 @@ def main() -> int:
             print(f"creating instance '{instance_id}'; this takes several minutes")
         elif instance.get("DBInstanceStatus") == "available":
             print(f"instance '{instance_id}' already exists")
-            _write_result({"status": "succeeded", "outputs": _outputs(instance, region, False)})
+            _write_result({"status": "succeeded", "outputs": _outputs(instance, region, False, team)})
             return 0
         else:
             print(f"instance '{instance_id}' exists ({instance.get('DBInstanceStatus')}); waiting")
@@ -168,7 +178,7 @@ def main() -> int:
         return _aws_failure(error)
 
     print(f"instance '{instance_id}' is available")
-    _write_result({"status": "succeeded", "outputs": _outputs(instance, region, created)})
+    _write_result({"status": "succeeded", "outputs": _outputs(instance, region, created, team)})
     return 0
 
 

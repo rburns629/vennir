@@ -59,6 +59,7 @@ class CreateActionTest(unittest.TestCase):
                 {
                     "executionId": "e",
                     "taskId": "t",
+                    "forTeam": "web",
                     "action": "create",
                     "attempt": 1,
                     "inputs": inputs,
@@ -129,6 +130,22 @@ class CreateActionTest(unittest.TestCase):
             },
         )
 
+    def test_a_service_it_deployed_is_reported_only_for_its_team(self) -> None:
+        for team, reported in (("web", True), ("data", False)):
+            self._write_request(_VALID_INPUTS)
+            with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+                client_cls.return_value.service_path.return_value = "projects/my-project/locations/us-central1/services/hello-world"
+                client_cls.return_value.get_service.return_value = MagicMock(uri="https://x", labels={"vertra-made": "true", "vertra-team": team})
+                self.assertEqual(self.module.main(), 0)
+            self.assertEqual("resources" in self._result()["outputs"], reported, team)
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        self.module.INPUT_PATH.write_text(json.dumps({"inputs": _VALID_INPUTS}))
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            self.assertEqual(self.module.main(), 1)
+        client_cls.assert_not_called()
+        self.assertEqual(self._result()["error"]["code"], "MISSING_TEAM")
+
     def test_new_service_is_deployed(self) -> None:
         self._write_request(_VALID_INPUTS)
         with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
@@ -150,7 +167,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(call_kwargs["service_id"], "hello-world")
         submitted_image = call_kwargs["service"].template.containers[0].image
         self.assertEqual(submitted_image, _VALID_INPUTS["image"])
-        self.assertEqual(dict(call_kwargs["service"].labels), {"vertra-made": "true"})
+        self.assertEqual(dict(call_kwargs["service"].labels), {"vertra-made": "true", "vertra-team": "web"})
         # The team's runtime account, never the project's default compute one.
         self.assertEqual(call_kwargs["service"].template.service_account, _RUNTIME_ACCOUNT)
         self.assertEqual(exit_code, 0)
@@ -305,7 +322,7 @@ class BuildCredentialsTest(unittest.TestCase):
 
             self.module.INPUT_PATH = Path(tempfile.mkstemp()[1])
             self.module.OUTPUT_PATH = Path(tempfile.mkstemp()[1])
-            self.module.INPUT_PATH.write_text(json.dumps({"inputs": _VALID_INPUTS}))
+            self.module.INPUT_PATH.write_text(json.dumps({"forTeam": "web", "inputs": _VALID_INPUTS}))
 
             self.module.main()
 

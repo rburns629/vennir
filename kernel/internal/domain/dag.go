@@ -46,6 +46,25 @@ type TaskDef struct {
 	// Capacity is the kind its product asks for (Capacities); "": the
 	// install's own placement.
 	Capacity string
+	// ForTeam is the team it runs for (request.json's forTeam), a
+	// namespace name; "": none.
+	ForTeam string
+}
+
+// NamespaceNameProblem says what's wrong with a Kubernetes namespace name
+// (an RFC 1123 label: lowercase letters, digits and "-", starting and
+// ending with a letter or digit, at most 63), or "".
+func NamespaceNameProblem(name string) string {
+	if len(name) > 63 {
+		return "must be at most 63 characters"
+	}
+	for i, r := range name {
+		alnum := r >= 'a' && r <= 'z' || r >= '0' && r <= '9'
+		if !alnum && (r != '-' || i == 0 || i == len(name)-1) {
+			return "must be a namespace name: lowercase letters, digits and \"-\", starting and ending with a letter or digit"
+		}
+	}
+	return ""
 }
 
 // MaxTokenAudiences is how many a task may ask for.

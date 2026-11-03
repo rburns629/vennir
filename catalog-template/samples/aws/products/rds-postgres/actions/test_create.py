@@ -41,8 +41,8 @@ class CreateActionTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
 
-    def _run(self, inputs: dict, configure) -> tuple[int, dict, object]:
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": inputs}))
+    def _run(self, inputs: dict, configure, team: str | None = "web") -> tuple[int, dict, object]:
+        self.module.INPUT_PATH.write_text(json.dumps({"forTeam": team, "inputs": inputs} if team else {"inputs": inputs}))
         with patch.object(self.module.boto3.session, "Session") as session_cls:
             rds = session_cls.return_value.client.return_value
             configure(rds)
@@ -67,9 +67,17 @@ class CreateActionTest(unittest.TestCase):
 
     def test_an_instance_it_made_is_reported_when_found_again(self) -> None:
         def configure(rds):
-            rds.describe_db_instances.return_value = {"DBInstances": [{**AVAILABLE, "TagList": [{"Key": "vertra-made", "Value": "true"}]}]}
+            rds.describe_db_instances.return_value = {"DBInstances": [{**AVAILABLE, "TagList": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}]}
         _, result, _ = self._run({"instanceId": "orders-db", "region": "eu-west-1"}, configure)
         self.assertEqual(result["outputs"]["resources"][0]["id"], AVAILABLE["DBInstanceArn"])
+        # Made by this product for another team: not this team's to delete.
+        _, result, _ = self._run({"instanceId": "orders-db", "region": "eu-west-1"}, configure, team="data")
+        self.assertNotIn("resources", result["outputs"])
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        exit_code, result, rds = self._run({"instanceId": "orders-db", "region": "eu-west-1"}, lambda rds: None, team=None)
+        self.assertEqual((exit_code, result["error"]["code"]), (1, "MISSING_TEAM"))
+        rds.create_db_instance.assert_not_called()
 
     def test_a_new_instance_has_no_password_in_the_step_and_is_private(self) -> None:
         def configure(rds):
@@ -83,6 +91,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertTrue(create["StorageEncrypted"])
         self.assertEqual(result["outputs"]["masterUserSecretArn"], AVAILABLE["MasterUserSecret"]["SecretArn"])
         self.assertIn({"Key": "vertra-made", "Value": "true"}, create["Tags"])
+        self.assertIn({"Key": "vertra-team", "Value": "web"}, create["Tags"])
         self.assertEqual(result["outputs"]["resources"][0], {
             "type": "aws/rds-instance", "id": AVAILABLE["DBInstanceArn"], "name": "orders-db",
             "link": "https://eu-west-1.console.aws.amazon.com/rds/home?region=eu-west-1#database:id=orders-db",

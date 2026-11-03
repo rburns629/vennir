@@ -26,8 +26,9 @@ actions:
     idempotent: true
     maxAttempts: 3
     script: actions/create.py
-    # Deleting the service it deployed (only one it deployed: create labels
-    # it vertra-made, and delete refuses any other).
+    # Deleting the service it deployed (only one it deployed for the run's
+    # team: create labels it vertra-made and vertra-team, and delete refuses
+    # any other).
     cleanup:
       action: delete
     input:

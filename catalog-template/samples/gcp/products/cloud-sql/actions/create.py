@@ -42,6 +42,11 @@ from googleapiclient.errors import HttpError
 # those, never an instance made some other way; and how a retry that finds
 # the instance it made a moment ago still reports it.
 MADE_BY_LABEL = ("vertra-made", "true")
+# And for which team (the request's forTeam, the team the run is for, not
+# the one it runs in: a Kubernetes namespace name, so always a valid label
+# value), so it's reported, and deleted, only for that team: another team's
+# instance, even one this product made, isn't theirs.
+TEAM_LABEL = "vertra-team"
 
 INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")
@@ -155,14 +160,14 @@ def _wait_until_ready(service, project_id: str, name: str, instance: dict[str, A
         instance = service.instances().get(project=project_id, instance=name).execute()
 
 
-def _outputs_from_instance(instance: dict[str, Any]) -> dict[str, Any]:
+def _outputs_from_instance(instance: dict[str, Any], team: str) -> dict[str, Any]:
     ip_addresses = instance.get("ipAddresses") or []
     outputs: dict[str, Any] = {
         "instanceConnectionName": instance["connectionName"],
         "ipAddress": ip_addresses[0]["ipAddress"] if ip_addresses else "",
     }
     labels = (instance.get("settings") or {}).get("userLabels") or {}
-    if labels.get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1]:
+    if labels.get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1] and labels.get(TEAM_LABEL) == team:
         project = instance["connectionName"].split(":")[0]
         name = instance.get("name", "")
         outputs["resources"] = [
@@ -214,6 +219,9 @@ def _run() -> int:
     instance_name = inputs.get("instanceName")
     if not project_id or not instance_name:
         return _failure("MISSING_INPUT", "inputs.projectId and inputs.instanceName are required")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
 
     credentials = _build_credentials()
     service = _build_service(credentials)
@@ -228,7 +236,7 @@ def _run() -> int:
         existing, failed = _wait_until_ready(service, project_id, instance_name, existing)
         if failed is not None:
             return failed
-        _write_result({"status": "succeeded", "outputs": _outputs_from_instance(existing)})
+        _write_result({"status": "succeeded", "outputs": _outputs_from_instance(existing, team)})
         return 0
     except HttpError as error:
         if error.resp.status != 404:
@@ -260,7 +268,7 @@ def _run() -> int:
             # concretely), real complexity this demo doesn't need just to
             # satisfy the policy.
             "ipConfiguration": {"sslMode": "ENCRYPTED_ONLY"},
-            "userLabels": dict([MADE_BY_LABEL]),
+            "userLabels": {MADE_BY_LABEL[0]: MADE_BY_LABEL[1], TEAM_LABEL: team},
         },
     }
     try:
@@ -273,7 +281,7 @@ def _run() -> int:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
     print(f"created Cloud SQL instance '{instance_name}' in '{project_id}'")
-    _write_result({"status": "succeeded", "outputs": _outputs_from_instance(instance)})
+    _write_result({"status": "succeeded", "outputs": _outputs_from_instance(instance, team)})
     return 0
 
 

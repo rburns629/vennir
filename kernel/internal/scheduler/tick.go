@@ -278,7 +278,7 @@ func (p *pass) resolve(t *Task) (executor.ResolvedTask, bool, error) {
 	}
 	return executor.ResolvedTask{
 		ExecutionID: t.ExecutionID, TaskKey: t.TaskKey, Image: t.Image, Action: t.Action, Attempt: t.AttemptCount,
-		ResolvedInputs: inputs, TimeoutSeconds: t.TimeoutSeconds, Team: t.Team, ServiceAccount: t.ServiceAccount, Capacity: deref(t.Capacity),
+		ResolvedInputs: inputs, TimeoutSeconds: t.TimeoutSeconds, Team: t.Team, ForTeam: deref(t.ForTeam), ServiceAccount: t.ServiceAccount, Capacity: deref(t.Capacity),
 		SecretRefs: t.SecretRefs, TokenAudiences: t.TokenAudiences, Resources: t.Resources,
 	}, true, nil
 }

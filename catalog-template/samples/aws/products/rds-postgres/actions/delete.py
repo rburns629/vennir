@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """aws/rds-postgres's "delete" action, its create's cleanup: deletes an
-instance create made (tagged vertra-made=true), and no other, given the
-resource create reported (its ARN, which names its region). A final
-snapshot is kept, named in the output, so the data isn't lost with it:
+instance create made (tagged vertra-made=true) for the run's team
+(tagged vertra-team=<it>), and no other, given the resource create reported
+(its ARN, which names its region). A final snapshot is kept, named in the output, so the data isn't lost with it:
 delete that snapshot once nobody needs it (it's billed as storage). An
 instance already gone, or already being deleted, counts as deleted. RDS
 finishes a delete on its own once it's accepted, so this doesn't wait.
@@ -25,6 +25,7 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 MADE_BY_TAG = ("vertra-made", "true")
+TEAM_TAG = "vertra-team"
 INSTANCE_ARN = re.compile(r"^arn:aws[a-z-]*:rds:([a-z0-9-]+):[0-9]{12}:db:([a-zA-Z](?:[a-zA-Z0-9]|-(?!-)){0,62})$")
 RETRYABLE_CODES = {
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
@@ -80,10 +81,14 @@ def _gone(arn: str) -> int:
 
 
 def main() -> int:
-    resource = json.loads(INPUT_PATH.read_text()).get("inputs", {}).get("resource") or {}
+    request = json.loads(INPUT_PATH.read_text())
+    resource = request.get("inputs", {}).get("resource") or {}
     arn = resource.get("id", "")
     if resource.get("type") != "aws/rds-instance" or not arn:
         return _failure("MISSING_INPUT", "inputs.resource is the aws/rds-instance to delete, as create reported it")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
     match = INSTANCE_ARN.match(arn)
     if not match:
         return _failure("INVALID_INPUT", f"'{arn}' isn't an RDS instance's ARN")
@@ -103,6 +108,11 @@ def main() -> int:
             return _failure(
                 "NOT_MADE_BY_VERTRA",
                 f"Instance '{instance_id}' has no {MADE_BY_TAG[0]}={MADE_BY_TAG[1]} tag: this product deletes only instances it made.",
+            )
+        if {"Key": TEAM_TAG, "Value": team} not in instance.get("TagList", []):
+            return _failure(
+                "NOT_THIS_TEAMS",
+                f"Instance '{instance_id}' has no {TEAM_TAG}={team} tag: this product deletes only instances it made for this team.",
             )
         snapshot = f"{instance_id}-final-{time.strftime('%Y%m%d%H%M%S', time.gmtime())}"
         try:

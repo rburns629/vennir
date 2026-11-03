@@ -164,5 +164,7 @@ describe("an approver's preview", () => {
     const asked = await call(maintainerToken, "ExecutionService/PreviewStep", { executionId, taskId: "create" });
     expect(asked.code).toBe("ok");
     expect(lastDag().tasks).toEqual([expect.objectContaining({ id: "create", action: "plan", inputs: { name: "prod" } })]);
+    // For the team the step it previews runs for, not the approver's.
+    expect(lastDag().tasks[0]?.["forTeam"]).toBe(cons);
   });
 });

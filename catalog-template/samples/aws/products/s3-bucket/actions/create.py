@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """aws/s3-bucket's "create" action: finds an S3 bucket by name, creating it
 (with every kind of public access blocked) only if it doesn't exist. One it
-creates is tagged vertra-made=true in the create call itself, so a step cut
-short right after still finds its bucket tagged, and reported as a resource,
-which delete (its cleanup) removes; one it only found is neither. A bucket
+creates is tagged vertra-made=true and vertra-team=<the run's team> in the
+create call itself, so a step cut short right after still finds its bucket
+tagged, and reported as a resource, which delete (its cleanup) removes; one
+it only found is neither, unless it was made for this team. A bucket
 it made, found again, has its public access block put again, in case the
 step that made it stopped before that.
 
@@ -30,6 +31,10 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 # What marks a bucket this product made: delete removes no other.
 MADE_BY_TAG = ("vertra-made", "true")
+# And for which team (the request's forTeam, the team the run is for, not
+# the one it runs in), so it's reported, and deleted, only for that team:
+# another team's bucket, even one this product made, isn't theirs.
+TEAM_TAG = "vertra-team"
 RETRYABLE_CODES = {
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
     "SlowDown", "ServiceUnavailable", "InternalError", "InternalFailure", "OperationAborted",
@@ -77,15 +82,15 @@ def _session(region: str) -> boto3.session.Session:
     )
 
 
-def _made_here(s3: Any, bucket: str) -> bool:
-    """Whether the bucket carries this product's tag."""
+def _made_here(s3: Any, bucket: str, team: str) -> bool:
+    """Whether the bucket carries this product's tags, for this team."""
     try:
         tags = s3.get_bucket_tagging(Bucket=bucket).get("TagSet", [])
     except ClientError as error:
         if error.response.get("Error", {}).get("Code") == "NoSuchTagSet":
             return False
         raise
-    return {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]} in tags
+    return {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]} in tags and {"Key": TEAM_TAG, "Value": team} in tags
 
 
 def _outputs(bucket: str, region: str, made_here: bool) -> dict[str, Any]:
@@ -102,11 +107,15 @@ def _outputs(bucket: str, region: str, made_here: bool) -> dict[str, Any]:
 
 
 def main() -> int:
-    inputs = json.loads(INPUT_PATH.read_text()).get("inputs", {})
+    request = json.loads(INPUT_PATH.read_text())
+    inputs = request.get("inputs", {})
     bucket = inputs.get("bucketName")
     region = inputs.get("region")
     if not bucket or not region:
         return _failure("MISSING_INPUT", "inputs.bucketName and inputs.region are required")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
 
     try:
         s3 = _session(region).client("s3")
@@ -114,7 +123,7 @@ def main() -> int:
             found = s3.head_bucket(Bucket=bucket)
             region = found.get("BucketRegion") or region
             print(f"bucket '{bucket}' already exists, in {region}")
-            made_here = _made_here(s3, bucket)
+            made_here = _made_here(s3, bucket, team)
         except ClientError as error:
             code = error.response.get("Error", {}).get("Code")
             if code == "403":
@@ -125,7 +134,7 @@ def main() -> int:
                 )
             if code != "404":
                 raise
-            made_here = _create(s3, bucket, region)
+            made_here = _create(s3, bucket, region, team)
             if made_here is None:
                 return _failure("BUCKET_NAME_TAKEN", f"Bucket name '{bucket}' is taken. Choose another.")
             if made_here == "denied":
@@ -153,10 +162,11 @@ def main() -> int:
     return 0
 
 
-def _create(s3: Any, bucket: str, region: str) -> bool | None | str:
-    """Creates the bucket, tagged: whether it's this product's, None if the
-    name is another account's, or "denied" if this role may not."""
-    configuration: dict[str, Any] = {"Tags": [{"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}]}
+def _create(s3: Any, bucket: str, region: str, team: str) -> bool | None | str:
+    """Creates the bucket, tagged for this team: whether it's this product's,
+    for this team; None if the name is another account's, or "denied" if
+    this role may not."""
+    configuration: dict[str, Any] = {"Tags": [{"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}, {"Key": TEAM_TAG, "Value": team}]}
     if region != "us-east-1":  # us-east-1 refuses a LocationConstraint
         configuration["LocationConstraint"] = region
     try:
@@ -169,8 +179,9 @@ def _create(s3: Any, bucket: str, region: str) -> bool | None | str:
             return "denied"
         if code != "BucketAlreadyOwnedByYou":
             raise
-        # Made a moment ago, by a run that got there first: its tag says whose.
-        return _made_here(s3, bucket)
+        # Made a moment ago, by a run that got there first: its tags say
+        # whose, and for which team.
+        return _made_here(s3, bucket, team)
     return True
 
 

@@ -166,12 +166,18 @@ export async function previewStep(caller: AuthUser | undefined, executionId: str
   if (!plan) throw new ApiError(409, "NO_PREVIEW", `Step "${taskId}" has no preview: its product.yaml names no plan for it.`);
   const outputs = new Map(detail.tasks.flatMap((t) => (t.outputs ? [[t.taskId, t.outputs as Record<string, unknown>] as const] : [])));
   const inputs = resolvedInputs(task?.["inputs"], outputs);
+  // The plan runs for the team the step it previews runs for, not the approver's.
+  const runFor = (typeof task?.["forTeam"] === "string" ? task["forTeam"] : undefined) ?? submitted.onBehalfOf ?? undefined;
   return runProductSteps(
     who,
     `Preview: ${detail.name} · ${taskId}`,
     [{ id: taskId, product: plan, inputs, label: `Step "${taskId}"` }],
     who.teamNames.includes(team) ? team : undefined,
-    { template: PREVIEW_RUN, parameters: { of: `${executionId}/${taskId}`, parameters: inputs } },
+    {
+      template: PREVIEW_RUN,
+      parameters: { of: `${executionId}/${taskId}`, parameters: inputs },
+      ...(runFor ? { forTeams: { [taskId]: runFor } } : {}),
+    },
     { chained: false, eachShared: true },
     log,
   );

@@ -936,7 +936,15 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   service, another team's member was refused their Delete, an admin's
   cleanup run shut both down. The aws samples' (s3-bucket, app-runner,
   rds-postgres) and Cloud SQL's proven 2026-10-25 on EKS and GKE. Azure's
-  cleanups are after the MVP (decided 2026-10-25).
+  cleanups are after the MVP (decided 2026-10-25). Since 2026-11-03 the
+  cloud samples also mark what they make `vertra-team=<forTeam>`
+  (request.json carries `team`, the namespace, and `forTeam`, the team the
+  run is for: the console sends each task's as kernel Task.for_team), report
+  a found resource as theirs and delete it only when that matches
+  (`NOT_THIS_TEAMS`), so a shared delete can't reach another team's; not
+  yet proven on a cloud. Resources made before then have no `vertra-team`
+  and are refused until relabelled by hand (the sample READMEs say how).
+  A console-side check against the recorded resources may come later.
 - [x] **P2: notifications** (done 2026-10-24): an inbox (the bell) and
   each team's chat webhook (Slack, Google Chat, Teams; decided 2026-10-24:
   the URL kept encrypted in the console's database, write-only, allowed

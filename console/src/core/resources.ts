@@ -297,7 +297,7 @@ async function deleteChecked(who: AuthUser, ids: string[], log: FastifyBaseLogge
   const finishedRuns = new Set(
     pending.length === 0 ? [] : (await getExecutionStates([...new Set(pending)])).filter((e) => FINISHED.has(e.state)).map((e) => e.executionId),
   );
-  const steps: Omit<ProductStep, "id">[] = [];
+  const steps: (Omit<ProductStep, "id"> & { madeFor: string })[] = [];
   for (const row of rows) {
     const r = row.resource;
     const label = `${r.type} ${r.externalId}`;
@@ -341,7 +341,9 @@ async function deleteChecked(who: AuthUser, ids: string[], log: FastifyBaseLogge
     const r = row.resource;
     const label = `${r.type} ${r.externalId}`;
     const { product, mapping } = await cleanupOf(r.product, label);
-    steps.push({ product, inputs: cleanupInputs(mapping, r), label });
+    // For the team it was made for (one made for a person alone: its
+    // product's team, as its run's step was), whoever asks.
+    steps.push({ product, inputs: cleanupInputs(mapping, r), label, madeFor: r.ownerTeam ?? r.productTeam });
   }
   const ownerTeam = rows[0]?.resource.ownerTeam ?? undefined;
   // For the team it was made for, when the caller is in it (else an admin or the person alone).

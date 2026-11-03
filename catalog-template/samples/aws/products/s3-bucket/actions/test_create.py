@@ -39,8 +39,8 @@ class CreateActionTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
 
-    def _run(self, inputs: dict) -> tuple[int, dict, object]:
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": inputs}))
+    def _run(self, inputs: dict, team: str | None = "web") -> tuple[int, dict, object]:
+        self.module.INPUT_PATH.write_text(json.dumps({"forTeam": team, "inputs": inputs} if team else {"inputs": inputs}))
         with patch.object(self.module.boto3.session, "Session") as session_cls:
             s3 = session_cls.return_value.client.return_value
             self.configure(s3)
@@ -68,13 +68,22 @@ class CreateActionTest(unittest.TestCase):
     def test_a_bucket_it_made_is_reported_when_found_again(self) -> None:
         def configure(s3):
             s3.head_bucket.return_value = {"BucketRegion": "eu-west-1"}
-            s3.get_bucket_tagging.return_value = {"TagSet": [{"Key": "vertra-made", "Value": "true"}]}
+            s3.get_bucket_tagging.return_value = {"TagSet": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
         self.configure = configure
         _, result, s3 = self._run({"bucketName": "b", "region": "eu-west-1"})
         self.assertEqual(result["outputs"]["resources"][0]["id"], "b")
         # Put again: the step that made it may have stopped before it did.
         block = s3.put_public_access_block.call_args.kwargs["PublicAccessBlockConfiguration"]
         self.assertTrue(all(block.values()))
+        s3.create_bucket.assert_not_called()
+        # Made by this product for another team: not this team's to delete.
+        _, result, _ = self._run({"bucketName": "b", "region": "eu-west-1"}, team="data")
+        self.assertNotIn("resources", result["outputs"])
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        self.configure = lambda s3: setattr(s3.head_bucket, "side_effect", _client_error("404", 404))
+        exit_code, result, s3 = self._run({"bucketName": "b", "region": "eu-west-1"}, team=None)
+        self.assertEqual((exit_code, result["error"]["code"]), (1, "MISSING_TEAM"))
         s3.create_bucket.assert_not_called()
 
     def test_a_retry_finishes_after_the_block_failed(self) -> None:
@@ -89,7 +98,7 @@ class CreateActionTest(unittest.TestCase):
         # Attempt 2 finds it, tagged as its own: blocked, and reported.
         def second(s3):
             s3.head_bucket.return_value = {"BucketRegion": "eu-west-1"}
-            s3.get_bucket_tagging.return_value = {"TagSet": [{"Key": "vertra-made", "Value": "true"}]}
+            s3.get_bucket_tagging.return_value = {"TagSet": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
         self.configure = second
         exit_code, result, s3 = self._run({"bucketName": "b", "region": "eu-west-1"})
         self.assertEqual(exit_code, 0)
@@ -97,7 +106,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(result["outputs"]["resources"][0]["id"], "b")
 
     def test_a_bucket_made_a_moment_ago_is_known_by_its_tag(self) -> None:
-        for tags, made in (([{"Key": "vertra-made", "Value": "true"}], True), ([], False)):
+        for tags, made in (([{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}], True), ([], False)):
             def configure(s3, tags=tags):
                 s3.head_bucket.side_effect = _client_error("404", 404)
                 s3.create_bucket.side_effect = _client_error("BucketAlreadyOwnedByYou", 409)
@@ -134,7 +143,7 @@ class CreateActionTest(unittest.TestCase):
         # Tagged as it's made, so a step cut short after this still finds it its own.
         s3.create_bucket.assert_called_once_with(
             Bucket="b",
-            CreateBucketConfiguration={"LocationConstraint": "eu-west-1", "Tags": [{"Key": "vertra-made", "Value": "true"}]},
+            CreateBucketConfiguration={"LocationConstraint": "eu-west-1", "Tags": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]},
         )
         block = s3.put_public_access_block.call_args.kwargs["PublicAccessBlockConfiguration"]
         self.assertTrue(all(block.values()))
@@ -147,7 +156,7 @@ class CreateActionTest(unittest.TestCase):
         self.configure = lambda s3: setattr(s3.head_bucket, "side_effect", _client_error("404", 404))
         _, _, s3 = self._run({"bucketName": "b", "region": "us-east-1"})
         s3.create_bucket.assert_called_once_with(
-            Bucket="b", CreateBucketConfiguration={"Tags": [{"Key": "vertra-made", "Value": "true"}]}
+            Bucket="b", CreateBucketConfiguration={"Tags": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
         )
 
     def test_someone_elses_bucket_is_a_clear_refusal(self) -> None:

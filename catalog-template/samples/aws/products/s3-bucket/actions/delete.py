@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """aws/s3-bucket's "delete" action, its create's cleanup: deletes a bucket
-create made (tagged vertra-made=true), and no other. A bucket that's already
+create made (tagged vertra-made=true) for the run's team (tagged
+vertra-team=<it>), and no other. A bucket that's already
 gone counts as deleted; one that still holds objects is refused rather than
 emptied, so nothing anyone stored in it is lost by a cleanup.
 
@@ -20,6 +21,7 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 MADE_BY_TAG = ("vertra-made", "true")
+TEAM_TAG = "vertra-team"
 RETRYABLE_CODES = {
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
     "SlowDown", "ServiceUnavailable", "InternalError", "InternalFailure", "OperationAborted",
@@ -76,10 +78,14 @@ def _gone(bucket: str) -> int:
 
 
 def main() -> int:
-    inputs = json.loads(INPUT_PATH.read_text()).get("inputs", {})
+    request = json.loads(INPUT_PATH.read_text())
+    inputs = request.get("inputs", {})
     bucket, region = inputs.get("bucketName"), inputs.get("region")
     if not bucket or not region:
         return _failure("MISSING_INPUT", "inputs.bucketName and inputs.region are required")
+    team = request.get("forTeam")
+    if not team:
+        return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
 
     try:
         s3 = _session(region).client("s3")
@@ -102,6 +108,11 @@ def main() -> int:
             return _failure(
                 "NOT_MADE_BY_VERTRA",
                 f"Bucket '{bucket}' has no {MADE_BY_TAG[0]}={MADE_BY_TAG[1]} tag: this product deletes only buckets it made.",
+            )
+        if {"Key": TEAM_TAG, "Value": team} not in tags:
+            return _failure(
+                "NOT_THIS_TEAMS",
+                f"Bucket '{bucket}' has no {TEAM_TAG}={team} tag: this product deletes only buckets it made for this team.",
             )
         try:
             s3.delete_bucket(Bucket=bucket)

@@ -242,6 +242,24 @@ its own, for the team the resource was made for, so `shareWith` and
 `approval` apply to it too, and it must succeed when what it deletes is
 already gone. The local `ticket` sample does all of this.
 
+A cleanup is an action like any other: a team you share it with can run it
+directly, with any resource it names. So mark what you make with the team
+it's for, the request's `forTeam` (the cloud samples label or tag it
+`vertra-team=<forTeam>`, beside `vertra-made=true`), and have your delete
+refuse anything whose mark isn't the request's `forTeam`, and anything
+without one: that keeps one team's cleanup off another team's resources,
+and off anything made some other way. `forTeam` is the team the run is
+for, which the console sets and nobody can choose outside their own teams:
+a consumer's run of your shared product is for the consumer's team, a
+cleanup run from **What runs made** for the team the resource was made for,
+your own team's run for your team. A person's run for no team is for your
+team when they're in it, and otherwise has no `forTeam`: refuse what needs
+one. A create that finds what it would make
+reports it in `resources` only when it carries both marks for this team.
+A team name is a Kubernetes namespace name (lowercase letters, digits and
+`-`, at most 63), so it's a valid GCP label value and Azure or AWS tag value
+as it is.
+
 ```yaml
   - name: create
     output:
@@ -515,8 +533,11 @@ Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
   container's argument. `entrypoint.sh` runs `actions/<action>.*` by its
   shebang, or fails with `UNSUPPORTED_ACTION`, so language support lives
   entirely in the Dockerfile. The request is
-  `{"executionId", "taskId", "action", "attempt", "inputs"}`, `inputs`
-  always an object, with every `$fromStep` already replaced by its value.
+  `{"executionId", "taskId", "team", "forTeam", "action", "attempt",
+  "inputs"}`: `team` the namespace it runs in (your team), `forTeam` the
+  team the run is for (left out for a person's run for no team when
+  they aren't in yours; see `cleanup` above), `inputs` always an object, with every `$fromStep` already
+  replaced by its value.
   `executionId` and `taskId` together make a good idempotency key.
 - The action writes `/platform/output/result.json`, at most 4 KB, exactly
   one of:
@@ -571,6 +592,7 @@ each against the built image with the request mounted where the platform
 mounts it, with no network. A succeeding case must also match the action's
 schemas. A case's request.json may be just `{"inputs": {...}}`: the rest
 is filled in (`executionId: contract-test`, `taskId` the case's name,
+`team` and `forTeam` the product's team (`templates` for a starter),
 `attempt: 1`).
 
 Each case runs hardened as a step does on an install: a read-only root

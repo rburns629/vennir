@@ -11,6 +11,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 _MODULE_PATH = Path(__file__).parent / "create.py"
+# What create labels a project it makes for team web with.
+MADE_FOR_WEB = {"vertra-made": "true", "vertra-team": "web"}
 
 
 def _load_create_module():
@@ -42,6 +44,7 @@ class CreateActionTest(unittest.TestCase):
                 {
                     "executionId": "e",
                     "taskId": "t",
+                    "forTeam": "web",
                     "action": "create",
                     "attempt": 1,
                     "inputs": inputs,
@@ -80,9 +83,28 @@ class CreateActionTest(unittest.TestCase):
         # A retry that finds the project the first attempt made.
         self._write_request({"projectId": "made-before"})
         with patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls:
-            client_cls.return_value.get_project.return_value = MagicMock(labels={"vertra-made": "true"})
+            client_cls.return_value.get_project.return_value = MagicMock(labels=MADE_FOR_WEB)
             self.assertEqual(self.module.main(), 0)
         self.assertEqual(self._result()["outputs"]["resources"][0]["id"], "made-before")
+
+    def test_another_teams_project_isnt_reported_or_billed(self) -> None:
+        # Made by this product, but for another team: not this team's to delete.
+        self._write_request({"projectId": "data-1", "billingAccountId": "AAAAAA-BBBBBB-CCCCCC"})
+        with (
+            patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls,
+            patch.object(self.module, "CloudBillingClient") as billing_cls,
+        ):
+            client_cls.return_value.get_project.return_value = MagicMock(labels={"vertra-made": "true", "vertra-team": "data"})
+            self.assertEqual(self.module.main(), 0)
+        billing_cls.assert_not_called()
+        self.assertEqual(self._result(), {"status": "succeeded", "outputs": {"projectId": "data-1"}})
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"projectId": "brand-new"}}))
+        with patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls:
+            self.assertEqual(self.module.main(), 1)
+        client_cls.assert_not_called()
+        self.assertEqual(self._result()["error"]["code"], "MISSING_TEAM")
 
     def test_new_project_is_created_and_billing_linked(self) -> None:
         self._write_request(
@@ -102,7 +124,7 @@ class CreateActionTest(unittest.TestCase):
         client.create_project.assert_called_once()
         created_project = client.create_project.call_args.kwargs["project"]
         self.assertEqual(created_project.project_id, "brand-new")
-        self.assertEqual(dict(created_project.labels), {"vertra-made": "true"})
+        self.assertEqual(dict(created_project.labels), MADE_FOR_WEB)
         self.assertEqual(
             self._result()["outputs"]["resources"],
             [{"type": "gcp/project", "id": "brand-new", "link": "https://console.cloud.google.com/home/dashboard?project=brand-new"}],
@@ -194,7 +216,7 @@ class CreateActionTest(unittest.TestCase):
             patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls,
             patch.object(self.module, "CloudBillingClient") as billing_cls,
         ):
-            client_cls.return_value.get_project.return_value = MagicMock(labels={"vertra-made": "true"})
+            client_cls.return_value.get_project.return_value = MagicMock(labels=MADE_FOR_WEB)
             billing_cls.return_value.get_project_billing_info.return_value = MagicMock(billing_account_name="")
             self.assertEqual(self.module.main(), 0)
         client_cls.return_value.create_project.assert_not_called()
@@ -206,7 +228,7 @@ class CreateActionTest(unittest.TestCase):
             patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls,
             patch.object(self.module, "CloudBillingClient") as billing_cls,
         ):
-            client_cls.return_value.get_project.return_value = MagicMock(labels={"vertra-made": "true"})
+            client_cls.return_value.get_project.return_value = MagicMock(labels=MADE_FOR_WEB)
             billing_cls.return_value.get_project_billing_info.return_value = MagicMock(
                 billing_account_name="billingAccounts/AAAAAA-BBBBBB-CCCCCC"
             )
@@ -292,6 +314,7 @@ class BuildCredentialsTest(unittest.TestCase):
                     {
                         "executionId": "e",
                         "taskId": "t",
+                        "forTeam": "web",
                         "action": "create",
                         "attempt": 1,
                         "inputs": {"projectId": "already-exists"},

@@ -14,7 +14,7 @@ from botocore.exceptions import ClientError
 
 _MODULE_PATH = Path(__file__).parent / "delete.py"
 ARN = "arn:aws:rds:us-east-2:123456789012:db:orders-db"
-MADE = [{"Key": "vertra-made", "Value": "true"}]
+MADE = [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]
 
 
 def _load():
@@ -41,8 +41,11 @@ class DeleteActionTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
 
-    def _run(self, resource: dict, instance: dict | Exception | None = None) -> tuple[int, dict, object, object]:
-        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {"resource": resource}}))
+    def _run(self, resource: dict, instance: dict | Exception | None = None, team: str | None = "web") -> tuple[int, dict, object, object]:
+        request: dict = {"inputs": {"resource": resource}}
+        if team:
+            request["forTeam"] = team
+        self.module.INPUT_PATH.write_text(json.dumps(request))
         with patch.object(self.module.boto3.session, "Session") as session_cls:
             rds = session_cls.return_value.client.return_value
             if isinstance(instance, Exception):
@@ -69,6 +72,16 @@ class DeleteActionTest(unittest.TestCase):
         )
         self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VERTRA"))
         rds.delete_db_instance.assert_not_called()
+
+    def test_one_made_for_another_team_is_refused(self) -> None:
+        code, result, rds, _ = self._run({"type": "aws/rds-instance", "id": ARN}, {"DBInstanceStatus": "available", "TagList": MADE}, team="data")
+        self.assertEqual((code, result["error"]["code"]), (1, "NOT_THIS_TEAMS"))
+        rds.delete_db_instance.assert_not_called()
+
+    def test_a_request_without_a_team_is_refused(self) -> None:
+        code, result, _, session_cls = self._run({"type": "aws/rds-instance", "id": ARN}, team=None)
+        self.assertEqual((code, result["error"]["code"]), (1, "MISSING_TEAM"))
+        session_cls.assert_not_called()
 
     def test_one_already_gone_or_going_is_deleted(self) -> None:
         for instance in (_client_error("DBInstanceNotFound", 404), {"DBInstanceStatus": "deleting", "TagList": MADE}):
