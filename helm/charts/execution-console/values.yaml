@@ -291,7 +291,10 @@ gateway:
   serviceAccountAnnotations: {}
   image:
     repository: ghcr.io/rburns629/vertra/execution-gateway
+    # -- Defaults to the chart's appVersion, as image.tag does.
     tag: ""
+    # -- Pin by digest ("sha256:…"), as image.digest does.
+    digest: ""
     pullPolicy: IfNotPresent
   replicaCount: 1
   # -- A second listener (the Service's port public) for APIs reachable
