@@ -4,8 +4,8 @@ name: security
 #
 #   secrets   gitleaks over the commits a PR or push adds, and over the
 #             whole history on the weekly run.
-#   code      Semgrep: Python, TypeScript, Dockerfile, Kubernetes, GitHub
-#             Actions and secret rules from the Semgrep registry, plus
+#   code      Semgrep: Go, Python, TypeScript, Dockerfile, Kubernetes,
+#             GitHub Actions and secret rules from the Semgrep registry, plus
 #             .semgrep/malicious.yml (reverse shells, piping downloads to a
 #             shell, hidden payloads, mining, calls to bare IPs).
 #
@@ -89,7 +89,7 @@ jobs:
         run: |
           set +e
           semgrep scan --metrics=off --disable-version-check --error \
-            --config p/python --config p/typescript --config p/dockerfile \
+            --config p/golang --config p/python --config p/typescript --config p/dockerfile \
             --config p/kubernetes --config p/github-actions --config p/secrets \
             --config .semgrep/ \
             --exclude-rule javascript.express.security.audit.xss.direct-response-write.direct-response-write \
@@ -109,7 +109,7 @@ jobs:
           {
             echo "### Code scan: findings"
             echo
-            echo "A finding with a real, reviewed reason can be suppressed on its line with \`# nosemgrep: <rule id>\` and the reason beside it."
+            echo "A finding with a real, reviewed reason can be suppressed on its line with a \`nosemgrep: <rule id>\` comment (\`#\` or \`//\`) and the reason beside it."
             echo
             echo "| Severity | Rule | Where | What |"
             echo "|---|---|---|---|"

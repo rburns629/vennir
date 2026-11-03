@@ -15,7 +15,7 @@ package main
 import (
 	"encoding/json"
 	"log/slog"
-	"math/rand/v2"
+	"math/rand/v2" // nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used -- jitters a test delay, nothing secret
 	"net/http"
 	"os"
 	"sync"

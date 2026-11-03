@@ -873,8 +873,10 @@ fix, a secret in a layer, or a known-malicious package fails the release),
 pushes them to GHCR and signs each digest with cosign, keyless, as the
 workflow's own GitHub identity. The charts and the `vertra` binaries are
 signed the same way, and a catalog's `./vertra` downloads its binary by
-SHA-256. Every pull request also runs Semgrep, gitleaks, and the same scan
-of the three platform images (`.github/workflows/security.yml`, `ci.yml`).
+SHA-256; the release checks it with govulncheck before pushing it. Every
+pull request also runs Semgrep (Go rules included), gitleaks, govulncheck
+over the CLI, the kernel and the gateway, and the same scan of the three
+platform images (`.github/workflows/security.yml`, `ci.yml`).
 
 Nothing verifies those signatures when installing: `vertra` pulls the
 charts by version, the charts run their images by tag unless

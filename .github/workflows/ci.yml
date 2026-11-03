@@ -17,6 +17,9 @@ name: ci
 #             (backup destinations, a shared database, policies off), so a
 #             change that breaks a template fails here, not at helm upgrade.
 #   cli       gofmt, go vet and the unit tests of vertra (its catalog commands included), and macOS builds.
+#   govulncheck  known vulnerabilities (Go's database) that the CLI's, the
+#             kernel's or the gateway's code can reach, in their modules or
+#             the standard library; weekly too, for new ones.
 #   perf      gofmt, go vet and the benchmark driver's own tests (the
 #             benchmarks themselves run by hand: perf/README.md).
 #   opentofu  init, validate and fmt of the CLI's OpenTofu modules.
@@ -288,6 +291,26 @@ jobs:
       - run: apk add --no-cache git
       - run: go test ./...
       - run: GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/vertra
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    # The Go toolchain the three are built with, pinned by digest: its
+    # standard library is part of what's checked.
+    container: golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd
+    env:
+      CGO_ENABLED: "0"
+      # Pinned; go run checks the module against the Go checksum database.
+      GOVULNCHECK: golang.org/x/vuln/cmd/govulncheck@v1.9.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Fails on a known vulnerability the code can reach; one only in a
+      # module it doesn't call is listed, not failed.
+      - working-directory: cli
+        run: go run "$GOVULNCHECK" ./...
+      - working-directory: kernel
+        run: go run "$GOVULNCHECK" ./...
+      - working-directory: gateway
+        run: go run "$GOVULNCHECK" ./...
 
   perf:
     # The benchmark driver's own tests (its workloads' shapes and caps, its
