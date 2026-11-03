@@ -6,7 +6,7 @@ An API product is a backend a team already runs, published through this install'
 
 A team publishes a backend it already runs (a Service in its namespace, a Cloud Run service, a Lambda function URL) by adding an `api.yaml` and an OpenAPI file to its catalog folder. Once the catalog's release is applied, the gateway answers for it at `/<team>/<name>/` and forwards requests to the backend.
 
-The OpenAPI file is the allowlist. The gateway forwards a request only when its method and path are an operation in that file and the request fits that operation's schemas. Anything else is answered by the gateway and never reaches the backend.
+The OpenAPI file is the allowlist. The gateway forwards a request only when its method and path are an operation in that file and the request fits that operation's schemas: a query parameter the operation doesn't declare is refused, and so is a body on an operation that declares none, a body without a `Content-Type`, or one whose media type has a schema the gateway can't check (it checks JSON). Headers the operation doesn't mention are passed on. Anything else is answered by the gateway and never reaches the backend.
 
 | Word | What it is |
 | --- | --- |

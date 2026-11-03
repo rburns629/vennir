@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pb33f/libopenapi"
 	validator "github.com/pb33f/libopenapi-validator"
+	"github.com/pb33f/libopenapi-validator/config"
 )
 
 // API is one published API, as the gateway serves it.
@@ -246,7 +247,16 @@ func build(spec []byte) (validator.Validator, string) {
 	if err != nil {
 		return nil, "its OpenAPI document can't be read: " + err.Error()
 	}
-	v, errs := validator.NewValidator(doc)
+	// Strict: what the document doesn't describe isn't forwarded. A body
+	// on an operation that declares none, or of a media type with a schema
+	// the validator can't decode, is refused, and so is an undeclared query
+	// parameter. Headers and cookies aren't held to it (clients and proxies
+	// add their own), nor a body's properties beyond what its schema allows.
+	v, errs := validator.NewValidator(doc,
+		config.WithRejectUndeclaredRequestBody(),
+		config.WithRejectUnsupportedBodyContent(),
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.headers.**", "$.cookies.**", "$.body.**"))
 	if len(errs) > 0 {
 		return nil, fmt.Sprintf("its OpenAPI document can't be used: %v", errs[0])
 	}

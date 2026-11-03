@@ -244,6 +244,13 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, result, http.StatusRequestEntityTooLarge, "TOO_LARGE", "The body is larger than this API takes: "+strconv.FormatInt(api.MaxRequest, 10)+" bytes.")
 	}
 
+	// The validator checks a body only by its Content-Type, and would let
+	// one without it through unchecked.
+	if len(body) > 0 && r.Header.Get("Content-Type") == "" {
+		result.name = "invalid"
+		return g.refuse(w, result, http.StatusBadRequest, "INVALID_REQUEST", "A body needs a Content-Type: nothing was forwarded.")
+	}
+
 	target := *api.BackendURL
 	target.Path = strings.TrimSuffix(api.BackendURL.Path, "/") + rest
 	target.RawPath = ""

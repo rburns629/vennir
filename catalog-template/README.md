@@ -445,7 +445,9 @@ namespace) can be published through the install's gateway, without
 changing it. Its OpenAPI file is the allowlist: the gateway forwards a
 request only when its method and path are an operation in the file and it
 fits that operation's schemas, exactly as sent (headers, query and body),
-with the caller's credential swapped for the backend's. Anything else gets
+with the caller's credential swapped for the backend's. Declare every query
+parameter and every body (with a JSON media type, the one the gateway can
+check against a schema): an undeclared one is refused. Anything else gets
 404 or 400 from the gateway and never reaches your backend.
 
 ```yaml
