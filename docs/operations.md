@@ -614,9 +614,10 @@ process is up) and `GET /health/ready` on their API ports: kernel-api's is
 ready once its database answers and is at the schema its code expects, the
 console's once its database answers. The charts' probes use them. The
 scheduler serves no health endpoint: its loop touches a heartbeat file each
-time round, and its liveness probe restarts it when the file is older than
-`scheduler.livenessSeconds` (300; keep it above the slowest pass a slow
-Kubernetes API can make, as its comment in the chart's values works out).
+time round and between the phases of a pass, and its liveness probe
+restarts it when the file is older than `scheduler.livenessSeconds` (300;
+keep it above the slowest phase a slow Kubernetes API can make, as its
+comment in the chart's values works out).
 
 **Log format.** One JSON object per line on stdout. The kernel's carry
 `timestamp`, `severity` (`INFO`, `WARNING`, `ERROR`), `logger`, `message`

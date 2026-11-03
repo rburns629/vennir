@@ -160,3 +160,16 @@ func TestWhatFinishedIsCommittedBeforeASlowDispatch(t *testing.T) {
 	}
 	equal(t, "second", tasksByKey(t, testPool, second)["only"].State, domain.TaskRunning)
 }
+
+// The heartbeat is touched between a pass's phases too, so the probe
+// bounds the slowest phase rather than their sum.
+func TestAPassTouchesTheHeartbeatBetweenItsPhases(t *testing.T) {
+	loop := &Loop{Pool: testPool, Executor: fake(), Options: DefaultOptions(fmt.Sprintf("loop-heartbeat-%d", time.Now().UnixNano())),
+		HeartbeatFile: filepath.Join(t.TempDir(), "heartbeat"), Log: quietLog}
+	if _, err := loop.pass(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(loop.HeartbeatFile); err != nil {
+		t.Errorf("no heartbeat: %v", err)
+	}
+}

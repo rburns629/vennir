@@ -256,14 +256,20 @@ scheduler:
     maxLines: 5000
     maxBytes: 1048576
     refreshSeconds: 60
-  # The scheduler is restarted when its loop hasn't come round for this
-  # long (a hung pass), plus the probe's own 90 s (3 failures, 30 s apart).
-  # Keep that above the slowest pass the Kubernetes API can make: about
-  # ceil(claimLimit / executorConcurrency) x 2 calls x
-  # kubernetesRequestTimeoutSeconds to dispatch (4 x 2 x 30 = 240 s by
-  # default), plus pollIntervalSeconds. Lower than that, a slow API server
-  # gets the scheduler restarted mid-pass, and the new one makes the same
-  # slow pass.
+  # The scheduler is restarted when its heartbeat is this old (a hung pass),
+  # plus the probe's own 90 s (3 failures, 30 s apart). It's touched between
+  # each phase of a turn, so keep that above the slowest one a slow
+  # Kubernetes API can make (each call waits at most
+  # kubernetesRequestTimeoutSeconds, T):
+  #   dispatching: ceil(claimLimit / executorConcurrency) x 2 calls x T
+  #     (4 x 2 x 30 = 240 s by default);
+  #   recording: ceil(running steps / executorConcurrency) x 2 calls x T
+  #     for their statuses (as long as dispatching at 64 steps running,
+  #     longer above), plus its database statements;
+  #   releasing finished steps: 2 calls x T each, one at a time; and the
+  #     orphan sweep (every 5 minutes): one list, then 2 x T per orphan.
+  # Lower than that, a slow API server gets the scheduler restarted
+  # mid-pass, and the new one makes the same slow pass.
   livenessSeconds: 300
   heartbeatFile: /tmp/vertra-scheduler-heartbeat
   # A running step whose Job and Pod haven't changed isn't re-read from the

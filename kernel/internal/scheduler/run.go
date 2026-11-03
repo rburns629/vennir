@@ -78,6 +78,10 @@ func (h *heldJobs) take(now time.Time) []executor.Handle {
 	return due
 }
 
+// heartbeat touches the liveness probe's file: each time the loop comes
+// round, and between the phases of one turn (recording, dispatching,
+// housekeeping, releasing), so the probe bounds the slowest phase, not
+// their sum.
 func (l *Loop) heartbeat() {
 	now := time.Now()
 	if err := os.Chtimes(l.HeartbeatFile, now, now); err != nil {
@@ -114,11 +118,13 @@ func (l *Loop) Run(ctx context.Context) error {
 		}
 		// Committed: only now may what finished be removed, once held.
 		l.held.hold(outcome.Finished, time.Now().Add(l.ReleaseAfter))
+		l.heartbeat()
 		if err != nil {
 			metrics.TickErrors.Inc()
 			l.Log.Error("scheduler tick failed; will retry next poll", "error", err.Error())
 		} else {
 			l.housekeeping(work, &nextRetention, &nextOrphanSweep)
+			l.heartbeat()
 		}
 		ReleaseFinished(work, l.Executor, l.held.take(time.Now()), l.Log)
 		if time.Now().After(nextGauges) {
@@ -165,6 +171,7 @@ func (l *Loop) pass(ctx context.Context) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
+	l.heartbeat()
 	err = pgx.BeginFunc(ctx, l.Pool, func(tx pgx.Tx) error {
 		var err error
 		dispatched, err = DispatchPass(ctx, tx, l.Executor, l.Options, time.Now(), l.Log)
