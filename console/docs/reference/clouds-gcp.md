@@ -40,7 +40,10 @@ A project in an organization may be limited by its policies. `init` checks
 two that stop an install:
 
 - **Resource locations** (`gcp.resourceLocations`): choose a region it
-  allows.
+  allows. vertra reads regions and the groups named after them
+  (`in:us-locations`, `in:europe-locations`…). For a group named after a
+  jurisdiction (`in:eu-locations`, `in:japan-locations`…), it says it can't
+  tell rather than refusing, and the apply stops if Google refuses.
 - **External IPs for VMs** (`compute.vmExternalIpAccess`): GKE's nodes then
   need private nodes and Cloud NAT, which the module doesn't make yet.
 

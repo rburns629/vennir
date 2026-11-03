@@ -121,6 +121,12 @@ Kernel and alerts:
 
 ## Installing and operating
 
+- [ ] **The gcp access check reads only a location policy's allowed
+  values** (found reviewing M-1, 2026-11-03): `orgPolicyValues`
+  (`cli/internal/access/gcp.go`) reads `listPolicy.allowedValues`, so a
+  `gcp.resourceLocations` policy that lists `deniedValues` isn't seen. It
+  fails toward no problem: the apply stops when Google refuses the region.
+
 - [x] **A burst that starts a counter can't fire its alert** (found proving
   #45 on kind; fixed 2026-10-30, #46): a series born holding a burst has no
   lower sample, so `increase()` missed the 70 failed sign-ins that made
