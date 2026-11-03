@@ -12,8 +12,8 @@
 //  2. the caller signs in, as the console's callers do; else 401, or 404
 //     for a hidden or paused API: before sign-in it's as one that isn't
 //     there, and nothing of its state is told
-//  3. the caller may see it: it isn't hidden, or it's their team's or
-//     shared with them, or they're an admin; else 404, as the console
+//  3. the caller may see it: it isn't hidden, or it's their team's, or
+//     they're an admin; else 404, as the console's sees()
 //  4. it isn't closed, paused or held, and its spec could be read; else 503
 //  5. it's shared with one of the caller's teams; else 403
 //  6. its body is within the API's size; else 413
@@ -238,9 +238,9 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, o.as("unavailable"), http.StatusServiceUnavailable, "UNAVAILABLE", "The gateway can't check who you are right now.")
 	}
 	o.subject = "user:" + who.UserID
-	if _, shared := g.callingTeam(who, api, ""); api.Hidden && !shared && !who.IsAdmin {
-		// As the console's sees(): a hidden API is its own team's (and,
-		// here, those it's shared with), and no one else hears of it.
+	if api.Hidden && !who.IsAdmin && !slices.Contains(who.Teams, api.Team) {
+		// As the console's sees(): a hidden API is its own team's (and
+		// admins'), whatever it's shared with, and no one else hears of it.
 		return g.refuse(w, o.as("not_found"), http.StatusNotFound, "NOT_FOUND", "No such API here.")
 	}
 
@@ -360,7 +360,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		}
 		for _, v := range values {
 			if k == "Set-Cookie" {
-				if v = scopeCookie(v, "/"+api.Team+"/"+api.Name); v == "" {
+				if v = scopeCookie(v, "/"+api.Team+"/"+api.Name, api.BackendURL.Path); v == "" {
 					continue
 				}
 			}
@@ -437,19 +437,34 @@ func forwardHeaders(in http.Header, remoteAddr string) http.Header {
 }
 
 // scopeCookie is a backend's Set-Cookie kept to its API's own path (every
-// API shares the gateway's origin), and to the gateway's host: its Path
-// under base, no Domain. "" when it can't be read, so it isn't passed on.
-func scopeCookie(setCookie, base string) string {
+// API shares the gateway's origin), and to the gateway's host: its Path, as
+// the caller sees it (less the backend's own base path, backendPath), under
+// base (/<team>/<api>), the API's root when it's outside the backend's
+// base; no Domain; its other attributes kept. "" when it can't be read, or
+// it's a __Host- cookie (which must be Path=/, so can't be kept to one
+// API): it isn't passed on.
+func scopeCookie(setCookie, base, backendPath string) string {
 	c, err := http.ParseSetCookie(setCookie)
-	if err != nil {
+	if err != nil || strings.HasPrefix(c.Name, "__Host-") {
 		return ""
 	}
-	path := c.Path
-	if !strings.HasPrefix(path, "/") {
+	path, prefix := c.Path, strings.TrimSuffix(backendPath, "/")
+	switch {
+	case !strings.HasPrefix(path, "/"):
+		path = "/"
+	case prefix == "":
+	case path == prefix || strings.HasPrefix(path, prefix+"/"):
+		path = "/" + strings.TrimPrefix(strings.TrimPrefix(path, prefix), "/")
+	default:
 		path = "/"
 	}
 	c.Path, c.Domain = base+path, ""
-	return c.String()
+	// String drops the attributes it doesn't know (Unparsed): kept as sent.
+	out := c.String()
+	for _, attr := range c.Unparsed {
+		out += "; " + attr
+	}
+	return out
 }
 
 // transport is a client whose wait for the backend's answer to begin is

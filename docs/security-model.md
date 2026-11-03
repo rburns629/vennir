@@ -460,7 +460,7 @@ Paths with encoded slashes, backslashes or dot segments (`..;` too) are
 refused, so what's checked is what's forwarded. Before sign-in, an API
 that's hidden or paused is answered as one that isn't there (404), so its
 state and pause message reach only signed-in callers who can see it; a
-hidden one is 404 to a caller it isn't shared with, as in the console.
+hidden one is 404 to anyone but its own team and admins, as in the console.
 
 Backends must be under hosts the admins allow (`gateway.backendHosts`), or
 the API is held: the gateway can't be pointed anywhere a catalog says. Its

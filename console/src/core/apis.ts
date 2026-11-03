@@ -247,7 +247,7 @@ export async function pauseApi(caller: AuthUser | undefined, team: string, name:
 }
 
 /** Outcomes the gateway answers itself, without forwarding. */
-const STOPPED = ["blocked", "invalid", "limited", "unauthenticated", "forbidden", "paused", "held", "closed", "unavailable"];
+const STOPPED = ["blocked", "invalid", "limited", "unauthenticated", "forbidden", "not_found", "paused", "held", "closed", "unavailable"];
 
 /** An API's traffic over the last `hours`: its own team, and admins. */
 export async function getApiTraffic(caller: AuthUser | undefined, team: string, name: string, hours: number) {

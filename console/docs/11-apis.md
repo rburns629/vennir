@@ -96,14 +96,14 @@ For each request to `/<team>/<name>/<path>`:
 
 1. **The API exists here.** On the public address, only APIs reachable from the internet are served. Else 404.
 2. **You're signed in.** Else 401; but 404 for a hidden or paused API, which before you sign in is answered as one that isn't there.
-3. **You may see it.** A hidden API is only for its own team, the teams it's shared with, and admins. Else 404, as in the console.
+3. **You may see it.** A hidden API is only for its own team and admins, whatever it's shared with. Else 404, as in the console.
 4. **It's open.** Not closed by an admin, not paused, not held, and its spec could be read. Else 503.
 5. **It's shared with your team.** Else 403.
 6. **The body isn't too large** for this API (`maxRequest`, 1 MiB unless it says otherwise). Else 413.
 7. **The method and path are an operation in the spec.** Else 404, and the request is counted as blocked.
 8. **Parameters, headers and body fit that operation's schemas**, with no query parameter it doesn't declare, a body only where it declares one, and that body with a `Content-Type`. Else 400, with what didn't fit.
 9. **Your team is within its requests a minute.** Else 429, with `Retry-After`.
-10. **Forwarded** to the backend, with the backend's own credential. `X-Forwarded-For` is the address the gateway got the request from (on the public address, the ingress's); a caller's own `Forwarded`, `X-Forwarded-*` and `X-Real-Ip` are dropped. A cookie the backend sets is kept to the API's own path (`/<team>/<name>/`), since every API shares the gateway's address.
+10. **Forwarded** to the backend, with the backend's own credential. `X-Forwarded-For` is the address the gateway got the request from (on the public address, the ingress's); a caller's own `Forwarded`, `X-Forwarded-*` and `X-Real-Ip` are dropped. A cookie the backend sets is kept to the API's own path (`/<team>/<name>/`, its `Path` as callers see it, without the backend's base path), since every API shares the gateway's address; a `__Host-` cookie, which must cover the whole address, is dropped.
 
 A path with an encoded slash (`%2F`), a backslash (`%5C`), or a `.`, `..`, `.;…` or `..;…` segment is refused with 404 before any of this, so the path that's checked is the path that's forwarded.
 

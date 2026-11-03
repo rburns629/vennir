@@ -129,10 +129,11 @@ func setup(t *testing.T, basePath string) *fixture {
 	gw := &Gateway{
 		Store: st,
 		Callers: callers{
-			"web-person": {UserID: "u1", Email: "web@example.com", Teams: []string{"web"}},
-			"outsider":   {UserID: "u2", Teams: []string{"data"}},
-			"two-teams":  {UserID: "u3", Teams: []string{"data", "web"}},
-			"admin":      {UserID: "u4", IsAdmin: true, Teams: []string{"data"}},
+			"web-person":      {UserID: "u1", Email: "web@example.com", Teams: []string{"web"}},
+			"outsider":        {UserID: "u2", Teams: []string{"data"}},
+			"two-teams":       {UserID: "u3", Teams: []string{"data", "web"}},
+			"admin":           {UserID: "u4", IsAdmin: true, Teams: []string{"data"}},
+			"payments-person": {UserID: "u5", Teams: []string{"payments"}},
 		},
 		Signer:   &caller.Signer{Key: key, Issuer: "https://api.example.com"},
 		Limiter:  limits.New(),
@@ -461,13 +462,36 @@ func TestWhatsToldBeforeSignIn(t *testing.T) {
 	if w := f.do("GET", path, "admin", "", nil); w.Code != 403 || errorCode(t, w) != "NOT_SHARED" {
 		t.Errorf("hidden, an admin: %d %s", w.Code, w.Body)
 	}
-	if w := f.do("GET", path, "web-person", "", nil); w.Code != 201 {
-		t.Errorf("hidden, from a team it's shared with: %d %s", w.Code, w.Body)
+	if w := f.do("GET", path, "web-person", "", nil); w.Code != 404 || w.Body.String() != missing.Body.String() {
+		t.Errorf("hidden, from a team it's shared with (as the console, only its own team's): %d %s", w.Code, w.Body)
+	}
+	if w := f.do("GET", path, "payments-person", "", nil); w.Code != 201 {
+		t.Errorf("hidden, from its own team: %d %s", w.Code, w.Body)
 	}
 	// A live one says only "sign in", whatever its state.
 	f.api.Hidden = false
 	f.gw.Settings.Closed = true
 	if w := f.do("GET", path, "", "", nil); w.Code != 401 {
 		t.Errorf("closed, before sign-in: %d %s", w.Code, w.Body)
+	}
+}
+
+func TestABackendsCookiesAreKeptToItsAPI(t *testing.T) {
+	for name, tc := range map[string]struct{ setCookie, backendPath, want string }{
+		"no path":                    {"a=1", "", "a=1; Path=/payments/orders/"},
+		"a path":                     {"a=1; Path=/orders", "", "a=1; Path=/payments/orders/orders"},
+		"a domain":                   {"a=1; Path=/; Domain=example.com", "", "a=1; Path=/payments/orders/"},
+		"under the backend's base":   {"a=1; Path=/v1/orders", "/v1", "a=1; Path=/payments/orders/orders"},
+		"the backend's base itself":  {"a=1; Path=/v1", "/v1/", "a=1; Path=/payments/orders/"},
+		"outside the backend's base": {"a=1; Path=/other", "/v1", "a=1; Path=/payments/orders/"},
+		"not quite the base":         {"a=1; Path=/v10/x", "/v1", "a=1; Path=/payments/orders/"},
+		"attributes it knows":        {"a=1; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=60", "", "a=1; Path=/payments/orders/; Max-Age=60; HttpOnly; Secure; SameSite=Strict"},
+		"attributes it doesn't":      {"a=1; Path=/; Priority=High", "", "a=1; Path=/payments/orders/; Priority=High"},
+		"a __Host- cookie":           {"__Host-sid=1; Path=/; Secure", "", ""},
+		"not a cookie":               {"=", "", ""},
+	} {
+		if got := scopeCookie(tc.setCookie, "/payments/orders", tc.backendPath); got != tc.want {
+			t.Errorf("%s: %q, want %q", name, got, tc.want)
+		}
 	}
 }

@@ -171,6 +171,7 @@ const GATEWAY_REFUSALS: Record<string, { code: string; why: string }> = {
   invalid: { code: "INVALID_REQUEST", why: "The request didn't fit the API's OpenAPI document, or was too large." },
   unauthenticated: { code: "UNAUTHENTICATED", why: "No valid session or bot token." },
   forbidden: { code: "NOT_SHARED", why: "The API isn't shared with the caller's team." },
+  not_found: { code: "NOT_FOUND", why: "The API is hidden, and the caller isn't of its team: they were told there's no such API." },
   limited: { code: "RATE_LIMITED", why: "Over the calling team's requests a minute." },
   paused: { code: "API_PAUSED", why: "Its team paused the API." },
   closed: { code: "GATEWAY_CLOSED", why: "The gateway was closed." },
