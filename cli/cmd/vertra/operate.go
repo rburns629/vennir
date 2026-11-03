@@ -402,7 +402,8 @@ func (a *app) destroyCmd() *cobra.Command {
 				}
 				kctx := cluster.Context(c)
 				if deleteData {
-					if err := a.runner.Run(ctx, "kubectl", "--context", kctx, "--namespace", c.Namespace, "delete", "pvc",
+					// The volumes, and the Secrets kept with them (their passwords).
+					if err := a.runner.Run(ctx, "kubectl", "--context", kctx, "--namespace", c.Namespace, "delete", "pvc,secret",
 						"-l", "app.kubernetes.io/instance in ("+install.KernelRelease+","+install.ConsoleRelease+")"); err != nil {
 						return err
 					}
