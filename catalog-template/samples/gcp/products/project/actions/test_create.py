@@ -169,6 +169,44 @@ class CreateActionTest(unittest.TestCase):
             self.assertEqual(self.module.main(), 1)
         self.assertEqual(self._result()["error"], {**self._result()["error"], "code": "PROJECT_ID_TAKEN", "retryable": False})
 
+    def test_a_project_made_meanwhile_for_this_team_is_found(self) -> None:
+        # Another step for the same id (or an earlier attempt) made it
+        # between the lookup and the create.
+        self._write_request({"projectId": "raced", "billingAccountId": "AAAAAA-BBBBBB-CCCCCC"})
+        with (
+            patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls,
+            patch.object(self.module, "CloudBillingClient") as billing_cls,
+        ):
+            client = client_cls.return_value
+            client.get_project.side_effect = [self.module.NotFound("not yet"), MagicMock(labels=MADE_FOR_WEB)]
+            client.create_project.return_value.result.side_effect = self.module.AlreadyExists("taken")
+            billing_cls.return_value.get_project_billing_info.return_value = MagicMock(billing_account_name="")
+            self.assertEqual(self.module.main(), 0)
+        billing_cls.return_value.update_project_billing_info.assert_called_once()
+        self.assertEqual(self._result()["outputs"]["resources"][0]["id"], "raced")
+
+    def test_a_project_made_meanwhile_some_other_way_isnt_reported(self) -> None:
+        self._write_request({"projectId": "raced"})
+        with patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls:
+            client = client_cls.return_value
+            client.get_project.side_effect = [self.module.NotFound("not yet"), MagicMock(labels={})]
+            client.create_project.return_value.result.side_effect = self.module.AlreadyExists("taken")
+            self.assertEqual(self.module.main(), 0)
+        self.assertEqual(self._result(), {"status": "succeeded", "outputs": {"projectId": "raced"}})
+
+    def test_a_taken_id_unseen_on_a_retry_is_retried(self) -> None:
+        # Perhaps the first attempt's create, still running where this
+        # identity can't see it yet.
+        request = {"forTeam": "web", "attempt": 2, "inputs": {"projectId": "in-flight"}}
+        self.module.INPUT_PATH.write_text(json.dumps(request))
+        with patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls:
+            client = client_cls.return_value
+            client.get_project.side_effect = self.module.PermissionDenied("denied")
+            client.create_project.return_value.result.side_effect = self.module.AlreadyExists("taken")
+            self.assertEqual(self.module.main(), 1)
+        error = self._result()["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("PROJECT_ID_TAKEN", True))
+
     def test_new_project_without_billing_account_skips_billing_call(self) -> None:
         self._write_request({"projectId": "brand-new-no-billing"})
         with (
