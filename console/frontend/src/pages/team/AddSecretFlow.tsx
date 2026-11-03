@@ -343,27 +343,35 @@ export function AddSecretFlow({
  * for a whole file such as a key.json, and never spell-checked, corrected
  * or remembered by the browser (enhanced spell check sends what it checks
  * to its vendor). Show unmasks it to check it.
+ *
+ * Masking is -webkit-text-security, which Chrome, Edge and Safari support
+ * but Firefox doesn't: there the value shows as typed, so the field says so
+ * and offers no Show (still never spell-checked or remembered).
  */
 function SecretValueField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const id = useId();
+  const [canMask] = useState(() => typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("-webkit-text-security", "disc"));
   const [shown, setShown] = useState(false);
+  const masked = canMask && !shown;
   return (
     <Stack spacing={0.5}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
         <Typography component="label" htmlFor={id} variant="body2" sx={{ fontWeight: 500 }}>
           Value
         </Typography>
-        <Button
-          size="small"
-          variant="outlined"
-          aria-pressed={shown}
-          aria-controls={id}
-          onClick={() => {
-            setShown((s) => !s);
-          }}
-        >
-          {shown ? "Hide" : "Show"}
-        </Button>
+        {canMask && (
+          <Button
+            size="small"
+            variant="outlined"
+            aria-pressed={shown}
+            aria-controls={id}
+            onClick={() => {
+              setShown((s) => !s);
+            }}
+          >
+            {shown ? "Hide" : "Show"}
+          </Button>
+        )}
       </Box>
       <TextField
         id={id}
@@ -375,7 +383,7 @@ function SecretValueField({ value, onChange }: { value: string; onChange: (value
         onChange={(event) => {
           onChange(event.target.value);
         }}
-        helperText="Hidden as you paste, and never spell-checked or suggested. Kept encrypted; nobody can read it back here."
+        helperText={`${masked ? "Hidden as you paste, and never" : canMask ? "Never" : "This browser can't hide it as you paste. It's never"} spell-checked or suggested. Kept encrypted; nobody can read it back here.`}
         slotProps={{
           htmlInput: {
             spellCheck: false,
@@ -386,7 +394,7 @@ function SecretValueField({ value, onChange }: { value: string; onChange: (value
           },
         }}
         // Masked yet multi-line: a textarea can't be type="password".
-        sx={shown ? undefined : { "& textarea": { WebkitTextSecurity: "disc" } }}
+        sx={masked ? { "& textarea": { WebkitTextSecurity: "disc" } } : undefined}
       />
     </Stack>
   );
