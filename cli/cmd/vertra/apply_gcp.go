@@ -354,6 +354,7 @@ func (a *app) destroyGCP(ctx context.Context, out io.Writer, dir string, c *conf
 		} else if disks, _ := a.runner.Output(ctx, "kubectl", "--context", kctx, "get", "pv",
 			"-o", "jsonpath={range .items[*]}{.spec.csi.volumeHandle}{\"\\n\"}{end}"); disks != "" {
 			fmt.Fprintln(out, "Keeping the database's disk:", strings.ReplaceAll(disks, "\n", ", "))
+			fmt.Fprintln(out, "Its passwords were in the cluster, which goes with it: a new install can open it only after resetting them in Postgres by hand.")
 		}
 	}
 
