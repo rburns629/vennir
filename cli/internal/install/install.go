@@ -1037,12 +1037,15 @@ func WithFirstAdmin(consoleValues map[string]any) {
 
 // AdminCreated reports whether this install's migrate Job created the first
 // admin (with GivePassword's password), from the line its log has for that
-// (never a password). False only when the log was read and hasn't it: the
-// account was already there, its data kept from before.
+// (never a password). False only when the logs were read and haven't it:
+// the account was already there, its data kept from before. Every attempt's
+// Pod is read (`logs job/...` reads only one, maybe a failed first try).
 func AdminCreated(ctx context.Context, r *run.Runner, c *config.Config) bool {
 	out, err := r.Output(ctx, "kubectl", "--context", cluster.Context(c), "--namespace", c.Namespace,
-		"logs", "job/"+ConsoleRelease+"-execution-console-migrate")
-	return err != nil || strings.Contains(out, "Bootstrap admin account created: "+c.Admin.Email)
+		"logs", "--selector", "batch.kubernetes.io/job-name="+ConsoleRelease+"-execution-console-migrate",
+		"--tail=-1", "--max-log-requests=20")
+	// No Pod at all (the Job gone) says nothing either way.
+	return err != nil || out == "" || strings.Contains(out, "Bootstrap admin account created: "+c.Admin.Email)
 }
 
 // ForgetPassword deletes GivePassword's Secret once the console is

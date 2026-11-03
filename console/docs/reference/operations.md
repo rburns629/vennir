@@ -1304,6 +1304,11 @@ else does (a new account's, or an admin's reset of theirs). Without vertra: `kub
 deploy/console-execution-console -n vertra-system -- node
 dist/db/resetAdmin.js <email>`.
 
+**Installed before 2026-11-03, and the first admin hasn't signed in yet?**
+Its generated password was printed to the migrate Job's log, which the
+cluster's logging may still keep, and it still works: run `vertra admin
+reset-password <env>` (or `resetAdmin.js` above) now.
+
 **An admin account appeared after an upgrade.** Every console install and
 upgrade creates an admin with the console chart's `bootstrapAdmin.email`
 (`admin.email` in vertra.yaml) when no account has that email: the first

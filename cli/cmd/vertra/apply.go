@@ -197,8 +197,8 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 		return err
 	}
 	generated := install.ConsoleValues(c, envName(dir), images, made)
-	var password string // the first admin's, on a fresh install
-	if installed[install.ConsoleRelease] == "" {
+	var password string // the first admin's, until an apply has finished
+	if firstAdminPending(dir, installed[install.ConsoleRelease]) {
 		// Saved first, so it can't be lost, then given to the console in a
 		// Secret (never through a log, which the cluster may keep). One
 		// saved already (an install that stopped part way) is used again.
@@ -331,6 +331,16 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 		}
 	}
 	return nil
+}
+
+// firstAdminPending: the first admin's password is still to be given to the
+// console. A fresh install, or one whose first apply stopped part way (a
+// failed release is still listed, and its next upgrade's migrate may be the
+// one that creates the account): a password is saved and no apply has
+// finished (applied.yaml). Given again to an account that exists, it's
+// harmless: the console leaves that account alone.
+func firstAdminPending(dir, consoleChart string) bool {
+	return consoleChart == "" || (savedPassword(dir) != "" && config.Applied(dir) == nil)
 }
 
 // current is what apply finds installed, beyond the releases.

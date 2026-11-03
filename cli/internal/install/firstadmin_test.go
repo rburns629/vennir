@@ -58,17 +58,26 @@ func TestGivePassword(t *testing.T) {
 	}
 }
 
-// The account is new only when the migrate Job's log says so; a log that
-// can't be read isn't taken to mean it wasn't.
+// The account is new only when a migrate Pod's log says so, any of them (a
+// failed first try's, then the one that created it); logs that can't be
+// read, or no Pod, aren't taken to mean it wasn't.
 func TestAdminCreated(t *testing.T) {
 	c := kindConfig()
-	r, _ := fakeKubectl(t, "Migrations applied.\nBootstrap admin account created: admin@example.com\n")
+	r, dir := fakeKubectl(t, "Error: connect ECONNREFUSED\nMigrations applied.\nBootstrap admin account created: admin@example.com\n")
 	if !AdminCreated(context.Background(), r, c) {
-		t.Error("created, by its log")
+		t.Error("created, by its second Pod's log")
+	}
+	args, _ := os.ReadFile(filepath.Join(dir, "args"))
+	if !strings.Contains(string(args), "logs --selector batch.kubernetes.io/job-name=console-execution-console-migrate --tail=-1") {
+		t.Errorf("not every attempt's log: %s", args)
 	}
 	r, _ = fakeKubectl(t, "Migrations applied.\n")
 	if AdminCreated(context.Background(), r, c) {
 		t.Error("already there: its log doesn't say it was created")
+	}
+	r, _ = fakeKubectl(t, "")
+	if !AdminCreated(context.Background(), r, c) {
+		t.Error("no Pod's log isn't proof it was already there")
 	}
 	r = &run.Runner{Out: os.Stdout, Err: os.Stderr, Resolve: func(string) string { return "/nonexistent/kubectl" }}
 	if !AdminCreated(context.Background(), r, c) {

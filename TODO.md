@@ -781,6 +781,8 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
   it, saves it, and gives it to the console in the `vertra-first-admin`
   Secret (`bootstrapAdmin.existingSecret`), deleted once installed; a chart
   install that sets none gets a random one, never printed, and resets it.
+  An install from before whose first admin hasn't signed in yet: `vertra
+  admin reset-password` (the logged password still works).
   To prove in the billed run: a fresh gcp install's `admin-password` signs
   in, and Cloud Logging has no password from the migrate Job.
 - [x] **Cross-building on Apple silicon** (done 2026-10-27): the console's
