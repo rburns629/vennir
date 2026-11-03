@@ -55,7 +55,7 @@ import {
 } from "../kernel/client.js";
 import { UNREGISTERED_SERVICE_ACCOUNT } from "../productPolicy.js";
 import { ensureStillRunnable, rerunTemplate } from "./templates.js";
-import { mayDecide, taskTeams } from "./approvals.js";
+import { mayDecide, notDeciders, notDecidersOf, taskTeams } from "./approvals.js";
 import { visibleLines } from "../logLevels.js";
 import { failureCodeOnly, runView, visibleEvent, visiblePayload } from "./runView.js";
 import { errorMessage, errorPath, schemaErrors } from "../jsonSchema.js";
@@ -892,6 +892,7 @@ export async function submitChecked(
       executionId: result.executionId,
       teams,
       submittedBy: caller?.id ?? null,
+      notDeciders: await notDeciders(caller?.id ?? null),
       name: typeof submission["name"] === "string" ? submission["name"] : "",
       payload: recordable(submission),
       template: run?.template,
@@ -927,8 +928,9 @@ export async function executionDetail(caller: AuthUser | undefined, executionId:
   }
   const helped = await failuresExplained(detail.tasks, submitted.payload);
   const teamOf = taskTeams(submitted.payload);
+  const excluded = detail.tasks.some((t) => t.state === "AWAITING_APPROVAL") ? await notDecidersOf(submitted) : [];
   const deciding = (t: { taskId: string; state: string }) =>
-    t.state === "AWAITING_APPROVAL" && caller !== undefined && mayDecide(caller, teamOf.get(t.taskId) ?? "", submitted.submittedBy);
+    t.state === "AWAITING_APPROVAL" && caller !== undefined && mayDecide(caller, teamOf.get(t.taskId) ?? "", excluded);
   // Who may decide on a waiting step can preview it, when its product has a plan.
   const previewable = new Set<string>();
   const products = productLookup();
@@ -1116,7 +1118,14 @@ export async function rerun(caller: AuthUser | undefined, executionId: string, l
 
   const result = await submitExecution(scopeRequestId(rerunPayload, submitted.teams), requester(caller));
   await recordOrCancel(
-    { executionId: result.executionId, teams: submitted.teams, submittedBy: caller?.id ?? "", name: submitted.name, payload: recordable(rerunPayload) },
+    {
+      executionId: result.executionId,
+      teams: submitted.teams,
+      submittedBy: caller?.id ?? "",
+      notDeciders: await notDeciders(caller?.id ?? null),
+      name: submitted.name,
+      payload: recordable(rerunPayload),
+    },
     result.created,
     log,
   );

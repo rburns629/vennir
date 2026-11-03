@@ -5,12 +5,14 @@
  * maintainer of the step's team, never whoever submitted the run.
  */
 import { randomUUID } from "node:crypto";
-import { eq, inArray, like } from "drizzle-orm";
+import { arrayOverlaps, eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../src/db/client.js";
-import { addTeamMember, createTeam, upsertProduct } from "../src/db/queries.js";
-import { products, submittedExecutions, teams } from "../src/db/schema.js";
+import { addTeamMember, createApiToken, createTeam, upsertProduct } from "../src/db/queries.js";
+import { generateApiToken, hashApiToken } from "../src/auth/apiToken.js";
+import { notDeciders } from "../src/core/approvals.js";
+import { apiTokens, products, schedules, submittedExecutions, teamMemberships, teams, users as usersTable } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { decideApproval, getExecution, listAwaitingApproval, submitExecution, type KernelExecution } from "../src/kernel/client.js";
 import { targetsNeedApproval } from "../src/targets.js";
@@ -102,10 +104,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(submittedExecutions).where(like(submittedExecutions.template, `${prefix}%`));
+  await db.delete(submittedExecutions).where(arrayOverlaps(submittedExecutions.teams, [owner, apps]));
   await db.delete(products).where(like(products.name, `${prefix}%`));
   const ours = await db.select({ id: teams.id }).from(teams).where(like(teams.name, `${prefix}%`));
   if (ours.length > 0) await db.delete(teams).where(inArray(teams.id, ours.map((t) => t.id)));
+  await db.delete(usersTable).where(like(usersTable.email, `${prefix}-ci-%@bots.vertra.local`));
   await users.cleanUp();
   await app.close();
 });
@@ -221,6 +224,64 @@ describe("deciding", () => {
     expect(refused.message).toContain("another maintainer");
     expect((await decide("maintainer2", executionId, false)).code).toBe("ok");
     expect(decideApproval).toHaveBeenCalledWith(executionId, "run", false, `user:${ids["maintainer2"] ?? ""}`, "not now");
+  });
+
+  it("never the maintainer who made the bot that submitted it", async () => {
+    const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vertra.local`;
+    const minted = await call<{ token: string }>(tokens["maintainer"], "TokenService/CreateBotToken", { team: owner, email, label: "ci" });
+    expect(minted.code).toBe("ok");
+    const asBot = await call<{ executionId: string }>(minted.body.token, "TemplateService/RunAction", { product: wipe, inputs: { projectId: `${apps}-dev` } });
+    expect(asBot.code).toBe("ok");
+    const executionId = asBot.body.executionId;
+    vi.mocked(getExecution).mockResolvedValue(awaiting(executionId));
+
+    const refused = await decide("maintainer", executionId);
+    expect(refused.code).toBe("permission_denied");
+    expect(refused.message).toContain("another maintainer");
+    type Detail = { execution: { tasks: { approval?: { canDecide?: boolean } }[] } };
+    const canDecide = async (who: keyof typeof tokens) =>
+      (await call<Detail>(tokens[who], "ExecutionService/GetExecution", { executionId })).body.execution.tasks[0]?.approval?.canDecide ?? false;
+    expect(await canDecide("maintainer")).toBe(false);
+    expect(await canDecide("maintainer2")).toBe(true);
+
+    // Kept with the run: the token gone afterwards changes nothing.
+    await db.delete(apiTokens).where(eq(apiTokens.createdBy, ids["maintainer"] ?? ""));
+    expect((await decide("maintainer", executionId)).code).toBe("permission_denied");
+    expect((await decide("maintainer2", executionId)).code).toBe("ok");
+  });
+
+  it("never a bot, even a maintainer's", async () => {
+    const { executionId } = await run("maintainer", wipe);
+    vi.mocked(getExecution).mockResolvedValue(awaiting(executionId));
+    const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vertra.local`;
+    const minted = await call<{ token: string }>(tokens["maintainer2"], "TokenService/CreateBotToken", { team: owner, email, label: "approver" });
+    const refused = await call(minted.body.token, "ExecutionService/DecideApproval", { executionId, taskId: "run", approve: true, reason: "" });
+    expect(refused.code).toBe("permission_denied");
+    expect(refused.message).toContain("not a bot");
+    expect(decideApproval).not.toHaveBeenCalled();
+  });
+
+  it("never whoever made or changed a schedule its bot runs, nor a bot's maker's bot's maker", async () => {
+    const [ownerTeam] = await db.select({ id: teams.id }).from(teams).where(eq(teams.name, owner));
+    const bot = async () => {
+      const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vertra.local`;
+      const [user] = await db.insert(usersTable).values({ email, isBot: true }).returning();
+      await db.insert(teamMemberships).values({ userId: user!.id, teamId: ownerTeam!.id, role: "maintainer" });
+      return user!.id;
+    };
+    const scheduled = await bot();
+    await db.insert(schedules).values({
+      teamId: ownerTeam!.id, name: `${prefix}-nightly`, kind: "action", runnableTeam: owner, runnableName: wipe, cron: "0 3 * * *",
+      botId: scheduled, enabled: false, createdBy: ids["maintainer"] ?? null, updatedBy: ids["maintainer2"] ?? null,
+    });
+    expect((await notDeciders(scheduled)).sort()).toEqual([scheduled, ids["maintainer"], ids["maintainer2"]].sort());
+
+    // Bot X, made by the maintainer, made bot Y a token: Y's runs aren't the maintainer's to approve either.
+    const x = await bot();
+    const y = await bot();
+    await createApiToken(x, "x", hashApiToken(generateApiToken()), [], null, ids["maintainer"] ?? null);
+    await createApiToken(y, "y", hashApiToken(generateApiToken()), [], null, x);
+    expect((await notDeciders(y)).sort()).toEqual([y, x, ids["maintainer"]].sort());
   });
 
   it("only a step awaiting approval", async () => {

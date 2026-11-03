@@ -390,13 +390,25 @@ export async function createApiToken(
   tokenHash: string,
   scopes: string[] = [],
   expiresAt: Date | null = null,
+  createdBy: string | null = null,
 ): Promise<ApiTokenMeta> {
   const [token] = await db
     .insert(apiTokens)
-    .values({ userId, label, tokenHash, scopes, expiresAt })
+    .values({ userId, label, tokenHash, scopes, expiresAt, createdBy })
     .returning();
   if (!token) throw new Error("Insert returned no row");
   return token;
+}
+
+/** Everyone who made a bot something to act with: a token, a keyless
+ * identity, or a schedule that runs as it (made or last changed it). */
+export async function botMakers(botId: string): Promise<string[]> {
+  const rows = await db.execute<{ id: string }>(sql`
+    SELECT created_by AS id FROM ${apiTokens} WHERE user_id = ${botId} AND created_by IS NOT NULL
+    UNION SELECT created_by FROM ${botIdentities} WHERE bot_id = ${botId} AND created_by IS NOT NULL
+    UNION SELECT created_by FROM ${schedules} WHERE bot_id = ${botId} AND created_by IS NOT NULL
+    UNION SELECT updated_by FROM ${schedules} WHERE bot_id = ${botId} AND updated_by IS NOT NULL`);
+  return rows.rows.map((r) => r.id);
 }
 
 export interface AutomationToken extends ApiTokenMeta {
@@ -927,6 +939,8 @@ export interface SubmittedExecution {
   teams: string[];
   /** Null once the submitter's account was deleted (history outlives it). */
   submittedBy: string | null;
+  /** Who may not approve its steps, as worked out at submission (core/approvals.ts); null for a run from before. */
+  notDeciders: string[] | null;
   name: string;
   // The exact body originally forwarded to kernel-api -- `null` only for
   // rows recorded before this column existed (see schema.ts). This is
@@ -954,6 +968,8 @@ export async function recordSubmittedExecution(input: {
   teams: string[];
   /** Null: the console itself (readiness checks). */
   submittedBy: string | null;
+  /** Who may not approve its steps (core/approvals.ts notDeciders): every run records it. */
+  notDeciders: string[];
   scheduleId?: string | undefined;
   name: string;
   payload: unknown;
@@ -985,7 +1001,7 @@ export async function findSubmittedExecutions(executionIds: string[]): Promise<S
     .where(inArray(submittedExecutions.executionId, executionIds));
 }
 
-export type SubmittedExecutionSummary = Omit<SubmittedExecution, "payload" | "templateParameters" | "onBehalfOf">;
+export type SubmittedExecutionSummary = Omit<SubmittedExecution, "payload" | "templateParameters" | "onBehalfOf" | "notDeciders">;
 
 // Every list caller (core/executions.ts's list) only ever
 // renders summary fields -- `payload` is a full stored task graph, fetched

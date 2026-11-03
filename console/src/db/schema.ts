@@ -173,6 +173,9 @@ export const apiTokens = pgTable("api_tokens", {
   // membership like any human's. An automation token's bot belongs to no
   // team, so these scopes are the only things it can do.
   scopes: text("scopes").array().notNull().default(sql`'{}'::text[]`),
+  // Who made it: a bot's run then isn't approved by whoever holds its
+  // tokens (core/approvals.ts). Null for one whose maker isn't known.
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   // When the token last authenticated a request, at most a few minutes
@@ -539,6 +542,11 @@ export const submittedExecutions = pgTable("submitted_executions", {
   // Null once the submitter's account is deleted: the execution's record
   // (and so its history in the console) outlives the account.
   submittedBy: uuid("submitted_by").references(() => users.id, { onDelete: "set null" }),
+  // Who may not approve its steps, worked out when it was submitted
+  // (core/approvals.ts notDeciders): its submitter and, for a bot, whoever
+  // made it something to act with. Null for a run from before, whose are
+  // worked out when asked.
+  notDeciders: uuid("not_deciders").array(),
   name: text("external_reference").notNull(),
   // The exact body forwarded to kernel-api's `POST /v1/executions` (see
   // core/executions.ts) -- kept so a later rerun can resubmit the same
@@ -901,6 +909,8 @@ export const schedules = pgTable(
     // Why its last start was refused, if it was.
     lastError: text("last_error"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    // Who last changed it: it runs as its bot, so they too don't approve its runs.
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique("schedules_team_id_name").on(table.teamId, table.name), index("schedules_next_run_at_idx").on(table.nextRunAt)],

@@ -57,6 +57,7 @@ import { listAwaitingApproval, listRefusals } from "./kernel/client.js";
 import { deliverCallbacks } from "./callbacks.js";
 import { policySyncOutcomes } from "./policySync.js";
 import { auditExportStatus } from "./auditExport.js";
+import { notDecidersOfRuns } from "./core/approvals.js";
 
 const MAX_ATTEMPTS = 5;
 /** A finished run older than this when it's recorded isn't news (a console's first pass over old runs). */
@@ -211,14 +212,14 @@ export async function notifyApprovals(): Promise<number> {
       .select({ id: teamMemberships.userId })
       .from(teamMemberships)
       .where(and(eq(teamMemberships.teamId, team.id), eq(teamMemberships.role, "maintainer")));
-    const requester = step.requestedBy.startsWith("user:") ? step.requestedBy.slice(5) : "";
+    const excluded = (await notDecidersOfRuns([step])).get(step.executionId) ?? [];
     const fresh = await notify({
       key: `approval:${step.executionId}:${step.taskId}:${step.awaitingSince ?? ""}`,
       kind: "approval_waiting",
       title: `${step.executionName}: ${step.taskId} needs ${team.name}'s approval`,
       body: `It runs ${step.action} and waits until a maintainer of ${team.name} approves or declines it.`,
       link: `/runs/${step.executionId}`,
-      userIds: await people(maintainers.map((m) => m.id).filter((id) => id !== requester)),
+      userIds: await people(maintainers.map((m) => m.id).filter((id) => !excluded.includes(id))),
       teams: [team.name],
     });
     if (fresh) made += 1;

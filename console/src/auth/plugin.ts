@@ -41,6 +41,9 @@ declare module "fastify" {
       teamNames: string[];
       maintainerOf: string[];
       isAdmin: boolean;
+      // A bot (a token's, a keyless sign-in's, or what the console does as
+      // one): never the person approving a step (core/approvals.ts).
+      isBot?: boolean;
       scopes: string[];
       mustChangePassword?: boolean;
       // Set for an ordering bot's own request: the only templates it may
@@ -147,6 +150,7 @@ export async function resolveCaller(request: FastifyRequest): Promise<CallerReso
       teamNames,
       maintainerOf,
       isAdmin: user.isAdmin,
+      ...(user.isBot ? { isBot: true } : {}),
       scopes,
       mustChangePassword,
       ...(user.orderTemplates ? { orderTemplates: user.orderTemplates } : {}),
@@ -169,6 +173,7 @@ export async function callerForUser(userId: string): Promise<AuthUser | undefine
     teamNames: roles.map((row) => row.name),
     maintainerOf: roles.filter((row) => row.role === "maintainer").map((row) => row.name),
     isAdmin: user.isAdmin,
+    ...(user.isBot ? { isBot: true } : {}),
     scopes: [],
     mustChangePassword: false,
   };

@@ -64,7 +64,7 @@ Cancelling stops every team's steps in the run, which is why it takes a maintain
 
 A product can ask that its steps wait for a person: always, or only when another team runs them, or when they aim at a target that needs an approval. Such a step waits in **Awaiting approval** and is never started until someone decides.
 
-- A maintainer of the step's team decides, on the run's page. The person who submitted the run can't, even as a maintainer: two people agree before it runs.
+- A maintainer of the step's team decides, on the run's page. The person who submitted the run can't, even as a maintainer, and nor can whoever made the bot that submitted it a token, identity or schedule: two people agree before it runs.
 - Declined, the step fails with `APPROVAL_DECLINED`, and the run fails.
 - Nobody deciding within 3 days (unless your install says otherwise) fails it with `APPROVAL_EXPIRED`.
 - Retrying a declined or expired step asks for approval again.
