@@ -1234,6 +1234,16 @@ for AKS Workload Identity (Installing), run forms from schemas (Console).
 
 ## Products and catalog
 
+- [ ] **`vertra catalog create` applies `main`'s ruleset** (found
+  2026-11-02, T-5). It creates the Environments but no ruleset, so a
+  failing check, or a missing code-owner review, doesn't block a merge
+  until someone adds one by hand (catalog README, "Protecting main", lists
+  what to require: code-owner review and `check`, `secrets`, `code`,
+  `codeowners`). Publishing reruns the scans either way. Applying it means
+  deciding who can still merge in a new one-person catalog, where the
+  creator can't approve their own pull request (a bypass for repository
+  admins, pull requests only, is the likely answer).
+
 - [ ] **Prove the chat agent answering through Bedrock** once the acyclix
   account can: it has the Anthropic use-case form to submit, and every
   Bedrock daily token quota is 0 (AWS Support raises those). Proven so far

@@ -14,6 +14,11 @@ name: security
 # GitHub Advanced Security isn't enabled on this repo, so results go to each
 # run's summary and annotations rather than the Security tab. Any finding
 # fails the run.
+#
+# A pull request's run is what main's ruleset requires (`secrets` and
+# `code`; README, "Protecting main"). ci.yml also calls it before
+# publishing (workflow_call), so nothing is published past a finding even
+# where no ruleset requires it.
 on:
   pull_request:
   push:
@@ -21,6 +26,7 @@ on:
   schedule:
     - cron: "17 6 * * 1"   # Mondays, 06:17 UTC
   workflow_dispatch: {}
+  workflow_call: {}
 
 permissions:
   contents: read
