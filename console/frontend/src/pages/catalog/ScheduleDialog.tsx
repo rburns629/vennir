@@ -13,6 +13,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import { ApiError, createSchedule, listBots, updateSchedule, type Bot, type Runnable, type Schedule } from "../../api";
+import { LoadFailed, loadFailure } from "../../components/LoadFailed";
 import { Mono } from "../../components/Mono";
 import { runLink } from "../RunFormPage";
 
@@ -56,20 +57,28 @@ export function ScheduleDialog({
   const [cron, setCron] = useState(PRESETS[1]?.cron ?? "0 2 * * *");
   const [timeZone, setTimeZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
   const [bots, setBots] = useState<Bot[] | null>(null);
+  const [botsFailed, setBotsFailed] = useState<string | null>(null);
+  const [botsTry, setBotsTry] = useState(0);
   const [botId, setBotId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open || !team) return;
+    // A team chosen before the last one's bots answered: theirs are dropped.
+    let current = true;
     setBots(null);
+    setBotsFailed(null);
+    setBotId("");
     listBots(team)
       .then((found) => {
+        if (!current) return;
         setBots(found);
         setBotId(found[0]?.id ?? "");
       })
-      .catch(() => { setBots([]); });
-  }, [open, team]);
+      .catch((err: unknown) => { if (current) setBotsFailed(loadFailure(err)); });
+    return () => { current = false; };
+  }, [open, team, botsTry]);
 
   async function save(): Promise<void> {
     const values = parameters();
@@ -104,7 +113,7 @@ export function ScheduleDialog({
           ))}
         </TextField>
         <WhenFields cron={cron} timeZone={timeZone} onCron={setCron} onTimeZone={setTimeZone} />
-        <BotField team={team} bots={bots} botId={botId} onBot={setBotId} />
+        <BotField team={team} bots={bots} failed={botsFailed} onRetry={() => { setBotsTry((n) => n + 1); }} botId={botId} onBot={setBotId} />
         {error && <Alert severity="error">{error}</Alert>}
       </DialogContent>
       <DialogActions>
@@ -142,8 +151,23 @@ function WhenFields({ cron, timeZone, onCron, onTimeZone }: { cron: string; time
   );
 }
 
-/** Which of the team's bots it runs as; a link to add one when it has none. */
-function BotField({ team, bots, botId, onBot }: { team: string; bots: Bot[] | null; botId: string; onBot: (id: string) => void }) {
+/** Which of the team's bots it runs as; a link to add one when it has none, and Try again when they couldn't be loaded. */
+function BotField({
+  team,
+  bots,
+  failed,
+  onRetry,
+  botId,
+  onBot,
+}: {
+  team: string;
+  bots: Bot[] | null;
+  failed: string | null;
+  onRetry: () => void;
+  botId: string;
+  onBot: (id: string) => void;
+}) {
+  if (failed) return <LoadFailed what={`${team}'s bots`} reason={failed} onRetry={onRetry} />;
   return bots && bots.length === 0 ? (
     <Alert severity="info">
       {team} has no bot to run it as.{" "}
@@ -175,15 +199,20 @@ export function EditScheduleDialog({ schedule, onClose, onSaved }: { schedule: S
   const [cron, setCron] = useState(schedule.cron);
   const [timeZone, setTimeZone] = useState(schedule.timeZone);
   const [bots, setBots] = useState<Bot[] | null>(null);
+  const [botsFailed, setBotsFailed] = useState<string | null>(null);
+  const [botsTry, setBotsTry] = useState(0);
   const [botId, setBotId] = useState(schedule.botId);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    let current = true;
+    setBotsFailed(null);
     listBots(schedule.team)
-      .then(setBots)
-      .catch(() => { setBots([]); });
-  }, [schedule.team]);
+      .then((found) => { if (current) setBots(found); })
+      .catch((err: unknown) => { if (current) setBotsFailed(loadFailure(err)); });
+    return () => { current = false; };
+  }, [schedule.team, botsTry]);
 
   async function save(): Promise<void> {
     setSaving(true);
@@ -242,7 +271,7 @@ export function EditScheduleDialog({ schedule, onClose, onSaved }: { schedule: S
           </Typography>
         </Box>
         <WhenFields cron={cron} timeZone={timeZone} onCron={setCron} onTimeZone={setTimeZone} />
-        <BotField team={schedule.team} bots={bots} botId={botId} onBot={setBotId} />
+        <BotField team={schedule.team} bots={bots} failed={botsFailed} onRetry={() => { setBotsTry((n) => n + 1); }} botId={botId} onBot={setBotId} />
         <Typography variant="caption" color="text.secondary">
           A run it already started finishes as it began.
         </Typography>

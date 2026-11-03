@@ -264,6 +264,45 @@ describe("runs", () => {
     expect(screen.getByText("sam@acme.com")).toBeTruthy();
   });
 
+  it("says when the runs couldn't be loaded, in their card, and tries again", async () => {
+    let asked = 0;
+    await renderAt("/runs", MEMBER, {
+      // The list's first page fails once; the week's tiles (since set) load.
+      "ExecutionService/ListExecutions": (request: Record<string, unknown>) =>
+        request["since"] ? { executions: [RUN] } : asked++ === 0 ? refused(503, "unavailable", "kernel-api didn't answer.") : { executions: [RUN] },
+    });
+    const failed = await screen.findByText(/Couldn't load the runs: kernel-api didn't answer\. Nothing is wrong with the runs themselves\./, {}, { timeout: 5000 });
+    expect(screen.queryByText(/No runs you can see yet/)).toBeNull();
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("orders-api first deploy")).toBeTruthy();
+    expect(screen.queryByText(/Couldn't load the runs/)).toBeNull();
+  });
+
+  it("says when the steps to approve or the schedules couldn't be loaded, never that there are none, and tries again", async () => {
+    let approvalsAsked = 0;
+    let schedulesAsked = 0;
+    await renderAt("/runs", MEMBER, {
+      "ExecutionService/ListExecutions": { executions: [RUN] },
+      "ExecutionService/ListPendingApprovals": () =>
+        approvalsAsked++ === 0
+          ? refused(503, "unavailable", "kernel-api didn't answer.")
+          : { approvals: [{ executionId: RUN.executionId, executionName: "orders-api prod database", taskId: "database", team: "azure-apps", requestedBy: "sam@acme.com", canDecide: true }] },
+      "ScheduleService/ListSchedules": () => (schedulesAsked++ === 0 ? refused(503, "unavailable", "kernel-api didn't answer.") : { schedules: [] }),
+    });
+    const failed = await screen.findByText(/Couldn't load the steps waiting for your approval: kernel-api didn't answer\./, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole("tab", { name: /to approve/i }));
+    expect(screen.queryByText("Nothing waits for your teams to approve.")).toBeNull();
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("link", { name: "orders-api prod database" })).toBeTruthy();
+    expect(screen.queryByText(/Couldn't load the steps/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: /schedules/i }));
+    const noSchedules = await screen.findByText(/Couldn't load your teams' schedules: kernel-api didn't answer\./);
+    fireEvent.click(within(noSchedules.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    await waitFor(() => { expect(screen.queryByText(/Couldn't load your teams' schedules/)).toBeNull(); });
+    expect(schedulesAsked).toBe(2);
+  });
+
   it("counts the week's runs, filters by kind, and says who started each", async () => {
     const DAG = { ...RUN, executionId: "1b6f6a1e-6c64-4d39-9a0d-7d4c1f6c2a12", name: "kafka topics backfill", template: "", state: "EXECUTION_STATE_FAILED", submittedBy: "u9", submittedByEmail: "sam@acme.com" };
     const GONE = { ...RUN, executionId: "2b6f6a1e-6c64-4d39-9a0d-7d4c1f6c2a13", name: "old cleanup", template: "", state: "EXECUTION_STATE_SUCCEEDED" };
@@ -943,6 +982,23 @@ describe("the chat panel", () => {
 });
 
 describe("the cart", () => {
+  it("says when what its steps ask for couldn't be loaded, and won't place it until it is", async () => {
+    const { cart } = await import("./cart");
+    cart.add("gcp-app-hosting-create");
+    let asked = 0;
+    const action = { kind: "KIND_ACTION", team: "gcp", name: "gcp-app-hosting-create", displayName: "App hosting", parameters: { type: "object", properties: {} }, actions: ["gcp/app-hosting.create"], shared: true };
+    await renderAt("/catalog/cart", MEMBER, {
+      "TemplateService/ListTemplates": () => (asked++ === 0 ? refused(503, "unavailable", "The console is restarting.") : { runnables: [action] }),
+      "OrderService/PreviewOrder": { steps: [{ id: "app-hosting", product: "gcp-app-hosting-create", inputs: {} }] },
+    });
+    const failed = await screen.findByText(/Couldn't load what the steps ask for: The console is restarting\. Their inputs can't be asked until it is\./, {}, { timeout: 5000 });
+    await waitFor(() => { expect((screen.getByRole("button", { name: "Place order" }) as HTMLButtonElement).disabled).toBe(true); });
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    await waitFor(() => { expect((screen.getByRole("button", { name: "Place order" }) as HTMLButtonElement).disabled).toBe(false); });
+    expect(screen.queryByText(/Couldn't load what the steps ask for/)).toBeNull();
+    cart.clear();
+  });
+
   it("plans the cart for your team, offers what's there, and places it with what you fill in", async () => {
     const { cart } = await import("./cart");
     cart.add("gcp-app-hosting-create");
@@ -1423,6 +1479,18 @@ describe("observe", () => {
     expect(screen.getByRole("heading", { name: "Who sees which lines" })).toBeTruthy();
   });
 
+  it("says when the APIs to search couldn't be loaded, and tries again", async () => {
+    let asked = 0;
+    await renderAt("/observe?tab=logs&from=api&team=payments&hours=24", MEMBER, {
+      "ObserveService/SearchLogs": { lines: [], searchDays: 30 },
+      "ApiService/ListApis": () => (asked++ === 0 ? refused(503, "unavailable", "The console is restarting.") : { apis: [] }),
+    });
+    const failed = await screen.findByText(/Couldn't load the APIs to choose from: The console is restarting\./, {}, { timeout: 5000 });
+    fireEvent.click(within(failed.closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+    await waitFor(() => { expect(screen.queryByText(/Couldn't load the APIs/)).toBeNull(); });
+    expect(asked).toBe(2);
+  });
+
   it("counts what was refused by code, and marks who refused each", async () => {
     await renderAt("/observe", MEMBER, {
       "ObserveService/GetSecurity": {
@@ -1639,6 +1707,23 @@ describe("a run form", () => {
         expect.objectContaining({ team: "payments", name: "app-on-cloud-run", kind: "template", runnableTeam: "gcp-platform", runnableName: "app-on-cloud-run", parameters: { projectId: "orders-api" }, cron: "0 2 * * *", botId: "b0b0b0b0-0000-4000-8000-000000000001" }),
       ]);
     });
+  });
+
+  it("says when the team's bots couldn't be loaded, rather than that it has none, and tries again", async () => {
+    let asked = 0;
+    await renderAt("/catalog/run?template=gcp-platform%2Fapp-on-cloud-run", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
+      "TemplateService/ListTemplates": { runnables: [TEMPLATE] },
+      "TokenService/ListBots": () => (asked++ === 0 ? refused(503, "unavailable", "The console is restarting.") : { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-nightly@bots.vertra.local" }] }),
+      "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
+    });
+    await screen.findByLabelText(/project id/i);
+    fireEvent.click(screen.getByRole("button", { name: "Schedule…" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/Couldn't load payments's bots: The console is restarting\./)).toBeTruthy();
+    expect(within(dialog).queryByText(/has no bot to run it as/)).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Schedule it" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
+    expect(await within(dialog).findByText("payments-nightly@bots.vertra.local")).toBeTruthy();
   });
 
   it("fills itself from an example", async () => {
