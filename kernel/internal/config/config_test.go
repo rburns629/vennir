@@ -83,6 +83,8 @@ func TestAMisconfigurationStopsTheSchedulerAtStartup(t *testing.T) {
 		"profiler for all":    {"PROFILING_ADDRESS": ":6060"},
 		"profiler outward":    {"PROFILING_ADDRESS": "0.0.0.0:6060"},
 		"profiler no port":    {"PROFILING_ADDRESS": "127.0.0.1"},
+		"no Job TTL":          {"KUBERNETES_JOB_TTL_SECONDS": "0"},
+		"polls past a lease":  {"SCHEDULER_POLL_INTERVAL_SECONDS": "60", "LEASE_DURATION_SECONDS": "60"},
 	} {
 		_, err := load(t, env)
 		if err == nil {
