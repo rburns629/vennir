@@ -24,6 +24,9 @@ actions:
     # retried, up to three attempts in all.
     idempotent: true
     maxAttempts: 3
+    # One step per projectId at a time, so two runs for the same project
+    # don't both try to create it: the second finds what the first made.
+    concurrencyKey: [projectId]
     script: actions/create.py
     # Deleting the project it made (only one it made for the run's team:
     # create labels it vertra-made and vertra-team, and delete refuses any
