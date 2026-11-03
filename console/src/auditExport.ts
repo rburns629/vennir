@@ -177,10 +177,14 @@ export async function compareWithCopy(log: FastifyBaseLogger): Promise<void> {
       .where(and(gte(auditLog.id, copy.first), lte(auditLog.id, copy.last)))
       .orderBy(asc(auditLog.id));
     const stored = new Map(rows.map((row) => [row.id, JSON.stringify(row)]));
+    // Retention deletes what's older than auditDays (retention.ts): an
+    // entry gone from the database for that is as expected.
+    const kept = config.retention.auditDays ? now.getTime() - config.retention.auditDays * 86_400_000 : null;
     for (const line of lines) {
-      const { id } = JSON.parse(line) as { id: number };
+      const { id, at } = JSON.parse(line) as { id: number; at: string };
       const row = stored.get(id);
       if (row === line) continue;
+      if (row === undefined && kept !== null && new Date(at).getTime() < kept) continue;
       const how = row === undefined ? "is gone from the database" : "differs in the database";
       const problem = `audit entry ${String(id)} ${how} from its write-once copy (${copy.name}): it was changed after it was copied.`;
       log.error({ event: "audit_copy_differs", entryId: id, object: copy.name }, problem);

@@ -14,6 +14,7 @@ import { db } from "../src/db/client.js";
 import { auditExport, auditLog } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { rpcClient } from "./rpc.js";
+import { deleteExpired } from "../src/retention.js";
 
 let app: FastifyInstance;
 const { rpc, makeUser, signIn, cleanUp } = rpcClient(() => app);
@@ -151,6 +152,35 @@ describe("the database compared with its copy", () => {
     await db.delete(auditLog).where(eq(auditLog.id, ids[0]!));
     await compareWithCopy(app.log);
     expect((await state())?.compareProblem).toContain(`entry ${String(ids[0])} is gone from the database`);
+  });
+
+  it("expects an entry past retention to be gone from the database", async () => {
+    const { ids, name, body } = await copied("retained");
+    // The first copied a decade ago, and since deleted by retention.
+    const lines = body.split("\n");
+    lines[0] = JSON.stringify({ ...(JSON.parse(lines[0]!) as Record<string, unknown>), at: "2016-01-01T00:00:00.000Z" });
+    bucket(name, lines.join("\n"));
+    await db.delete(auditLog).where(eq(auditLog.id, ids[0]!));
+    await compareWithCopy(app.log);
+    expect(await state()).toMatchObject({ comparedThrough: ids[2], differsAt: null, compareProblem: null });
+  });
+
+  it("is never shortened by retention past what's been copied", async () => {
+    // Here, where this file owns the export's row: an entry old enough to
+    // go, but after the last one copied, stays.
+    Object.assign(config.audit.export, { bucket: "acme-audit", provider: "gcs" });
+    const [row] = await db
+      .insert(auditLog)
+      .values({ actorId: null, method: "RPC", route: "uncopied", status: 200, requestId: `${prefix}-uncopied`, at: new Date("2000-01-01T00:00:00Z") })
+      .returning();
+    try {
+      await db.delete(auditExport);
+      await db.insert(auditExport).values({ id: 1, lastId: row!.id - 1 });
+      await deleteExpired();
+      expect(await db.select().from(auditLog).where(eq(auditLog.id, row!.id))).toHaveLength(1);
+    } finally {
+      await db.delete(auditLog).where(eq(auditLog.id, row!.id));
+    }
   });
 
   it("says when it can't read the copy, without calling that a difference", async () => {

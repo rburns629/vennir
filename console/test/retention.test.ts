@@ -51,4 +51,5 @@ describe("retention", () => {
     const scans = await db.select().from(imageScans).where(like(imageScans.image, `${prefix}%`));
     expect(scans.map((s) => s.image)).toEqual([`${prefix}/new`]);
   });
+
 });

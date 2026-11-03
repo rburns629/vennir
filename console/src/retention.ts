@@ -7,11 +7,12 @@
  * a kind forever.
  */
 import type { FastifyBaseLogger } from "fastify";
-import { and, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { config } from "./config.js";
 import { db } from "./db/client.js";
 import {
   apiTraffic,
+  auditExport,
   auditLog,
   callbackDeliveries,
   chatFeedback,
@@ -35,8 +36,18 @@ export async function deleteExpired(): Promise<{ executions: number; audit: numb
           .returning({ id: submittedExecutions.executionId })
       ).length
     : 0;
+  // With the log copied to write-once storage, only what's been copied
+  // goes: an export that's stuck keeps everything after it.
+  const copied = config.audit.export.bucket
+    ? ((await db.select({ lastId: auditExport.lastId }).from(auditExport).where(eq(auditExport.id, 1)))[0]?.lastId ?? 0)
+    : null;
   const audit = auditDays
-    ? (await db.delete(auditLog).where(lt(auditLog.at, daysAgo(auditDays))).returning({ id: auditLog.id })).length
+    ? (
+        await db
+          .delete(auditLog)
+          .where(copied === null ? lt(auditLog.at, daysAgo(auditDays)) : and(lt(auditLog.at, daysAgo(auditDays)), lte(auditLog.id, copied)))
+          .returning({ id: auditLog.id })
+      ).length
     : 0;
   const scans = scanDays
     ? (
