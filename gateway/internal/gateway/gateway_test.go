@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"strings"
 	"testing"
@@ -492,6 +493,63 @@ func TestABackendsCookiesAreKeptToItsAPI(t *testing.T) {
 	} {
 		if got := scopeCookie(tc.setCookie, "/payments/orders", tc.backendPath); got != tc.want {
 			t.Errorf("%s: %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
+// Behind a trusted proxy, the caller is the last address it saw, never what
+// the caller wrote before it; from anyone else, the peer.
+func TestTheCallersAddressIsTakenOnlyFromTrustedProxies(t *testing.T) {
+	trusted := []netip.Prefix{netip.MustParsePrefix("10.244.0.0/16"), netip.MustParsePrefix("34.120.1.2/32")}
+	for what, c := range map[string]struct {
+		peer, forwarded, want string
+	}{
+		"an untrusted peer":            {"203.0.113.9:4000", "198.51.100.1", "203.0.113.9"},
+		"no proxies trusted":           {"10.244.1.5:4000", "198.51.100.1", "10.244.1.5"},
+		"a trusted ingress":            {"10.244.1.5:4000", "198.51.100.1", "198.51.100.1"},
+		"what the caller wrote before": {"10.244.1.5:4000", "6.6.6.6, 198.51.100.1", "198.51.100.1"},
+		"two trusted hops":             {"10.244.1.5:4000", "6.6.6.6, 198.51.100.1, 34.120.1.2", "198.51.100.1"},
+		"several header lines":         {"10.244.1.5:4000", "6.6.6.6\n198.51.100.1", "198.51.100.1"},
+		"an entry with a port":         {"10.244.1.5:4000", "198.51.100.1:5555", "198.51.100.1"},
+		"no X-Forwarded-For":           {"10.244.1.5:4000", "", "10.244.1.5"},
+		"garbage after the client":     {"10.244.1.5:4000", "198.51.100.1, not-an-address", "10.244.1.5"},
+		"every hop trusted":            {"10.244.1.5:4000", "10.244.9.9, 34.120.1.2", "10.244.9.9"},
+		"an IPv4-mapped peer":          {"[::ffff:10.244.1.5]:4000", "198.51.100.1", "198.51.100.1"},
+		"an IPv6 client":               {"10.244.1.5:4000", "2001:db8::7", "2001:db8::7"},
+	} {
+		h := http.Header{}
+		for _, line := range strings.Split(c.forwarded, "\n") {
+			if line != "" {
+				h.Add("X-Forwarded-For", line)
+			}
+		}
+		list := trusted
+		if what == "no proxies trusted" {
+			list = nil
+		}
+		if got := clientAddress(h, c.peer, list); got != c.want {
+			t.Errorf("%s: %q, want %q", what, got, c.want)
+		}
+	}
+}
+
+// The trusted list applies on the public listener, behind its ingress; on
+// the in-cluster one, any Pod could write X-Forwarded-For, so the peer is
+// the caller there whatever's trusted.
+func TestABackendSeesTheCallersAddressOnlyThroughTheTrustedPublicListener(t *testing.T) {
+	for _, public := range []bool{true, false} {
+		f := setup(t, "")
+		f.api.Internet = true
+		f.gw.Public = public
+		f.gw.Settings.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("192.0.2.0/24")} // httptest's peer
+		w := f.do("POST", "/payments/orders/orders", "web-person", `{"amount": 1}`, map[string]string{
+			"Content-Type": "application/json", "X-Forwarded-For": "6.6.6.6, 198.51.100.1"})
+		if w.Code != http.StatusCreated {
+			t.Fatalf("public %v: %d %s", public, w.Code, w.Body)
+		}
+		want := map[bool]string{true: "198.51.100.1", false: "192.0.2.1"}[public]
+		if v := f.backend.got[0].Header.Values("X-Forwarded-For"); len(v) != 1 || v[0] != want {
+			t.Errorf("public %v: X-Forwarded-For = %q, want %q", public, v, want)
 		}
 	}
 }

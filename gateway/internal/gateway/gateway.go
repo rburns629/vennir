@@ -24,7 +24,8 @@
 //     Content-Type; else 400
 //  9. the calling team is within the API's rate; else 429 with Retry-After
 //  10. forwarded, with the backend's credential minted for it, and
-//     X-Forwarded-For the gateway's own peer (never what the caller said);
+//     X-Forwarded-For the gateway's own peer, or on the public listener
+//     behind a trusted proxy the address it saw (never what the caller said);
 //     a cookie the backend sets is kept to the API's own path
 //
 // Every answer says who gave it: Vertra-Answered-By: gateway or backend.
@@ -44,6 +45,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"slices"
 	"strconv"
@@ -99,6 +101,9 @@ type Gateway struct {
 type Settings struct {
 	BackendHosts  []string
 	InternetTeams []string
+	// TrustedProxies: the peers whose X-Forwarded-For names the caller
+	// (clientAddress), on the public listener only.
+	TrustedProxies []netip.Prefix
 	// DefaultPerMinute applies to a team an API's limits don't name and
 	// that has no default of its own.
 	DefaultPerMinute int
@@ -332,7 +337,13 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		result.name = "invalid"
 		return g.refuse(w, result, http.StatusBadRequest, "BAD_REQUEST", "The request can't be read.")
 	}
-	out.Header = forwardHeaders(r.Header, r.RemoteAddr)
+	// Only the public listener is behind a proxy: on the in-cluster one,
+	// the peer is the caller (a Pod's X-Forwarded-For says nothing).
+	var trusted []netip.Prefix
+	if g.Public {
+		trusted = g.Settings.TrustedProxies
+	}
+	out.Header = forwardHeaders(r.Header, clientAddress(r.Header, r.RemoteAddr, trusted))
 	out.Header.Set(caller.Header, signed)
 	out.Header.Set(RequestIDHeader, requestID)
 	out.ContentLength = int64(len(body))
@@ -410,9 +421,9 @@ func notInSpec(problems []*verrors.ValidationError) bool {
 // gateway: hop-by-hop ones, their Authorization (the gateway's sign-in,
 // never the backend's), any Vertra-* (which only the gateway sets), and
 // what a caller could claim about where it's from (Forwarded,
-// X-Forwarded-*, X-Real-Ip): X-Forwarded-For is set to the address the
-// request came from (on the public listener, the ingress's).
-func forwardHeaders(in http.Header, remoteAddr string) http.Header {
+// X-Forwarded-*, X-Real-Ip): X-Forwarded-For is set to client, the caller's
+// address as clientAddress worked it out.
+func forwardHeaders(in http.Header, client string) http.Header {
 	out := in.Clone()
 	for _, h := range hopByHop {
 		out.Del(h)
@@ -430,10 +441,65 @@ func forwardHeaders(in http.Header, remoteAddr string) http.Header {
 			out.Del(k)
 		}
 	}
-	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
-		out.Set("X-Forwarded-For", host)
+	if client != "" {
+		out.Set("X-Forwarded-For", client)
 	}
 	return out
+}
+
+// clientAddress is the caller's address: the request's peer, unless the
+// peer is one of trusted (an ingress, a load balancer); then the peer's
+// X-Forwarded-For is read from its end back, past every trusted address,
+// to the first that isn't one: the address the trusted proxies saw. What
+// a caller wrote before that is never taken. An entry that isn't an
+// address ends the walk at the last one that was.
+func clientAddress(header http.Header, remoteAddr string, trusted []netip.Prefix) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return ""
+	}
+	peer, err := netip.ParseAddr(host)
+	if err != nil || !trustedAddress(peer, trusted) {
+		return host
+	}
+	var hops []string
+	for _, value := range header.Values("X-Forwarded-For") {
+		hops = append(hops, strings.Split(value, ",")...)
+	}
+	client := peer.Unmap()
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop, ok := address(strings.TrimSpace(hops[i]))
+		if !ok {
+			break
+		}
+		client = hop
+		if !trustedAddress(hop, trusted) {
+			break
+		}
+	}
+	return client.String()
+}
+
+// address reads one X-Forwarded-For entry: an address, with or without a
+// port (some proxies add it).
+func address(entry string) (netip.Addr, bool) {
+	if a, err := netip.ParseAddr(entry); err == nil {
+		return a.Unmap(), true
+	}
+	if ap, err := netip.ParseAddrPort(entry); err == nil {
+		return ap.Addr().Unmap(), true
+	}
+	return netip.Addr{}, false
+}
+
+func trustedAddress(a netip.Addr, trusted []netip.Prefix) bool {
+	a = a.Unmap()
+	for _, p := range trusted {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
 }
 
 // scopeCookie is a backend's Set-Cookie kept to its API's own path (every
