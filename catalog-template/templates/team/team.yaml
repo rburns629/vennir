@@ -1,6 +1,6 @@
-# Copy to teams/<your-team>/team.yaml. Merging it creates your
-# team: a namespace on the cluster, a team in the console, and a GitHub
-# Environment in this repo, all named after the folder.
+# Copy to teams/<your-team>/team.yaml. Merging it creates your team on
+# every install that reads this catalog: a team in its console and a
+# namespace on its cluster, both named after the folder.
 #
 # CHANGE every value. The folder name is your team's name everywhere:
 # lowercase letters, digits and dashes, never used before.
