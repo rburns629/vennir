@@ -21,8 +21,8 @@
  */
 import { Code } from "@connectrpc/connect";
 import type { FastifyBaseLogger } from "fastify";
-import { ApiError } from "../apiError.js";
 import { ensureMayOrder } from "../auth/access.js";
+import { ApiError } from "../apiError.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { checkCitations, type Citation } from "./citations.js";
 import { chatModel, ModelUnavailable, type ChatMessage, type ChatModel, type Usage } from "./model.js";
@@ -173,6 +173,9 @@ function fromPlatform(steps: Answer["steps"]): boolean {
 
 function checked(caller: AuthUser | undefined, request: AskRequest): { who: AuthUser; team: string | null } {
   if (!caller) throw new ApiError(401, "UNAUTHORIZED", "Sign in first.", Code.Unauthenticated);
+  // Every question can cost many calls to a billed model: people ask, and
+  // each person's are counted (core/chatLimits.ts); a bot doesn't.
+  if (caller.isBot) throw new ApiError(403, "FORBIDDEN", "The chat agent answers people, not bots.");
   // An ordering bot orders its templates, and nothing else (decision 23).
   ensureMayOrder(caller);
   const { messages, team } = request;

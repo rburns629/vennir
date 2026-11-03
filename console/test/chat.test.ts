@@ -17,7 +17,7 @@ import { AnthropicMessages, ModelUnavailable, OpenAICompatible, quickCall, witho
 import type { AuthUser } from "../src/auth/plugin.js";
 import { db } from "../src/db/client.js";
 import { createTeam, upsertProduct } from "../src/db/queries.js";
-import { chatFeedback, products, resources, teams } from "../src/db/schema.js";
+import { chatFeedback, chatLimits, products, resources, teams } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { caller, rpcClient } from "./rpc.js";
 
@@ -352,10 +352,33 @@ describe("what it sees and does", () => {
 describe("who it answers", () => {
   it("refuses an ordering bot, someone outside the team, and says when the model's away", async () => {
     await expect(ask(person([mine], { orderTemplates: [] }), question("x"), log, new Scripted([]))).rejects.toMatchObject({ code: "ORDERS_ONLY" });
+    await expect(ask(person([mine], { isBot: true }), question("x"), log, new Scripted([]))).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(ask(person([theirs]), question("x", mine), log, new Scripted([]))).rejects.toMatchObject({ code: "FORBIDDEN" });
     const away: ChatModel = { name: "away", complete: () => Promise.reject(new ModelUnavailable("down")) };
     await expect(ask(person([mine]), question("x"), log, away)).rejects.toMatchObject({ code: "MODEL_UNAVAILABLE" });
     await expect(ask(person([mine]), question("x"), log, null)).rejects.toMatchObject({ code: "CHAT_OFF" });
+  });
+
+  it("counts each person's questions, by the limits an admin set", async () => {
+    const admin = await users.signIn((await users.makeUser({ admin: true })).email);
+    const someone = await users.signIn((await users.makeUser()).email);
+    try {
+      const defaults = await rpc<{ limits: { perHour: number; perDay: number } }>(admin, "ChatService/GetChatLimits", {});
+      expect(defaults.body.limits).toMatchObject({ perHour: 30, perDay: 200 });
+      expect((await rpc(someone, "ChatService/GetChatLimits", {})).failure).toBe("FORBIDDEN");
+      expect((await rpc(admin, "ChatService/SetChatLimits", { perHour: 10, perDay: 5 })).failure).toBe("BAD_CHAT_LIMITS");
+      expect((await rpc(admin, "ChatService/SetChatLimits", { perHour: 0, perDay: 5 })).failure).toBe("BAD_CHAT_LIMITS");
+      const set = await rpc<{ limits: { perHour: number; perDay: number; updatedBy: string } }>(admin, "ChatService/SetChatLimits", { perHour: 1, perDay: 5 });
+      expect(set.body.limits).toMatchObject({ perHour: 1, perDay: 5 });
+      expect(set.body.limits.updatedBy).toMatch(/@example\.com$/);
+      // The first is counted (and answered: chat is off here); the second is over the hour's.
+      expect((await rpc(someone, "ChatService/Ask", { messages: [{ role: "user", content: "hi" }] })).failure).toBe("CHAT_OFF");
+      expect((await rpc(someone, "ChatService/Ask", { messages: [{ role: "user", content: "hi" }] })).failure).toBe("RATE_LIMITED");
+      // Each person's own: another's first question is still answered.
+      expect((await rpc(admin, "ChatService/Ask", { messages: [{ role: "user", content: "hi" }] })).failure).toBe("CHAT_OFF");
+    } finally {
+      await db.delete(chatLimits);
+    }
   });
 
   it("is off over the API when no model is set", async () => {

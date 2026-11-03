@@ -1215,7 +1215,9 @@ when one's needed, is a Secret named in `chat.apiKeySecret` (key
 `api-key`): `kubectl -n vertra-system create secret generic console-chat-key
 --from-file=api-key=<file>`. What a person asks, and what
 the agent's tools find for them, goes to the model: on a cloud, use one in
-the install's own. `chat.maxSteps` (8), `timeoutSeconds` (180) and
+the install's own. Each person may ask 30 questions an hour and 200 a day
+(admins change it with `ChatService/SetChatLimits`), and bots none.
+`chat.maxSteps` (8), `timeoutSeconds` (180) and
 `maxTokens` (8000 on anthropic, bedrock and vertex, where thinking counts toward
 it; else 1500) bound one answer; `chat.effort` sets how hard Claude or
 Gemini thinks. `chat.contextTokens` (64000 on anthropic, bedrock and vertex, else 16000; at most the model's

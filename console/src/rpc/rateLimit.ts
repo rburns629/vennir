@@ -18,6 +18,8 @@ export class FixedWindowLimit {
   constructor(
     private readonly max: number,
     private readonly windowMs: number,
+    /** What's counted, for the refusal: "attempts", "questions". */
+    private readonly what = "attempts",
   ) {}
 
   /**
@@ -41,7 +43,7 @@ export class FixedWindowLimit {
     throw rpcError(
       Code.ResourceExhausted,
       "RATE_LIMITED",
-      `Too many attempts. Try again in ${describe(seconds)}.`,
+      `Too many ${this.what}. Try again in ${describe(seconds)}.`,
       true,
     );
   }

@@ -5,6 +5,7 @@ import { Type } from "@sinclair/typebox";
 import { ask, askStream, type Answer, type AskRequest as AskQuestion } from "../../chat/agent.js";
 import { chatModel } from "../../chat/model.js";
 import { listChatFeedback, rateAnswer } from "../../core/chatFeedback.js";
+import { countQuestion, getChatLimits, setChatLimits, type ChatLimitsView } from "../../core/chatLimits.js";
 import { getChatConfig, resetChatConfig, setChatConfig, testChatConfig, type ChatConfigInput, type ChatConfigView } from "../../core/chatSettings.js";
 import { currentChat } from "../../chat/settings.js";
 import type { AskRequest, AskStreamRequest, ChatConfigInput as ChatConfigMessage, ChatService } from "../../gen/vertra/console/v1/chat_pb.js";
@@ -13,6 +14,10 @@ import { timestamp } from "../convert.js";
 import { check } from "../validate.js";
 
 const Turn = Type.Object({ role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]), content: Type.String({ minLength: 1, maxLength: 4000 }) });
+
+function limitsView(l: ChatLimitsView) {
+  return { perHour: l.perHour, perDay: l.perDay, updatedBy: l.updatedBy, ...(l.updatedAt ? { updatedAt: timestamp(l.updatedAt) } : {}) };
+}
 
 /** Ask's request, checked. */
 function asked(req: AskRequest | AskStreamRequest): AskQuestion {
@@ -145,11 +150,21 @@ export function chatService(): ServiceImpl<typeof ChatService> {
       return testChatConfig(callerOf(ctx), configInput(req.config), logOf(ctx));
     },
 
+    async getChatLimits(_req, ctx) {
+      return { limits: limitsView(await getChatLimits(callerOf(ctx))) };
+    },
+
+    async setChatLimits(req, ctx) {
+      return { limits: limitsView(await setChatLimits(callerOf(ctx), { perHour: req.perHour, perDay: req.perDay }, logOf(ctx))) };
+    },
+
     async ask(req, ctx) {
+      await countQuestion(callerOf(ctx), ctx);
       return response(await ask(callerOf(ctx), asked(req), logOf(ctx), chatModel(), { signal: ctx.signal }));
     },
 
     async *askStream(req, ctx) {
+      await countQuestion(callerOf(ctx), ctx);
       for await (const event of askStream(callerOf(ctx), asked(req), logOf(ctx), chatModel(), ctx.signal)) {
         yield "step" in event ? { event: { case: "step" as const, value: event.step } } : { event: { case: "answer" as const, value: response(event.answer) } };
       }

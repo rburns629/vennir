@@ -15,6 +15,109 @@ import type { OrderChoice } from "./order_pb";
 export declare const file_vertra_console_v1_chat: GenFile;
 
 /**
+ * Questions each person may ask the chat agent (Ask and AskStream alike);
+ * one more is refused RATE_LIMITED, with Retry-After. Bots may not ask.
+ *
+ * @generated from message vertra.console.v1.ChatLimits
+ */
+export declare type ChatLimits = Message<"vertra.console.v1.ChatLimits"> & {
+  /**
+   * @generated from field: int32 per_hour = 1;
+   */
+  perHour: number;
+
+  /**
+   * @generated from field: int32 per_day = 2;
+   */
+  perDay: number;
+
+  /**
+   * Empty, and no time, while they're the defaults.
+   *
+   * @generated from field: string updated_by = 3;
+   */
+  updatedBy: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 4;
+   */
+  updatedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message vertra.console.v1.ChatLimits.
+ * Use `create(ChatLimitsSchema)` to create a new message.
+ */
+export declare const ChatLimitsSchema: GenMessage<ChatLimits>;
+
+/**
+ * @generated from message vertra.console.v1.GetChatLimitsRequest
+ */
+export declare type GetChatLimitsRequest = Message<"vertra.console.v1.GetChatLimitsRequest"> & {
+};
+
+/**
+ * Describes the message vertra.console.v1.GetChatLimitsRequest.
+ * Use `create(GetChatLimitsRequestSchema)` to create a new message.
+ */
+export declare const GetChatLimitsRequestSchema: GenMessage<GetChatLimitsRequest>;
+
+/**
+ * @generated from message vertra.console.v1.GetChatLimitsResponse
+ */
+export declare type GetChatLimitsResponse = Message<"vertra.console.v1.GetChatLimitsResponse"> & {
+  /**
+   * @generated from field: vertra.console.v1.ChatLimits limits = 1;
+   */
+  limits?: ChatLimits | undefined;
+};
+
+/**
+ * Describes the message vertra.console.v1.GetChatLimitsResponse.
+ * Use `create(GetChatLimitsResponseSchema)` to create a new message.
+ */
+export declare const GetChatLimitsResponseSchema: GenMessage<GetChatLimitsResponse>;
+
+/**
+ * @generated from message vertra.console.v1.SetChatLimitsRequest
+ */
+export declare type SetChatLimitsRequest = Message<"vertra.console.v1.SetChatLimitsRequest"> & {
+  /**
+   * 1 to 10,000 each, and no more an hour than a day.
+   *
+   * @generated from field: int32 per_hour = 1;
+   */
+  perHour: number;
+
+  /**
+   * @generated from field: int32 per_day = 2;
+   */
+  perDay: number;
+};
+
+/**
+ * Describes the message vertra.console.v1.SetChatLimitsRequest.
+ * Use `create(SetChatLimitsRequestSchema)` to create a new message.
+ */
+export declare const SetChatLimitsRequestSchema: GenMessage<SetChatLimitsRequest>;
+
+/**
+ * @generated from message vertra.console.v1.SetChatLimitsResponse
+ */
+export declare type SetChatLimitsResponse = Message<"vertra.console.v1.SetChatLimitsResponse"> & {
+  /**
+   * @generated from field: vertra.console.v1.ChatLimits limits = 1;
+   */
+  limits?: ChatLimits | undefined;
+};
+
+/**
+ * Describes the message vertra.console.v1.SetChatLimitsResponse.
+ * Use `create(SetChatLimitsResponseSchema)` to create a new message.
+ */
+export declare const SetChatLimitsResponseSchema: GenMessage<SetChatLimitsResponse>;
+
+/**
  * @generated from message vertra.console.v1.RateAnswerRequest
  */
 export declare type RateAnswerRequest = Message<"vertra.console.v1.RateAnswerRequest"> & {
@@ -941,6 +1044,27 @@ export declare const ChatService: GenService<{
     methodKind: "unary";
     input: typeof TestChatConfigRequestSchema;
     output: typeof TestChatConfigResponseSchema;
+  },
+  /**
+   * How many questions each person may ask: by default 30 an hour and 200
+   * a day. Admins only.
+   *
+   * @generated from rpc vertra.console.v1.ChatService.GetChatLimits
+   */
+  getChatLimits: {
+    methodKind: "unary";
+    input: typeof GetChatLimitsRequestSchema;
+    output: typeof GetChatLimitsResponseSchema;
+  },
+  /**
+   * An admin's own limits (BAD_CHAT_LIMITS), for every console at once.
+   *
+   * @generated from rpc vertra.console.v1.ChatService.SetChatLimits
+   */
+  setChatLimits: {
+    methodKind: "unary";
+    input: typeof SetChatLimitsRequestSchema;
+    output: typeof SetChatLimitsResponseSchema;
   },
   /**
    * Thumbs up or down on an answer you got, sent with its question and
