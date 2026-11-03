@@ -119,3 +119,15 @@ func TestUntarRefusesWhatEscapes(t *testing.T) {
 		t.Error("wrote outside its directory")
 	}
 }
+
+func TestUntarRefusesAFileOverItsLimitRatherThanCuttingIt(t *testing.T) {
+	dir := t.TempDir()
+	pkg := filepath.Join(dir, "big.tgz")
+	tgz(t, pkg, map[string]string{"chart/big": strings.Repeat("\x00", untarLimit+1)})
+	if err := Untar(pkg, filepath.Join(dir, "out")); err == nil || !strings.Contains(err.Error(), "bigger than") {
+		t.Fatalf("got %v, want a refusal", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "out", "chart", "big")); !os.IsNotExist(err) {
+		t.Error("wrote part of it")
+	}
+}

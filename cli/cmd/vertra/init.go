@@ -18,8 +18,10 @@ import (
 	"github.com/rburns629/vertra/cli/internal/awscloud"
 	"github.com/rburns629/vertra/cli/internal/config"
 	"github.com/rburns629/vertra/cli/internal/githost"
+	"github.com/rburns629/vertra/cli/internal/install"
 	"github.com/rburns629/vertra/cli/internal/plan"
 	"github.com/rburns629/vertra/cli/internal/prompt"
+	"github.com/rburns629/vertra/cli/internal/releases"
 )
 
 type initFlags struct {
@@ -352,7 +354,14 @@ func releaseDefault() string {
 	if Version != "dev" {
 		return strings.TrimPrefix(Version, "v")
 	}
-	return "0.1.0"
+	// Built from a checkout: the newest release whose charts it can check.
+	newest := "0.1.0"
+	for _, v := range install.KnownReleases() {
+		if releases.Compare(v, newest) > 0 {
+			newest = v
+		}
+	}
+	return newest
 }
 
 func orDefault(v, def string) string {

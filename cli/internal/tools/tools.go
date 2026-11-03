@@ -413,8 +413,12 @@ func CheckSHA256(path, sum string) error {
 	return nil
 }
 
+// untarLimit is the biggest file Untar unpacks.
+const untarLimit = 64 << 20
+
 // Untar unpacks a .tgz's directories and regular files into dest; anything
-// else (links), or a name that would land outside dest, is refused.
+// else (links), a name that would land outside dest, or a file over
+// untarLimit, is refused.
 func Untar(archive, dest string) error {
 	f, err := os.Open(archive)
 	if err != nil {
@@ -444,6 +448,9 @@ func Untar(archive, dest string) error {
 				return err
 			}
 		case tar.TypeReg:
+			if h.Size > untarLimit {
+				return fmt.Errorf("%s: %q is bigger than a chart's file should be", filepath.Base(archive), h.Name)
+			}
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				return err
 			}
@@ -451,7 +458,7 @@ func Untar(archive, dest string) error {
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(out, io.LimitReader(tr, 64<<20)); err != nil {
+			if _, err := io.Copy(out, tr); err != nil {
 				out.Close()
 				return err
 			}

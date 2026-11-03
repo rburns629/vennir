@@ -512,10 +512,12 @@ confirmation unless `--yes` is also given.
   SHA-256 (`internal/tools/pins.go`) and installed from the checked file,
   never the repository. A release's own are checked against the SHA-256s
   its release recorded (`internal/install/release-charts.sha256`, which the
-  release workflow adds to each release's vertra and to main), before
-  they're unpacked into `deploy/<env>/charts/<version>/`, where the package
-  is kept and checked again on each apply; a release the running vertra
-  doesn't know (a newer one) is refused before the approval screen. kind's local registry runs `registry` by digest.
+  release workflow adds to each release's vertra, with any earlier
+  release's missing, and to main). The package is kept in
+  `deploy/<env>/charts/<version>/`, checked again on each apply, and the
+  chart unpacked afresh from it, so an edit there is never installed; a
+  release the running vertra doesn't know (a newer one) is refused before
+  the approval screen. kind's local registry runs `registry` by digest.
 - **The OpenTofu state** can contain resource details: it stays next to the
   config, gitignored, or in a remote backend you control.
 

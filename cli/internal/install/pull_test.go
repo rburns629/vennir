@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -86,8 +87,11 @@ func TestEveryReleaseUpToNowIsKnown(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if err := KnownRelease("99.0.0"); err == nil || !strings.Contains(err.Error(), "vertra 99.0.0 or newer") {
+	if err := KnownRelease("99.0.0"); err == nil || !strings.Contains(err.Error(), "no recorded checksums for release 99.0.0") {
 		t.Errorf("an unknown release: %v", err)
+	}
+	if known := KnownReleases(); !slices.Contains(known, "0.8.0") || slices.Contains(known, "99.0.0") {
+		t.Errorf("known: %v", known)
 	}
 }
 
@@ -106,15 +110,37 @@ func TestAReleasedChartIsCheckedThenUnpackedAndKept(t *testing.T) {
 	if sha(t, kept) != sha(t, pkg) {
 		t.Error("the checked package isn't kept beside it")
 	}
-	// Once kept and still matching, it isn't pulled again.
+	// Once kept and still matching, it isn't pulled again, but what's
+	// installed is unpacked from it afresh: an edit to the unpacked chart, or
+	// a file added to it, doesn't reach Helm.
+	edited := filepath.Join(chart.Dir, "Chart.yaml")
+	if err := os.WriteFile(edited, []byte("name: edited\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(chart.Dir, "extra.yaml"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := Pull(context.Background(), r, chart); err != nil || pullCount(pulls) != 1 {
 		t.Errorf("second apply: %v, %d pulls", err, pullCount(pulls))
 	}
-	// A chart pulled before vertra kept its package is pulled (and checked) again.
+	if b, _ := os.ReadFile(edited); string(b) != "name: execution-kernel\n" {
+		t.Errorf("the edited chart was kept: %q", b)
+	}
+	if _, err := os.Stat(filepath.Join(chart.Dir, "extra.yaml")); !os.IsNotExist(err) {
+		t.Error("an added file was kept")
+	}
+	// A kept package that no longer matches, or none (a chart pulled before
+	// vertra kept its package), is pulled and checked again.
+	if err := os.WriteFile(kept, []byte("tampered"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Pull(context.Background(), r, chart); err != nil || pullCount(pulls) != 2 || sha(t, kept) != sha(t, pkg) {
+		t.Errorf("tampered: %v, %d pulls", err, pullCount(pulls))
+	}
 	if err := os.Remove(kept); err != nil {
 		t.Fatal(err)
 	}
-	if err := Pull(context.Background(), r, chart); err != nil || pullCount(pulls) != 2 {
+	if err := Pull(context.Background(), r, chart); err != nil || pullCount(pulls) != 3 {
 		t.Errorf("unkept: %v, %d pulls", err, pullCount(pulls))
 	}
 }

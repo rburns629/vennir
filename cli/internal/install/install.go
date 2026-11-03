@@ -194,21 +194,34 @@ func releaseChartSum(name, version string) string {
 	return ""
 }
 
-// KnownRelease refuses a release whose charts this vertra can't check: one
-// newer than itself.
+// KnownRelease refuses a release whose charts this vertra can't check.
 func KnownRelease(version string) error {
 	for _, name := range []string{"execution-kernel", "execution-console"} {
 		if releaseChartSum(name, version) == "" {
-			return fmt.Errorf("this vertra doesn't know release %s's charts, so it can't check them: install with vertra %s or newer (`vertra version`)", version, version)
+			return fmt.Errorf("this vertra has no recorded checksums for release %s's charts, so it can't check them: use that release's vertra, or a newer one (`vertra version`)", version)
 		}
 	}
 	return nil
 }
 
-// Pull fetches a released chart into its Dir, once per version: the package
-// is checked against the release's SHA-256 before it's unpacked, and kept
-// beside it, checked again on each apply (one that doesn't match, or a
-// chart pulled before vertra kept it, is pulled again).
+// KnownReleases are the releases whose charts this vertra can check.
+func KnownReleases() []string {
+	var out []string
+	for line := range strings.Lines(releaseChartSums) {
+		if _, file, ok := strings.Cut(strings.TrimSpace(line), "  "); ok {
+			if v, ok := strings.CutPrefix(strings.TrimSuffix(file, ".tgz"), "execution-kernel-"); ok && KnownRelease(v) == nil {
+				out = append(out, v)
+			}
+		}
+	}
+	return out
+}
+
+// Pull fetches a released chart into its Dir: the package, kept beside it
+// once per version, is checked against the release's SHA-256 on each apply
+// (and pulled again if it doesn't match, or a vertra before it kept none),
+// and Dir unpacked afresh from it, so what's installed is only ever the
+// checked package.
 func Pull(ctx context.Context, r *run.Runner, chart Chart) error {
 	if chart.Remote == "" {
 		return nil
@@ -218,10 +231,6 @@ func Pull(ctx context.Context, r *run.Runner, chart Chart) error {
 	if sum == "" {
 		return KnownRelease(chart.Version)
 	}
-	archive := filepath.Join(parent, name+"-"+chart.Version+".tgz")
-	if _, err := os.Stat(filepath.Join(chart.Dir, "Chart.yaml")); err == nil && tools.CheckSHA256(archive, sum) == nil {
-		return nil
-	}
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return err
 	}
@@ -230,20 +239,24 @@ func Pull(ctx context.Context, r *run.Runner, chart Chart) error {
 		return err
 	}
 	defer os.RemoveAll(tmp)
-	pulled, err := tools.PullChartTo(ctx, r, tmp, sum, chart.Remote, "--version", chart.Version)
-	if err != nil {
+	archive := filepath.Join(parent, name+"-"+chart.Version+".tgz")
+	if tools.CheckSHA256(archive, sum) != nil {
+		pulled, err := tools.PullChartTo(ctx, r, tmp, sum, chart.Remote, "--version", chart.Version)
+		if err != nil {
+			return err
+		}
+		if err := os.Rename(pulled, archive); err != nil {
+			return err
+		}
+	}
+	unpacked := filepath.Join(tmp, "unpacked")
+	if err := tools.Untar(archive, unpacked); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(chart.Dir); err != nil {
 		return err
 	}
-	if err := tools.Untar(pulled, tmp); err != nil {
-		return err
-	}
-	if err := os.Rename(filepath.Join(tmp, name), chart.Dir); err != nil {
-		return err
-	}
-	return os.Rename(pulled, archive)
+	return os.Rename(filepath.Join(unpacked, name), chart.Dir)
 }
 
 // SizeValues is the chart's preset for the config's size.

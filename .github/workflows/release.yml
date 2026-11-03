@@ -151,12 +151,23 @@ jobs:
         # In the Go image CI uses, pinned by digest (the Makefile's GO_IMAGE).
         env:
           CHART_SUMS: ${{ needs.charts.outputs.sums }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           image=$(sed -n 's/^GO_IMAGE ?= *//p' Makefile)
           mkdir -p dist
-          # This release's charts' sums, so this vertra can check them too
-          # (it knows the earlier releases' already).
-          printf '%s\n' "$CHART_SUMS" >> cli/internal/install/release-charts.sha256
+          # The charts' sums this vertra checks them against: this release's,
+          # and any earlier release's whose pin pull request hasn't merged
+          # (from its attached packages' digests).
+          sums=cli/internal/install/release-charts.sha256
+          {
+            printf '%s\n' "$CHART_SUMS"
+            for tag in $(gh release list --exclude-pre-releases --limit 1000 --json tagName --jq '.[].tagName'); do
+              gh release view "$tag" --json assets \
+                --jq '.assets[] | select(.digest != null and (.name | test("^execution-(kernel|console)-.*\\.tgz$"))) | "\(.digest | ltrimstr("sha256:"))  \(.name)"'
+            done
+          } | while IFS= read -r line; do
+            [ -z "$line" ] || grep -qxF "$line" "$sums" || printf '%s\n' "$line" >> "$sums"
+          done
           # The catalog template it makes catalogs from (`catalog create`),
           # this tag's tracked files with their modes.
           git archive --format=tar.gz HEAD catalog-template -o cli/internal/catalogtemplate/template.tgz
@@ -232,7 +243,7 @@ jobs:
           # And its charts' sums, for every vertra built after it.
           sums=cli/internal/install/release-charts.sha256
           while IFS= read -r line; do
-            grep -qxF "$line" "$sums" || printf '%s\n' "$line" >> "$sums"
+            [ -z "$line" ] || grep -qxF "$line" "$sums" || printf '%s\n' "$line" >> "$sums"
           done <<< "$CHART_SUMS"
           if git diff --quiet; then
             echo "catalog-template/vertra already pins $version, and its charts' sums are recorded"
