@@ -1177,8 +1177,8 @@ Both charts ship NetworkPolicies (`networkPolicy.enabled`, on by default):
 
 | Pod | Accepts connections from |
 | --- | --- |
-| Kernel Postgres | The kernel release's Pods, and the console's when it holds the console's database |
-| kernel-api | The console (`networkPolicy.consoleSelector`), and `networkPolicy.metricsFrom` |
+| Kernel Postgres | The kernel release's Pods, and, when it holds the console's database, the console, its migrations and the gateway (`networkPolicy.consoleDatabaseSelector`) |
+| kernel-api | The console's own Pods, not its gateway (`networkPolicy.consoleSelector`), and `networkPolicy.metricsFrom` |
 | Scheduler | `networkPolicy.metricsFrom` only |
 | Console | Anyone on its port; its metrics port, `networkPolicy.metricsFrom` only |
 | Gateway | Anyone on its ports; its metrics port, `networkPolicy.metricsFrom` only |

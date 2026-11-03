@@ -92,9 +92,10 @@ spec:
   validations:
     - expression: >-
         request.name.endsWith("-api") && has(namespaceObject.metadata.labels) &&
-        {{ .Values.writeFence.teamNamespaceLabel | quote }} in namespaceObject.metadata.labels
+        {{ .Values.writeFence.teamNamespaceLabel | quote }} in namespaceObject.metadata.labels &&
+        namespaceObject.metadata.labels[{{ .Values.writeFence.teamNamespaceLabel | quote }}] == "true"
       messageExpression: >-
-        "The gateway may only mint tokens for API ServiceAccounts (*-api) in team namespaces, not " +
+        "The gateway may only mint tokens for API ServiceAccounts (*-api) in active team namespaces, not " +
         request.namespace + "/" + request.name + "."
       reason: Forbidden
     # For a backend's audience: named (none means the Kubernetes API's own),

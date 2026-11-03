@@ -3,7 +3,8 @@
 #
 # Proves the charts' admission policies on a real cluster: dispatch (team
 # namespaces only), image sources, step identity (kernel chart) and the
-# console's write fence and its Jobs (console chart). Every case is a server-side dry run,
+# console's write fence and its Jobs, and the gateway's token minting
+# (console chart). Every case is a server-side dry run,
 # so nothing is created, made as the identity the policy guards (impersonated).
 #
 # Renders the policies under their own release name, "policytest", so they
@@ -31,6 +32,7 @@ OTHER_NS=$RELEASE-other
 RETIRED_NS=$RELEASE-retired
 SCHEDULER=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-kernel
 CONSOLE=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-console
+GATEWAY=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-console-gateway
 SOURCE=registry.example
 PRODUCTS='[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa"},{"team":"","repository":"registry.example/platform","action":"run","serviceAccount":"plat-sa"}]'
 TEAM_SECRETS='{"'$TEAM_A'":"api-token,db-key","'$TEAM_B'":"b-key"}'
@@ -63,6 +65,15 @@ render() {
       --show-only templates/write-fence-policy.yaml \
       --show-only templates/namespace-policy.yaml \
       --show-only templates/console-jobs-policy.yaml
+    echo "---"
+    # The gateway's token fence alone (not its Deployment).
+    helm template "$RELEASE" helm/charts/execution-console -n "$PLATFORM_NS" \
+      --set kernelApiUrl=http://unused --set gateway.enabled=true \
+      --show-only templates/gateway.yaml \
+      | python3 -c '
+import sys
+docs = sys.stdin.read().split("\n---\n")
+print("\n---\n".join(d for d in docs if "\nkind: ValidatingAdmissionPolicy" in "\n" + d))'
   }
 }
 
@@ -88,6 +99,9 @@ k label namespace "$RETIRED_NS" vertra/team=retired --overwrite > /dev/null
 for sa in eso-gcp db-sa; do
   k -n "$TEAM_A" create serviceaccount "$sa" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
+for ns in "$TEAM_A" "$OTHER_NS" "$RETIRED_NS"; do
+  k -n "$ns" create serviceaccount orders-api --dry-run=client -o yaml | k apply -f - > /dev/null
+done
 
 # RBAC comes before admission, so the impersonated identities need leave to
 # create what the cases try to create.
@@ -100,6 +114,7 @@ rules:
   - {apiGroups: [""], resources: [secrets, configmaps], verbs: [create]}
   - {apiGroups: [""], resources: [namespaces], verbs: [get, create, update, patch]}
   - {apiGroups: [""], resources: [serviceaccounts], verbs: [get, update, patch]}
+  - {apiGroups: [""], resources: [serviceaccounts/token], verbs: [create]}
   - {apiGroups: [rbac.authorization.k8s.io], resources: [rolebindings, roles], verbs: [create]}
   - {apiGroups: [rbac.authorization.k8s.io], resources: [clusterroles], verbs: [bind]}
 ---
@@ -110,6 +125,7 @@ roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: $RELEASE
 subjects:
   - {kind: ServiceAccount, name: $RELEASE-execution-kernel, namespace: $PLATFORM_NS}
   - {kind: ServiceAccount, name: $RELEASE-execution-console, namespace: $PLATFORM_NS}
+  - {kind: ServiceAccount, name: $RELEASE-execution-console-gateway, namespace: $PLATFORM_NS}
 EOF
 
 render | k apply -f - > /dev/null
@@ -181,6 +197,15 @@ EOF
 as_console() { k --as="$CONSOLE" "$@" --dry-run=server 2>&1; }
 new_namespace() {  # name, labels as JSON
   echo '{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"'"$1"'","labels":'"$2"'}}' | as_console create -f -
+}
+
+# A token the gateway asks for, as gateway/internal/credentials does
+# (dryRun=All: none is issued). Says "(server dry run)" when it's allowed.
+gateway_token() {  # namespace, ServiceAccount, audiences (JSON), seconds
+  local out
+  out=$(echo '{"apiVersion":"authentication.k8s.io/v1","kind":"TokenRequest","spec":{"audiences":'"$3"',"expirationSeconds":'"$4"'}}' \
+    | k --as="$GATEWAY" create --raw "/api/v1/namespaces/$1/serviceaccounts/$2/token?dryRun=All" -f - 2>&1)
+  if echo "$out" | grep -q '"kind":"TokenRequest"'; then echo "(server dry run)"; else echo "$out"; fi
 }
 
 secret() {  # namespace
@@ -312,6 +337,16 @@ expect "another name"                            "only RBAC write"      "$(bindi
 expect "in kube-system"                          "may only write in team" "$(binding kube-system vertra-scheduler-logs "$LOGS_ROLE")"
 # (RBAC's own escalation check, or the fence: refused either way.)
 expect "a Role"                                  "forbidden"            "$(as_console -n "$TEAM_A" create role r --verb=get --resource=pods )"
+
+echo "Gateway tokens:"
+AUD='["https://orders.example"]'
+expect "an API's ServiceAccount, its audience"    allowed                    "$(gateway_token "$TEAM_A" orders-api "$AUD" 600)"
+expect "a product's ServiceAccount"               "only mint tokens for API" "$(gateway_token "$TEAM_A" db-sa "$AUD" 600)"
+expect "a namespace that isn't a team's"          "only mint tokens for API" "$(gateway_token "$OTHER_NS" orders-api "$AUD" 600)"
+expect "a retired team's namespace"               "only mint tokens for API" "$(gateway_token "$RETIRED_NS" orders-api "$AUD" 600)"
+expect "the Kubernetes API's audience"            "never the Kubernetes API" "$(gateway_token "$TEAM_A" orders-api '["https://kubernetes.default.svc"]' 600)"
+expect "no audience (the Kubernetes API's)"       "never the Kubernetes API" "$(gateway_token "$TEAM_A" orders-api '[]' 600)"
+expect "longer than an hour"                      "an hour at most"          "$(gateway_token "$TEAM_A" orders-api "$AUD" 7200)"
 
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"
