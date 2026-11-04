@@ -309,7 +309,15 @@ it); an API under none is held. `gateway.url` is where callers reach it
 inside the cluster (its Service, `<release>-execution-console-gateway:8080`);
 with `gateway.publicListener`, port 8081 serves the APIs of
 `gateway.internetTeams` that ask to be reachable from the internet: put an
-Ingress or load balancer in front of it, at `gateway.publicUrl`.
+Ingress or load balancer in front of it, at `gateway.publicUrl`. With
+`vennir`, set these in a values file it layers last (`vennir config set -e
+<env> values <file>`): it asks only about `enabled`, `backendHosts` and
+`internetTeams`. `gateway.publicListenerFrom` limits who may reach the
+public listener (the Ingress controller's namespace, a load balancer's
+ranges), and `gateway.trustedProxies` lists the proxies whose
+`X-Forwarded-For` names the caller; the chart refuses the second without
+the first. The whole walk-through, per cloud:
+[the API gateway](../console/docs/21-api-gateway.md#putting-it-on-the-internet).
 An admin closes it from the Admin page (every API answers 503 with their
 message), or `gateway.closed` keeps it closed; a team's maintainers pause
 one of theirs from its page. With `gateway.ingress`, an Ingress serves the

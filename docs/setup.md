@@ -1,6 +1,10 @@
 # Setting up Vennir
 
 From an empty account to people running steps, with `vennir`, the installer.
+[Onboarding](../console/docs/17-onboarding.md) is the whole path in order,
+from getting `vennir` to a first resource deployed to your cloud, and
+[Where to host Vennir](../console/docs/18-where-to-host.md) compares the
+targets.
 It asks what it needs, shows what it will create and what that costs, and
 changes nothing until you approve. Every answer is kept in
 `deploy/<env>/vennir.yaml`, so `vennir apply` again makes the install match it,
@@ -129,6 +133,9 @@ release ([Rolling back](operations.md#rolling-back)).
 
 ## Where to read more
 
+- Teams' side, once it's installed: [Deploy to Google Cloud](../console/docs/19-deploy-to-gcp.md),
+  [Deploy to AWS](../console/docs/20-deploy-to-aws.md), [the API gateway](../console/docs/21-api-gateway.md),
+  [addresses and firewall rules](../console/docs/22-addresses-and-firewalls.md).
 - [Operations](operations.md): what each feature does on each cloud,
   upgrades and rolling back, backups, monitoring, troubleshooting. Every
   chart setting, with its default, is documented in the charts'

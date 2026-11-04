@@ -50,3 +50,6 @@ two that stop an install:
 ## Next
 
 [Setting up Vennir](../setup.md): `vennir init`, what each question decides, and what to expect from `vennir apply`.
+This page readies the account Vennir runs in. Letting products create
+resources in your projects (each product's own principal, its roles, the
+APIs it calls) is [Deploy to Google Cloud](../../console/docs/19-deploy-to-gcp.md).

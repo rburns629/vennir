@@ -326,6 +326,12 @@ Shown on the console's Docs page, in file order. They ship inside the console im
 | `14-bots-and-automation.md` | Bots and their tokens, keyless CI sign-in, ordering bots, signed callbacks, outcome webhooks, notifications, schedules. |
 | `15-troubleshooting.md` | By symptom: a failed run, a refused submission or image, a waiting step, a missing secret, sign-in, the catalog. |
 | `16-admin-settings.md` | Every Admin section: what it does, what it affects, and whether it's set here or by the install. |
+| `17-onboarding.md` | Onboarding, start to finish: install, the catalog, a team, a first product, then a cloud ready for products and a first real resource. |
+| `18-where-to-host.md` | Where to host Vennir: kind, GKE, EKS or an existing cluster, compared, and what changes for teams by host. |
+| `19-deploy-to-gcp.md` | Deploy to Google Cloud: each product's principal, the APIs, its roles, the runtime account and team secrets, readiness, running and cleaning up; from outside GKE. |
+| `20-deploy-to-aws.md` | Deploy to AWS: a role per product through EKS Pod Identity, other accounts, readiness, running and cleaning up; from outside EKS. |
+| `21-api-gateway.md` | The API gateway, start to finish: turning it on, publishing each kind of backend, calling it, putting it on the internet, running it. |
+| `22-addresses-and-firewalls.md` | Addresses and firewall rules: which address each part uses, finding them, identity instead of allowlists, and a fixed outbound address. |
 | `reference/` | The platform's own docs, copied from the repository (`SOURCES` lists them; `make console-docs`, `.github/scripts/console-docs.sh`): the Docs page's reference, and what the chat agent answers from; `reference/architecture/` holds the figures they draw (`docs/architecture/*.svg`). `test/docs.test.ts` fails while a copy differs. |
 
 ### `console/test/`

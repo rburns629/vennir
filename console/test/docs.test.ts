@@ -43,9 +43,12 @@ describe("the in-app guides", () => {
   });
 
   it("serves a guide as markdown, and every link between guides resolves", async () => {
-    const docs = (await listGuides()).filter((d) => d.section === "guides");
-    // The API reference is a page of its own, not a guide file.
-    const ids = new Set([...docs.map((d) => d.id), "api-reference"]);
+    const all = await listGuides();
+    const docs = all.filter((d) => d.section === "guides");
+    // The API reference is a page of its own, not a guide file; a reference
+    // doc is linked by its own name (setup.md), as the Docs page resolves it.
+    const reference = all.filter((d) => d.section === "reference").map((d) => d.id.replace(/^reference-/, ""));
+    const ids = new Set([...docs.map((d) => d.id), ...reference, "api-reference"]);
     for (const { id } of docs) {
       const page = await getGuide(id);
       expect(page.code).toBe("ok");

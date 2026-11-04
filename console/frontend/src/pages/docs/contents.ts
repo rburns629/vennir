@@ -55,8 +55,9 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
   {
     id: "start",
     title: "Get started",
-    blurb: "Run your first DAG, and learn the one idea everything else builds on.",
+    blurb: "Install Vennir and bring a team on, run your first DAG, and learn the one idea everything else builds on.",
     items: [
+      ["17-onboarding", "Onboarding, start to finish"],
       ["01-getting-started", "Try Vennir end to end"],
       ["03-what-is-a-dag", "What's a DAG?"],
     ],
@@ -86,8 +87,12 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
   {
     id: "how-to",
     title: "How-to guides",
-    blurb: "Things you'll do once you're running: automate runs with bots, and bring in secrets.",
+    blurb: "Things you'll do once you're running: deploy to your cloud, publish APIs, automate runs with bots, and bring in secrets.",
     items: [
+      ["19-deploy-to-gcp", "Deploy to Google Cloud"],
+      ["20-deploy-to-aws", "Deploy to AWS"],
+      ["21-api-gateway", "The API gateway, start to finish"],
+      ["22-addresses-and-firewalls", "Addresses and firewall rules"],
       ["14-bots-and-automation", "Bots and automation"],
       ["05-calling-the-api", "Call the API from a pipeline"],
       ["02-sync-secrets-gcp", "Sync secrets from Secret Manager"],
@@ -118,6 +123,7 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
       {
         group: "Set up",
         items: [
+          ["18-where-to-host", "Where to host Vennir"],
           ["reference-setup", "Set up Vennir"],
           ["reference-clouds-gcp", "Get Google Cloud ready"],
           ["reference-clouds-aws", "Get AWS ready"],
@@ -283,6 +289,18 @@ export const TASKS: { id: string; title: string; blurb: string; questions: Answe
       { label: "How do I call an API through the gateway?", guide: "11-apis", section: "how-do-i-call-an-api-through-the-gateway" },
       { label: "What does each gateway error mean?", guide: "11-apis", section: "what-does-each-gateway-error-mean" },
       { label: "Pausing an API during an incident", guide: "11-apis", section: "pausing-an-api-during-an-incident" },
+      { label: "Publish an API through the gateway", guide: "21-api-gateway", section: "2-publish-an-api" },
+    ],
+  },
+  {
+    id: "cloud",
+    title: "Deploy to your cloud",
+    blurb: "Let products create resources in Google Cloud or AWS, and get past firewalls that want an address.",
+    questions: [
+      { label: "Let a product create things in Google Cloud", guide: "19-deploy-to-gcp" },
+      { label: "Let a product create things in AWS", guide: "20-deploy-to-aws" },
+      { label: "A firewall needs Vennir's address", guide: "22-addresses-and-firewalls", section: "finding-the-outbound-addresses-now" },
+      { label: "Which cloud should Vennir run on?", guide: "18-where-to-host" },
     ],
   },
   {
@@ -310,6 +328,7 @@ export const TASKS: { id: string; title: string; blurb: string; questions: Answe
     title: "Install and operate",
     blurb: "For admins: set Vennir up, connect your cloud, and run it day to day.",
     questions: [
+      { label: "Onboarding, start to finish", guide: "17-onboarding" },
       { label: "Set up Vennir", guide: "reference-setup" },
       { label: "The Admin page, setting by setting", guide: "16-admin-settings" },
       { label: "Upgrading, backups, rotating secrets", guide: "reference-operations", section: "upgrading" },

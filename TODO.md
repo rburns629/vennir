@@ -55,6 +55,13 @@ last one was.
   secret through `RUN --mount=type=secret`; the image handed to publish,
   loaded, scanned, pushed and signed; the weekly check loading it; a pull
   request only validating it.
+- [ ] **The gateway on the internet, on GKE and EKS** (documented
+  2026-11-03, `console/docs/21-api-gateway.md`): the values file it gives
+  (`gateway.publicListener`, its Ingress, `publicListenerFrom`,
+  `trustedProxies`) behind GKE's load balancer (a reserved address, a
+  Google-managed certificate, the health check on `/.vennir/health`) and an
+  ALB (ACM, `target-type: ip`); a backend seeing the caller's own address.
+  Proven only on kind with Traefik.
 - [ ] **Deploy GKE from a release once** (`make gke-deploy VERSION=...`,
   which deploys the release's signed charts and images, each signature
   checked against the release workflow's identity at that tag first): the
@@ -111,6 +118,21 @@ it was seen.
   `listPolicy.allowedValues`, so a `gcp.resourceLocations` policy that lists
   `deniedValues` isn't seen. It fails toward no problem: the apply stops
   when Google refuses the region.
+
+- [ ] **A `vennir` setting for the gateway's internet listener** (found
+  2026-11-03, writing the gateway guide): `vennir` asks only `enabled`,
+  `backendHosts` and `internetTeams`, so `internetTeams` does nothing until
+  someone writes a values file with the public listener and its Ingress. On
+  gcp and aws it could make them as it does the console's (a reserved
+  address and Google's certificate; an ALB with ACM's), with
+  `publicListenerFrom` and `trustedProxies` filled in.
+
+- [ ] **A fixed outbound address, as an option** (found 2026-11-03,
+  `console/docs/22-addresses-and-firewalls.md`): `vennir`'s clusters give
+  nodes public addresses (no NAT), which change, so a target that admits
+  only known addresses can't be given one. An option for private nodes with
+  Cloud NAT on reserved addresses (gcp) and private subnets with a NAT
+  gateway and Elastic IPs (aws), priced on the approval screen.
 
 - [ ] **`vennir`: GitLab as a second git host, then the azure target**
   (last). The rest of `cli/DESIGN.md`'s build order is done; its decisions
@@ -181,6 +203,20 @@ it was seen.
   still merge in a new one-person catalog, where the creator can't approve
   their own pull request (a bypass for repository admins, pull requests
   only, is the likely answer).
+
+- [ ] **`samples/gcp`'s `project` turns on no APIs** (found 2026-11-03,
+  writing `console/docs/19-deploy-to-gcp.md`): a project it creates has
+  only Google's defaults, so `build-image` or `app-hosting` into it in the
+  same run fails `SERVICE_DISABLED`. An input of the services to turn on
+  (`serviceusage.services.enable`, granted as `roles/serviceusage.serviceUsageAdmin`
+  on the folder), or a product of its own.
+
+- [ ] **A sample calling Google Cloud from outside GKE** (found 2026-11-03):
+  `caller-identity` shows AWS from any cluster with a public issuer; nothing
+  shows Google Cloud from EKS (a workload identity pool trusting the
+  cluster's issuer, the provider as a `tokenAudiences` entry, an external
+  account credential file). The gateway does it for `googleIdToken`; the
+  guide describes it for products, unproven.
 
 - [ ] **Prove the chat agent answering through Bedrock** once the acyclix
   account can: it has the Anthropic use-case form to submit, and every
