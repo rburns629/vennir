@@ -83,7 +83,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 data:
-  vertra.json: |-
+  vennir.json: |-
     {{- .Files.Get "files/grafana-dashboard.json" | nindent 4 }}
 {{- end }}
 
@@ -91,9 +91,9 @@ data:
 {{- define "execution-console.alertGroups" -}}
 {{- $ns := printf "namespace=%q" .Release.Namespace }}
 groups:
-  - name: vertra-console
+  - name: vennir-console
     rules:
-      - alert: VertraConsoleFailing
+      - alert: VennirConsoleFailing
         expr: >-
           sum(rate(console_rpc_requests_total{ {{- $ns -}}, code="internal"}[5m]))
           / sum(rate(console_rpc_requests_total{ {{- $ns -}} }[5m])) > 0.05
@@ -102,13 +102,13 @@ groups:
         annotations:
           summary: More than 5% of the console's calls are failing.
           description: Each is logged in full by the console (maskErrors). Usually its database, kernel-api or the Kubernetes API.
-      - alert: VertraSignInBurst
-        expr: sum(increase(console_rpc_requests_total{ {{- $ns -}}, procedure="vertra.console.v1.AuthService/Login", code!="ok"}[15m])) > 50
+      - alert: VennirSignInBurst
+        expr: sum(increase(console_rpc_requests_total{ {{- $ns -}}, procedure="vennir.console.v1.AuthService/Login", code!="ok"}[15m])) > 50
         labels: {severity: warning}
         annotations:
           summary: Over 50 failed sign-ins in 15 minutes.
           description: Someone may be guessing passwords. Accounts lock for a while after repeated failures; the console's logs have the client addresses.
-      - alert: VertraCatalogNotApplying
+      - alert: VennirCatalogNotApplying
         expr: >-
           sum(increase(console_catalog_syncs_total{ {{- $ns -}}, outcome="failed"}[1h])) > 0
           unless sum(increase(console_catalog_syncs_total{ {{- $ns -}}, outcome!="failed"}[1h])) > 0
@@ -117,10 +117,10 @@ groups:
         annotations:
           summary: The catalog's release hasn't been applied for over an hour.
           description: Observe's security checks (and the Admin page) show why. Nothing in the catalog changes here until it applies.
-      - alert: VertraGatewayBackendUnreachable
+      - alert: VennirGatewayBackendUnreachable
         expr: >-
-          sum by (api) (rate(vertra_gateway_requests_total{ {{- $ns -}}, outcome="backend_error"}[5m]))
-          / sum by (api) (rate(vertra_gateway_requests_total{ {{- $ns -}}, outcome=~"forwarded|backend_error"}[5m])) > 0.1
+          sum by (api) (rate(vennir_gateway_requests_total{ {{- $ns -}}, outcome="backend_error"}[5m]))
+          / sum by (api) (rate(vennir_gateway_requests_total{ {{- $ns -}}, outcome=~"forwarded|backend_error"}[5m])) > 0.1
         for: 10m
         labels: {severity: warning}
         annotations:

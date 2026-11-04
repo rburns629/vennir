@@ -3,7 +3,7 @@
  * Gives an admin a new password, for when the first admin's is lost, or was
  * never known (an install that set no bootstrapAdmin password: the migrate
  * Job gives it a random one it never prints). Run inside the console's own
- * Pod, so only someone the cluster lets exec there can (`vertra admin
+ * Pod, so only someone the cluster lets exec there can (`vennir admin
  * reset-password`, or `kubectl exec deploy/<release>-execution-console --
  * node dist/db/resetAdmin.js <email>`). The new password is random and
  * printed once, to the exec's own output, which no Pod log keeps; every

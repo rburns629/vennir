@@ -6,7 +6,7 @@
 # action runs with your team's secrets whoever calls it, and the caller
 # picks the URL, so they'd choose where your token goes. To share it, drop
 # useToken and the secretRefs, or fix the host in the code.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: http-check
 team: try-anna             # CHANGE: your team

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/rburns629/vertra/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/config"
 )
 
 // Floor is a size's platform requests while awake, database in-cluster,

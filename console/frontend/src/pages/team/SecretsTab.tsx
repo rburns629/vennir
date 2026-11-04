@@ -477,7 +477,7 @@ function SecretDetail({
               {fix && (
                 <>
                   <Typography variant="body2" sx={{ mb: 1 }}>
-                    Someone who owns that secret can let Vertra read it:
+                    Someone who owns that secret can let Vennir read it:
                   </Typography>
                   <CodeBlock code={fix} />
                 </>

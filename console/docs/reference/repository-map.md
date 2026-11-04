@@ -17,7 +17,7 @@ Around them: `helm/` packages both for Kubernetes, with each cluster's settings,
 ├── docs/          maintainer documentation and diagrams
 ├── examples/      demo products (not real catalog products)
 ├── catalog-template/  what a new catalog repository starts as
-├── cli/           vertra, the installer CLI (Go)
+├── cli/           vennir, the installer CLI (Go)
 ├── proto/         the console's API as protobuf (Connect); `make proto` generates its code
 ├── .github/       CI and security workflows
 ├── Makefile       everyday commands: run, deploy, logs
@@ -28,7 +28,7 @@ Around them: `helm/` packages both for Kubernetes, with each cluster's settings,
 
 | Path | What it's for |
 | --- | --- |
-| `README.md` | What Vertra is, a first example DAG, trying it locally on kind, and how the parts fit together. |
+| `README.md` | What Vennir is, a first example DAG, trying it locally on kind, and how the parts fit together. |
 | `LICENSE` | The MIT license. |
 | `SECURITY.md` | How to report a vulnerability privately, response times, supported versions, scope. |
 | `CONTRIBUTING.md` | Setting up, testing, what a pull request needs, the CLA. |
@@ -41,11 +41,11 @@ Around them: `helm/` packages both for Kubernetes, with each cluster's settings,
 | `.gitignore` | Keeps `_local/`, build output and dependencies out of git. |
 | `buf.yaml` | buf's module (`proto/`) and lint rules for the APIs. |
 | `buf.gen.es.yaml`, `buf.gen.frontend.yaml`, `buf.gen.go.yaml`, `buf.gen.kernel.yaml` | What `make proto` generates: TypeScript for the console (`console/src/gen/`: its API and kernel-api's, which it calls) and for the frontend (`console/frontend/src/gen/`, the console's API only, JavaScript with type declarations), Go for the CLI (`cli/internal/gen/`, the console's API and the catalog release) and for the kernel (`kernel/internal/gen/`, its own), each from plugins pinned in that project. |
-| `proto/vertra/console/v1/` | The console's API as Connect services: one file per service (`execution.proto`'s `ExecutionService` streams `WatchExecution`), and `common.proto` (failures, problems, paging). The API reference page is built from these. |
-| `proto/vertra/catalog/v1/release.proto` | A catalog release: every team (with its SecretStore files) and product action of a catalog's `main`, which `vertra catalog release` pushes as an OCI artifact and each console pulls. |
-| `proto/vertra/kernel/v1/kernel.proto` | kernel-api's `KernelService`, internal: only the console calls it. |
+| `proto/vennir/console/v1/` | The console's API as Connect services: one file per service (`execution.proto`'s `ExecutionService` streams `WatchExecution`), and `common.proto` (failures, problems, paging). The API reference page is built from these. |
+| `proto/vennir/catalog/v1/release.proto` | A catalog release: every team (with its SecretStore files) and product action of a catalog's `main`, which `vennir catalog release` pushes as an OCI artifact and each console pulls. |
+| `proto/vennir/kernel/v1/kernel.proto` | kernel-api's `KernelService`, internal: only the console calls it. |
 | `gateway/` | The API gateway (its own section, below). |
-| `perf/` | Performance benchmarks on a kind cluster of their own (`vertra-perf`): `README.md` (the runbook and the findings), the driver (a Go module, no dependencies: `main.go` runs a scenario through the console's API, `workload.go` the shapes and hard caps, `console.go` the calls, `analyze.go` the timings, correctness checks and report, `readers.go` people reading while it runs (`-readers`), `compare.go` two runs side by side (`go run . compare`)), `pgbench/run.sh` (Postgres alone, in the cluster, as it's sized), `slowcreate/` (an admission webhook holding Job creates, to see a create that timed out but happened: `main.go`, `webhook.yaml`, `run.sh` up or down, `kernel.yaml` the short timeout), and the perf cluster's settings (`kind-kernel.yaml`, `kind-console.yaml`). Results go to `perf/results/`, not in git. |
+| `perf/` | Performance benchmarks on a kind cluster of their own (`vennir-perf`): `README.md` (the runbook and the findings), the driver (a Go module, no dependencies: `main.go` runs a scenario through the console's API, `workload.go` the shapes and hard caps, `console.go` the calls, `analyze.go` the timings, correctness checks and report, `readers.go` people reading while it runs (`-readers`), `compare.go` two runs side by side (`go run . compare`)), `pgbench/run.sh` (Postgres alone, in the cluster, as it's sized), `slowcreate/` (an admission webhook holding Job creates, to see a create that timed out but happened: `main.go`, `webhook.yaml`, `run.sh` up or down, `kernel.yaml` the short timeout), and the perf cluster's settings (`kind-kernel.yaml`, `kind-console.yaml`). Results go to `perf/results/`, not in git. |
 | `.semgrep/malicious.yml` | Semgrep rules for code that has no business in a product (running remote code, hidden payloads, reverse shells, mining). Run by `security.yml`. |
 
 ## `.github/`: CI
@@ -53,15 +53,15 @@ Around them: `helm/` packages both for Kubernetes, with each cluster's settings,
 | Path | What it's for |
 | --- | --- |
 | `workflows/ci.yml` | Every PR: the kernel's `gofmt`, `go vet`, migrations and tests (`-race`), with its kind tests in the kubernetes job; console tests, lint and build; the API's protos linted and their committed generated code checked against `make proto`; govulncheck over the CLI, the kernel and the gateway; Helm lint and render of `helm/values/*`; `actionlint` (this repo's workflows and the catalog template's); the catalog template's checks; building both platform images and scanning them (Trivy, OSV-Scanner). |
-| `workflows/perf.yml` | The performance benchmarks, by hand or weekly, never on a PR: `vertra-perf` on the runner, baseline and burst, the results kept as an artifact and compared with the last successful run's (`perf`'s `compare`). |
+| `workflows/perf.yml` | The performance benchmarks, by hand or weekly, never on a PR: `vennir-perf` on the runner, baseline and burst, the results kept as an artifact and compared with the last successful run's (`perf`'s `compare`). |
 | `dependabot.yml` | Weekly, grouped update pull requests (a week's cooldown) for the kernel's and the CLI's Go, the console's npm, every Dockerfile, the workflows, and the catalog template's starters. |
 | `workflows/cla.yml` | On a pull request: asks each author who hasn't accepted the CLA to, and passes once all have (CLA Assistant Lite; signatures on the `cla-signatures` branch). |
-| `workflows/release.yml` | On a version tag: first checks `vertra` with govulncheck; then builds both platform images for amd64 and arm64, scans them, pushes them to GHCR, signs them keyless; packages, pushes and signs both charts; creates the GitHub release; builds `vertra` for linux and macOS (amd64, arm64), pushes each binary to GHCR as a blob a catalog's `./vertra` downloads by SHA-256, signs them, and attaches them with their checksums (each `vertra` carrying its release's charts' SHA-256s); then, for a release that isn't a pre-release, opens the pull request pinning `catalog-template/vertra` to it (`pin-vertra.sh`) and adding its charts' SHA-256s to `cli/internal/install/release-charts.sha256`. |
+| `workflows/release.yml` | On a version tag: first checks `vennir` with govulncheck; then builds both platform images for amd64 and arm64, scans them, pushes them to GHCR, signs them keyless; packages, pushes and signs both charts; creates the GitHub release; builds `vennir` for linux and macOS (amd64, arm64), pushes each binary to GHCR as a blob a catalog's `./vennir` downloads by SHA-256, signs them, and attaches them with their checksums (each `vennir` carrying its release's charts' SHA-256s); then, for a release that isn't a pre-release, opens the pull request pinning `catalog-template/vennir` to it (`pin-vennir.sh`) and adding its charts' SHA-256s to `cli/internal/install/release-charts.sha256`. |
 | `workflows/security.yml` | Secret scanning (gitleaks) and code scanning (Semgrep with Go rules, including `.semgrep/`). |
 | `scripts/install-scanners.sh` | Installs pinned, checksum-verified tool binaries (Trivy, OSV-Scanner, gitleaks, actionlint, cosign, oras) for the workflows. |
-| `scripts/pin-vertra.sh` | Pins a released `vertra` in a catalog's `./vertra` (default `catalog-template/vertra`): its version and each platform's SHA-256 from the release, after checking each downloads anonymously and matches. |
-| `scripts/catalog-template.sh` | Runs `vertra catalog` (vertra built from this checkout) in `catalog-template/` with its samples (all, or `SAMPLES=`) installed as teams: CI's `validate` and `check`, and `make catalog-publish`'s `publish -- release` (commands separated by `--` run in the same assembled catalog). |
-| `scripts/build-vertra.sh` | Builds `vertra` for this machine in the pinned Go image (no Go needed) into `cli/bin/`, and prints its path, for `VERTRA_BIN`. |
+| `scripts/pin-vennir.sh` | Pins a released `vennir` in a catalog's `./vennir` (default `catalog-template/vennir`): its version and each platform's SHA-256 from the release, after checking each downloads anonymously and matches. |
+| `scripts/catalog-template.sh` | Runs `vennir catalog` (vennir built from this checkout) in `catalog-template/` with its samples (all, or `SAMPLES=`) installed as teams: CI's `validate` and `check`, and `make catalog-publish`'s `publish -- release` (commands separated by `--` run in the same assembled catalog). |
+| `scripts/build-vennir.sh` | Builds `vennir` for this machine in the pinned Go image (no Go needed) into `cli/bin/`, and prints its path, for `VENNIR_BIN`. |
 | `scripts/scan-image.sh` | Scans one built platform image and fails if it must not ship (fixable high or critical vulnerabilities, and more). |
 | `scripts/published.sh` | Whether a tag is in the registry (its digest), for the release workflow, which writes each version's tags once. |
 | `ISSUE_TEMPLATE/bug_report.yml`, `feature_request.yml` | Issue forms for bugs and feature requests. |
@@ -76,10 +76,10 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | --- | --- |
 | `README.md` | What the kernel is and how to run and test it. |
 | `ARCHITECTURE.md` | The package rules, and a call-by-call trace of submit → claim → dispatch → poll → finish. |
-| `go.mod`, `go.sum` | The kernel's Go module (`github.com/rburns629/vertra/kernel`). |
+| `go.mod`, `go.sum` | The kernel's Go module (`github.com/rburns629/vennir/kernel`). |
 | `Dockerfile` | The image: a Go stage builds the binary; it runs on distroless (no shell) as a non-root user. |
 | `.dockerignore`, `.gcloudignore` | Keep test binaries and local files out of the image and the Cloud Build upload. |
-| `cmd/kernel/main.go` | The binary: `api`, `scheduler`, `migrate`, `database-setup`, `sleep [--now]`, `wake`; for the chart `wait-for-postgres` (init containers) and `check-heartbeat` (the scheduler's liveness probe); and `database-token FILE` (a managed database's sign-in for pg_restore, when vertra moves an install's data in). |
+| `cmd/kernel/main.go` | The binary: `api`, `scheduler`, `migrate`, `database-setup`, `sleep [--now]`, `wake`; for the chart `wait-for-postgres` (init containers) and `check-heartbeat` (the scheduler's liveness probe); and `database-token FILE` (a managed database's sign-in for pg_restore, when vennir moves an install's data in). |
 | `internal/config/config.go` | Every setting, for every process, read from the environment (the chart's ConfigMap) and checked at startup. |
 | `internal/dbauth/` | Signing in to a managed database with the workload's own identity: on GKE, its Workload Identity token from the metadata server (Cloud SQL's IAM database authentication); on EKS, an RDS token its Pod Identity role signs (`rds.go`), and the RDS administrator's password from Secrets Manager, for database-setup. |
 | `internal/dbsetup/` | `kernel database-setup`: as a managed server's administrator, makes what the cloud didn't (on RDS, the databases and the services' `rds_iam` users), then opens each database to its own service alone (the console may pass on its CONNECT and schema USAGE, for the gateway). |
@@ -116,7 +116,7 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | `internal/sleeper/sleeper.go` | The sleeper: one look, and if the platform is idle, the counts to wake to recorded and every Deployment scaled to zero (the databases last), the wake CronJob armed for the console's next schedule; and `Wake` (`kernel wake`), which brings it back. |
 | `internal/logging/`, `internal/metrics/` | JSON logs; the Prometheus metrics. |
 | `internal/gen/` | `KernelService`'s generated Go (`make proto`). |
-| `internal/scheduler/perf_test.go` | The scheduler and Postgres alone, with the fake executor and 1, 2 and 4 schedulers: steps a second, and that no step starts twice. Only with `VERTRA_PERF=1` (`perf/README.md`). |
+| `internal/scheduler/perf_test.go` | The scheduler and Postgres alone, with the fake executor and 1, 2 and 4 schedulers: steps a second, and that no step starts twice. Only with `VENNIR_PERF=1` (`perf/README.md`). |
 | `internal/dbtest/`, `internal/kindtest/` | For tests: the test database and throwaway ones; the current kind cluster and test images (`kindtest/fixture/`: a test-only product that crashes, sleeps or fails on demand). |
 | `*_test.go` | Beside each package: against the real, migrated test database (`TEST_DATABASE_URL`), client-go's fake clientset, or (`TestKind*`) a real kind cluster, skipping without one or failing when `KERNEL_TESTS_REQUIRE_KUBERNETES=1` (CI). |
 
@@ -165,16 +165,16 @@ TypeScript, Fastify 5, Drizzle (Postgres), `@kubernetes/client-node`. One proces
 | `policySync.ts` | Rewrites the identity and scan policies and the teams' pull Secrets every few minutes, so drift doesn't last; keeps each sync's outcome for admins. |
 | `logLevels.ts` | Who sees which of a step's log lines: INFO to everyone who can see the run, the rest to the step's team. |
 | `registryFederation.ts` | Reading another install's registry with no stored key: the console's projected token exchanged at Google's STS (Workload Identity Federation, an Artifact Registry) or AWS STS (the owner's role by web identity, then ECR's token), and the Docker config it hands out. |
-| `pullSecret.ts` | Copies the platform's registry pull Secret into every team namespace (`vertra-pull`), for steps' images in private registries. |
+| `pullSecret.ts` | Copies the platform's registry pull Secret into every team namespace (`vennir-pull`), for steps' images in private registries. |
 | `failureHelp.ts` | What a failed step's error means, what to do, whether a retry is safe and whom to ask: the owner's words, else the platform's. |
 | `targets.ts` | Allowed targets (X1): which projects, folders, accounts or subscriptions another team may aim a team's products at, from its `allowedTargets`. |
 | `schedulerLogs.ts` | Binds the kernel scheduler's log reading in each team namespace (one RoleBinding to its logs-only ClusterRole, the console's only RBAC write), with the namespace and on every policy resync. |
-| `teamNetwork.ts` | Keeps the default-deny NetworkPolicy (`vertra-default-deny`) in every team namespace, so teams' steps can't reach each other. |
+| `teamNetwork.ts` | Keeps the default-deny NetworkPolicy (`vennir-default-deny`) in every team namespace, so teams' steps can't reach each other. |
 | `retention.ts` | Deletes, hourly, submitted-execution records, audit entries, unused scan verdicts and chat ratings (90 days) past their retention. |
 | `notifier.ts` | Notifications: making each event once (a run that failed or finished, a step waiting for an approval, the catalog not pulled, a product not ready, a step the cluster refused, a platform alert), fanning it out to inboxes, email (SMTP, the kinds each person chooses) and teams' chat webhooks, and sending those, one console at a time (webhook URLs encrypted, allowed hosts only). |
 | `readiness.ts` | Whether each product is ready on this install: runs its check action (as the console, as the product) when it's new or changed, daily or on Check now, and records the answer. |
 | `scheduleRunner.ts`, `cron.ts` | Starting teams' schedules when they're due, each as its bot (claimed by moving its next run on, so one console starts it), and the cron expressions they use (five fields, IANA time zones). |
-| `callbacks.ts` | Callbacks for systems (decision 23): a finished run queued for its ordering bot's callback (`order.finished`) and its owning teams' outcome webhooks (`run.finished`, with steps' outputs), posted signed (`Vertra-Signature`), allowed hosts only, five tries, one console at a time. |
+| `callbacks.ts` | Callbacks for systems (decision 23): a finished run queued for its ordering bot's callback (`order.finished`) and its owning teams' outcome webhooks (`run.finished`, with steps' outputs), posted signed (`Vennir-Signature`), allowed hosts only, five tries, one console at a time. |
 | `resourceRecorder.ts` | Every 30 seconds, copies what finished runs' steps reported as `resources` (with each step's inputs and outputs) into the `resources` table, and marks what cleanup runs deleted. |
 | `productPolicy.ts` | Writes the registered products into the cluster's identity policy, after every product change and at startup. |
 | `gcpMetadata.ts` | The console's own Google access token, from the node's metadata server (Workload Identity): the registry's, the audit export's, single sign-on's, Vertex's and the database's. |
@@ -185,7 +185,7 @@ TypeScript, Fastify 5, Drizzle (Postgres), `@kubernetes/client-node`. One proces
 | `core/executions.ts` | Submitting (team, identity, secret, image and scan checks, pinning, ServiceAccounts), listing, reading, events, logs, cancel, retry, rerun. |
 | `core/teams.ts` | Teams and members, their namespaces, retiring, restoring and purging, SecretStore files, running task Pods. |
 | `core/secrets.ts`, `core/products.ts`, `core/images.ts` | Team secrets and their sources; the product registry, repository ownership and wiring types; the image policy and scan verdicts. |
-| `core/clouds.ts` | Which installs a product is for: its clouds against this install's (`INSTALL_CLOUD`, which vertra sets), and the `NOT_FOR_THIS_INSTALL` refusal at submit. |
+| `core/clouds.ts` | Which installs a product is for: its clouds against this install's (`INSTALL_CLOUD`, which vennir sets), and the `NOT_FOR_THIS_INSTALL` refusal at submit. |
 | `core/users.ts`, `core/tokens.ts`, `core/admin.ts` | Accounts; bot and automation tokens; platform counts, the audit log, policy sync. |
 | `core/orderRate.ts` | An ordering bot's rate (decision 23): its orders in the last minute, counted from its runs; past `orders.ratePerMinute`, 429 with Retry-After. |
 | `core/templates.ts` | Templates: what a person may run (templates and shared actions), running one with parameters only, each step built from its product; reruns of a template's run; previews (runs of plan actions) and cleanup runs. |
@@ -213,11 +213,11 @@ TypeScript, Fastify 5, Drizzle (Postgres), `@kubernetes/client-node`. One proces
 | `core/apis.ts` | API products: who sees and may call each, whether it's live, held (its backend's host isn't allowed) or paused, and pausing one. |
 | `core/approvals.ts` | Approvals: a maintainer of a step's team, never whoever ran it, approves or declines it; the steps awaiting one. |
 | `core/retired.ts` | The shared "this team is retired, it's read-only" refusal. |
-| **`rpc/`** | **The API**: Connect services from `proto/`, at `/api/vertra.console.v1.<Service>/<Method>`. |
+| **`rpc/`** | **The API**: Connect services from `proto/`, at `/api/vennir.console.v1.<Service>/<Method>`. |
 | `rpc/server.ts` | Mounts every service on Fastify with `@connectrpc/connect-fastify`, resolving each call's caller from its bearer token. |
 | `rpc/interceptors.ts` | Masking unexpected errors as `internal`, auditing every changing call (with the run it started), requiring a caller outside the public methods. |
 | `rpc/errors.ts`, `rpc/context.ts`, `rpc/validate.ts`, `rpc/rateLimit.ts`, `rpc/convert.ts` | Connect errors with `Failure`/`Problem` details; the caller, log and request in the handler context; checking requests against REST's TypeBox schemas; fixed-window rate limits; timestamps. |
-| `rpc/services/*.ts` | One file per service in `proto/vertra/console/v1/`, each mapping messages to and from `core/`. `execution.ts` also streams `WatchExecution` (re-reading and re-authorizing every 2 seconds). |
+| `rpc/services/*.ts` | One file per service in `proto/vennir/console/v1/`, each mapping messages to and from `core/`. `execution.ts` also streams `WatchExecution` (re-reading and re-authorizing every 2 seconds). |
 | **`auth/`** | **Who's calling.** |
 | `auth/plugin.ts` | Checks every request's session or bot token and loads the caller's teams and admin flag. |
 | `auth/oidc.ts` | Single sign-on (any OpenID Connect provider): the authorization code flow with PKCE, the ID token's checks, each account bound to its provider identity once, then its groups and mapped teams (`sso.ts`). |
@@ -238,8 +238,8 @@ TypeScript, Fastify 5, Drizzle (Postgres), `@kubernetes/client-node`. One proces
 | `db/connection.ts` | How every pool connects: `DATABASE_URL`, and with `DATABASE_IAM_AUTH` a short-lived token as each connection's password (gcp: its Workload Identity's; aws: `db/rds.ts`, an RDS token its role signs). |
 | `awsSha256.ts` | SHA-256 for AWS's SigV4 signer: the Bedrock chat's requests and RDS tokens. |
 | `db/gatewayAccess.ts` | The gateway's own database role: the columns it reads and its traffic counts, nothing else; created here on the console's own Postgres. |
-| `db/bootstrapAdmin.ts` | Creates the first admin once: with the operator's password (vertra's, from a Secret, changed at the first sign-in), or a random one that is never printed (given one by `resetAdmin.ts`). |
-| `db/resetAdmin.ts` | Gives an admin a new random password from inside the console's Pod (`vertra admin reset-password`): printed once, every session revoked, audited. |
+| `db/bootstrapAdmin.ts` | Creates the first admin once: with the operator's password (vennir's, from a Secret, changed at the first sign-in), or a random one that is never printed (given one by `resetAdmin.ts`). |
+| `db/resetAdmin.ts` | Gives an admin a new random password from inside the console's Pod (`vennir admin reset-password`): printed once, every session revoked, audited. |
 | `db/migrations/` | The schema: `0000_initial_schema.sql` (every table at the first public release), then one SQL file per later change, generated by `npm run db:generate` (`0002_catalog_sync.sql`: the catalog release applied, and which teams and products it made; `0003_token_audiences.sql`; `0004_templates.sql`: templates, and which template a run came from; `0005_team_roles.sql`: maintainer or member; `0006_visibility.sql`; `0007_allowed_targets.sql`; `0008_retries.sql`; `0009_concurrency_keys.sql`; `0010_failure_help.sql`; `0011_approvals.sql`; `0012_apis.sql`; `0013_gateway_traffic.sql`; `0014_oidc_subject.sql`: each account's single sign-on identity; `0015_team_require_sso.sql`: a team requiring it; `0016_must_change_password.sql`; `0017_audit_chain.sql`: the audit log's hashes and its copy's progress; `0018_last_signed_in.sql`: each account's last sign-in; `0019_audit_broken_at.sql`: where the audit chain broke; `0020_resources.sql`: what runs made, and products' cleanup; `0021_notifications.sql`: notifications and teams' chat webhooks; `0022_plans.sql`: products' plan actions, for Preview; `0023_readiness.sql`: products' checks and their answers; `0024_schedules.sql`: teams' schedules; `0025_bot_identities.sql`: bots' keyless identities; `0026_examples.sql`: actions' examples, from their tests; `0027_email.sql`: notifications by email; `0028_drafts_and_template_examples.sql`: Compose's drafts, and templates' examples; `0029_sso_settings.sql`: single sign-on as admins set it, and groups mapped to teams; `0030_team_quota.sql`: a team's own resource limits; `0031_catalog_version.sql`: the catalog version applied; `0032_secret_store_identities.sql`: the cloud identity each team's SecretStores sign in as; `0033_alerts.sql`: refusals and platform alerts emailed by default; `0034_admin_channel.sql`: the team whose webhook gets admins' alerts; `0035_product_caps.sql`: products' maxRunning; `0036_product_capacity.sql`: products' capacity; `0037_team_owner.sql`: team.yaml's owner; `0038_ordering_bots.sql`: the templates each ordering bot may order; `0039_order_callbacks.sql`: ordering bots' callbacks, and what's waiting to be posted; `0040_order_rate_index.sql`: each submitter's runs by time, for an ordering bot's rate; `0041_team_callbacks.sql`: teams' outcome webhooks, a delivery to a bot or a team; `0042_wiring_type_teams.sql`: the team that defines each wiring type; `0043_resource_links.sql`: what each resource depends on, across runs, and deletes waiting for an admin; `0044_chat_feedback.sql`: how people rated the chat agent's answers; `0045_chat_settings.sql`: the chat agent's model as admins set it; `0049_stored_dag_field_names.sql`: stored submissions' old field names renamed; `0050_audit_copy_compare.sql`: the database compared with the audit copy; `0051_approval_teams.sql`: products' approval for some teams' runs; `0052_team_description.sql`: team.yaml's description; `0057_product_clouds.sql`: the clouds of the installs each product is for; `0060_unrecorded_runs_index.sql`: the runs the resource recorder has still to record, by time; `0061_chat_limits.sql`: the chat agent's questions per person, as admins set them; `0062_schedule_claims.sql`: a schedule's claimed time until it starts; `0063_lowercase_emails.sql`: accounts' emails lowercased); `meta/` is drizzle's bookkeeping. |
 
 ### `console/frontend/`: the web app
@@ -274,7 +274,7 @@ React 19, MUI, Vite, react-router. Its own `package.json`.
 | `src/pages/team/OutcomeWebhookSection.tsx`, `src/components/SignedCallback.tsx` | A team's outcome webhook on its Settings tab, and the signed callback editor it shares with an ordering bot's card (Automation): where it posts, its last post, a new URL or secret, the secret shown once. |
 | `src/components/ReadinessPill.tsx` | Whether a product is ready on this install (its check): Ready, Not ready, Check failed, Checking or Not checked yet, with what's missing on hover. |
 | `src/pages/catalog/ScheduleDialog.tsx`, `src/pages/team/SchedulesTab.tsx` | Scheduling a run from its form (when, time zone, the team's bot), and a team's schedules on its Schedules tab (pause, delete, last start). |
-| `src/pages/ComposePage.tsx`, `src/compose.ts` | Compose (`/catalog/compose`): a template built from shared actions, inputs wired by type (`x-vertra-needs`, `x-vertra-provides`), proposed to the catalog as a file (GitHub's new-file page) or run now when it's all the person's team's. |
+| `src/pages/ComposePage.tsx`, `src/compose.ts` | Compose (`/catalog/compose`): a template built from shared actions, inputs wired by type (`x-vennir-needs`, `x-vennir-provides`), proposed to the catalog as a file (GitHub's new-file page) or run now when it's all the person's team's. |
 | `src/pages/useComposeDrafts.ts` | Compose's drafts, kept by the console for their team: saved a second after a change, each save naming the version before it; a rename moves the draft; a conflict waits for the person; drafts a browser kept move over. Tested alongside. |
 | `src/pages/team/KeylessSection.tsx` | A bot signing in from CI with no token, on its Automation card: its identities, adding one (GitHub Actions, GitLab), the job's snippet. |
 | `src/pages/team/TeamOffers.tsx` | A team as anyone signed in sees it (its page, for those not in it; its members' What it offers tab): where to ask it, and its templates, actions and APIs, with sharing and readiness. |
@@ -310,7 +310,7 @@ Shown on the console's Docs page, in file order. They ship inside the console im
 
 | File | Guide |
 | --- | --- |
-| `01-getting-started.md` | Try Vertra end to end: a platform, a product, a DAG. |
+| `01-getting-started.md` | Try Vennir end to end: a platform, a product, a DAG. |
 | `02-sync-secrets-gcp.md` | Syncing secrets from GCP Secret Manager. |
 | `03-what-is-a-dag.md` | DAGs, `dependsOn` and `$fromTask`. |
 | `04-secrets-explained.md` | How secrets stay locked to one product. |
@@ -356,7 +356,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `image-policy.test.ts`, `registry.test.ts` | Allowed image sources; the registry check. |
 | `product-releases.test.ts`, `product-catalog.test.ts` | Product registration, releases, full descriptions, wiring types. |
 | `docs.test.ts`, `schemaDoc.test.ts` | The guides load and link correctly; the database guide matches the schema. |
-| `jsonSchema.test.ts` | What a schema refuses, in its own words (a pattern's `x-vertra-pattern-message`) or ajv's. |
+| `jsonSchema.test.ts` | What a schema refuses, in its own words (a pattern's `x-vennir-pattern-message`) or ajv's. |
 | `secrets.test.ts` | Registering and revoking secrets: other teams refused, names Kubernetes would refuse, a Secret the console didn't create. |
 | `apis.test.ts` | API products from releases (with their ServiceAccounts), who sees and may call them, held backends, pausing. |
 | `approvals.test.ts` | Which steps wait for an approval (`always`, `otherTeams`, a list of teams, a target rule), and who may decide. |
@@ -393,12 +393,12 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | Path | What it's for |
 | --- | --- |
 | `cmd/gateway/main.go` | Reads its settings, the published APIs (every few seconds) and serves: inside the cluster, optionally a public listener, and metrics. |
-| `internal/gateway/` | The request path: the API, paused or held, who's calling, shared with them, size, the spec (404 when not in it, 400 when unfit, `problems.go` saying each field and the rule it broke, never the value), the team's rate, then forwarded with the backend's credential and a signed `Vertra-Caller`, the answer streamed back. |
+| `internal/gateway/` | The request path: the API, paused or held, who's calling, shared with them, size, the spec (404 when not in it, 400 when unfit, `problems.go` saying each field and the rule it broke, never the value), the team's rate, then forwarded with the backend's credential and a signed `Vennir-Caller`, the answer streamed back. |
 | `internal/auth/` | Signing callers in as the console does: session JWTs (checked with the console's public key, fetched from its JWKS: `keys.go`) and bot tokens, against its database. |
 | `internal/store/` | The published APIs from the console's `apis` table, each with its OpenAPI validator and endpoints, and why one can't be served (written to the console's `api_problems`); whether an admin closed the gateway; the backend host rule. |
 | `internal/credentials/` | Signing a forwarded request in to its backend, from the API's own ServiceAccount: its token (TokenRequest), a Google ID token (federated at Google's STS, then generateIdToken), or AWS SigV4 (AssumeRoleWithWebIdentity); each kept for most of its life. |
 | `internal/traffic/` | Counting each API's requests a minute at a time (team, endpoint, outcome) and adding them to the console's `api_traffic`. |
-| `internal/caller/` | The `Vertra-Caller` header (an EdDSA JWT) and its public key at `/.vertra/jwks.json`. |
+| `internal/caller/` | The `Vennir-Caller` header (an EdDSA JWT) and its public key at `/.vennir/jwks.json`. |
 | `internal/limits/` | A token bucket per API and calling team. |
 | `internal/config/` | Its settings, checked at startup. |
 | `internal/dbauth/` | Signing in to a managed database as itself (the kernel's, copied: the projects share no code): an RDS token, or on GKE a Google token federated from its own ServiceAccount token, since its NetworkPolicy keeps it from the metadata server. |
@@ -426,7 +426,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/backup-cronjob.yaml` | Scheduled database backup (both databases when they share the instance) to GCS, S3, Azure Blob or a volume. |
 | `templates/configmap.yaml`, `secret.yaml`, `serviceaccount.yaml` | Settings, the database password, the kernel's identity. |
 | `templates/rbac.yaml` | What the scheduler may do: create and delete Jobs and ConfigMaps, read Pods; and its logs-only ClusterRole, bound per team namespace by the console (or cluster-wide, `rbac.schedulerLogs: cluster`). |
-| `templates/dispatch-policy.yaml` | Admission policy: the scheduler may only create Jobs (hardened, with `taskPodHardening`) in namespaces labelled `vertra/team=true`, and delete only its own Jobs and ConfigMaps there. |
+| `templates/dispatch-policy.yaml` | Admission policy: the scheduler may only create Jobs (hardened, with `taskPodHardening`) in namespaces labelled `vennir/team=true`, and delete only its own Jobs and ConfigMaps there. |
 | `templates/image-policy.yaml` | Admission policy: task images only from allowed sources (the console edits the list). |
 | `templates/image-signature.yaml` | With Sigstore's policy-controller: only signed images from the source registry run in team namespaces, checked on Pods; a second policy passes the workloads that make them. |
 | `templates/purge-policy.yaml` | Admission policy: only the purge identity may delete a team's namespace. |
@@ -444,8 +444,8 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `sizes/{minimal,resilient,scaled,auto}.yaml` | The size presets: copies and retention. |
 | `templates/autoscaling.yaml` | The console's HorizontalPodAutoscaler (`auto`) and its PodDisruptionBudget from two copies. |
 | `templates/logs.yaml`, `files/alloy.alloy` | Log search (`logs`): one Loki (a volume or a bucket) and Grafana Alloy collecting steps' and the platform's Pods with credentials redacted; only Alloy and the console reach Loki. |
-| `templates/monitoring.yaml`, `files/grafana-dashboard.json` | Monitoring (`monitoring.provider`): a PodMonitor or PodMonitoring for the console and gateway, alerts (calls failing, sign-in bursts, the catalog not applying, backends unreachable) as a PrometheusRule, Rules or a rule file, and Vertra's Grafana dashboard as a ConfigMap. |
-| `templates/prometheus.yaml` | The bundled Prometheus (`monitoring.provider: bundled`): one StatefulSet with a volume, finding this namespace's Vertra Pods through a Role, both charts' alerts, reachable by nothing (port-forward). |
+| `templates/monitoring.yaml`, `files/grafana-dashboard.json` | Monitoring (`monitoring.provider`): a PodMonitor or PodMonitoring for the console and gateway, alerts (calls failing, sign-in bursts, the catalog not applying, backends unreachable) as a PrometheusRule, Rules or a rule file, and Vennir's Grafana dashboard as a ConfigMap. |
+| `templates/prometheus.yaml` | The bundled Prometheus (`monitoring.provider: bundled`): one StatefulSet with a volume, finding this namespace's Vennir Pods through a Role, both charts' alerts, reachable by nothing (port-forward). |
 | `templates/ingress.yaml` | Reaching the console from outside the cluster (HTTPS only), for the catalog's CI: the certificate from the cloud, a Secret, or cert-manager (an issuer of yours, or Let's Encrypt through the chart's own Issuer); plain HTTP refused for known controllers. With `trustProxy`, the console believes the load balancer's X-Forwarded-For. |
 | `templates/httproute.yaml` | The same through a Gateway (`gatewayApi`): an HTTPRoute on its HTTPS listener, and a redirect from its HTTP one. |
 | `templates/activity.yaml` | The ConfigMap the console records its last use in (for the kernel's sleeper), and the Role that lets it update that one. |
@@ -483,13 +483,13 @@ The complete settings for each cluster: `make kind-deploy*` and `make gke-deploy
 | `gke/kernel.yaml`, `gke/console.yaml` | The real GKE cluster: Artifact Registry images, Workload Identity, the LoadBalancer, image signatures. |
 | `gke/external-secrets.yaml` | External Secrets Operator on GKE, with Workload Identity. |
 | `gke/policy-controller.yaml` | Sigstore's policy-controller, which checks image signatures on GKE. |
-| `eks/kernel.yaml`, `eks/console.yaml`, `eks/policy-controller.yaml`, `eks/external-secrets.yaml` | An example for EKS (Auto Mode), as `vertra apply` writes it: ECR, Pod Identity (no annotations), the steps NodePool and its Spot or on-demand placements, a KMS signer, IRSA for teams' stores. Not a live cluster's; placeholders in angle brackets. |
+| `eks/kernel.yaml`, `eks/console.yaml`, `eks/policy-controller.yaml`, `eks/external-secrets.yaml` | An example for EKS (Auto Mode), as `vennir apply` writes it: ECR, Pod Identity (no annotations), the steps NodePool and its Spot or on-demand placements, a KMS signer, IRSA for teams' stores. Not a live cluster's; placeholders in angle brackets. |
 
 ## `docs/`: maintainer documentation
 
 | Path | What it's for |
 | --- | --- |
-| `architecture.md` | **Start here.** What Vertra is, the pieces, how a DAG becomes running containers, the product contract, the data, observability, the design decisions, a glossary. |
+| `architecture.md` | **Start here.** What Vennir is, the pieces, how a DAG becomes running containers, the product contract, the data, observability, the design decisions, a glossary. |
 | `operations.md` | Installing (kind, and any cluster with Helm), cloud identities, upgrading, databases (passwords, access, retention), backups and restores, network policies, troubleshooting. |
 | `security-model.md` | For security reviewers: where secrets live, vault sync, who can read a secret, what the cluster enforces, what isn't enforced yet, and what's out of scope. |
 | `assessment.md` | The architecture assessment of 2026-10-19: what exists, findings, comparisons with Temporal and Inngest, identity across clouds, the agreed direction and its roadmap. |
@@ -498,13 +498,13 @@ The complete settings for each cluster: `make kind-deploy*` and `make gke-deploy
 
 ### `docs/setup.md`
 
-Setting up Vertra with `vertra`, start to finish: the questions `init` asks and what each decides, what `apply` asks of you (DNS), the first sign-in and Google sign-in, the catalog, day-to-day commands, and what `destroy` keeps.
+Setting up Vennir with `vennir`, start to finish: the questions `init` asks and what each decides, what `apply` asks of you (DNS), the first sign-in and Google sign-in, the catalog, day-to-day commands, and what `destroy` keeps.
 
-### `docs/clouds/`: before `vertra init`
+### `docs/clouds/`: before `vennir init`
 
 | Path | What it's for |
 | --- | --- |
-| `aws.md`, `gcp.md`, `github.md` | What only each website can do before an install (an account or project, the root user's MFA, a budget, an IAM user, signing in, organization policies), linked from `vertra` when it finds one of them missing. |
+| `aws.md`, `gcp.md`, `github.md` | What only each website can do before an install (an account or project, the root user's MFA, a budget, an IAM user, signing in, organization policies), linked from `vennir` when it finds one of them missing. |
 
 ## `examples/`: demo products
 
@@ -515,35 +515,35 @@ Fake products used by the demos and the kernel's integration tests. They deliber
 | `project-product/` | Pretends to create a project and outputs its id. |
 | `application-product/` | Pretends to deploy an application into a project, taking the project id from the step before. |
 | `hello-world-app/` | A tiny web app: the image the Cloud Run demo deploys (and `samples/gcp/apis/hello-world` publishes through the gateway). |
-| `greetings-api/` | The backend of `samples/local/apis/greetings`: a Go service (standard library only) that checks the gateway's signed `Vertra-Caller` against its JWKS before answering; `deploy.yaml` runs it in the local team's namespace, labelled `vertra/api-backend` (`make kind-sample-api`). |
-| `order-receiver/` | A reference receiver for order callbacks: a Go service (standard library only) that checks each post's `Vertra-Signature` (HMAC-SHA256, at most five minutes old) before accepting it; `deploy.yaml` runs it in a namespace of its own, with the bot's secret and a certificate the console trusts. |
+| `greetings-api/` | The backend of `samples/local/apis/greetings`: a Go service (standard library only) that checks the gateway's signed `Vennir-Caller` against its JWKS before answering; `deploy.yaml` runs it in the local team's namespace, labelled `vennir/api-backend` (`make kind-sample-api`). |
+| `order-receiver/` | A reference receiver for order callbacks: a Go service (standard library only) that checks each post's `Vennir-Signature` (HMAC-SHA256, at most five minutes old) before accepting it; `deploy.yaml` runs it in a namespace of its own, with the bot's secret and a certificate the console trusts. |
 
 ## `cli/`: the installer
 
 | Path | What it's for |
 | --- | --- |
-| `DESIGN.md` | The design for `vertra`: targets, cluster modes, sizes, scale-down, requirements, the OpenTofu modules, the approval screen and cost estimate, the catalog step, the build order. |
-| `go.mod`, `go.sum` | The Go module (`github.com/rburns629/vertra/cli`): cobra and yaml.v3, protobuf and Connect for the console's API, and `make proto`'s two plugins as `tool` dependencies. |
+| `DESIGN.md` | The design for `vennir`: targets, cluster modes, sizes, scale-down, requirements, the OpenTofu modules, the approval screen and cost estimate, the catalog step, the build order. |
+| `go.mod`, `go.sum` | The Go module (`github.com/rburns629/vennir/cli`): cobra and yaml.v3, protobuf and Connect for the console's API, and `make proto`'s two plugins as `tool` dependencies. |
 | `internal/gen/` | Generated from `proto/` by `make proto` (messages and Connect clients); never edited. |
-| `cmd/vertra/catalog_commands.go` | A catalog's own commands, `vertra catalog validate`, `check`, `publish`, `release`, `changed`, `secret-stores check`, `bases`, `migrate`: what every catalog's `./vertra` runs. `vertra catalog create` (making the repository) is `catalog.go`. |
-| `cmd/vertra/catalog_grant.go` | `vertra catalog grant`: the catalog owner's install lets another read its catalog, as exactly that reader's identity (its screen, confirmation, `--revoke`). |
-| `internal/grant/` | What `vertra catalog grant` finds and changes, through gcloud or the AWS CLI as you: a Workload Identity provider and the repository's reader binding, or a reader's service accounts (gcp); an IAM OIDC provider and a role reading only the catalog's ECR prefix (aws). |
-| `internal/catalogtool/` | What `vertra catalog` does in a catalog: validating teams, CODEOWNERS, products, `dags/` templates and DAGs, `apis/` API products and their OpenAPI files (`apis.go`), and teams' wiring types and the types products name (`types.go`) in catalog format v2 (against the schemas it embeds, `schemas/`, kept equal to the template's `tools/` by a test), and `migrate` from before v2; the compatibility check against the base (`compat.go`: breaking changes need a raised `version`, removals a deprecation first); pinning base images; building, contract-testing, scanning (Trivy, OSV-Scanner), pushing and signing products; building a team's products in its own GitHub Environment, and planning and checking those Environments (`buildenv.go`); building, pushing and signing the catalog's release (`release.go`), and tagging a commit's release as a version (`promote.go`). It never calls a console. |
-| `cmd/vertra/main.go` | The root command, its shared flags (`--config`, `-v`, `--non-interactive`) and loading an environment. |
-| `cmd/vertra/help.go` | Every command's help and examples, the `settings` and `sizes` help topics, and `vertra man`; a test checks every command has its help. |
-| `cmd/vertra/init.go` | `init <env>`: the questions (or flags), then `deploy/<env>/vertra.yaml`. |
-| `cmd/vertra/apply.go` | `apply`: the approval screen (what changed since `applied.yaml`, the add-ons only when missing or older), then registry, cluster (on aws, the catalog repository's OIDC subject naming its branch first, `ensureCatalogSubject`), namespace, images and both releases. |
-| `cmd/vertra/operate.go` | `check`, `status`, `sleep`, `wake`, `console` and `destroy`. |
-| `cmd/vertra/backup.go` | `backup`, `backups` and `restore`. |
-| `cmd/vertra/logs.go` | `logs`: the platform's components' logs, or one execution's steps' from their team namespaces. |
-| `cmd/vertra/admin.go` | `admin reset-password`: a lost admin password, reset inside the cluster; where a generated password is saved (`admin-password`, 0600, never printed). |
-| `cmd/vertra/catalog.go` | `catalog create`: creates the catalog repository on GitHub with its first team and starters, sets its registry variables (no console credential; old ones removed and revoked), pushes it (or, taking one over from another registry, runs its CI by hand to republish), waits for its CI, has the console apply the release, and runs a starter; the first admin's generated password changed first. |
-| `cmd/vertra/apply_aws.go` | The aws target's part of `apply` and `destroy`: the sign-in and region checks, the module's plan, prices, outputs, Auto Mode's StorageClass and steps' node pool, and what a destroy keeps. |
-| `cmd/vertra/apply_gcp.go` | The gcp target's part of `apply` and `destroy`: the project's checks, the module's plan, prices, outputs, and what a destroy keeps. |
-| `cmd/vertra/tools.go` | `tools`, `config get/set`, and the tools check `init` and `apply` share. |
+| `cmd/vennir/catalog_commands.go` | A catalog's own commands, `vennir catalog validate`, `check`, `publish`, `release`, `changed`, `secret-stores check`, `bases`, `migrate`: what every catalog's `./vennir` runs. `vennir catalog create` (making the repository) is `catalog.go`. |
+| `cmd/vennir/catalog_grant.go` | `vennir catalog grant`: the catalog owner's install lets another read its catalog, as exactly that reader's identity (its screen, confirmation, `--revoke`). |
+| `internal/grant/` | What `vennir catalog grant` finds and changes, through gcloud or the AWS CLI as you: a Workload Identity provider and the repository's reader binding, or a reader's service accounts (gcp); an IAM OIDC provider and a role reading only the catalog's ECR prefix (aws). |
+| `internal/catalogtool/` | What `vennir catalog` does in a catalog: validating teams, CODEOWNERS, products, `dags/` templates and DAGs, `apis/` API products and their OpenAPI files (`apis.go`), and teams' wiring types and the types products name (`types.go`) in catalog format v2 (against the schemas it embeds, `schemas/`, kept equal to the template's `tools/` by a test), and `migrate` from before v2; the compatibility check against the base (`compat.go`: breaking changes need a raised `version`, removals a deprecation first); pinning base images; building, contract-testing, scanning (Trivy, OSV-Scanner), pushing and signing products; building a team's products in its own GitHub Environment, and planning and checking those Environments (`buildenv.go`); building, pushing and signing the catalog's release (`release.go`), and tagging a commit's release as a version (`promote.go`). It never calls a console. |
+| `cmd/vennir/main.go` | The root command, its shared flags (`--config`, `-v`, `--non-interactive`) and loading an environment. |
+| `cmd/vennir/help.go` | Every command's help and examples, the `settings` and `sizes` help topics, and `vennir man`; a test checks every command has its help. |
+| `cmd/vennir/init.go` | `init <env>`: the questions (or flags), then `deploy/<env>/vennir.yaml`. |
+| `cmd/vennir/apply.go` | `apply`: the approval screen (what changed since `applied.yaml`, the add-ons only when missing or older), then registry, cluster (on aws, the catalog repository's OIDC subject naming its branch first, `ensureCatalogSubject`), namespace, images and both releases. |
+| `cmd/vennir/operate.go` | `check`, `status`, `sleep`, `wake`, `console` and `destroy`. |
+| `cmd/vennir/backup.go` | `backup`, `backups` and `restore`. |
+| `cmd/vennir/logs.go` | `logs`: the platform's components' logs, or one execution's steps' from their team namespaces. |
+| `cmd/vennir/admin.go` | `admin reset-password`: a lost admin password, reset inside the cluster; where a generated password is saved (`admin-password`, 0600, never printed). |
+| `cmd/vennir/catalog.go` | `catalog create`: creates the catalog repository on GitHub with its first team and starters, sets its registry variables (no console credential; old ones removed and revoked), pushes it (or, taking one over from another registry, runs its CI by hand to republish), waits for its CI, has the console apply the release, and runs a starter; the first admin's generated password changed first. |
+| `cmd/vennir/apply_aws.go` | The aws target's part of `apply` and `destroy`: the sign-in and region checks, the module's plan, prices, outputs, Auto Mode's StorageClass and steps' node pool, and what a destroy keeps. |
+| `cmd/vennir/apply_gcp.go` | The gcp target's part of `apply` and `destroy`: the project's checks, the module's plan, prices, outputs, and what a destroy keeps. |
+| `cmd/vennir/tools.go` | `tools`, `config get/set`, and the tools check `init` and `apply` share. |
 | `internal/config/` | The config file: defaults, validation, load and save, dotted-key get and set (any setting, lists included); `settings.go` describes every setting, kept complete by a test. |
 | `internal/prompt/` | The questions on a terminal; defaults when non-interactive. |
-| `internal/tools/` | Required tools per target, version checks, and pinned, checksum-verified downloads into `~/.vertra/bin`; the third-party Helm charts, each pulled and checked against its SHA-256 before it's installed (`pins.go`: both pin lists, and how to update them). |
+| `internal/tools/` | Required tools per target, version checks, and pinned, checksum-verified downloads into `~/.vennir/bin`; the third-party Helm charts, each pulled and checked against its SHA-256 before it's installed (`pins.go`: both pin lists, and how to update them). |
 | `internal/run/` | Runs the external commands (kubectl, helm, docker, kind), printing them with `-v`; `Together` runs independent lookups side by side. |
 | `internal/cluster/` | The kind cluster and its local registry: inspect, create, delete; namespaces. |
 | `internal/install/` | The platform images (built from source or released), the generated Helm values, and `helm upgrade`; the first admin's password, given in a Secret (`firstadmin_test.go`); `database.go`, a managed database's values, Secrets and `kernel database-setup` Job; `addons.go`, the add-ons an apply installed (recorded for `destroy`) and the team namespaces the console made; `release-charts.sha256`, every released chart's SHA-256, which a pulled release chart is checked against (the release workflow adds each release's). |
@@ -551,18 +551,18 @@ Fake products used by the demos and the kernel's integration tests. They deliber
 | `internal/plan/` | The approval screen and the sizes' platform floors (`FloorOf`: with the optional parts turned on). |
 | `internal/gcp/` | What a gcp install needs from gcloud, as you: the project's checks, the cluster's credentials, a short-lived Docker sign-in, the module's inputs and the registry paths. |
 | `internal/access/` | Guided access: who you're signed in as (AWS, Google, GitHub), where an install would go, and what that allows (regions an organization's policy permits, budgets, OpenTofu's sign-in, a project's existing resources), as the approval screen's Access block and problems with fixes and guides; AWS's errors classified whole. |
-| `cmd/vertra/init_access.go` | The guided access steps in `init`: choosing a sign-in and running it, choosing a project or a region from those that answer, offering a budget, recording who set the environment up. |
+| `cmd/vennir/init_access.go` | The guided access steps in `init`: choosing a sign-in and running it, choosing a project or a region from those that answer, offering a budget, recording who set the environment up. |
 | `internal/awscloud/` | What an aws install needs from the AWS CLI, as you: the sign-in and region checks, the cluster's credentials, a short-lived ECR sign-in, the module's inputs, the account's GitHub OIDC provider, Auto Mode's in-cluster setup, and the ECR repositories a destroy removes. |
 | `internal/modules/aws/` | The aws OpenTofu module (embedded): a VPC in two zones (public subnets, no NAT gateway), an EKS Auto Mode cluster, ECR (a template that creates products' repositories on push, and the platform's), Pod Identity roles for the console and the backups, the backup bucket, and the catalog CI's GitHub OIDC role. |
 | `internal/modules/gcp/` | The gcp OpenTofu module (embedded in the binary): network, a GKE Autopilot or Standard cluster, Artifact Registry repositories, the nodes', console's and backups' identities, the backup bucket; `.terraform.lock.hcl` pins the provider's checksums. |
 | `internal/modules/modules.go` | Embeds the modules and writes one into an environment's `tofu/`. |
-| `internal/catalog/` | Assembles a new catalog's first commit from `catalog-template/`: the first team, the starters for its languages, the owners, where it publishes; and pins its `./vertra` to a release. |
-| `internal/catalogtemplate/` | `catalog-template/` inside a released vertra: `template.tgz`, empty in git, written by the release workflow (`git archive`) before it builds. |
+| `internal/catalog/` | Assembles a new catalog's first commit from `catalog-template/`: the first team, the starters for its languages, the owners, where it publishes; and pins its `./vennir` to a release. |
+| `internal/catalogtemplate/` | `catalog-template/` inside a released vennir: `template.tgz`, empty in git, written by the release workflow (`git archive`) before it builds. |
 | `internal/githost/` | The catalog's git host, as you through `gh`: repositories, pushes (gh signs git in for that command only), variables, secrets from stdin, Environments, workflow runs; GitHub's single sign-on refusals. |
-| `internal/consoleapi/` | The console's API as vertra uses it, over the generated Connect clients: signing in as the admin, revoking the tokens catalogs once held, syncing the catalog, running a DAG and watching it finish. Tested against fake Connect handlers. |
+| `internal/consoleapi/` | The console's API as vennir uses it, over the generated Connect clients: signing in as the admin, revoking the tokens catalogs once held, syncing the catalog, running a DAG and watching it finish. Tested against fake Connect handlers. |
 | `internal/tofu/` | Runs OpenTofu in an environment's `tofu/`: init, plan (summarised for the approval screen, each resource type named in words: a test checks every module's), apply the approved plan, outputs, destroy. |
 | `internal/backup/` | The databases' backups: the backup Job run now, dumps to and from this machine, the bucket's pairs, the restore (writers stopped, both databases replaced, started again), a managed database's on-demand backups, and moving an install's data into a managed database (`move.go`). |
-| `internal/releases/` | Vertra's releases (GitHub's list, cached a day): the newest, what an upgrade passes over, whether a version change can be applied, and a release's binaries' checksums. |
+| `internal/releases/` | Vennir's releases (GitHub's list, cached a day): the newest, what an upgrade passes over, whether a version change can be applied, and a release's binaries' checksums. |
 | `internal/pricing/` | Live prices for the approval screen: Google's price catalog (read with your gcloud sign-in; `gcp_account.go`: your billing account's prices, when you may read them) and AWS's Price List and Spot price history (with your AWS sign-in), fetched a few calls at a time and each cached a day, and their cost models; `testdata/` holds real price entries. |
 
 ## `catalog-template/`: what a new catalog starts as
@@ -572,9 +572,9 @@ Copied whole into a new catalog repository (`README.md` there explains it to its
 | Path | What it's for |
 | --- | --- |
 | `README.md` | The catalog's guide: layout, onboarding a team, `product.yaml`, testing, CI, publishing, SecretStores, retiring. |
-| `vertra.yaml` | Where products publish (registry, signing), local defaults overridden by CI variables; and `buildEnvironments`, the teams whose products build on main in a GitHub Environment of their own. |
-| `bases.yaml` | The base images the catalog approves, empty to start: CI copies each into the registry weekly (`vertra catalog bases mirror`), and `--use-mirror` points Dockerfiles at the copies. |
-| `vertra`, `tools/` | The wrapper that runs `vertra` (`cli/cmd/vertra`) at a pinned, checksum-verified release, or `VERTRA_BIN`: the one tool behind every workflow and local publishing; and the schemas of every catalog file in format v2 (`team`, `product`, `template`, `dag`, `api`, `bases`, `types`), for editors (vertra catalog embeds its own). |
+| `vennir.yaml` | Where products publish (registry, signing), local defaults overridden by CI variables; and `buildEnvironments`, the teams whose products build on main in a GitHub Environment of their own. |
+| `bases.yaml` | The base images the catalog approves, empty to start: CI copies each into the registry weekly (`vennir catalog bases mirror`), and `--use-mirror` points Dockerfiles at the copies. |
+| `vennir`, `tools/` | The wrapper that runs `vennir` (`cli/cmd/vennir`) at a pinned, checksum-verified release, or `VENNIR_BIN`: the one tool behind every workflow and local publishing; and the schemas of every catalog file in format v2 (`team`, `product`, `template`, `dag`, `api`, `bases`, `types`), for editors (vennir catalog embeds its own). |
 | `.github/` | The catalog's workflows (check; on main, plan, build in teams' own Environments, then publish and release; a `vX.Y.Z` tag asking main to make that version, `version.yml`; SecretStore and CODEOWNERS checks; deleting a removed team's images), the registry sign-in plan and publish share (`actions/registry-sign-in`), its scanner installer, and a placeholder `CODEOWNERS`. |
 | `.semgrep/malicious.yml` | Code rules for products: download-and-execute, reverse shells, mining, reading the Pod's token. |
 | `templates/` | Starters to copy: a team, three products, and DAGs that use them. Checked by CI, never published. |

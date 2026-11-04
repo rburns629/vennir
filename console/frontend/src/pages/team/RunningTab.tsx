@@ -25,7 +25,7 @@ function taskTitle(pod: TaskPod): string {
 }
 
 function executionLine(pod: TaskPod): string {
-  if (!pod.execution) return pod.executionId ? "an execution" : "not a Vertra task";
+  if (!pod.execution) return pod.executionId ? "an execution" : "not a Vennir task";
   const { name, taskNumber, taskCount } = pod.execution;
   return taskNumber && taskCount ? `${name} · task ${String(taskNumber)} of ${String(taskCount)}` : name;
 }

@@ -167,8 +167,8 @@ const SERIES = [
   "kernel_oldest_ready_task_age_seconds",
   "console_rpc_requests_total",
   "console_catalog_syncs_total",
-  "vertra_gateway_requests_total",
-  "vertra_gateway_request_duration_seconds",
+  "vennir_gateway_requests_total",
+  "vennir_gateway_request_duration_seconds",
 ];
 
 export function MetricsTab() {

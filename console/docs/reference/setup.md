@@ -1,10 +1,10 @@
-# Setting up Vertra
+# Setting up Vennir
 
-From an empty account to people running steps, with `vertra`, the installer.
+From an empty account to people running steps, with `vennir`, the installer.
 It asks what it needs, shows what it will create and what that costs, and
 changes nothing until you approve. Every answer is kept in
-`deploy/<env>/vertra.yaml`, so `vertra apply` again makes the install match it,
-and `vertra config set` changes one thing.
+`deploy/<env>/vennir.yaml`, so `vennir apply` again makes the install match it,
+and `vennir config set` changes one thing.
 
 ## Before you start
 
@@ -12,11 +12,11 @@ and `vertra config set` changes one thing.
   (`aws`), or a Kubernetes cluster you already have (`existing`). For a cloud,
   get the account ready first: [Google Cloud](clouds/gcp.md),
   [AWS](clouds/aws.md). For the catalog, [GitHub](clouds/github.md).
-- **The tools.** `vertra tools --install` downloads what's missing (kubectl,
+- **The tools.** `vennir tools --install` downloads what's missing (kubectl,
   helm, OpenTofu, kind), each pinned and checksum-verified. Docker is yours to
   install.
 
-## 1. `vertra init <env>`
+## 1. `vennir init <env>`
 
 It asks, in order, with what each choice costs or gives up:
 
@@ -24,10 +24,10 @@ It asks, in order, with what each choice costs or gives up:
 | --- | --- |
 | Where | kind, gcp, aws or existing; the project, region or kubectl context |
 | Size | how many copies of each part, and the step caps (`minimal` to `scaled`, or `auto`) |
-| Sleep when idle | scale to zero after a quiet spell (data kept); `vertra wake` brings it back |
-| Database | gcp, aws: in-cluster Postgres (backed up to a bucket), or managed: Cloud SQL or Amazon RDS, no passwords of Vertra's, the cloud's backups, a standby in a second zone if chosen ([Databases](operations.md#databases)) |
+| Sleep when idle | scale to zero after a quiet spell (data kept); `vennir wake` brings it back |
+| Database | gcp, aws: in-cluster Postgres (backed up to a bucket), or managed: Cloud SQL or Amazon RDS, no passwords of Vennir's, the cloud's backups, a standby in a second zone if chosen ([Databases](operations.md#databases)) |
 | First admin | their email; the password is generated, and the first apply saves it to `deploy/<env>/admin-password`, readable only by you |
-| The console | private (`vertra console` port-forwards to it) or reached over HTTPS at a hostname |
+| The console | private (`vennir console` port-forwards to it) or reached over HTTPS at a hostname |
 | The catalog | a GitHub repository for your teams' products, made for you |
 | Log search | keep steps' logs for search in Observe (archived to a bucket after 30 days on a cloud) |
 | The audit copy | gcp, aws: copy the audit log to a bucket that refuses deletes; locking it is a separate, permanent choice |
@@ -39,14 +39,14 @@ It asks, in order, with what each choice costs or gives up:
 
 - **gcp**: a reserved address and a Google-managed certificate, on a free
   `nip.io` name or a hostname of yours.
-- **aws**: a Route 53 zone vertra creates (e.g. `vertra.example.com`), which you
+- **aws**: a Route 53 zone vennir creates (e.g. `vennir.example.com`), which you
   delegate once with its NS records; the certificate and record are made for
   you.
 - **existing**: your Ingress controller and a certificate from cert-manager
-  (Let's Encrypt, or a ClusterIssuer of yours); vertra installs cert-manager if
+  (Let's Encrypt, or a ClusterIssuer of yours); vennir installs cert-manager if
   the cluster hasn't got it.
 
-## 2. `vertra apply <env>`
+## 2. `vennir apply <env>`
 
 It shows the plan: what it creates in your account, what it builds and
 installs, and the estimated monthly cost. Nothing happens until you approve.
@@ -57,73 +57,73 @@ where your domain is managed, and waits for it:
 
 ```
 Add this DNS record where example.com is managed:
-  A     vertra.example.com → 34.57.221.133   (TTL 300)
+  A     vennir.example.com → 34.57.221.133   (TTL 300)
 ```
 
 Many DNS providers add the domain themselves: then the record's name is just
-`vertra`. The certificate is issued once the name resolves; `vertra status`
+`vennir`. The certificate is issued once the name resolves; `vennir status`
 shows both.
 
 **The admin's password** is in `deploy/<env>/admin-password`, readable only
 by you: the first apply generates it and gives it to the console without
 printing or logging it anywhere. Sign in with it and choose your own: nothing else opens until you do. If it's lost,
-`vertra admin reset-password <env>` makes a new one, which then has to be
+`vennir admin reset-password <env>` makes a new one, which then has to be
 changed at the next sign-in.
 
 ## 3. Sign in, and invite people
 
-Sign in at the console's address (or `vertra console <env>`, then
+Sign in at the console's address (or `vennir console <env>`, then
 http://localhost:18080). On the Admin page, create accounts: each gets a
 temporary password to change at their first sign-in, and starts in the teams
 you choose.
 
-**Signing in with Google** (Workspace accounts): `vertra sso google <env>`. It
+**Signing in with Google** (Workspace accounts): `vennir sso google <env>`. It
 says which two pages of the Google Cloud console to open and what to paste
-there, then reads the file you download. `vertra apply` turns it on. Passwords
+there, then reads the file you download. `vennir apply` turns it on. Passwords
 keep working; on a team's page, an admin can then require Google sign-in for
 that team's members (admins can always use their password, in case Google
-can't be reached). `vertra sso off` turns it off again.
+can't be reached). `vennir sso off` turns it off again.
 
 ## 4. The catalog
 
-`vertra catalog create <env>` makes your catalog repository: its CI builds,
+`vennir catalog create <env>` makes your catalog repository: its CI builds,
 scans and signs your teams' products and releases them to every install that
-reads the catalog. Run it with the `vertra` release your install runs: its
-catalog template is that release's, and the catalog's `./vertra` is pinned
+reads the catalog. Run it with the `vennir` release your install runs: its
+catalog template is that release's, and the catalog's `./vennir` is pinned
 to it. It signs in to the console with the password `apply` saved, and has
-you choose your own first (`VERTRA_NEW_ADMIN_PASSWORD` without a terminal). The [catalog's own guide](../catalog-template/README.md)
+you choose your own first (`VENNIR_NEW_ADMIN_PASSWORD` without a terminal). The [catalog's own guide](../catalog-template/README.md)
 covers adding teams and products.
 
 ## Day to day
 
 | Command | What it does |
 | --- | --- |
-| `vertra status <env>` | what's installed, awake or asleep; a public console's address and certificate |
-| `vertra console <env>` | reach the console from your machine |
-| `vertra backup <env>` / `vertra backups <env>` | back up the databases now (`--to <folder>`: here); list the backups |
-| `vertra restore <env> <time>` | replace the databases with a backup (`--from <folder>`); asks first |
-| `vertra logs <env> [component] [-f]` | the platform's logs; `--execution <id>` for a run's steps |
-| `vertra sleep` / `vertra wake <env>` | scale to zero and back (data kept) |
-| `vertra config set -e <env> <key> <value>` | change a setting, then `vertra apply` |
-| `vertra apply <env>` | upgrade, or make the install match the settings again |
-| `vertra destroy <env>` | remove it; asks about data |
-| `vertra help settings` / `vertra help sizes` | every setting, and what each size gets |
-| `vertra man ~/.local/share/man` | write the man pages (`man vertra`); each release also attaches them, `vertra-man.tar.gz` |
+| `vennir status <env>` | what's installed, awake or asleep; a public console's address and certificate |
+| `vennir console <env>` | reach the console from your machine |
+| `vennir backup <env>` / `vennir backups <env>` | back up the databases now (`--to <folder>`: here); list the backups |
+| `vennir restore <env> <time>` | replace the databases with a backup (`--from <folder>`); asks first |
+| `vennir logs <env> [component] [-f]` | the platform's logs; `--execution <id>` for a run's steps |
+| `vennir sleep` / `vennir wake <env>` | scale to zero and back (data kept) |
+| `vennir config set -e <env> <key> <value>` | change a setting, then `vennir apply` |
+| `vennir apply <env>` | upgrade, or make the install match the settings again |
+| `vennir destroy <env>` | remove it; asks about data |
+| `vennir help settings` / `vennir help sizes` | every setting, and what each size gets |
+| `vennir man ~/.local/share/man` | write the man pages (`man vennir`); each release also attaches them, `vennir-man.tar.gz` |
 
 **What `destroy` keeps.** Unless you choose to delete data: the database's
 disk, the backups and logs buckets, and the task registry. The audit copy's
 bucket is always kept: it's the record, and its retention refuses deletion
 until it lapses. A local registry another kind cluster still uses is kept too.
 On an existing cluster, it offers to delete only the team namespaces the
-console made, naming them, never one labelled `vertra/team` by hand; and
+console made, naming them, never one labelled `vennir/team` by hand; and
 to uninstall only the add-ons (policy-controller, External Secrets
-Operator, cert-manager) vertra installed there, asking about each, even
+Operator, cert-manager) vennir installed there, asking about each, even
 with `--all`.
 
-**Upgrading.** The release an install runs is the `vertra` setting
-(`vertra init --release <x.y.z>` chooses it; `source` builds your checkout
-instead). To upgrade, `vertra config set -e <env> vertra <x.y.z>`, then
-`vertra apply <env>`. Back up first: going back across a database
+**Upgrading.** The release an install runs is the `vennir` setting
+(`vennir init --release <x.y.z>` chooses it; `source` builds your checkout
+instead). To upgrade, `vennir config set -e <env> vennir <x.y.z>`, then
+`vennir apply <env>`. Back up first: going back across a database
 migration means restoring the databases, not just applying the older
 release ([Rolling back](operations.md#rolling-back)).
 

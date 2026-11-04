@@ -28,7 +28,7 @@ spec:
         {{- include "execution-console.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: app
       annotations:
-        # kubectl logs (and vertra logs) read this one, not the init container.
+        # kubectl logs (and vennir logs) read this one, not the init container.
         kubectl.kubernetes.io/default-container: execution-console
         # A ConfigMap change alone doesn't restart the Pods consuming it
         # via envFrom -- env vars are injected once at container start,
@@ -129,10 +129,10 @@ spec:
                   key: jwt-secret
             {{- if .Values.registryCheck.pullSecretName }}
             - name: REGISTRY_AUTH_FILE
-              value: /etc/vertra/registry/config.json
+              value: /etc/vennir/registry/config.json
             {{- if .Values.registryCheck.copyToTeams }}
             - name: TEAM_PULL_SECRET_FILE
-              value: /etc/vertra/registry/config.json
+              value: /etc/vennir/registry/config.json
             {{- end }}
             {{- end }}
             - name: REGISTRY_GCP_METADATA_TOKEN
@@ -173,13 +173,13 @@ spec:
             {{- end }}
             {{- end }}
             - name: REGISTRY_FEDERATION_TOKEN_FILE
-              value: /var/run/secrets/vertra/registry/token
+              value: /var/run/secrets/vennir/registry/token
             - name: REGISTRY_TOKEN_SECRET
-              value: vertra-registry-token
+              value: vennir-registry-token
             {{- end }}
             {{- if .Values.kernelApiToken.enabled }}
             - name: KERNEL_API_TOKEN_FILE
-              value: /var/run/secrets/vertra/kernel-api/token
+              value: /var/run/secrets/vennir/kernel-api/token
             {{- end }}
           # Up to five minutes to start (its startup work, on a minimal
           # install's quarter of a CPU, took over a minute) before liveness,
@@ -207,22 +207,22 @@ spec:
             {{- include "execution-console.tlsMounts" . | nindent 12 }}
             {{- if .Values.kernelApiToken.enabled }}
             - name: kernel-api-token
-              mountPath: /var/run/secrets/vertra/kernel-api
+              mountPath: /var/run/secrets/vennir/kernel-api
               readOnly: true
             {{- end }}
             {{- if .Values.registryCheck.pullSecretName }}
             - name: registry-auth
-              mountPath: /etc/vertra/registry
+              mountPath: /etc/vennir/registry
               readOnly: true
             {{- end }}
             {{- if and .Values.notifications.email.host .Values.notifications.email.passwordSecret.name }}
             - name: smtp-password
-              mountPath: /var/run/secrets/vertra/smtp
+              mountPath: /var/run/secrets/vennir/smtp
               readOnly: true
             {{- end }}
             {{- if include "execution-console.registryFederationAudience" . }}
             - name: registry-federation-token
-              mountPath: /var/run/secrets/vertra/registry
+              mountPath: /var/run/secrets/vennir/registry
               readOnly: true
             {{- end }}
       volumes:

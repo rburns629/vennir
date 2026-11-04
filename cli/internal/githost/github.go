@@ -13,7 +13,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // GitHub talks to github.com through gh.
@@ -195,7 +195,7 @@ func (g *GitHub) Push(ctx context.Context, dir, repo string) error {
 	for _, step := range [][]string{
 		{"init", "--quiet", "--initial-branch=main"},
 		{"add", "--all"},
-		{"commit", "--quiet", "-m", "A new catalog, from vertra"},
+		{"commit", "--quiet", "-m", "A new catalog, from vennir"},
 		{"push", "--quiet", url, "main"},
 	} {
 		if err := git(step...); err != nil {
@@ -380,7 +380,7 @@ func (g *GitHub) DeleteVariable(ctx context.Context, repo, name string) error {
 	return err
 }
 
-// SubjectClaimKeys is the subject template vertra sets on a catalog
+// SubjectClaimKeys is the subject template vennir sets on a catalog
 // repository: the job's context (its branch, or its Environment) and its
 // branch, so a job in an Environment says which branch it ran from too.
 var SubjectClaimKeys = []string{"repo", "context", "ref"}

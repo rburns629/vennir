@@ -15,7 +15,7 @@ import { Type } from "@sinclair/typebox";
 const DOCS_DIR = config.docsDir;
 const REFERENCE = "reference-";
 
-/** What a doc is (decision 24): a guide to using Vertra; how it works now;
+/** What a doc is (decision 24): a guide to using Vennir; how it works now;
  * installing and running it; or design history, which answers "why",
  * never "what is". */
 export type GuideKind = "guide" | "current" | "operating" | "history";
@@ -23,7 +23,7 @@ export type GuideKind = "guide" | "current" | "operating" | "history";
 export interface GuideSummary {
   id: string;
   title: string;
-  /** guides: for using Vertra; reference: the platform's own docs. */
+  /** guides: for using Vennir; reference: the platform's own docs. */
   section: "guides" | "reference";
   kind: GuideKind;
   /** Its ## headings, in order, each with its anchor. */

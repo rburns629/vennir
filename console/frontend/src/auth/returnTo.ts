@@ -5,7 +5,7 @@
  * across single sign-on's round trip in this tab's sessionStorage. Only
  * one of this console's own pages is taken; anything else is Home.
  */
-const SSO_RETURN_KEY = "vertra_sso_return";
+const SSO_RETURN_KEY = "vennir_sso_return";
 
 /** A path of this console's (not another site's, not the sign-in pages), or Home. */
 function ownPath(path: unknown): string {

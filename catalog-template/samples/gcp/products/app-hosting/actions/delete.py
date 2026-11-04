@@ -3,8 +3,8 @@
 deployed (its cleanup). Given {"resource": {"type":
 "gcp/cloud-run-service", "id": "projects/<p>/locations/<r>/services/<name>"}}.
 
-Only a service carrying create's vertra-made label, and the run's team
-(request.json's forTeam) as its vertra-team label, is deleted: one deployed some other way, or
+Only a service carrying create's vennir-made label, and the run's team
+(request.json's forTeam) as its vennir-team label, is deleted: one deployed some other way, or
 for another team, is refused, whoever asks. One already gone succeeds.
 """
 
@@ -22,8 +22,8 @@ from google.api_core.exceptions import GoogleAPIError, NotFound
 from google.auth import impersonated_credentials
 from google.cloud import run_v2
 
-MADE_BY_LABEL = ("vertra-made", "true")
-TEAM_LABEL = "vertra-team"
+MADE_BY_LABEL = ("vennir-made", "true")
+TEAM_LABEL = "vennir-team"
 SERVICE_PATH = re.compile(r"^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]+/services/[a-z][a-z0-9-]{0,62}$")
 
 INPUT_PATH = Path("/platform/input/request.json")
@@ -121,7 +121,7 @@ def _run() -> int:
 
     labels = dict(service.labels)
     if labels.get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
-        return _failure("NOT_MADE_BY_VERTRA", f"service '{path}' wasn't deployed by this product (it has no {MADE_BY_LABEL[0]} label), so it isn't deleted")
+        return _failure("NOT_MADE_BY_VENNIR", f"service '{path}' wasn't deployed by this product (it has no {MADE_BY_LABEL[0]} label), so it isn't deleted")
     if labels.get(TEAM_LABEL) != team:
         return _failure("NOT_THIS_TEAMS", f"service '{path}' wasn't deployed for team '{team}' (its {TEAM_LABEL} label says otherwise), so it isn't deleted")
 

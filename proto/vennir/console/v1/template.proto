@@ -1,0 +1,187 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "vennir/console/v1/execution.proto";
+import "google/protobuf/struct.proto";
+import "vennir/console/v1/product.proto";
+
+// Templates: what a consumer runs, filling in only parameters. A template
+// comes from a team's catalog (dags/*.yaml of kind Template); each step
+// names an action, and runs that action's product as its ServiceAccount,
+// with that action's own secrets, in its team's namespace: none of which
+// the person running it chooses. Every shared action can also be run on its
+// own, as a one-step template whose parameters are its inputs.
+//
+// Anyone signed in may run what's shared with them: a template's own team,
+// the teams it lists in share_with, or everyone ("*"). Whoever runs one may
+// see, cancel, retry and rerun that run (ExecutionService), as may members
+// of the teams its steps ran in.
+service TemplateService {
+  // Every template and action the caller may see: those shared with them,
+  // and the rest (shared = false, with ask_for_access_url) except hidden
+  // ones, which only their own team sees.
+  rpc ListTemplates(ListTemplatesRequest) returns (ListTemplatesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Runs a template with these parameters. They're checked against its
+  // parameter schema first; problems come back together, as
+  // invalid_argument with Problem details.
+  rpc RunTemplate(RunTemplateRequest) returns (RunTemplateResponse);
+  // Runs one shared action with these inputs, as a one-step template.
+  rpc RunAction(RunActionRequest) returns (RunActionResponse);
+  // What running a template with these parameters would do, without doing
+  // it: a run (a preview) of its steps' plan actions (product.yaml's plan),
+  // side by side, for the steps that have one and whose inputs are known
+  // before anything runs. Each step's outputs say what it would change.
+  rpc PreviewTemplate(PreviewTemplateRequest) returns (PreviewTemplateResponse);
+  // What running one action with these inputs would do: a run of its plan action.
+  rpc PreviewAction(PreviewActionRequest) returns (PreviewActionResponse);
+}
+
+message ListTemplatesRequest {}
+
+message ListTemplatesResponse {
+  repeated Runnable runnables = 1;
+}
+
+// A template, or an action that can run as one, as the caller may run it.
+message Runnable {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_TEMPLATE = 1;
+    KIND_ACTION = 2;
+  }
+  Kind kind = 1;
+  // How RunTemplate (team and name) or RunAction (product) name it.
+  string team = 2;
+  string name = 3;
+  string display_name = 4;
+  string description = 5;
+  // A JSON Schema for an object: what to fill in.
+  google.protobuf.Struct parameters = 6;
+  // Its steps' actions, as <team>/<product>.<action>.
+  repeated string actions = 7;
+  // Why it's deprecated and what to use instead; empty when it isn't.
+  string deprecated = 8;
+  // The caller's teams it may be run on behalf of. When on_behalf_of_required
+  // is set, a run names one of them; otherwise naming one is optional.
+  repeated string on_behalf_of = 9;
+  bool on_behalf_of_required = 10;
+  // Whether the caller may run it. One that isn't shared with any of their
+  // teams is still listed (unless hidden), with how to ask for it.
+  bool shared = 11;
+  // The other teams it's shared with, or "*" for every team.
+  repeated string share_with = 12;
+  // Where it's defined in the catalog repository, for people; empty when
+  // that isn't known.
+  string source_url = 13;
+  // When it isn't shared with the caller: GitHub's new-issue page on the
+  // catalog repository, filled in with what to change, which the person
+  // opens in their own browser. Empty when it can't be built.
+  string ask_for_access_url = 14;
+  // Its parameters that name a target (a project, folder, account or
+  // subscription another team's product acts on), with what the caller's
+  // teams may give each. A run with any other value is refused
+  // (permission_denied, TARGET_NOT_ALLOWED). Empty for the owning team's
+  // own people and admins, who aren't limited.
+  repeated TargetChoice targets = 15;
+  // Whether Preview says what it would do: the action, or one of the
+  // template's steps, has a plan.
+  bool previewable = 16;
+  // Whether it's ready on this install: the action's product's check, or
+  // for a template its steps' together (not ready when any isn't). Unset
+  // when nothing in it has a check.
+  Readiness readiness = 17;
+  // Examples of running it, from its product's passing contract tests (an
+  // action's; a template has none yet): a name, inputs to fill the form
+  // with, and what it gave.
+  repeated RunExample examples = 18;
+  // An action's product's clouds (Product.clouds); for a template, those of
+  // its steps that aren't for this install.
+  repeated string clouds = 19;
+  // Whether an action's product is for this install (Product.runs_here);
+  // for a template, whether every step's is. Run, a schedule or an order
+  // of one that isn't is refused (NOT_FOR_THIS_INSTALL).
+  bool runs_here = 20;
+  // Where an action's clouds are set (Product.clouds_from).
+  string clouds_from = 21;
+}
+
+message RunExample {
+  string name = 1;
+  google.protobuf.Struct inputs = 2;
+  google.protobuf.Struct outputs = 3;
+}
+
+// A step a preview left out, and why: it has no plan, or its inputs come
+// from an earlier step.
+message NotPreviewed {
+  string step = 1;
+  string why = 2;
+}
+
+message PreviewTemplateRequest {
+  string team = 1;
+  string name = 2;
+  google.protobuf.Struct parameters = 3;
+  optional string on_behalf_of = 4;
+}
+
+message PreviewTemplateResponse {
+  // The preview run.
+  string execution_id = 1;
+  repeated NotPreviewed not_previewed = 2;
+}
+
+message PreviewActionRequest {
+  string product = 1;
+  google.protobuf.Struct inputs = 2;
+  optional string on_behalf_of = 3;
+}
+
+message PreviewActionResponse {
+  string execution_id = 1;
+}
+
+message TargetChoice {
+  string parameter = 1;
+  // gcp.project, gcp.folder, aws.account or azure.subscription.
+  string type = 2;
+  // Values, or patterns where "*" matches any run of characters; empty:
+  // none, so a run can't supply one.
+  repeated string allowed = 3;
+}
+
+message RunTemplateRequest {
+  // The template's team and name.
+  string team = 1;
+  string name = 2;
+  google.protobuf.Struct parameters = 3;
+  // Which of the caller's teams it runs for: needed when the template is
+  // shared with specific teams rather than its own or everyone.
+  optional string on_behalf_of = 4;
+  // Ties retries of this request to one run, as SubmitExecution's does.
+  optional string request_id = 5;
+}
+
+message RunTemplateResponse {
+  string execution_id = 1;
+  ExecutionState state = 2;
+}
+
+message RunActionRequest {
+  // The registered product (one action of a product.yaml), as ListProducts
+  // names it: <team>-<product>-<action> from a catalog.
+  string product = 1;
+  google.protobuf.Struct inputs = 2;
+  optional string on_behalf_of = 3;
+  optional string request_id = 4;
+}
+
+message RunActionResponse {
+  string execution_id = 1;
+  ExecutionState state = 2;
+}

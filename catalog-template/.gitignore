@@ -1,5 +1,5 @@
-# The downloaded vertra (./vertra).
-.vertra/
+# The downloaded vennir (./vennir).
+.vennir/
 # What running a product's tests or builds on your machine leaves behind
 # (Python, npm, Rust), never meant for a pull request.
 __pycache__/

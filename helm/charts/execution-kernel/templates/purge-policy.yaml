@@ -94,7 +94,7 @@ spec:
         oldObject.metadata.labels[{{ $label | quote }}] == "retired"
       messageExpression: >-
         "namespace " + oldObject.metadata.name + " can't be purged: only a
-        retired Vertra team namespace ({{ $label }}=retired) that isn't a
+        retired Vennir team namespace ({{ $label }}=retired) that isn't a
         protected namespace may be deleted by this identity"
       reason: Forbidden
 ---

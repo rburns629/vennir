@@ -1,0 +1,375 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/timestamp.proto";
+import "vennir/console/v1/admin.proto";
+
+// Observe: what this install checks, what it refused, and what everything
+// is doing. Everyone signed in sees the security checks (what's enforced,
+// what's refused, every image that may run and its scan); runs' details
+// follow who may see each run.
+service ObserveService {
+  // What this install enforces (and what it doesn't yet), what it refused
+  // over the last week, and every image allowed to run here.
+  rpc GetSecurity(GetSecurityRequest) returns (GetSecurityResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // An image's software bill of materials (CycloneDX JSON), as catalog CI
+  // attached it, signed by the image's signer; for an image the caller may
+  // see. NOT_FOUND when it has none.
+  rpc GetImageSbom(GetImageSbomRequest) returns (GetImageSbomResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // What the steps are doing: started and how long they waited, hour by
+  // hour over the last day; why they failed; and each product's step
+  // times over the last week.
+  rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Who ran what over the last day, week or month: runs started for each
+  // team, who started them, the products their steps used, and the teams
+  // each team's products ran for. From the console's own record of runs,
+  // read at most once a minute. Admins see every team; anyone else the
+  // teams they're in, their products' users, and their teams' use of
+  // others' products.
+  rpc GetUsage(GetUsageRequest) returns (GetUsageResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // The install's alerts, as the Prometheus the console reads has them now
+  // (the console chart's monitoring.prometheusUrl, else the bundled one):
+  // the charts' rules (groups vennir-*), each inactive, pending or firing,
+  // with what it fires for. Everyone signed in; a firing instance about an
+  // API the caller can't see is counted, not described.
+  rpc ListAlerts(ListAlertsRequest) returns (ListAlertsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Who changed what, newest first. Admins see every entry; anyone else
+  // their own, and what was done to their teams and to runs in them.
+  rpc ListAudit(ListAuditRequest) returns (ListAuditResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // The audit log's write-once copy: whether this install keeps one, how
+  // far it has gone, and whether the entries' hash chain held when they
+  // were copied. Where it goes is for admins only.
+  rpc GetAuditCopy(GetAuditCopyRequest) returns (GetAuditCopyResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Searches the logs kept in Loki (when the install collects them), newest
+  // first. A step's INFO lines reach anyone who may see its run; its other
+  // lines its own team; the platform's own logs admins only. failed_precondition
+  // (LOGS_OFF) when this install doesn't collect logs.
+  rpc SearchLogs(SearchLogsRequest) returns (SearchLogsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message GetSecurityRequest {}
+
+message GetImageSbomRequest {
+  // The image, pinned by digest, as GetSecurity lists it.
+  string image = 1;
+}
+
+message GetImageSbomResponse {
+  // The CycloneDX document, as JSON.
+  string sbom = 1;
+}
+
+message GetSecurityResponse {
+  repeated SecurityCheck checks = 1;
+  repeated Refusal refusals = 2;
+  repeated AllowedImage images = 3;
+}
+
+message SecurityCheck {
+  string name = 1;
+  // enforced: the cluster (or the gateway) refuses what breaks it.
+  // off: this install turned it off. not_yet: a known gap.
+  string state = 2;
+  string text = 3;
+}
+
+message Refusal {
+  // When; for the gateway's, the last of them.
+  google.protobuf.Timestamp at = 1;
+  // What was refused: a step (its team and id), the catalog's release, or
+  // calls to an API (the calling team and the API).
+  string what = 2;
+  // The step's team, or the API's.
+  string team = 3;
+  string code = 4;
+  string why = 5;
+  // The run it was in, when the caller may see it; else empty.
+  string execution_id = 6;
+  // Who refused it: step (the cluster), catalog (the console) or gateway.
+  // The gateway's are seen by the API's team, the calling team and admins.
+  string source = 7;
+  // How many: the gateway's are grouped by API, calling team, endpoint and
+  // reason over the week; 1 otherwise.
+  int32 count = 8;
+  // Under it: a step's image, the endpoint called, or the release's version
+  // (else its digest).
+  string detail = 9;
+}
+
+message AllowedImage {
+  // The product's registered name, and its team.
+  string product = 1;
+  string team = 2;
+  // <repository>@sha256:..., as it runs.
+  string image = 3;
+  // pending, passed, failed, error, or unscanned.
+  string scan = 4;
+  google.protobuf.Timestamp scanned_at = 5;
+  int32 fixable = 6;
+  int32 unfixable = 7;
+  int32 secrets = 8;
+  // An admin accepted a failed scan, and why.
+  string accepted_reason = 9;
+}
+
+message GetMetricsRequest {}
+
+message GetMetricsResponse {
+  repeated HourMetrics hours = 1;
+  repeated FailureMetrics failures = 2;
+  repeated ProductMetrics products = 3;
+  // Steps waiting to start, and running, now.
+  int32 ready = 4;
+  int32 running = 5;
+}
+
+message GetUsageRequest {
+  // 1, 7 or 30; 7 when unset.
+  int32 days = 1;
+}
+
+message GetUsageResponse {
+  // Where the period starts.
+  google.protobuf.Timestamp since = 1;
+  int32 days = 2;
+  // Busiest first.
+  repeated TeamUsage teams = 3;
+  // Most used first.
+  repeated ProductUsage products = 4;
+  // The runs the caller sees counted once each, however many of the
+  // teams it counts for (a raw DAG across two counts for both): in the
+  // period, in the one before it, and their steps.
+  int32 runs = 5;
+  int32 previous_runs = 6;
+  int32 steps = 7;
+}
+
+message TeamUsage {
+  // Empty for runs started for no team. A run counts for the team a
+  // template was run for, or every team of a raw DAG. A team whose
+  // products ran, but that started nothing, has a row too.
+  string team = 1;
+  int32 runs = 2;
+  // In the period before, as long.
+  int32 previous_runs = 3;
+  int32 by_people = 4;
+  int32 by_bots = 5;
+  int32 by_schedules = 6;
+  // The steps of those runs as submitted, retries not counted.
+  int32 steps = 7;
+  // Steps of its runs by product, most first.
+  repeated UsageCount used = 8;
+  // Steps of its own products by the team each run was for, most first.
+  repeated UsageCount ran_for = 9;
+}
+
+message ProductUsage {
+  // The registered product, or the image repository for one that isn't
+  // (or a hidden product the caller doesn't see). A step is a product's
+  // only when it ran in the product's team's namespace.
+  string product = 1;
+  // The product's team; for an image that isn't a product, the namespace
+  // its steps ran in.
+  string team = 2;
+  string action = 3;
+  bool registered = 4;
+  int32 steps = 5;
+  int32 runs = 6;
+  // Steps by the team each run was for (empty: no team), most first.
+  repeated UsageCount used_by = 7;
+  google.protobuf.Timestamp last_used = 8;
+}
+
+message UsageCount {
+  string name = 1;
+  int32 count = 2;
+}
+
+message ListAlertsRequest {}
+
+message ListAlertsResponse {
+  // Whether the console reads a Prometheus at all.
+  bool configured = 1;
+  // Why it couldn't be read just now; empty when it was.
+  string problem = 2;
+  google.protobuf.Timestamp checked_at = 3;
+  repeated AlertRule rules = 4;
+  // Where they're read from: "prometheus" (its rules API), or "google": the
+  // charts' Rules in the cluster, and which fire from Google Cloud's
+  // managed Prometheus, which keeps no instance's own summary.
+  string source = 5;
+  // With google: the project whose managed Prometheus evaluates them.
+  string project = 6;
+  // With google: the rules were read but which fire couldn't be (problem
+  // says why); each rule's state is then unknown.
+  bool state_unknown = 7;
+}
+
+message AlertRule {
+  string name = 1;
+  // Its severity label (warning, critical).
+  string severity = 2;
+  // Its summary, with what varies by instance left out.
+  string summary = 3;
+  // inactive, pending or firing; unknown when it couldn't be read.
+  string state = 4;
+  repeated AlertInstance instances = 5;
+  // Pending or firing for something the caller can't see (another team's
+  // hidden API).
+  int32 hidden = 6;
+}
+
+message AlertInstance {
+  // pending or firing.
+  string state = 1;
+  // Since when.
+  google.protobuf.Timestamp active_at = 2;
+  string summary = 3;
+  string description = 4;
+  // Its labels, but alertname and severity.
+  map<string, string> labels = 5;
+}
+
+message HourMetrics {
+  google.protobuf.Timestamp hour = 1;
+  int32 started = 2;
+  double wait_p95_seconds = 3;
+}
+
+message FailureMetrics {
+  string code = 1;
+  int32 count = 2;
+  // Some were retried automatically.
+  bool retried = 3;
+  // What the code means, when the platform knows it.
+  string means = 4;
+}
+
+message ProductMetrics {
+  // The registered product, or the image repository for one that isn't.
+  string product = 1;
+  string action = 2;
+  string team = 3;
+  int32 steps = 4;
+  int32 succeeded = 5;
+  double p50_seconds = 6;
+  double p95_seconds = 7;
+}
+
+message ListAuditRequest {
+  // Older than this entry id; the newest when unset.
+  int64 before = 1;
+  // Only what was done to this team (or to runs in it).
+  string team = 2;
+  // Only the caller's own.
+  bool mine = 3;
+  // Only what was refused (a status of 400 or more).
+  bool refused_only = 4;
+  // 100 when unset, at most 500.
+  int32 limit = 5;
+}
+
+message ListAuditResponse {
+  repeated AuditEntry entries = 1;
+  // Pass as `before` for the next page; 0 on the last.
+  int64 next_before = 2;
+}
+
+message GetAuditCopyRequest {}
+
+message GetAuditCopyResponse {
+  // False when this install keeps no copy: the log is then only in the
+  // console's database, and its chain is checked by nothing.
+  bool enabled = 1;
+  // gs://bucket/prefix or s3://bucket/prefix; empty unless the caller is an
+  // admin.
+  string destination = 2;
+  // The newest entry copied (0 for none yet), and when.
+  int64 copied_through = 3;
+  optional google.protobuf.Timestamp copied_at = 4;
+  // Entries written since, waiting for the next copy.
+  int64 waiting = 5;
+  // When the export last looked: each look checks the chain of the entries
+  // it is about to copy.
+  optional google.protobuf.Timestamp checked_at = 6;
+  // The entry where the chain broke (changed, or one before it removed or
+  // slipped in); 0 while it holds. Nothing from there on is copied.
+  int64 broken_at = 7;
+  // Why the last look didn't copy, if it didn't.
+  string problem = 8;
+  // The database compared with the copy, entry by entry, a few copies an
+  // hour, round and round (the chain alone misses a change whose hashes
+  // were all rewritten after it): how far this round has gone, and when.
+  int64 compared_through = 9;
+  optional google.protobuf.Timestamp compared_at = 10;
+  // The first entry the database has changed (or lost) since it was
+  // copied; 0 while they agree.
+  int64 differs_at = 11;
+  // Why the last comparison didn't finish, or what it found.
+  string compare_problem = 12;
+}
+
+message SearchLogsRequest {
+  // Lines containing this, ignoring case.
+  string text = 1;
+  // Only this team's steps (or API backends).
+  string team = 2;
+  // Only this run's steps (not with source api).
+  string execution_id = 3;
+  // debug, info, warn or error; any when empty.
+  string level = 4;
+  // step (the default); api, the API backends a team runs (Pods labelled
+  // vennir/api-backend), its own team's only; or platform (admins only).
+  string source = 5;
+  // The window; the last hour when unset. At most the install's search
+  // window (searchDays) back: older logs are archived.
+  google.protobuf.Timestamp since = 6;
+  google.protobuf.Timestamp until = 7;
+  // 200 when unset, at most 1000.
+  int32 limit = 8;
+  // With source api: only the backend of this API product of the team's
+  // (its Pods labelled vennir/api: <name>).
+  string api = 9;
+}
+
+message SearchLogsResponse {
+  repeated LogLine lines = 1;
+  // More matched than limit: narrow the search.
+  bool truncated = 2;
+  // How far back this install searches.
+  int32 search_days = 3;
+}
+
+message LogLine {
+  google.protobuf.Timestamp at = 1;
+  // A step's or API backend's team (its namespace); empty for the
+  // platform's.
+  string team = 2;
+  string execution_id = 3;
+  string task = 4;
+  int32 attempt = 5;
+  string level = 6;
+  // For the platform's: which part (app, gateway, scheduler...); for an
+  // API backend's, its app.kubernetes.io/name or app label.
+  string app = 7;
+  string line = 8;
+}

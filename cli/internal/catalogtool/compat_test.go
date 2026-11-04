@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const baseProduct = `apiVersion: vertra.dev/v2
+const baseProduct = `apiVersion: vennir.dev/v2
 kind: Product
 name: db
 team: a

@@ -21,7 +21,7 @@ import { SignInLayout } from "../layout/SignInLayout";
 const SSO_ERRORS: Record<string, string> = {
   DOMAIN_NOT_ALLOWED: "That account isn't from a domain allowed to sign in here. Choose your work account.",
   EMAIL_NOT_VERIFIED: "Your provider hasn't verified that account's email.",
-  ACCOUNT_LINKED_ELSEWHERE: "This email's Vertra account signs in with a different account. Ask an admin if that's wrong.",
+  ACCOUNT_LINKED_ELSEWHERE: "This email's Vennir account signs in with a different account. Ask an admin if that's wrong.",
   SIGN_IN_EXPIRED: "That sign-in took too long or was started elsewhere. Try again.",
   NOT_STARTED_HERE: "That sign-in link wasn't started from this window, so it wasn't used. Sign in here.",
   SIGN_IN_CANCELLED: "Sign-in was cancelled.",
@@ -31,7 +31,7 @@ const SSO_ERRORS: Record<string, string> = {
 };
 
 /** Where the sign-in page keeps the value it gives single sign-on for this tab. */
-const SSO_TAB_KEY = "vertra_sso_tab";
+const SSO_TAB_KEY = "vennir_sso_tab";
 
 /** Starts single sign-on from this tab: a value only it knows, which must come back with the session. */
 function startSso(returnTo: string): void {
@@ -123,7 +123,7 @@ export function LoginPage() {
           Sign in
         </Typography>
         {environment?.label && (
-          <Typography sx={{ fontSize: 14, color: "text.secondary" }}>to Vertra on {environment.label}</Typography>
+          <Typography sx={{ fontSize: 14, color: "text.secondary" }}>to Vennir on {environment.label}</Typography>
         )}
       </Box>
       <Stack spacing={2}>
@@ -173,7 +173,7 @@ export function LoginPage() {
           </Stack>
         </Box>
         <Typography sx={{ fontSize: 12, color: "text.secondary", lineHeight: 1.5 }}>
-          Forgot your password? Ask a Vertra admin for a new one; you choose your own when you next sign in. Too many
+          Forgot your password? Ask a Vennir admin for a new one; you choose your own when you next sign in. Too many
           tries from one place wait a few minutes.
         </Typography>
         <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
@@ -182,9 +182,9 @@ export function LoginPage() {
               No account? <Link component={RouterLink} to="/register">Register</Link>
             </>
           ) : sso ? (
-            `No account? Sign in with ${sso}, or ask a Vertra admin for one.`
+            `No account? Sign in with ${sso}, or ask a Vennir admin for one.`
           ) : (
-            "No account? Ask a Vertra admin for one."
+            "No account? Ask a Vennir admin for one."
           )}
         </Typography>
       </Stack>

@@ -6,7 +6,7 @@ No password ever passes through the step: RDS generates the master password
 and keeps it in AWS Secrets Manager (ManageMasterUserPassword), and the
 output is that secret's ARN, a reference an app's own identity may be
 granted to read. New instances are encrypted and not publicly accessible.
-One it creates is tagged vertra-made=true and vertra-team=<the run's team> and
+One it creates is tagged vennir-made=true and vennir-team=<the run's team> and
 reported as a resource, which delete (its cleanup) removes; one it only
 found is neither, unless an earlier attempt made it for this team.
 Credentials as in the aws team's README.md: boto3's default chain (EKS Pod
@@ -30,11 +30,11 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 # team's README.md.
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 # What marks an instance this product made: delete removes no other.
-MADE_BY_TAG = ("vertra-made", "true")
+MADE_BY_TAG = ("vennir-made", "true")
 # And for which team (the request's forTeam, the team the run is for, not
 # the one it runs in), so it's reported, and deleted, only for that team:
 # another team's instance, even one this product made, isn't theirs.
-TEAM_TAG = "vertra-team"
+TEAM_TAG = "vennir-team"
 RETRYABLE_CODES = {
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
     "ServiceUnavailable", "InternalError", "InternalFailure",
@@ -77,7 +77,7 @@ def _session(region: str) -> boto3.session.Session:
     if not target:
         return session
     credentials = session.client("sts").assume_role(
-        RoleArn=target, RoleSessionName="vertra-step"
+        RoleArn=target, RoleSessionName="vennir-step"
     )["Credentials"]
     return boto3.session.Session(
         aws_access_key_id=credentials["AccessKeyId"],
@@ -145,13 +145,13 @@ def main() -> int:
                 "Engine": "postgres",
                 "DBInstanceClass": inputs.get("instanceClass", "db.t4g.micro"),
                 "AllocatedStorage": int(inputs.get("allocatedStorageGb", 20)),
-                "MasterUsername": inputs.get("masterUsername", "vertra_admin"),
+                "MasterUsername": inputs.get("masterUsername", "vennir_admin"),
                 "ManageMasterUserPassword": True,
                 "StorageEncrypted": True,
                 "PubliclyAccessible": False,
                 "BackupRetentionPeriod": 7,
                 "CopyTagsToSnapshot": True,
-                "Tags": [{"Key": "managed-by", "Value": "vertra"}, {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}, {"Key": TEAM_TAG, "Value": team}],
+                "Tags": [{"Key": "managed-by", "Value": "vennir"}, {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]}, {"Key": TEAM_TAG, "Value": team}],
             }
             if inputs.get("engineVersion"):
                 create["EngineVersion"] = inputs["engineVersion"]

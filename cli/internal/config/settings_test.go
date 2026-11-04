@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Every key has its line in `vertra help settings`, in the file's order,
+// Every key has its line in `vennir help settings`, in the file's order,
 // and every line a key: a new setting can't go unexplained.
 func TestEverySettingIsExplained(t *testing.T) {
 	var described []string
@@ -40,7 +40,7 @@ func TestEverySettingIsExplained(t *testing.T) {
 // key are refused, saying why.
 func TestAnySettingCanBeSet(t *testing.T) {
 	c := Default("aws")
-	c.Vertra = "0.5.2"
+	c.Vennir = "0.5.2"
 	c.AWS = AWS{Profile: "p", Region: "us-east-2"}
 	c.Admin.Email = "admin@example.com"
 	c.Database.Type = "managed"

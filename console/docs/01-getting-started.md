@@ -1,11 +1,11 @@
-# Try Vertra end to end
+# Try Vennir end to end
 
-In about an hour you take a trial team from nothing to a product that runs on Vertra, reads a secret, and passes its output to a second product. Every step copies a sample from the catalog's `templates/` folder: they run anywhere, call no cloud, and cost nothing.
+In about an hour you take a trial team from nothing to a product that runs on Vennir, reads a secret, and passes its output to a second product. Every step copies a sample from the catalog's `templates/` folder: they run anywhere, call no cloud, and cost nothing.
 
 You need:
 
-- **A Vertra console account.** A Vertra admin creates it; there is no sign-up page.
-- **Access to the catalog repo** (`my-org/vertra-catalog`), to open pull requests.
+- **A Vennir console account.** A Vennir admin creates it; there is no sign-up page.
+- **Access to the catalog repo** (`my-org/vennir-catalog`), to open pull requests.
 - **Docker on your laptop** (optional). It lets you run a product's test before you push, instead of waiting for CI.
 - **A team name.** Lowercase letters, digits and dashes, not used by anyone before; a removed team's name stays reserved. For a trial, use `try-<your-name>`, for example `team-a`.
 
@@ -17,7 +17,7 @@ A team offers products; a DAG runs some of their actions in order; a team's secr
 
 | Word | What it is | Where it lives |
 | --- | --- | --- |
-| **Team** | You and your colleagues, as Vertra sees you: one folder in the catalog, one team in the console, one namespace on the cluster, all with the same name | `teams/team-a/` |
+| **Team** | You and your colleagues, as Vennir sees you: one folder in the catalog, one team in the console, one namespace on the cluster, all with the same name | `teams/team-a/` |
 | **Product** | A container image that does one kind of job, plus a `product.yaml` describing it | `teams/team-a/products/hello/` |
 | **Action** | One thing a product can do, as a script named after it | `actions/greet.py` |
 | **DAG** | A list of tasks to run, where a task can wait for another and use its output ([more](03-what-is-a-dag.md)) | Pasted into the console's Submit page |
@@ -52,7 +52,7 @@ One pull request creates your team. Merging it sets up your namespace and your t
 3. Add your team's line to `.github/CODEOWNERS`, with the other teams' lines: `/teams/team-a/ @<your-org>/<your-team>`. From then on, your team approves changes to your products.
 4. Open a pull request. A catalog admin approves it, since it changes `.github/`. The `check-new-team-names` check fails if the name is taken or was used before; pick another.
 5. Merge once it's approved.
-6. Ask a Vertra admin to add you to the `team-a` team. A new team starts empty, so its first person comes from an admin, as a maintainer; after that, its maintainers add teammates on the Members tab, as members or maintainers ([what each may do](#members-and-maintainers)).
+6. Ask a Vennir admin to add you to the `team-a` team. A new team starts empty, so its first person comes from an admin, as a maintainer; after that, its maintainers add teammates on the Members tab, as members or maintainers ([what each may do](#members-and-maintainers)).
 
 **You're done when** the console's Teams page lists `team-a` and you can open it.
 
@@ -67,7 +67,7 @@ Copy the `hello` sample, rename three things, and merge: CI builds it, tests it,
 3. Optional, before pushing: run what CI will, from the catalog repo's root.
 
    ```bash
-   ./vertra catalog check teams/team-a/products/hello
+   ./vennir catalog check teams/team-a/products/hello
    ```
 
 4. Open a pull request. CI checks `product.yaml`, builds the image, runs its tests (each `tests/<action>/<case>/` folder: a `request.json` and the `expected.json` its result must contain), and scans it for fixable vulnerabilities, baked-in secrets and malicious packages. Nothing is published from a pull request.
@@ -142,15 +142,15 @@ A task that uses another's output must list it in `dependsOn`; the DAG is refuse
 
 ## Step 6: Sync secrets from your own vault (optional)
 
-If your secrets already live in a vault, connect it once and add them from there; a change in the vault reaches Vertra within an hour. You keep the vault in your own cloud account.
+If your secrets already live in a vault, connect it once and add them from there; a change in the vault reaches Vennir within an hour. You keep the vault in your own cloud account.
 
 1. On your team's **Secrets** tab, choose **Connect a source** and pick your provider.
-2. Fill in its few details. The page then shows the commands to run in your own account, already filled in, and who Vertra will sign in as.
+2. Fill in its few details. The page then shows the commands to run in your own account, already filled in, and who Vennir will sign in as.
 3. Run them, then open the pull request the page prepares: one file, `teams/team-a/secret-stores/secretstore.yaml`. A catalog admin approves it.
-4. After merge, the source appears under **Where secrets come from**, showing whether Vertra could sign in.
+4. After merge, the source appears under **Where secrets come from**, showing whether Vennir could sign in.
 5. From then on, **Add a secret** offers **Sync from …**: give the secret's name in the vault instead of pasting a value.
 
-| Provider | What Vertra stores | Status |
+| Provider | What Vennir stores | Status |
 | --- | --- | --- |
 | GCP Secret Manager | Nothing: it signs in with Workload Identity | Tested ([step by step](02-sync-secrets-gcp.md)) |
 | AWS Secrets Manager | Nothing: AWS trusts the cluster's identity | Guide only, not yet tested |
@@ -232,7 +232,7 @@ Every error names its cause; this table maps the common ones to the fix.
 | The Admin page's Catalog card: `a team named ... already exists here and the catalog didn't make it` | A new team folder has the name of a team someone made by hand | An admin adopts the team (if it's meant to be the same one), or the folder gets another name |
 | CI: `no tests` | The product has no `tests/<action>/<case>/` folders | Add one; copy the sample's |
 | CI: a `HIGH`/`CRITICAL` vulnerability, a secret, or a malicious package | The image failed its security scan | The run's summary lists each; usually keep the `apt-get upgrade` line and pin a fixed version |
-| You can't open your team | You're not a member yet | Ask a Vertra admin (first member) or a teammate |
+| You can't open your team | You're not a member yet | Ask a Vennir admin (first member) or a teammate |
 | Refused: `Managing team "team-a" takes a maintainer` | You're a member, and this takes a maintainer | Ask a maintainer to do it, or to make you one ([who may do what](#members-and-maintainers)) |
 | Refused: `TEAM_RETIRED` | The team is retired, so nothing new runs for it | See [a retired team](#if-your-team-is-retired) |
 
@@ -242,7 +242,7 @@ A task's own logs are on its execution's page; the team's **Running now** tab sh
 
 - **Signing in.** With your email and password, or with single sign-on when your install has it. A team can require single sign-on; then your password no longer works while you're in that team.
 - **A new or reset password.** A password an admin set for you must be changed before you can do anything else.
-- **A forgotten password.** There's no email reset: ask a Vertra admin to reset it, then change it.
+- **A forgotten password.** There's no email reset: ask a Vennir admin to reset it, then change it.
 - **Changing your password** signs you out everywhere else.
 - **Sessions** last 8 hours, unless your install says otherwise; then you sign in again.
 - **Too many wrong passwords.** After 10 failed sign-ins, you must wait before the next try; a successful sign-in clears the count.
@@ -260,13 +260,13 @@ An admin can later remove a retired team for good. Its name stays reserved.
 
 ## Help, and what isn't ready yet
 
-Ask the Vertra team; for an account, or the first member of a new team, ask a Vertra admin.
+Ask the Vennir team; for an account, or the first member of a new team, ask a Vennir admin.
 
 Known gaps today:
 
 - **AWS and 1Password syncing** have guides in the console but haven't been tested end to end. Expect rough edges and tell us what you hit.
-- **No "sync now".** A secret changed in your vault reaches Vertra within an hour.
+- **No "sync now".** A secret changed in your vault reaches Vennir within an hour.
 - **One namespace per team.** Separate environments by secret name for now, for example `db-password-prod`.
 - **The console is served over plain HTTP** while HTTPS is set up. Don't reuse a password you use elsewhere.
 
-**Cleaning up a trial team:** a pull request that deletes `teams/team-a/` retires it ([what that means](#if-your-team-is-retired)); a Vertra admin can then remove it for good. Its name stays reserved.
+**Cleaning up a trial team:** a pull request that deletes `teams/team-a/` retires it ([what that means](#if-your-team-is-retired)); a Vennir admin can then remove it for good. Its name stays reserved.

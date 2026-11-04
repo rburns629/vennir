@@ -144,7 +144,7 @@ function Dag() {
 
 /**
  * The screens before the console proper (signing in, registering, choosing
- * your own password): what Vertra is on one side, the form on the other.
+ * your own password): what Vennir is on one side, the form on the other.
  * On a phone the panel shrinks to a strip above the form.
  */
 export function SignInLayout({ children }: { children: ReactNode }) {
@@ -154,7 +154,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
     <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: { xs: "column", md: "row" }, bgcolor: "background.default" }}>
       <Box
         component="section"
-        aria-label="Vertra"
+        aria-label="Vennir"
         sx={{
           flex: { md: "1 1 420px" },
           bgcolor: "sidebar.background",
@@ -177,7 +177,7 @@ export function SignInLayout({ children }: { children: ReactNode }) {
               <path d="M7 7.5l3.5 8.5M17 7.5l-3.5 8.5" />
             </g>
           </Box>
-          Vertra
+          Vennir
         </Box>
         <Box sx={{ display: { xs: "none", md: "flex" }, flexDirection: "column", gap: 3, maxWidth: 460, my: "auto" }}>
           <Dag />

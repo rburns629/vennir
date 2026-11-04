@@ -12,7 +12,7 @@ import { hashPassword } from "../src/auth/password.js";
 import { db } from "../src/db/client.js";
 import { createUser, setUserAdmin } from "../src/db/queries.js";
 import { users } from "../src/db/schema.js";
-import { FailureSchema, ProblemSchema } from "../src/gen/vertra/console/v1/common_pb.js";
+import { FailureSchema, ProblemSchema } from "../src/gen/vennir/console/v1/common_pb.js";
 
 export const PASSWORD = "correct-horse-battery";
 
@@ -33,7 +33,7 @@ export function rpcClient(app: () => FastifyInstance) {
   ) {
     return app().inject({
       method: "POST",
-      url: `/api/vertra.console.v1.${service}/${method}`,
+      url: `/api/vennir.console.v1.${service}/${method}`,
       headers: {
         "content-type": "application/json",
         ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
@@ -69,27 +69,27 @@ export function rpcClient(app: () => FastifyInstance) {
 
 /** The Failure detail's stable code (FORBIDDEN, TEAM_RETIRED, ...). */
 export function failureCode(error: RpcError): string | undefined {
-  const detail = error.details?.find((d) => d.type === "vertra.console.v1.Failure");
+  const detail = error.details?.find((d) => d.type === "vennir.console.v1.Failure");
   return detail ? fromBinary(FailureSchema, Buffer.from(detail.value, "base64")).code : undefined;
 }
 
 /** The Failure detail's extra information (allowed sources, findings, ...). */
 export function failureDetail(error: RpcError): Record<string, unknown> | undefined {
-  const detail = error.details?.find((d) => d.type === "vertra.console.v1.Failure");
+  const detail = error.details?.find((d) => d.type === "vennir.console.v1.Failure");
   return detail ? fromBinary(FailureSchema, Buffer.from(detail.value, "base64")).detail : undefined;
 }
 
 /** Each Problem detail's message (a refused document's problems). */
 export function problemMessages(error: RpcError): string[] {
   return (error.details ?? [])
-    .filter((d) => d.type === "vertra.console.v1.Problem")
+    .filter((d) => d.type === "vennir.console.v1.Problem")
     .map((d) => fromBinary(ProblemSchema, Buffer.from(d.value, "base64")).message);
 }
 
 /** The fields an invalid_argument error names. */
 export function problemFields(error: RpcError): string[] {
   return (error.details ?? [])
-    .filter((d) => d.type === "vertra.console.v1.Problem")
+    .filter((d) => d.type === "vennir.console.v1.Problem")
     .map((d) => fromBinary(ProblemSchema, Buffer.from(d.value, "base64")).field);
 }
 
@@ -114,7 +114,7 @@ export function caller(app: () => FastifyInstance) {
   ): Promise<Outcome<T>> {
     const response = await app().inject({
       method: "POST",
-      url: `/api/vertra.console.v1.${procedure}`,
+      url: `/api/vennir.console.v1.${procedure}`,
       headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
       payload: JSON.stringify(body),
       remoteAddress: "10.9.0.1",

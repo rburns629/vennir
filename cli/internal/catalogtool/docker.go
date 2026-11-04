@@ -134,7 +134,7 @@ func (c *Catalog) Build(p *Product) bool {
 
 // Every FROM names its base by digest (python:3.12-slim@sha256:…), so a
 // build is the same bytes until someone deliberately moves it:
-// ./vertra catalog bases --update re-pins each tag to what it names now.
+// ./vennir catalog bases --update re-pins each tag to what it names now.
 var fromLine = regexp.MustCompile(`(?i)^(FROM\s+(?:--platform=\S+\s+)?)(\S+)(.*)$`)
 
 // stageAlias is the name a FROM line gives its stage ("AS name"), or "".
@@ -160,7 +160,7 @@ func baseProblems(path string) []string {
 		}
 		image, rest := m[2], m[3]
 		if !stages[strings.ToLower(image)] && image != "scratch" && !strings.Contains(image, "@sha256:") {
-			problems = append(problems, fmt.Sprintf("Dockerfile line %d: base image %s isn't pinned by digest: run ./vertra catalog bases", i+1, image))
+			problems = append(problems, fmt.Sprintf("Dockerfile line %d: base image %s isn't pinned by digest: run ./vennir catalog bases", i+1, image))
 		}
 		if alias := stageAlias(rest); alias != "" {
 			stages[alias] = true
@@ -244,7 +244,7 @@ func (c *Catalog) Bases(update, useMirror bool) error {
 			return fmt.Errorf("bases.yaml: %s", strings.Join(problems, "; "))
 		}
 		if s.Registry == "" {
-			return errors.New("--use-mirror needs the registry: registry in vertra.yaml or VERTRA_REGISTRY")
+			return errors.New("--use-mirror needs the registry: registry in vennir.yaml or VENNIR_REGISTRY")
 		}
 		for _, b := range bases {
 			mirrors[b.Image] = s.MirrorRepository(b) + ":" + mirrorTag(b)

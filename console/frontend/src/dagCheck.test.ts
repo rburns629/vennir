@@ -34,14 +34,14 @@ describe("checkDag", () => {
   });
 
   it("submits a catalog's kind: Dag file without its header, and explains a template", () => {
-    const checked = check({ apiVersion: "vertra.dev/v2", kind: "Dag", name: "hello", tasks: [task("a")] });
+    const checked = check({ apiVersion: "vennir.dev/v2", kind: "Dag", name: "hello", tasks: [task("a")] });
     expect(checked.status).toBe("valid");
     if (checked.status === "valid") {
       expect(checked.payload).not.toHaveProperty("apiVersion");
       expect(checked.payload).not.toHaveProperty("kind");
     }
-    expect(messages(check({ apiVersion: "vertra.dev/v2", kind: "Template", name: "t", steps: [] }))[0]).toContain("template");
-    expect(check({ apiVersion: "vertra.dev/v1", name: "hello", tasks: [task("a")] }).status).toBe("invalid");
+    expect(messages(check({ apiVersion: "vennir.dev/v2", kind: "Template", name: "t", steps: [] }))[0]).toContain("template");
+    expect(check({ apiVersion: "vennir.dev/v1", name: "hello", tasks: [task("a")] }).status).toBe("invalid");
   });
 
   it("names the new field for one renamed since", () => {

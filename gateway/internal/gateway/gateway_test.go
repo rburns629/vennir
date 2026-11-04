@@ -19,10 +19,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/rburns629/vertra/gateway/internal/auth"
-	"github.com/rburns629/vertra/gateway/internal/caller"
-	"github.com/rburns629/vertra/gateway/internal/limits"
-	"github.com/rburns629/vertra/gateway/internal/store"
+	"github.com/rburns629/vennir/gateway/internal/auth"
+	"github.com/rburns629/vennir/gateway/internal/caller"
+	"github.com/rburns629/vennir/gateway/internal/limits"
+	"github.com/rburns629/vennir/gateway/internal/store"
 )
 
 const spec = `{
@@ -168,7 +168,7 @@ func errorCode(t *testing.T, w *httptest.ResponseRecorder) string {
 func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 	f := setup(t, "")
 	w := f.do("POST", "/payments/orders/orders?dry=true", "web-person", `{"amount": 1200}`, map[string]string{
-		"Content-Type": "application/json", "Idempotency-Key": "k1", "Vertra-Caller": "forged", "Connection": "close, X-Hop",
+		"Content-Type": "application/json", "Idempotency-Key": "k1", "Vennir-Caller": "forged", "Connection": "close, X-Hop",
 		"X-Hop": "for the next hop only", "Proxy-Authorization": "Basic cHJveHk=", "X-Forwarded-For": "10.0.0.66", "X-Forwarded-Host": "evil.example",
 		"Forwarded": "for=10.0.0.66", "X-Real-Ip": "10.0.0.66"})
 	if w.Code != http.StatusCreated || w.Header().Get(AnsweredBy) != "backend" || w.Header().Get("X-Backend") != "yes" || w.Body.String() != `{"ok":true}` {
@@ -201,7 +201,7 @@ func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 	}
 	claims := verify(t, got.Header.Get(caller.Header), f.public)
 	if claims.Subject != "user:u1" || claims.Team != "web" || claims.API != "payments/orders" || claims.Email != "web@example.com" {
-		t.Errorf("Vertra-Caller = %+v", claims)
+		t.Errorf("Vennir-Caller = %+v", claims)
 	}
 }
 
@@ -209,11 +209,11 @@ func verify(t *testing.T, token string, pub ed25519.PublicKey) caller.Claims {
 	t.Helper()
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		t.Fatalf("Vertra-Caller isn't a JWT: %q", token)
+		t.Fatalf("Vennir-Caller isn't a JWT: %q", token)
 	}
 	sig, _ := base64.RawURLEncoding.DecodeString(parts[2])
 	if !ed25519.Verify(pub, []byte(parts[0]+"."+parts[1]), sig) {
-		t.Fatal("Vertra-Caller's signature doesn't verify")
+		t.Fatal("Vennir-Caller's signature doesn't verify")
 	}
 	payload, _ := base64.RawURLEncoding.DecodeString(parts[1])
 	var c caller.Claims
@@ -394,10 +394,10 @@ func TestABackendUnderAPath(t *testing.T) {
 
 func TestItsOwnPaths(t *testing.T) {
 	f := setup(t, "")
-	if w := f.do("GET", "/.vertra/health", "", "", nil); w.Code != 200 {
+	if w := f.do("GET", "/.vennir/health", "", "", nil); w.Code != 200 {
 		t.Errorf("health: %d", w.Code)
 	}
-	w := f.do("GET", "/.vertra/jwks.json", "", "", nil)
+	w := f.do("GET", "/.vennir/jwks.json", "", "", nil)
 	var jwks struct{ Keys []map[string]string }
 	if err := json.Unmarshal(w.Body.Bytes(), &jwks); err != nil || len(jwks.Keys) != 1 || jwks.Keys[0]["crv"] != "Ed25519" {
 		t.Errorf("jwks: %s", w.Body)

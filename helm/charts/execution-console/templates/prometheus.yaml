@@ -65,7 +65,7 @@ data:
       - /etc/prometheus/rules/kernel/*.yaml
     scrape_configs:
       # The console, the gateway and the scheduler, each on its metrics port.
-      - job_name: vertra
+      - job_name: vennir
         kubernetes_sd_configs:
           - role: pod
             namespaces: {names: [{{ .Release.Namespace | quote }}]}
@@ -82,7 +82,7 @@ data:
         {{- if $kernelTls }}
         scheme: https
         tls_config:
-          ca_file: /etc/vertra/tls/ca.crt
+          ca_file: /etc/vennir/tls/ca.crt
           server_name: {{ printf "%s-api.%s.svc" $kernel .Release.Namespace }}
         {{- end }}
         kubernetes_sd_configs:
@@ -184,7 +184,7 @@ spec:
             - {name: console-rules, mountPath: /etc/prometheus/rules/console, readOnly: true}
             - {name: kernel-rules, mountPath: /etc/prometheus/rules/kernel, readOnly: true}
             {{- if $kernelTls }}
-            - {name: kernel-ca, mountPath: /etc/vertra/tls, readOnly: true}
+            - {name: kernel-ca, mountPath: /etc/vennir/tls, readOnly: true}
             {{- end }}
             - {name: data, mountPath: /prometheus}
       volumes:

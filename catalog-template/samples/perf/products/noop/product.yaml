@@ -1,4 +1,4 @@
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: noop
 team: perf

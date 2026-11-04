@@ -121,7 +121,7 @@ async function checks(): Promise<Check[]> {
     {
       name: "Teams from the directory",
       state: "not_yet",
-      text: "Team membership is set in Vertra; mapping your directory's groups to teams is planned.",
+      text: "Team membership is set in Vennir; mapping your directory's groups to teams is planned.",
     },
     await auditCheck(),
   ];
@@ -323,8 +323,8 @@ export async function getMetrics(caller: AuthUser | undefined) {
 
 /** Methods that name their team as `name`; the rest name it `team`. */
 const TEAM_NAMED = ["CreateTeam", "EnsureTeam", "RetireTeam", "UnretireTeam", "PurgeTeam"].map(
-  (m) => `vertra.console.v1.TeamService/${m}`,
-).concat("vertra.console.v1.AdminService/AdoptCatalogTeam");
+  (m) => `vennir.console.v1.TeamService/${m}`,
+).concat("vennir.console.v1.AdminService/AdoptCatalogTeam");
 
 function textArray(values: string[]): SQL {
   return values.length > 0 ? sql`ARRAY[${sql.join(values.map((v) => sql`${v}`), sql`, `)}]::text[]` : sql`ARRAY[]::text[]`;

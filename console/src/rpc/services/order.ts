@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-/** OrderService (proto/vertra/console/v1/order.proto): core/orders.ts over Connect. */
+/** OrderService (proto/vennir/console/v1/order.proto): core/orders.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import { MAX_CART, placeOrder, previewOrder, type OrderChoice, type OrderInput } from "../../core/orders.js";
-import type { OrderService } from "../../gen/vertra/console/v1/order_pb.js";
+import type { OrderService } from "../../gen/vennir/console/v1/order_pb.js";
 import { callerOf, logOf } from "../context.js";
 import { check } from "../validate.js";
 import { executionState, viaKernel } from "./execution.js";

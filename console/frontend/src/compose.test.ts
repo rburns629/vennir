@@ -8,10 +8,10 @@ const product = (team: string, name: string, action: string, input: object, outp
   ({ name: `${team}-${name}-${action}`, action, teamName: team, image: `r/${team}/${name}@sha256:aa`, inputSchema: input, outputSchema: output }) as unknown as Product;
 
 const project = product("gcp-platform", "project", "create",
-  { type: "object", required: ["projectId"], properties: { projectId: { type: "string", "x-vertra-needs": "gcp.project", pattern: "^[a-z]+$" } } },
-  { type: "object", properties: { projectId: { type: "string", "x-vertra-provides": "gcp.project" }, url: { type: "string" } } });
+  { type: "object", required: ["projectId"], properties: { projectId: { type: "string", "x-vennir-needs": "gcp.project", pattern: "^[a-z]+$" } } },
+  { type: "object", properties: { projectId: { type: "string", "x-vennir-provides": "gcp.project" }, url: { type: "string" } } });
 const app = product("web", "app", "deploy",
-  { type: "object", required: ["project", "replicas"], properties: { project: { type: "string", "x-vertra-needs": "gcp.project" }, replicas: { type: "integer" }, url: { type: "string" } } },
+  { type: "object", required: ["project", "replicas"], properties: { project: { type: "string", "x-vennir-needs": "gcp.project" }, replicas: { type: "integer" }, url: { type: "string" } } },
   { type: "object", properties: {} });
 const products = new Map([project, app].map((p) => [p.name, p]));
 const empty: Draft = { name: "web-on-gcp", displayName: "", description: "", team: "web", steps: [] };

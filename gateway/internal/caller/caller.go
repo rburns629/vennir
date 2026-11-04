@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-// Package caller makes the Vertra-Caller header a backend gets with every
+// Package caller makes the Vennir-Caller header a backend gets with every
 // request: who called, as which team, and which API, in a short-lived JWT
 // the gateway signs (EdDSA, Ed25519). A backend that cares checks it
-// against the gateway's public key at /.vertra/jwks.json; one that doesn't
-// can ignore it. A caller can't forge it: the gateway drops any Vertra-*
+// against the gateway's public key at /.vennir/jwks.json; one that doesn't
+// can ignore it. A caller can't forge it: the gateway drops any Vennir-*
 // header a request arrives with.
 package caller
 
@@ -17,13 +17,13 @@ import (
 )
 
 // Header names the caller to the backend.
-const Header = "Vertra-Caller"
+const Header = "Vennir-Caller"
 
-// Lifetime is how long a Vertra-Caller token is good for: long enough for
+// Lifetime is how long a Vennir-Caller token is good for: long enough for
 // the request to arrive, too short to replay usefully.
 const Lifetime = 60 * time.Second
 
-// Signer signs Vertra-Caller tokens.
+// Signer signs Vennir-Caller tokens.
 type Signer struct {
 	Key ed25519.PrivateKey
 	// Issuer is the gateway's address, the token's iss.
@@ -70,7 +70,7 @@ func (s *Signer) Sign(c Claims, now time.Time) (string, error) {
 	return signing + "." + base64.RawURLEncoding.EncodeToString(ed25519.Sign(s.Key, []byte(signing))), nil
 }
 
-// JWKS is the public key, as /.vertra/jwks.json serves it.
+// JWKS is the public key, as /.vennir/jwks.json serves it.
 func (s *Signer) JWKS() ([]byte, error) {
 	return json.Marshal(map[string]any{"keys": []map[string]string{{
 		"kty": "OKP", "crv": "Ed25519", "alg": "EdDSA", "use": "sig", "kid": s.KeyID(),

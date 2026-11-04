@@ -1,7 +1,7 @@
 name: security
 
 # Code and secret scanning for everything in this repo. (Each product IMAGE
-# is scanned by ./vertra in ci.yml, between its tests and its push, so a
+# is scanned by ./vennir in ci.yml, between its tests and its push, so a
 # failing image is never published, and again by its weekly run.)
 #
 #   secrets          gitleaks over the commits a PR or push adds, and over

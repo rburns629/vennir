@@ -4,7 +4,7 @@
  * https://bedrock-mantle.<region>.api.aws/anthropic, signed with AWS SigV4
  * (service bedrock-mantle) instead of a key. This signs each request the
  * Anthropic client makes, as the console's own AWS identity: the default
- * credential chain, which on EKS is Pod Identity (the role vertra's module
+ * credential chain, which on EKS is Pod Identity (the role vennir's module
  * grants bedrock-mantle:CreateInference on the one model). Nothing stored.
  *
  * Anthropic's @anthropic-ai/bedrock-sdk does the same; it isn't used

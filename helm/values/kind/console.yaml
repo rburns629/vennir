@@ -1,8 +1,8 @@
 # execution-console on the local kind cluster (release `console`,
-# namespace vertra-system):
-#   helm upgrade --install console helm/charts/execution-console -n vertra-system \
-#     --reset-values --kube-context kind-vertra-local -f helm/values/kind/console.yaml
-kernelApiUrl: https://kernel-execution-kernel-api.vertra-system.svc.cluster.local:8000
+# namespace vennir-system):
+#   helm upgrade --install console helm/charts/execution-console -n vennir-system \
+#     --reset-values --kube-context kind-vennir-local -f helm/values/kind/console.yaml
+kernelApiUrl: https://kernel-execution-kernel-api.vennir-system.svc.cluster.local:8000
 # kernel-api's HTTPS, and the kernel's Postgres, are checked against the
 # kernel chart's own CA.
 tls:
@@ -38,12 +38,12 @@ catalog:
   release: localhost:5001/catalog-release:latest
   pollSeconds: 60
 bootstrapAdmin:
-  password: vertra-local
+  password: vennir-local
 # The "Connect a source" wizard. kind's tokens aren't trusted by any cloud,
 # so only stored-credential sources (1Password) are offered here.
 secretSources:
-  catalogRepo: my-org/vertra-catalog
-# The API gateway: forwards to backends in the vertra-samples namespace and
+  catalogRepo: my-org/vennir-catalog
+# The API gateway: forwards to backends in the vennir-samples namespace and
 # the local sample team's (its greetings API: make kind-sample-api)
 # (kubectl port-forward svc/console-execution-console-gateway 18090:8080).
 gateway:
@@ -54,7 +54,7 @@ gateway:
   image:
     repository: execution-gateway
     tag: latest
-  backendHosts: ["*.vertra-samples.svc.cluster.local", "*.local.svc.cluster.local"]
+  backendHosts: ["*.vennir-samples.svc.cluster.local", "*.local.svc.cluster.local"]
   url: http://localhost:18090
 
 # A Prometheus in the monitoring namespace may scrape /metrics (none is

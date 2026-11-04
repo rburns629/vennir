@@ -82,7 +82,7 @@ func report(r Report) string {
 }
 
 func TestCheckAWSFindsTheRegionsAnOrganizationAllows(t *testing.T) {
-	a := CheckAWS(context.Background(), fakeAWS("arn:aws:iam::111111111111:user/rburns"), "vertra", "us-east-1")
+	a := CheckAWS(context.Background(), fakeAWS("arn:aws:iam::111111111111:user/rburns"), "vennir", "us-east-1")
 	if strings.Join(a.Allowed, ",") != "us-east-2" || a.Denied["us-east-1"] == "" {
 		t.Fatalf("allowed %v, denied %v", a.Allowed, a.Denied)
 	}
@@ -118,7 +118,7 @@ func TestCheckAWSWithNoBudgets(t *testing.T) {
 				return answer.out, answer.err
 			}
 			return exec(ctx, n, args...)
-		}, "vertra", "us-east-2")
+		}, "vennir", "us-east-2")
 		if out := report(a.Report); a.BudgetsUnread || a.Budgets != 0 || !strings.Contains(out, "Budgets: none in this account") {
 			t.Errorf("%s: unread %v, %d budgets:\n%s", name, a.BudgetsUnread, a.Budgets, out)
 		}
@@ -134,17 +134,17 @@ func TestCheckAWSWithoutBudgetsAccess(t *testing.T) {
 			return "", errors.New("An error occurred (AccessDeniedException)")
 		}
 		return exec(ctx, name, args...)
-	}, "vertra", "us-east-2")
+	}, "vennir", "us-east-2")
 	if out := report(a.Report); !a.BudgetsUnread || !strings.Contains(out, "Budgets: couldn't read them") || strings.Contains(out, "none in this account") {
 		t.Errorf("unread %v:\n%s", a.BudgetsUnread, out)
 	}
-	if b := CheckAWS(context.Background(), exec, "vertra", "us-east-2"); b.BudgetsUnread {
+	if b := CheckAWS(context.Background(), exec, "vennir", "us-east-2"); b.BudgetsUnread {
 		t.Error("budgets read, but marked unread")
 	}
 }
 
 func TestCheckAWSInAnAllowedRegion(t *testing.T) {
-	a := CheckAWS(context.Background(), fakeAWS("arn:aws:iam::111111111111:user/rburns"), "vertra", "us-east-2")
+	a := CheckAWS(context.Background(), fakeAWS("arn:aws:iam::111111111111:user/rburns"), "vennir", "us-east-2")
 	out := report(a.Report)
 	if len(a.Problems) != 0 || !strings.Contains(out, "Region: us-east-2 (your organization allows only us-east-2)") ||
 		!strings.Contains(out, "Spot: your organization's policy denies reading Spot prices") {
@@ -183,7 +183,7 @@ func withZones(exec Exec, answers map[string]error, asked map[string]int) Exec {
 func TestCheckAWSAsksTheRegionChosen(t *testing.T) {
 	asked := map[string]int{}
 	exec := withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"il-central-1": nil}, asked)
-	a := CheckAWS(context.Background(), exec, "vertra", "il-central-1")
+	a := CheckAWS(context.Background(), exec, "vennir", "il-central-1")
 	if len(a.Problems) != 0 || !contains(a.Allowed, "il-central-1") || asked["il-central-1"] != 1 {
 		t.Errorf("allowed %v, asked %v:\n%s", a.Allowed, asked, report(a.Report))
 	}
@@ -194,14 +194,14 @@ func TestCheckAWSAsksTheRegionChosen(t *testing.T) {
 	// One the account hasn't opted in to is still a problem.
 	notEnabled := errors.New("\naws: [ERROR]: An error occurred (OptInRequired): You are not subscribed to this service.")
 	exec = withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"me-central-1": notEnabled}, asked)
-	a = CheckAWS(context.Background(), exec, "vertra", "me-central-1")
+	a = CheckAWS(context.Background(), exec, "vennir", "me-central-1")
 	if !strings.Contains(report(a.Report), "PROBLEM can't use me-central-1 from this account") {
 		t.Errorf("got:\n%s", report(a.Report))
 	}
 
 	// ap-northeast-3 every account has: it's offered without being chosen.
 	exec = withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"ap-northeast-3": nil}, asked)
-	if a := CheckAWS(context.Background(), exec, "vertra", ""); !contains(a.Allowed, "ap-northeast-3") {
+	if a := CheckAWS(context.Background(), exec, "vennir", ""); !contains(a.Allowed, "ap-northeast-3") {
 		t.Errorf("allowed %v", a.Allowed)
 	}
 }
@@ -210,15 +210,15 @@ func TestCheckAWSAsksTheRegionChosen(t *testing.T) {
 func TestProbeRegionAddsItToAllowed(t *testing.T) {
 	asked := map[string]int{}
 	exec := withZones(fakeAWS("arn:aws:iam::111111111111:user/rburns"), map[string]error{"eu-south-1": nil}, asked)
-	a := CheckAWS(context.Background(), exec, "vertra", "")
+	a := CheckAWS(context.Background(), exec, "vennir", "")
 	if contains(a.Allowed, "eu-south-1") {
 		t.Fatalf("eu-south-1 asked before it was chosen: %v", a.Allowed)
 	}
-	a.ProbeRegion(context.Background(), exec, "vertra", "eu-south-1")
+	a.ProbeRegion(context.Background(), exec, "vennir", "eu-south-1")
 	if strings.Join(a.Allowed, ",") != "eu-south-1,us-east-2" {
 		t.Errorf("allowed %v", a.Allowed)
 	}
-	a.ProbeRegion(context.Background(), exec, "vertra", "eu-south-2")
+	a.ProbeRegion(context.Background(), exec, "vennir", "eu-south-2")
 	if a.Denied["eu-south-2"] == "" {
 		t.Errorf("an organization's refusal is kept: %v", a.Denied)
 	}
@@ -334,7 +334,7 @@ func TestCheckGCPCantTellIsNotAProblem(t *testing.T) {
 	if len(g.Problems) > 0 {
 		t.Errorf("problems: %+v", g.Problems)
 	}
-	if out := report(g.Report); !strings.Contains(out, "Policy: your organization's policy allows only in:eu-locations: Vertra can't tell whether that includes europe-west1") {
+	if out := report(g.Report); !strings.Contains(out, "Policy: your organization's policy allows only in:eu-locations: Vennir can't tell whether that includes europe-west1") {
 		t.Errorf("no line saying so in:\n%s", out)
 	}
 }

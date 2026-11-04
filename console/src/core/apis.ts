@@ -143,7 +143,7 @@ export function sees(caller: AuthUser, api: Pick<Api, "hidden" | "teamName">): b
 
 /**
  * The requests a minute the caller may send it, as the gateway counts them
- * (without Vertra-Team): the calling team's own limit, else the API's
+ * (without Vennir-Team): the calling team's own limit, else the API's
  * default, else the gateway's (0 in either means unset there too).
  */
 function perMinuteFor(caller: AuthUser, api: Api): number {

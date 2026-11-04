@@ -7,7 +7,7 @@
  * refuses deletes and overwrites (a GCS retention policy, S3 Object Lock),
  * create-only on its side too. A broken chain (an entry changed, removed or
  * inserted in the database) stops the export where it breaks, loudly: what
- * was shipped stays the record. The bucket and its lock are vertra's
+ * was shipped stays the record. The bucket and its lock are vennir's
  * (docs/operations.md, "The audit log's copy").
  *
  * The chain shows a change only if it wasn't rewritten after the change:

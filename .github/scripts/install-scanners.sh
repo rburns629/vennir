@@ -5,7 +5,7 @@
 # binaries rather than third-party GitHub Actions: a scanner is exactly what
 # an attacker would want to tamper with, and pinning the bytes themselves
 # leaves nothing to trust but this file. (Started as a copy of
-# vertra-catalog's; the two repos pin independently.)
+# vennir-catalog's; the two repos pin independently.)
 #
 # To upgrade one: bump its version, then take the new linux/amd64 sum from
 # that release's own checksums file (trivy_<v>_checksums.txt,

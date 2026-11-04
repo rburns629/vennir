@@ -21,8 +21,8 @@ export interface DocQuestion {
 }
 
 export const DOC_QUESTIONS: DocQuestion[] = [
-  // Using Vertra
-  { question: "how do I get started trying vertra?", answers: ["01-getting-started :: Try Vertra end to end", "01-getting-started :: Six words to know"] },
+  // Using Vennir
+  { question: "how do I get started trying vennir?", answers: ["01-getting-started :: Try Vennir end to end", "01-getting-started :: Six words to know"] },
   { question: "how do I give my product a password or API key?", answers: ["01-getting-started :: Step 4: Give it a secret", "04-secrets-explained :: Step 1 — registering one"] },
   { question: "can I pass one product's output into another?", answers: ["01-getting-started :: Step 5: Chain two products", "07-how-data-moves :: How a value moves from one task to the next"] },
   {
@@ -71,34 +71,34 @@ export const DOC_QUESTIONS: DocQuestion[] = [
   { question: "how do I onboard a new team to the catalog", answers: ["reference-catalog-guide :: Onboarding a team", "reference-catalog-onboarding-with-ai :: Onboarding a team or product, with an AI assistant"] },
   { question: "who has to approve changes to my team's products", answers: ["reference-catalog-guide :: Who approves what"] },
   { question: "what should a product never print or return", answers: ["reference-catalog-guide :: The container contract", "reference-security-model :: Rules for product authors"] },
-  // Running Vertra
+  // Running Vennir
   {
     question: "how do I back up the databases",
     answers: ["reference-operations :: Backups"],
-    // Qwen 27B, 2026-10-28: joined the chart's backup.enabled to `vertra
+    // Qwen 27B, 2026-10-28: joined the chart's backup.enabled to `vennir
     // config set` into a command that doesn't exist. The doc now says it.
     mustSay: ["database.backups.enabled"],
     mustNotSay: ["config set -e <env> backup.enabled"],
   },
   { question: "how do I upgrade to a new version", answers: ["reference-operations :: Upgrading"] },
-  { question: "install vertra on a cluster with helm", answers: ["reference-operations :: Installing on a cluster with Helm", "reference-setup :: 2. `vertra apply <env>`"] },
+  { question: "install vennir on a cluster with helm", answers: ["reference-operations :: Installing on a cluster with Helm", "reference-setup :: 2. `vennir apply <env>`"] },
   { question: "how do I set up HTTPS for the console", answers: ["reference-operations :: HTTPS for the console"] },
   {
     question: "let people sign in with their google accounts",
     answers: ["reference-operations :: Signing in with Google", "reference-security-model :: Signing in", "reference-setup :: 3. Sign in, and invite people"],
     // Qwen3 14B, 2026-10-28: invented where to require it ("Admin > People")
     // under a genuine citation; it's on the team's page.
-    mustSay: ["vertra sso google"],
+    mustSay: ["vennir sso google"],
     mustNotSay: ["Admin > People"],
   },
   { question: "the scheduler is slow, steps start late", answers: ["reference-operations :: Throughput", "reference-operations :: Troubleshooting"] },
   { question: "which pods can talk to postgres", answers: ["reference-operations :: Network policies"] },
   { question: "where are the metrics and alerts", answers: ["reference-operations :: Metrics and alerts"] },
-  { question: "how do I prepare a new AWS account", answers: ["reference-clouds-aws :: Getting AWS ready for Vertra", "reference-clouds-aws :: An account"] },
-  { question: "what do I need in google cloud before installing", answers: ["reference-clouds-gcp :: Getting Google Cloud ready for Vertra", "reference-clouds-gcp :: A project, with billing"] },
+  { question: "how do I prepare a new AWS account", answers: ["reference-clouds-aws :: Getting AWS ready for Vennir", "reference-clouds-aws :: An account"] },
+  { question: "what do I need in google cloud before installing", answers: ["reference-clouds-gcp :: Getting Google Cloud ready for Vennir", "reference-clouds-gcp :: A project, with billing"] },
   // How it works
   { question: "what guarantees does execution have, can a step run twice", answers: ["reference-architecture :: Guarantees and their limits"] },
-  { question: "what parts make up vertra", answers: ["reference-architecture :: The pieces", "reference-architecture :: What Vertra is"] },
+  { question: "what parts make up vennir", answers: ["reference-architecture :: The pieces", "reference-architecture :: What Vennir is"] },
   { question: "who can delete something a run made", answers: ["reference-security-model :: What a run made, and deleting it"] },
   { question: "what security checks aren't enforced yet", answers: ["reference-security-model :: Not yet enforced"] },
   // The console's own guides (10-16)
@@ -111,7 +111,7 @@ export const DOC_QUESTIONS: DocQuestion[] = [
   { question: "why can't I see another team's logs in Observe?", answers: ["12-observe :: Whose logs can I see?"] },
   { question: "what's the difference between a maintainer and a member?", answers: ["13-teams-and-roles :: What may a member, a maintainer and an admin do?", "01-getting-started :: Members and maintainers"] },
   { question: "can I undo deleting a team?", answers: ["13-teams-and-roles :: What does purging a team do?", "13-teams-and-roles :: What does retiring a team do?"] },
-  { question: "how do I rotate my pipeline's vertra token before it expires?", answers: ["14-bots-and-automation :: How long does a token last, and how do I rotate it?", "05-calling-the-api :: 1. Get a token"] },
+  { question: "how do I rotate my pipeline's vennir token before it expires?", answers: ["14-bots-and-automation :: How long does a token last, and how do I rotate it?", "05-calling-the-api :: 1. Get a token"] },
   { question: "how do I get slack messages when a run fails?", answers: ["14-bots-and-automation :: How do I get my team's notifications in chat?", "reference-security-model :: Notifications and chat webhooks"] },
   { question: "my run failed, where do I look first?", answers: ["15-troubleshooting :: Where do I start when a run fails?", "01-getting-started :: When something goes wrong"] },
   { question: "my step can't read its secret file", answers: ["15-troubleshooting :: My step doesn't get its secret"] },

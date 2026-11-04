@@ -123,7 +123,7 @@ export async function testTeamWebhook(caller: AuthUser | undefined, teamName: st
   const url = decryptUrl(row.urlEncrypted);
   try {
     if (!url) throw new Error("The stored webhook URL can't be read (the console's key changed): set it again.");
-    await postToWebhook(url, `Vertra: ${teamName}'s notifications will come here (a test).`);
+    await postToWebhook(url, `Vennir: ${teamName}'s notifications will come here (a test).`);
     await db.update(teamWebhooks).set({ lastSentAt: sql`now()`, lastError: null }).where(eq(teamWebhooks.teamId, team.id));
     return { sent: true, error: "" };
   } catch (error) {

@@ -7,7 +7,7 @@ describe("what a schema refuses", () => {
   const schema = {
     type: "object",
     properties: {
-      title: { type: "string", pattern: "\\S", "x-vertra-pattern-message": "can't be blank" },
+      title: { type: "string", pattern: "\\S", "x-vennir-pattern-message": "can't be blank" },
       code: { type: "string", pattern: "^[A-Z]+$" },
     },
   };

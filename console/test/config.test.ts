@@ -27,9 +27,9 @@ describe("the console's settings", () => {
 
   it("turn keyless bots off with no audience, never accepting a constant one", async () => {
     expect((await load({ KEYLESS_AUDIENCE: undefined, CONSOLE_URL: undefined })).keyless).toEqual({ issuers: [], audience: "", noAudience: true });
-    expect((await load({ KEYLESS_AUDIENCE: undefined, CONSOLE_URL: "https://vertra.acme.dev/" })).keyless).toEqual({
+    expect((await load({ KEYLESS_AUDIENCE: undefined, CONSOLE_URL: "https://vennir.acme.dev/" })).keyless).toEqual({
       issuers: ["https://token.actions.githubusercontent.com", "https://gitlab.com"],
-      audience: "https://vertra.acme.dev",
+      audience: "https://vennir.acme.dev",
       noAudience: false,
     });
   });

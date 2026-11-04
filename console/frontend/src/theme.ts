@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { alpha, createTheme } from "@mui/material/styles";
 
-// Vertra's design tokens. Everything the console colors or sets in mono
+// Vennir's design tokens. Everything the console colors or sets in mono
 // comes from here; a page reaches these through sx by name
 // (bgcolor: "code.background", fontFamily: "fontFamilyMono").
 

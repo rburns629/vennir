@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-/** AdminService (proto/vertra/console/v1/admin.proto): core/admin.ts over Connect. */
+/** AdminService (proto/vennir/console/v1/admin.proto): core/admin.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import type { JsonObject } from "@bufbuild/protobuf";
 import type { CatalogStatus } from "../../catalogSync.js";
 import { AuditQuery, adoptCatalogTeam, auditEntries, type auditPage, catalogState, install, platformStats, policySync, syncCatalogNow, syncPoliciesNow } from "../../core/admin.js";
-import type { AdminService } from "../../gen/vertra/console/v1/admin_pb.js";
+import type { AdminService } from "../../gen/vennir/console/v1/admin_pb.js";
 import type { SyncOutcome } from "../../policySync.js";
 import { timestamp, unsetIfEmpty } from "../convert.js";
 import { callerOf, logOf } from "../context.js";

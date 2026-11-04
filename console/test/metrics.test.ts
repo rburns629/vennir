@@ -35,13 +35,13 @@ describe("metrics", () => {
   it("start what alerts measure at zero, so the burst that begins one counts", async () => {
     const text = await registry.metrics();
     for (const code of ["unauthenticated", "resource_exhausted", "invalid_argument"]) {
-      expect(text).toMatch(new RegExp(`console_rpc_requests_total\\{procedure="vertra\\.console\\.v1\\.AuthService/Login",code="${code}"\\} \\d`));
+      expect(text).toMatch(new RegExp(`console_rpc_requests_total\\{procedure="vennir\\.console\\.v1\\.AuthService/Login",code="${code}"\\} \\d`));
     }
     expect(text).toContain('console_catalog_syncs_total{outcome="failed"} 0');
   });
 
   it("counts calls by procedure and code", async () => {
-    const login = "vertra.console.v1.AuthService/Login";
+    const login = "vennir.console.v1.AuthService/Login";
     const before = await count(login, "unauthenticated");
     await rpc("AuthService", "Login", { email: `nobody-${randomUUID()}@example.com`, password: "x" });
     expect(await count(login, "unauthenticated")).toBe(before + 1);

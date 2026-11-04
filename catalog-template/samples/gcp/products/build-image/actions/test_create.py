@@ -1,5 +1,5 @@
 """Tests for gcp/build-image's create action, with the Google Cloud clients
-mocked, so they run without a GCP account. `./vertra catalog check` runs them in
+mocked, so they run without a GCP account. `./vennir catalog check` runs them in
 the product's own image with its python3 (unittest, no pytest).
 """
 

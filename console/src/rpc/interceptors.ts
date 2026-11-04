@@ -19,8 +19,8 @@ import { toJson, type JsonObject } from "@bufbuild/protobuf";
 import { MethodOptions_IdempotencyLevel } from "@bufbuild/protobuf/wkt";
 import { ApiError } from "../apiError.js";
 import { targetFields, writeAuditEntry } from "../audit.js";
-import { AuthService } from "../gen/vertra/console/v1/auth_pb.js";
-import { ProblemSchema } from "../gen/vertra/console/v1/common_pb.js";
+import { AuthService } from "../gen/vennir/console/v1/auth_pb.js";
+import { ProblemSchema } from "../gen/vennir/console/v1/common_pb.js";
 import { kAuthError, kAuthProblem, kCaller, kClientIp, kLog, kRequestId, kSignedIn } from "./context.js";
 import { httpStatusFor, rpcError, unauthenticated } from "./errors.js";
 

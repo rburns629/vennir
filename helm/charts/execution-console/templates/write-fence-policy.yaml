@@ -55,7 +55,7 @@ spec:
         {{ .Values.writeFence.teamNamespaceLabel | quote }} in namespaceObject.metadata.labels)
         {{- if include "execution-console.registryFederationAudience" . }} || (
         request.namespace == {{ .Release.Namespace | quote }} && request.resource.resource == "secrets" &&
-        request.operation != "DELETE" && object.metadata.name == "vertra-registry-token")
+        request.operation != "DELETE" && object.metadata.name == "vennir-registry-token")
         {{- end }}
       messageExpression: >-
         "The console may only write in team namespaces (labelled " +
@@ -75,16 +75,16 @@ spec:
     # writeTeamNetworkPolicy), never deleted, and only ever refusing more:
     # every Pod selected, and connections let in from this namespace's own
     # Pods alone, with no egress rule (NetworkPolicy allows add up, so one
-    # would undo vertra-no-metadata). So the console can't open a team
+    # would undo vennir-no-metadata). So the console can't open a team
     # namespace to anything outside it, except, with the gateway on, exactly
     # one opening: this release's gateway Pods to the Pods the team itself
-    # labels vertra/api-backend=true. The no-metadata one may only let out
+    # labels vennir/api-backend=true. The no-metadata one may only let out
     # everything less the metadata server's address.
     {{- $gatewayIngress := and .Values.gateway.enabled .Values.teamNamespaces.manage .Values.teamNamespaces.defaultDenyIngress }}
     - expression: >-
         request.resource.resource != "networkpolicies" || (
           request.operation != "DELETE" && ((
-          object.metadata.name == "vertra-default-deny" &&
+          object.metadata.name == "vennir-default-deny" &&
           (!has(object.spec.podSelector.matchLabels) || size(object.spec.podSelector.matchLabels) == 0) &&
           !has(object.spec.podSelector.matchExpressions) &&
           object.spec.policyTypes == ["Ingress"] &&
@@ -93,9 +93,9 @@ spec:
             has(rule.from) && size(rule.from) > 0 && rule.from.all(peer,
               has(peer.podSelector) && !has(peer.namespaceSelector) && !has(peer.ipBlock))))
           ){{ if $gatewayIngress }} || (
-          object.metadata.name == "vertra-gateway-ingress" &&
+          object.metadata.name == "vennir-gateway-ingress" &&
           has(object.spec.podSelector.matchLabels) &&
-          object.spec.podSelector.matchLabels == {"vertra/api-backend": "true"} &&
+          object.spec.podSelector.matchLabels == {"vennir/api-backend": "true"} &&
           !has(object.spec.podSelector.matchExpressions) &&
           object.spec.policyTypes == ["Ingress"] &&
           !has(object.spec.egress) &&
@@ -112,7 +112,7 @@ spec:
           object.spec.ingress[0].from[0].podSelector.matchLabels == {{ include "execution-console.gatewaySelectorLabels" . | fromYaml | toJson }} &&
           !has(object.spec.ingress[0].from[0].podSelector.matchExpressions)
           ){{ end }}{{ if .Values.teamNamespaces.blockMetadata }} || (
-          object.metadata.name == "vertra-no-metadata" &&
+          object.metadata.name == "vennir-no-metadata" &&
           (!has(object.spec.podSelector.matchLabels) || size(object.spec.podSelector.matchLabels) == 0) &&
           !has(object.spec.podSelector.matchExpressions) &&
           object.spec.policyTypes == ["Egress"] &&
@@ -124,15 +124,15 @@ spec:
               has(peer.ipBlock.except) && "169.254.169.254/32" in peer.ipBlock.except))
           ){{ end }}))
       message: >-
-        The console's NetworkPolicies are a team namespace's vertra-default-deny, selecting every
+        The console's NetworkPolicies are a team namespace's vennir-default-deny, selecting every
         Pod and letting in nothing from outside the namespace, and (with the gateway on)
-        vertra-gateway-ingress, letting only the gateway's Pods reach the team's API backends, and
-        (with teamNamespaces.blockMetadata) vertra-no-metadata, letting out everything but the
+        vennir-gateway-ingress, letting only the gateway's Pods reach the team's API backends, and
+        (with teamNamespaces.blockMetadata) vennir-no-metadata, letting out everything but the
         metadata server (169.254.169.254); none but that one has an egress rule, and it never
         deletes one.
       reason: Forbidden
     # Its only RoleBinding written is each team namespace's
-    # vertra-scheduler-logs (schedulerLogs.ts): the kernel's logs-only
+    # vennir-scheduler-logs (schedulerLogs.ts): the kernel's logs-only
     # ClusterRole for its scheduler, and nothing else; no Role ever. It may
     # still delete the per-secret ones older consoles made.
     {{- $logs := include "execution-console.schedulerLogs" . | fromJson }}
@@ -141,7 +141,7 @@ spec:
         (request.resource.resource != "roles" && request.resource.resource != "rolebindings")
         {{- if $logs }} || (
         request.resource.resource == "rolebindings" &&
-        object.metadata.name == "vertra-scheduler-logs" &&
+        object.metadata.name == "vennir-scheduler-logs" &&
         object.roleRef.apiGroup == "rbac.authorization.k8s.io" &&
         object.roleRef.kind == "ClusterRole" &&
         object.roleRef.name == {{ $logs.clusterRole | quote }} &&
@@ -151,17 +151,17 @@ spec:
         has(object.subjects[0].namespace) && object.subjects[0].namespace == {{ $logs.namespace | quote }})
         {{- end }}
       message: >-
-        The console's only RBAC write is a team namespace's vertra-scheduler-logs RoleBinding,
+        The console's only RBAC write is a team namespace's vennir-scheduler-logs RoleBinding,
         binding the kernel's logs-only ClusterRole to its scheduler alone.
       reason: Forbidden
     # Its only quota and limits are each team's (teamQuota.ts). (Deleting
     # one is checked by its name in the request: there's no object then.)
     - expression: >-
-        (request.resource.resource != "resourcequotas" || request.name == "vertra-team-quota") &&
-        (request.resource.resource != "limitranges" || request.name == "vertra-team-limits")
+        (request.resource.resource != "resourcequotas" || request.name == "vennir-team-quota") &&
+        (request.resource.resource != "limitranges" || request.name == "vennir-team-limits")
       message: >-
-        The console's only ResourceQuota and LimitRange are a team namespace's vertra-team-quota
-        and vertra-team-limits.
+        The console's only ResourceQuota and LimitRange are a team namespace's vennir-team-quota
+        and vennir-team-limits.
       reason: Forbidden
 ---
 apiVersion: admissionregistration.k8s.io/v1

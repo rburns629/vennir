@@ -1,0 +1,122 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/timestamp.proto";
+import "vennir/console/v1/team.proto";
+
+// Single sign-on, as admins set it up: the OpenID Connect provider people
+// may sign in with (optional: passwords keep working), where their groups
+// come from, and which groups make whom a member of which team. A provider
+// the install set (the console chart's sso) is used as it is and shown
+// read-only here; the groups and their mappings are always admins'. A
+// mapped team's members who sign in with single sign-on follow their
+// groups at each sign-in: added, given the mapping's role, or removed.
+// Admins only.
+service SsoService {
+  // The provider in effect (the install's, or the saved one) and where
+  // groups come from; never the client secret.
+  rpc GetSsoSettings(GetSsoSettingsRequest) returns (GetSsoSettingsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Sets the provider (refused, failed_precondition SSO_SET_BY_INSTALL, when
+  // the install set one) and where groups come from. The issuer's discovery
+  // document must be readable; a client secret left empty keeps the stored
+  // one.
+  rpc SetSsoSettings(SetSsoSettingsRequest) returns (SetSsoSettingsResponse);
+  // Which groups make whom a member of which team, by group.
+  rpc ListSsoGroupMappings(ListSsoGroupMappingsRequest) returns (ListSsoGroupMappingsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Maps a group to a team, as member or maintainer; the same group and
+  // team again changes its role.
+  rpc SetSsoGroupMapping(SetSsoGroupMappingRequest) returns (SetSsoGroupMappingResponse);
+  // Unmaps it. Memberships it gave change at each person's next sign-in.
+  rpc DeleteSsoGroupMapping(DeleteSsoGroupMappingRequest) returns (DeleteSsoGroupMappingResponse);
+}
+
+message SsoSettings {
+  // Whether people may sign in with the provider.
+  bool enabled = 1;
+  // True when the install set the provider: issuer to label are read-only.
+  bool set_by_install = 2;
+  string issuer = 3;
+  string client_id = 4;
+  // Whether a client secret is stored; it's never sent back.
+  bool client_secret_set = 5;
+  // <console URL>/api/auth/oidc/callback, registered with the provider.
+  string redirect_url = 6;
+  // Email domains (a Google Workspace account's hd) that may sign in.
+  repeated string allowed_domains = 7;
+  // The sign-in button's name for the provider, such as Google or Okta.
+  string label = 8;
+  // The ID token claim listing a person's groups (usually "groups": Entra
+  // ID, Okta, Keycloak); empty: none.
+  string groups_claim = 9;
+  // Whether groups also come from Google Workspace (Cloud Identity's Groups
+  // API, as the console's own Google identity, which needs the Groups Reader
+  // role).
+  bool google_groups = 10;
+  string updated_by = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  // The Google account this console reads groups as (its own service
+  // account, which a Workspace admin makes a Groups Reader); empty when it
+  // has none (not on Google Cloud).
+  string google_identity = 13;
+}
+
+message SsoGroupMapping {
+  string id = 1;
+  // As the provider names it: a groups claim value, or a Google group's email.
+  string group = 2;
+  string team = 3;
+  TeamRole role = 4;
+}
+
+message GetSsoSettingsRequest {}
+
+message GetSsoSettingsResponse {
+  SsoSettings settings = 1;
+}
+
+message SetSsoSettingsRequest {
+  bool enabled = 1;
+  string issuer = 2;
+  string client_id = 3;
+  // Empty: keep the stored one.
+  string client_secret = 4;
+  string redirect_url = 5;
+  repeated string allowed_domains = 6;
+  string label = 7;
+  string groups_claim = 8;
+  bool google_groups = 9;
+}
+
+message SetSsoSettingsResponse {
+  SsoSettings settings = 1;
+}
+
+message ListSsoGroupMappingsRequest {}
+
+message ListSsoGroupMappingsResponse {
+  repeated SsoGroupMapping mappings = 1;
+}
+
+message SetSsoGroupMappingRequest {
+  string group = 1;
+  string team = 2;
+  // Unspecified: a member.
+  TeamRole role = 3;
+}
+
+message SetSsoGroupMappingResponse {
+  SsoGroupMapping mapping = 1;
+}
+
+message DeleteSsoGroupMappingRequest {
+  string id = 1;
+}
+
+message DeleteSsoGroupMappingResponse {}

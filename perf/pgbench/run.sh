@@ -3,7 +3,7 @@
 # Postgres Pod as it's sized, from a Pod of the release (the NetworkPolicy
 # lets only those reach it), over TLS, in a scratch database it drops after.
 #
-#   perf/pgbench/run.sh <label>      on vertra-perf (KUBE_CONTEXT to change)
+#   perf/pgbench/run.sh <label>      on vennir-perf (KUBE_CONTEXT to change)
 #   PGBENCH_ALLOW=<context> KUBE_CONTEXT=<context> perf/pgbench/run.sh <label>
 #                                    a throwaway cloud test install, named
 #                                    twice so it's never one by mistake
@@ -12,13 +12,13 @@
 # for pgbench's TPC-B-like mix (writes) and select-only (reads).
 set -euo pipefail
 label=${1:?usage: run.sh <label>}
-ctx=${KUBE_CONTEXT:-kind-vertra-perf}
+ctx=${KUBE_CONTEXT:-kind-vennir-perf}
 case "$ctx" in
-  kind-vertra-perf*) ;;
+  kind-vennir-perf*) ;;
   "${PGBENCH_ALLOW:-}") ;;
-  *) echo "run.sh: only on a vertra-perf cluster, or one named in PGBENCH_ALLOW, not $ctx" >&2; exit 1;;
+  *) echo "run.sh: only on a vennir-perf cluster, or one named in PGBENCH_ALLOW, not $ctx" >&2; exit 1;;
 esac
-ns=vertra-system
+ns=vennir-system
 release=kernel
 image=$(kubectl --context "$ctx" -n "$ns" get deploy "$release-execution-kernel-postgres" -o jsonpath='{.spec.template.spec.containers[0].image}')
 secret=$(kubectl --context "$ctx" -n "$ns" get deploy "$release-execution-kernel-postgres" -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="POSTGRES_PASSWORD")].valueFrom.secretKeyRef.name}')

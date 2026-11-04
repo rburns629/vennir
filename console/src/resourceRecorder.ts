@@ -9,7 +9,7 @@
  * deleted. A retried run is recorded again once it finishes. A run the kernel no longer has
  * is passed over. A failed pass is logged and the next one tries again:
  * nothing is marked recorded until it is. Each resource also keeps what
- * its step provided (each output typed x-vertra-provides) and links to the
+ * its step provided (each output typed x-vennir-provides) and links to the
  * resources its step took inputs from (resourceLinks: an input wired from
  * another step of the run, or one whose value a live resource provides, of
  * the input's wiring type), decision 25. Each finished run is also told to
@@ -76,8 +76,8 @@ export function resolvedInputs(inputs: unknown, outputs: Map<string, Record<stri
   );
 }
 
-/** A schema's top-level property `name`'s wiring hint (x-vertra-needs or x-vertra-provides), or null. */
-function hintOf(schema: unknown, name: string, hint: "x-vertra-needs" | "x-vertra-provides"): string | null {
+/** A schema's top-level property `name`'s wiring hint (x-vennir-needs or x-vennir-provides), or null. */
+function hintOf(schema: unknown, name: string, hint: "x-vennir-needs" | "x-vennir-provides"): string | null {
   const properties = isRecord(schema) && isRecord(schema["properties"]) ? schema["properties"] : {};
   const property = properties[name];
   const wiring = isRecord(property) ? property[hint] : undefined;
@@ -89,10 +89,10 @@ function scalar(value: unknown): string | null {
   return typeof value === "string" ? text(value, 2048) : typeof value === "number" || typeof value === "boolean" ? String(value) : null;
 }
 
-/** What a step provided: each of its outputs its product types with x-vertra-provides, with a scalar value. */
+/** What a step provided: each of its outputs its product types with x-vennir-provides, with a scalar value. */
 export function providedBy(outputSchema: unknown, outputs: Record<string, unknown>): Provided[] {
   return Object.entries(outputs).flatMap(([output, raw]) => {
-    const type = hintOf(outputSchema, output, "x-vertra-provides");
+    const type = hintOf(outputSchema, output, "x-vennir-provides");
     const value = scalar(raw);
     return type && value !== null ? [{ type, value, output }] : [];
   });
@@ -126,7 +126,7 @@ export async function refreshProvides(product: string, outputSchema: unknown): P
     needers ??= (await db.select({ name: products.name, inputSchema: products.inputSchema }).from(products)).flatMap((p) => {
       const properties = isRecord(p.inputSchema) && isRecord(p.inputSchema["properties"]) ? p.inputSchema["properties"] : {};
       return Object.keys(properties).flatMap((input) => {
-        const wiringType = hintOf(p.inputSchema, input, "x-vertra-needs");
+        const wiringType = hintOf(p.inputSchema, input, "x-vennir-needs");
         return wiringType ? [{ product: p.name, input, wiringType }] : [];
       });
     });
@@ -256,7 +256,7 @@ export async function recordRun(run: Run, detail: KernelExecution): Promise<numb
       const links = new Map<string, { dependsOnId: string; input: string; wiringType: string | null }>();
       const inputs = isRecord(reporter.task["inputs"]) ? reporter.task["inputs"] : {};
       for (const [input, raw] of Object.entries(inputs)) {
-        const wiringType = hintOf(reporter.inputSchema, input, "x-vertra-needs");
+        const wiringType = hintOf(reporter.inputSchema, input, "x-vennir-needs");
         let found: { id: string }[] = [];
         if (isReference(raw)) {
           // Wired from another step of this run: what that step reported.

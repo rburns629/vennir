@@ -46,7 +46,7 @@ flowchart LR
 
 - **People and pipelines** only ever talk to the console.
 - **The platform** is the console, kernel-api, kernel-scheduler and their databases. Only it reads or writes the databases.
-- **A product's container** is given exactly two things: the file `request.json`, and the secrets its step lists (its platform's, registered in the console), mounted at `/platform/secrets/<name>`. It gives back exactly one: the file `result.json`. It has no password to any Vertra database and no reason to call the platform. (By default the Pod's Kubernetes ServiceAccount token isn't mounted either, so it has no Kubernetes API access. A cloud identity bound to the product's ServiceAccount is the platform team's own.)
+- **A product's container** is given exactly two things: the file `request.json`, and the secrets its step lists (its platform's, registered in the console), mounted at `/platform/secrets/<name>`. It gives back exactly one: the file `result.json`. It has no password to any Vennir database and no reason to call the platform. (By default the Pod's Kubernetes ServiceAccount token isn't mounted either, so it has no Kubernetes API access. A cloud identity bound to the product's ServiceAccount is the platform team's own.)
 
 Everything below is about how a file gets across that last line, in each direction, without the container ever touching the platform.
 
@@ -135,7 +135,7 @@ Both are named `ek-make-name-86049a8a6115d0c3`: the task's id, plus a fingerprin
 
 **Who:** the product's own code. **Where:** the product, in the catalog (here `templates/name-maker/actions/make.py`).
 
-This is the whole contract between a product and Vertra. The product knows nothing about databases, Kubernetes or other tasks:
+This is the whole contract between a product and Vennir. The product knows nothing about databases, Kubernetes or other tasks:
 
 ```python
 inputs = json.loads(Path("/platform/input/request.json").read_text())["inputs"]
@@ -259,4 +259,4 @@ The whole run took about five seconds.
 
 **Where can I see this for my own run?** The execution's page in the console shows each task's state, outputs and logs. To watch the Kubernetes side on kind, run `kubectl -n <team> get configmaps,pods -w`, then submit a DAG; the `ek-…` objects appear and are deleted about half a minute after each step ends.
 
-**Want more?** [What's a DAG?](03-what-is-a-dag.md) explains `dependsOn` and `$fromTask`. [How Vertra works under the hood](08-under-the-hood.md) lists every Kubernetes feature used here and why. [Where Vertra keeps its data](06-database-schemas.md) describes the tables named above.
+**Want more?** [What's a DAG?](03-what-is-a-dag.md) explains `dependsOn` and `$fromTask`. [How Vennir works under the hood](08-under-the-hood.md) lists every Kubernetes feature used here and why. [Where Vennir keeps its data](06-database-schemas.md) describes the tables named above.

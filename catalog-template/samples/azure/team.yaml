@@ -1,7 +1,7 @@
 # A sample team whose products call real, billed Azure APIs. Copy it into
 # teams/ (or one product into your own team) once its managed identities
 # exist.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Team
 name: azure
 displayName: Azure samples

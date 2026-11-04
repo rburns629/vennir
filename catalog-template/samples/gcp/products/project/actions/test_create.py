@@ -1,5 +1,5 @@
 """Tests for gcp/project's create action, with the Google Cloud clients
-mocked, so they run without a GCP account. `./vertra catalog check` runs them in
+mocked, so they run without a GCP account. `./vennir catalog check` runs them in
 the product's own image with its python3 (unittest, no pytest).
 """
 
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 _MODULE_PATH = Path(__file__).parent / "create.py"
 # What create labels a project it makes for team web with.
-MADE_FOR_WEB = {"vertra-made": "true", "vertra-team": "web"}
+MADE_FOR_WEB = {"vennir-made": "true", "vennir-team": "web"}
 
 
 def _load_create_module():
@@ -94,7 +94,7 @@ class CreateActionTest(unittest.TestCase):
             patch.object(self.module.resourcemanager_v3, "ProjectsClient") as client_cls,
             patch.object(self.module, "CloudBillingClient") as billing_cls,
         ):
-            client_cls.return_value.get_project.return_value = MagicMock(labels={"vertra-made": "true", "vertra-team": "data"})
+            client_cls.return_value.get_project.return_value = MagicMock(labels={"vennir-made": "true", "vennir-team": "data"})
             self.assertEqual(self.module.main(), 0)
         billing_cls.assert_not_called()
         self.assertEqual(self._result(), {"status": "succeeded", "outputs": {"projectId": "data-1"}})

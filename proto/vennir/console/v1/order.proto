@@ -1,0 +1,135 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/struct.proto";
+import "vennir/console/v1/execution.proto";
+
+// The order builder (decision 23): a cart of actions made into one run's
+// steps, each input wired by its wiring type (an input's x-vennir-needs to
+// the one output in the cart whose x-vennir-provides is the same), for
+// Compose to open. It never runs anything: a person reviews the result in
+// Compose and runs it, or proposes it as a template.
+service OrderService {
+  // Wires a cart (decision 25). Each required input whose type no step
+  // provides is offered what the team (or you) already has of it, none
+  // chosen (CHOOSE_EXISTING, with "a new one" when the type has a default
+  // provider); with nothing there, the type's default provider is added
+  // (when the catalog names one), or, for a shared type, one parameter is
+  // asked once. An input of a type its own action provides (what it makes)
+  // is yours to fill. An optional input nothing fills is suggested
+  // (`suggestions`), not added. An input two outputs could fill is left for
+  // you to choose (AMBIGUOUS, with the options), unless `choices` says
+  // which; a cycle is reported (CYCLE). Members of `team` (and admins); an
+  // ordering bot may not (ORDERS_ONLY).
+  rpc PreviewOrder(PreviewOrderRequest) returns (PreviewOrderResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Places a cart as one run for `team` (decision 25): planned as
+  // PreviewOrder plans it, with `choices` made and `values` given. Refused
+  // while a choice is unmade, or a required value without a provider is
+  // missing (ORDER_INCOMPLETE, with what's left in the Failure detail).
+  // Each step runs as its action would alone: shared with you for the team,
+  // its targets ones the team may use, its inputs fitting its schema (a
+  // value another step gives, targets included, checked once known). The
+  // run is the team's, and an order (its template "order", its cart as its
+  // parameters). Members of `team` (and admins); an ordering bot may not.
+  rpc PlaceOrder(PlaceOrderRequest) returns (PlaceOrderResponse);
+}
+
+message PlaceOrderRequest {
+  string team = 1;
+  repeated string actions = 2;
+  repeated OrderChoice choices = 3;
+  // What you fill in: {"<step>": {"<input>": value}}, for inputs nothing in
+  // the order fills.
+  google.protobuf.Struct values = 4;
+  // A shared type's value, by the type's name: {"gcp.region": "us-central1"}.
+  google.protobuf.Struct parameters = 5;
+  // Sent again (a retry after a timeout), the same run.
+  string request_id = 6;
+}
+
+message PlaceOrderResponse {
+  string execution_id = 1;
+  ExecutionState state = 2;
+}
+
+message PreviewOrderRequest {
+  // The team it's for: Compose's "for team".
+  string team = 1;
+  // The cart: registered actions (<team>-<product>-<action>, as the
+  // catalog lists them), at most 50. One may be in it twice.
+  repeated string actions = 2;
+  // Which output fills an input two could, from an earlier answer's options.
+  repeated OrderChoice choices = 3;
+}
+
+// How an input is filled: one of another step's output (from_step and
+// from_output), a resource already there (resource_id), or a new one, the
+// type's default provider (add_new). Send back one of an answer's options.
+message OrderChoice {
+  string step = 1;
+  string input = 2;
+  string from_step = 3;
+  string from_output = 4;
+  string resource_id = 5;
+  bool add_new = 6;
+  // For people: what the option is.
+  string label = 7;
+}
+
+message PreviewOrderResponse {
+  // In an order they can run in: each after the steps it takes outputs from.
+  repeated OrderStep steps = 1;
+  repeated OrderProblem problems = 2;
+  // Optional inputs nothing fills, and what could: add the provider to the
+  // cart, or choose an existing one.
+  repeated OrderSuggestion suggestions = 3;
+}
+
+message OrderSuggestion {
+  string step = 1;
+  string input = 2;
+  string wiring_type = 3;
+  // The type's default provider (a registered action) to add; empty when
+  // there's none you may use.
+  string provider = 4;
+  // What you already have of it, as choices.
+  repeated OrderChoice existing = 5;
+}
+
+message OrderStep {
+  string id = 1;
+  // The registered action.
+  string product = 2;
+  // Every input of the action, by name.
+  map<string, OrderInput> inputs = 3;
+  // Added as a wiring type's default provider: it wasn't in the cart.
+  bool added = 4;
+}
+
+message OrderInput {
+  // "step": another step's output; "parameter": asked when it runs (a
+  // shared type's, once, named for the type); "resource": something already
+  // there, its value; "unset": for the person.
+  string kind = 1;
+  string step = 2;
+  string output = 3;
+  string parameter = 4;
+  string resource_id = 5;
+  string value = 6;
+}
+
+message OrderProblem {
+  // AMBIGUOUS, NO_PROVIDER, CHOOSE_EXISTING or CYCLE.
+  string code = 1;
+  string step = 2;
+  string input = 3;
+  string message = 4;
+  // AMBIGUOUS: the outputs that could fill it; CHOOSE_EXISTING: what's
+  // there, and a new one.
+  repeated OrderChoice options = 5;
+}

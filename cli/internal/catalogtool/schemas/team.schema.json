@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vertra team (team.yaml), format v2",
+  "title": "Vennir team (team.yaml), format v2",
   "description": "One team: a team, its folder catalog/<name>/ and its namespace.",
   "type": "object",
   "additionalProperties": false,
@@ -14,20 +14,20 @@
   ],
   "properties": {
     "apiVersion": {
-      "description": "The catalog format: vertra.dev/v2. A file without it is from before v2: ./vertra catalog migrate rewrites it.",
-      "const": "vertra.dev/v2"
+      "description": "The catalog format: vennir.dev/v2. A file without it is from before v2: ./vennir catalog migrate rewrites it.",
+      "const": "vennir.dev/v2"
     },
     "kind": {
       "description": "What the file is: Team.",
       "const": "Team"
     },
     "name": {
-      "description": "The team's folder name, which is also its team and namespace. Never bases or catalog-release (the catalog's own repositories, beside <registry>/<team>/), vertra-system or kube-* (platform namespaces).",
+      "description": "The team's folder name, which is also its team and namespace. Never bases or catalog-release (the catalog's own repositories, beside <registry>/<team>/), vennir-system or kube-* (platform namespaces).",
       "type": "string",
       "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$",
       "not": {
         "anyOf": [
-          {"enum": ["bases", "catalog-release", "vertra-system"]},
+          {"enum": ["bases", "catalog-release", "vennir-system"]},
           {"pattern": "^kube-"}
         ]
       }
@@ -84,7 +84,7 @@
       }
     },
     "allowedTargets": {
-      "description": "Where other teams may aim this team's products: for each rule, the teams it covers (or \"*\" for every team) and the values each kind of target may take. An action input typed (x-vertra-needs) gcp.project, gcp.folder, aws.account or azure.subscription is a target; when another team runs the action, each target it supplies must match a rule for that team, or the run is refused. Left out, other teams may not supply targets at all. Your own team's runs aren't limited.",
+      "description": "Where other teams may aim this team's products: for each rule, the teams it covers (or \"*\" for every team) and the values each kind of target may take. An action input typed (x-vennir-needs) gcp.project, gcp.folder, aws.account or azure.subscription is a target; when another team runs the action, each target it supplies must match a rule for that team, or the run is refused. Left out, other teams may not supply targets at all. Your own team's runs aren't limited.",
       "type": "array",
       "maxItems": 200,
       "items": {

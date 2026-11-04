@@ -125,7 +125,7 @@ spec:
 
 {{- /*
 The alerts, as a rule file's (and a PrometheusRule's spec's) groups.
-VertraSchedulerDown: only while the scheduler's Deployment wants replicas,
+VennirSchedulerDown: only while the scheduler's Deployment wants replicas,
 so asleep (kernel sleep) isn't down. That needs kube-state-metrics; the
 bundled Prometheus has none, so there it's a scheduler Pod that's down, or
 up but finishing no passes.
@@ -136,9 +136,9 @@ up but finishing no passes.
 {{- $schedulerName := printf "%s-scheduler" (include "execution-kernel.fullname" .) }}
 {{- $scheduler := printf "namespace=%q, deployment=%q" .Release.Namespace $schedulerName }}
 groups:
-  - name: vertra-kernel
+  - name: vennir-kernel
     rules:
-      - alert: VertraSchedulerDown
+      - alert: VennirSchedulerDown
         {{- if eq $mon.provider "bundled" }}
         expr: >-
           max(up{ {{- $ns -}}, pod=~"{{ $schedulerName }}-.*"}) == 0
@@ -153,21 +153,21 @@ groups:
         annotations:
           summary: No scheduler has finished a pass in 10 minutes.
           description: Nothing will start or finish. Check the scheduler's Pods and logs (docs/operations.md, Troubleshooting).
-      - alert: VertraSchedulerFailing
+      - alert: VennirSchedulerFailing
         expr: sum(increase(kernel_scheduler_tick_errors_total{ {{- $ns -}} }[10m])) > 5
         for: 10m
         labels: {severity: warning}
         annotations:
           summary: The scheduler's passes keep failing.
           description: Each failed pass is retried from the database, so a run of them usually means Postgres or the Kubernetes API is failing. See "scheduler tick failed" in its logs.
-      - alert: VertraStepsWaiting
+      - alert: VennirStepsWaiting
         expr: max(kernel_oldest_ready_task_age_seconds{ {{- $ns -}} }) > {{ $mon.alerts.readyWaitSeconds }}
         for: 5m
         labels: {severity: warning}
         annotations:
           summary: A step has waited {{ "{{ $value | humanizeDuration }}" }} to start.
           description: Steps are ready but not starting. The cluster may be out of room, a team at its limit, or the scheduler behind.
-      - alert: VertraStepsUnschedulable
+      - alert: VennirStepsUnschedulable
         # A count over 5 minutes, not one Pod's age: the scheduler replaces a
         # Pod that hasn't started (taskStartTimeoutSeconds), after a backoff.
         expr: max(max_over_time(kernel_unschedulable_steps{ {{- $ns -}} }[5m])) > 0

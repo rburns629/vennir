@@ -1,6 +1,6 @@
 # Admin settings
 
-This page is for the install's admins. It goes through every section of the **Admin** page in order: what each setting does, what it affects, and whether you change it in the console or it's set by the install. Install settings live in the environment's `vertra.yaml` (change one with `vertra config set -e <env> <key> <value>`, then `vertra apply <env>`) or, without `vertra`, in the console chart's Helm values. Each section has its own address, `/admin/<id>`, shown next to its name below. The list of sections down the side shows each one's state in a few words where the console knows it (such as **3 to finish**, **1 to adopt**, **In sync**). Each section opens with what it does, what's **Set here** and what's **Set by the install**, with this install's value beside each install setting the console knows (such as `jwtTtl` (this install: 8h)). Never a credential: an SMTP server's sign-in, a key or a token isn't shown. Only admins can open the Admin page; anyone else sees "Admins only".
+This page is for the install's admins. It goes through every section of the **Admin** page in order: what each setting does, what it affects, and whether you change it in the console or it's set by the install. Install settings live in the environment's `vennir.yaml` (change one with `vennir config set -e <env> <key> <value>`, then `vennir apply <env>`) or, without `vennir`, in the console chart's Helm values. Each section has its own address, `/admin/<id>`, shown next to its name below. The list of sections down the side shows each one's state in a few words where the console knows it (such as **3 to finish**, **1 to adopt**, **In sync**). Each section opens with what it does, what's **Set here** and what's **Set by the install**, with this install's value beside each install setting the console knows (such as `jwtTtl` (this install: 8h)). Never a credential: an SMTP server's sign-in, a key or a token isn't shown. Only admins can open the Admin page; anyone else sees "Admins only".
 
 | Section | Changed here | Set by the install |
 | --- | --- | --- |
@@ -31,15 +31,15 @@ Across the top: the console's version and environment, how many **Teams** (and h
 
 | Step | Done when | How |
 | --- | --- | --- |
-| Connect the catalog | A catalog release has been applied | `vertra catalog create <env>`. The first release is pulled within minutes |
+| Connect the catalog | A catalog release has been applied | `vennir catalog create <env>`. The first release is pulled within minutes |
 | Allow an image source | At least one image source is allowed | Set at install, or in [Image sources](#image-sources) |
 | Have a team | At least one team exists | A team folder in the catalog, or **Create team** on the **Teams** page |
 | Add people | More than one account exists | In [People](#people) |
-| Optional: single sign-on | A provider is set | In [Single sign-on and groups](#single-sign-on-and-groups), or `vertra sso google <env>` |
+| Optional: single sign-on | A provider is set | In [Single sign-on and groups](#single-sign-on-and-groups), or `vennir sso google <env>` |
 
 Once they're done, a **Ready to run** line says so instead.
 
-**Every part, and where it's set** lists each part of the install by group, with its state and whether it's set **Here** (in this console), by the **Install** (vertra.yaml, then `vertra apply`), or **Both** (the install turns it on; it's run here). Each part with a section links to it:
+**Every part, and where it's set** lists each part of the install by group, with its state and whether it's set **Here** (in this console), by the **Install** (vennir.yaml, then `vennir apply`), or **Both** (the install turns it on; it's run here). Each part with a section links to it:
 
 | Group | Parts |
 | --- | --- |
@@ -50,7 +50,7 @@ Once they're done, a **Ready to run** line says so instead.
 
 Two install settings have no section of their own:
 
-- **Monitoring.** Observe's **Metrics** tab works with nothing installed. For Prometheus, `monitoring` in vertra.yaml chooses the cluster's Prometheus Operator (`operator`), GKE's managed one (`google`), or one the console chart runs (`bundled`). The console chart's `monitoring.dashboard.enabled` adds a Grafana dashboard, and `monitoring.grafanaUrl` says where that Grafana is, for the link here and on Observe's **Metrics**. See [operations](operations.md#metrics-and-alerts).
+- **Monitoring.** Observe's **Metrics** tab works with nothing installed. For Prometheus, `monitoring` in vennir.yaml chooses the cluster's Prometheus Operator (`operator`), GKE's managed one (`google`), or one the console chart runs (`bundled`). The console chart's `monitoring.dashboard.enabled` adds a Grafana dashboard, and `monitoring.grafanaUrl` says where that Grafana is, for the link here and on Observe's **Metrics**. See [operations](operations.md#metrics-and-alerts).
 - **Email.** Notifications go by email only when the console chart's `notifications.email` names an SMTP server: [Admins' alerts](#admins-alerts) names it and the address mail comes from. Each person chooses which kinds they get in their preferences.
 
 ## People and access
@@ -84,17 +84,17 @@ Set by the install:
 
 | Setting | What it does |
 | --- | --- |
-| `admin.email` (vertra.yaml), `bootstrapAdmin` (chart) | The first admin account |
+| `admin.email` (vennir.yaml), `bootstrapAdmin` (chart) | The first admin account |
 | `jwtTtl` (chart) | How long a session lasts, `8h` by default |
 | `allowSelfRegistration` (chart) | Lets anyone who can reach the console sign up. Off by default; only for a console behind a trusted network |
 
-If no admin can sign in, run `vertra admin reset-password <env>` from a machine with access to the cluster.
+If no admin can sign in, run `vennir admin reset-password <env>` from a machine with access to the cluster.
 
 ### Single sign-on and groups
 
 `/admin/sign-in`. Optional. People may sign in with an OpenID Connect provider (Google, Entra ID, Okta, Keycloak and others). Passwords keep working, except for members of teams that require single sign-on. Admins can always use their password, in case the provider can't be reached.
 
-**The provider.** If the install sets one (`sso` in vertra.yaml, made with `vertra sso google <env>`; or the console chart's `sso`), this section shows it read-only: change it with `vertra sso` and `vertra apply`. Otherwise you set it here:
+**The provider.** If the install sets one (`sso` in vennir.yaml, made with `vennir sso google <env>`; or the console chart's `sso`), this section shows it read-only: change it with `vennir sso` and `vennir apply`. Otherwise you set it here:
 
 | Field | What it is |
 | --- | --- |
@@ -110,7 +110,7 @@ Saved settings reach every copy of the console within seconds. Someone signing i
 **Where groups come from.** Always set here, whoever set the provider:
 
 - **Groups claim**: the ID token claim listing a person's groups, usually `groups` for Entra ID, Okta and Keycloak. Empty means none.
-- **Google Workspace groups too**: reads Google groups with Cloud Identity's Groups API, as the console's own Google account. A Workspace admin must make that account a Groups Reader. On GCP, `vertra sso google-groups <env>` then `vertra apply` enables the API and names the account.
+- **Google Workspace groups too**: reads Google groups with Cloud Identity's Groups API, as the console's own Google account. A Workspace admin must make that account a Groups Reader. On GCP, `vennir sso google-groups <env>` then `vennir apply` enables the API and names the account.
 
 A sign-in whose groups can't be read is refused. It is never treated as "no groups".
 
@@ -160,10 +160,10 @@ Set by the install:
 
 | Setting | What it does |
 | --- | --- |
-| `catalog` (vertra.yaml, made by `vertra catalog create`); `catalog.release` (chart) | The catalog repository and the release this console reads. Empty: no catalog, so teams and products are only what admins make |
-| `catalogVersion` (vertra.yaml); `catalog.newestVersion` (chart) | Which releases to apply: every one `main` publishes (`latest`), the newest `vX.Y.Z` (`newest`), or one version pinned. See [operations](operations.md#catalog-versions) |
-| `signing` (vertra.yaml); `catalog.signature` (chart) | Who may sign releases: a key (`kms`), or catalog CI's own identity (`keyless`). With none, releases aren't verified |
-| `externalCatalog.registry` and `catalogSignature` (vertra.yaml) | Read another install's catalog instead of owning one, and trust its signer. This page shows it "as configured": nothing the console reads confirms it. See [operations](operations.md#reading-another-installs-catalog) |
+| `catalog` (vennir.yaml, made by `vennir catalog create`); `catalog.release` (chart) | The catalog repository and the release this console reads. Empty: no catalog, so teams and products are only what admins make |
+| `catalogVersion` (vennir.yaml); `catalog.newestVersion` (chart) | Which releases to apply: every one `main` publishes (`latest`), the newest `vX.Y.Z` (`newest`), or one version pinned. See [operations](operations.md#catalog-versions) |
+| `signing` (vennir.yaml); `catalog.signature` (chart) | Who may sign releases: a key (`kms`), or catalog CI's own identity (`keyless`). With none, releases aren't verified |
+| `externalCatalog.registry` and `catalogSignature` (vennir.yaml) | Read another install's catalog instead of owning one, and trust its signer. This page shows it "as configured": nothing the console reads confirms it. See [operations](operations.md#reading-another-installs-catalog) |
 | `catalog.pollSeconds` (chart) | How often the release is read, 300 seconds by default |
 
 Admins are alerted when the catalog hasn't been pulled for 30 minutes.
@@ -180,7 +180,7 @@ Each entry is a path prefix. Saving a whole registry host, such as `docker.io`, 
 
 If no source is set, no task can run. If the card says the cluster's image policy doesn't exist, the kernel chart isn't installed: installing or upgrading it creates the policy.
 
-Set by the install: the first value only. `taskImages.registry` in vertra.yaml (or `externalCatalog.registry`), or the kernel chart's `imagePolicy.sourceRegistry` and `imagePolicy.additionalSources`, seeds the list when the kernel is installed. Upgrades keep whatever you saved here.
+Set by the install: the first value only. `taskImages.registry` in vennir.yaml (or `externalCatalog.registry`), or the kernel chart's `imagePolicy.sourceRegistry` and `imagePolicy.additionalSources`, seeds the list when the kernel is installed. Upgrades keep whatever you saved here.
 
 Admins are alerted when the image sources change.
 
@@ -205,7 +205,7 @@ Set by the install, in the console chart's `scanning`: `enabled` (on by default)
 
 `/admin/gateway`. One front door for every team's API products. It signs callers in, lets through only what each API's reviewed OpenAPI file describes, and forwards the request to the API's backend.
 
-If the gateway isn't running, the section says so: turn it on with `gateway.enabled` in vertra.yaml. Otherwise it shows its state, the APIs published, the requests in the last 24 hours, and how many were refused at the door.
+If the gateway isn't running, the section says so: turn it on with `gateway.enabled` in vennir.yaml. Otherwise it shows its state, the APIs published, the requests in the last 24 hours, and how many were refused at the door.
 
 **This install's settings** shows, read-only:
 
@@ -216,7 +216,7 @@ If the gateway isn't running, the section says so: turn it on with `gateway.enab
 | **Inside the cluster** | `gateway.url` |
 | **From the internet** | `gateway.publicUrl`, with `gateway.publicListener` |
 
-These change with `vertra apply`, not here. See [operations](operations.md#the-api-gateway).
+These change with `vennir apply`, not here. See [operations](operations.md#the-api-gateway).
 
 **Close the gateway…** takes a **Message to every caller**, and asks you to confirm. While it's closed, every API answers 503 with that message and nothing is forwarded. The console and runs carry on. **Reopen** undoes it. Both are recorded in the audit log. The console chart's `gateway.closed` keeps it closed from the install's side. A team's maintainers can pause one of their own APIs from its page.
 
@@ -246,7 +246,7 @@ What the agent is sent reaches the model's provider. On a cloud, choose the inst
 
 **Chat answers** lists what people rated in Ask, filtered by **Wrong**, **Good** or **All**, with the question, comment, answer and the docs it cited. A wrong answer is usually a doc to fix, because the agent answers from the docs. Ratings are kept 90 days.
 
-Set by the install: `chat` in vertra.yaml on gcp and aws (`chat.off`, `chat.model`); elsewhere, the console chart's `chat` values (`provider`, `model`, `endpoint`, `apiKeySecret`). See [operations](operations.md#the-chat-agent).
+Set by the install: `chat` in vennir.yaml on gcp and aws (`chat.off`, `chat.model`); elsewhere, the console chart's `chat` values (`provider`, `model`, `endpoint`, `apiKeySecret`). See [operations](operations.md#the-chat-agent).
 
 ### Admins' alerts
 
@@ -285,7 +285,7 @@ One this install doesn't have the console keep says **Not used here**. The card 
 
 | Status | Means |
 | --- | --- |
-| **Off** | No copy: the log is only in the console's database, and nothing checks its chain. Turn it on with `audit.export` in vertra.yaml (gcp, aws), or the console chart's `audit.export.bucket` |
+| **Off** | No copy: the log is only in the console's database, and nothing checks its chain. Turn it on with `audit.export` in vennir.yaml (gcp, aws), or the console chart's `audit.export.bucket` |
 | **Intact** | The chain held, and the copies match the database |
 | **Not copying** | The last copy failed. The reason is shown |
 | **Chain broken** | An entry was changed, removed or added after it was written. Nothing from there on is copied |
@@ -293,4 +293,4 @@ One this install doesn't have the console keep says **Not used here**. The card 
 
 It also shows how many entries are copied and how many are waiting for the next copy, **Copied to**, **Last copy**, when the **Chain checked**, and how far it's **Compared with the copy**. **Read the audit log in Observe →** opens the log itself.
 
-Set by the install: `audit.export`, `audit.keepDays` and `audit.lock` in vertra.yaml. This page shows the last two "as configured": the bucket enforces them, and the console can't read them back from it. `audit.lock` makes the bucket's retention permanent: nobody can shorten it or delete the bucket until it lapses. Decide before you set it. See [operations](operations.md#the-audit-logs-copy).
+Set by the install: `audit.export`, `audit.keepDays` and `audit.lock` in vennir.yaml. This page shows the last two "as configured": the bucket enforces them, and the console can't read them back from it. `audit.lock` makes the bucket's retention permanent: nobody can shorten it or delete the bucket until it lapses. Decide before you set it. See [operations](operations.md#the-audit-logs-copy).

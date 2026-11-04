@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /**
- * The client for kernel-api: KernelService (proto/vertra/kernel/v1) over
+ * The client for kernel-api: KernelService (proto/vennir/kernel/v1) over
  * Connect. Every call here is made only after core/executions.ts has
  * checked the caller may touch the execution or team in question:
  * kernel-api has no users or teams and never will (docs/architecture.md),
@@ -32,7 +32,7 @@ import {
   TaskState,
   ValidationIssuesSchema,
   type Task,
-} from "../gen/vertra/kernel/v1/kernel_pb.js";
+} from "../gen/vennir/kernel/v1/kernel_pb.js";
 
 export class KernelApiError extends Error {
   readonly status: number;

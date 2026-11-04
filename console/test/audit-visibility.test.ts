@@ -37,7 +37,7 @@ async function newUser(isAdmin: boolean) {
 }
 
 const call = caller(() => app);
-const route = (procedure: string) => `vertra.console.v1.${procedure}`;
+const route = (procedure: string) => `vennir.console.v1.${procedure}`;
 
 type Page = { entries?: { id: string }[]; nextBefore?: string };
 

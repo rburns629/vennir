@@ -1,10 +1,10 @@
 # The kinds of thing this team's products make or name (decision 25): an
-# output that is one says x-vertra-provides, an input that needs one says
-# x-vertra-needs. Here, ticket.open provides a ticket and ticket.watch needs
+# output that is one says x-vennir-provides, an input that needs one says
+# x-vennir-needs. Here, ticket.open provides a ticket and ticket.watch needs
 # one: someone who orders a watch is offered the tickets they already have,
 # or gets open added to the order. A watch then depends on its ticket, so the
 # ticket can't be deleted while it's watched without an admin's approval.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: WiringTypes
 types:
   - name: local.ticket

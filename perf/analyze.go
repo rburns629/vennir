@@ -280,7 +280,7 @@ func environment(context string, kind bool) env {
 	}
 	e.Nodes = len(strings.Fields(output("kubectl", "--context", context, "get", "nodes", "-o", "name")))
 	var cm struct{ Data map[string]string }
-	if json.Unmarshal([]byte(output("kubectl", "--context", context, "-n", "vertra-system", "get", "configmap", "kernel-execution-kernel-config", "-o", "json")), &cm) == nil {
+	if json.Unmarshal([]byte(output("kubectl", "--context", context, "-n", "vennir-system", "get", "configmap", "kernel-execution-kernel-config", "-o", "json")), &cm) == nil {
 		for k, v := range cm.Data {
 			if strings.HasPrefix(k, "SCHEDULER_") || strings.Contains(k, "POOL") || strings.Contains(k, "POLL") {
 				e.Kernel[k] = v
@@ -288,7 +288,7 @@ func environment(context string, kind bool) env {
 		}
 	}
 	for _, d := range []string{"kernel-execution-kernel-scheduler", "kernel-execution-kernel-api", "console-execution-console"} {
-		e.Replicas[d] = output("kubectl", "--context", context, "-n", "vertra-system", "get", "deployment", d, "-o", "jsonpath={.spec.replicas}")
+		e.Replicas[d] = output("kubectl", "--context", context, "-n", "vennir-system", "get", "deployment", d, "-o", "jsonpath={.spec.replicas}")
 	}
 	return e
 }

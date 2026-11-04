@@ -7,20 +7,20 @@ import (
 	"strings"
 )
 
-// Setting is one key of vertra.yaml, as `vertra help settings` lists it.
+// Setting is one key of vennir.yaml, as `vennir help settings` lists it.
 type Setting struct {
 	Key, About string
 }
 
-// Settings is every key of vertra.yaml, in the file's order, each said in a
-// line: `vertra help settings`. A test keeps it to Config's keys.
+// Settings is every key of vennir.yaml, in the file's order, each said in a
+// line: `vennir help settings`. A test keeps it to Config's keys.
 var Settings = []Setting{
-	{"version", "The file's format (vertra writes it)."},
-	{"vertra", "The release to install (e.g. 0.6.0), or source to build from a checkout. Changing it and applying upgrades."},
-	{"source", "With vertra: source, the Vertra checkout to build images and take charts from."},
+	{"version", "The file's format (vennir writes it)."},
+	{"vennir", "The release to install (e.g. 0.6.0), or source to build from a checkout. Changing it and applying upgrades."},
+	{"source", "With vennir: source, the Vennir checkout to build images and take charts from."},
 	{"target", "Where it runs: kind (your machine), gcp, aws, or existing (a cluster you have)."},
-	{"cluster.create", "Whether vertra makes the cluster (kind, gcp, aws) or uses one you have."},
-	{"cluster.mode", "gcp, aws: auto (GKE Autopilot, EKS Auto Mode) or standard (node groups vertra sizes); existing."},
+	{"cluster.create", "Whether vennir makes the cluster (kind, gcp, aws) or uses one you have."},
+	{"cluster.mode", "gcp, aws: auto (GKE Autopilot, EKS Auto Mode) or standard (node groups vennir sizes); existing."},
 	{"cluster.name", "The cluster's name (kind, gcp, aws)."},
 	{"cluster.context", "existing: the kubectl context of the cluster to install into."},
 	{"cluster.cloud", "existing: the cloud the cluster is on (gcp, aws or azure), so the catalog's products made for that cloud run on it; empty, only those for every install."},
@@ -30,13 +30,13 @@ var Settings = []Setting{
 	{"gcp.region", "gcp: the region (default us-central1)."},
 	{"aws.profile", "aws: the AWS CLI profile to sign in with; empty for the default chain."},
 	{"aws.region", "aws: the region."},
-	{"namespace", "The platform's own namespace (default vertra-system)."},
-	{"taskImages.registry", "Where steps' images may come from (the image policy's source), when vertra doesn't make it."},
+	{"namespace", "The platform's own namespace (default vennir-system)."},
+	{"taskImages.registry", "Where steps' images may come from (the image policy's source), when vennir doesn't make it."},
 	{"taskImages.create", "gcp, aws: make the registry steps' images come from (Artifact Registry, ECR)."},
 	{"taskImages.name", "gcp, aws: that registry's name."},
 	{"platformImages.registry", "existing, built from source: the registry the platform's images are pushed to."},
-	{"size", "minimal, resilient, scaled or auto: copies, step caps, the database's size and connections (`vertra help sizes`)."},
-	{"scaleDown.enabled", "Sleep when idle (scaled to zero, data kept); `vertra wake` or a schedule brings it back."},
+	{"size", "minimal, resilient, scaled or auto: copies, step caps, the database's size and connections (`vennir help sizes`)."},
+	{"scaleDown.enabled", "Sleep when idle (scaled to zero, data kept); `vennir wake` or a schedule brings it back."},
 	{"scaleDown.idleAfter", "With scaleDown: how long idle before sleeping (default 2h)."},
 	{"scaleDown.schedule", "With scaleDown: also sleep at these times however recently used, a cron schedule (e.g. \"0 20 * * 1-5\", weekday evenings)."},
 	{"minReplicas", "Without scaleDown: always-on copies of the console and kernel-api."},
@@ -48,23 +48,23 @@ var Settings = []Setting{
 	{"admin.email", "The first admin's email: their password is generated at the first apply and saved to admin-password beside this file, readable only by you."},
 	{"console.public", "gcp, aws, existing: reach the console over HTTPS from the internet (what catalog CI needs)."},
 	{"console.hostname", "A public console's hostname (gcp default: a nip.io name; aws default: console.<zone>)."},
-	{"console.zone", "aws: a DNS zone vertra makes in Route 53 for the console, which you delegate."},
+	{"console.zone", "aws: a DNS zone vennir makes in Route 53 for the console, which you delegate."},
 	{"console.ingressClass", "existing: the Ingress controller serving a public console."},
 	{"console.tls.issuer", "existing: a cert-manager ClusterIssuer for the console's certificate."},
 	{"console.tls.letsEncryptEmail", "existing: Let's Encrypt for the console's certificate, with this contact email."},
 	{"console.tls.installCertManager", "existing: install cert-manager when the cluster hasn't got it."},
 	{"catalog.host", "The catalog repository's host: github."},
 	{"catalog.owner", "The catalog repository's owner, an account or organization."},
-	{"catalog.repository", "The catalog repository's name (default vertra-catalog)."},
+	{"catalog.repository", "The catalog repository's name (default vennir-catalog)."},
 	{"catalog.visibility", "public, private (default) or internal."},
 	{"catalog.team", "The catalog's first team (default platform)."},
 	{"catalog.languages", "The first team's starter languages: python, typescript, go, powershell, rust."},
 	{"catalog.useExisting", "The catalog repository already existed: its contents stay."},
-	{"catalog.subjectPrefix", "How GitHub names the repository in its OIDC tokens (vertra reads it)."},
+	{"catalog.subjectPrefix", "How GitHub names the repository in its OIDC tokens (vennir reads it)."},
 	{"externalCatalog.registry", "Read another install's catalog: the registry holding its images and releases."},
 	{"externalCatalog.gcpWorkloadIdentityProvider", "That catalog's Artifact Registry on another cloud: the provider this cluster federates through."},
 	{"externalCatalog.gcpServiceAccount", "That catalog: a service account to impersonate, if not granted directly."},
-	{"externalCatalog.awsRoleArn", "That catalog's Amazon ECR in another account or read from another cloud: the owner's role this cluster assumes (vertra catalog grant)."},
+	{"externalCatalog.awsRoleArn", "That catalog's Amazon ECR in another account or read from another cloud: the owner's role this cluster assumes (vennir catalog grant)."},
 	{"catalogSignature.publicKeyFile", "That catalog's signing key (cosign, PEM), whose releases alone are applied."},
 	{"catalogSignature.repository", "That catalog's repository, when its CI signs keyless."},
 	{"externalSecrets", "Install External Secrets Operator, so teams' SecretStores sync their vaults' secrets."},
@@ -79,7 +79,7 @@ var Settings = []Setting{
 	{"audit.export", "gcp, aws: copy the audit log to a bucket that refuses deletes."},
 	{"audit.keepDays", "How long that copy is kept."},
 	{"audit.lock", "Lock the copy's retention for good: it can't be shortened or the bucket deleted until it lapses."},
-	{"sso.provider", "Single sign-on: google (`vertra sso google`)."},
+	{"sso.provider", "Single sign-on: google (`vennir sso google`)."},
 	{"sso.clientId", "Google's OAuth client id."},
 	{"sso.clientFile", "The OAuth client's downloaded JSON, read at apply (its secret is never written here)."},
 	{"sso.allowedDomains", "Google Workspace domains whose people may sign in."},
@@ -95,7 +95,7 @@ var Settings = []Setting{
 	{"monitoring.ruleLabels", "operator: labels it selects alerting rules by."},
 	{"access.cloud", "Who set the environment up in the cloud: a run signed in as someone else stops first."},
 	{"access.github", "Who set the catalog up on GitHub."},
-	{"values", "A Helm values file layered last (relative to this directory): anything vertra doesn't ask about."},
+	{"values", "A Helm values file layered last (relative to this directory): anything vennir doesn't ask about."},
 }
 
 // keysOf is every key of a settings type, dotted, in its fields' order.
@@ -145,5 +145,5 @@ func settingKind(key string) (reflect.Kind, bool) {
 	return t.Kind(), true
 }
 
-// AllKeys is every key vertra.yaml can have.
+// AllKeys is every key vennir.yaml can have.
 func AllKeys() []string { return keysOf(reflect.TypeOf(Config{}), "") }

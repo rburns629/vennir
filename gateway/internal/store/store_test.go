@@ -54,12 +54,18 @@ func TestWhyAnAPICantBeServedIsRecordedUntilItCan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
+	// Closed after the cleanups below (they run last-in, first-out): a
+	// deferred Close runs first, and they'd find it closed.
+	t.Cleanup(pool.Close)
 	var teamID, team, apiID string
 	if err := pool.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-store-' || substr(md5(random()::text), 1, 6)) RETURNING id::text, name`).Scan(&teamID, &team); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID) })
+	t.Cleanup(func() {
+		if _, err := pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID); err != nil {
+			t.Errorf("removing the test's team: %v", err)
+		}
+	})
 	broken := `{"openapi": "3.1.0", "info": {"title": "Orders", "version": "1"}, "paths": {"/orders": {"get": {"responses": {"200": {"description": "ok",
 		"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}}}}}}}}`
 	if err := pool.QueryRow(ctx, `INSERT INTO apis (team_id, name, display_name, openapi, backend_url, service_account)
@@ -109,12 +115,18 @@ func TestSettingsThatDontDecodeAreAProblem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
+	// Closed after the cleanups below (they run last-in, first-out): a
+	// deferred Close runs first, and they'd find it closed.
+	t.Cleanup(pool.Close)
 	var teamID, team string
 	if err := pool.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-store-' || substr(md5(random()::text), 1, 6)) RETURNING id::text, name`).Scan(&teamID, &team); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID) })
+	t.Cleanup(func() {
+		if _, err := pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID); err != nil {
+			t.Errorf("removing the test's team: %v", err)
+		}
+	})
 	spec := `{"openapi": "3.1.0", "info": {"title": "Orders", "version": "1"}, "paths": {}}`
 	for name, c := range map[string]struct{ auth, perMinute, want string }{
 		"auth":   {`{"serviceAccountToken": {"audience": 7}}`, `{}`, "its backend credential settings can't be read"},

@@ -1,6 +1,6 @@
 # The performance benchmarks (perf/README.md) on a kind cluster of their
 # own, by hand or weekly, never on a pull request: about 15 minutes on a
-# runner. It brings up vertra-perf as the README does, runs baseline and
+# runner. It brings up vennir-perf as the README does, runs baseline and
 # burst, keeps the results as an artifact, and compares each with the last
 # successful run's (perf's compare: a p50 or p95 time a quarter worse, and
 # half a second, or throughput a quarter lower). An incorrect run fails it,
@@ -39,20 +39,20 @@ jobs:
           install_only: true
       - name: The perf cluster
         run: |
-          make quickstart KIND_CLUSTER=vertra-perf
-          make kind-deploy-kernel KIND_CLUSTER=vertra-perf KIND_KERNEL_VALUES=perf/kind-kernel.yaml
-          make kind-deploy-console KIND_CLUSTER=vertra-perf KIND_CONSOLE_VALUES=perf/kind-console.yaml
+          make quickstart KIND_CLUSTER=vennir-perf
+          make kind-deploy-kernel KIND_CLUSTER=vennir-perf KIND_KERNEL_VALUES=perf/kind-kernel.yaml
+          make kind-deploy-console KIND_CLUSTER=vennir-perf KIND_CONSOLE_VALUES=perf/kind-console.yaml
       - name: Benchmarks
         run: |
           # The port-forward the driver checks for, in this step: it's what
           # reaches the console.
-          make up KIND_CLUSTER=vertra-perf
-          make catalog-publish KIND_CLUSTER=vertra-perf SAMPLES=perf CATALOG_REGISTRY=localhost:5001/perf-catalog
+          make up KIND_CLUSTER=vennir-perf
+          make catalog-publish KIND_CLUSTER=vennir-perf SAMPLES=perf CATALOG_REGISTRY=localhost:5001/perf-catalog
           # kind's own admin, whose password is the kind values' (kind only).
           password=$(sed -n '/^bootstrapAdmin:/,/^[^ ]/p' helm/values/kind/console.yaml | sed -n 's/^  password: *//p' | tr -d '"')
-          VERTRA_TOKEN=$(jq -n --arg p "$password" '{email: "admin@example.com", password: $p}' \
-            | curl -sf -X POST localhost:18080/api/vertra.console.v1.AuthService/Login -H 'Content-Type: application/json' -d @- | jq -r .token)
-          export VERTRA_TOKEN
+          VENNIR_TOKEN=$(jq -n --arg p "$password" '{email: "admin@example.com", password: $p}' \
+            | curl -sf -X POST localhost:18080/api/vennir.console.v1.AuthService/Login -H 'Content-Type: application/json' -d @- | jq -r .token)
+          export VENNIR_TOKEN
           # The console applies the release within a minute.
           sleep 60
           cd perf

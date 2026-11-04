@@ -196,6 +196,6 @@ describe("audit", () => {
     const { id, email } = await makeUser();
     await signIn(email);
     const rows = await db.select().from(auditLog).where(eq(auditLog.actorId, id)).orderBy(desc(auditLog.id));
-    expect(rows.map((r) => [r.route, r.status])).toEqual([["vertra.console.v1.AuthService/Login", 200]]);
+    expect(rows.map((r) => [r.route, r.status])).toEqual([["vennir.console.v1.AuthService/Login", 200]]);
   });
 });

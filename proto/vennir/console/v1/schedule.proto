@@ -1,0 +1,99 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// A team's schedules: a template or action run on a cron, with set
+// parameters, for the team, as one of its bots. Checked as that bot when
+// made or changed, and again on every run. The team's members see them;
+// its maintainers (and admins) make, change and delete them. At most one
+// run every five minutes.
+service ScheduleService {
+  // A team's schedules, by name.
+  rpc ListSchedules(ListSchedulesRequest) returns (ListSchedulesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Makes a schedule: refused (invalid_argument, BAD_SCHEDULE) for a cron or
+  // time zone that can't be read, one more often than every five minutes, a
+  // bot that isn't the team's, or what the bot couldn't run.
+  rpc CreateSchedule(CreateScheduleRequest) returns (CreateScheduleResponse);
+  // Changes a schedule: pausing or resuming it, its times, its parameters
+  // or its bot.
+  rpc UpdateSchedule(UpdateScheduleRequest) returns (UpdateScheduleResponse);
+  // Deletes a schedule. Its runs stay.
+  rpc DeleteSchedule(DeleteScheduleRequest) returns (DeleteScheduleResponse);
+}
+
+message Schedule {
+  string id = 1;
+  string team = 2;
+  string name = 3;
+  // "template" or "action".
+  string kind = 4;
+  // What it runs: a template's team and name, or an action's team and
+  // registered product name.
+  string runnable_team = 5;
+  string runnable_name = 6;
+  google.protobuf.Struct parameters = 7;
+  // Five fields: minute, hour, day of the month, month, day of the week.
+  string cron = 8;
+  // An IANA time zone, such as Europe/Berlin.
+  string time_zone = 9;
+  string bot_id = 10;
+  string bot_email = 11;
+  bool enabled = 12;
+  google.protobuf.Timestamp next_run_at = 13;
+  google.protobuf.Timestamp last_run_at = 14;
+  // Its last run, when it started one.
+  string last_execution_id = 15;
+  // Why its last start was refused, if it was.
+  string last_error = 16;
+}
+
+message ListSchedulesRequest {
+  string team = 1;
+}
+
+message ListSchedulesResponse {
+  repeated Schedule schedules = 1;
+}
+
+message CreateScheduleRequest {
+  string team = 1;
+  string name = 2;
+  string kind = 3;
+  string runnable_team = 4;
+  string runnable_name = 5;
+  google.protobuf.Struct parameters = 6;
+  string cron = 7;
+  // Empty: UTC.
+  string time_zone = 8;
+  string bot_id = 9;
+}
+
+message CreateScheduleResponse {
+  Schedule schedule = 1;
+}
+
+message UpdateScheduleRequest {
+  string id = 1;
+  optional bool enabled = 2;
+  optional string cron = 3;
+  optional string time_zone = 4;
+  google.protobuf.Struct parameters = 5;
+  optional string bot_id = 6;
+}
+
+message UpdateScheduleResponse {
+  Schedule schedule = 1;
+}
+
+message DeleteScheduleRequest {
+  string id = 1;
+}
+
+message DeleteScheduleResponse {}

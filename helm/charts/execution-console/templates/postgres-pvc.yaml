@@ -8,7 +8,7 @@ metadata:
     {{- include "execution-console.labels" . | nindent 4 }}
   {{- if .Values.postgres.persistence.keepOnUninstall }}
   # Uninstalling the release leaves the data; deleting it is a separate,
-  # explicit step (vertra destroy asks).
+  # explicit step (vennir destroy asks).
   annotations:
     helm.sh/resource-policy: keep
   {{- end }}

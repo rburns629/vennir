@@ -108,7 +108,7 @@ describe("the settings", () => {
     const audited = await db
       .select({ target: auditLog.target })
       .from(auditLog)
-      .where(and(eq(auditLog.route, "vertra.console.v1.SsoService/SetSsoSettings"), eq(auditLog.status, 200)))
+      .where(and(eq(auditLog.route, "vennir.console.v1.SsoService/SetSsoSettings"), eq(auditLog.status, 200)))
       .orderBy(desc(auditLog.id))
       .limit(2);
     expect(audited.map((a) => a.target)).toMatchObject([

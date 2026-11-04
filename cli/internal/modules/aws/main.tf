@@ -224,10 +224,10 @@ resource "aws_eks_node_group" "steps" {
   capacity_type   = local.spot ? "SPOT" : "ON_DEMAND"
   disk_size       = 20
   labels = {
-    "vertra.dev/pool" = "steps"
+    "vennir.dev/pool" = "steps"
   }
   taint {
-    key    = "vertra.dev/steps"
+    key    = "vennir.dev/steps"
     value  = "true"
     effect = "NO_SCHEDULE"
   }
@@ -288,7 +288,7 @@ resource "aws_eks_addon" "ebs" {
   depends_on = [aws_eks_node_group.platform, aws_eks_addon.cni]
 }
 
-# The Cluster Autoscaler (vertra installs it): resize this cluster's
+# The Cluster Autoscaler (vennir installs it): resize this cluster's
 # groups only, by their tags.
 resource "aws_iam_role" "autoscaler" {
   count              = local.standard ? 1 : 0
@@ -340,7 +340,7 @@ resource "aws_eks_pod_identity_association" "autoscaler" {
 resource "aws_ecr_repository_creation_template" "tasks" {
   prefix               = var.task_registry
   applied_for          = ["CREATE_ON_PUSH"]
-  description          = "Vertra ${var.name}: the catalog's product images"
+  description          = "Vennir ${var.name}: the catalog's product images"
   image_tag_mutability = "MUTABLE"
   encryption_configuration {
     encryption_type = "AES256"
@@ -536,7 +536,7 @@ resource "aws_eks_pod_identity_association" "backup" {
   count           = var.backups ? 1 : 0
   cluster_name    = aws_eks_cluster.this.name
   namespace       = var.namespace
-  service_account = "vertra-pg-backup"
+  service_account = "vennir-pg-backup"
   role_arn        = aws_iam_role.backup[0].arn
 }
 
@@ -612,12 +612,12 @@ resource "aws_eks_pod_identity_association" "logs" {
   count           = var.logs ? 1 : 0
   cluster_name    = aws_eks_cluster.this.name
   namespace       = var.namespace
-  service_account = "vertra-loki"
+  service_account = "vennir-loki"
   role_arn        = aws_iam_role.logs[0].arn
 }
 
 # --- metrics: Amazon Managed Service for Prometheus -------------------------
-# The bundled Prometheus (vertra-prometheus) scrapes in the cluster and
+# The bundled Prometheus (vennir-prometheus) scrapes in the cluster and
 # writes every sample to this workspace, and sends its firing alerts to the
 # workspace's Alertmanager, which publishes them to an SNS topic (an email
 # subscribed to it when alert_email is set). Its role may do only those two
@@ -708,7 +708,7 @@ resource "aws_eks_pod_identity_association" "prometheus" {
   count           = var.amazon_prometheus ? 1 : 0
   cluster_name    = aws_eks_cluster.this.name
   namespace       = var.namespace
-  service_account = "vertra-prometheus"
+  service_account = "vennir-prometheus"
   role_arn        = aws_iam_role.prometheus[0].arn
 }
 
@@ -791,13 +791,13 @@ resource "aws_iam_role_policy" "console_audit" {
 resource "aws_iam_openid_connect_provider" "cluster" {
   url            = aws_eks_cluster.this.identity[0].oidc[0].issuer
   client_id_list = ["sts.amazonaws.com"]
-  tags           = { "vertra-environment" = var.name }
+  tags           = { "vennir-environment" = var.name }
 }
 
 # --- the catalog's CI: pushes images from main, by GitHub's OIDC token -------
 
 # The account has at most one, which every install in it uses: made here
-# when it has none, and forgotten by vertra on the install's next run, so no
+# when it has none, and forgotten by vennir on the install's next run, so no
 # install's destroy deletes it (writeAWSVars).
 resource "aws_iam_openid_connect_provider" "github" {
   count          = var.catalog_repository != "" && var.github_oidc_provider_arn == "" ? 1 : 0
@@ -823,7 +823,7 @@ data "aws_iam_policy_document" "publish_trust" {
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
-    # main only, always. `vertra catalog create` sets the repository's
+    # main only, always. `vennir catalog create` sets the repository's
     # subject template to repo, context and ref, so a job in the
     # catalog-publish Environment names its branch too: whether or not the
     # Environment exists with its main-only rule, a branch's job can't match.
@@ -884,8 +884,8 @@ locals {
 resource "aws_route53_zone" "console" {
   count   = var.console_zone != "" ? 1 : 0
   name    = var.console_zone
-  comment = "Vertra ${var.name}: the console's public address"
-  # Records vertra adds (the load balancer's alias) go first on destroy.
+  comment = "Vennir ${var.name}: the console's public address"
+  # Records vennir adds (the load balancer's alias) go first on destroy.
   force_destroy = true
 }
 
@@ -899,7 +899,7 @@ resource "aws_acm_certificate" "console" {
 }
 
 # ACM's validation record. ACM issues the certificate once the zone is
-# delegated to Route 53 (vertra waits for it; OpenTofu doesn't).
+# delegated to Route 53 (vennir waits for it; OpenTofu doesn't).
 resource "aws_route53_record" "console_validation" {
   for_each = var.console_zone != "" ? {
     for o in aws_acm_certificate.console[0].domain_validation_options : o.domain_name => o
@@ -947,7 +947,7 @@ data "aws_iam_policy_document" "signing_key" {
 
 resource "aws_kms_key" "signing" {
   count                    = var.signing == "kms" && var.catalog_repository != "" ? 1 : 0
-  description              = "Vertra ${var.name}: signs the catalog's images and releases"
+  description              = "Vennir ${var.name}: signs the catalog's images and releases"
   key_usage                = "SIGN_VERIFY"
   customer_master_key_spec = "ECC_NIST_P256"
   deletion_window_in_days  = 7
@@ -989,7 +989,7 @@ resource "aws_eks_pod_identity_association" "verifier" {
 
 # --- a managed database: Amazon RDS for PostgreSQL --------------------------
 # In the install's VPC with no public access, reachable only from the
-# cluster's own security group; TLS forced. No passwords of Vertra's: the
+# cluster's own security group; TLS forced. No passwords of Vennir's: the
 # kernel, the console and the gateway each sign in as their own role (IAM
 # database authentication, a 15-minute token their Pod Identity signs).
 # RDS keeps its administrator's password in Secrets Manager itself (so it's
@@ -1006,7 +1006,7 @@ locals {
     auto      = { class = "db.t4g.medium", max_connections = 200 }
   }[var.size]
   # Its users: made by database-setup, signed in to by IAM.
-  database_users = { kernel = "vertra_kernel", console = "vertra_console", gateway = "vertra_gateway" }
+  database_users = { kernel = "vennir_kernel", console = "vennir_console", gateway = "vennir_gateway" }
 }
 
 resource "aws_db_subnet_group" "this" {
@@ -1018,7 +1018,7 @@ resource "aws_db_subnet_group" "this" {
 resource "aws_security_group" "database" {
   count       = var.managed_database ? 1 : 0
   name        = "${var.name}-database"
-  description = "Vertra ${var.name}: Postgres, from the cluster only"
+  description = "Vennir ${var.name}: Postgres, from the cluster only"
   vpc_id      = aws_vpc.this.id
 }
 
@@ -1062,13 +1062,13 @@ resource "aws_db_instance" "this" {
   publicly_accessible                 = false
   multi_az                            = var.database_high_availability
   iam_database_authentication_enabled = true
-  username                            = "vertra_admin"
+  username                            = "vennir_admin"
   manage_master_user_password         = true
   backup_retention_period             = min(var.backup_retention_days, 35)
   copy_tags_to_snapshot               = true
   auto_minor_version_upgrade          = true
   apply_immediately                   = true
-  # Only when destroy is told to delete data (vertra destroy asks first).
+  # Only when destroy is told to delete data (vennir destroy asks first).
   deletion_protection = !var.delete_data
   skip_final_snapshot = true
 }
@@ -1134,7 +1134,7 @@ resource "aws_eks_pod_identity_association" "database" {
     "kernel-execution-kernel-api"       = aws_iam_role.kernel_db[0].arn
     "kernel-execution-kernel-sleeper"   = aws_iam_role.kernel_db[0].arn
     "console-execution-console-gateway" = aws_iam_role.gateway_db[0].arn
-    "vertra-db-admin"                   = aws_iam_role.database_admin[0].arn
+    "vennir-db-admin"                   = aws_iam_role.database_admin[0].arn
   } : {}
   cluster_name    = aws_eks_cluster.this.name
   namespace       = var.namespace

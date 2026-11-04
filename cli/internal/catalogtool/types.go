@@ -13,14 +13,14 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	catalogv1 "github.com/rburns629/vertra/cli/internal/gen/vertra/catalog/v1"
+	catalogv1 "github.com/rburns629/vennir/cli/internal/gen/vennir/catalog/v1"
 )
 
 // A catalog's wiring types (decision 25, docs/assessment.md): the kinds of
 // thing its products make or name, such as gcp.project. Each team defines
 // the ones it's the authority on in teams/<team>/types.yaml, with its
 // default providers among its own actions; an input of any team says it
-// needs one (x-vertra-needs), an output that it is one (x-vertra-provides).
+// needs one (x-vennir-needs), an output that it is one (x-vennir-provides).
 // The console's order builder and chat agent wire carts by them, so once a
 // catalog defines any, every type a product names must be defined.
 
@@ -99,7 +99,7 @@ func (c *Catalog) LoadWiringTypes() ([]WiringType, []typeProblem) {
 		product, action, _ := strings.Cut(rest, ".")
 		if !provides(specs[team+"/"+product], action, t.Name) {
 			problems = append(problems, typeProblem{c.path("teams", team, "types.yaml"),
-				fmt.Sprintf("%s's defaultProvider %s.%s isn't one of this team's actions with an output that provides it (x-vertra-provides: %s)", t.Name, product, action, t.Name)})
+				fmt.Sprintf("%s's defaultProvider %s.%s isn't one of this team's actions with an output that provides it (x-vennir-provides: %s)", t.Name, product, action, t.Name)})
 		}
 	}
 	byName := map[string]WiringType{}
@@ -115,7 +115,7 @@ func (c *Catalog) LoadWiringTypes() ([]WiringType, []typeProblem) {
 		team, product, _ := strings.Cut(label, "/")
 		path := c.path("teams", team, "products", product, "product.yaml")
 		for _, action := range actionsOf(specs[label]) {
-			for _, side := range []struct{ schema, hint string }{{"input", "x-vertra-needs"}, {"output", "x-vertra-provides"}} {
+			for _, side := range []struct{ schema, hint string }{{"input", "x-vennir-needs"}, {"output", "x-vennir-provides"}} {
 				for _, field := range typedFields(action[side.schema], side.hint) {
 					t, ok := byName[field.wiring]
 					switch {
@@ -191,7 +191,7 @@ func provides(spec map[string]any, action, wiring string) bool {
 		if text(a, "name") != action {
 			continue
 		}
-		for _, field := range typedFields(a["output"], "x-vertra-provides") {
+		for _, field := range typedFields(a["output"], "x-vennir-provides") {
 			if field.wiring == wiring {
 				return true
 			}

@@ -18,7 +18,7 @@ afterAll(async () => {
 it("sends a CSP that only runs this origin's scripts and can't be framed", async () => {
   const response = await app.inject({
     method: "POST",
-    url: "/api/vertra.console.v1.AuthService/GetEnvironment",
+    url: "/api/vennir.console.v1.AuthService/GetEnvironment",
     headers: { "content-type": "application/json" },
     payload: "{}",
   });

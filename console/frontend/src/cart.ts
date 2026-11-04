@@ -20,7 +20,7 @@ export interface Cart {
   values: Record<string, Record<string, unknown>>;
 }
 
-const KEY = "vertra.cart";
+const KEY = "vennir.cart";
 const EMPTY: Cart = { team: null, actions: [], choices: [], values: {} };
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const listeners = new Set<() => void>();

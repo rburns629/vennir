@@ -1,4 +1,4 @@
-"""Tests for aws/caller-identity's check action. `./vertra catalog check`
+"""Tests for aws/caller-identity's check action. `./vennir catalog check`
 runs them in the product's own image with its python3.
 """
 

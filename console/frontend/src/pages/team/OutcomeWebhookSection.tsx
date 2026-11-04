@@ -46,7 +46,7 @@ export function OutcomeWebhookSection({ team, canManage, retired }: { team: stri
         />
       )}
       <Typography variant="caption" color="text.secondary">
-        Each post carries <Mono>Vertra-Signature: t=…,v1=…</Mono>: HMAC-SHA256 of <Mono>{"<t>.<body>"}</Mono> with its secret.
+        Each post carries <Mono>Vennir-Signature: t=…,v1=…</Mono>: HMAC-SHA256 of <Mono>{"<t>.<body>"}</Mono> with its secret.
         Allowed hosts: {allowed.join(", ") || "none"}.
       </Typography>
     </SettingsCard>

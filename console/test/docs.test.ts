@@ -38,7 +38,7 @@ const getGuide = (id: string, as: string | undefined = token) => call<{ markdown
 describe("the in-app guides", () => {
   it("lists the guides in order, the walkthrough first", async () => {
     const docs = await listGuides();
-    expect(docs[0]).toMatchObject({ id: "01-getting-started", title: "Try Vertra end to end", section: "guides", kind: "guide" });
+    expect(docs[0]).toMatchObject({ id: "01-getting-started", title: "Try Vennir end to end", section: "guides", kind: "guide" });
     expect(docs.map((d) => d.id)).toEqual([...docs.map((d) => d.id)].sort());
   });
 

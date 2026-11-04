@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs ./vertra in a catalog assembled from catalog-template/, with
+# Runs ./vennir in a catalog assembled from catalog-template/, with
 # samples installed as teams (each folder under samples/ copied to teams/,
 # with its CODEOWNERS line), so samples are checked and can be published as
 # the catalog a new install starts with.
@@ -7,11 +7,11 @@
 #   catalog-template.sh validate               every sample, checked
 #   catalog-template.sh check                  every product built, tested, scanned
 #   SAMPLES=local catalog-template.sh publish  just the local sample, published
-#                                              (to VERTRA_REGISTRY)
+#                                              (to VENNIR_REGISTRY)
 #   ... publish -- release                     then the catalog's release, in
 #                                              the same catalog (commands are
 #                                              separated by --)
-#   VERTRA_PINNED=1 catalog-template.sh validate   with the vertra the template
+#   VENNIR_PINNED=1 catalog-template.sh validate   with the vennir the template
 #                                              pins, as a new catalog's CI
 #                                              runs it
 set -euo pipefail
@@ -23,14 +23,20 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 cp -R "$template/." "$work"
-rm -rf "$work/.vertra"
-# This checkout's vertra, not the template's pinned release; or, with
-# VERTRA_PINNED=1, the pinned release, as a new catalog's CI runs it.
-if [ "${VERTRA_PINNED:-}" = 1 ]; then
-  unset VERTRA_BIN
-elif [ -z "${VERTRA_BIN:-}" ]; then
-  VERTRA_BIN=$(bash "$root/.github/scripts/build-vertra.sh")
-  export VERTRA_BIN
+rm -rf "$work/.vennir"
+# This checkout's vennir, not the template's pinned release; or, with
+# VENNIR_PINNED=1, the pinned release, as a new catalog's CI runs it.
+if [ "${VENNIR_PINNED:-}" = 1 ]; then
+  # Between a rename and its first release there's no vennir to pin (the
+  # Vertra releases can't read this format): say so rather than fail.
+  if grep -q '^version=""$' "$template/vennir"; then
+    echo "::notice::catalog-template pins no vennir release yet; pin the first one (.github/scripts/pin-vennir.sh)"
+    exit 0
+  fi
+  unset VENNIR_BIN
+elif [ -z "${VENNIR_BIN:-}" ]; then
+  VENNIR_BIN=$(bash "$root/.github/scripts/build-vennir.sh")
+  export VENNIR_BIN
 fi
 for team in $samples; do
   [ -d "$template/samples/$team" ] || { echo "No sample named $team in catalog-template/samples/." >&2; exit 1; }
@@ -47,7 +53,7 @@ cd "$work"
 command=()
 for arg in "$@" --; do
   if [ "$arg" = "--" ]; then
-    [ ${#command[@]} -eq 0 ] || ./vertra catalog "${command[@]}"
+    [ ${#command[@]} -eq 0 ] || ./vennir catalog "${command[@]}"
     command=()
   else
     command+=("$arg")

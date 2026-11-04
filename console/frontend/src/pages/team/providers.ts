@@ -4,7 +4,7 @@ import { catalogFileUrl } from "../../catalogFile";
 
 /**
  * What the "Connect a source" wizard knows about each secret provider:
- * what to ask the platform owner, who Vertra will sign in as, the
+ * what to ask the platform owner, who Vennir will sign in as, the
  * commands to run on the provider's side, and the SecretStore (plus the
  * ServiceAccount ESO signs in as) that goes into the catalog repo for
  * review. Everything here is display: the catalog PR's review is what
@@ -71,14 +71,14 @@ const ALL_PROVIDERS: ProviderGuide[] = [
     id: "gcpsm",
     title: "GCP Secret Manager",
     description: "Secrets in a Google Cloud project your team owns.",
-    credential: "nothing: Vertra signs in with Workload Identity.",
+    credential: "nothing: Vennir signs in with Workload Identity.",
     tested: true,
     unavailable: (facts) =>
       facts.gcpWorkloadIdentityPool && facts.gkeClusterName && facts.gkeClusterLocation
         ? null
         : "Needs a GKE cluster with Workload Identity; this one isn't.",
     fields: [
-      { key: "project", label: "GCP project holding your secrets", hint: "Your own project is fine; it doesn't have to be Vertra's." },
+      { key: "project", label: "GCP project holding your secrets", hint: "Your own project is fine; it doesn't have to be Vennir's." },
       { key: "firstSecret", label: "A first secret to allow", hint: "Grant more later the same way, one secret at a time." },
     ],
     defaults: () => ({ project: "", firstSecret: "" }),
@@ -88,12 +88,12 @@ const ALL_PROVIDERS: ProviderGuide[] = [
       ["Workload Identity member", `serviceAccount:${facts.gcpWorkloadIdentityPool}[${team}/${esoAccount("gcp")}]`],
     ],
     commandsIntro:
-      "Creates a GCP identity only this team uses, lets it read the secret you named, and lets Vertra sign in as it. Safe to re-run.",
+      "Creates a GCP identity only this team uses, lets it read the secret you named, and lets Vennir sign in as it. Safe to re-run.",
     commands: (team, facts, values) => {
       const project = values["project"] || "<YOUR_PROJECT>";
       const sa = gcpServiceAccount(team, values);
       return [
-        `gcloud iam service-accounts create vertra-eso-${team} \\`,
+        `gcloud iam service-accounts create vennir-eso-${team} \\`,
         `  --project=${project}`,
         "",
         `gcloud secrets add-iam-policy-binding ${values["firstSecret"] || "<SECRET_NAME>"} \\`,
@@ -154,10 +154,10 @@ const ALL_PROVIDERS: ProviderGuide[] = [
       ["Audience", "api://AzureADTokenExchange"],
     ],
     commandsIntro:
-      "Creates a managed identity, lets it read the vault's secrets, and tells Azure to trust Vertra's cluster for it.",
+      "Creates a managed identity, lets it read the vault's secrets, and tells Azure to trust Vennir's cluster for it.",
     commands: (team, facts, values) => {
       const group = values["resourceGroup"] || "<RESOURCE_GROUP>";
-      const identity = `vertra-eso-${team}`;
+      const identity = `vennir-eso-${team}`;
       return [
         `az identity create -g ${group} -n ${identity} --query clientId -o tsv`,
         "",
@@ -169,7 +169,7 @@ const ALL_PROVIDERS: ProviderGuide[] = [
         "",
         "az identity federated-credential create \\",
         `  -g ${group} --identity-name ${identity} \\`,
-        `  --name vertra-${team} \\`,
+        `  --name vennir-${team} \\`,
         `  --issuer ${facts.clusterIssuer} \\`,
         `  --subject system:serviceaccount:${team}:${esoAccount("azure")} \\`,
         "  --audiences api://AzureADTokenExchange",
@@ -218,7 +218,7 @@ const ALL_PROVIDERS: ProviderGuide[] = [
       ["Subject", `system:serviceaccount:${team}:${esoAccount("aws")}`],
     ],
     commandsIntro:
-      "Registers Vertra's cluster as an identity provider in IAM (once per cluster: an install vertra made on AWS has it already, so skip that step), then a role only this team's ESO ServiceAccount can use (IRSA), limited to secrets whose names start with the team's name and a slash.",
+      "Registers Vennir's cluster as an identity provider in IAM (once per cluster: an install vennir made on AWS has it already, so skip that step), then a role only this team's ESO ServiceAccount can use (IRSA), limited to secrets whose names start with the team's name and a slash.",
     commands: (team, facts, values) => {
       const account = values["account"] || "<ACCOUNT_ID>";
       const region = values["region"] || "<REGION>";
@@ -250,7 +250,7 @@ const ALL_PROVIDERS: ProviderGuide[] = [
         ],
       };
       return [
-        "# Once per cluster (vertra does this for an install it made on AWS):",
+        "# Once per cluster (vennir does this for an install it made on AWS):",
         `aws iam create-open-id-connect-provider \\`,
         `  --url ${facts.clusterIssuer} \\`,
         "  --client-id-list sts.amazonaws.com",
@@ -258,13 +258,13 @@ const ALL_PROVIDERS: ProviderGuide[] = [
         "cat > trust.json <<'EOF'",
         JSON.stringify(trust, null, 2),
         "EOF",
-        `aws iam create-role --role-name vertra-eso-${team} \\`,
+        `aws iam create-role --role-name vennir-eso-${team} \\`,
         "  --assume-role-policy-document file://trust.json",
         "",
         "cat > read-secrets.json <<'EOF'",
         JSON.stringify(policy, null, 2),
         "EOF",
-        `aws iam put-role-policy --role-name vertra-eso-${team} \\`,
+        `aws iam put-role-policy --role-name vennir-eso-${team} \\`,
         `  --policy-name read-${team}-secrets \\`,
         "  --policy-document file://read-secrets.json",
       ].join("\n");
@@ -300,7 +300,7 @@ const ALL_PROVIDERS: ProviderGuide[] = [
     tested: false,
     unavailable: (facts) => (facts.catalogRepo ? null : "Needs the catalog repo configured for this console."),
     fields: [{ key: "vault", label: "Vault name", hint: "Give the 1Password service account access to this vault only." }],
-    defaults: (team) => ({ vault: `vertra-${team}` }),
+    defaults: (team) => ({ vault: `vennir-${team}` }),
     signsInAs: (team) => [
       ["Token stored as", "Secrets tab → Stored credential, in this install only"],
       ["Becomes Kubernetes Secret", `${team}/eso-auth (key: token)`],
@@ -341,11 +341,11 @@ const ALL_PROVIDERS: ProviderGuide[] = [
 ];
 
 function gcpServiceAccount(team: string, values: Values): string {
-  return `vertra-eso-${team}@${values["project"] || "<YOUR_PROJECT>"}.iam.gserviceaccount.com`;
+  return `vennir-eso-${team}@${values["project"] || "<YOUR_PROJECT>"}.iam.gserviceaccount.com`;
 }
 
 function awsRole(team: string, values: Values): string {
-  return `arn:aws:iam::${values["account"] || "<ACCOUNT_ID>"}:role/vertra-eso-${team}`;
+  return `arn:aws:iam::${values["account"] || "<ACCOUNT_ID>"}:role/vennir-eso-${team}`;
 }
 
 export function providerGuide(id: string): ProviderGuide | undefined {

@@ -35,16 +35,16 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/rburns629/vertra/kernel/internal/api"
-	"github.com/rburns629/vertra/kernel/internal/config"
-	"github.com/rburns629/vertra/kernel/internal/dbauth"
-	"github.com/rburns629/vertra/kernel/internal/dbsetup"
-	"github.com/rburns629/vertra/kernel/internal/executor"
-	"github.com/rburns629/vertra/kernel/internal/logging"
-	"github.com/rburns629/vertra/kernel/internal/metrics"
-	"github.com/rburns629/vertra/kernel/internal/migrate"
-	"github.com/rburns629/vertra/kernel/internal/scheduler"
-	"github.com/rburns629/vertra/kernel/internal/sleeper"
+	"github.com/rburns629/vennir/kernel/internal/api"
+	"github.com/rburns629/vennir/kernel/internal/config"
+	"github.com/rburns629/vennir/kernel/internal/dbauth"
+	"github.com/rburns629/vennir/kernel/internal/dbsetup"
+	"github.com/rburns629/vennir/kernel/internal/executor"
+	"github.com/rburns629/vennir/kernel/internal/logging"
+	"github.com/rburns629/vennir/kernel/internal/metrics"
+	"github.com/rburns629/vennir/kernel/internal/migrate"
+	"github.com/rburns629/vennir/kernel/internal/scheduler"
+	"github.com/rburns629/vennir/kernel/internal/sleeper"
 )
 
 const usage = `usage: kernel api | scheduler | migrate | database-setup | database-token FILE | sleep [--now] | wake | wait-for-postgres HOST:PORT | check-heartbeat SECONDS`

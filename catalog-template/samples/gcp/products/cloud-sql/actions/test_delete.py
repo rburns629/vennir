@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 _MODULE_PATH = Path(__file__).parent / "delete.py"
 CONNECTION = "demo-project:us-central1:orders-db"
 # An instance create made for team web.
-MADE_FOR_WEB = {"settings": {"userLabels": {"vertra-made": "true", "vertra-team": "web"}}}
+MADE_FOR_WEB = {"settings": {"userLabels": {"vennir-made": "true", "vennir-team": "web"}}}
 
 
 def _load():
@@ -71,7 +71,7 @@ class DeleteActionTest(unittest.TestCase):
     def test_one_made_some_other_way_is_refused(self) -> None:
         self.service.instances.return_value.get.return_value.execute.return_value = {"settings": {}}
         code, result = self._run({"type": "gcp/cloud-sql-instance", "id": CONNECTION})
-        self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VERTRA"))
+        self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VENNIR"))
         self.service.instances.return_value.delete.assert_not_called()
 
     def test_one_made_for_another_team_is_refused(self) -> None:

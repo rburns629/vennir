@@ -2,7 +2,7 @@
 # parameters. Its steps name actions, not images, so it keeps working as the
 # products release new images. This one shouts the text, then writes it
 # backwards: upper-case (PowerShell), then reverse (TypeScript).
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Template
 name: shout-backwards
 displayName: Shout it backwards

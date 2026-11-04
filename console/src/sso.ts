@@ -147,7 +147,7 @@ export async function groupsOf(claims: Record<string, unknown>, email: string): 
       const overage = typeof claims["_claim_names"] === "object" && claims["_claim_names"] !== null;
       throw new GroupsUnavailable(
         overage
-          ? `The provider left out the ${sources.claim} claim: too many groups to list (configure it to send only the groups assigned to Vertra).`
+          ? `The provider left out the ${sources.claim} claim: too many groups to list (configure it to send only the groups assigned to Vennir).`
           : `The ID token has no ${sources.claim} claim: configure the provider to send it.`,
       );
     }

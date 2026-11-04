@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 
 // Package grant is the catalog owner's side of an install reading its
-// catalog (`vertra catalog grant`): read on the owner's catalog registry
+// catalog (`vennir catalog grant`): read on the owner's catalog registry
 // (its images and its release, nothing else) for exactly one reader's
 // identity, with no key stored anywhere.
 //
 //   - A reader on another cloud, or in another AWS account, is its
 //     cluster's OIDC identity: the console's ServiceAccount, from one
-//     issuer. On gcp the owner's Workload Identity pool (vertra-installs)
+//     issuer. On gcp the owner's Workload Identity pool (vennir-installs)
 //     gets a provider for that issuer accepting that subject alone, mapped
 //     to a subject of the reader's own, and that principal reads the
 //     repository. On aws the account gets an IAM OIDC provider for the
-//     issuer and a role (vertra-reader-<reader>) only that subject may
+//     issuer and a role (vennir-reader-<reader>) only that subject may
 //     assume by web identity, which may read only the registry's
 //     repositories: a role scoped to <prefix>/* covers every product
 //     published later, where a repository policy would have to be added
@@ -60,7 +60,7 @@ var (
 )
 
 // Pool is the owner's Workload Identity pool for reading installs (gcp).
-const Pool = "vertra-installs"
+const Pool = "vennir-installs"
 
 // Federated says whether the reader is a cluster's OIDC identity.
 func (r Reader) Federated() bool { return r.Issuer != "" }
@@ -119,7 +119,7 @@ type Plan struct {
 	Access  string
 	Actions []Action
 	Notes   []string
-	// ReaderSets is what the reader sets in its vertra.yaml afterwards
+	// ReaderSets is what the reader sets in its vennir.yaml afterwards
 	// (key and value), when anything.
 	ReaderSets [2]string
 }
@@ -177,13 +177,13 @@ func ArtifactRegistry(registry string) (GCPOwner, error) {
 	return GCPOwner{RegistryProject: parts[1], Region: region, Repository: parts[2]}, nil
 }
 
-// ProviderID is the reader's provider in the pool: vertra-<reader>, as the
+// ProviderID is the reader's provider in the pool: vennir-<reader>, as the
 // commands earlier versions printed named it.
 func ProviderID(r Reader) string {
-	if strings.HasPrefix(r.Name, "vertra") {
+	if strings.HasPrefix(r.Name, "vennir") {
 		return r.Name
 	}
-	return "vertra-" + r.Name
+	return "vennir-" + r.Name
 }
 
 // gcpSubject is the reader's subject in the pool: its console's
@@ -308,7 +308,7 @@ func PlanGCP(ctx context.Context, exec Exec, o GCPOwner, r Reader, revoke bool) 
 	switch poolState {
 	case "":
 		p.Actions = append(p.Actions, Action{Label: "Will create", Text: "the Workload Identity pool " + Pool + " in " + o.Project + ", for installs reading the catalog",
-			Tool: "gcloud", Args: append([]string{"iam", "workload-identity-pools", "create", Pool, "--display-name=Vertra installs", "--format=none"}, pool...)})
+			Tool: "gcloud", Args: append([]string{"iam", "workload-identity-pools", "create", Pool, "--display-name=Vennir installs", "--format=none"}, pool...)})
 	case "DELETED":
 		p.Actions = append(p.Actions, Action{Label: "Will restore", Text: "the deleted Workload Identity pool " + Pool,
 			Tool: "gcloud", Args: append([]string{"iam", "workload-identity-pools", "undelete", Pool, "--format=none"}, pool...)})
@@ -367,7 +367,7 @@ type AWSOwner struct {
 }
 
 // RoleName is the reader's role in the owner's account.
-func RoleName(r Reader) string { return "vertra-reader-" + r.Name }
+func RoleName(r Reader) string { return "vennir-reader-" + r.Name }
 
 // PolicyName is the role's one inline policy.
 const PolicyName = "read-catalog"
@@ -461,7 +461,7 @@ func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke, repla
 		return nil, roleErr
 	}
 	// The role is keyed by the reader's name alone, which another reader
-	// may share (a cluster's default name is vertra): one trusting another
+	// may share (a cluster's default name is vennir): one trusting another
 	// reader is left alone unless --replace says otherwise.
 	var sameReader, sameTrust bool
 	leaving := r.Name
@@ -514,7 +514,7 @@ func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke, repla
 	case err != nil:
 		p.Actions = append(p.Actions, Action{Label: "Will create", Text: "an IAM OIDC provider for " + r.Issuer + " (audience sts.amazonaws.com)",
 			Tool: "aws", Args: o.Args("iam", "create-open-id-connect-provider", "--url", r.Issuer, "--client-id-list", "sts.amazonaws.com",
-				"--tags", "Key=vertra,Value=catalog-reader")})
+				"--tags", "Key=vennir,Value=catalog-reader")})
 	default:
 		var provider struct{ ClientIDList []string }
 		if err := json.Unmarshal([]byte(out), &provider); err != nil {
@@ -531,7 +531,7 @@ func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke, repla
 	case roleErr != nil:
 		p.Actions = append(p.Actions, Action{Label: "Will create", Text: "the role " + role + ": " + trusts,
 			Tool: "aws", Args: o.Args("iam", "create-role", "--role-name", role, "--assume-role-policy-document", trust,
-				"--max-session-duration", "3600", "--description", "Vertra: "+r.Name+"'s console reads the catalog", "--tags", "Key=vertra,Value=catalog-reader")})
+				"--max-session-duration", "3600", "--description", "Vennir: "+r.Name+"'s console reads the catalog", "--tags", "Key=vennir,Value=catalog-reader")})
 	case sameTrust:
 		p.Actions = append(p.Actions, Action{Label: "Has", Text: "the role " + role + ": " + trusts})
 	default:
@@ -592,7 +592,7 @@ func trustedBy(doc json.RawMessage) (trusted, string) {
 			}
 		}
 	}
-	return trusted{}, "a trust policy vertra didn't write"
+	return trusted{}, "a trust policy vennir didn't write"
 }
 
 // sameJSON says whether two JSON documents say the same, whatever their

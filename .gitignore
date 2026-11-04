@@ -2,7 +2,7 @@
 # convenience, such as a catalog repository (it has its own git history).
 _local/
 
-# vertra's per-install settings and OpenTofu state (cli/DESIGN.md):
+# vennir's per-install settings and OpenTofu state (cli/DESIGN.md):
 # names only, but the state can hold resource details. Keep them in a
 # private repository of your own if you want them versioned.
 deploy/
@@ -44,9 +44,9 @@ htmlcov/
 _local/
 # OpenTofu working files, should a module be initialised in place.
 cli/internal/modules/*/.terraform/
-# Built binaries (.github/scripts/build-vertra.sh; the kernel's kind tests in CI).
+# Built binaries (.github/scripts/build-vennir.sh; the kernel's kind tests in CI).
 cli/bin/
 kernel/bin/
 
-# The vertra binary, built in place (`go build -o vertra ./cmd/vertra`).
-/cli/vertra
+# The vennir binary, built in place (`go build -o vennir ./cmd/vennir`).
+/cli/vennir

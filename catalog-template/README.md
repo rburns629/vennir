@@ -1,18 +1,18 @@
 # Catalog
 
-Where teams declare what they offer to Vertra. Each team has a
+Where teams declare what they offer to Vennir. Each team has a
 folder; each of its products is a container image plus a `product.yaml`
 saying what its actions take, return and need. Open a pull request and CI
 builds, tests and scans it; merge it and the image is pushed, and the
-catalog's release names it. Each Vertra install's console reads that release
+catalog's release names it. Each Vennir install's console reads that release
 and registers what it says: CI never calls a console, and one catalog can serve
 any number of installs.
 
-CI runs one tool, `./vertra` (the platform's command line, at the release
+CI runs one tool, `./vennir` (the platform's command line, at the release
 pinned in that file: downloaded on first use from the platform's public
 package by its SHA-256, and checked against it), and so
-can you: `./vertra catalog check` runs every pull request check on your machine,
-and `./vertra catalog publish` publishes from a laptop when there's no CI.
+can you: `./vennir catalog check` runs every pull request check on your machine,
+and `./vennir catalog publish` publishes from a laptop when there's no CI.
 
 `teams/` starts empty: your first team goes there. `samples/` holds whole
 example teams, never published from there:
@@ -33,8 +33,8 @@ A copied product's `team:` must be changed to its new team's name.
 ## Layout
 
 ```
-vertra.yaml                  where products publish: registry, signing
-vertra                        runs the pinned vertra (downloaded into .vertra/)
+vennir.yaml                  where products publish: registry, signing
+vennir                        runs the pinned vennir (downloaded into .vennir/)
 tools/                        the schemas of every catalog file (format v2), for editors
 templates/                    starters to copy (checked by CI, never published)
 samples/<team>/               example teams: local (five languages); gcp, aws, azure (billed); perf
@@ -60,7 +60,7 @@ teams/
 A team's folder name is its identity everywhere: its console team, its
 namespace, and `team` in a DAG. It can't be `bases` or `catalog-release`
 (the catalog's own repositories in the registry, beside the teams'),
-`vertra-system` or `kube-*` (platform namespaces).
+`vennir-system` or `kube-*` (platform namespaces).
 
 ## Onboarding a team
 
@@ -77,7 +77,7 @@ merging the team's folder. So: team, access, secrets, then code.
    creates it and its namespace. A name that ever was a purged team's is
    refused there, and so is one already taken by a team the catalog didn't
    make, until that install's admin adopts it (Admin page → Catalog).
-2. **Get access.** A Vertra admin creates your console account and adds
+2. **Get access.** A Vennir admin creates your console account and adds
    you to the team; after that, members add each other.
 3. **Register secrets**, in the console (Team page → Secrets): paste a value,
    or sync from a vault once your team has a SecretStore (below). Note each
@@ -85,7 +85,7 @@ merging the team's folder. So: team, access, secrets, then code.
 4. **Add a product.** `cp -r templates/hello teams/<team>/products/<product>`
    (or a starter in your language from `samples/local/products/`), change
    what's marked `CHANGE` (a starter's `team:` too), then run what CI will:
-   `./vertra catalog check teams/<team>/products/<product>`.
+   `./vennir catalog check teams/<team>/products/<product>`.
 5. **Run it.** Submit a DAG naming `<registry>/<team>/<product>:latest`,
    the action, your `team`, and any `secretRefs`. The console pins `:latest`
    to its digest at submission, so what runs (and is retried and scanned) is
@@ -97,7 +97,7 @@ says what to ask for and what to check.
 ## `product.yaml`
 
 ```yaml
-apiVersion: vertra.dev/v2  # the catalog format: every file starts with these two
+apiVersion: vennir.dev/v2  # the catalog format: every file starts with these two
 kind: Product
 name: project               # the folder's name
 team: gcp               # the team folder's name
@@ -139,7 +139,7 @@ again, resolved, before it starts (`INPUT_INVALID`), and its outputs against
 `output` when it finishes (`OUTPUT_INVALID`; no later step gets them). Keep
 them to what the action really takes and returns, and self-contained (no
 `$ref` to another file or URL). Every field is in
-[tools/product.schema.json](tools/product.schema.json); `./vertra catalog validate`
+[tools/product.schema.json](tools/product.schema.json); `./vennir catalog validate`
 checks against it. There's no image field: the image comes from the folder.
 
 Both are JSON Schema draft 2020-12, and each must be an object at the top
@@ -155,19 +155,19 @@ template, from its `parameters`) from the same schema: `title` and
 makes a choice, an array of text or numbers a list, an object of strings
 name/value rows, and `required`, `pattern`, lengths and limits are checked
 on the field before anything is sent. Four hints shape the form, and
-`./vertra catalog validate` checks them:
+`./vennir catalog validate` checks them:
 
 ```yaml
 properties:
   projectId:
     type: string
     pattern: "^[a-z][a-z0-9-]{5,29}$"
-    x-vertra-pattern-message: 6 to 30 lowercase letters, digits or hyphens, starting with a letter
-    x-vertra-order: 1          # lower first; the rest follow as written
-    x-vertra-group: Project    # a heading, shared by the fields that name it
+    x-vennir-pattern-message: 6 to 30 lowercase letters, digits or hyphens, starting with a letter
+    x-vennir-order: 1          # lower first; the rest follow as written
+    x-vennir-group: Project    # a heading, shared by the fields that name it
   notes:
     type: string
-    x-vertra-widget: textarea  # a big box
+    x-vennir-widget: textarea  # a big box
 ```
 
 An action's `secretRefs` are its bindings, reviewed with the code that
@@ -211,8 +211,8 @@ products; a product.yaml's replaces it. On an install on another cloud,
 the product is still listed, marked "For aws installs", but its readiness
 check isn't run there and a run naming it is refused (`NOT_FOR_THIS_INSTALL`)
 before anything starts. Left out on both, it's for every install. An
-install vertra made knows its cloud; one on a cluster you already had says
-it (`vertra config set -e <env> cluster.cloud aws`), or runs only the
+install vennir made knows its cloud; one on a cluster you already had says
+it (`vennir config set -e <env> cluster.cloud aws`), or runs only the
 products for every install. `clouds` says where a product is meant to run,
 not who may run what: that's still each team's sharing and the platform's
 image and identity policies.
@@ -250,7 +250,7 @@ already gone. The local `ticket` sample does all of this.
 A cleanup is an action like any other: a team you share it with can run it
 directly, with any resource it names. So mark what you make with the team
 it's for, the request's `forTeam` (the cloud samples label or tag it
-`vertra-team=<forTeam>`, beside `vertra-made=true`), and have your delete
+`vennir-team=<forTeam>`, beside `vennir-made=true`), and have your delete
 refuse anything whose mark isn't the request's `forTeam`, and anything
 without one: that keeps one team's cleanup off another team's resources,
 and off anything made some other way. `forTeam` is the team the run is
@@ -338,7 +338,7 @@ product's ServiceAccount.
 
 ### Changing a product other teams use
 
-Other teams' templates rely on a product's contract, so `./vertra catalog check
+Other teams' templates rely on a product's contract, so `./vennir catalog check
 --changed <base>` (what CI runs on every pull request) compares each changed
 product with the same product at the base, which is what's published, and
 refuses a change that could break them:
@@ -376,7 +376,7 @@ A team's `dags/` folder holds two kinds of file:
   `<team>/<product>.<action>` of a team that shares it, never an image, so
   a template keeps working as products release. Inputs are values,
   `{$param: <name>}`, or `{$fromStep: <id>, $output: <name>}` from a step
-  in `dependsOn`. `./vertra catalog validate` checks every action exists and is
+  in `dependsOn`. `./vennir catalog validate` checks every action exists and is
   shared with your team, and that each step gets the inputs its action
   needs. `examples` (up to ten, each a `name` and its `parameters`) are
   ways to run it, which must fit `parameters`; the run form offers them
@@ -400,8 +400,8 @@ browser saying what to add to `shareWith` and where. Mark one
 your team sees it; it can't be shared then.
 
 Type outputs too: an output that is a project, a database, a URL of some
-kind, says so with `x-vertra-provides` (a wiring type, such as
-`gcp.project`), and an input that takes one says `x-vertra-needs`. The
+kind, says so with `x-vennir-provides` (a wiring type, such as
+`gcp.project`), and an input that takes one says `x-vennir-needs`. The
 console wires orders by them: someone who orders your app hosting and
 nothing else is offered the projects their team already has, or gets the
 type's default provider added to their cart, and an optional input that
@@ -413,7 +413,7 @@ in `teams/<team>/types.yaml` (`tools/types.schema.json`;
 `samples/gcp/types.yaml` is an example):
 
 ```yaml
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: WiringTypes
 types:
   - name: gcp.project
@@ -427,13 +427,13 @@ types:
 ```
 
 Any team's products may need or provide it. Once any team defines types,
-`vertra catalog validate` refuses a product naming a type no team defines,
+`vennir catalog validate` refuses a product naming a type no team defines,
 or naming it with a different JSON type, so the vocabulary stays the one
 reviewed. The catalog's release carries them to every install.
 
 When another team runs your product, it chooses the inputs, so it could aim
 your identity at something that isn't theirs. Type each input that names a
-project, folder, account or subscription with `x-vertra-needs` (`gcp.project`,
+project, folder, account or subscription with `x-vennir-needs` (`gcp.project`,
 `gcp.folder`, `aws.account` or `azure.subscription`), and list in your
 team.yaml where each team may aim it:
 
@@ -461,8 +461,8 @@ Keep your identity's cloud permissions to the same folders: that's what
 holds if anything else goes wrong (samples/gcp shows both).
 
 A catalog from before format v2 (no `apiVersion` in its files) is
-converted in place by `./vertra catalog migrate`, comments and all; review the
-diff, then `./vertra catalog validate`.
+converted in place by `./vennir catalog migrate`, comments and all; review the
+diff, then `./vennir catalog validate`.
 
 ## API products (`apis/`)
 
@@ -479,7 +479,7 @@ XML, forms, multipart, text, CSV and binary). Anything else gets
 404 or 400 from the gateway and never reaches your backend.
 
 ```yaml
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Api
 name: orders                  # its folder; callers use /<team>/orders/ on the gateway
 displayName: Orders API
@@ -499,12 +499,12 @@ timeout: 30s
 maxRequest: 1MiB
 ```
 
-`./vertra catalog validate` checks the OpenAPI file: 3.0 or 3.1, every
+`./vennir catalog validate` checks the OpenAPI file: 3.0 or 3.1, every
 `$ref` inside the file, `servers` including `backend.url`, a schema for
 every parameter and request body, no two paths matching the same requests,
 paths made only of a URL path's characters (letters, digits, `-._~/{}:@%+,;=!*`:
 no quotes, `$`, backticks or spaces, since the console shows each one in a
-`curl` command people paste), and nothing under `/.vertra/` (the gateway's
+`curl` command people paste), and nothing under `/.vennir/` (the gateway's
 own). Every field of
 `api.yaml` is in [tools/api.schema.json](tools/api.schema.json). The
 backend's host must be one the install's admins allow, or the API is held,
@@ -520,22 +520,22 @@ a function URL the role needs both `lambda:InvokeFunctionUrl` and
 `serviceAccountToken` (the Kubernetes token itself, for a backend that
 checks those). A backend that takes only a static key can't be published:
 the gateway reads no secrets. Your backend learns who called from the
-`Vertra-Caller` header, which the gateway signs (its public key at
-`/.vertra/jwks.json` on the gateway).
+`Vennir-Caller` header, which the gateway signs (its public key at
+`/.vennir/jwks.json` on the gateway).
 
 A backend in your team's own namespace is reachable by the gateway only
-when its Pods are labelled `vertra/api-backend: "true"` (every other Pod
+when its Pods are labelled `vennir/api-backend: "true"` (every other Pod
 there stays closed to everything outside the namespace). What those Pods
 print is searchable by your team, and only your team, on Observe's Logs tab
 (From: API backends), when the install keeps logs. The samples show
 each way: `samples/local/apis/greetings` (a Service in the namespace, no
-cloud, checking `Vertra-Caller`), `samples/gcp/apis/hello-world` (Cloud
+cloud, checking `Vennir-Caller`), `samples/gcp/apis/hello-world` (Cloud
 Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
 `awsSigV4`).
 
 What your backend gets, and what the gateway keeps to itself:
 
-- **Headers.** The caller's `Authorization`, any `Vertra-*`, hop-by-hop
+- **Headers.** The caller's `Authorization`, any `Vennir-*`, hop-by-hop
   headers, and what a caller could claim about where it's from
   (`Forwarded`, `X-Forwarded-*`, `X-Real-Ip`) never reach you.
   `X-Forwarded-For` is the address the gateway's connection came from:
@@ -547,7 +547,7 @@ What your backend gets, and what the gateway keeps to itself:
   `Path=/`). A path isn't a boundary inside one origin, though: a page
   another API serves can read your cookies that aren't HttpOnly, and send
   requests to your API with them. Keep cookies HttpOnly, and never take a
-  cookie alone as who's calling: `Vertra-Caller` says that.
+  cookie alone as who's calling: `Vennir-Caller` says that.
 - **Paths.** Encoded slashes, backslashes and dot segments (`..;` too) are
   refused, so what's checked against your file is what you get.
 - **Who hears of it.** `visibility: hidden` keeps an API to your team (and
@@ -614,14 +614,14 @@ What your backend gets, and what the gateway keeps to itself:
   `USER` must be numeric (`USER 65532:65532`, as the templates have):
   Kubernetes can't tell that a name like `app` isn't root, so it refuses
   to start the container, and the step fails as `IMAGE_USER_NOT_ALLOWED`.
-  `./vertra catalog check` refuses such a Dockerfile before that.
+  `./vennir catalog check` refuses such a Dockerfile before that.
 
 ## Testing
 
-Test a product before publishing it: `./vertra catalog check` builds it and
+Test a product before publishing it: `./vennir catalog check` builds it and
 runs its tests on your machine, as CI does before anything is published.
 A product's tests are contract tests: `tests/<action>/<case>/request.json`
-and the `expected.json` its result must contain. `./vertra catalog check` runs
+and the `expected.json` its result must contain. `./vennir catalog check` runs
 each against the built image with the request mounted where the platform
 mounts it, with no network. A succeeding case must also match the action's
 schemas. A case's request.json may be just `{"inputs": {...}}`: the rest
@@ -632,7 +632,7 @@ is filled in (`executionId: contract-test`, `taskId` the case's name,
 Each case runs hardened as a step does on an install: a read-only root
 filesystem (only `/tmp` is writable), no capabilities, no privilege
 escalation, and result.json held to 4 KB and read as strictly as the
-platform reads it (above); `./vertra catalog validate` refuses a
+platform reads it (above); `./vennir catalog validate` refuses a
 Dockerfile whose final stage doesn't end with a numeric, non-root `USER`.
 What it can't give a case is `/platform/tokens`, or the cluster's network
 and quotas. A case that
@@ -650,14 +650,14 @@ private.
 
 ## What CI blocks
 
-Per product (`./vertra catalog check`, in `ci.yml`):
+Per product (`./vennir catalog check`, in `ci.yml`):
 
 | Blocks on | Fix |
 |---|---|
 | A HIGH or CRITICAL vulnerability with a fix | Usually OS packages: keep the templates' `apt-get upgrade`, or pin a fixed package version |
 | A secret in the image | Remove it; secrets are mounted at run time |
 | A known-malicious package ([OSV](https://osv.dev)) | Check the package name for a typo |
-| A base image not pinned by digest | `./vertra catalog bases` pins it; `./vertra catalog bases --update` moves every pin to its tag's current image |
+| A base image not pinned by digest | `./vennir catalog bases` pins it; `./vennir catalog bases --update` moves every pin to its tag's current image |
 
 Across the repository (`security.yml`): committed secrets (gitleaks; rotate
 anything it finds), and Semgrep: its Python, TypeScript, JavaScript, Go,
@@ -678,7 +678,7 @@ An accepted finding gets its exception where it applies, with the reason, so
 the pull request's review decides: a vulnerability ID in the product's
 `.trivyignore`, or `# nosemgrep: <rule>` on the line. Every product is
 rechecked each Monday, since new vulnerabilities are published against old
-images; the Vertra console also rescans images in use daily and refuses ones
+images; the Vennir console also rescans images in use daily and refuses ones
 that fail.
 
 ## Who approves what
@@ -686,16 +686,16 @@ that fail.
 [.github/CODEOWNERS](.github/CODEOWNERS), with `main`'s ruleset
 requiring a code owner's review ([Protecting main](#protecting-main)): the catalog admins own everything by
 default, each team's owners own `/teams/<team>/`, and the admins
-own, last so nothing overrides them, `.github/`, `tools/`, `vertra.yaml`,
-`vertra` (the wrapper), `templates/` and every `/teams/*/secret-stores/`. A
+own, last so nothing overrides them, `.github/`, `tools/`, `vennir.yaml`,
+`vennir` (the wrapper), `templates/` and every `/teams/*/secret-stores/`. A
 team ships its own products, but can't change how CI builds and
 publishes, take another team's folder, add a team, or change what
-vault its namespace can read. `./vertra catalog validate` checks this layout, and
+vault its namespace can read. `./vennir catalog validate` checks this layout, and
 `check-codeowners.yml` checks every owner exists.
 
 ### Protecting main
 
-None of that holds until `main` has a ruleset, which `vertra catalog
+None of that holds until `main` has a ruleset, which `vennir catalog
 create` doesn't make: add one under **Settings → Rules → Rulesets → New
 branch ruleset**, targeting the default branch, with:
 
@@ -728,12 +728,12 @@ reruns the product checks and scans and publishes nothing that fails them.
 
 ## Publishing
 
-`./vertra catalog publish` checks each product, then pushes its image tagged with
-the commit that last changed it (its folder, `tools/`, `vertra.yaml` or
-`vertra`; the time, from a laptop), signs it if the
+`./vennir catalog publish` checks each product, then pushes its image tagged with
+the commit that last changed it (its folder, `tools/`, `vennir.yaml` or
+`vennir`; the time, from a laptop), signs it if the
 catalog signs, and attaches its software bill of materials (CycloneDX, from
 its scan) as an attestation signed the same way, which each install's
-Observe page offers for download; only then does it move `:latest` to it. `./vertra catalog release` then pushes the catalog's release to
+Observe page offers for download; only then does it move `:latest` to it. `./vennir catalog release` then pushes the catalog's release to
 `<registry>/catalog-release`, signs it the same way and only then tags it
 with the commit and `latest`: every team, its SecretStore files, and every action as
 `<team>-<product>-<action>`, its image pinned by digest to the image tagged
@@ -749,12 +749,12 @@ can press **Sync now**), verifies its signature, and applies it.
 In CI, pull requests run `check` on the changed products, and a merge to
 `main` runs `publish` on them and then `release`, one run at a time, in the
 `catalog-publish` Environment (`main` only). Settings are in
-[vertra.yaml](vertra.yaml), each overridable by an environment variable:
+[vennir.yaml](vennir.yaml), each overridable by an environment variable:
 
 | Name | Kind | What |
 |---|---|---|
-| `VERTRA_REGISTRY` | variable | where images and releases go, such as `us-docker.pkg.dev/my-project/catalog` |
-| `VERTRA_SIGNING_MODE`, `VERTRA_SIGNING_KEY` | variables | `none`, `key` (a key pair or cloud KMS key) or `keyless` |
+| `VENNIR_REGISTRY` | variable | where images and releases go, such as `us-docker.pkg.dev/my-project/catalog` |
+| `VENNIR_SIGNING_MODE`, `VENNIR_SIGNING_KEY` | variables | `none`, `key` (a key pair or cloud KMS key) or `keyless` |
 | `COSIGN_PRIVATE_KEY`, `COSIGN_PASSWORD` | secrets | a generated signing key |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER`, `PUBLISH_GCP_SERVICE_ACCOUNT` | variables | sign in to Artifact Registry through OIDC |
 | `AWS_ROLE_ARN`, `AWS_REGION` | variables | or to ECR through OIDC (a role that may push under the registry's prefix) |
@@ -764,8 +764,8 @@ CI needs only the registry: no console token, no cluster credential. Each
 install points its console at the release (the console chart's
 `catalog.release`) and trusts the same signing key or identity as its images.
 
-From a laptop: `./vertra catalog publish [teams/<team>/products/<product> ...]`,
-then `./vertra catalog release`, signed in to the registry with `docker login`.
+From a laptop: `./vennir catalog publish [teams/<team>/products/<product> ...]`,
+then `./vennir catalog release`, signed in to the registry with `docker login`.
 
 If a merged product doesn't show up on an install, the install refused
 it: each console applies a release item by item, and keeps a list of what
@@ -792,7 +792,7 @@ Neither goes in a template's or DAG's inputs (a run's inputs are shown to
 anyone who can see the run), in `result.json`, or in an image.
 
 **Values a build needs.** A team whose builds need one is listed in
-[vertra.yaml](vertra.yaml)'s `buildEnvironments`. On `main` its products are
+[vennir.yaml](vennir.yaml)'s `buildEnvironments`. On `main` its products are
 then built in a job of their own, in the team's Environment (which only
 `main` may use), with each of that Environment's secrets offered to `docker
 build` under its own name. The images are handed to the publish job, which
@@ -805,9 +805,9 @@ team's products.
 
 To set one up, in this order:
 
-1. A pull request adds the team to `buildEnvironments` in `vertra.yaml`
+1. A pull request adds the team to `buildEnvironments` in `vennir.yaml`
    (catalog admins approve it).
-2. A catalog admin runs `./vertra catalog environments`, which makes
+2. A catalog admin runs `./vennir catalog environments`, which makes
    `team-<team>` and limits it to `main`. Run it again any time: it changes
    only what isn't so, and keeps the Environment's secrets and reviewers.
 3. Add the team's secrets to that Environment (Settings → Environments, or
@@ -828,11 +828,11 @@ RUN --mount=type=secret,id=NPM_TOKEN,required=true \
 A secret mounted this way is never in a layer. Don't copy it into one, or
 write it into a file the image keeps: the image's scan fails on a secret it
 finds. To build on a laptop, hand it the values as JSON:
-`VERTRA_BUILD_SECRETS='{"NPM_TOKEN":"..."}' ./vertra catalog check
+`VENNIR_BUILD_SECRETS='{"NPM_TOKEN":"..."}' ./vennir catalog check
 teams/<team>/products/<product>`.
 
 The separation depends on `main` being protected (code-owner review, with
-`.github/` and `vertra.yaml` approved by catalog admins: "Protecting main"),
+`.github/` and `vennir.yaml` approved by catalog admins: "Protecting main"),
 and on GitHub Environments, which a private repository has only on a paid
 plan. On GitHub Free a private catalog has no per-team separation in CI: a
 team that needs build values there keeps a catalog repository of its own.
@@ -841,10 +841,10 @@ team that needs build values there keeps a catalog repository of its own.
 
 [bases.yaml](bases.yaml) lists the base images the catalog approves. Each
 week CI copies each into the registry, `<registry>/bases/<name>`, with the
-same digest, scans the copy and signs it as products are (`./vertra catalog
+same digest, scans the copy and signs it as products are (`./vennir catalog
 bases mirror`; run `ci.yml` by hand to do it now). A product can then build
 FROM the catalog's own copy, which stays put if the source moves or goes
-away: `./vertra catalog bases --use-mirror` points each Dockerfile's FROM of
+away: `./vennir catalog bases --use-mirror` points each Dockerfile's FROM of
 an approved base at its copy, pinned. Products may use other bases too;
 their own checks scan them either way.
 
@@ -852,7 +852,7 @@ their own checks scan them either way.
 
 Every release `main` publishes is `latest`, and an install following
 `latest` applies it within minutes. An install can follow versions
-instead (`catalogVersion` in its vertra.yaml: `newest`, or one such as
+instead (`catalogVersion` in its vennir.yaml: `newest`, or one such as
 `v1.4.0`), so a catalog can reach a test install first and a production one
 when you choose. A version is a Git tag:
 
@@ -862,7 +862,7 @@ git push origin v1.4.0
 ```
 
 `version.yml` then asks CI on `main` to tag that commit's release
-`<registry>/catalog-release:v1.4.0` (`./vertra catalog promote`). Nothing is
+`<registry>/catalog-release:v1.4.0` (`./vennir catalog promote`). Nothing is
 rebuilt or re-signed: a version is the same digests, under the same
 signature, as the release test already applied. A version never moves:
 tagging it again on another commit is refused, so make a new one, or pin
@@ -907,28 +907,46 @@ other providers are designed but not yet proven.
 
 ## Updating your catalog
 
-Your catalog is a copy of this template, so a new Vertra release changes
+Your catalog is a copy of this template, so a new Vennir release changes
 nothing in it by itself. Each release's notes say what a catalog changes
 with it. Then:
 
-1. **Pin the release's `./vertra`.** It's what runs your checks, tests and
+1. **Pin the release's `./vennir`.** It's what runs your checks, tests and
    publishing, with the catalog schemas built in, so a new check or fix
    reaches your catalog only through this pin. From a platform checkout:
-   `.github/scripts/pin-vertra.sh <version> <your-catalog>/vertra` writes
+   `.github/scripts/pin-vennir.sh <version> <your-catalog>/vennir` writes
    the version and each platform's SHA-256, after checking each binary
    downloads anonymously and matches the release. Merge it as any change.
 2. **Copy what the template changed at that release**, after comparing:
    `.github/workflows/`, `.github/actions/`, `.github/scripts/`,
    `.semgrep/`, `.gitignore`, and `tools/` (the schemas your editor reads;
-   `./vertra` has its own copy). You may have changed some of these
+   `./vennir` has its own copy). You may have changed some of these
    yourself. Copy them in the same pull request as the pin: a workflow can
-   run commands only the new `./vertra` has.
-3. **Leave the rest:** `teams/` and `vertra.yaml` are yours, and
+   run commands only the new `./vennir` has.
+3. **Leave the rest:** `teams/` and `vennir.yaml` are yours, and
    `samples/` and `templates/` are examples: take what's new from them by
    hand, as you'd copy a starter.
 
+**From a Vertra catalog** (the platform's name until 2026-11-03; releases
+through 0.10.0), in one pull request:
+
+1. Copy the template's `./vennir` (pinned to a Vennir release) into the
+   catalog's root, and run `./vennir catalog migrate`. It rewrites every
+   file's `apiVersion` to `vennir.dev/v2`, renames `vertra.yaml` to
+   `vennir.yaml`, and removes `./vertra`, pointing CODEOWNERS' and
+   `.gitignore`'s lines for it at `./vennir`.
+2. Copy the template's `.github/` as in step 2 above: its workflows read
+   `VENNIR_*` variables.
+3. Rename the repository's variables (`VERTRA_REGISTRY`,
+   `VERTRA_SIGNING_MODE`, `VERTRA_SIGNING_KEY`) to `VENNIR_*`, or run
+   `vennir catalog create` again from the install, which sets the new ones
+   and removes the old.
+
+The first run on `main` after the merge publishes a release Vennir installs
+read; a Vennir install doesn't read a Vertra release.
+
 On AWS, the publish role trusts only jobs whose OIDC subject names `main`,
 so the repository's tokens carry their branch even in an Environment
-(subject claims `repo`, `context`, `ref`). `vertra catalog create` sets
-that, and `vertra apply` sets it on a catalog made before it did (with `gh`
+(subject claims `repo`, `context`, `ref`). `vennir catalog create` sets
+that, and `vennir apply` sets it on a catalog made before it did (with `gh`
 signed in as an admin of the repository), before it changes the role.

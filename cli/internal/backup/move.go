@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/install"
-	"github.com/rburns629/vertra/cli/internal/platform"
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/install"
+	"github.com/rburns629/vennir/cli/internal/platform"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // Moving an install's data from its in-cluster Postgres into a managed
@@ -56,7 +56,7 @@ func MoveToManaged(ctx context.Context, r *run.Runner, c *config.Config, out io.
 		return err
 	}
 	if platform.Asleep(deps) {
-		return fmt.Errorf("the platform is asleep: `vertra wake`, then apply again to move its data")
+		return fmt.Errorf("the platform is asleep: `vennir wake`, then apply again to move its data")
 	}
 	postgresImage, err := r.Output(ctx, "kubectl", kubectl(c, "get", "deployment", postgresDeployment,
 		"-o", `jsonpath={.spec.template.spec.containers[?(@.name=="postgres")].image}`)...)
@@ -94,8 +94,8 @@ func MoveToManaged(ctx context.Context, r *run.Runner, c *config.Config, out io.
 	// stayed stopped since, which the record's being there says.
 	copied := copiedDatabases(ctx, r, c)
 	moves := []struct{ job, database, user, serviceAccount string }{
-		{"vertra-move-kernel", kernelDatabase, db.KernelUser, kernelServiceAccount},
-		{"vertra-move-console", consoleDatabase, db.ConsoleUser, consoleServiceAccount},
+		{"vennir-move-kernel", kernelDatabase, db.KernelUser, kernelServiceAccount},
+		{"vennir-move-console", consoleDatabase, db.ConsoleUser, consoleServiceAccount},
 	}
 	var pending []func()
 	errs := make([]error, len(moves))
@@ -273,15 +273,15 @@ func moveJob(name, serviceAccount, kernelImage, postgresImage, database string, 
 	caMount, caVolume := "", ""
 	if sourceTLS {
 		sslmode = `{name: SOURCE_SSLMODE, value: verify-full}
-            - {name: PGSSLROOTCERT, value: /etc/vertra/tls/ca.crt}`
-		caMount = "\n            - {name: tls-ca, mountPath: /etc/vertra/tls, readOnly: true}"
+            - {name: PGSSLROOTCERT, value: /etc/vennir/tls/ca.crt}`
+		caMount = "\n            - {name: tls-ca, mountPath: /etc/vennir/tls, readOnly: true}"
 		caVolume = fmt.Sprintf("\n        - name: tls-ca\n          secret: {secretName: %s}", install.KernelRelease+"-execution-kernel-tls-ca")
 	}
 	return fmt.Sprintf(`apiVersion: batch/v1
 kind: Job
 metadata:
   name: %[1]s
-  labels: {app.kubernetes.io/managed-by: vertra}
+  labels: {app.kubernetes.io/managed-by: vennir}
 spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 86400
@@ -310,7 +310,7 @@ spec:
           volumeMounts:
             - {name: token, mountPath: /token}
             # The URL names the server's CA, which pgx reads as it parses it.
-            - {name: db-ca, mountPath: /etc/vertra/tls-db, readOnly: true}
+            - {name: db-ca, mountPath: /etc/vennir/tls-db, readOnly: true}
           resources:
             requests: {cpu: 50m, memory: 64Mi}
             limits: {memory: 128Mi}
@@ -332,7 +332,7 @@ spec:
             - %[12]s
           volumeMounts:
             - {name: token, mountPath: /token, readOnly: true}
-            - {name: db-ca, mountPath: /etc/vertra/tls-db, readOnly: true}%[13]s
+            - {name: db-ca, mountPath: /etc/vennir/tls-db, readOnly: true}%[13]s
           resources:
             requests: {cpu: 250m, memory: 256Mi}
             limits: {memory: 1Gi}

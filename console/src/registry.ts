@@ -307,8 +307,8 @@ export async function missingImages(images: string[], allowedPrefixes: string[])
 /** The most a catalog release's JSON may be: far more than any catalog. */
 const MAX_RELEASE_BYTES = 10 * 1024 * 1024;
 const RELEASE_TIMEOUT_MS = 30_000;
-export const RELEASE_MEDIA_TYPE = "application/vnd.vertra.catalog.release.v1+json";
-const RELEASE_CONFIG_MEDIA_TYPE = "application/vnd.vertra.catalog.release.config.v1+json";
+export const RELEASE_MEDIA_TYPE = "application/vnd.vennir.catalog.release.v1+json";
+const RELEASE_CONFIG_MEDIA_TYPE = "application/vnd.vennir.catalog.release.config.v1+json";
 
 /** A GET of `path` under the reference's repository, signing in as the
  * manifest checks do (the registry's own token service only). */
@@ -346,7 +346,7 @@ async function body(response: Response, what: string): Promise<Uint8Array> {
 }
 
 /**
- * A catalog release (catalog CI's `vertra catalog release`): its manifest's
+ * A catalog release (catalog CI's `vennir catalog release`): its manifest's
  * digest, and its one layer, the release as JSON. `reference` is the
  * console's own setting (config.catalog.release), never a caller's. Every
  * byte read is checked against the digest that names it, so the JSON is

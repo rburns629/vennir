@@ -1,4 +1,4 @@
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: project
 team: gcp
@@ -29,7 +29,7 @@ actions:
     concurrencyKey: [projectId]
     script: actions/create.py
     # Deleting the project it made (only one it made for the run's team:
-    # create labels it vertra-made and vertra-team, and delete refuses any
+    # create labels it vennir-made and vennir-team, and delete refuses any
     # other). The console offers it to
     # whoever the run was for, and admins.
     cleanup:
@@ -41,7 +41,7 @@ actions:
       properties:
         projectId:
           type: string
-          x-vertra-needs: gcp.project  # a target: checked against allowedTargets for other teams
+          x-vennir-needs: gcp.project  # a target: checked against allowedTargets for other teams
           pattern: "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"
           description: >-
             The GCP project id to look up or create. If a project with this
@@ -67,7 +67,7 @@ actions:
       properties:
         projectId:
           type: string
-          x-vertra-provides: gcp.project  # Compose wires it into inputs that need one
+          x-vennir-provides: gcp.project  # Compose wires it into inputs that need one
           description: >-
             Echoed back either way, for downstream tasks to reference via
             $fromTask/$output.

@@ -12,7 +12,7 @@ import (
 	"connectrpc.com/connect"
 )
 
-const console = "system:serviceaccount:vertra-system:execution-console"
+const console = "system:serviceaccount:vennir-system:execution-console"
 
 type reviews struct {
 	asked int
@@ -22,7 +22,7 @@ type reviews struct {
 
 func (r *reviews) review(_ context.Context, token, audience string) (string, error) {
 	r.asked++
-	if audience != "vertra-kernel-api" {
+	if audience != "vennir-kernel-api" {
 		return "", nil
 	}
 	return r.users[token], r.err
@@ -30,7 +30,7 @@ func (r *reviews) review(_ context.Context, token, audience string) (string, err
 
 func callers(r *reviews, allowed ...string) (*Callers, *time.Time) {
 	now := time.Now()
-	c := &Callers{Review: r.review, Audience: "vertra-kernel-api", Allowed: allowed, Log: quiet}
+	c := &Callers{Review: r.review, Audience: "vennir-kernel-api", Allowed: allowed, Log: quiet}
 	c.now = func() time.Time { return now }
 	return c, &now
 }

@@ -57,11 +57,11 @@ function product(name: string, needs: Record<string, string | [string, "optional
       properties: Object.fromEntries(
         Object.entries(needs).map(([n, t]) => {
           const wiring = typeof t === "string" ? t : t[0];
-          return [n, { type: "string", ...(wiring ? { "x-vertra-needs": wiring } : {}) }];
+          return [n, { type: "string", ...(wiring ? { "x-vennir-needs": wiring } : {}) }];
         }),
       ),
     },
-    outputSchema: { type: "object", properties: Object.fromEntries(Object.entries(provides).map(([n, t]) => [n, { type: "string", "x-vertra-provides": t }])) },
+    outputSchema: { type: "object", properties: Object.fromEntries(Object.entries(provides).map(([n, t]) => [n, { type: "string", "x-vennir-provides": t }])) },
   } as unknown as TeamProduct;
 }
 
@@ -206,14 +206,14 @@ beforeAll(async () => {
     image: `registry.example/${team}/project:1`,
     action: "create",
     teamId: shop.id,
-    outputSchema: { type: "object", properties: { projectId: { type: "string", "x-vertra-provides": `${prefix}.project` } } },
+    outputSchema: { type: "object", properties: { projectId: { type: "string", "x-vennir-provides": `${prefix}.project` } } },
   });
   await upsertProduct({
     name: `${team}-bucket-create`,
     image: `registry.example/${team}/bucket:1`,
     action: "create",
     teamId: shop.id,
-    inputSchema: { type: "object", required: ["project"], properties: { project: { type: "string", "x-vertra-needs": `${prefix}.project` } } },
+    inputSchema: { type: "object", required: ["project"], properties: { project: { type: "string", "x-vennir-needs": `${prefix}.project` } } },
   });
   await upsertProduct({ name: `${other}-secret-get`, image: `registry.example/${other}/secret:1`, action: "get", teamId: otherTeam.id });
 });

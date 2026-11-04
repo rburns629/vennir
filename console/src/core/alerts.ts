@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 /**
  * The install's alerts, as a Prometheus has them now (Observe's Metrics):
- * the charts' alerting rules (their groups are vertra-console and
- * vertra-kernel), each inactive, pending or firing, with what it fires
+ * the charts' alerting rules (their groups are vennir-console and
+ * vennir-kernel), each inactive, pending or firing, with what it fires
  * for. Read from config.monitoring.prometheusUrl's HTTP API, which any
  * Prometheus serves itself, Alertmanager or not: the bundled one, one the
  * operator runs, or one outside the cluster.
@@ -56,7 +56,7 @@ export interface AlertRuleView {
 }
 
 /** The charts' rule groups. */
-const OURS = /^vertra-/;
+const OURS = /^vennir-/;
 /** A rule's summary for no one instance: its template expressions left out. */
 const general = (text: string) => text.replace(/\{\{[^}]*\}\}/g, "…");
 const STATE_ORDER = ["firing", "pending", "inactive"];
@@ -106,7 +106,7 @@ async function gmpQuery(project: string, query: string): Promise<Series[]> {
     throw new GmpUnread("Google's managed Prometheus isn't answering.");
   }
   if (response.status === 403) {
-    throw new GmpUnread(`Google's managed Prometheus refused the console (403): its Google identity needs roles/monitoring.viewer on ${project}, which vertra apply grants.`);
+    throw new GmpUnread(`Google's managed Prometheus refused the console (403): its Google identity needs roles/monitoring.viewer on ${project}, which vennir apply grants.`);
   }
   if (!response.ok) throw new GmpUnread(`Google's managed Prometheus answered ${String(response.status)}.`);
   let body: { status: string; data?: { result?: Series[] } };

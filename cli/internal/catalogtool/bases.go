@@ -17,10 +17,10 @@ import (
 )
 
 // A catalog's approved base images (bases.yaml): each copied into its
-// registry, <registry>/bases/<name>, by `vertra catalog bases mirror` (catalog
+// registry, <registry>/bases/<name>, by `vennir catalog bases mirror` (catalog
 // CI, weekly), keeping its digest, for products to build FROM. The copies are
 // the catalog's own: pinned, scanned, signed as its images are, and still
-// there if the source moves or goes. A product may use them (`vertra catalog
+// there if the source moves or goes. A product may use them (`vennir catalog
 // bases --use-mirror` points its Dockerfile at them) or not.
 
 var basesSchema = sync.OnceValue(func() *jsonschema.Schema { return embeddedSchema("bases.schema.json") })
@@ -131,7 +131,7 @@ func (c *Catalog) MirrorBases(ctx context.Context) (bool, error) {
 	}
 	if problems := s.Problems(); len(problems) > 0 {
 		for _, p := range problems {
-			c.errorAt(c.path("vertra.yaml"), p)
+			c.errorAt(c.path("vennir.yaml"), p)
 		}
 		return false, nil
 	}
@@ -170,7 +170,7 @@ func (c *Catalog) MirrorBases(ctx context.Context) (bool, error) {
 // scanBase is what a scan of a mirrored base found, in words; a base is never
 // refused for it.
 func (c *Catalog) scanBase(reference string) string {
-	work, cleanup, err := tempDir("vertra-base-")
+	work, cleanup, err := tempDir("vennir-base-")
 	if err != nil {
 		return "(not scanned)"
 	}

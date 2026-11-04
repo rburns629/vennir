@@ -228,7 +228,7 @@ function botEmail(teamName: string, purpose: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
-  return `${teamName}-${slug || "bot"}@bots.vertra.local`;
+  return `${teamName}-${slug || "bot"}@bots.vennir.local`;
 }
 
 /** The three kinds of bot, side by side above the list. */
@@ -358,20 +358,20 @@ export function AutomationTab({
                   </Alert>
                   <CodeBlock code={issued.token} copyLabel="Copy token" />
                   <Typography variant="subtitle2">1. Store it in your pipeline</Typography>
-                  <CodeBlock code={"gh secret set VERTRA_TOKEN \\\n  --repo <your-org>/<your-repo>"} />
+                  <CodeBlock code={"gh secret set VENNIR_TOKEN \\\n  --repo <your-org>/<your-repo>"} />
                   <Typography variant="subtitle2">{issued.ordering ? "2. Place an order from it" : "2. Submit a DAG from it"}</Typography>
                   <CodeBlock
                     code={
                       issued.ordering
                         ? [
-                            `curl -X POST ${consoleUrl}/api/vertra.console.v1.TemplateService/RunTemplate \\`,
-                            '  -H "Authorization: Bearer $VERTRA_TOKEN" \\',
+                            `curl -X POST ${consoleUrl}/api/vennir.console.v1.TemplateService/RunTemplate \\`,
+                            '  -H "Authorization: Bearer $VENNIR_TOKEN" \\',
                             '  -H "Content-Type: application/json" \\',
                             `  -d '{"team": "<team>", "name": "<template>", "onBehalfOf": "${teamName}", "requestId": "<order id>", "parameters": {}}'`,
                           ].join("\n")
                         : [
-                            `jq '{dag: .}' dag.json | curl -X POST ${consoleUrl}/api/vertra.console.v1.ExecutionService/SubmitExecution \\`,
-                            '  -H "Authorization: Bearer $VERTRA_TOKEN" \\',
+                            `jq '{dag: .}' dag.json | curl -X POST ${consoleUrl}/api/vennir.console.v1.ExecutionService/SubmitExecution \\`,
+                            '  -H "Authorization: Bearer $VENNIR_TOKEN" \\',
                             '  -H "Content-Type: application/json" \\',
                             "  -d @-",
                           ].join("\n")
@@ -407,7 +407,7 @@ export function AutomationTab({
             <Card component="section" aria-labelledby="kl" sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 1.5 }}>
               <CardTitle id="kl" title="Keyless sign-in, in the job">
                 For <Mono>{shownIdentity.botEmail.split("@")[0]}</Mono> from <Mono>{Object.values(shownIdentity.claims).join(" on ")}</Mono>. The
-                job swaps its {shownCi.name} ID token for an hour&apos;s Vertra token; any other repository{shownIdentity.claims["ref"] ? " or branch" : ""} can&apos;t.
+                job swaps its {shownCi.name} ID token for an hour&apos;s Vennir token; any other repository{shownIdentity.claims["ref"] ? " or branch" : ""} can&apos;t.
               </CardTitle>
               <CodeBlock code={shownCi.snippet(keyless.audience, consoleUrl)} />
             </Card>

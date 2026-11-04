@@ -19,7 +19,7 @@ const (
 	trivyImage      = "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969"
 	osvScannerImage = "ghcr.io/google/osv-scanner:v2.6.0@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa"
 	// Trivy's vulnerability database, kept between local runs.
-	trivyCacheVolume = "vertra-trivy-cache"
+	trivyCacheVolume = "vennir-trivy-cache"
 )
 
 // scanner is the command that runs a scanner: installed, or else from its
@@ -45,7 +45,7 @@ func (c *Catalog) scanner(binary, image, work string, args []string, cache bool)
 // .trivyignore, one id per line with a comment saying why; its review is
 // what accepts it.
 func (c *Catalog) Scan(p *Product) bool {
-	work, cleanup, err := tempDir("vertra-scan-")
+	work, cleanup, err := tempDir("vennir-scan-")
 	if err != nil {
 		c.errorAt(p.Dir, err.Error())
 		return false

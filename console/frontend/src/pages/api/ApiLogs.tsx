@@ -15,7 +15,7 @@ const SHOWN = 20;
 /**
  * The newest lines from its team's API backends (ObserveService.SearchLogs,
  * source api), for its own team and admins. They're the team's Pods
- * labelled vertra/api-backend, not this API's alone: the logs don't say
+ * labelled vennir/api-backend, not this API's alone: the logs don't say
  * which API a Pod serves.
  */
 export function ApiLogs({ team, api }: { team: string; api: string }) {
@@ -47,7 +47,7 @@ export function ApiLogs({ team, api }: { team: string; api: string }) {
             Its backend’s logs
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
-            The newest lines, over the last day, from Pods {team} labels <Mono sx={{ fontSize: 12 }}>vertra/api-backend</Mono>, every level,
+            The newest lines, over the last day, from Pods {team} labels <Mono sx={{ fontSize: 12 }}>vennir/api-backend</Mono>, every level,
             seen by {team} and admins only. Credentials are redacted before anything is kept.
           </Typography>
         </Box>

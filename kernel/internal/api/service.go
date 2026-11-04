@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-// Package api is kernel-api: KernelService (proto/vertra/kernel/v1) over
+// Package api is kernel-api: KernelService (proto/vennir/kernel/v1) over
 // Connect, on the same database kernel-scheduler runs. It accepts only the
 // console (auth.go) and trusts it to have authorized each request against
 // the caller's teams: kernel-api has no users or teams. It never calls the
@@ -25,10 +25,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
-	kernelv1 "github.com/rburns629/vertra/kernel/internal/gen/vertra/kernel/v1"
-	"github.com/rburns629/vertra/kernel/internal/gen/vertra/kernel/v1/kernelv1connect"
-	"github.com/rburns629/vertra/kernel/internal/metrics"
+	"github.com/rburns629/vennir/kernel/internal/domain"
+	kernelv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1"
+	"github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1/kernelv1connect"
+	"github.com/rburns629/vennir/kernel/internal/metrics"
 )
 
 // MaxStatesPerRequest bounds GetExecutionStates; the console asks in batches.

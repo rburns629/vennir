@@ -45,11 +45,11 @@ export function schemaErrors(schema: unknown, value: unknown): ErrorObject[] {
 
 /**
  * What's wrong, in the schema's own words where it gives them (a pattern's
- * x-vertra-pattern-message, as the console's forms show it), else ajv's.
+ * x-vennir-pattern-message, as the console's forms show it), else ajv's.
  */
 export function errorMessage(e: ErrorObject): string {
   const parent: unknown = e.parentSchema;
-  const own = e.keyword === "pattern" && typeof parent === "object" && parent !== null ? (parent as Record<string, unknown>)["x-vertra-pattern-message"] : undefined;
+  const own = e.keyword === "pattern" && typeof parent === "object" && parent !== null ? (parent as Record<string, unknown>)["x-vennir-pattern-message"] : undefined;
   return typeof own === "string" && own ? own : (e.message ?? "is invalid");
 }
 

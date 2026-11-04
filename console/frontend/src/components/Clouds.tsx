@@ -127,7 +127,7 @@ export function NotForThisInstall({ error, product, what }: { error: ApiError; p
         )}
         {typeof ask.model === "string" && (
           <Button variant="text" onClick={() => { ask.open("Why was my run refused with NOT_FOR_THIS_INSTALL, and what should I do?"); }}>
-            Ask Vertra about it
+            Ask Vennir about it
           </Button>
         )}
         <Box sx={{ ml: { sm: "auto" } }}>

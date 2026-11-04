@@ -12,7 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/rburns629/vertra/kernel/internal/executor"
+	"github.com/rburns629/vennir/kernel/internal/executor"
 )
 
 // The scheduler and Postgres alone (perf/README.md, phase 1): schedulers
@@ -21,11 +21,11 @@ import (
 // database. What's measured is claiming, dispatching, recording and
 // releasing, with no Kubernetes at all: the ceiling the database and the
 // scheduler's own logic put on steps a second. A benchmark, so it runs only
-// with VERTRA_PERF=1, and checks what a load mustn't break: every run
+// with VENNIR_PERF=1, and checks what a load mustn't break: every run
 // succeeds, and no step is started twice.
 func TestPerfSchedulerThroughput(t *testing.T) {
-	if os.Getenv("VERTRA_PERF") == "" {
-		t.Skip("a benchmark: VERTRA_PERF=1 go test ./internal/scheduler -run TestPerf -v (perf/README.md)")
+	if os.Getenv("VENNIR_PERF") == "" {
+		t.Skip("a benchmark: VENNIR_PERF=1 go test ./internal/scheduler -run TestPerf -v (perf/README.md)")
 	}
 	for _, w := range []struct {
 		name       string

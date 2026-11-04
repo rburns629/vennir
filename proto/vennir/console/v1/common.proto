@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: MIT
+//
+// Types shared by the console's services.
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/struct.proto";
+
+// Why something went wrong, in a form a caller can act on: a stable code,
+// a message for a person, and whether trying again may work. A task's
+// failure, a product's error, and the details of an error response all
+// take this shape.
+message Failure {
+  // A stable code, such as TASK_TIMEOUT, IDENTITY_NOT_ALLOWED or TEAM_RETIRED.
+  string code = 1;
+  // What went wrong, for a person to read.
+  string message = 2;
+  // Whether the same request may succeed if tried again.
+  bool retryable = 3;
+  // More about it, when there is more: the images refused and the sources
+  // allowed (IMAGE_NOT_ALLOWED), a failed scan's findings, the executions
+  // still running (EXECUTIONS_RUNNING).
+  google.protobuf.Struct detail = 4;
+}
+
+// Every problem found with a request, attached to an invalid_argument
+// error so a caller can fix them all at once. `field` says where, as a
+// path such as "tasks[2].inputs.region".
+message Problem {
+  string field = 1;
+  string code = 2;
+  string message = 3;
+}
+
+// One page of a list, and how to ask for the next.
+message PageRequest {
+  // At most this many items; the method's own default when unset.
+  int32 limit = 1;
+  // A previous response's next_cursor, to continue from there.
+  string cursor = 2;
+}
+
+// CPU and memory for a task's Pod, as Kubernetes quantities ("250m",
+// "512Mi"). A product's are its tasks' defaults; a task's own win.
+message TaskResources {
+  optional string cpu = 1;
+  optional string memory = 2;
+  optional string memory_limit = 3;
+}

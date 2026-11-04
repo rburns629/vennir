@@ -4,7 +4,7 @@
 image:
   # -- The released images (built, scanned and signed by the release
   # workflow). Local installs set their own (helm/values/kind/).
-  repository: ghcr.io/rburns629/vertra/execution-console
+  repository: ghcr.io/rburns629/vennir/execution-console
   # -- Defaults to the chart's appVersion: the image released with it.
   tag: ""
   # -- Pin by digest ("sha256:…") so what runs can't change under a moved tag.
@@ -194,7 +194,7 @@ scanning:
 # -- The audit log's write-once copy (console/src/auditExport.ts): every
 # `minutes`, the entries since the last copy, their hash chain checked, as
 # one JSON-lines object in a bucket that refuses deletes and overwrites (a
-# GCS retention policy, S3 Object Lock; vertra makes it). A broken chain
+# GCS retention policy, S3 Object Lock; vennir makes it). A broken chain
 # stops the copy there and shows on Observe. Empty bucket: off.
 audit:
   export:
@@ -207,10 +207,10 @@ audit:
     # -- A Secret with access-key-id and secret-access-key, for a store
     # without the cloud's identities (MinIO); empty otherwise.
     credentialsSecret: ""
-    prefix: vertra-audit/
+    prefix: vennir-audit/
     minutes: 5
     # -- What the bucket keeps each copy for, in days, and whether that
-    # retention is locked (vertra.yaml's audit.keepDays and audit.lock). The
+    # retention is locked (vennir.yaml's audit.keepDays and audit.lock). The
     # bucket enforces them; here they're only shown on the Admin page,
     # labelled "as configured" (the console may read the bucket's objects,
     # not its retention). 0: not known.
@@ -219,7 +219,7 @@ audit:
 
 # -- Log search (Observe's Logs tab, console/src/core/logs.ts): Grafana
 # Alloy reads every step's output, the API backends teams run (Pods
-# labelled vertra/api-backend: "true") and the platform's own through the
+# labelled vennir/api-backend: "true") and the platform's own through the
 # Kubernetes API, redacts credentials, and sends it to a single Loki here.
 # The console queries Loki itself, adding each caller's visibility (a step's
 # INFO lines to anyone who may see its run; the rest, and a backend's
@@ -233,7 +233,7 @@ logs:
   keepDays: 365
   storage:
     # -- filesystem (a volume here), gcs or s3. A bucket's lifecycle moves
-    # chunks older than searchDays to its archive class (vertra creates the
+    # chunks older than searchDays to its archive class (vennir creates the
     # bucket so; docs/operations.md, Logs).
     type: filesystem
     bucket: ""
@@ -244,7 +244,7 @@ logs:
     size: 10Gi
     storageClassName: ""
   # -- Loki's ServiceAccount (default: <release>-execution-console-loki):
-  # the name its bucket identity is bound to (vertra uses vertra-loki).
+  # the name its bucket identity is bound to (vennir uses vennir-loki).
   serviceAccountName: ""
   # -- On it: GKE's iam.gke.io/gcp-service-account (EKS binds a role to the
   # name by Pod Identity instead).
@@ -288,7 +288,7 @@ gateway:
   # role and Secret yourself.
   database:
     existingSecret: ""
-    role: vertra_gateway
+    role: vennir_gateway
   # -- Most database connections each gateway holds (each request checks
   # who's calling there).
   databaseMaxConnections: 10
@@ -296,7 +296,7 @@ gateway:
   # Identity it signs in as (iam.gke.io/gcp-service-account).
   serviceAccountAnnotations: {}
   image:
-    repository: ghcr.io/rburns629/vertra/execution-gateway
+    repository: ghcr.io/rburns629/vennir/execution-gateway
     # -- Defaults to the chart's appVersion, as image.tag does.
     tag: ""
     # -- Pin by digest ("sha256:…"), as image.digest does.
@@ -356,7 +356,7 @@ gateway:
   # audience that token carries. On GKE, the cluster's Workload Identity
   # pool: tokenAudience <project>.svc.id.goog, stsAudience
   # identitynamespace:<project>.svc.id.goog:https://container.googleapis.com/v1/projects/<project>/locations/<location>/clusters/<cluster>
-  # (vertra sets both). Elsewhere, a pool's provider trusting the cluster's
+  # (vennir sets both). Elsewhere, a pool's provider trusting the cluster's
   # issuer: //iam.googleapis.com/projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>,
   # and its https:// form.
   gcp:
@@ -365,7 +365,7 @@ gateway:
 
 # -- The catalog this console registers from (console/src/catalogSync.ts):
 # its release, which catalog CI pushes from main beside the images
-# (`vertra catalog release`, <registry>/catalog-release:latest). The console reads
+# (`vennir catalog release`, <registry>/catalog-release:latest). The console reads
 # it every pollSeconds (and on the Admin page's Sync now), verifies its
 # signature when `signature` trusts one, and applies it: teams, products and
 # SecretStores, with the release's rights only (never purging). It reads the
@@ -374,12 +374,12 @@ gateway:
 catalog:
   release: ""
   # -- Follow the newest version (a vX.Y.Z tag of release's repository, which
-  # a vX.Y.Z Git tag in the catalog repository makes: `vertra catalog
+  # a vX.Y.Z Git tag in the catalog repository makes: `vennir catalog
   # promote`) instead of release's own tag. Or pin one: release
   # <registry>/catalog-release:v1.4.0.
   newestVersion: false
   pollSeconds: 300
-  # -- release is another install's catalog (vertra.yaml's externalCatalog),
+  # -- release is another install's catalog (vennir.yaml's externalCatalog),
   # not this install's own. Shown on the Admin page only, "as configured".
   external: false
   # -- Who may sign a release: any of these cosign public keys (PEM), and/or
@@ -419,9 +419,9 @@ registryCheck:
   # GHCR, Docker Hub, Artifact Registry). Its credential only needs to read
   # manifests, unless it's also copied to teams (below).
   pullSecretName: ""
-  # -- Also copy pullSecretName into every team namespace as `vertra-pull`,
+  # -- Also copy pullSecretName into every team namespace as `vennir-pull`,
   # so steps can run images from private registries; set the kernel chart's
-  # scheduler.taskImagePullSecret to `vertra-pull` to match. Its credential
+  # scheduler.taskImagePullSecret to `vennir-pull` to match. Its credential
   # then needs to pull images, not just read manifests. Steps can't read it
   # (it's never a team secret); only the kubelet uses it. Kept in step with
   # the Secret on every policy resync, so a rotation reaches every team.
@@ -441,10 +441,10 @@ registryCheck:
   # projected for workloadIdentityProvider, is exchanged at Google's STS
   # (Workload Identity Federation) for an hour's access token, used as is,
   # or to impersonate serviceAccount when set. The console signs in to
-  # `hosts` with it, and writes it every policy sync as `vertra-pull` in
+  # `hosts` with it, and writes it every policy sync as `vennir-pull` in
   # every team namespace (set the kernel chart's
-  # scheduler.taskImagePullSecret to `vertra-pull`) and as
-  # `vertra-registry-token` here, for the verify and scan Jobs. The pool's
+  # scheduler.taskImagePullSecret to `vennir-pull`) and as
+  # `vennir-registry-token` here, for the verify and scan Jobs. The pool's
   # provider trusts this cluster's OIDC issuer; grant
   # roles/artifactregistry.reader on the repository to the console's
   # principal (principal://iam.googleapis.com/<pool>/subject/
@@ -461,10 +461,10 @@ registryCheck:
   # ServiceAccount token, projected for sts.amazonaws.com, assumes roleArn
   # (AssumeRoleWithWebIdentity), whose credentials get ECR's registry
   # token. It signs in to `hosts` with it and writes it, as gcpFederation
-  # does, as `vertra-pull` in every team namespace and `vertra-registry-token`
+  # does, as `vennir-pull` in every team namespace and `vennir-registry-token`
   # here. The owner's role trusts this cluster's OIDC issuer for the
   # console's ServiceAccount alone, and may read only the catalog's
-  # repositories (`vertra catalog grant`). Not with gcpFederation.
+  # repositories (`vennir catalog grant`). Not with gcpFederation.
   awsFederation:
     # arn:aws:iam::<owner's account>:role/<name>
     roleArn: ""
@@ -493,7 +493,7 @@ kernelApiUrl: ""
 # ServiceAccount in api.auth.allowedServiceAccounts).
 kernelApiToken:
   enabled: true
-  audience: vertra-kernel-api
+  audience: vennir-kernel-api
 
 # -- Cosmetic only, rendered as a badge in the UI (see console/src/config.ts) --
 # lets a browser tab make it obvious whether it's talking to this
@@ -505,7 +505,7 @@ kernelApiToken:
 # the specific cluster.
 environmentLabel: "Kubernetes"
 
-# -- The cloud this install is on: gcp, aws, azure, kind or existing (vertra
+# -- The cloud this install is on: gcp, aws, azure, kind or existing (vennir
 # sets it). A catalog product whose `clouds` leave it out is listed but not
 # checked or run here. Empty: not known, so every product runs.
 installCloud: ""
@@ -618,12 +618,12 @@ bootstrapAdmin:
   # -- The first admin's password, used only when the account is created.
   # Leave it and existingSecret empty for a random one that is never
   # printed (a Job's log is kept wherever the cluster ships logs): give it
-  # one with `vertra admin reset-password`, or `kubectl exec
+  # one with `vennir admin reset-password`, or `kubectl exec
   # deploy/<release>-execution-console -- node dist/db/resetAdmin.js
   # <email>`. Deliberately never a hardcoded default password.
   password: ""
   # -- Or a Secret you create, in the release's namespace, holding it
-  # (vertra apply makes one for a fresh install, then deletes it). Read
+  # (vennir apply makes one for a fresh install, then deletes it). Read
   # only by the migrate Job; it must exist whenever that runs while set.
   existingSecret: ""
   existingSecretKey: password
@@ -701,7 +701,7 @@ chat:
     location: global
   # With provider bedrock: the AWS region whose Bedrock answers. The
   # console's role needs bedrock-mantle:CreateInference on the model there
-  # (vertra's aws module grants it, for that model only).
+  # (vennir's aws module grants it, for that model only).
   bedrock:
     region: ""
 
@@ -712,16 +712,16 @@ teamNamespaces:
   # -- Pod Security enforced in the namespaces the console creates (the
   # kernel's step Pods meet `restricted`). Empty for none.
   podSecurity: restricted
-  # -- A NetworkPolicy (vertra-default-deny) in every team namespace: its
+  # -- A NetworkPolicy (vennir-default-deny) in every team namespace: its
   # Pods accept connections only from Pods in the same namespace, so one
   # team's steps can't reach another's. Written with each namespace and
   # rewritten on every policy resync. With gateway.enabled, a second one
-  # (vertra-gateway-ingress) lets the gateway's Pods reach the Pods a team
-  # labels vertra/api-backend: "true", its APIs' in-cluster backends. The
+  # (vennir-gateway-ingress) lets the gateway's Pods reach the Pods a team
+  # labels vennir/api-backend: "true", its APIs' in-cluster backends. The
   # write fence accepts no other policy from the console. Needs a CNI that
   # enforces NetworkPolicy.
   defaultDenyIngress: true
-  # -- With defaultDenyIngress, a third NetworkPolicy (vertra-no-metadata)
+  # -- With defaultDenyIngress, a third NetworkPolicy (vennir-no-metadata)
   # refusing connections from a team's Pods to the instance metadata server
   # (169.254.169.254; IPv4 clusters only), so a step can't take its node's
   # cloud credentials; everything else outward stays open. For EKS (on in
@@ -730,7 +730,7 @@ teamNamespaces:
   # policies in place (the console never deletes one).
   blockMetadata: false
   # -- The kernel scheduler's log reading, bound in each team namespace (a
-  # RoleBinding, vertra-scheduler-logs: the console's only RBAC write, held
+  # RoleBinding, vennir-scheduler-logs: the console's only RBAC write, held
   # to exactly that by the write fence) instead of cluster-wide. The kernel
   # chart's logs-only ClusterRole and its scheduler's ServiceAccount
   # (namespace/name; empty: this release's namespace, kernel-execution-kernel).
@@ -740,7 +740,7 @@ teamNamespaces:
     clusterRole: kernel-execution-kernel-scheduler-logs
     serviceAccount: ""
   # -- What each team's steps may use together, as a ResourceQuota
-  # (vertra-team-quota) and LimitRange (vertra-team-limits) in its
+  # (vennir-team-quota) and LimitRange (vennir-team-limits) in its
   # namespace, unless an admin sets the team's own on its Settings tab.
   # Kubernetes quantities; empty: no limit. The cluster refuses a step over
   # them: one that can never fit fails (RESOURCES_NOT_ALLOWED), one waiting
@@ -759,7 +759,7 @@ teamNamespaces:
 # them anywhere.
 writeFence:
   enabled: true
-  teamNamespaceLabel: vertra/team
+  teamNamespaceLabel: vennir/team
 
 # -- Bundled Postgres, matching execution-kernel's own chart. To use your
 # own instead, set postgres.enabled=false and either externalDatabaseUrl
@@ -848,7 +848,7 @@ database:
   # -- With iamAuth aws: the database's AWS region.
   region: ""
   # -- A Secret holding the server's CA (ca.crt), mounted at
-  # /etc/vertra/tls-db for the URLs' sslrootcert.
+  # /etc/vennir/tls-db for the URLs' sslrootcert.
   caSecret: ""
 
 # -- A scheduled pg_dump of this chart's own Postgres (when the kernel's
@@ -869,7 +869,7 @@ backup:
   # destination (GKE Workload Identity, EKS Pod Identity or IRSA, AKS
   # Workload Identity). Not created here: the kernel chart's backup can
   # share it. Unused for pvc.
-  serviceAccountName: "vertra-pg-backup"
+  serviceAccountName: "vennir-pg-backup"
   gcs:
     # -- Bucket name, no gs://. The identity needs roles/storage.objectCreator
     # and roles/storage.objectViewer on it (gsutil reads before writing).
@@ -952,11 +952,11 @@ monitoring:
     collectorNamespace: gmp-system
     # -- The project whose managed Prometheus evaluates the charts' Rules:
     # Observe reads which alerts fire from its query API, as the console's
-    # Google identity, which needs roles/monitoring.viewer there (vertra
-    # grants it). Empty: Observe shows no alerts. vertra sets it.
+    # Google identity, which needs roles/monitoring.viewer there (vennir
+    # grants it). Empty: Observe shows no alerts. vennir sets it.
     project: ""
     # -- The GKE cluster's name, so another cluster's alerts in the same
-    # project aren't shown. vertra sets it.
+    # project aren't shown. vennir sets it.
     cluster: ""
   # -- With provider bundled: one Prometheus in this namespace, scraping
   # this release's Pods and the kernel release's (found through the
@@ -973,7 +973,7 @@ monitoring:
       digest: sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
     # -- How long it keeps samples.
     retentionDays: 15
-    # -- Its volume. Vertra's few hundred series need well under 1Gi for
+    # -- Its volume. Vennir's few hundred series need well under 1Gi for
     # 15 days.
     size: 2Gi
     storageClassName: ""
@@ -982,8 +982,8 @@ monitoring:
     # TLS name (its Service's).
     kernelRelease: kernel
     # -- Its ServiceAccount (default: <release>-execution-console-prometheus):
-    # the name an AWS role is bound to by Pod Identity (vertra uses
-    # vertra-prometheus).
+    # the name an AWS role is bound to by Pod Identity (vennir uses
+    # vennir-prometheus).
     serviceAccountName: ""
     # -- Labels on every sample it sends on and alert it raises (say, which
     # install).
@@ -1019,7 +1019,7 @@ monitoring:
     enabled: false
     labels: {}
   dashboard:
-    # -- A ConfigMap holding Vertra's Grafana dashboard (steps, the console,
+    # -- A ConfigMap holding Vennir's Grafana dashboard (steps, the console,
     # the gateway), for Grafana's dashboard sidecar to load.
     enabled: false
     # -- The label the sidecar looks for (kube-prometheus-stack's default).

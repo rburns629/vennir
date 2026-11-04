@@ -12,13 +12,13 @@
 #   CONSOLE_URL      the console (default http://localhost:18080, make up's)
 #   ADMIN_EMAIL      default admin@example.com
 #   ADMIN_PASSWORD   required (never printed)
-#   KUBE_CONTEXT     default kind-vertra-local
+#   KUBE_CONTEXT     default kind-vennir-local
 #   REGISTRY         the image source steps may come from (default localhost:5001)
 set -euo pipefail
 
 CONSOLE_URL=${CONSOLE_URL:-http://localhost:18080}
 ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
-KUBE_CONTEXT=${KUBE_CONTEXT:-kind-vertra-local}
+KUBE_CONTEXT=${KUBE_CONTEXT:-kind-vennir-local}
 REGISTRY=${REGISTRY:-localhost:5001}
 : "${ADMIN_PASSWORD:?set ADMIN_PASSWORD to the console admin password}"
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -36,17 +36,17 @@ fail() { echo "FAIL $1"; failures=$((failures + 1)); }
 # Calls a console method, signed in; prints the JSON answer.
 rpc() {
   curl -sS -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN" \
-    -d "$2" "$CONSOLE_URL/api/vertra.console.v1.$1"
+    -d "$2" "$CONSOLE_URL/api/vennir.console.v1.$1"
 }
 TOKEN=$(jq -nc --arg e "$ADMIN_EMAIL" --arg p "$ADMIN_PASSWORD" '{email: $e, password: $p}' |
-  curl -sS -X POST -H 'Content-Type: application/json' -d @- "$CONSOLE_URL/api/vertra.console.v1.AuthService/Login" | jq -r '.token // empty')
+  curl -sS -X POST -H 'Content-Type: application/json' -d @- "$CONSOLE_URL/api/vennir.console.v1.AuthService/Login" | jq -r '.token // empty')
 [ -n "$TOKEN" ] || { echo "couldn't sign in as $ADMIN_EMAIL at $CONSOLE_URL"; exit 1; }
 
 # Undoes it all: the product, its image repository's claim, the teams, and
 # their namespaces (which purging leaves, labelled retired).
 cleanup() {
   rpc ProductService/DeleteProduct "$(jq -nc --arg n "$TEAM-digest" '{name: $n}')" > /dev/null || true
-  rpc ProductService/ReleaseImageRepository "$(jq -nc --arg r "$REGISTRY/vertra-e2e/secret-digest" '{repository: $r}')" > /dev/null || true
+  rpc ProductService/ReleaseImageRepository "$(jq -nc --arg r "$REGISTRY/vennir-e2e/secret-digest" '{repository: $r}')" > /dev/null || true
   for team in "$TEAM" "$OTHER"; do
     rpc TeamService/RetireTeam "$(jq -nc --arg n "$team" '{name: $n}')" > /dev/null || true
     rpc TeamService/PurgeTeam "$(jq -nc --arg n "$team" '{name: $n}')" > /dev/null || true
@@ -56,11 +56,11 @@ cleanup() {
 trap cleanup EXIT
 
 # The kernel's test fixture (its secret-digest action), by digest.
-image_for() {  # repository name under $REGISTRY/vertra-e2e
-  local ref="$REGISTRY/vertra-e2e/$1:latest"
+image_for() {  # repository name under $REGISTRY/vennir-e2e
+  local ref="$REGISTRY/vennir-e2e/$1:latest"
   docker build -q -t "$ref" "$ROOT/kernel/internal/kindtest/fixture" > /dev/null
   docker push -q "$ref" > /dev/null
-  docker inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$ref" | grep "^$REGISTRY/vertra-e2e/$1@" | head -1
+  docker inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$ref" | grep "^$REGISTRY/vennir-e2e/$1@" | head -1
 }
 PRODUCT_IMAGE=$(image_for secret-digest)
 UNREGISTERED_IMAGE=$(image_for unregistered)

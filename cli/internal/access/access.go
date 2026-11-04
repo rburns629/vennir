@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rburns629/vertra/cli/internal/plan"
+	"github.com/rburns629/vennir/cli/internal/plan"
 )
 
 // Exec runs a command and returns its output; the checks take one so tests

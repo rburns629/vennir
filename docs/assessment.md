@@ -1,6 +1,6 @@
 # Architecture assessment (2026-10-19)
 
-An assessment of Vertra against what it's meant to become: a Git-governed
+An assessment of Vennir against what it's meant to become: a Git-governed
 marketplace where platform teams publish automation products and anyone in
 an organization runs them, reliably and with each team's identities kept to
 that team. It compares the kernel with Temporal and Inngest, borrowing their
@@ -84,7 +84,7 @@ are done (decided 2026-10-19).
 - **The owning team writes the dependency map** (`dependsOn`) in its
   templates; the service may draft one, never decide it.
 - **One catalog, many installs.** The same catalog repository may feed
-  several Vertra installs (GKE, EKS, AKS, kind). Each install allows the
+  several Vennir installs (GKE, EKS, AKS, kind). Each install allows the
   registries it pulls from and binds the catalog's identities to its own
   cloud accounts.
 - **Products stay plain containers.** Any language, no SDK: inputs in,
@@ -100,7 +100,7 @@ are done (decided 2026-10-19).
 | Retries with backoff, `maxAttempts` (default 1), timeouts | Built | `kernel/internal/scheduler/tick.go` (`handleFailure`, `poll`) |
 | Cancel, idempotent | Built | `kernel/internal/api/service.go` (`CancelExecution`) |
 | Append-only event history | Built, shown in the console | `execution_events` |
-| History per attempt | Partial: stored in `task_attempts`; the API returns only `attemptCount` | `proto/vertra/kernel/v1/kernel.proto` |
+| History per attempt | Partial: stored in `task_attempts`; the API returns only `attemptCount` | `proto/vennir/kernel/v1/kernel.proto` |
 | Running-step caps, platform-wide and per team | Built | `kernel/internal/config/config.go` (`MaxRunning`, `MaxRunningPerTeam`) |
 | Caps per product, priorities, fairness | Missing | |
 | Inputs checked against `inputSchema` | Missing: structure only | `console/src/core/executions.ts`, `console/frontend/src/dagCheck.ts` |
@@ -116,12 +116,12 @@ are done (decided 2026-10-19).
 | Schedules, webhooks | Missing | |
 | Re-running a stored DAG | Built | execution page |
 | Order builder (cart → DAG) | Exploratory: wiring types stored | `wiringTypes` table |
-| Several installs per catalog | Missing: one console URL, one token, one registry per repository | `cli/cmd/vertra/catalog.go:261-263`, the catalog's workflows |
+| Several installs per catalog | Missing: one console URL, one token, one registry per repository | `cli/cmd/vennir/catalog.go:261-263`, the catalog's workflows |
 | GCP products | Proven | |
 | AWS products | Proven 2026-10-19 (not their SecretStore) | |
 | Azure products | Unproven, and blocked: AKS Workload Identity needs a Pod label the kernel can't set | |
 | A ServiceAccount token in step Pods | Missing: `automountServiceAccountToken: false`, no projected token. *Since fixed (noted 2026-10-28): step Pods get no Kubernetes token while `scheduler.taskPodHardening` is on, the default (`kernel/internal/executor/kubernetes.go`)* | `kubernetes.py:594` |
-| Default-deny between team namespaces | Done 2026-10-21: `vertra-default-deny` in every team namespace | [security-model.md](security-model.md#guardrails-the-cluster-enforces) |
+| Default-deny between team namespaces | Done 2026-10-21: `vennir-default-deny` in every team namespace | [security-model.md](security-model.md#guardrails-the-cluster-enforces) |
 | SSO sign-in | Missing (documented) | same |
 | GitLab | Planned | `cli/DESIGN.md` |
 
@@ -224,7 +224,7 @@ references fixed in the owning team's template. **API done 2026-10-21**
 
 **M1. One catalog repository serves one install.** Architectural
 limitation; high. The catalog's workflows push to one
-`VERTRA_CONSOLE_URL` with one `VERTRA_TOKEN`, and `vertra catalog create`
+`VENNIR_CONSOLE_URL` with one `VENNIR_TOKEN`, and `vennir catalog create`
 overwrites both (`catalog.go:261-263`), so a second install pointed at the
 same repository silently takes registrations away from the first. **Do:**
 pull-based registration: each console reads `main` (a read-only deploy key
@@ -237,7 +237,7 @@ images, not `main` itself, so an install needs registry access only.
 
 **M2. One registry per catalog.** Medium. CI publishes to one registry;
 other installs pull from it through their allowed sources. An install on
-another cloud needs read access to it (federated, or the `vertra-pull`
+another cloud needs read access to it (federated, or the `vennir-pull`
 copy) and must trust the catalog's signing identity. **Done 2026-10-22**
 for an Artifact Registry catalog read from EKS by Workload Identity
 Federation (docs/operations.md, "Reading another install's catalog").
@@ -256,7 +256,7 @@ project. **Do:** scope owner identities to the folders they serve; give
 each team a list of allowed targets per consumer team (section 12); have
 later steps act on the project an earlier step outputs, not a typed one.
 **Allowed targets done 2026-10-21:** team.yaml's `allowedTargets`, checked
-against inputs typed `x-vertra-needs` before another team's run starts;
+against inputs typed `x-vennir-needs` before another team's run starts;
 outputs passed between steps aren't checked. Scoping owner identities stays
 each team's own (the gcp sample shows it).
 
@@ -278,7 +278,7 @@ checks a schema it's given and stays product-agnostic, failing with
 `INPUT_INVALID`); check outputs against the output schema. **Done 2026-10-21**.
 
 **C2. No versions or compatibility checks.** Missing capability; medium.
-Other teams' templates depend on a product's outputs. **Do:** `vertra catalog
+Other teams' templates depend on a product's outputs. **Do:** `vennir catalog
 check` compares a product's schemas with its last release and fails on a
 removed action, a new required input, or a removed or retyped output,
 unless the change is marked breaking; add `deprecated: <message>`.
@@ -308,7 +308,7 @@ identity references in team secrets, bound by the owning team.
 
 ## 5. Compared with Temporal
 
-| Temporal | Vertra | Verdict |
+| Temporal | Vennir | Verdict |
 | --- | --- | --- |
 | Durable state, crash recovery | Postgres rows, one transaction per pass, leases adopted | Have it |
 | Activity fencing | Row locks, `lease_owner`, a Job name per attempt | Have it, once R1 and R2 are fixed |
@@ -327,7 +327,7 @@ that look before they create can, and every sample does.
 
 ## 6. Compared with Inngest
 
-| Inngest | Vertra | Verdict |
+| Inngest | Vennir | Verdict |
 | --- | --- | --- |
 | Run timeline, step status, logs, retry | Execution page: graph, events, logs, durations, retry, re-run | Have most; add attempts |
 | Failure classification | `{code, message, retryable}` everywhere | Have it |
@@ -430,13 +430,13 @@ tokens (I1). **W**: needs Pod labels (I2).
 | kind | No public issuer: publish its discovery document and keys, then **K**; or a static credential synced from a vault | the same, or IAM Roles Anywhere | the same |
 
 Every **F** path is the product exchanging tokens with its cloud's own SDK:
-no broker in Vertra. Static credentials are a documented fallback for local
+no broker in Vennir. Static credentials are a documented fallback for local
 use, never the default. Only the **P** cells are proven; treat the rest as
 supported once each has been run for real.
 
 ## 11. Keeping cloud permissions from creeping
 
-Vertra enforces, or will:
+Vennir enforces, or will:
 
 - an image runs only as the ServiceAccount its reviewed `product.yaml`
   declares (built);
@@ -450,7 +450,7 @@ Vertra enforces, or will:
 
 Cloud IAM and the organization keep: what each identity may do, trust
 scopes, Token Creator, PassRole and role-assignment rights, SCPs and
-organization policies. Vertra doesn't provision IAM.
+organization policies. Vennir doesn't provision IAM.
 
 Drift: each product may ship a `check` action (who am I, may I do X); the
 console runs it per install on registration and daily and records which
@@ -535,7 +535,7 @@ team's page, preview and approval, and a failed step explained.
 | Run state | Kernel database | — | Never edited by hand: every change is an action that records an event |
 | Run actions: cancel, retry a step, re-run | Console | The requester for their own runs; maintainers for their team's steps | Retry says whether it's safe, from the action's idempotency |
 | Retries | Policy in `product.yaml`; manual in the console | Owners set the policy | |
-| What a run created | A `resources` output convention (type, id, link) | — | Vertra records references; it doesn't track infrastructure state. Cleanup runs products' `delete` actions in reverse |
+| What a run created | A `resources` output convention (type, id, link) | — | Vennir records references; it doesn't track infrastructure state. Cleanup runs products' `delete` actions in reverse |
 | Users, teams, roles | Console; teams also in Git | Admins, maintainers | Roles: admin, maintainer, consumer; SSO groups map to them. Everyone signed in is a consumer |
 | Step logs | Kernel database | The owning team | Consumers see status, errors and outputs |
 | Platform logs, metrics, alerts | stdout, `/metrics` | Operators | |
@@ -573,10 +573,10 @@ metadata product teams write; the UI says plainly when a product has none.
 ### Sleep
 
 A sleeping install can't answer, so scale-down is offered for single-person
-and development installs, with that warning in `vertra init`. Schedules
+and development installs, with that warning in `vennir init`. Schedules
 wake the platform (a CronJob can); there's no always-on page.
 
-Onboarding stays short per role: an installer runs `vertra` and, for an
+Onboarding stays short per role: an installer runs `vennir` and, for an
 existing catalog, connects to it; a platform team adds its folder, its
 secrets and its products, guided by readiness; a consumer signs in, picks a
 template, fills a form.
@@ -641,7 +641,7 @@ Rejected: discovering accounts and projects live.
 service or language.
 
 **8. Forms from schemas.** The input schemas teams write drive the form,
-submit-time and run-time validation and wiring, with a few `x-vertra`
+submit-time and run-time validation and wiring, with a few `x-vennir`
 hints; no custom forms per product.
 
 **9. Bindings in `product.yaml`.** Each action names the team secrets it
@@ -670,7 +670,7 @@ compatibility shims while nobody depends on them.
 done (decided 2026-10-19).
 
 **16. The console's API on Connect** (decided 2026-10-20). Protos written by
-maintainers; clients generated for the frontend and `vertra`; JSON over HTTP for `curl`, and gRPC for callers that want it,
+maintainers; clients generated for the frontend and `vennir`; JSON over HTTP for `curl`, and gRPC for callers that want it,
 from the same endpoints. Resources and actions alike are RPCs; health,
 metrics, static files and outside webhooks stay plain HTTP. Chosen for its
 schema and generated clients, not for speed: neither protocol is the
@@ -694,10 +694,10 @@ downloaded pinned and checked by each catalog's wrapper in place of today's
 virtualenv. Ported while the catalog format changes anyway (Phase 1).
 
 **19. One command line** (decided 2026-10-21): the catalog tool is part of
-`vertra`, as `vertra catalog ...` (`check`, `publish`, `release`, ...), and
-a catalog's wrapper is `./vertra`, downloading the pinned `vertra`. The
-repository's setup is `vertra catalog create`. Accepted: a larger download
-in catalog CI, and a catalog pinning a whole `vertra` release.
+`vennir`, as `vennir catalog ...` (`check`, `publish`, `release`, ...), and
+a catalog's wrapper is `./vennir`, downloading the pinned `vennir`. The
+repository's setup is `vennir catalog create`. Accepted: a larger download
+in catalog CI, and a catalog pinning a whole `vennir` release.
 
 **20. API products, through one gateway** (decided 2026-10-21). Besides
 steps, which run as Jobs, a team may publish a backend it already runs as
@@ -724,7 +724,7 @@ step reports what it made or changed as `resources` in its outputs: each
 `{type, id, name?, link?}`. The console copies them, with the step's
 resolved inputs and outputs, into its own table when the run finishes, so
 a delete never depends on the run still existing: it may come months
-later, after run retention has dropped the run. Vertra keeps references,
+later, after run retention has dropped the run. Vennir keeps references,
 not infrastructure state. An action that creates things names the action
 that removes them, `cleanup` in product.yaml: by default that action is
 given `{"resource": {...}}`, the one resource as reported; `cleanup.inputs`
@@ -752,13 +752,13 @@ never moves once made. An install follows a pinned version or the newest
 one, so promoting test's catalog to prod is cutting a tag. A reading
 install trusts the owner's signer (its public key, or its repository's
 keyless identity) and enforces it on releases and images as the owner
-does, holding no signing rights. `vertra` refuses to make a second
+does, holding no signing rights. `vennir` refuses to make a second
 install the owner of a repository that already publishes elsewhere.
 Rejected: channel tags such as `:prod` (unfamiliar, and they move);
 branches per environment (two histories to merge and sign); signing on a
 tag's run (anyone who may push a tag could sign); per-install signers for
 one catalog (several roots of trust); approval in each console (no shared
-record of what was promoted). An install's cloud is where Vertra runs, not
+record of what was promoted). An install's cloud is where Vennir runs, not
 what its steps may deploy to (federation reaches other clouds), so a second
 install is for a real boundary (prod and non-prod, residency, separate
 units), not each engineer's cloud.
@@ -876,7 +876,7 @@ in VS Code, for one) can do the same. Proposed:
      result, never from the model's text. A factual answer citing nothing
      is marked as not from the docs, and nothing found means "the docs
      don't say", with a link to search.
-   - *Docs by kind.* Each says what it is: a guide (using Vertra), how it
+   - *Docs by kind.* Each says what it is: a guide (using Vennir), how it
      works now, how to run it, or design history (the decisions, with
      proposals and rejected options). History answers "why", never "what
      is", and is searched only for that. The TODO isn't shipped.
@@ -925,8 +925,8 @@ checks it out as one run. The agent reads the same answer the cart does. It
 never guesses dependencies from descriptions. Proposed:
 
 1. *Declared in the catalog, by the product's own team:* an input that
-   `x-vertra-needs` a wiring type depends on something of that type, and
-   an output that `x-vertra-provides` one is one (both as today). A
+   `x-vennir-needs` a wiring type depends on something of that type, and
+   an output that `x-vennir-provides` one is one (both as today). A
    required input is a dependency; an optional one is a suggestion (app
    hosting's `cloudSqlConnectionName`, typed `gcp.cloud-sql-instance`,
    suggests a database). The wiring types themselves (what each means,

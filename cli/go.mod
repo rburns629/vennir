@@ -1,4 +1,4 @@
-module github.com/rburns629/vertra/cli
+module github.com/rburns629/vennir/cli
 
 go 1.26.0
 

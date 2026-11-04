@@ -3,13 +3,13 @@
 /**
  * The whole app, routed and signed in, over a fake console API: every page
  * renders, the navigation follows who you are, and the sign-in rules hold.
- * The fake answers each `/api/vertra.console.v1.<Service>/<Method>` call
+ * The fake answers each `/api/vennir.console.v1.<Service>/<Method>` call
  * with canned JSON (an empty message when a test gives none), so these
  * tests check what the pages do with the API, whatever the pages look like.
  */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { create, toBinary } from "@bufbuild/protobuf";
-import { FailureSchema } from "./gen/vertra/console/v1/common_pb.js";
+import { FailureSchema } from "./gen/vennir/console/v1/common_pb.js";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import type { ComponentType } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -31,7 +31,7 @@ async function connectResponse(key: string, request: Record<string, unknown>, st
   if (value && typeof value === "object" && "refused" in value && !Array.isArray(value.refused)) {
     const { status, code, message, failure, detail } = (value as ReturnType<typeof refused>).refused;
     const details = failure
-      ? [{ type: "vertra.console.v1.Failure", value: btoa(String.fromCharCode(...toBinary(FailureSchema, create(FailureSchema, { code: failure, message, detail })))) }]
+      ? [{ type: "vennir.console.v1.Failure", value: btoa(String.fromCharCode(...toBinary(FailureSchema, create(FailureSchema, { code: failure, message, detail })))) }]
       : undefined;
     // A stream that fails says so in its end, as the console's does.
     if (streaming) return streamOf([], { error: { code, message, details } });
@@ -67,7 +67,7 @@ beforeAll(() => {
   // Before the app's API client exists: it keeps the fetch it's given.
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
-    const match = /\/api\/vertra\.console\.v1\.(\w+)\/(\w+)$/.exec(url.pathname);
+    const match = /\/api\/vennir\.console\.v1\.(\w+)\/(\w+)$/.exec(url.pathname);
     if (!match) return new Response("not found", { status: 404 });
     const key = `${match[1]}/${match[2]}`;
     calls.push(key);
@@ -343,7 +343,7 @@ describe("runs", () => {
       "ScheduleService/ListSchedules": (request: Record<string, unknown>) => {
         const team = String(request["team"]);
         asked.push(team);
-        return { schedules: [{ id: `s-${team}`, team, name: `${team} nightly`, kind: "action", runnableName: "uptime-check.check", cron: "0 2 * * *", timeZone: "UTC", botEmail: `${team}@bots.vertra.local`, enabled: team === "ml" }] };
+        return { schedules: [{ id: `s-${team}`, team, name: `${team} nightly`, kind: "action", runnableName: "uptime-check.check", cron: "0 2 * * *", timeZone: "UTC", botEmail: `${team}@bots.vennir.local`, enabled: team === "ml" }] };
       },
     });
     expect(await screen.findByText("payments nightly")).toBeTruthy();
@@ -481,7 +481,7 @@ describe("a run", () => {
     await waitFor(() => { expect(retried).toEqual([{ executionId: FAILED_RUN.executionId, taskId: "deploy" }]); });
   });
 
-  it("offers Ask Vertra about a failure, with the question in its box to send", async () => {
+  it("offers Ask Vennir about a failure, with the question in its box to send", async () => {
     let asked = 0;
     await renderAt(`/runs/${FAILED_RUN.executionId}`, MEMBER, {
       "ExecutionService/WatchExecution": [{ execution: FAILED_RUN }],
@@ -491,9 +491,9 @@ describe("a run", () => {
         return [];
       },
     });
-    fireEvent.click(await screen.findByRole("button", { name: "Ask Vertra about it" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ask Vennir about it" }));
     const box = (await screen.findByLabelText("Your question")) as HTMLTextAreaElement;
-    // Only what Vertra itself says: the run's id and the step's position, never the product's code or the step's id.
+    // Only what Vennir itself says: the run's id and the step's position, never the product's code or the step's id.
     await waitFor(() => { expect(box.value).toBe(`Why did run ${FAILED_RUN.executionId} fail at step 2, and what should I do?`); });
     expect(asked).toBe(0);
   });
@@ -602,7 +602,7 @@ describe("the catalog", () => {
         parameters: { type: "object", properties: { projectId: { type: "string" }, region: { type: "string" } } },
         actions: ["gcp-platform/project.create", "gcp-platform/app-hosting.create"],
         shared: true,
-        sourceUrl: "https://github.com/acme/vertra-catalog/blob/main/teams/gcp-platform/templates/app.yaml",
+        sourceUrl: "https://github.com/acme/vennir-catalog/blob/main/teams/gcp-platform/templates/app.yaml",
       },
       {
         kind: "KIND_ACTION",
@@ -612,7 +612,7 @@ describe("the catalog", () => {
         actions: ["aws-platform/rds.create"],
         shared: false,
         shareWith: ["data-team"],
-        askForAccessUrl: "https://github.com/acme/vertra-catalog/issues/new?title=rds",
+        askForAccessUrl: "https://github.com/acme/vennir-catalog/issues/new?title=rds",
       },
     ],
   };
@@ -624,7 +624,7 @@ describe("the catalog", () => {
     expect(screen.getByText("gcp-platform · template · 2 steps")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Run" }).getAttribute("href")).toBe("/catalog/run?template=gcp-platform%2Fapp-on-cloud-run");
     expect(screen.getByRole("link", { name: /ask for access/i }).getAttribute("href")).toContain("issues/new");
-    expect(screen.getByRole("link", { name: /catalog repository/i }).getAttribute("href")).toBe("https://github.com/acme/vertra-catalog");
+    expect(screen.getByRole("link", { name: /catalog repository/i }).getAttribute("href")).toBe("https://github.com/acme/vennir-catalog");
 
     fireEvent.click(screen.getByRole("button", { name: "aws-platform" }));
     expect(screen.queryByRole("heading", { name: "App on Cloud Run" })).toBeNull();
@@ -660,9 +660,9 @@ describe("the docs", () => {
   const DOCS = {
     "GuideService/ListGuides": {
       guides: [
-        { id: "01-getting-started", title: "Try Vertra end to end", section: "guides", kind: "guide" },
+        { id: "01-getting-started", title: "Try Vennir end to end", section: "guides", kind: "guide" },
         { id: "03-what-is-a-dag", title: "What's a DAG", section: "guides", kind: "guide" },
-        { id: "reference-setup", title: "Setting up Vertra", section: "reference", kind: "operating" },
+        { id: "reference-setup", title: "Setting up Vennir", section: "reference", kind: "operating" },
         {
           id: "reference-operations",
           title: "Operations",
@@ -691,12 +691,12 @@ describe("the docs", () => {
     expect(within(tasks).getByRole("link", { name: "Upgrading, backups, rotating secrets" }).getAttribute("href")).toBe("/docs/reference-operations#upgrading");
     expect(within(tasks).getByRole("link", { name: "All guides, in reading order" }).getAttribute("href")).toBe("/docs/01-getting-started");
     // Nothing to offer without a model.
-    expect(screen.queryByRole("button", { name: "Ask Vertra instead" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ask Vennir instead" })).toBeNull();
   });
 
-  it("offers Ask Vertra from the help when there's a model", async () => {
+  it("offers Ask Vennir from the help when there's a model", async () => {
     await renderAt("/docs", MEMBER, { ...DOCS, "ChatService/GetChatSettings": { enabled: true, model: "qwen3.8-27b" } });
-    fireEvent.click(await screen.findByRole("button", { name: "Ask Vertra instead" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ask Vennir instead" }));
     expect(((await screen.findByLabelText("Your question")) as HTMLTextAreaElement).value).toBe("");
   });
 
@@ -708,7 +708,7 @@ describe("the docs", () => {
     });
     fireEvent.change(await screen.findByLabelText("Search the guides"), { target: { value: "rotate a bot token" } });
     const results = await screen.findByRole("region", { name: "Search results" });
-    fireEvent.click(within(results).getByRole("button", { name: "Ask Vertra" }));
+    fireEvent.click(within(results).getByRole("button", { name: "Ask Vennir" }));
     await waitFor(() => { expect((screen.getByLabelText("Your question") as HTMLTextAreaElement).value).toBe("rotate a bot token"); });
   });
 
@@ -721,7 +721,7 @@ describe("the docs", () => {
         return [{ answer: { text: "Its step ran out of memory." } }];
       },
     });
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ask Vertra" }), { target: { value: "Why did my run fail?" } });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ask Vennir" }), { target: { value: "Why did my run fail?" } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     expect(await screen.findByText("Its step ran out of memory.")).toBeTruthy();
     expect(asked).toBe(1);
@@ -733,7 +733,7 @@ describe("the docs", () => {
       // The first answer never comes, so it's busy.
       "ChatService/AskStream": () => new Promise(() => {}),
     });
-    const box = await screen.findByRole("textbox", { name: "Ask Vertra" });
+    const box = await screen.findByRole("textbox", { name: "Ask Vennir" });
     fireEvent.change(box, { target: { value: "Why did my run fail?" } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     const question = (await screen.findByLabelText("Your question")) as HTMLTextAreaElement;
@@ -747,7 +747,7 @@ describe("the docs", () => {
       "ChatService/GetChatSettings": { enabled: true, model: "qwen3.8-27b" },
       "ChatService/AskStream": () => [{ answer: { text: "See [your runs](/runs) or [the status page](https://status.example.com)." } }],
     });
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ask Vertra" }), { target: { value: "Where are my runs?" } });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ask Vennir" }), { target: { value: "Where are my runs?" } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     const external = await screen.findByRole("link", { name: "the status page" });
     expect(external.getAttribute("target")).toBe("_blank");
@@ -755,16 +755,16 @@ describe("the docs", () => {
     fireEvent.click(screen.getByRole("link", { name: "your runs" }));
     // The Runs page, in the console (no reload), with the panel closed for it.
     expect(await screen.findByRole("heading", { level: 1, name: "Runs" })).toBeTruthy();
-    await waitFor(() => { expect(screen.queryByRole("dialog", { name: "Ask Vertra" })).toBeNull(); });
+    await waitFor(() => { expect(screen.queryByRole("dialog", { name: "Ask Vennir" })).toBeNull(); });
   });
 
   it("keeps the help's contents loaded moving from one guide to another", async () => {
-    const titles: Record<string, string> = { "01-getting-started": "Try Vertra end to end" };
+    const titles: Record<string, string> = { "01-getting-started": "Try Vennir end to end" };
     await renderAt("/docs/01-getting-started", MEMBER, {
       ...DOCS,
       "GuideService/GetGuide": (request: Record<string, unknown>) => ({ markdown: `# ${titles[String(request["id"])] ?? "?"}\n\nIts text.` }),
     });
-    expect(await screen.findByRole("heading", { level: 1, name: "Try Vertra end to end" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Try Vennir end to end" })).toBeTruthy();
     const listed = calls.filter((c) => c === "GuideService/ListGuides").length;
     // Any link to another guide (the side contents, or Next).
     const other = screen.getAllByRole("link").find((l) => (l.getAttribute("href") ?? "").startsWith("/docs/0") && !(l.getAttribute("href") ?? "").startsWith("/docs/01-"));
@@ -780,7 +780,7 @@ describe("the docs", () => {
     await renderAt("/docs/old-guide", MEMBER, {
       ...DOCS,
       "GuideService/GetGuide": (request: Record<string, unknown>) =>
-        request["id"] === "old-guide" ? refused(404, "not_found", "No such guide.") : { markdown: "# Try Vertra end to end\n\nIts text." },
+        request["id"] === "old-guide" ? refused(404, "not_found", "No such guide.") : { markdown: "# Try Vennir end to end\n\nIts text." },
     });
     expect((await screen.findByRole("alert")).textContent).toContain("No such guide.");
     screen.getByRole("button", { name: "Settings" }).click();
@@ -788,7 +788,7 @@ describe("the docs", () => {
     const start = await screen.findByRole("region", { name: "New here? Start with these two" });
     expect(screen.queryByText("No such guide.")).toBeNull();
     fireEvent.click(within(start).getAllByRole("link").find((l) => l.getAttribute("href") === "/docs/01-getting-started")!);
-    expect(await screen.findByRole("heading", { level: 1, name: "Try Vertra end to end" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Try Vennir end to end" })).toBeTruthy();
   });
 
   it("shows the guide that's open, not one whose answer came late", async () => {
@@ -798,14 +798,14 @@ describe("the docs", () => {
       "GuideService/GetGuide": (request: Record<string, unknown>) =>
         request["id"] === "03-what-is-a-dag"
           ? new Promise((resolve) => { answerFirst = resolve; })
-          : { markdown: "# Try Vertra end to end\n\nIts text." },
+          : { markdown: "# Try Vennir end to end\n\nIts text." },
     });
     const contents = await screen.findByRole("navigation", { name: "Docs contents" });
-    fireEvent.click(within(contents).getByRole("link", { name: "Try Vertra end to end" }));
-    expect(await screen.findByRole("heading", { level: 1, name: "Try Vertra end to end" })).toBeTruthy();
+    fireEvent.click(within(contents).getByRole("link", { name: "Try Vennir end to end" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Try Vennir end to end" })).toBeTruthy();
     await act(async () => { answerFirst({ markdown: "# What's a DAG\n\nToo late." }); await Promise.resolve(); });
     expect(screen.queryByText("Too late.")).toBeNull();
-    expect(screen.getByRole("heading", { level: 1, name: "Try Vertra end to end" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Try Vennir end to end" })).toBeTruthy();
   });
 
   it("sets a troubleshooting guide by symptom: what you see, why, and what to do", async () => {
@@ -823,7 +823,7 @@ describe("the docs", () => {
   });
 
   it("lists a doc the contents don't place under More", async () => {
-    await renderAt("/docs/01-getting-started", MEMBER, { ...DOCS, "GuideService/GetGuide": { markdown: "# Try Vertra end to end\n\nHello." } });
+    await renderAt("/docs/01-getting-started", MEMBER, { ...DOCS, "GuideService/GetGuide": { markdown: "# Try Vennir end to end\n\nHello." } });
     const contents = await screen.findByRole("navigation", { name: "Docs contents" });
     fireEvent.click(await within(contents).findByRole("button", { name: "More" }));
     expect((await within(contents).findByRole("link", { name: "Something new" })).getAttribute("href")).toBe("/docs/09-something-new");
@@ -909,7 +909,7 @@ describe("the chat panel", () => {
       },
       "TemplateService/ListTemplates": { runnables: [] },
     });
-    fireEvent.click(await screen.findByRole("button", { name: "Ask Vertra" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ask Vennir" }));
     fireEvent.change(await screen.findByLabelText("Your question"), { target: { value: "How do I back up?" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect((await screen.findByRole("link", { name: "Operations · Backups" })).getAttribute("href")).toBe("/docs/reference-operations#backups");
@@ -938,7 +938,7 @@ describe("the chat panel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open in cart" }));
     expect(await screen.findByRole("heading", { name: "Cart" })).toBeTruthy();
     // With what the answer filled in, for the cart page to start from.
-    expect(JSON.parse(localStorage.getItem("vertra.cart") ?? "{}")).toMatchObject({
+    expect(JSON.parse(localStorage.getItem("vennir.cart") ?? "{}")).toMatchObject({
       team: "azure-apps",
       actions: ["azure-apps-bucket-create"],
       choices: [{ step: "bucket", input: "account", resourceId: "r-1" }],
@@ -959,7 +959,7 @@ describe("the chat panel", () => {
           : refused(429, "resource_exhausted", "This conversation is too long for the chat model: start a new one.", "CONVERSATION_TOO_LONG");
       },
     });
-    fireEvent.click(await screen.findByRole("button", { name: "Ask Vertra" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ask Vennir" }));
     fireEvent.change(await screen.findByLabelText("Your question"), { target: { value: "first" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText(/80% of what the model can take/)).toBeTruthy();
@@ -975,7 +975,7 @@ describe("the chat panel", () => {
 
   it("is there but off when no model is set, saying who sets one", async () => {
     await renderAt("/", MEMBER, { "ChatService/GetChatSettings": { enabled: false } });
-    const ask = await screen.findByRole("button", { name: "Ask Vertra" });
+    const ask = await screen.findByRole("button", { name: "Ask Vennir" });
     expect(ask.hasAttribute("disabled") || ask.getAttribute("aria-disabled") === "true").toBe(true);
     expect(screen.getByLabelText("Not set up yet: an admin chooses its model")).toBeTruthy();
   });
@@ -1145,7 +1145,7 @@ describe("an API", () => {
 });
 
 describe("the APIs page", () => {
-  const api = (team: string, name: string, extra: Record<string, unknown> = {}) => ({ team, name, displayName: `${name} API`, state: "API_STATE_LIVE", endpoints: [], url: `http://gateway.vertra-system.svc/${team}/${name}`, ...extra });
+  const api = (team: string, name: string, extra: Record<string, unknown> = {}) => ({ team, name, displayName: `${name} API`, state: "API_STATE_LIVE", endpoints: [], url: `http://gateway.vennir-system.svc/${team}/${name}`, ...extra });
 
   it("groups APIs as your teams', shared with you, and not shared, and filters them", async () => {
     await renderAt("/apis", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
@@ -1165,7 +1165,7 @@ describe("the APIs page", () => {
     // An issue on the catalog asking its team, when the console can build one; else the team's page.
     expect(within(table).getByRole("link", { name: "Ask ml for access" }).getAttribute("href")).toBe("/teams/ml");
     expect(within(table).getByRole("link", { name: "Ask risk for access ↗" }).getAttribute("href")).toBe("https://github.com/acme/catalog/issues/new?title=fraud");
-    expect(screen.getByText("http://gateway.vertra-system.svc/<team>/<api>")).toBeTruthy();
+    expect(screen.getByText("http://gateway.vennir-system.svc/<team>/<api>")).toBeTruthy();
     expect(screen.getByRole("link", { name: "A bot for payments" }).getAttribute("href")).toBe("/teams/payments?tab=automation");
 
     fireEvent.click(screen.getByRole("button", { name: /Not live/ }));
@@ -1279,10 +1279,10 @@ describe("admin", () => {
       catalogVersion: "newest",
       catalogPollSeconds: 300,
       catalogSignerKeys: 1,
-      externalCatalog: "us-docker.pkg.dev/other/vertra-products",
+      externalCatalog: "us-docker.pkg.dev/other/vennir-products",
       email: true,
       emailHost: "smtp.acme.com",
-      emailFrom: "vertra@acme.com",
+      emailFrom: "vennir@acme.com",
       monitoringProvider: "google",
       grafanaUrl: "https://grafana.acme.com",
       sessionLength: "12h",
@@ -1296,7 +1296,7 @@ describe("admin", () => {
     };
     await renderAt("/admin/catalog", ADMIN, { "AdminService/GetInstall": install });
     expect(await screen.findByText("newest")).toBeTruthy();
-    expect(screen.getByText("us-docker.pkg.dev/other/vertra-products")).toBeTruthy();
+    expect(screen.getByText("us-docker.pkg.dev/other/vennir-products")).toBeTruthy();
     expect(screen.getByText(/1 public key/)).toBeTruthy();
     expect(screen.getByText(/every 5 min/)).toBeTruthy();
     cleanup();
@@ -1661,7 +1661,7 @@ describe("a run form", () => {
       type: "object",
       required: ["projectId"],
       properties: {
-        projectId: { type: "string", title: "Project ID", minLength: 6, pattern: "^[a-z][a-z0-9-]*$", "x-vertra-pattern-message": "Lowercase letters, digits and hyphens.", "x-vertra-group": "Project" },
+        projectId: { type: "string", title: "Project ID", minLength: 6, pattern: "^[a-z][a-z0-9-]*$", "x-vennir-pattern-message": "Lowercase letters, digits and hyphens.", "x-vennir-group": "Project" },
         regions: { type: "array", title: "Regions", items: { type: "string" } },
       },
     },
@@ -1719,7 +1719,7 @@ describe("a run form", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show as an API call" }));
     const call = screen.getByText(/TemplateService\/RunTemplate/).textContent ?? "";
     expect(call).toContain('"projectId": "orders-api"');
-    expect(call).toContain("Bearer $VERTRA_TOKEN");
+    expect(call).toContain("Bearer $VENNIR_TOKEN");
   });
 
   it("previews what it would do, from each step's plan", async () => {
@@ -1750,7 +1750,7 @@ describe("a run form", () => {
     const made: Record<string, unknown>[] = [];
     await renderAt("/catalog/run?template=gcp-platform%2Fapp-on-cloud-run", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TemplateService/ListTemplates": { runnables: [TEMPLATE] },
-      "TokenService/ListBots": { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-nightly@bots.vertra.local" }] },
+      "TokenService/ListBots": { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-nightly@bots.vennir.local" }] },
       "ScheduleService/CreateSchedule": (request: Record<string, unknown>) => {
         made.push(request);
         return { schedule: { id: "s1", team: "payments", name: request["name"] } };
@@ -1759,7 +1759,7 @@ describe("a run form", () => {
     });
     fireEvent.change(await screen.findByLabelText(/project id/i), { target: { value: "orders-api" } });
     fireEvent.click(screen.getByRole("button", { name: "Schedule…" }));
-    expect(await screen.findByText("payments-nightly@bots.vertra.local")).toBeTruthy();
+    expect(await screen.findByText("payments-nightly@bots.vennir.local")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Schedule it" }));
     await waitFor(() => {
       expect(made).toEqual([
@@ -1772,7 +1772,7 @@ describe("a run form", () => {
     let asked = 0;
     await renderAt("/catalog/run?template=gcp-platform%2Fapp-on-cloud-run", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TemplateService/ListTemplates": { runnables: [TEMPLATE] },
-      "TokenService/ListBots": () => (asked++ === 0 ? refused(503, "unavailable", "The console is restarting.") : { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-nightly@bots.vertra.local" }] }),
+      "TokenService/ListBots": () => (asked++ === 0 ? refused(503, "unavailable", "The console is restarting.") : { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-nightly@bots.vennir.local" }] }),
       "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
     });
     await screen.findByLabelText(/project id/i);
@@ -1782,7 +1782,7 @@ describe("a run form", () => {
     expect(within(dialog).queryByText(/has no bot to run it as/)).toBeNull();
     expect(within(dialog).getByRole("button", { name: "Schedule it" }).hasAttribute("disabled")).toBe(true);
     fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
-    expect(await within(dialog).findByText("payments-nightly@bots.vertra.local")).toBeTruthy();
+    expect(await within(dialog).findByText("payments-nightly@bots.vennir.local")).toBeTruthy();
   });
 
   it("fills itself from an example", async () => {
@@ -1960,12 +1960,12 @@ describe("signing in", () => {
     localStorage.clear();
 
     // Single sign-on leaves the page, so where to go back to waits in this tab.
-    sessionStorage.setItem("vertra_sso_tab", "fedcba9876543210fedcba9876543210");
-    sessionStorage.setItem("vertra_sso_return", `/runs/${RUN}`);
+    sessionStorage.setItem("vennir_sso_tab", "fedcba9876543210fedcba9876543210");
+    sessionStorage.setItem("vennir_sso_return", `/runs/${RUN}`);
     window.history.replaceState(null, "", "/login#token=this-tabs&tab=fedcba9876543210fedcba9876543210");
     await renderAt("/login", null, { "AuthService/GetMe": MEMBER, ...run });
     expect(await screen.findByText("the failed run", undefined, { timeout: 5000 })).toBeTruthy();
-    expect(sessionStorage.getItem("vertra_sso_return")).toBeNull();
+    expect(sessionStorage.getItem("vennir_sso_return")).toBeNull();
   });
 
   it("waits out a console that can't answer yet instead of signing out", async () => {
@@ -2028,18 +2028,18 @@ describe("signing in", () => {
     const { cart } = await import("./cart");
     for (const end of ["sign out", "session ends"]) {
       cart.replace("payments", ["payments-ledger-refund"], [], { refund: { amount: 40 } });
-      localStorage.setItem("vertra.compose.drafts", JSON.stringify({ old: { name: "old", team: "payments" } }));
+      localStorage.setItem("vennir.compose.drafts", JSON.stringify({ old: { name: "old", team: "payments" } }));
       await renderAt("/", MEMBER, end === "sign out" ? {} : { "AuthService/GetMe": refused(401, "unauthenticated", "Session expired.") });
       if (end === "sign out") {
         (await screen.findByRole("button", { name: "Settings" })).click();
         fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
       }
       expect(await screen.findByLabelText(/email/i)).toBeTruthy();
-      expect(localStorage.getItem("vertra.cart")).toBeNull();
-      expect(localStorage.getItem("vertra.compose.drafts")).toBeNull();
+      expect(localStorage.getItem("vennir.cart")).toBeNull();
+      expect(localStorage.getItem("vennir.compose.drafts")).toBeNull();
       // Nor does this page still hold it.
       cart.add("growth-report");
-      expect(JSON.parse(localStorage.getItem("vertra.cart") ?? "{}")).toMatchObject({ team: null, actions: ["growth-report"] });
+      expect(JSON.parse(localStorage.getItem("vennir.cart") ?? "{}")).toMatchObject({ team: null, actions: ["growth-report"] });
       cart.forget();
       cleanup();
     }
@@ -2064,13 +2064,13 @@ describe("signing in", () => {
     cleanup();
 
     // Back from the sign-in this tab started: its own value comes back.
-    sessionStorage.setItem("vertra_sso_tab", "fedcba9876543210fedcba9876543210");
+    sessionStorage.setItem("vennir_sso_tab", "fedcba9876543210fedcba9876543210");
     window.history.replaceState(null, "", "/login#token=this-tabs&tab=fedcba9876543210fedcba9876543210");
     await renderAt("/login", null, { "AuthService/GetMe": MEMBER });
     await waitFor(() => {
       expect(localStorage.getItem("token")).toBe("this-tabs");
     });
-    expect(sessionStorage.getItem("vertra_sso_tab")).toBeNull();
+    expect(sessionStorage.getItem("vennir_sso_tab")).toBeNull();
   });
 
   it("holds someone with a password set by someone else until they choose their own", async () => {
@@ -2123,7 +2123,7 @@ describe("the Teams page", () => {
       },
       "TeamService/ListPods": { pods: [{ podName: "ek-1", state: "TASK_POD_STATE_RUNNING" }] },
       "SecretService/ListSecrets": { secrets: [{ id: "s1", secretName: "stripe-webhook", external: { status: "error" } }, { id: "s2", secretName: "db" }] },
-      "TokenService/ListBots": { bots: [{ id: "b1", email: "payments-ci@bots.vertra.local" }] },
+      "TokenService/ListBots": { bots: [{ id: "b1", email: "payments-ci@bots.vennir.local" }] },
       "TemplateService/ListTemplates": { runnables: [{ kind: "KIND_TEMPLATE", team: "payments", name: "merchant-onboarding", shared: true }] },
       "ExecutionService/ListPendingApprovals": { approvals: [{ executionId: "r9", executionName: "refund-ledger for growth", taskId: "t", team: "payments", canDecide: true }] },
       "TeamService/ListTeams": {
@@ -2238,7 +2238,7 @@ describe("a team's bots", () => {
     await renderAt("/teams/payments?tab=automation", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
       "TokenService/ListBots": {
-        bots: [{ id: "b1", email: "payments-ci@bots.vertra.local", tokens: [{ tokenId: "k1", label: "ci", expiresAt: "2020-01-01T00:00:00Z" }] }],
+        bots: [{ id: "b1", email: "payments-ci@bots.vennir.local", tokens: [{ tokenId: "k1", label: "ci", expiresAt: "2020-01-01T00:00:00Z" }] }],
       },
     });
     expect(await screen.findByText(/No working token/)).toBeTruthy();
@@ -2268,7 +2268,7 @@ describe("a team's settings", () => {
         members: [
           { id: "u1", email: "ana@acme.com", hasPassword: true, usesSso: true, role: "TEAM_ROLE_MAINTAINER" },
           { id: "u2", email: "lee@acme.com", hasPassword: true, usesSso: false, role: "TEAM_ROLE_MEMBER" },
-          { id: "u3", email: "ci@bots.vertra.local", isBot: true, role: "TEAM_ROLE_MEMBER" },
+          { id: "u3", email: "ci@bots.vennir.local", isBot: true, role: "TEAM_ROLE_MEMBER" },
         ],
       },
     });
@@ -2358,8 +2358,8 @@ describe("keyless bots", () => {
     const added: Record<string, unknown>[] = [];
     await renderAt("/teams/payments?tab=automation", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
-      "TokenService/ListBots": { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-release@bots.vertra.local" }] },
-      "TokenService/ListBotIdentities": { identities: [], issuers: ["https://token.actions.githubusercontent.com"], audience: "https://vertra.acme.dev" },
+      "TokenService/ListBots": { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-release@bots.vennir.local" }] },
+      "TokenService/ListBotIdentities": { identities: [], issuers: ["https://token.actions.githubusercontent.com"], audience: "https://vennir.acme.dev" },
       "TokenService/AddBotIdentity": (request: Record<string, unknown>) => {
         added.push(request);
         return { identity: {} };
@@ -2368,7 +2368,7 @@ describe("keyless bots", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Sign in from CI…" }));
     fireEvent.change(screen.getByLabelText("Repository (owner/name)"), { target: { value: "acme/release" } });
     fireEvent.change(screen.getByLabelText(/only from this branch/i), { target: { value: "refs/heads/main" } });
-    expect(screen.getByText(/audience=https:\/\/vertra\.acme\.dev/)).toBeTruthy();
+    expect(screen.getByText(/audience=https:\/\/vennir\.acme\.dev/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => {
       expect(added).toEqual([
@@ -2382,10 +2382,10 @@ describe("keyless bots", () => {
     await renderAt("/teams/payments?tab=automation", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
       "TokenService/ListBots": { bots: [] },
-      "TokenService/ListBotIdentities": { identities: [], issuers: ["https://token.actions.githubusercontent.com"], audience: "https://vertra.acme.dev" },
+      "TokenService/ListBotIdentities": { identities: [], issuers: ["https://token.actions.githubusercontent.com"], audience: "https://vennir.acme.dev" },
       "TokenService/CreateKeylessBot": (request: Record<string, unknown>) => {
         made.push(request);
-        return { email: "payments-deploy@bots.vertra.local", identity: { id: "i1" } };
+        return { email: "payments-deploy@bots.vennir.local", identity: { id: "i1" } };
       },
     });
     fireEvent.change(await screen.findByLabelText(/What will use it/), { target: { value: "deploy" } });
@@ -2398,7 +2398,7 @@ describe("keyless bots", () => {
     fireEvent.click(create);
     await waitFor(() => {
       expect(made).toEqual([
-        { team: "payments", email: "payments-deploy@bots.vertra.local", issuer: "https://token.actions.githubusercontent.com", claims: { repository: "acme/deploy" } },
+        { team: "payments", email: "payments-deploy@bots.vennir.local", issuer: "https://token.actions.githubusercontent.com", claims: { repository: "acme/deploy" } },
       ]);
     });
     expect(calls).not.toContain("TokenService/CreateBotToken");
@@ -2411,14 +2411,14 @@ describe("ordering bots", () => {
     await renderAt("/teams/payments?tab=automation", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
       "TokenService/ListBots": {
-        bots: [{ id: "b1", email: "payments-shop@bots.vertra.local", ordering: true, orderTemplates: ["payments/onboarding"], tokens: [{ id: "k1", label: "Shop" }] }],
+        bots: [{ id: "b1", email: "payments-shop@bots.vennir.local", ordering: true, orderTemplates: ["payments/onboarding"], tokens: [{ id: "k1", label: "Shop" }] }],
       },
       "TokenService/SetBotOrders": (request: Record<string, unknown>) => {
         saved.push(request);
         return { templates: request["templates"] };
       },
     });
-    const card = (await screen.findByRole("heading", { name: "payments-shop@bots.vertra.local" })).closest("article") as HTMLElement;
+    const card = (await screen.findByRole("heading", { name: "payments-shop@bots.vennir.local" })).closest("article") as HTMLElement;
     expect(within(card).getByText("Ordering")).toBeTruthy();
     expect(within(card).getByText("payments/onboarding")).toBeTruthy();
     expect(within(card).queryByLabelText("Templates it may order")).toBeNull();
@@ -2426,7 +2426,7 @@ describe("ordering bots", () => {
     fireEvent.change(within(card).getByLabelText("Templates it may order"), { target: { value: "payments/onboarding\ndata/postgres-db" } });
     // The templates' Save, before the callback's.
     fireEvent.click(within(card).getAllByRole("button", { name: "Save" })[0] as HTMLElement);
-    await waitFor(() => { expect(saved).toEqual([{ team: "payments", email: "payments-shop@bots.vertra.local", templates: ["payments/onboarding", "data/postgres-db"] }]); });
+    await waitFor(() => { expect(saved).toEqual([{ team: "payments", email: "payments-shop@bots.vennir.local", templates: ["payments/onboarding", "data/postgres-db"] }]); });
   });
 });
 
@@ -2436,7 +2436,7 @@ describe("schedules", () => {
     await renderAt("/teams/payments?tab=schedules", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
       "ScheduleService/ListSchedules": {
-        schedules: [{ id: "s1", team: "payments", name: "nightly", kind: "template", runnableTeam: "gcp-platform", runnableName: "app-on-cloud-run", cron: "0 2 * * *", timeZone: "Europe/Berlin", botEmail: "payments-nightly@bots.vertra.local", enabled: true, nextRunAt: "2026-10-26T01:00:00Z", lastError: "Template gcp-platform/app-on-cloud-run isn't shared with you." }],
+        schedules: [{ id: "s1", team: "payments", name: "nightly", kind: "template", runnableTeam: "gcp-platform", runnableName: "app-on-cloud-run", cron: "0 2 * * *", timeZone: "Europe/Berlin", botEmail: "payments-nightly@bots.vennir.local", enabled: true, nextRunAt: "2026-10-26T01:00:00Z", lastError: "Template gcp-platform/app-on-cloud-run isn't shared with you." }],
       },
       "ScheduleService/UpdateSchedule": (request: Record<string, unknown>) => {
         changed.push(request);
@@ -2453,12 +2453,12 @@ describe("schedules", () => {
     const changed: Record<string, unknown>[] = [];
     const nightly = {
       id: "s1", team: "payments", name: "nightly", kind: "template", runnableTeam: "gcp-platform", runnableName: "app-on-cloud-run",
-      parameters: { projectId: "orders-api" }, cron: "0 2 * * *", timeZone: "Europe/Berlin", botId: "b1", botEmail: "payments-nightly@bots.vertra.local", enabled: true,
+      parameters: { projectId: "orders-api" }, cron: "0 2 * * *", timeZone: "Europe/Berlin", botId: "b1", botEmail: "payments-nightly@bots.vennir.local", enabled: true,
     };
     await renderAt("/teams/payments?tab=schedules", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
       "ScheduleService/ListSchedules": { schedules: [nightly] },
-      "TokenService/ListBots": { bots: [{ id: "b1", email: "payments-nightly@bots.vertra.local" }, { id: "b2", email: "payments-release@bots.vertra.local" }] },
+      "TokenService/ListBots": { bots: [{ id: "b1", email: "payments-nightly@bots.vennir.local" }, { id: "b2", email: "payments-release@bots.vennir.local" }] },
       "TemplateService/ListTemplates": {
         runnables: [{ kind: "KIND_TEMPLATE", team: "gcp-platform", name: "app-on-cloud-run", displayName: "App on Cloud Run", shared: true, actions: [],
           parameters: { type: "object", required: ["projectId"], properties: { projectId: { type: "string", title: "Project ID" } } } }],
@@ -2475,7 +2475,7 @@ describe("schedules", () => {
     fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: "When" }));
     fireEvent.click(await screen.findByRole("option", { name: "Weekdays at 09:00" }));
     fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: "Runs as" }));
-    fireEvent.click(await screen.findByRole("option", { name: "payments-release@bots.vertra.local" }));
+    fireEvent.click(await screen.findByRole("option", { name: "payments-release@bots.vennir.local" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
     await waitFor(() => { expect(changed).toEqual([{ id: "s1", cron: "0 9 * * 1-5", timeZone: "Europe/Berlin", botId: "b2" }]); });
     await waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
@@ -2702,14 +2702,14 @@ describe("Observe's alerts", () => {
         checkedAt: "2026-10-30T14:29:00Z",
         rules: [
           {
-            name: "VertraGatewayBackendUnreachable",
+            name: "VennirGatewayBackendUnreachable",
             severity: "warning",
             summary: "The gateway can't reach …'s backend.",
             state: "firing",
             hidden: 1,
             instances: [{ state: "firing", activeAt: "2026-10-30T13:58:00Z", summary: "The gateway can't reach payments/orders's backend.", labels: { api: "payments/orders" } }],
           },
-          { name: "VertraSchedulerDown", severity: "critical", summary: "No scheduler has finished a pass in 10 minutes.", state: "inactive" },
+          { name: "VennirSchedulerDown", severity: "critical", summary: "No scheduler has finished a pass in 10 minutes.", state: "inactive" },
         ],
       },
     });
@@ -2725,13 +2725,13 @@ describe("Observe's alerts", () => {
   it("on Google Cloud's managed Prometheus, say where they're from, and what's missing when Google refuses", async () => {
     const rules = [
       {
-        name: "VertraGatewayBackendUnreachable",
+        name: "VennirGatewayBackendUnreachable",
         severity: "critical",
         summary: "The gateway can't reach …'s backend.",
         state: "firing",
-        instances: [{ state: "firing", activeAt: "2026-10-30T13:58:00Z", labels: { api: "payments/orders", namespace: "vertra-system" } }],
+        instances: [{ state: "firing", activeAt: "2026-10-30T13:58:00Z", labels: { api: "payments/orders", namespace: "vennir-system" } }],
       },
-      { name: "VertraSchedulerDown", severity: "critical", summary: "No scheduler has finished a pass in 10 minutes.", state: "inactive" },
+      { name: "VennirSchedulerDown", severity: "critical", summary: "No scheduler has finished a pass in 10 minutes.", state: "inactive" },
     ];
     await renderAt("/observe?tab=metrics", MEMBER, {
       "ObserveService/ListAlerts": { configured: true, source: "google", project: "acyclix-dev", checkedAt: "2026-10-30T14:29:00Z", rules },
@@ -2739,12 +2739,12 @@ describe("Observe's alerts", () => {
     let card = await screen.findByRole("region", { name: "Alerts" });
     expect(await within(card).findByText(/^1 firing · from Google Cloud · checked/)).toBeTruthy();
     expect(within(card).getByText("acyclix-dev")).toBeTruthy();
-    expect(within(card).getByText("api=payments/orders · namespace=vertra-system")).toBeTruthy();
+    expect(within(card).getByText("api=payments/orders · namespace=vennir-system")).toBeTruthy();
     expect(within(card).getByText(/^Since /)).toBeTruthy();
     expect(within(card).getByText(/Google keeps which alerts fire and their labels/)).toBeTruthy();
     cleanup();
 
-    const problem = "Google's managed Prometheus refused the console (403): its Google identity needs roles/monitoring.viewer on acyclix-dev, which vertra apply grants.";
+    const problem = "Google's managed Prometheus refused the console (403): its Google identity needs roles/monitoring.viewer on acyclix-dev, which vennir apply grants.";
     await renderAt("/observe?tab=metrics", MEMBER, {
       "ObserveService/ListAlerts": {
         configured: true, source: "google", project: "acyclix-dev", checkedAt: "2026-10-30T14:29:00Z", stateUnknown: true, problem,
@@ -2833,7 +2833,7 @@ describe("a run a schedule started", () => {
     createdAt: "2026-10-30T02:00:00Z",
     state: "EXECUTION_STATE_SUCCEEDED",
     submittedBy: "b0b0b0b0-0000-4000-8000-000000000001",
-    submittedByEmail: "payments-nightly@bots.vertra.local",
+    submittedByEmail: "payments-nightly@bots.vennir.local",
     schedule: "nightly",
   };
 
@@ -2856,11 +2856,11 @@ describe("a bot's CI identities", () => {
   it("say when each was added, and when it was last used", async () => {
     await renderAt("/teams/payments?tab=automation", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
       "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
-      "TokenService/ListBots": { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-release@bots.vertra.local" }] },
+      "TokenService/ListBots": { bots: [{ id: "b0b0b0b0-0000-4000-8000-000000000001", email: "payments-release@bots.vennir.local" }] },
       "TokenService/ListBotIdentities": {
-        identities: [{ id: "i1", botId: "b0b0b0b0-0000-4000-8000-000000000001", botEmail: "payments-release@bots.vertra.local", issuer: "https://token.actions.githubusercontent.com", claims: { repository: "acme/release" }, createdAt: "2026-10-02T09:00:00Z" }],
+        identities: [{ id: "i1", botId: "b0b0b0b0-0000-4000-8000-000000000001", botEmail: "payments-release@bots.vennir.local", issuer: "https://token.actions.githubusercontent.com", claims: { repository: "acme/release" }, createdAt: "2026-10-02T09:00:00Z" }],
         issuers: ["https://token.actions.githubusercontent.com"],
-        audience: "https://vertra.acme.dev",
+        audience: "https://vennir.acme.dev",
       },
     });
     expect(await screen.findByText(/^added .+ · last used never$/)).toBeTruthy();
@@ -2982,7 +2982,7 @@ describe("a cart Ask proposes", () => {
         ],
       },
     });
-    fireEvent.change(await screen.findByRole("textbox", { name: "Ask Vertra" }), { target: { value: "A database and app hosting?" } });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Ask Vennir" }), { target: { value: "A database and app hosting?" } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     const proposed = await screen.findByRole("region", { name: "Proposed cart" });
     expect(await within(proposed).findByText("gcp-platform/app-hosting")).toBeTruthy();
@@ -3003,7 +3003,7 @@ describe("products for other installs", () => {
     parameters: { type: "object", properties: { name: { type: "string" }, region: { type: "string" } } },
     shared: true,
     clouds: ["aws"],
-    sourceUrl: "https://github.com/acme/vertra-catalog/blob/main/teams/aws-platform/s3-bucket/product.yaml",
+    sourceUrl: "https://github.com/acme/vennir-catalog/blob/main/teams/aws-platform/s3-bucket/product.yaml",
   };
   const BUCKET = { kind: "KIND_ACTION", team: "data-platform", name: "data-platform-object-bucket-create", displayName: "Object bucket", actions: ["data-platform/object-bucket.create"], shared: true, runsHere: true };
 
@@ -3112,7 +3112,7 @@ describe("products for other installs", () => {
   it("are why the Admin page's Console card names the install's cloud, and it's left out when not known", async () => {
     const install = { "AdminService/GetInstall": { version: "0.4.0", environmentLabel: "Kubernetes on GKE, us-central1", scanning: true, runRetentionDays: 90 } };
     await renderAt("/admin", ADMIN, { "AuthService/GetEnvironment": GCP, ...install });
-    expect(await screen.findByText("Cloud: gcp (set by vertra)")).toBeTruthy();
+    expect(await screen.findByText("Cloud: gcp (set by vennir)")).toBeTruthy();
     cleanup();
     await renderAt("/admin", ADMIN, install);
     expect(await screen.findByText("0.4.0")).toBeTruthy();

@@ -1,16 +1,16 @@
-# Go for vertra (`make proto`): the console's API and the
+# Go for vennir (`make proto`): the console's API and the
 # catalog release format, from the plugins pinned as tools in cli/go.mod.
 # Output is committed.
 version: v2
 clean: true
 inputs:
   - directory: proto
-    paths: [proto/vertra/console, proto/vertra/catalog]
+    paths: [proto/vennir/console, proto/vennir/catalog]
 managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: github.com/rburns629/vertra/cli/internal/gen
+      value: github.com/rburns629/vennir/cli/internal/gen
 plugins:
   - local: protoc-gen-go
     out: cli/internal/gen

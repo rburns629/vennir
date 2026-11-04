@@ -8,7 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 
-	kernelv1 "github.com/rburns629/vertra/kernel/internal/gen/vertra/kernel/v1"
+	kernelv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1"
 )
 
 // GetStats is what the steps did, from the kernel's own tables (the

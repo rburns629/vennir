@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 _MODULE_PATH = Path(__file__).parent / "delete.py"
 PATH = "projects/my-project/locations/us-central1/services/hello-world"
 # What create labels a service it deploys for team web with.
-MADE_FOR_WEB = {"vertra-made": "true", "vertra-team": "web"}
+MADE_FOR_WEB = {"vennir-made": "true", "vennir-team": "web"}
 
 
 def _load():
@@ -61,7 +61,7 @@ class DeleteActionTest(unittest.TestCase):
 
     def test_one_deployed_some_other_way_is_refused(self) -> None:
         code, result, client = self._run({"type": "gcp/cloud-run-service", "id": PATH}, MagicMock(labels={}))
-        self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VERTRA"))
+        self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VENNIR"))
         client.delete_service.assert_not_called()
 
     def test_one_deployed_for_another_team_is_refused(self) -> None:

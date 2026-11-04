@@ -12,5 +12,5 @@ they are, and CI checks that on every PR, so a copy starts from green.
 | `http-check/` | Calls an API with an optional token, with timeouts and retryable errors | `teams/<team>/products/http-check/` |
 | `dags/` | DAGs to paste into the console's Submit page, one per step; then a template (`5-template.yaml`), how others run your products | (paste; change the team name) · `teams/<team>/dags/` |
 
-The step-by-step walkthrough that uses them is the "Vertra: try the
+The step-by-step walkthrough that uses them is the "Vennir: try the
 team end to end" guide.

@@ -22,7 +22,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/rburns629/vertra/kernel/internal/config"
+	"github.com/rburns629/vennir/kernel/internal/config"
 )
 
 // KernelActivity is tested against the real database in activity_test.go.
@@ -61,7 +61,7 @@ func TestShouldSleep(t *testing.T) {
 }
 
 var settings = config.Settings{
-	SleeperNamespace: "vertra-system", SleeperDeployments: []string{"api", "console", "trivy"},
+	SleeperNamespace: "vennir-system", SleeperDeployments: []string{"api", "console", "trivy"},
 	SleeperDatabases: []string{"postgres"}, SleeperStateConfigMap: "kernel-sleep",
 	SleeperConsoleActivityConfigMap: "console-activity", SleeperAPIPodSelector: "component=api",
 	SleeperIdleAfter: twoHours, SleeperCronJob: "kernel-sleeper", SleeperScheduledWait: time.Hour,
@@ -79,12 +79,12 @@ type platform struct {
 // used at console (nil: never), and kernel-api started six hours ago.
 func newPlatform(replicas map[string]int32, console *time.Time) *platform {
 	objects := []runtime.Object{
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "api-1", Namespace: "vertra-system", Labels: map[string]string{"component": "api"}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "api-1", Namespace: "vennir-system", Labels: map[string]string{"component": "api"}},
 			Status: corev1.PodStatus{StartTime: &metav1.Time{Time: time.Now().Add(-3 * twoHours)}}},
-		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "kernel-sleep", Namespace: "vertra-system"}},
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "kernel-sleep", Namespace: "vennir-system"}},
 	}
 	if console != nil {
-		objects = append(objects, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "console-activity", Namespace: "vertra-system"},
+		objects = append(objects, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "console-activity", Namespace: "vennir-system"},
 			Data: map[string]string{"lastActivityAt": console.UTC().Format("2006-01-02T15:04:05.000Z07:00")}})
 	}
 	client := fake.NewClientset(objects...)
@@ -116,7 +116,7 @@ func newPlatform(replicas map[string]int32, console *time.Time) *platform {
 		p.patched = body.Data
 		return true, &corev1.ConfigMap{}, nil
 	})
-	p.Platform = &Platform{Client: client, Namespace: "vertra-system", Timeout: 5 * time.Second}
+	p.Platform = &Platform{Client: client, Namespace: "vennir-system", Timeout: 5 * time.Second}
 	return p
 }
 
@@ -163,9 +163,9 @@ func TestStaysUpWhileAnExecutionIsUnfinished(t *testing.T) {
 // kernel-api starting (woken, upgraded) counts as activity.
 func TestARecentKernelAPIStartKeepsItUp(t *testing.T) {
 	p := newPlatform(map[string]int32{"api": 1, "postgres": 1}, nil)
-	pod, _ := p.client.CoreV1().Pods("vertra-system").Get(context.Background(), "api-1", metav1.GetOptions{})
+	pod, _ := p.client.CoreV1().Pods("vennir-system").Get(context.Background(), "api-1", metav1.GetOptions{})
 	pod.Status.StartTime = &metav1.Time{Time: time.Now().Add(-time.Minute)}
-	_, _ = p.client.CoreV1().Pods("vertra-system").UpdateStatus(context.Background(), pod, metav1.UpdateOptions{})
+	_, _ = p.client.CoreV1().Pods("vennir-system").UpdateStatus(context.Background(), pod, metav1.UpdateOptions{})
 	run(t, p, false, at(-3*twoHours), false)
 	if p.scaled != nil {
 		t.Errorf("scaled %v", p.scaled)
@@ -211,12 +211,12 @@ func newNotFound(gvr schema.GroupVersionResource, name string) error {
 // schedule runs at next, and records what the wake CronJob is patched with.
 func withNextSchedule(t *testing.T, p *platform, next time.Time) map[string]string {
 	t.Helper()
-	cm, err := p.client.CoreV1().ConfigMaps("vertra-system").Get(context.Background(), "console-activity", metav1.GetOptions{})
+	cm, err := p.client.CoreV1().ConfigMaps("vennir-system").Get(context.Background(), "console-activity", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	cm.Data[NextScheduleKey] = next.UTC().Format(time.RFC3339)
-	if _, err := p.client.CoreV1().ConfigMaps("vertra-system").Update(context.Background(), cm, metav1.UpdateOptions{}); err != nil {
+	if _, err := p.client.CoreV1().ConfigMaps("vennir-system").Update(context.Background(), cm, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	patches := map[string]string{}
@@ -266,9 +266,9 @@ func TestAScheduleSoonKeepsItAwake(t *testing.T) {
 
 func TestWakeRestoresWhatWasAsleepDatabasesFirst(t *testing.T) {
 	p := newPlatform(map[string]int32{"api": 0, "console": 0, "postgres": 0}, nil)
-	cm, _ := p.client.CoreV1().ConfigMaps("vertra-system").Get(context.Background(), "kernel-sleep", metav1.GetOptions{})
+	cm, _ := p.client.CoreV1().ConfigMaps("vennir-system").Get(context.Background(), "kernel-sleep", metav1.GetOptions{})
 	cm.Data = map[string]string{AwakeReplicasKey: `{"api":2,"console":1,"postgres":1}`}
-	if _, err := p.client.CoreV1().ConfigMaps("vertra-system").Update(context.Background(), cm, metav1.UpdateOptions{}); err != nil {
+	if _, err := p.client.CoreV1().ConfigMaps("vennir-system").Update(context.Background(), cm, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	var woke []string

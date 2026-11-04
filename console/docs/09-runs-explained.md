@@ -158,7 +158,7 @@ What a run made (on **Runs → What runs made**) is kept after the run is gone, 
 
 ## Where are a step's logs, and why don't I see all of them?
 
-Click a step on the run's page, or call `ExecutionService/GetExecutionLogs`. A step's printed output is copied into Vertra's database:
+Click a step on the run's page, or call `ExecutionService/GetExecutionLogs`. A step's printed output is copied into Vennir's database:
 
 - every 60 seconds while it runs, and once more when it ends, so a running step's logs can be up to a minute behind;
 - only its last 5000 lines, at most 1 MiB. When more was printed, the first line says earlier output wasn't kept;

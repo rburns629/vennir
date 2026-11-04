@@ -13,9 +13,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rburns629/vertra/cli/internal/cluster"
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/cluster"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // State is what gcloud says about the project and the cluster.
@@ -175,7 +175,7 @@ func TaskRegistry(c *config.Config) string {
 // PlatformRepository is the repository the module creates for platform
 // images built from source ("" when installing a release).
 func PlatformRepository(c *config.Config) string {
-	if c.Vertra != "source" {
+	if c.Vennir != "source" {
 		return ""
 	}
 	return c.Cluster.Name + "-platform"
@@ -183,7 +183,7 @@ func PlatformRepository(c *config.Config) string {
 
 // PlatformRegistry is that repository's path.
 func PlatformRegistry(c *config.Config) string {
-	if c.Vertra != "source" {
+	if c.Vennir != "source" {
 		return ""
 	}
 	return fmt.Sprintf("%s-docker.pkg.dev/%s/%s", c.GCP.Region, c.GCP.Project, PlatformRepository(c))
@@ -241,7 +241,7 @@ func SigningPublicKey(ctx context.Context, r *run.Runner, key string) (string, e
 	if m == nil {
 		return "", fmt.Errorf("%q isn't a Cloud KMS key", key)
 	}
-	file, err := os.CreateTemp("", "vertra-signing-*.pem")
+	file, err := os.CreateTemp("", "vennir-signing-*.pem")
 	if err != nil {
 		return "", err
 	}

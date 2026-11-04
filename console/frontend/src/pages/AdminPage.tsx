@@ -35,7 +35,7 @@ const GUIDE = "16-admin-settings";
 
 /**
  * Where a section's settings are made: in the console (here), by the
- * install (vertra.yaml or the Helm values, then vertra apply), the install
+ * install (vennir.yaml or the Helm values, then vennir apply), the install
  * turning it on and the console running it (both), or nothing to set.
  */
 type Source = "here" | "install" | "both" | "status";
@@ -117,8 +117,8 @@ const GROUPS: { name: string; sections: Section[] }[] = [
         about: "This install at a glance: what still needs you, and the state of every part, each leading to the section that sets it. Nothing is changed on this page.",
         source: "status",
         install: [
-          <>Optional parts are turned on in {mono("vertra.yaml")}: {mono("vertra config set -e <env> <key> <value>")}, then {mono("vertra apply <env>")}.</>,
-          "Without vertra, the same keys are in the console and kernel charts' Helm values.",
+          <>Optional parts are turned on in {mono("vennir.yaml")}: {mono("vennir config set -e <env> <key> <value>")}, then {mono("vennir apply <env>")}.</>,
+          "Without vennir, the same keys are in the console and kernel charts' Helm values.",
         ],
         content: (summary) => <OverviewTab summary={summary} />,
       },
@@ -134,7 +134,7 @@ const GROUPS: { name: string; sections: Section[] }[] = [
         source: "here",
         here: ["Accounts, admins and password resets.", "A new person joins each team chosen as a maintainer; the team's maintainers change roles on its Members tab."],
         install: (i) => [
-          <>The first admin: {mono("admin.email")} in vertra.yaml.</>,
+          <>The first admin: {mono("admin.email")} in vennir.yaml.</>,
           <>How long a session lasts: {mono("jwtTtl")}{thisInstall(i, (x) => mono(x.sessionLength)) ?? " (8 hours unless the install changes it)"}.</>,
           <SelfRegistration key="self-registration" />,
         ],
@@ -151,8 +151,8 @@ const GROUPS: { name: string; sections: Section[] }[] = [
           <>Whether a team requires single sign-on: on <Link component={RouterLink} to="/teams">that team&apos;s Settings tab</Link>.</>,
         ],
         install: [
-          <>Optionally the provider: {mono("sso")} in vertra.yaml ({mono("vertra sso google <env>")}). It then shows here read-only.</>,
-          <>Google Workspace groups&apos; access: {mono("vertra sso google-groups <env>")}.</>,
+          <>Optionally the provider: {mono("sso")} in vennir.yaml ({mono("vennir sso google <env>")}). It then shows here read-only.</>,
+          <>Google Workspace groups&apos; access: {mono("vennir sso google-groups <env>")}.</>,
         ],
         content: () => <SsoCard />,
       },
@@ -177,7 +177,7 @@ const GROUPS: { name: string; sections: Section[] }[] = [
         here: ["Sync now: read and apply the release at once.", "Adopt a team the catalog found here but didn't make."],
         install: (i) => [
           <>
-            The release, and which versions to apply: {mono("catalog")}, {mono("catalogVersion")} ({mono("vertra catalog create")}, {mono("vertra catalog promote")})
+            The release, and which versions to apply: {mono("catalog")}, {mono("catalogVersion")} ({mono("vennir catalog create")}, {mono("vennir catalog promote")})
             {thisInstall(i, (x) => (x.catalogVersion ? mono(x.catalogVersion) : "no catalog"))}.
           </>,
           <>How often it looks for a new release: the console chart&apos;s {mono("catalog.pollSeconds")}{thisInstall(i, (x) => (x.catalogVersion ? `every ${seconds(x.catalogPollSeconds)}` : "no catalog"))}.</>,
@@ -193,7 +193,7 @@ const GROUPS: { name: string; sections: Section[] }[] = [
         source: "both",
         here: ["The allowed sources: the source registry and any more.", "Upgrades keep what's saved here."],
         install: (i) => [
-          <>Their first value, when the kernel is installed: {mono("taskImages.registry")} in vertra.yaml.</>,
+          <>Their first value, when the kernel is installed: {mono("taskImages.registry")} in vennir.yaml.</>,
           <>
             Whether images must be signed: the kernel chart&apos;s {mono("imageSignature")}
             {thisInstall(i, (x) =>
@@ -244,13 +244,13 @@ const GROUPS: { name: string; sections: Section[] }[] = [
         label: "Chat agent",
         about: (
           <>
-            The model behind Ask Vertra, which answers from the guides and proposes carts from the catalog, and what people asked it and how
+            The model behind Ask Vennir, which answers from the guides and proposes carts from the catalog, and what people asked it and how
             they rated the answers. What it&apos;s sent reaches the model&apos;s provider: on a cloud, choose the install&apos;s own.
           </>
         ),
         source: "both",
         here: ["A model of your own, its provider and limits: it replaces the install's until you choose Use the install's.", "Turning it off for everyone."],
-        install: [<>A default model: {mono("chat")} in vertra.yaml ({mono("chat.model")}, {mono("chat.off")}) on gcp and aws; elsewhere the console chart&apos;s {mono("chat")} values.</>],
+        install: [<>A default model: {mono("chat")} in vennir.yaml ({mono("chat.model")}, {mono("chat.off")}) on gcp and aws; elsewhere the console chart&apos;s {mono("chat")} values.</>],
         content: () => (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <ChatSettingsCard />
@@ -297,7 +297,7 @@ const GROUPS: { name: string; sections: Section[] }[] = [
         about: "Every request that tried to change something is in the audit log, each entry hash-chained to the one before, so changing, removing or slipping in an entry breaks every later hash. This is its write-once copy in a bucket that refuses deletes and overwrites, and whether the chain still holds.",
         source: "install",
         install: (i) => [
-          <>Whether there&apos;s a copy, and where: {mono("audit.export")} in vertra.yaml (gcp, aws), or the console chart&apos;s {mono("audit.export.bucket")}.</>,
+          <>Whether there&apos;s a copy, and where: {mono("audit.export")} in vennir.yaml (gcp, aws), or the console chart&apos;s {mono("audit.export.bucket")}.</>,
           <>How long the bucket keeps each entry: {mono("audit.keepDays")}{thisInstall(i, (x) => (!x.auditCopy ? "no copy" : x.auditKeepDays ? `${String(x.auditKeepDays)} days, as configured` : "not known here"))}.</>,
           <>
             {mono("audit.lock")} makes that retention permanent: nobody can shorten it or delete the bucket until it lapses. Decide before you set it
@@ -451,7 +451,7 @@ function AdminSections({ section, onSection }: { section: Section; onSection: (i
     <Box>
       <PageHeader
         title="Admin"
-        subtitle={<>This install&apos;s settings, grouped by what they&apos;re for. Teams, products and templates come from the catalog. Each section says what&apos;s set here and what the install sets (vertra.yaml, then {mono("vertra apply")}).</>}
+        subtitle={<>This install&apos;s settings, grouped by what they&apos;re for. Teams, products and templates come from the catalog. Each section says what&apos;s set here and what the install sets (vennir.yaml, then {mono("vennir apply")}).</>}
         help={{ guide: GUIDE, label: "The Admin page, setting by setting" }}
       />
       <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "236px minmax(0, 1fr)" }, alignItems: "start" }}>

@@ -18,10 +18,10 @@ import (
 // TestHelperForward stands in for kubectl's port-forward: it listens on the
 // port for a while, then ends as a dropped stream does.
 func TestHelperForward(t *testing.T) {
-	if os.Getenv("VERTRA_HELPER_FORWARD") == "" {
+	if os.Getenv("VENNIR_HELPER_FORWARD") == "" {
 		t.Skip("run by TestSuperviseRestarts")
 	}
-	l, err := net.Listen("tcp", "127.0.0.1:"+os.Getenv("VERTRA_HELPER_FORWARD"))
+	l, err := net.Listen("tcp", "127.0.0.1:"+os.Getenv("VENNIR_HELPER_FORWARD"))
 	if err != nil {
 		os.Exit(2)
 	}
@@ -69,7 +69,7 @@ func TestSuperviseRestarts(t *testing.T) {
 		starts++
 		mu.Unlock()
 		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestHelperForward$")
-		cmd.Env = append(os.Environ(), "VERTRA_HELPER_FORWARD="+strconv.Itoa(port))
+		cmd.Env = append(os.Environ(), "VENNIR_HELPER_FORWARD="+strconv.Itoa(port))
 		return cmd
 	})
 	if err != nil {

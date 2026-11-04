@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // fakeKubectl is a kubectl that records its arguments and stdin in dir
@@ -44,8 +44,8 @@ func TestGivePassword(t *testing.T) {
 		t.Error("the password is in kubectl's arguments")
 	}
 	// Server-side, so no copy of it lands in the last-applied annotation,
-	// and one an older vertra's apply left is removed.
-	if !strings.Contains(string(args), "--namespace "+c.Namespace+" apply --server-side --field-manager=vertra --force-conflicts -f -") ||
+	// and one an older vennir's apply left is removed.
+	if !strings.Contains(string(args), "--namespace "+c.Namespace+" apply --server-side --field-manager=vennir --force-conflicts -f -") ||
 		!strings.Contains(string(args), "annotate secret "+FirstAdminSecret+" kubectl.kubernetes.io/last-applied-configuration-") {
 		t.Errorf("args: %s", args)
 	}
@@ -111,7 +111,7 @@ func TestEnsureSSOSecret(t *testing.T) {
 	if strings.Contains(string(args), "s3cr3t-value") || !strings.Contains(string(stdin), "s3cr3t-value") {
 		t.Error("the secret isn't only in stdin")
 	}
-	if !strings.Contains(string(args), "apply --server-side --field-manager=vertra --force-conflicts -f -") ||
+	if !strings.Contains(string(args), "apply --server-side --field-manager=vennir --force-conflicts -f -") ||
 		!strings.Contains(string(args), "annotate secret "+SSOSecretName+" kubectl.kubernetes.io/last-applied-configuration-") {
 		t.Errorf("args: %s", args)
 	}

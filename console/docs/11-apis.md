@@ -41,7 +41,7 @@ Your own team's APIs are also on your team's page, on the **APIs** tab, with eac
 | **Live** | Its backend is under a host this install allows | Forwards what its spec describes |
 | **Held** | Its backend's host isn't one the install's admins allow | Answers every call with 503 `API_HELD`; forwards nothing |
 | **Paused** | A maintainer of its team paused it, with a message | Answers every call with 503 `API_PAUSED` and that message; forwards nothing |
-| **Can’t serve** | The gateway can't use its OpenAPI document (it can't be read, or a `$ref` points nowhere); its page says what the gateway found, and when | Answers every call with 503 `API_UNAVAILABLE`; forwards nothing until a release fixes the file. `vertra catalog validate` refuses a file it can't read or whose `$ref` points nowhere, so most of these never reach a release |
+| **Can’t serve** | The gateway can't use its OpenAPI document (it can't be read, or a `$ref` points nowhere); its page says what the gateway found, and when | Answers every call with 503 `API_UNAVAILABLE`; forwards nothing until a release fixes the file. `vennir catalog validate` refuses a file it can't read or whose `$ref` points nowhere, so most of these never reach a release |
 
 An API can also be marked deprecated in its `api.yaml`. It keeps working; its page shows **Deprecated:** and what to use instead.
 
@@ -75,7 +75,7 @@ Send the request to the address on the API's **Overview**, with a bearer token i
 
 ```console
 $ curl -X GET 'https://gateway.example.com/team-b/orders/orders/<orderId>' \
-    -H "Authorization: Bearer $VERTRA_TOKEN"
+    -H "Authorization: Bearer $VENNIR_TOKEN"
 ```
 
 The gateway signs you in exactly as the console does. The token is one of:
@@ -83,12 +83,12 @@ The gateway signs you in exactly as the console does. The token is one of:
 - **a bot's API token** (starts with `mp_`), the usual choice for a script or a service. A maintainer makes one on the team page's **Automation** tab ([Get a token](05-calling-the-api.md#1-get-a-token));
 - **a person's console session**. A session issued before your last password change, or one you signed out of, is refused. If one of your teams requires single sign-on, a password session is refused too (admins excepted).
 
-If you're in more than one team that may call the API, the gateway picks one: the API's own team if you're in it, else the first of yours it's shared with. To choose, send `Vertra-Team: <team>`. Your calls then count against that team's limit, and it's refused with 403 if you're not in that team or it may not call the API.
+If you're in more than one team that may call the API, the gateway picks one: the API's own team if you're in it, else the first of yours it's shared with. To choose, send `Vennir-Team: <team>`. Your calls then count against that team's limit, and it's refused with 403 if you're not in that team or it may not call the API.
 
 Every answer carries two headers worth keeping:
 
-- `Vertra-Answered-By`: `gateway` when the gateway refused or answered itself, `backend` when the backend did;
-- `Vertra-Request-Id`: the gateway's id for this request. The backend gets the same id, so give it to the owning team when you report a problem.
+- `Vennir-Answered-By`: `gateway` when the gateway refused or answered itself, `backend` when the backend did;
+- `Vennir-Request-Id`: the gateway's id for this request. The backend gets the same id, so give it to the owning team when you report a problem.
 
 ## What does the gateway check, in order?
 
@@ -116,7 +116,7 @@ The gateway's own answers are JSON, `{"error": "<code>", "message": "…"}`, and
 | Status | `error` | Means | What to do |
 | --- | --- | --- | --- |
 | 401 | `UNAUTHENTICATED` | No token, or it's invalid, expired or revoked | Send `Authorization: Bearer <token>`; make a new bot token if it expired |
-| 403 | `NOT_SHARED` | The API isn't shared with your team, or not with the team in `Vertra-Team` | [Ask for access](#how-do-i-get-access-to-an-api) |
+| 403 | `NOT_SHARED` | The API isn't shared with your team, or not with the team in `Vennir-Team` | [Ask for access](#how-do-i-get-access-to-an-api) |
 | 404 | `NOT_IN_SPEC` | The spec has no such method and path. Nothing was forwarded | Check the endpoint list on its **Overview** |
 | 404 | `NOT_FOUND` | No such API here (or not on the public address, or one hidden from you, or one that's hidden or paused while you aren't signed in), or the path has an encoded slash, a backslash or a dot segment | Check the address on its **Overview**, and your token |
 | 400 | `INVALID_REQUEST` | The request doesn't fit the spec's schemas | Read `problems`; compare with the downloaded spec |
@@ -131,17 +131,17 @@ The gateway's own answers are JSON, `{"error": "<code>", "message": "…"}`, and
 | 502 | `BACKEND_UNREACHABLE` | The backend couldn't be reached | Tell its team |
 | 504 | `BACKEND_TIMEOUT` | The backend didn't start answering in time | Tell its team |
 
-Anything with `Vertra-Answered-By: backend` came from the backend itself, unchanged; its meaning is the owning team's.
+Anything with `Vennir-Answered-By: backend` came from the backend itself, unchanged; its meaning is the owning team's.
 
 ## What does the backend receive?
 
 The request as you sent it: the same method, path (below `/<team>/<name>`), query, headers and body, with three changes:
 
 - your `Authorization` header stops at the gateway. The backend gets its own credential instead, minted per request from the API's own ServiceAccount: a Kubernetes token, a Google ID token, or an AWS SigV4 signature, whichever its `api.yaml` asks for;
-- any `Vertra-*` header you sent is dropped, so you can't forge one;
-- the gateway adds `Vertra-Caller` and `Vertra-Request-Id`.
+- any `Vennir-*` header you sent is dropped, so you can't forge one;
+- the gateway adds `Vennir-Caller` and `Vennir-Request-Id`.
 
-`Vertra-Caller` is a short-lived token (60 seconds) the gateway signs, naming who called (their user id and email, and whether it's a bot), the team they called as, and the API. A backend that cares checks it against the gateway's public key at `/.vertra/jwks.json` on the gateway; one that doesn't can ignore it.
+`Vennir-Caller` is a short-lived token (60 seconds) the gateway signs, naming who called (their user id and email, and whether it's a bot), the team they called as, and the API. A backend that cares checks it against the gateway's public key at `/.vennir/jwks.json` on the gateway; one that doesn't can ignore it.
 
 The backend's answer goes back to you unchanged. A redirect from the backend goes back to you too; the gateway doesn't follow it.
 
@@ -183,15 +183,15 @@ To release it, ask an admin to add the host (or a `*.` pattern above it) to the 
 
 ## Where are my API backend's logs?
 
-When the install keeps logs, a backend running in your team's namespace has its output on Observe: **Logs**, then **From: API backends**. The API's own page shows the newest of them, from all your team's API backends, under **Its backend’s logs**, with **Search them in Observe**. Only Pods labelled `vertra/api-backend: "true"` are collected. Label them `vertra/api: <the API's name>` too, and **Search them in Observe** finds this API's backend alone (else every API backend of your team's). Those lines, at every level, are seen by your team and admins only: they belong to no run, so no caller sees them ([Observe's logs](12-observe.md#whose-logs-can-i-see)).
+When the install keeps logs, a backend running in your team's namespace has its output on Observe: **Logs**, then **From: API backends**. The API's own page shows the newest of them, from all your team's API backends, under **Its backend’s logs**, with **Search them in Observe**. Only Pods labelled `vennir/api-backend: "true"` are collected. Label them `vennir/api: <the API's name>` too, and **Search them in Observe** finds this API's backend alone (else every API backend of your team's). Those lines, at every level, are seen by your team and admins only: they belong to no run, so no caller sees them ([Observe's logs](12-observe.md#whose-logs-can-i-see)).
 
-A backend outside the cluster (Cloud Run, Lambda) logs where it runs. Use `Vertra-Request-Id` to find a request on both sides.
+A backend outside the cluster (Cloud Run, Lambda) logs where it runs. Use `Vennir-Request-Id` to find a request on both sides.
 
 ## What admins see: the API gateway section
 
 Admins open **Admin → API gateway**. It shows:
 
-- **This install's settings**: **Backends may be under** (the allowed hosts; when there are none, every API is held), **May publish to the internet** (the teams whose APIs may be reachable from the internet), the gateway's address **Inside the cluster** and **From the internet**, and the **Last 24 hours**: requests, how many APIs, and how many were refused at the door, with a link to Observe. These are the install's settings; `vertra apply` changes them, not this page;
+- **This install's settings**: **Backends may be under** (the allowed hosts; when there are none, every API is held), **May publish to the internet** (the teams whose APIs may be reachable from the internet), the gateway's address **Inside the cluster** and **From the internet**, and the **Last 24 hours**: requests, how many APIs, and how many were refused at the door, with a link to Observe. These are the install's settings; `vennir apply` changes them, not this page;
 - **Close the gateway**: with a **Message to every caller**, every API answers 503 `GATEWAY_CLOSED` and nothing is forwarded, until an admin presses **Reopen**. The console and runs carry on. Closing and reopening are recorded in the audit log.
 
 If the gateway isn't running on the install, the section says so (`gateway.enabled`).

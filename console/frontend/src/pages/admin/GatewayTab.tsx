@@ -90,7 +90,7 @@ export function GatewayTab() {
       {error && <Alert severity="error">{error}</Alert>}
       {gateway && !gateway.enabled && (
         <Alert severity="info">
-          The gateway isn&apos;t running on this install: <Mono>gateway.enabled</Mono> in vertra.yaml.
+          The gateway isn&apos;t running on this install: <Mono>gateway.enabled</Mono> in vennir.yaml.
         </Alert>
       )}
       {gateway?.enabled && (
@@ -134,7 +134,7 @@ export function GatewayTab() {
               ]}
             />
             <Typography variant="caption" color="text.secondary">
-              These are the console chart&apos;s gateway values: an upgrade (<Mono>vertra apply</Mono>) changes them, not this page.
+              These are the console chart&apos;s gateway values: an upgrade (<Mono>vennir apply</Mono>) changes them, not this page.
             </Typography>
           </AdminCard>
 

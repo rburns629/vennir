@@ -1,6 +1,6 @@
 # A second tiny product, made to be chained: its output feeds hello's input
 # (templates/dags/3-chain.yaml). Copy to teams/<your-team>/products/name-maker/.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: name-maker
 team: try-anna             # CHANGE: your team

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const apiYAML = `apiVersion: vertra.dev/v2
+const apiYAML = `apiVersion: vennir.dev/v2
 kind: Api
 name: orders
 displayName: Orders API
@@ -83,7 +83,7 @@ func TestAPIs(t *testing.T) {
 		"another backend":                {apiYAML, strings.Replace(openapiYAML, "https://orders.example.com", "https://elsewhere.example.com", 1), "servers don't include backend.url"},
 		"a reference outside the file":   {apiYAML, strings.Replace(openapiYAML, "#/components/schemas/Order", "orders.yaml#/Order", 1), "refers outside itself"},
 		"a parameter with no schema":     {apiYAML, strings.Replace(openapiYAML, `schema: {type: string, pattern: "^ord_[a-z0-9]{8}$"}`, "description: x", 1), "parameter 'orderId' has no schema"},
-		"the gateway's own path":         {apiYAML, strings.Replace(openapiYAML, "/orders:", "/.vertra/health:", 1), "the gateway's own"},
+		"the gateway's own path":         {apiYAML, strings.Replace(openapiYAML, "/orders:", "/.vennir/health:", 1), "the gateway's own"},
 		"two paths alike":                {apiYAML, strings.Replace(openapiYAML, "/orders:", "/orders/{id}:", 1), "match the same requests"},
 		"a shell in a path":              {apiYAML, strings.Replace(openapiYAML, "/orders:", "/orders'$(id)':", 1), "a character a path doesn't need"},
 		"a reference to nothing":         {apiYAML, strings.Replace(openapiYAML, "#/components/schemas/Order", "#/components/schemas/Missing", 1), "isn't valid OpenAPI"},

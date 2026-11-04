@@ -44,8 +44,8 @@ export const scansFinished = new Counter({
 /** snake_case, as Connect's wire codes are: permission_denied. */
 const codeName = (code: Code) => Code[code].replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
 
-/** Sign-in, whose failures VertraSignInBurst counts. */
-export const SIGN_IN = "vertra.console.v1.AuthService/Login";
+/** Sign-in, whose failures VennirSignInBurst counts. */
+export const SIGN_IN = "vennir.console.v1.AuthService/Login";
 
 // The series an alert measures with increase() exist at zero from the start
 // (the charts' monitoring.yaml): a series born holding a burst has no lower

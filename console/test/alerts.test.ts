@@ -15,7 +15,7 @@ import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, findTeamByName } from "../src/db/queries.js";
 import { teams } from "../src/db/schema.js";
-import { ApiSchema } from "../src/gen/vertra/catalog/v1/release_pb.js";
+import { ApiSchema } from "../src/gen/vennir/catalog/v1/release_pb.js";
 import { buildApp } from "../src/index.js";
 import { caller, rpcClient } from "./rpc.js";
 
@@ -30,8 +30,8 @@ vi.mock("../src/gcpMetadata.js", () => ({ gcpMetadataToken: vi.fn(() => Promise.
 
 // The cluster's Rules objects, as GKE's managed Prometheus evaluates them.
 const gmpGroups = [
-  { name: "vertra-kernel", rules: [{ alert: "VertraSchedulerDown", labels: { severity: "critical" }, annotations: { summary: "No scheduler has finished a pass in 10 minutes." } }, { record: "x" }] },
-  { name: "vertra-console", rules: [{ alert: "VertraGatewayBackendUnreachable", labels: { severity: "critical" }, annotations: { summary: "The gateway can't reach {{ $labels.api }}'s backend." } }] },
+  { name: "vennir-kernel", rules: [{ alert: "VennirSchedulerDown", labels: { severity: "critical" }, annotations: { summary: "No scheduler has finished a pass in 10 minutes." } }, { record: "x" }] },
+  { name: "vennir-console", rules: [{ alert: "VennirGatewayBackendUnreachable", labels: { severity: "critical" }, annotations: { summary: "The gateway can't reach {{ $labels.api }}'s backend." } }] },
   { name: "someone-elses", rules: [{ alert: "DiskFull", annotations: { summary: "A disk is full." } }] },
 ];
 // What GMP's query API answers, by query; and what it was asked.
@@ -99,15 +99,15 @@ beforeAll(async () => {
         status: "success",
         data: {
           groups: [
-            { name: "vertra-kernel", rules: [rule("VertraSchedulerDown", "inactive", "No scheduler has finished a pass in 10 minutes.")] },
+            { name: "vennir-kernel", rules: [rule("VennirSchedulerDown", "inactive", "No scheduler has finished a pass in 10 minutes.")] },
             {
-              name: "vertra-console",
+              name: "vennir-console",
               rules: [
-                rule("VertraGatewayBackendUnreachable", "firing", "The gateway can't reach {{ $labels.api }}'s backend.", [
+                rule("VennirGatewayBackendUnreachable", "firing", "The gateway can't reach {{ $labels.api }}'s backend.", [
                   { labels: { api: `${owner}/orders` }, summary: `The gateway can't reach ${owner}/orders's backend.` },
                   { labels: { api: `${owner}/ledger` }, summary: `The gateway can't reach ${owner}/ledger's backend.` },
                 ]),
-                { type: "recording", name: "vertra:requests:rate5m" },
+                { type: "recording", name: "vennir:requests:rate5m" },
               ],
             },
             { name: "someone-elses", rules: [rule("DiskFull", "firing", "A disk is full.", [{ labels: {}, summary: "A disk is full." }])] },
@@ -148,8 +148,8 @@ describe("alerts", () => {
     const found = await list(tokens.owner);
     expect(found.configured).toBe(true);
     expect(found.rules?.map((r) => [r.name, r.state])).toEqual([
-      ["VertraGatewayBackendUnreachable", "firing"],
-      ["VertraSchedulerDown", "inactive"],
+      ["VennirGatewayBackendUnreachable", "firing"],
+      ["VennirSchedulerDown", "inactive"],
     ]);
     expect(found.rules?.[0]).toMatchObject({
       summary: "The gateway can't reach …'s backend.",
@@ -181,19 +181,19 @@ describe("alerts", () => {
 });
 
 describe("alerts on Google Cloud's managed Prometheus", () => {
-  const where = { project_id: "acyclix-dev", location: "us-central1", cluster: "vertra-dev", namespace: "vertra-system" };
+  const where = { project_id: "acyclix-dev", location: "us-central1", cluster: "vennir-dev", namespace: "vennir-system" };
   const series = (name: string, metric: Record<string, string>, value: string) => ({ metric: { __name__: name, ...metric }, value: [1793600000, value] });
   const success = (result: unknown[]) => Promise.resolve(Response.json({ status: "success", data: { resultType: "vector", result } }));
   const onGoogle = () => {
     config.monitoring.prometheusUrl = "";
     config.monitoring.provider = "google";
-    config.monitoring.google = { project: "acyclix-dev", cluster: "vertra-dev" };
+    config.monitoring.google = { project: "acyclix-dev", cluster: "vennir-dev" };
   };
 
   it("are the cluster's Rules, and which fire from Google, for this cluster", async () => {
     onGoogle();
     gmpAsked.length = 0;
-    const firing = { alertname: "VertraGatewayBackendUnreachable", severity: "critical", api: `${owner}/orders`, ...where };
+    const firing = { alertname: "VennirGatewayBackendUnreachable", severity: "critical", api: `${owner}/orders`, ...where };
     const hidden = { ...firing, api: `${owner}/ledger` };
     gmp = (query) =>
       query.startsWith("ALERTS_FOR_STATE")
@@ -204,17 +204,17 @@ describe("alerts on Google Cloud's managed Prometheus", () => {
     expect(found).toMatchObject({ configured: true, source: "google", project: "acyclix-dev", problem: "" });
     expect(found.stateUnknown ?? false).toBe(false);
     expect(found.rules?.map((r) => [r.name, r.state])).toEqual([
-      ["VertraGatewayBackendUnreachable", "firing"],
-      ["VertraSchedulerDown", "inactive"],
+      ["VennirGatewayBackendUnreachable", "firing"],
+      ["VennirSchedulerDown", "inactive"],
     ]);
     // Where it fires, not where Google keeps it; since when, from ALERTS_FOR_STATE; no text of its own.
     expect(found.rules?.[0]?.instances).toEqual([
-      { state: "firing", activeAt: expect.any(String), summary: "", description: "", labels: { api: `${owner}/orders`, namespace: "vertra-system" } },
-      { state: "firing", summary: "", description: "", labels: { api: `${owner}/ledger`, namespace: "vertra-system" } },
+      { state: "firing", activeAt: expect.any(String), summary: "", description: "", labels: { api: `${owner}/orders`, namespace: "vennir-system" } },
+      { state: "firing", summary: "", description: "", labels: { api: `${owner}/ledger`, namespace: "vennir-system" } },
     ]);
     expect(Date.parse(found.rules?.[0]?.instances?.[0]?.activeAt ?? "")).toBe(1793598000 * 1000);
     // This project's and cluster's, and only what its rule evaluator still writes.
-    const selector = '{alertname=~"VertraSchedulerDown|VertraGatewayBackendUnreachable",project_id="acyclix-dev",cluster="vertra-dev"}';
+    const selector = '{alertname=~"VennirSchedulerDown|VennirGatewayBackendUnreachable",project_id="acyclix-dev",cluster="vennir-dev"}';
     expect(gmpAsked.map((a) => a.query).sort()).toEqual([
       `ALERTS_FOR_STATE${selector} and (time() - timestamp(ALERTS_FOR_STATE${selector})) < 150`,
       `ALERTS${selector} and (time() - timestamp(ALERTS${selector})) < 150`,

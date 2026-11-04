@@ -92,7 +92,7 @@ function catalogSettings() {
   if (!release) {
     return { catalogVersion: "", catalogPollSeconds: 0, catalogSignerKeys: 0, catalogKeylessIssuer: "", catalogKeylessSubject: "", externalCatalog: "" };
   }
-  // <registry>/catalog-release:<tag>: the tag is latest or a version (vertra's releaseTag).
+  // <registry>/catalog-release:<tag>: the tag is latest or a version (vennir's releaseTag).
   const at = release.lastIndexOf(":");
   const slash = release.lastIndexOf("/");
   const tag = at > slash ? release.slice(at + 1) : "latest";

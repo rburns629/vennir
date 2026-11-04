@@ -62,7 +62,7 @@ def main() -> int:
             print(f"resource group '{name}' already exists, in {group.location}")
         else:
             group = groups.create_or_update(
-                name, {"location": location, "tags": {"managed-by": "vertra"}}
+                name, {"location": location, "tags": {"managed-by": "vennir"}}
             )
             print(f"created resource group '{name}' in {location}")
     except (HttpResponseError, ServiceRequestError) as error:

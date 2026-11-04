@@ -126,7 +126,7 @@ func TestAWSRequestsAreSignedAsTheAPIsRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	if form.Get("Action") != "AssumeRoleWithWebIdentity" || form.Get("RoleArn") != "arn:aws:iam::123456789012:role/orders-gateway" ||
-		form.Get("WebIdentityToken") != "k8s-token-for-"+AWSAudience || form.Get("RoleSessionName") != "vertra.payments.orders-api" {
+		form.Get("WebIdentityToken") != "k8s-token-for-"+AWSAudience || form.Get("RoleSessionName") != "vennir.payments.orders-api" {
 		t.Errorf("assumed with %v", form)
 	}
 	sum := sha256.Sum256(body)

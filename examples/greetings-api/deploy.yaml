@@ -1,8 +1,8 @@
 # The greetings backend in the local team's namespace, as the team itself
 # would run it (kubectl, or its own CD): `make kind-sample-api` builds it and
-# applies this. vertra/api-backend: "true" is what lets the gateway reach it
-# (the console's vertra-gateway-ingress NetworkPolicy); every other Pod in
-# the namespace stays closed to it. vertra/api names the API product it
+# applies this. vennir/api-backend: "true" is what lets the gateway reach it
+# (the console's vennir-gateway-ingress NetworkPolicy); every other Pod in
+# the namespace stays closed to it. vennir/api names the API product it
 # serves, so Observe can search its lines by API.
 apiVersion: apps/v1
 kind: Deployment
@@ -17,8 +17,8 @@ spec:
     metadata:
       labels:
         app: greetings
-        vertra/api-backend: "true"
-        vertra/api: greetings
+        vennir/api-backend: "true"
+        vennir/api: greetings
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -31,9 +31,9 @@ spec:
           imagePullPolicy: Always
           env:
             - name: GATEWAY_JWKS_URL
-              value: http://console-execution-console-gateway.vertra-system.svc.cluster.local:8080/.vertra/jwks.json
+              value: http://console-execution-console-gateway.vennir-system.svc.cluster.local:8080/.vennir/jwks.json
             # This backend's origin, as the API's backend.url names it: the
-            # Vertra-Caller token's audience.
+            # Vennir-Caller token's audience.
             - name: AUDIENCE
               value: http://greetings.local.svc.cluster.local:8080
             # The API it serves, <team>/<name>: a token for another API, even

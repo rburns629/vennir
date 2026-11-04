@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-/** TemplateService (proto/vertra/console/v1/template.proto): core/templates.ts over Connect. */
+/** TemplateService (proto/vennir/console/v1/template.proto): core/templates.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import type { JsonObject } from "@bufbuild/protobuf";
 import { Type } from "@sinclair/typebox";
 import { previewAction, previewTemplate, runAction, runnables, runTemplate } from "../../core/templates.js";
-import { Runnable_Kind, type TemplateService } from "../../gen/vertra/console/v1/template_pb.js";
+import { Runnable_Kind, type TemplateService } from "../../gen/vennir/console/v1/template_pb.js";
 import { callerOf, logOf } from "../context.js";
 import { check } from "../validate.js";
 import { executionState, viaKernel } from "./execution.js";

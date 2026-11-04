@@ -10,9 +10,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rburns629/vertra/cli/internal/cluster"
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/cluster"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // AddOn is a cluster-wide chart apply installs beside the platform, when
@@ -70,7 +70,7 @@ func RecordAddOn(dir string, a AddOn) error {
 		return nil
 	}
 	installed = append(installed, a.Release)
-	head := "# The add-ons vertra apply installed here, which vertra destroy offers to uninstall.\n"
+	head := "# The add-ons vennir apply installed here, which vennir destroy offers to uninstall.\n"
 	return os.WriteFile(filepath.Join(dir, AddOnsFile), []byte(head+strings.Join(installed, "\n")+"\n"), 0o644)
 }
 
@@ -106,8 +106,8 @@ func UninstallAddOn(ctx context.Context, r *run.Runner, c *config.Config, a AddO
 	return r.Run(ctx, "helm", "uninstall", a.Release, "--kube-context", cluster.Context(c), "--namespace", a.Namespace, "--wait")
 }
 
-// TeamNamespaces are the cluster's namespaces labelled vertra/team: those
-// the console made (it labels them managed-by vertra-console), and the rest,
+// TeamNamespaces are the cluster's namespaces labelled vennir/team: those
+// the console made (it labels them managed-by vennir-console), and the rest,
 // labelled by hand (an existing namespace handed over to a team, or one
 // labelled for another reason).
 func TeamNamespaces(ctx context.Context, r *run.Runner, c *config.Config) (made, others []string, err error) {
@@ -116,10 +116,10 @@ func TeamNamespaces(ctx context.Context, r *run.Runner, c *config.Config) (made,
 			"-o", "jsonpath={.items[*].metadata.name}")
 		return strings.Fields(out), err
 	}
-	if made, err = list("vertra/team,app.kubernetes.io/managed-by=vertra-console"); err != nil {
+	if made, err = list("vennir/team,app.kubernetes.io/managed-by=vennir-console"); err != nil {
 		return nil, nil, err
 	}
-	if others, err = list("vertra/team,app.kubernetes.io/managed-by!=vertra-console"); err != nil {
+	if others, err = list("vennir/team,app.kubernetes.io/managed-by!=vennir-console"); err != nil {
 		return nil, nil, err
 	}
 	return made, others, nil

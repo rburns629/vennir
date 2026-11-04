@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { config } from "../src/config.js";
 import { federatedDockerConfig, federatedGcpToken, federatedHost, resetFederatedToken } from "../src/registryFederation.js";
 
-const PROVIDER = "projects/123/locations/global/workloadIdentityPools/vertra/providers/eks";
+const PROVIDER = "projects/123/locations/global/workloadIdentityPools/vennir/providers/eks";
 const saved = { ...config.registryFederation };
 const savedCredentials = new Map(config.registryCredentials);
 let calls: { url: string; body: Record<string, unknown>; authorization: string | null }[];

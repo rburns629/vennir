@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vertra DAG (kind: Dag), format v2",
+  "title": "Vennir DAG (kind: Dag), format v2",
   "description": "A DAG exactly as the console's Submit page and ExecutionService/SubmitExecution take it: concrete images, teams and inputs, no parameters. For examples and walkthroughs; what consumers run is a Template.",
   "type": "object",
   "additionalProperties": false,
@@ -12,8 +12,8 @@
   ],
   "properties": {
     "apiVersion": {
-      "description": "The catalog format: vertra.dev/v2. A file without it is from before v2: ./vertra catalog migrate rewrites it.",
-      "const": "vertra.dev/v2"
+      "description": "The catalog format: vennir.dev/v2. A file without it is from before v2: ./vennir catalog migrate rewrites it.",
+      "const": "vennir.dev/v2"
     },
     "kind": {
       "description": "What the file is: Dag.",

@@ -40,7 +40,7 @@ export function catalogLinks(
     `shareWith: [${asking.join(", ")}]`,
     "```",
     "",
-    "Asked from the Vertra console.",
+    "Asked from the Vennir console.",
   ].join("\n");
   const query = new URLSearchParams({ title, body });
   return { sourceUrl, askForAccessUrl: `${base}/issues/new?${query.toString()}` };

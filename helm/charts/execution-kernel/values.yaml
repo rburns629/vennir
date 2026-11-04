@@ -3,7 +3,7 @@
 image:
   # -- The released images (built, scanned and signed by the release
   # workflow). Local installs set their own (helm/values/kind/).
-  repository: ghcr.io/rburns629/vertra/execution-kernel
+  repository: ghcr.io/rburns629/vennir/execution-kernel
   # -- Defaults to the chart's appVersion: the image released with it.
   tag: ""
   # -- Pin by digest ("sha256:…") so what runs can't change under a moved tag.
@@ -52,11 +52,11 @@ rbac:
 # create Jobs anywhere; this is what narrows "anywhere" to "team namespaces".
 # Label a namespace when its team is onboarded (the console does this for
 # every team it creates, catalog teams included), e.g.
-#   kubectl label namespace <team> vertra/team=true
+#   kubectl label namespace <team> vennir/team=true
 # Requires Kubernetes 1.30+ (ValidatingAdmissionPolicy).
 dispatchPolicy:
   enabled: true
-  teamNamespaceLabel: vertra/team
+  teamNamespaceLabel: vennir/team
   # -- Transitional escape hatch for an install that still shares its
   # namespace with a team: the platform installed into `default`, which is
   # also the admins' own team namespace (admins manage everyone's
@@ -65,7 +65,7 @@ dispatchPolicy:
   # rule still applies. It knowingly leaves one gap: tasks in that
   # namespace run alongside the platform's own ServiceAccounts and
   # Postgres. Leave false for any install in its own namespace (e.g.
-  # vertra-system); set true only until such an install is migrated.
+  # vennir-system); set true only until such an install is migrated.
   allowReleaseNamespace: false
 
 # -- Purging a retired platform's namespace (see templates/purge-policy.yaml).
@@ -107,7 +107,7 @@ imageSignature:
   # any publicKeys. For GitHub Actions: issuer
   # https://token.actions.githubusercontent.com, and a subject matching the
   # catalog's publish workflow on main, e.g.
-  # ^https://github\.com/my-org/vertra-catalog/\.github/workflows/ci\.yml@refs/heads/main$
+  # ^https://github\.com/my-org/vennir-catalog/\.github/workflows/ci\.yml@refs/heads/main$
   keyless:
     issuer: ""
     subjectRegExp: ""
@@ -134,8 +134,8 @@ scanPolicy:
   requireDigest: true
 
 # A platform's lifecycle is carried by the same label dispatchPolicy reads:
-#   vertra/team=true     active: tasks may be dispatched there
-#   vertra/team=retired  retired: dispatch blocked; eligible for purge
+#   vennir/team=true     active: tasks may be dispatched there
+#   vennir/team=retired  retired: dispatch blocked; eligible for purge
 # `purgers` get a ClusterRole to delete namespaces, and an admission policy
 # limits them to namespaces labelled `retired` that aren't protected
 # (default, kube-*, this release's namespace, and protectedNamespaces).
@@ -144,7 +144,7 @@ scanPolicy:
 purgePolicy:
   enabled: true
   # e.g. [{kind: User, name: "catalog-purge-ci@<project>.iam.gserviceaccount.com"}]
-  #   or [{kind: ServiceAccount, name: vertra-purger, namespace: vertra-system}]
+  #   or [{kind: ServiceAccount, name: vennir-purger, namespace: vennir-system}]
   #   or [{kind: Group, name: platform-admins}]: each member, limited the same
   purgers: []
   # Anything else that must never be purged, e.g. [external-secrets].
@@ -172,7 +172,7 @@ api:
   # reach kernel-api could then submit work for any team.
   auth:
     enabled: true
-    audience: vertra-kernel-api
+    audience: vennir-kernel-api
     allowedServiceAccounts:
       - name: console-execution-console
   # -- Explicit, because without them GKE Autopilot assigns 500m CPU and
@@ -271,7 +271,7 @@ scheduler:
   # Lower than that, a slow API server gets the scheduler restarted
   # mid-pass, and the new one makes the same slow pass.
   livenessSeconds: 420
-  heartbeatFile: /tmp/vertra-scheduler-heartbeat
+  heartbeatFile: /tmp/vennir-scheduler-heartbeat
   # A running step whose Job and Pod haven't changed isn't re-read from the
   # API, except this often, in case a watch event was missed.
   watchResyncSeconds: 30
@@ -321,14 +321,14 @@ scheduler:
   # To prefer Spot but fall back to regular nodes, use a preferred
   # nodeAffinity on the same label instead of the nodeSelector.
   # -- The imagePullSecret every step Pod names, for images in private
-  # registries: `vertra-pull` when the console chart's
+  # registries: `vennir-pull` when the console chart's
   # registryCheck.copyToTeams is on (it keeps that Secret in every team
   # namespace). Empty: none.
   taskImagePullSecret: ""
   # -- Labels added to every step Pod (not its Job), for webhooks that act on
   # a label. AKS Workload Identity only gives a Pod its credentials when it's
   # labelled {azure.workload.identity/use: "true"}. The kernel's own labels
-  # (app, vertra.dev/*) can't be set here; the scheduler refuses to start.
+  # (app, vennir.dev/*) can't be set here; the scheduler refuses to start.
   taskPodLabels: {}
   taskPlacement:
     nodeSelector: {}
@@ -339,7 +339,7 @@ scheduler:
   # taskPlacement: each its own nodeSelector and tolerations, which replace
   # taskPlacement's. A kind with none here runs where any step does. GKE
   # Autopilot: {spot: {nodeSelector: {cloud.google.com/gke-spot: "true"}},
-  # onDemand: {nodeSelector: {}}}. vertra sets these per cloud.
+  # onDemand: {nodeSelector: {}}}. vennir sets these per cloud.
   capacityPlacements: {}
   resources:
     requests:
@@ -353,7 +353,7 @@ scheduler:
 # minutes and, after idleAfterMinutes with no execution unfinished or
 # finished, nobody using the console (its activity ConfigMap) and kernel-api
 # not restarted, scales the platform's Deployments (both releases') to zero,
-# the databases last. Volumes stay. `vertra wake` brings it back (or
+# the databases last. Volumes stay. `vennir wake` brings it back (or
 # scale them up yourself: the copies to wake to are in the
 # <release>-execution-kernel-sleep ConfigMap). While asleep the console and
 # kernel-api don't answer: catalog CI and automation fail until it's woken.
@@ -443,7 +443,7 @@ postgres:
     # server itself. Made, with its own generated password, and handed the
     # database before each migration (templates/migration-job.yaml). Empty:
     # they use username, the superuser, as installs from before 2026-11-03 did.
-    kernelUsername: vertra_kernel
+    kernelUsername: vennir_kernel
   # -- Also host the console's database on this instance, under its own role
   # (templates/console-database.yaml), so the console needs no Postgres of
   # its own: one Pod and volume instead of two. Then set the console chart's
@@ -456,13 +456,13 @@ postgres:
     username: console
     # The console's API gateway's own role, which reads only what it needs
     # (the console chart's gateway.database.existingSecret: <release>-execution-kernel-gateway-db).
-    gatewayUsername: vertra_gateway
+    gatewayUsername: vennir_gateway
     # Where its backups go under backup.bucket: the same prefix the console
     # chart's own backups would use (its release name).
     backupPrefix: console
   # -- Run Postgres as its own user (999) from the start, never root: auto
   # (the default) for a volume made that way (a new install's, marked
-  # vertra.dev/postgres-layout: nonroot) and the image's way, root first,
+  # vennir.dev/postgres-layout: nonroot) and the image's way, root first,
   # for one made before (never moved by an upgrade on its own); true or false
   # to choose. true on a volume made before moves it, once: back it up
   # first (docs/operations.md, "Moving Postgres to its own user"); its
@@ -520,7 +520,7 @@ database:
   # -- With iamAuth aws: the database's AWS region.
   region: ""
   # -- A Secret holding the server's CA (ca.crt), mounted at
-  # /etc/vertra/tls-db for the URL's sslrootcert.
+  # /etc/vennir/tls-db for the URL's sslrootcert.
   caSecret: ""
 
 # -- Only used when postgres.enabled is false: the name of a pre-existing
@@ -548,7 +548,7 @@ backup:
   # destination (GKE Workload Identity, EKS Pod Identity or IRSA, AKS
   # Workload Identity). Not created here: the console chart's backup can
   # share it. Unused for pvc.
-  serviceAccountName: "vertra-pg-backup"
+  serviceAccountName: "vennir-pg-backup"
   gcs:
     # -- Bucket name, no gs://. The identity needs roles/storage.objectCreator
     # and roles/storage.objectViewer on it (gsutil reads before writing).
@@ -649,10 +649,10 @@ monitoring:
     # stopped or keeps failing, or steps wait too long to start or for a node.
     enabled: false
     labels: {}
-    # -- How long the oldest READY step may wait before VertraStepsWaiting.
+    # -- How long the oldest READY step may wait before VennirStepsWaiting.
     readyWaitSeconds: 600
     # -- How many minutes started steps may keep having no node with room
-    # (a Pod of theirs in every 5) before VertraStepsUnschedulable; a new
+    # (a Pod of theirs in every 5) before VennirStepsUnschedulable; a new
     # node takes a few. Each Pod is replaced at the start timeout, retried.
     unschedulableMinutes: 15
 

@@ -11,14 +11,14 @@
  *   - Amazon ECR: at AWS STS (AssumeRoleWithWebIdentity) for the owner's
  *     role's credentials, which ask ECR for its registry token. The role
  *     trusts this cluster's console alone and reads only the catalog
- *     (`vertra catalog grant`).
+ *     (`vennir catalog grant`).
  * Nothing is stored that outlives the token.
  *
  * The console federates once, for everything that reads the registry:
  * image checks and releases (registry.ts), and, written as Docker config
  * Secrets every policy sync (pullSecret.ts), the verify and scan Jobs
  * (REGISTRY_TOKEN_SECRET in this namespace) and the kubelet and
- * policy-controller pulling steps' images (vertra-pull in each team
+ * policy-controller pulling steps' images (vennir-pull in each team
  * namespace). A token is replaced 15 minutes before it expires and the
  * sync runs every few minutes, so those Secrets always hold one that's
  * still good.
@@ -123,7 +123,7 @@ async function assumeRole(region: string, partitionSuffix: string) {
       Action: "AssumeRoleWithWebIdentity",
       Version: "2011-06-15",
       RoleArn: config.registryFederation.awsRoleArn,
-      RoleSessionName: "vertra-console",
+      RoleSessionName: "vennir-console",
       DurationSeconds: "3600",
       WebIdentityToken: await projectedToken(),
     }),

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/install"
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/install"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // ManagedNow takes an on-demand backup of a managed database, with your
@@ -20,9 +20,9 @@ func ManagedNow(ctx context.Context, r *run.Runner, c *config.Config, db *instal
 	switch db.Provider {
 	case "gcp":
 		return db.Instance, r.Run(ctx, "gcloud", "sql", "backups", "create", "--instance", db.Instance,
-			"--project", c.GCP.Project, "--description", "vertra backup")
+			"--project", c.GCP.Project, "--description", "vennir backup")
 	case "aws":
-		snapshot := "vertra-" + time.Now().UTC().Format("20060102-150405")
+		snapshot := "vennir-" + time.Now().UTC().Format("20060102-150405")
 		if _, err := r.Output(ctx, "aws", awsArgs(c, "rds", "create-db-snapshot", "--db-instance-identifier", db.Instance,
 			"--db-snapshot-identifier", snapshot, "--output", "text", "--query", "DBSnapshot.DBSnapshotIdentifier")...); err != nil {
 			return "", err
@@ -46,12 +46,12 @@ func ManagedList(ctx context.Context, r *run.Runner, c *config.Config, db *insta
 	return "", fmt.Errorf("no managed database on %s", db.Provider)
 }
 
-// DeleteManagedSnapshots deletes the RDS snapshots vertra backup took of
-// instance (named vertra-...), which RDS keeps after the instance is gone:
+// DeleteManagedSnapshots deletes the RDS snapshots vennir backup took of
+// instance (named vennir-...), which RDS keeps after the instance is gone:
 // for destroy, when it deletes the data.
 func DeleteManagedSnapshots(ctx context.Context, r *run.Runner, c *config.Config, instance string) error {
 	out, err := r.Output(ctx, "aws", awsArgs(c, "rds", "describe-db-snapshots", "--db-instance-identifier", instance,
-		"--snapshot-type", "manual", "--output", "text", "--query", "DBSnapshots[?starts_with(DBSnapshotIdentifier, 'vertra-')].DBSnapshotIdentifier")...)
+		"--snapshot-type", "manual", "--output", "text", "--query", "DBSnapshots[?starts_with(DBSnapshotIdentifier, 'vennir-')].DBSnapshotIdentifier")...)
 	if err != nil {
 		return err
 	}

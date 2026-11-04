@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """aws/s3-bucket's "create" action: finds an S3 bucket by name, creating it
 (with every kind of public access blocked) only if it doesn't exist. One it
-creates is tagged vertra-made=true and vertra-team=<the run's team> in the
+creates is tagged vennir-made=true and vennir-team=<the run's team> in the
 create call itself, so a step cut short right after still finds its bucket
 tagged, and reported as a resource, which delete (its cleanup) removes; one
 it only found is neither, unless it was made for this team. A bucket
@@ -30,11 +30,11 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 # team's README.md.
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 # What marks a bucket this product made: delete removes no other.
-MADE_BY_TAG = ("vertra-made", "true")
+MADE_BY_TAG = ("vennir-made", "true")
 # And for which team (the request's forTeam, the team the run is for, not
 # the one it runs in), so it's reported, and deleted, only for that team:
 # another team's bucket, even one this product made, isn't theirs.
-TEAM_TAG = "vertra-team"
+TEAM_TAG = "vennir-team"
 RETRYABLE_CODES = {
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
     "SlowDown", "ServiceUnavailable", "InternalError", "InternalFailure", "OperationAborted",
@@ -72,7 +72,7 @@ def _session(region: str) -> boto3.session.Session:
     if not target:
         return session
     credentials = session.client("sts").assume_role(
-        RoleArn=target, RoleSessionName="vertra-step"
+        RoleArn=target, RoleSessionName="vennir-step"
     )["Credentials"]
     return boto3.session.Session(
         aws_access_key_id=credentials["AccessKeyId"],

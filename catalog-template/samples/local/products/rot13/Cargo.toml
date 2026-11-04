@@ -3,7 +3,7 @@ name = "rot13"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "rot13: a Rust sample of the Vertra product contract."
+description = "rot13: a Rust sample of the Vennir product contract."
 
 [dependencies]
 serde_json = "1"

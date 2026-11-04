@@ -42,7 +42,7 @@ jobs:
           custom-pr-sign-comment: I have read the CLA and I accept it
           custom-notsigned-prcomment: >-
             Thanks for your pull request. Before it can be merged, each of its
-            authors needs to accept Vertra's
+            authors needs to accept Vennir's
             [Contributor License Agreement](https://github.com/${{ github.repository }}/blob/main/CLA.md),
             once, by commenting the sentence below. You keep the copyright in
             your work.

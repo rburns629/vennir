@@ -2,7 +2,7 @@
 /**
  * The first admin (db/bootstrapAdmin.ts): a generated password is never
  * printed, and must be changed at the first sign-in; one the operator set
- * isn't forced, unless they ask (vertra does); and an existing account is
+ * isn't forced, unless they ask (vennir does); and an existing account is
  * never touched.
  */
 import { randomUUID } from "node:crypto";
@@ -35,9 +35,9 @@ describe("the first admin", () => {
 
     const admin = await findUserByEmail(address);
     expect(admin).toMatchObject({ isAdmin: true, mustChangePassword: true });
-    // vertra apply reads this line to know the account is new.
+    // vennir apply reads this line to know the account is new.
     expect(printed.join("\n")).toContain(`Bootstrap admin account created: ${address}`);
-    expect(printed.join("\n")).toContain("vertra admin reset-password");
+    expect(printed.join("\n")).toContain("vennir admin reset-password");
     // Nothing printed is shaped like the password (18 random bytes,
     // base64url; BOOTSTRAP_ADMIN_PASSWORD, named, has no lower case).
     expect(printed.join("\n")).not.toMatch(/(^|\s)(?=\S*[a-z])[A-Za-z0-9_-]{24}(\s|$)/);
@@ -51,12 +51,12 @@ describe("the first admin", () => {
     expect(await verifyPassword(admin!.passwordHash!, "an-operator-chosen-password")).toBe(true);
   });
 
-  it("must change a given password when asked to (vertra's, saved to a file)", async () => {
+  it("must change a given password when asked to (vennir's, saved to a file)", async () => {
     const address = email();
-    await seedBootstrapAdmin(db, address, "a-password-vertra-generated", true);
+    await seedBootstrapAdmin(db, address, "a-password-vennir-generated", true);
     const admin = await findUserByEmail(address);
     expect(admin).toMatchObject({ isAdmin: true, mustChangePassword: true });
-    expect(await verifyPassword(admin!.passwordHash!, "a-password-vertra-generated")).toBe(true);
+    expect(await verifyPassword(admin!.passwordHash!, "a-password-vennir-generated")).toBe(true);
   });
 
   it("leaves an existing account alone", async () => {

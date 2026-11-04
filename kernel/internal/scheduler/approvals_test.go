@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
+	"github.com/rburns629/vennir/kernel/internal/domain"
 )
 
 // A step that needs an approval waits for it, never claimed, and fails if

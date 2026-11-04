@@ -48,7 +48,7 @@ vi.mock("../src/kernel/client.js", async (importOriginal) => {
 // here, since catalog_sync is one row other test files write too.
 vi.mock("../src/db/queries.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/db/queries.js")>()),
-  catalogRepository: vi.fn(() => Promise.resolve("github.com/acme/vertra-catalog")),
+  catalogRepository: vi.fn(() => Promise.resolve("github.com/acme/vennir-catalog")),
 }));
 vi.mock("../src/imagePolicy.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/imagePolicy.js")>()),
@@ -231,9 +231,9 @@ describe("what isn't shared with someone", () => {
   it("is listed, not runnable, with where it's defined and an issue asking for it", async () => {
     const consumer = await listed(consumerToken);
     const theirs = consumer.find((r) => r.name === `${priv}-secret-get`);
-    expect(theirs).toMatchObject({ shared: false, sourceUrl: `https://github.com/acme/vertra-catalog/blob/main/teams/${priv}/products/secret/product.yaml` });
+    expect(theirs).toMatchObject({ shared: false, sourceUrl: `https://github.com/acme/vennir-catalog/blob/main/teams/${priv}/products/secret/product.yaml` });
     const ask = new URL(theirs?.askForAccessUrl ?? "");
-    expect(`${ask.origin}${ask.pathname}`).toBe("https://github.com/acme/vertra-catalog/issues/new");
+    expect(`${ask.origin}${ask.pathname}`).toBe("https://github.com/acme/vennir-catalog/issues/new");
     expect(ask.searchParams.get("title")).toBe(`Share ${priv}/secret.get with ${cons}`);
     expect(ask.searchParams.get("body")).toContain(`shareWith: [${cons}]`);
     // Running it is still refused.
@@ -485,7 +485,7 @@ describe("an ordering bot (decision 23)", () => {
     const order = (requestId: string) =>
       app.inject({
         method: "POST",
-        url: "/api/vertra.console.v1.TemplateService/RunTemplate",
+        url: "/api/vennir.console.v1.TemplateService/RunTemplate",
         headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
         payload: JSON.stringify({ team: own, name: "chain", parameters: { text: "hi" }, onBehalfOf: shop, requestId }),
       });
@@ -521,11 +521,11 @@ describe("an ordering bot (decision 23)", () => {
 
     // Only under the install's allowed hosts: none, by default.
     const hosts = config.orders.callbackHosts;
-    expect((await setCallback({ url: "https://orders.example.com/vertra" })).failure).toBe("BAD_CALLBACK");
+    expect((await setCallback({ url: "https://orders.example.com/vennir" })).failure).toBe("BAD_CALLBACK");
     config.orders.callbackHosts = ["orders.example.com"];
     try {
-      expect((await setCallback({ url: "https://elsewhere.example.com/vertra" })).failure).toBe("BAD_CALLBACK");
-      const set = await setCallback({ url: "https://orders.example.com/vertra" });
+      expect((await setCallback({ url: "https://elsewhere.example.com/vennir" })).failure).toBe("BAD_CALLBACK");
+      const set = await setCallback({ url: "https://orders.example.com/vennir" });
       expect(set.body.host).toBe("orders.example.com");
       const secret = set.body.signingSecret ?? "";
       expect(secret).toMatch(/^vcs_/);
@@ -541,7 +541,7 @@ describe("an ordering bot (decision 23)", () => {
       const [run] = await db.select().from(submittedExecutions).where(eq(submittedExecutions.executionId, ordered.body.executionId));
       const posted: { url: string; body: string; signature: string }[] = [];
       vi.stubGlobal("fetch", vi.fn((url: string, init: { body: string; headers: Record<string, string> }) => {
-        posted.push({ url, body: init.body, signature: init.headers["vertra-signature"] ?? "" });
+        posted.push({ url, body: init.body, signature: init.headers["vennir-signature"] ?? "" });
         return Promise.resolve(new Response("ok"));
       }));
       const finished = { ...run!, state: "SUCCEEDED", finishedAt: new Date().toISOString(), tasks: [] };
@@ -597,7 +597,7 @@ describe("a team's outcome webhook (decision 23)", () => {
 
       const posted: { url: string; body: string; signature: string }[] = [];
       vi.stubGlobal("fetch", vi.fn((url: string, init: { body: string; headers: Record<string, string> }) => {
-        posted.push({ url, body: init.body, signature: init.headers["vertra-signature"] ?? "" });
+        posted.push({ url, body: init.body, signature: init.headers["vennir-signature"] ?? "" });
         return Promise.resolve(new Response("ok"));
       }));
       const executionId = randomUUID();
@@ -628,7 +628,7 @@ describe("a team's outcome webhook (decision 23)", () => {
       vi.stubGlobal("fetch", vi.fn((url: string, init: { body: string; headers: Record<string, string> }) => new Promise<Response>((resolve) => {
         // Slow enough that the second pass starts while the first is posting.
         setTimeout(() => {
-          posted.push({ url, body: init.body, signature: init.headers["vertra-signature"] ?? "" });
+          posted.push({ url, body: init.body, signature: init.headers["vennir-signature"] ?? "" });
           resolve(new Response("ok"));
         }, 200);
       })));

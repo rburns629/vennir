@@ -3,7 +3,7 @@
 # billed calls. Paste into the console's Submit page (it takes YAML), with
 # <registry> and the CHANGE values replaced. `:latest` is pinned to its
 # digest when you submit.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Dag
 name: gcp-hello-world-demo
 tasks:

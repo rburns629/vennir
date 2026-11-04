@@ -41,7 +41,7 @@ type Settings struct {
 	// The console signs people in with single sign-on, so a team may
 	// refuse password sessions (teams.require_sso).
 	SSO bool
-	// SigningKey signs Vertra-Caller; Issuer is the gateway's address, its iss.
+	// SigningKey signs Vennir-Caller; Issuer is the gateway's address, its iss.
 	SigningKey ed25519.PrivateKey
 	Issuer     string
 	// Where it listens: inside the cluster, from the internet (empty: no

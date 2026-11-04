@@ -27,7 +27,7 @@ describe("a scan Job", () => {
   it("has a container per platform, each with its own cache, the first named trivy", async () => {
     const created = vi.spyOn(k8s.BatchV1Api.prototype, "createNamespacedJob").mockResolvedValue({});
     await createScanJob({
-      namespace: "vertra-system",
+      namespace: "vennir-system",
       name: "scan-x",
       scannerImage: "trivy@sha256:abc",
       serverUrl: "http://trivy:4954",
@@ -92,7 +92,7 @@ describe("a scan Job", () => {
     vi.spyOn(k8s.CoreV1Api.prototype, "readNamespacedPodLog").mockImplementation(({ container }) =>
       Promise.resolve(container === "trivy" ? "END\n" : "no child with platform linux/arm64 in index"),
     );
-    expect(await readScanJob("vertra-system", "scan-x", "trivy", true)).toEqual({
+    expect(await readScanJob("vennir-system", "scan-x", "trivy", true)).toEqual({
       state: "failed",
       output: "END\n",
       outputs: ["END\n", "no child with platform linux/arm64 in index"],

@@ -103,7 +103,7 @@ beforeEach(() => {
 describe("creating a team", () => {
   it("creates its namespace, labelled a team's", async () => {
     expect((await call(admin, "TeamService/CreateTeam", { name: name("new") })).code).toBe("ok");
-    expect(setTeamNamespace).toHaveBeenCalledWith(name("new"), "true", expect.objectContaining({ createIfMissing: true, label: "vertra/team" }));
+    expect(setTeamNamespace).toHaveBeenCalledWith(name("new"), "true", expect.objectContaining({ createIfMissing: true, label: "vennir/team" }));
   });
 
   it("refuses a name that can't be a namespace", async () => {
@@ -267,7 +267,7 @@ describe("applying a team's SecretStore file", () => {
     const refused = await call<RpcError>(admin, "TeamService/ApplySecretStore", { team, documents: [store(team)] });
     expect(refused.code).toBe("failed_precondition");
     expect(failureCode(refused.body)).toBe("EXTERNAL_SECRETS_MISSING");
-    expect(refused.body.message).toContain("`vertra config set -e <env> externalSecrets true`");
+    expect(refused.body.message).toContain("`vennir config set -e <env> externalSecrets true`");
   });
 });
 
@@ -312,7 +312,7 @@ describe("registering a secret", () => {
   it("refuses the name of a SecretStore's own credential, and of the pull Secret", async () => {
     const team = name("reserved");
     await createTeam(team);
-    for (const secretName of ["eso-auth", "vertra-pull"]) {
+    for (const secretName of ["eso-auth", "vennir-pull"]) {
       const put = await call(admin, "SecretService/PutSecret", { team, secretName, data: { token: "x" } });
       expect(put.code).toBe("invalid_argument");
     }
@@ -361,16 +361,16 @@ describe("the registry pull Secret", () => {
 
 describe("the gateway-ingress network policy", () => {
   it("lets only the gateway's Pods in, only to the Pods a team labels as API backends", () => {
-    const policy = gatewayIngressPolicy("team-a", { namespace: "vertra-system", labels: { "app.kubernetes.io/component": "gateway" } });
+    const policy = gatewayIngressPolicy("team-a", { namespace: "vennir-system", labels: { "app.kubernetes.io/component": "gateway" } });
     expect(policy.metadata?.name).toBe(TEAM_GATEWAY_INGRESS);
     expect(policy.spec).toEqual({
-      podSelector: { matchLabels: { "vertra/api-backend": "true" } },
+      podSelector: { matchLabels: { "vennir/api-backend": "true" } },
       policyTypes: ["Ingress"],
       ingress: [
         {
           _from: [
             {
-              namespaceSelector: { matchLabels: { "kubernetes.io/metadata.name": "vertra-system" } },
+              namespaceSelector: { matchLabels: { "kubernetes.io/metadata.name": "vennir-system" } },
               podSelector: { matchLabels: { "app.kubernetes.io/component": "gateway" } },
             },
           ],
@@ -381,7 +381,7 @@ describe("the gateway-ingress network policy", () => {
 });
 
 describe("the scheduler's log reading, bound per team namespace", () => {
-  const logs = { clusterRole: "kernel-execution-kernel-scheduler-logs", serviceAccount: { namespace: "vertra-system", name: "kernel-execution-kernel" } };
+  const logs = { clusterRole: "kernel-execution-kernel-scheduler-logs", serviceAccount: { namespace: "vennir-system", name: "kernel-execution-kernel" } };
   beforeAll(() => {
     config.teamNamespaces.schedulerLogs = logs;
   });
@@ -437,7 +437,7 @@ describe("the default-deny network policy", () => {
     expect(await syncTeamNetworkPolicies()).toBe(true);
     expect(writeTeamNetworkPolicy).toHaveBeenCalledWith(name("net-sync"), null, false);
     // With the gateway on, its Pods go with it.
-    const gateway = { namespace: "vertra-system", labels: { "app.kubernetes.io/component": "gateway" } };
+    const gateway = { namespace: "vennir-system", labels: { "app.kubernetes.io/component": "gateway" } };
     config.teamNamespaces.gatewayIngress = gateway;
     await syncTeamNetworkPolicies();
     config.teamNamespaces.gatewayIngress = null;
@@ -466,7 +466,7 @@ describe("the no-metadata network policy", () => {
   it("lets every Pod out anywhere but the instance metadata server", async () => {
     const { noMetadataPolicy } = await vi.importActual<typeof import("../src/k8s.js")>("../src/k8s.js");
     const policy = noMetadataPolicy("web");
-    expect(policy.metadata?.name).toBe("vertra-no-metadata");
+    expect(policy.metadata?.name).toBe("vennir-no-metadata");
     expect(policy.spec?.podSelector).toEqual({});
     expect(policy.spec?.policyTypes).toEqual(["Egress"]);
     expect(policy.spec?.ingress).toBeUndefined();

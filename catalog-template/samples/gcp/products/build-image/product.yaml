@@ -1,4 +1,4 @@
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: build-image
 team: gcp
@@ -34,7 +34,7 @@ actions:
       properties:
         projectId:
           type: string
-          x-vertra-needs: gcp.project  # a target: checked against allowedTargets for other teams
+          x-vennir-needs: gcp.project  # a target: checked against allowedTargets for other teams
           description: >-
             GCP project the build runs in (and is billed to). Typically
             supplied via $fromTask/$output from a gcp/project create task.
@@ -57,7 +57,7 @@ actions:
       properties:
         imageUri:
           type: string
-          x-vertra-provides: gcp.container-image
+          x-vennir-provides: gcp.container-image
           description: >-
             Echoed back either way -- feed this into gcp/app-hosting's
             `image` input via $fromTask/$output.

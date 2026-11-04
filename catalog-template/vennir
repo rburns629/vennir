@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Runs vennir, the platform's command line, at the release pinned below:
+# downloaded once into .vennir/ and checked against its SHA-256 before it
+# ever runs. A catalog uses its `vennir catalog ...` commands:
+#
+#   ./vennir catalog check      validate, build, test and scan (what a pull request runs)
+#   ./vennir catalog --help     the rest
+#
+# Each release's binaries are blobs in the platform's public package
+# (ghcr.io/<owner>/<repo>/cli), addressed by their SHA-256: what's pinned
+# below is what's downloaded, nothing else. A platform checkout's
+# .github/scripts/pin-vennir.sh <version> writes the pins.
+#
+# VENNIR_BIN runs a vennir of your own instead (one built from a platform
+# checkout: .github/scripts/build-vennir.sh there).
+set -euo pipefail
+
+version=""
+registry="https://ghcr.io"
+repository="rburns629/vennir/cli"
+
+root=$(cd "$(dirname "$0")" && pwd)
+export VENNIR_CATALOG_ROOT="$root"
+
+if [ -n "${VENNIR_BIN:-}" ]; then
+  exec "$VENNIR_BIN" "$@"
+fi
+
+os=$(uname -s | tr '[:upper:]' '[:lower:]')
+case $(uname -m) in
+  x86_64 | amd64) arch=amd64 ;;
+  arm64 | aarch64) arch=arm64 ;;
+  *) echo "vennir: no release for $(uname -m)" >&2; exit 1 ;;
+esac
+platform="$os-$arch"
+# Each platform's binary's SHA-256 (the release's vennir-checksums.txt).
+case $platform in
+  linux-amd64) sha256="" ;;
+  linux-arm64) sha256="" ;;
+  darwin-amd64) sha256="" ;;
+  darwin-arm64) sha256="" ;;
+  *) echo "vennir: no release for $platform" >&2; exit 1 ;;
+esac
+if [ -z "$version" ] || [ -z "$sha256" ]; then
+  echo "vennir: no release is pinned in ./vennir yet; set VENNIR_BIN to a vennir" >&2
+  echo "built from the platform repository (.github/scripts/build-vennir.sh)." >&2
+  exit 1
+fi
+
+binary="$root/.vennir/$version/vennir-$platform"
+if [ ! -x "$binary" ]; then
+  mkdir -p "$(dirname "$binary")"
+  download=$(mktemp "$binary.XXXXXX")
+  trap 'rm -f "$download"' EXIT
+  # An anonymous pull token (the package is public); a registry that
+  # needs none answers without one.
+  token=$(curl -fsSL "$registry/token?scope=repository:$repository:pull" 2>/dev/null |
+    sed -n 's/.*"token" *: *"\([^"]*\)".*/\1/p' || true)
+  auth=()
+  if [ -n "$token" ]; then auth=(-H "Authorization: Bearer $token"); fi
+  # (Written so an empty list survives bash 3.2's set -u, macOS's bash.)
+  curl -fsSL --retry 3 ${auth[@]+"${auth[@]}"} -o "$download" "$registry/v2/$repository/blobs/sha256:$sha256"
+  if command -v sha256sum > /dev/null; then
+    actual=$(sha256sum "$download" | cut -d' ' -f1)
+  else
+    actual=$(shasum -a 256 "$download" | cut -d' ' -f1)
+  fi
+  if [ "$actual" != "$sha256" ]; then
+    echo "vennir: the download's SHA-256 is $actual, not the pinned $sha256: refusing to run it" >&2
+    exit 1
+  fi
+  chmod +x "$download"
+  mv "$download" "$binary"
+fi
+exec "$binary" "$@"

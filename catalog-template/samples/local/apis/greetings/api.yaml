@@ -2,22 +2,22 @@
 # team already runs, published through the install's gateway. Callers reach
 # it at /local/greetings/ on the gateway, signed in as at the console; the
 # gateway forwards only what openapi.yaml describes, adds a signed
-# Vertra-Caller header, and blocks the rest. No cloud needed: the backend
+# Vennir-Caller header, and blocks the rest. No cloud needed: the backend
 # runs in this team's own namespace (on kind: make kind-sample-api, from
 # examples/greetings-api in the platform's repository), its Pods labelled
-# vertra/api-backend: "true" so the gateway may reach them.
-apiVersion: vertra.dev/v2
+# vennir/api-backend: "true" so the gateway may reach them.
+apiVersion: vennir.dev/v2
 kind: Api
 name: greetings
 displayName: Greetings API
 description: >-
   Greets someone by name, plainly or shouting. It checks the gateway's
-  Vertra-Caller signature on every request, so it answers only what came
+  Vennir-Caller signature on every request, so it answers only what came
   through the gateway, and says which team called.
 spec: openapi.yaml
 backend:
   # A Service in the cluster: http is allowed only for these. No auth: the
-  # backend trusts the gateway's signed Vertra-Caller instead (the other
+  # backend trusts the gateway's signed Vennir-Caller instead (the other
   # samples' APIs show the gateway signing in to the backend itself).
   url: http://greetings.local.svc.cluster.local:8080
 shareWith: ["*"]

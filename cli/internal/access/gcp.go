@@ -89,7 +89,7 @@ func CheckGCP(ctx context.Context, exec Exec, tokenEmail TokenEmail, project, re
 	networks := countLines(exec(ctx, "gcloud", "compute", "networks", "list", "--project", project, "--format=value(name)", "--filter=name!=default"))
 	switch {
 	case clusters+networks > 0:
-		g.line("Project", fmt.Sprintf("%s already holds %d cluster(s) and %d network(s) besides the default: Vertra only touches what it names after its cluster, but a project of its own is safer", project, clusters, networks))
+		g.line("Project", fmt.Sprintf("%s already holds %d cluster(s) and %d network(s) besides the default: Vennir only touches what it names after its cluster, but a project of its own is safer", project, clusters, networks))
 	default:
 		g.line("Project", project+" (nothing else in it)")
 	}
@@ -99,9 +99,9 @@ func CheckGCP(ctx context.Context, exec Exec, tokenEmail TokenEmail, project, re
 		switch regionInLocations(locations, region) {
 		case locationRefused:
 			g.problem(fmt.Sprintf("your organization's policy allows only %s, not %s", strings.Join(locations, ", "), region),
-				"choose a region it allows (`vertra config set gcp.region <region>`)", "gcp.md#organization-policies")
+				"choose a region it allows (`vennir config set gcp.region <region>`)", "gcp.md#organization-policies")
 		case locationUnknown:
-			g.line("Policy", fmt.Sprintf("your organization's policy allows only %s: Vertra can't tell whether that includes %s (if it doesn't, the apply stops at the first thing Google refuses to make there)",
+			g.line("Policy", fmt.Sprintf("your organization's policy allows only %s: Vennir can't tell whether that includes %s (if it doesn't, the apply stops at the first thing Google refuses to make there)",
 				strings.Join(locations, ", "), region))
 		}
 	}

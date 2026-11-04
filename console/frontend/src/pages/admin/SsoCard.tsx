@@ -234,8 +234,8 @@ export function SsoCard() {
       >
         {locked ? (
           <Alert severity="info">
-            This install sets its provider ({form.label}, {form.issuer}, for {form.allowedDomains.join(", ")}): change it with <Mono>vertra sso</Mono>{" "}
-            and <Mono>vertra apply</Mono>. Groups are set here.
+            This install sets its provider ({form.label}, {form.issuer}, for {form.allowedDomains.join(", ")}): change it with <Mono>vennir sso</Mono>{" "}
+            and <Mono>vennir apply</Mono>. Groups are set here.
           </Alert>
         ) : (
           <>
@@ -301,7 +301,7 @@ export function SsoCard() {
               <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                 Read with Cloud Identity&apos;s Groups API as this console&apos;s own Google account
                 {form.googleIdentity ? <>, <Mono>{form.googleIdentity}</Mono>,</> : " (it has none here: not on Google Cloud)"} which a
-                Workspace admin makes a Groups Reader (admin.google.com, Admin roles; <Mono>vertra sso google-groups</Mono> says how).
+                Workspace admin makes a Groups Reader (admin.google.com, Admin roles; <Mono>vennir sso google-groups</Mono> says how).
               </Typography>
             )}
           </Box>

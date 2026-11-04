@@ -44,7 +44,7 @@ const teamHref = (name: string, tab?: string) => `/teams/${encodeURIComponent(na
 const ROLES: [string, "neutral" | "info" | "warning", string][] = [
   ["Member", "neutral", "Sees the team's runs, logs and secrets' names, and runs its actions."],
   ["Maintainer", "info", "Also manages its people and roles, secrets, bots, schedules and raw DAGs, and approves its steps."],
-  ["Vertra admin", "warning", "Reaches every team; only admins create, retire and purge teams and set their limits."],
+  ["Vennir admin", "warning", "Reaches every team; only admins create, retire and purge teams and set their limits."],
 ];
 
 /** Every team's owner, description, people and what's running, in one
@@ -311,7 +311,7 @@ export function TeamsPage() {
             <Box component="form" onSubmit={(event: FormEvent) => void handleCreateTeam(event)} sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
               <CardTitle id="newteam" title="Create a team">
                 Catalog teams arrive with each release. Make one here only for a team outside the catalog; its namespace is
-                created with it, labelled <Mono>vertra/team=true</Mono>.
+                created with it, labelled <Mono>vennir/team=true</Mono>.
               </CardTitle>
               <TextField
                 inputRef={createInput}

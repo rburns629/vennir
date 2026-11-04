@@ -2,7 +2,7 @@
 # CHANGE: try-anna (twice) to your team.
 # A label for this run, shown in the console. It can repeat: every
 # submission is a new run.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Dag
 name: my-first-hello
 tasks:

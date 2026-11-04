@@ -160,7 +160,7 @@ describe("a due schedule", () => {
   });
 
   it("tells the sleeper when the next one runs, once each time it changes", async () => {
-    Object.assign(config, { activityConfigMap: "console-activity", platformNamespace: "vertra-system" });
+    Object.assign(config, { activityConfigMap: "console-activity", platformNamespace: "vennir-system" });
     try {
       const [row] = await db.select().from(schedules).where(eq(schedules.teamId, ownTeamId));
       const soon = new Date(Date.now() + 3_600_000);
@@ -171,7 +171,7 @@ describe("a due schedule", () => {
       const calls = vi.mocked(recordNextSchedule).mock.calls;
       expect(calls).toHaveLength(1);
       // The earliest of every enabled schedule here: ours, unless another test's comes first.
-      expect(calls[0]?.slice(0, 2)).toEqual(["vertra-system", "console-activity"]);
+      expect(calls[0]?.slice(0, 2)).toEqual(["vennir-system", "console-activity"]);
       expect((calls[0]?.[2] as Date).getTime()).toBeLessThanOrEqual(soon.getTime());
     } finally {
       Object.assign(config, { activityConfigMap: "", platformNamespace: "" });

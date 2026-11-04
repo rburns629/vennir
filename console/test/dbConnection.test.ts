@@ -37,9 +37,9 @@ describe("signing in to Amazon RDS", () => {
       signings++;
       return Promise.resolve({ accessKeyId: "AKIDEXAMPLE", secretAccessKey: "secret" });
     };
-    const token = rdsTokens("us-east-2", "db.example.us-east-2.rds.amazonaws.com", 5432, "vertra_console", credentials, () => now);
+    const token = rdsTokens("us-east-2", "db.example.us-east-2.rds.amazonaws.com", 5432, "vennir_console", credentials, () => now);
     const first = await token();
-    for (const part of ["db.example.us-east-2.rds.amazonaws.com:5432/?", "Action=connect", "DBUser=vertra_console", "X-Amz-Credential=AKIDEXAMPLE%2F", "%2Fus-east-2%2Frds-db%2Faws4_request", "X-Amz-Expires=900", "X-Amz-Signature="]) {
+    for (const part of ["db.example.us-east-2.rds.amazonaws.com:5432/?", "Action=connect", "DBUser=vennir_console", "X-Amz-Credential=AKIDEXAMPLE%2F", "%2Fus-east-2%2Frds-db%2Faws4_request", "X-Amz-Expires=900", "X-Amz-Signature="]) {
       expect(first).toContain(part);
     }
     expect(await token()).toBe(first);

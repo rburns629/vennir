@@ -31,7 +31,7 @@ variable "mode" {
 }
 
 variable "kubernetes_version" {
-  description = "The cluster's Kubernetes version (vertra matches the Cluster Autoscaler to it)."
+  description = "The cluster's Kubernetes version (vennir matches the Cluster Autoscaler to it)."
   type        = string
   default     = "1.36"
 }
@@ -55,13 +55,13 @@ variable "size" {
 variable "namespace" {
   description = "The platform's Kubernetes namespace: its ServiceAccounts get the cloud identities."
   type        = string
-  default     = "vertra-system"
+  default     = "vennir-system"
 }
 
 variable "task_registry" {
   description = "The ECR prefix steps' images live under (<prefix>/<team>/<product>); ECR creates each repository on its first push."
   type        = string
-  default     = "vertra-products"
+  default     = "vennir-products"
 }
 
 variable "platform_registry" {
@@ -77,7 +77,7 @@ variable "backups" {
 }
 
 variable "managed_database" {
-  description = "Amazon RDS for PostgreSQL instead of the in-cluster Postgres: in the install's VPC, no public access, every service signing in with its own role (IAM database authentication), no passwords of Vertra's."
+  description = "Amazon RDS for PostgreSQL instead of the in-cluster Postgres: in the install's VPC, no public access, every service signing in with its own role (IAM database authentication), no passwords of Vennir's."
   type        = bool
   default     = false
 }
@@ -142,7 +142,7 @@ variable "audit_lock" {
 }
 
 variable "delete_data" {
-  description = "Let destroy delete the backup and logs buckets even when they hold data (vertra destroy asks first)."
+  description = "Let destroy delete the backup and logs buckets even when they hold data (vennir destroy asks first)."
   type        = bool
   default     = false
 }
@@ -154,13 +154,13 @@ variable "catalog_repository" {
 }
 
 variable "github_oidc_provider_arn" {
-  description = "An account has one GitHub OIDC provider: its ARN if it exists already (vertra looks), empty to create it."
+  description = "An account has one GitHub OIDC provider: its ARN if it exists already (vennir looks), empty to create it."
   type        = string
   default     = ""
 }
 
 variable "console_zone" {
-  description = "A DNS zone for the console's public address (e.g. vertra.example.com), created in Route 53; you delegate it with its NS records. Empty: no public console."
+  description = "A DNS zone for the console's public address (e.g. vennir.example.com), created in Route 53; you delegate it with its NS records. Empty: no public console."
   type        = string
   default     = ""
 }
@@ -172,7 +172,7 @@ variable "console_hostname" {
 }
 
 variable "catalog_subject_prefix" {
-  description = "The catalog repository's OIDC subject prefix as GitHub sends it: repo:<owner>/<name>, or with immutable subjects repo:<owner>@<id>/<name>@<id> (`vertra catalog create` reads it). Empty: repo:<catalog_repository>."
+  description = "The catalog repository's OIDC subject prefix as GitHub sends it: repo:<owner>/<name>, or with immutable subjects repo:<owner>@<id>/<name>@<id> (`vennir catalog create` reads it). Empty: repo:<catalog_repository>."
   type        = string
   default     = ""
 }

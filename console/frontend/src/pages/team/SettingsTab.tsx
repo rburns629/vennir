@@ -133,7 +133,7 @@ export function SettingsTab({
                 {isAdmin && (
                   <>
                     {" "}
-                    To set it up: Admin, Single sign-on and groups (or <Mono>vertra sso google</Mono>).
+                    To set it up: Admin, Single sign-on and groups (or <Mono>vennir sso google</Mono>).
                   </>
                 )}
               </Typography>

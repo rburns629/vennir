@@ -32,7 +32,7 @@ var quietLog = slog.New(slog.NewTextHandler(io.Discard, nil))
 func stepTask() ResolvedTask {
 	return ResolvedTask{ExecutionID: "00000000-0000-0000-0000-000000000001", TaskKey: "env",
 		Image: "test-environment-product:local", Action: "create", Attempt: 1, TimeoutSeconds: 60,
-		Team: "vertra-system", ServiceAccount: "default"}
+		Team: "vennir-system", ServiceAccount: "default"}
 }
 
 func options() KubernetesOptions {
@@ -99,7 +99,7 @@ func status(code int32, reason metav1.StatusReason, message string) error {
 }
 
 const policyMessage = `jobs.batch "ek-env-1" is forbidden: ValidatingAdmissionPolicy ` +
-	`'kernel-execution-kernel-dispatch' denied request: namespace vertra-system is not a Vertra team namespace`
+	`'kernel-execution-kernel-dispatch' denied request: namespace vennir-system is not a Vennir team namespace`
 
 func check(t *testing.T, what string, got, want any) {
 	t.Helper()
@@ -148,8 +148,8 @@ func TestTheConfigMapIsOwnedByItsJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	check(t, "handle", handle, Handle{"namespace": "vertra-system", "jobName": JobName(stepTask().ExecutionID, "env", 1)})
-	cm, err := c.CoreV1().ConfigMaps("vertra-system").Get(context.Background(), handle["jobName"].(string), metav1.GetOptions{})
+	check(t, "handle", handle, Handle{"namespace": "vennir-system", "jobName": JobName(stepTask().ExecutionID, "env", 1)})
+	cm, err := c.CoreV1().ConfigMaps("vennir-system").Get(context.Background(), handle["jobName"].(string), metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestAJobTheKernelDidntMakeIsntAdopted(t *testing.T) {
 	task.SecretRefs = []string{"api-key"}
 	for what, change := range map[string]func(*batchv1.Job){
 		"no labels":        func(j *batchv1.Job) { j.Labels = nil },
-		"another attempt":  func(j *batchv1.Job) { j.Labels["vertra.dev/attempt"] = "2" },
+		"another attempt":  func(j *batchv1.Job) { j.Labels["vennir.dev/attempt"] = "2" },
 		"another task":     func(j *batchv1.Job) { j.Annotations = nil },
 		"another image":    func(j *batchv1.Job) { j.Spec.Template.Spec.Containers[0].Image = "attacker:latest" },
 		"its own command":  func(j *batchv1.Job) { j.Spec.Template.Spec.Containers[0].Command = []string{"sh", "-c", "echo"} },
@@ -469,7 +469,7 @@ func TestTokenAudiencesAreProjectedEachInItsOwnFile(t *testing.T) {
 
 func TestStepPodsNameThePullSecretWhenOneIsSet(t *testing.T) {
 	var names [][]string
-	for _, secret := range []string{"vertra-pull", ""} {
+	for _, secret := range []string{"vennir-pull", ""} {
 		opts := options()
 		opts.ImagePullSecret = secret
 		c := newCluster(opts)
@@ -480,7 +480,7 @@ func TestStepPodsNameThePullSecretWhenOneIsSet(t *testing.T) {
 		}
 		names = append(names, refs)
 	}
-	check(t, "pull secrets", names, [][]string{{"vertra-pull"}, nil})
+	check(t, "pull secrets", names, [][]string{{"vennir-pull"}, nil})
 }
 
 func TestDeploymentPodLabelsGoOnTheStepPodAlone(t *testing.T) {
@@ -667,7 +667,7 @@ func TestAStepsLogIsCappedAndSaysSo(t *testing.T) {
 	opts.LogMaxLines, opts.LogMaxBytes = 3, 10_000
 	k := newCluster(opts).k
 	lines := k.logLines([]byte("a\nb\nc\n"))
-	check(t, "note", strings.HasPrefix(lines[0], "[vertra: earlier output not kept"), true)
+	check(t, "note", strings.HasPrefix(lines[0], "[vennir: earlier output not kept"), true)
 	check(t, "lines", lines[1:], []string{"a", "b", "c"})
 	check(t, "short", k.logLines([]byte("short\n")), []string{"short"})
 	check(t, "empty", k.logLines(nil), []string{})
@@ -884,7 +884,7 @@ func TestListAttemptsReadsEachJobsIdentityFromItsLabels(t *testing.T) {
 		return &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "demo-3", Labels: labels, Annotations: annotations, CreationTimestamp: created}}
 	}
 	c := newCluster(options(),
-		job("ek-greet-1", map[string]string{"vertra.dev/execution-id": "e-1", "vertra.dev/attempt": "2"}, map[string]string{"vertra.dev/task": "greet"}),
+		job("ek-greet-1", map[string]string{"vennir.dev/execution-id": "e-1", "vennir.dev/attempt": "2"}, map[string]string{"vennir.dev/task": "greet"}),
 		job("ek-hand-made", map[string]string{}, nil), // not made the way the kernel makes Jobs
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "someone-elses", Namespace: "demo-3"}})
 	attempts, err := c.k.ListAttempts(context.Background())
@@ -1149,14 +1149,14 @@ func TestAStepThatCanNeverFitItsTeamFailsAndOneWaitingForRoomDoesnt(t *testing.T
 	const prefix = `pods "ek-big-1-abcde" is forbidden: `
 	never := map[string]string{
 		"over the LimitRange":  prefix + "maximum memory usage per Container is 4Gi, but limit is 8Gi",
-		"over the whole quota": prefix + "exceeded quota: vertra-team-quota, requested: requests.cpu=8,requests.memory=1Gi, used: requests.cpu=0,requests.memory=0, limited: requests.cpu=4,requests.memory=16Gi",
+		"over the whole quota": prefix + "exceeded quota: vennir-team-quota, requested: requests.cpu=8,requests.memory=1Gi, used: requests.cpu=0,requests.memory=0, limited: requests.cpu=4,requests.memory=16Gi",
 	}
 	for what, message := range never {
 		if NeverFits(message) == "" {
 			t.Errorf("%s: should never fit", what)
 		}
 	}
-	waits := prefix + "exceeded quota: vertra-team-quota, requested: requests.cpu=1, used: requests.cpu=4, limited: requests.cpu=4"
+	waits := prefix + "exceeded quota: vennir-team-quota, requested: requests.cpu=1, used: requests.cpu=4, limited: requests.cpu=4"
 	check(t, "quota in use", NeverFits(waits), "")
 	check(t, "another refusal", NeverFits(prefix+"error looking up service account"), "")
 

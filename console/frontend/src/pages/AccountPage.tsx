@@ -90,7 +90,7 @@ export function AccountPage() {
           {user.usesSso && (
             <Typography>
               You sign in with {sso}, as {user.email}.
-              {!user.hasPassword && " Your password, security keys and two-step verification are your provider's: there's no Vertra password to change."}
+              {!user.hasPassword && " Your password, security keys and two-step verification are your provider's: there's no Vennir password to change."}
             </Typography>
           )}
           {user.hasPassword && (

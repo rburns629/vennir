@@ -1,7 +1,7 @@
 # One of five language samples (Python, TypeScript, Go, PowerShell, Rust):
 # the same contract, text in and text out, in each language. Chain them with
 # the DAG in its team's README.md (samples/local/README.md).
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: slug
 team: local
@@ -46,7 +46,7 @@ actions:
         text:
           type: string
           title: Slug
-          description: The text as a slug, such as "hello-vertra-world".
+          description: The text as a slug, such as "hello-vennir-world".
         language:
           type: string
           title: Language

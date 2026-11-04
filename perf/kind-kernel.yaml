@@ -1,4 +1,4 @@
-# The kernel on the performance cluster (vertra-perf), on top of
+# The kernel on the performance cluster (vennir-perf), on top of
 # helm/values/kind/kernel.yaml. A cap on running steps, so a large scenario
 # queues rather than starting hundreds of Pods on a laptop's Docker VM.
 # Every result records the cap it ran under: throughput above it is the

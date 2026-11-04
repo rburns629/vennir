@@ -286,7 +286,7 @@ func cachePath(name string) string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".vertra", "cache", "prices", name)
+	return filepath.Join(home, ".vennir", "cache", "prices", name)
 }
 
 func readCache(path string) *GCPPrices {

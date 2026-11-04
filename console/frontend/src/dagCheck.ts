@@ -7,7 +7,7 @@
  *
  * Mirrors the real rules rather than inventing its own, so green means
  * accepted:
- *   - the kernel's submission contract (proto/vertra/kernel/v1 and
+ *   - the kernel's submission contract (proto/vennir/kernel/v1 and
  *     kernel/internal/api/service.go: required fields, number ranges; the
  *     console's client refuses unknown fields) and its DAG checks
  *     (kernel/internal/domain/dag.go: duplicate ids,
@@ -52,7 +52,7 @@ export interface DagCheckContext {
 
 const TOP_LEVEL_FIELDS = ["apiVersion", "kind", "name", "requestId", "tasks"];
 /** The catalog format a dags/ file says it's in (apiVersion: …, kind: Dag). */
-const CATALOG_API_VERSION = "vertra.dev/v2";
+const CATALOG_API_VERSION = "vennir.dev/v2";
 // Renamed: a DAG written with these is told the new name.
 const OLD_FIELD_NAMES: Record<string, string> = { externalReference: "name", idempotencyKey: "requestId" };
 const TASK_FIELDS = [

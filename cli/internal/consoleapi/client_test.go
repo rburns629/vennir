@@ -14,11 +14,11 @@ import (
 
 	"connectrpc.com/connect"
 
-	consolev1 "github.com/rburns629/vertra/cli/internal/gen/vertra/console/v1"
-	"github.com/rburns629/vertra/cli/internal/gen/vertra/console/v1/consolev1connect"
+	consolev1 "github.com/rburns629/vennir/cli/internal/gen/vennir/console/v1"
+	"github.com/rburns629/vennir/cli/internal/gen/vennir/console/v1/consolev1connect"
 )
 
-// fakeConsole answers the calls vertra makes, recording what it was sent.
+// fakeConsole answers the calls vennir makes, recording what it was sent.
 type fakeConsole struct {
 	consolev1connect.UnimplementedAuthServiceHandler
 	consolev1connect.UnimplementedTokenServiceHandler

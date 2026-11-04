@@ -19,9 +19,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/rburns629/vertra/kernel/internal/executor"
-	"github.com/rburns629/vertra/kernel/internal/kindtest"
-	"github.com/rburns629/vertra/kernel/internal/logging"
+	"github.com/rburns629/vennir/kernel/internal/executor"
+	"github.com/rburns629/vennir/kernel/internal/kindtest"
+	"github.com/rburns629/vennir/kernel/internal/logging"
 )
 
 // The executor against a real cluster (kind), with a minimal fixture image
@@ -180,7 +180,7 @@ func TestKindThePodIsLabelledWithItsExecutionAndTask(t *testing.T) {
 		t.Fatalf("pods = %d", len(pods))
 	}
 	p := pods[0]
-	if p.Labels["vertra.dev/execution-id"] != task.ExecutionID || p.Labels["vertra.dev/attempt"] != "1" || p.Annotations["vertra.dev/task"] != task.TaskKey {
+	if p.Labels["vennir.dev/execution-id"] != task.ExecutionID || p.Labels["vennir.dev/attempt"] != "1" || p.Annotations["vennir.dev/task"] != task.TaskKey {
 		t.Errorf("labels = %v, annotations = %v", p.Labels, p.Annotations)
 	}
 	attempts, err := k.ListAttempts(context.Background())
@@ -317,7 +317,7 @@ func TestKindImagePullPolicies(t *testing.T) {
 // within seconds, not at its timeout.
 func TestKindAMissingImageFailsFastAsImageNotFound(t *testing.T) {
 	k, client := kindExecutor(t)
-	task := fixtureTask(t, "greet", nil, "registry.k8s.io/pause:vertra-does-not-exist")
+	task := fixtureTask(t, "greet", nil, "registry.k8s.io/pause:vennir-does-not-exist")
 	task.Team = secondTeam(t, client)
 	s := waitForTerminal(t, k, start(t, k, task), 90*time.Second)
 	if s.State != executor.Failed || s.Error.Code != "IMAGE_NOT_FOUND" || s.Error.Retryable {

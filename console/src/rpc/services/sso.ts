@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-/** SsoService (proto/vertra/console/v1/sso.proto): core/sso.ts over Connect. */
+/** SsoService (proto/vennir/console/v1/sso.proto): core/sso.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import { deleteSsoGroupMapping, getSsoSettings, listSsoGroupMappings, setSsoGroupMapping, setSsoSettings, type SsoGroupMappingView, type SsoSettingsView } from "../../core/sso.js";
-import type { SsoService } from "../../gen/vertra/console/v1/sso_pb.js";
-import { TeamRole } from "../../gen/vertra/console/v1/team_pb.js";
+import type { SsoService } from "../../gen/vennir/console/v1/sso_pb.js";
+import { TeamRole } from "../../gen/vennir/console/v1/team_pb.js";
 import { callerOf, logOf } from "../context.js";
 import { timestamp } from "../convert.js";
 import { check } from "../validate.js";

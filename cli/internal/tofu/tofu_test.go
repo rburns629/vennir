@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vertra/cli/internal/modules"
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/modules"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // A trimmed `tofu show -json` of a first gcp plan.

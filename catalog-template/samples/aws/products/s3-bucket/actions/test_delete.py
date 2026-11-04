@@ -13,7 +13,7 @@ from unittest.mock import patch
 from botocore.exceptions import ClientError
 
 _MODULE_PATH = Path(__file__).parent / "delete.py"
-MADE = {"TagSet": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
+MADE = {"TagSet": [{"Key": "vennir-made", "Value": "true"}, {"Key": "vennir-team", "Value": "web"}]}
 
 
 def _load():
@@ -64,11 +64,11 @@ class DeleteActionTest(unittest.TestCase):
                 else:
                     s3.get_bucket_tagging.return_value = tagging
             code, result, s3 = self._run(configure)
-            self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VERTRA"))
+            self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VENNIR"))
             s3.delete_bucket.assert_not_called()
 
     def test_one_made_for_another_team_is_refused(self) -> None:
-        for tagging in (MADE, {"TagSet": [{"Key": "vertra-made", "Value": "true"}]}):
+        for tagging in (MADE, {"TagSet": [{"Key": "vennir-made", "Value": "true"}]}):
             code, result, s3 = self._run(lambda s3, tagging=tagging: setattr(s3.get_bucket_tagging, "return_value", tagging), team="data")
             self.assertEqual((code, result["error"]["code"]), (1, "NOT_THIS_TEAMS"))
             s3.delete_bucket.assert_not_called()

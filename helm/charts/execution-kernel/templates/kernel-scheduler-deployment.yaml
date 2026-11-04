@@ -18,7 +18,7 @@ spec:
         {{- include "execution-kernel.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: scheduler
       annotations:
-        # kubectl logs (and vertra logs) read this one, not the init container.
+        # kubectl logs (and vennir logs) read this one, not the init container.
         kubectl.kubernetes.io/default-container: scheduler
         prometheus.io/scrape: "true"
         prometheus.io/port: {{ .Values.scheduler.metricsPort | quote }}

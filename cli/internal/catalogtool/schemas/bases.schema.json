@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vertra base images (bases.yaml), format v2",
-  "description": "The base images this catalog approves: each copied into its registry (<registry>/bases/<name>), pinned and scanned, for its products' Dockerfiles to build FROM (./vertra catalog bases mirror; --use-mirror points the Dockerfiles at the copies).",
+  "title": "Vennir base images (bases.yaml), format v2",
+  "description": "The base images this catalog approves: each copied into its registry (<registry>/bases/<name>), pinned and scanned, for its products' Dockerfiles to build FROM (./vennir catalog bases mirror; --use-mirror points the Dockerfiles at the copies).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,8 +11,8 @@
   ],
   "properties": {
     "apiVersion": {
-      "description": "The catalog format: vertra.dev/v2.",
-      "const": "vertra.dev/v2"
+      "description": "The catalog format: vennir.dev/v2.",
+      "const": "vennir.dev/v2"
     },
     "kind": {
       "description": "What the file is: Bases.",

@@ -21,7 +21,7 @@ import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { createTeam } from "../src/db/queries.js";
 import { auditLog, catalogSync, products, teams, templates, wiringTypes } from "../src/db/schema.js";
-import { ReleaseSchema, type Release } from "../src/gen/vertra/catalog/v1/release_pb.js";
+import { ReleaseSchema, type Release } from "../src/gen/vennir/catalog/v1/release_pb.js";
 import { buildApp } from "../src/index.js";
 import { applySecretStoreObjects, createVerifyJob, ExternalSecretsMissingError, readScanJob } from "../src/k8s.js";
 import { fetchRelease, listTags } from "../src/registry.js";
@@ -61,7 +61,7 @@ function product(team: string, name: string, action = "run") {
 }
 
 function release(fields: MessageInitShape<typeof ReleaseSchema>): Release {
-  return create(ReleaseSchema, { commit: "c1", repository: "github.com/my-org/vertra-catalog", ...fields });
+  return create(ReleaseSchema, { commit: "c1", repository: "github.com/my-org/vennir-catalog", ...fields });
 }
 
 /** The registry answers with this release, under this digest. */
@@ -181,7 +181,7 @@ describe("applying a release", () => {
     const problems = (await status())?.problems as { item: string; message: string }[];
     expect(problems).toHaveLength(2);
     expect(problems[0]?.message).toContain("External Secrets Operator isn't installed");
-    expect(problems[0]?.message).toContain("vertra config set -e <env> externalSecrets true");
+    expect(problems[0]?.message).toContain("vennir config set -e <env> externalSecrets true");
     expect(problems[1]?.message).toBe("failed unexpectedly: the console's log has why");
   });
 
@@ -285,7 +285,7 @@ describe("the API", () => {
     publish(release({ commit: "guides", teams: [{ name: teamA }] }), digestOf(31));
     await syncCatalog(log);
     const facts = await call<{ catalogRepo: string }>(token, "SecretService/GetSecretSources");
-    expect(facts.body.catalogRepo).toBe("my-org/vertra-catalog");
+    expect(facts.body.catalogRepo).toBe("my-org/vennir-catalog");
     const original = config.secretSources.catalogRepo;
     config.secretSources.catalogRepo = "acme/catalog";
     try {
@@ -310,7 +310,7 @@ describe("the API", () => {
     const set = await call(memberToken, "TeamService/SetSecretStoreCredential", { team: teamA, credential: "op-token-secret" });
     expect(set.code).toBe("ok");
     expect(applySecretStoreObjects).toHaveBeenCalledWith(teamA, [], "op-token-secret");
-    const entries = await db.select().from(auditLog).where(inArray(auditLog.route, ["vertra.console.v1.TeamService/SetSecretStoreCredential"]));
+    const entries = await db.select().from(auditLog).where(inArray(auditLog.route, ["vennir.console.v1.TeamService/SetSecretStoreCredential"]));
     expect(JSON.stringify(entries)).not.toContain("op-token-secret");
   });
 });

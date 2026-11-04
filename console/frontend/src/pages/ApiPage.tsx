@@ -160,7 +160,7 @@ export function ApiPage() {
                     ) : (
                       "Fix its OpenAPI file in the catalog"
                     )}
-                    ; it serves again with the next release. Run <Mono sx={{ fontSize: 12.5 }}>vertra catalog validate</Mono> on the fix first.
+                    ; it serves again with the next release. Run <Mono sx={{ fontSize: 12.5 }}>vennir catalog validate</Mono> on the fix first.
                   </Box>
                 </Alert>
               )}

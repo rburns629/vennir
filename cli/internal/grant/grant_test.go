@@ -54,13 +54,13 @@ func find(t *testing.T, p *Plan, verb string) Action {
 }
 
 var (
-	eks = Reader{Name: "vertra-eks", Issuer: "https://oidc.eks.us-east-2.amazonaws.com/id/ABC",
-		Subject: "system:serviceaccount:vertra-system:console-execution-console"}
-	gke = Reader{Name: "vertra-gke", Issuer: "https://container.googleapis.com/v1/projects/reader/locations/us-central1/clusters/vertra-gke",
-		Subject: "system:serviceaccount:vertra-system:console-execution-console"}
-	owner   = GCPOwner{Project: "acyclix-dev", RegistryProject: "acyclix-dev", Region: "us-central1", Repository: "vertra-products"}
-	pool    = "projects/42/locations/global/workloadIdentityPools/vertra-installs"
-	member  = "principal://iam.googleapis.com/" + pool + "/subject/vertra-eks:system:serviceaccount:vertra-system:console-execution-console"
+	eks = Reader{Name: "vennir-eks", Issuer: "https://oidc.eks.us-east-2.amazonaws.com/id/ABC",
+		Subject: "system:serviceaccount:vennir-system:console-execution-console"}
+	gke = Reader{Name: "vennir-gke", Issuer: "https://container.googleapis.com/v1/projects/reader/locations/us-central1/clusters/vennir-gke",
+		Subject: "system:serviceaccount:vennir-system:console-execution-console"}
+	owner   = GCPOwner{Project: "acyclix-dev", RegistryProject: "acyclix-dev", Region: "us-central1", Repository: "vennir-products"}
+	pool    = "projects/42/locations/global/workloadIdentityPools/vennir-installs"
+	member  = "principal://iam.googleapis.com/" + pool + "/subject/vennir-eks:system:serviceaccount:vennir-system:console-execution-console"
 	missing = errors.New("ERROR: (gcloud) NOT_FOUND: Requested entity was not found.")
 )
 
@@ -110,20 +110,20 @@ func TestGCPGrantsAFederatedReader(t *testing.T) {
 	}
 	create := strings.Join(find(t, p, "create-oidc").Args, " ")
 	for _, want := range []string{
-		"create-oidc vertra-eks", "--issuer-uri=https://oidc.eks.us-east-2.amazonaws.com/id/ABC",
-		`--attribute-mapping=google.subject="vertra-eks:"+assertion.sub`,
-		"--attribute-condition=assertion.sub=='system:serviceaccount:vertra-system:console-execution-console'",
-		"--workload-identity-pool=vertra-installs", "--project=acyclix-dev",
+		"create-oidc vennir-eks", "--issuer-uri=https://oidc.eks.us-east-2.amazonaws.com/id/ABC",
+		`--attribute-mapping=google.subject="vennir-eks:"+assertion.sub`,
+		"--attribute-condition=assertion.sub=='system:serviceaccount:vennir-system:console-execution-console'",
+		"--workload-identity-pool=vennir-installs", "--project=acyclix-dev",
 	} {
 		if !strings.Contains(create, want) {
 			t.Errorf("create-oidc lacks %q: %s", want, create)
 		}
 	}
 	bind := find(t, p, "add-iam-policy-binding")
-	if !strings.Contains(strings.Join(bind.Args, " "), "vertra-products --role=roles/artifactregistry.reader --member="+member) {
+	if !strings.Contains(strings.Join(bind.Args, " "), "vennir-products --role=roles/artifactregistry.reader --member="+member) {
 		t.Errorf("binding: %v", bind.Args)
 	}
-	if p.ReaderSets != [2]string{"externalCatalog.gcpWorkloadIdentityProvider", pool + "/providers/vertra-eks"} {
+	if p.ReaderSets != [2]string{"externalCatalog.gcpWorkloadIdentityProvider", pool + "/providers/vennir-eks"} {
 		t.Errorf("reader sets %v", p.ReaderSets)
 	}
 
@@ -142,8 +142,8 @@ func TestGCPGrantsAFederatedReader(t *testing.T) {
 // bare subject) is updated in place, and the binding to the bare subject
 // noted for removal.
 func TestGCPGrantIsIdempotent(t *testing.T) {
-	provider := `{"state":"ACTIVE","attributeCondition":"assertion.sub=='system:serviceaccount:vertra-system:console-execution-console'",
-		"attributeMapping":{"google.subject":"\"vertra-eks:\"+assertion.sub"},"oidc":{"issuerUri":"https://oidc.eks.us-east-2.amazonaws.com/id/ABC"}}`
+	provider := `{"state":"ACTIVE","attributeCondition":"assertion.sub=='system:serviceaccount:vennir-system:console-execution-console'",
+		"attributeMapping":{"google.subject":"\"vennir-eks:\"+assertion.sub"},"oidc":{"issuerUri":"https://oidc.eks.us-east-2.amazonaws.com/id/ABC"}}`
 	policy := fmt.Sprintf(`{"bindings":[{"role":"roles/artifactregistry.reader","members":[%q]}]}`, member)
 	c := &cloud{answers: [][2]any{
 		{"auth list", "owner@example.com"}, {"get-iam-policy", policy}, {"projects describe", "42"},
@@ -159,7 +159,7 @@ func TestGCPGrantIsIdempotent(t *testing.T) {
 
 	old := "principal://iam.googleapis.com/" + pool + "/subject/" + eks.Subject
 	c.answers[1][1] = fmt.Sprintf(`{"bindings":[{"role":"roles/artifactregistry.reader","members":[%q]}]}`, old)
-	c.answers[3][1] = strings.Replace(provider, `\"vertra-eks:\"+assertion.sub`, "assertion.sub", 1)
+	c.answers[3][1] = strings.Replace(provider, `\"vennir-eks:\"+assertion.sub`, "assertion.sub", 1)
 	p, err = PlanGCP(context.Background(), c.exec, owner, eks, false)
 	if err != nil {
 		t.Fatal(err)
@@ -183,16 +183,16 @@ func TestGCPRevokesAFederatedReader(t *testing.T) {
 		t.Errorf("revoke: %s", labels(p))
 	}
 	find(t, p, "remove-iam-policy-binding")
-	find(t, p, "providers delete vertra-eks")
+	find(t, p, "providers delete vennir-eks")
 }
 
 // A reader on Google Cloud: its own service accounts, each read on the
 // repository; nothing for it to set.
 func TestGCPGrantsServiceAccounts(t *testing.T) {
-	r := Reader{Name: "vertra-gke", ServiceAccounts: []string{"vertra-gke-console@reader.iam.gserviceaccount.com", "vertra-gke-nodes@reader.iam.gserviceaccount.com"}}
+	r := Reader{Name: "vennir-gke", ServiceAccounts: []string{"vennir-gke-console@reader.iam.gserviceaccount.com", "vennir-gke-nodes@reader.iam.gserviceaccount.com"}}
 	c := &cloud{answers: [][2]any{
 		{"auth list", "owner@example.com"},
-		{"get-iam-policy", `{"bindings":[{"role":"roles/artifactregistry.reader","members":["serviceAccount:vertra-gke-console@reader.iam.gserviceaccount.com"]}]}`},
+		{"get-iam-policy", `{"bindings":[{"role":"roles/artifactregistry.reader","members":["serviceAccount:vennir-gke-console@reader.iam.gserviceaccount.com"]}]}`},
 	}}
 	p, err := PlanGCP(context.Background(), c.exec, owner, r, false)
 	if err != nil {
@@ -201,7 +201,7 @@ func TestGCPGrantsServiceAccounts(t *testing.T) {
 	if labels(p) != "Has,Will grant" || p.ReaderSets[0] != "" {
 		t.Errorf("service accounts: %s", labels(p))
 	}
-	if !strings.Contains(strings.Join(find(t, p, "add-iam-policy-binding").Args, " "), "--member=serviceAccount:vertra-gke-nodes@reader.iam.gserviceaccount.com") {
+	if !strings.Contains(strings.Join(find(t, p, "add-iam-policy-binding").Args, " "), "--member=serviceAccount:vennir-gke-nodes@reader.iam.gserviceaccount.com") {
 		t.Error("the nodes' account")
 	}
 	for _, line := range c.ran {
@@ -212,7 +212,7 @@ func TestGCPGrantsServiceAccounts(t *testing.T) {
 }
 
 func awsOwner() AWSOwner {
-	return AWSOwner{Region: "us-east-2", Prefix: "vertra-products", Args: func(a ...string) []string {
+	return AWSOwner{Region: "us-east-2", Prefix: "vennir-products", Args: func(a ...string) []string {
 		return append(a, "--profile", "owner", "--region", "us-east-2", "--output", "json")
 	}}
 }
@@ -234,8 +234,8 @@ func TestAWSGrantsAWebIdentity(t *testing.T) {
 	if labels(p) != "Will create,Will create,Will set" {
 		t.Fatalf("actions: %s", labels(p))
 	}
-	if p.Registry != "123456789012.dkr.ecr.us-east-2.amazonaws.com/vertra-products" ||
-		p.ReaderSets != [2]string{"externalCatalog.awsRoleArn", "arn:aws:iam::123456789012:role/vertra-reader-vertra-gke"} {
+	if p.Registry != "123456789012.dkr.ecr.us-east-2.amazonaws.com/vennir-products" ||
+		p.ReaderSets != [2]string{"externalCatalog.awsRoleArn", "arn:aws:iam::123456789012:role/vennir-reader-vennir-gke"} {
 		t.Errorf("plan: %s %v", p.Registry, p.ReaderSets)
 	}
 	provider := strings.Join(find(t, p, "create-open-id-connect-provider").Args, " ")
@@ -248,7 +248,7 @@ func TestAWSGrantsAWebIdentity(t *testing.T) {
 	if err := json.Unmarshal([]byte(role[indexOf(role, "--assume-role-policy-document")+1]), &trust); err != nil {
 		t.Fatal(err)
 	}
-	host := "container.googleapis.com/v1/projects/reader/locations/us-central1/clusters/vertra-gke"
+	host := "container.googleapis.com/v1/projects/reader/locations/us-central1/clusters/vennir-gke"
 	st := trust.Statement[0]
 	if len(trust.Statement) != 1 || st.Action != "sts:AssumeRoleWithWebIdentity" ||
 		st.Principal["Federated"] != "arn:aws:iam::123456789012:oidc-provider/"+host ||
@@ -262,7 +262,7 @@ func TestAWSGrantsAWebIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(policy.Statement) != 2 || policy.Statement[0].Action != "ecr:GetAuthorizationToken" ||
-		policy.Statement[1].Resource != "arn:aws:ecr:us-east-2:123456789012:repository/vertra-products/*" ||
+		policy.Statement[1].Resource != "arn:aws:ecr:us-east-2:123456789012:repository/vennir-products/*" ||
 		fmt.Sprint(policy.Statement[1].Action) != fmt.Sprint(ReadActions) {
 		t.Errorf("policy: %+v", policy)
 	}
@@ -280,7 +280,7 @@ const eksHost = "oidc.eks.us-east-2.amazonaws.com/id/ABC"
 func role(t *testing.T, trust string) string {
 	t.Helper()
 	var b strings.Builder
-	b.WriteString(`{"Role":{"RoleName":"vertra-reader-vertra-eks","AssumeRolePolicyDocument":`)
+	b.WriteString(`{"Role":{"RoleName":"vennir-reader-vennir-eks","AssumeRolePolicyDocument":`)
 	var out bytes.Buffer
 	if err := json.Indent(&out, []byte(trust), "    ", "  "); err != nil {
 		t.Fatal(err)
@@ -291,14 +291,14 @@ func role(t *testing.T, trust string) string {
 
 // policyAnswer is get-role-policy's answer.
 func policyAnswer(policy string) string {
-	return `{"RoleName":"vertra-reader-vertra-eks","PolicyName":"read-catalog","PolicyDocument":` + policy + `}`
+	return `{"RoleName":"vennir-reader-vennir-eks","PolicyName":"read-catalog","PolicyDocument":` + policy + `}`
 }
 
 // Again, with nothing different: nothing to change.
 func TestAWSGrantAgainChangesNothing(t *testing.T) {
 	c := &cloud{answers: [][2]any{
 		{"get-caller-identity", `{"Account":"123456789012","Arn":"arn:aws:iam::123456789012:user/owner"}`},
-		{"get-role-policy", policyAnswer(ReadPolicy("aws", "us-east-2", "123456789012", "vertra-products"))},
+		{"get-role-policy", policyAnswer(ReadPolicy("aws", "us-east-2", "123456789012", "vennir-products"))},
 		{"get-role", role(t, TrustPolicy("arn:aws:iam::123456789012:oidc-provider/"+eksHost, eks))},
 		{"get-open-id-connect-provider", `{"ClientIDList":["sts.amazonaws.com"]}`},
 	}}
@@ -345,16 +345,16 @@ func TestAWSRoleOfAnotherReader(t *testing.T) {
 		trust string
 		says  string
 	}{
-		{"another issuer", theirs, "system:serviceaccount:vertra-system:console-execution-console from oidc.eks.eu-west-1.amazonaws.com/id/XYZ"},
+		{"another issuer", theirs, "system:serviceaccount:vennir-system:console-execution-console from oidc.eks.eu-west-1.amazonaws.com/id/XYZ"},
 		{"another subject", role(t, TrustPolicy("arn:aws:iam::123456789012:oidc-provider/"+eksHost,
-			Reader{Issuer: eks.Issuer, Subject: "system:serviceaccount:vertra-system:other"})), "system:serviceaccount:vertra-system:other from " + eksHost},
-		{"not vertra's", role(t, `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
-			"a trust policy vertra didn't write"},
+			Reader{Issuer: eks.Issuer, Subject: "system:serviceaccount:vennir-system:other"})), "system:serviceaccount:vennir-system:other from " + eksHost},
+		{"not vennir's", role(t, `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+			"a trust policy vennir didn't write"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &cloud{answers: [][2]any{
 				{"get-caller-identity", `{"Account":"123456789012","Arn":"arn:aws:iam::123456789012:user/owner"}`},
-				{"get-role-policy", policyAnswer(ReadPolicy("aws", "us-east-2", "123456789012", "vertra-products"))},
+				{"get-role-policy", policyAnswer(ReadPolicy("aws", "us-east-2", "123456789012", "vennir-products"))},
 				{"get-role", tc.trust},
 				{"get-open-id-connect-provider", `{"ClientIDList":["sts.amazonaws.com"]}`},
 				{"list-role-policies", `{"PolicyNames":["read-catalog"]}`},
@@ -397,7 +397,7 @@ func TestAWSRevokes(t *testing.T) {
 	if labels(p) != "Will delete,Will delete" || len(p.Notes) != 1 {
 		t.Errorf("revoke: %s", labels(p))
 	}
-	if a := p.Actions[1]; strings.Join(a.Args[:4], " ") != "iam delete-role --role-name vertra-reader-vertra-eks" {
+	if a := p.Actions[1]; strings.Join(a.Args[:4], " ") != "iam delete-role --role-name vennir-reader-vennir-eks" {
 		t.Errorf("order: %v", a.Args)
 	}
 	if _, err := PlanAWS(context.Background(), c.exec, awsOwner(), Reader{Name: "x", ServiceAccounts: []string{"a@b.gserviceaccount.com"}}, false, false); err == nil {

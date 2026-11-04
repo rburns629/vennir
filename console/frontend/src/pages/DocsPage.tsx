@@ -412,7 +412,7 @@ function SearchResults({ query, hits, onPick, floating = false }: { query: strin
           </Box>
           {/* What was searched for, in the box, to put in your own words. */}
           <Button variant="outlined" startIcon={<ChatIcon />} onClick={() => { ask.open(q); }}>
-            Ask Vertra
+            Ask Vennir
           </Button>
         </Box>
       )}
@@ -477,7 +477,7 @@ function HelpHome({ categories, served }: { categories: Category[]; served: Read
               Help and guides
             </Typography>
             <Typography sx={{ m: 0, fontSize: 14, color: "sidebar.text" }}>
-              How to use Vertra, fix what&apos;s stuck, and how it works, for everyone from a new member to the install&apos;s admins.
+              How to use Vennir, fix what&apos;s stuck, and how it works, for everyone from a new member to the install&apos;s admins.
             </Typography>
           </Box>
           {typeof ask.model === "string" && (
@@ -487,7 +487,7 @@ function HelpHome({ categories, served }: { categories: Category[]; served: Read
               onClick={() => { ask.open(); }}
               sx={{ bgcolor: "sidebar.hoverBg", borderColor: "sidebar.activeBg", color: "sidebar.textStrong", "&:hover": { bgcolor: "sidebar.activeBg", borderColor: "sidebar.accent" }, "&.Mui-focusVisible": { outlineColor: (t) => t.palette.sidebar.accent } }}
             >
-              Ask Vertra instead
+              Ask Vennir instead
             </Button>
           )}
         </Box>
@@ -592,7 +592,7 @@ function HelpHome({ categories, served }: { categories: Category[]; served: Read
             The{" "}
             <HelpIcon sx={{ fontSize: 16, verticalAlign: "-0.2em", color: "primary.main" }} aria-label="question mark" role="img" aria-hidden={false} /> link
             beside each page&apos;s title opens the guide for that page, at the right section.
-            {typeof ask.model === "string" && " Ask Vertra (in the side menu, or the top bar on a phone) answers from these guides and your catalog, and says which sections it used."}
+            {typeof ask.model === "string" && " Ask Vennir (in the side menu, or the top bar on a phone) answers from these guides and your catalog, and says which sections it used."}
           </Box>
         </Card>
         {deeper.length > 0 && (
@@ -869,7 +869,7 @@ function StillStuck() {
     <Card sx={{ mt: 4.5, px: 2.5, py: 2.25, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 1.5, fontSize: 14 }}>
       <span>Still stuck? Ask in your own words; the answer cites the sections it used.</span>
       <Button variant="contained" startIcon={<ChatIcon />} onClick={() => { ask.open(); }}>
-        Ask Vertra
+        Ask Vennir
       </Button>
     </Card>
   );

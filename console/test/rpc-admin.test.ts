@@ -67,7 +67,7 @@ describe("AdminService", () => {
     await rpc("UserService", "SetAdmin", { email: admin.email, admin: true }, { token });
     const page = await rpc("AdminService", "ListAuditEntries", { actorId: admin.id, limit: 5 }, { token });
     const entries = page.json<{ entries: { route: string; method: string; status: number }[] }>().entries;
-    expect(entries[0]).toMatchObject({ route: "vertra.console.v1.UserService/SetAdmin", method: "RPC", status: 200 });
+    expect(entries[0]).toMatchObject({ route: "vennir.console.v1.UserService/SetAdmin", method: "RPC", status: 200 });
   });
 
   it("says what this install is: its version and which optional parts are on", async () => {
@@ -109,13 +109,13 @@ describe("AdminService", () => {
     const saved = structuredClone({ catalog: config.catalog, email: config.notifications.email, audit: config.audit, monitoring: config.monitoring });
     const savedSignaturePolicy = config.imageSignaturePolicyName;
     Object.assign(config.catalog, {
-      release: "us-docker.pkg.dev/other/vertra-products/catalog-release:v1.4.0",
+      release: "us-docker.pkg.dev/other/vennir-products/catalog-release:v1.4.0",
       newestVersion: false,
       external: true,
       pollSeconds: 120,
       signature: { publicKeys: ["-----BEGIN PUBLIC KEY-----\nkey\n-----END PUBLIC KEY-----"], keylessIssuer: "https://token.actions.githubusercontent.com", keylessSubjectRegExp: "^https://github.com/acme/catalog/" },
     });
-    Object.assign(config.notifications.email, { host: "smtp.example.com", from: "Vertra <vertra@example.com>", username: "smtp-user", passwordFile: "/var/run/secrets/vertra/smtp/password" });
+    Object.assign(config.notifications.email, { host: "smtp.example.com", from: "Vennir <vennir@example.com>", username: "smtp-user", passwordFile: "/var/run/secrets/vennir/smtp/password" });
     Object.assign(config.audit.export, { bucket: "acme-audit", keepDays: 400, lock: true });
     Object.assign(config.monitoring, { provider: "google", grafanaUrl: "https://grafana.example.com" });
     config.imageSignaturePolicyName = "kernel-execution-kernel-signed-images";
@@ -128,10 +128,10 @@ describe("AdminService", () => {
         catalogSignerKeys: 1,
         catalogKeylessIssuer: "https://token.actions.githubusercontent.com",
         catalogKeylessSubject: "^https://github.com/acme/catalog/",
-        externalCatalog: "us-docker.pkg.dev/other/vertra-products",
+        externalCatalog: "us-docker.pkg.dev/other/vennir-products",
         email: true,
         emailHost: "smtp.example.com",
-        emailFrom: "Vertra <vertra@example.com>",
+        emailFrom: "Vennir <vennir@example.com>",
         monitoringProvider: "google",
         grafanaUrl: "https://grafana.example.com",
         sessionLength: config.jwtTtl,

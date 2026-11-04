@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """aws/rds-postgres's "delete" action, its create's cleanup: deletes an
-instance create made (tagged vertra-made=true) for the run's team
-(tagged vertra-team=<it>), and no other, given the resource create reported
+instance create made (tagged vennir-made=true) for the run's team
+(tagged vennir-team=<it>), and no other, given the resource create reported
 (its ARN, which names its region). A final snapshot is kept, named in the output, so the data isn't lost with it:
 delete that snapshot once nobody needs it (it's billed as storage). An
 instance already gone, or already being deleted, counts as deleted. RDS
@@ -24,8 +24,8 @@ INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")
 
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
-MADE_BY_TAG = ("vertra-made", "true")
-TEAM_TAG = "vertra-team"
+MADE_BY_TAG = ("vennir-made", "true")
+TEAM_TAG = "vennir-team"
 INSTANCE_ARN = re.compile(r"^arn:aws[a-z-]*:rds:([a-z0-9-]+):[0-9]{12}:db:([a-zA-Z](?:[a-zA-Z0-9]|-(?!-)){0,62})$")
 RETRYABLE_CODES = {
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
@@ -64,7 +64,7 @@ def _session(region: str) -> boto3.session.Session:
     if not target:
         return session
     credentials = session.client("sts").assume_role(
-        RoleArn=target, RoleSessionName="vertra-step"
+        RoleArn=target, RoleSessionName="vennir-step"
     )["Credentials"]
     return boto3.session.Session(
         aws_access_key_id=credentials["AccessKeyId"],
@@ -106,7 +106,7 @@ def main() -> int:
             return _gone(arn)
         if {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]} not in instance.get("TagList", []):
             return _failure(
-                "NOT_MADE_BY_VERTRA",
+                "NOT_MADE_BY_VENNIR",
                 f"Instance '{instance_id}' has no {MADE_BY_TAG[0]}={MADE_BY_TAG[1]} tag: this product deletes only instances it made.",
             )
         if {"Key": TEAM_TAG, "Value": team} not in instance.get("TagList", []):

@@ -46,7 +46,7 @@ beforeAll(async () => {
       }
       const sent = JSON.parse(body) as { tools?: unknown[]; tool_choice?: string; max_tokens?: number };
       // The scope check has no tools; the answer, the docs' silence.
-      const content = sent.tools ? "The docs don't cover that." : "VERTRA";
+      const content = sent.tools ? "The docs don't cover that." : "VENNIR";
       res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content } }] }));
     });
   });
@@ -145,7 +145,7 @@ describe("the chat agent's settings", () => {
     expect((await call(admin, "ChatService/TestChatConfig", { config: input({ provider: "bedrock", model: "", apiKey: "", bedrockRegion: "us-east-2", endpoint: "https://attacker.example" }) })).failure).toBe("BAD_CHAT_SETTINGS");
 
     // Where they'd send its questions is in the audit log.
-    const [entry] = await db.select().from(auditLog).where(eq(auditLog.route, "vertra.console.v1.ChatService/TestChatConfig")).orderBy(desc(auditLog.id)).limit(1);
+    const [entry] = await db.select().from(auditLog).where(eq(auditLog.route, "vennir.console.v1.ChatService/TestChatConfig")).orderBy(desc(auditLog.id)).limit(1);
     expect(entry?.target).toMatchObject({ provider: "bedrock", endpoint: "https://attacker.example", bedrockRegion: "us-east-2" });
     await call(admin, "ChatService/ResetChatConfig");
   });

@@ -9,7 +9,7 @@ name: security
 #             .semgrep/malicious.yml (reverse shells, piping downloads to a
 #             shell, hidden payloads, mining, calls to bare IPs).
 #
-# Same approach as vertra-catalog's security.yml. GitHub Advanced
+# Same approach as vennir-catalog's security.yml. GitHub Advanced
 # Security isn't enabled, so results go to each run's summary and
 # annotations rather than the Security tab. Any finding fails the run.
 on:

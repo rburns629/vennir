@@ -10,11 +10,11 @@
 # namespaces.
 #
 # Renders the policies under their own release name, "policytest", so they
-# only ever match that release's (impersonated) identities: a Vertra
+# only ever match that release's (impersonated) identities: a Vennir
 # install on the same cluster is unaffected. Removes everything it added.
 #
 #   bash helm/tests/admission-policies.sh            # kubectl's current context
-#   KUBE_CONTEXT=kind-vertra-local bash helm/tests/admission-policies.sh
+#   KUBE_CONTEXT=kind-vennir-local bash helm/tests/admission-policies.sh
 #   POLICY_TEST_RELEASE=policytest-2 bash ...        # beside another run
 #
 # Needs kubectl, helm, python3, and a cluster with ValidatingAdmissionPolicy
@@ -103,8 +103,8 @@ done
 for ns in "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS"; do
   k create namespace "$ns" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
-k label namespace "$TEAM_A" "$TEAM_B" vertra/team=true --overwrite > /dev/null
-k label namespace "$RETIRED_NS" "$PROTECTED_NS" vertra/team=retired --overwrite > /dev/null
+k label namespace "$TEAM_A" "$TEAM_B" vennir/team=true --overwrite > /dev/null
+k label namespace "$RETIRED_NS" "$PROTECTED_NS" vennir/team=retired --overwrite > /dev/null
 for sa in eso-gcp db-sa orders-api; do
   k -n "$TEAM_A" create serviceaccount "$sa" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
@@ -122,7 +122,7 @@ k apply -f - > /dev/null <<EOF
  {"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"ek-mine","namespace":"$RETIRED_NS","labels":{"app":"execution-kernel"}}},
  {"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"ek-mine","namespace":"$PLATFORM_NS","labels":{"app":"execution-kernel"}}},
  {"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"ek-mine","namespace":"$OTHER_NS","labels":{"app":"execution-kernel"}}},
- {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"name":"vertra-default-deny","namespace":"$TEAM_B"},
+ {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"name":"vennir-default-deny","namespace":"$TEAM_B"},
   "spec":{"podSelector":{},"policyTypes":["Ingress"],"ingress":[{"from":[{"podSelector":{}}]}]}}]}
 EOF
 # And Jobs for it to resume, or not: suspended as the executor makes them
@@ -205,7 +205,7 @@ s = {"restartPolicy": "Never", "serviceAccountName": sys.argv[2], "automountServ
                      "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}]}],
      "volumes": [{"name": "tmp", "emptyDir": {}}, {"name": "docker-config", "secret": {"secretName": "pull-secret"}}]}
 c = s["containers"][0]
-labels = {"app.kubernetes.io/managed-by": "vertra-console", "app.kubernetes.io/component": "image-scan"}
+labels = {"app.kubernetes.io/managed-by": "vennir-console", "app.kubernetes.io/component": "image-scan"}
 exec(sys.argv[1])
 print(json.dumps({"apiVersion": "batch/v1", "kind": "Job", "metadata": {"name": "policy-check"},
                   "spec": {"template": {"metadata": {"labels": labels}, "spec": s}}}))
@@ -262,11 +262,11 @@ name, change, platform, release = sys.argv[1:5]
 gateway = {"app.kubernetes.io/name": "execution-console", "app.kubernetes.io/instance": release,
            "app.kubernetes.io/component": "gateway"}
 spec = {
-    "vertra-default-deny": {"podSelector": {}, "policyTypes": ["Ingress"], "ingress": [{"from": [{"podSelector": {}}]}]},
-    "vertra-gateway-ingress": {"podSelector": {"matchLabels": {"vertra/api-backend": "true"}}, "policyTypes": ["Ingress"],
+    "vennir-default-deny": {"podSelector": {}, "policyTypes": ["Ingress"], "ingress": [{"from": [{"podSelector": {}}]}]},
+    "vennir-gateway-ingress": {"podSelector": {"matchLabels": {"vennir/api-backend": "true"}}, "policyTypes": ["Ingress"],
         "ingress": [{"from": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": platform}},
                                "podSelector": {"matchLabels": gateway}}]}]},
-    "vertra-no-metadata": {"podSelector": {}, "policyTypes": ["Egress"],
+    "vennir-no-metadata": {"podSelector": {}, "policyTypes": ["Egress"],
         "egress": [{"to": [{"ipBlock": {"cidr": "0.0.0.0/0", "except": ["169.254.169.254/32"]}}]}]},
 }.get(name, {"podSelector": {}, "policyTypes": ["Ingress"]})
 exec(change)
@@ -303,14 +303,14 @@ expect() {  # label, "allowed" | text the refusal must contain, output
 
 # Policies take a few seconds to reach the API server's admission chain.
 for _ in $(seq 1 30); do
-  job "$OTHER_NS" $SOURCE/app:1 run default "" | grep -q "not a Vertra team namespace" && break
+  job "$OTHER_NS" $SOURCE/app:1 run default "" | grep -q "not a Vennir team namespace" && break
   sleep 1
 done
 
 echo "Dispatch:"
 expect "a team namespace"                     allowed                        "$(job "$TEAM_A" $SOURCE/app:1 run default "")"
-expect "a namespace without the team label"   "not a Vertra team namespace" "$(job "$OTHER_NS" $SOURCE/app:1 run default "")"
-expect "the platform's own namespace"         "not a Vertra team namespace" "$(job "$PLATFORM_NS" $SOURCE/app:1 run default "")"
+expect "a namespace without the team label"   "not a Vennir team namespace" "$(job "$OTHER_NS" $SOURCE/app:1 run default "")"
+expect "the platform's own namespace"         "not a Vennir team namespace" "$(job "$PLATFORM_NS" $SOURCE/app:1 run default "")"
 expect "a Job not hardened"                   "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" unhardened)"
 expect "a Job that adds a capability"         "must run hardened"           "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"capabilities":{"drop":["ALL"],"add":["NET_ADMIN"]}}' own)"
 
@@ -380,37 +380,37 @@ expect "a Secret in the platform's namespace"    "may only write in team"    "$(
 
 echo "Console NetworkPolicies:"
 NP_REFUSED="console's NetworkPolicies are"
-expect "the default deny"                        allowed          "$(network_policy vertra-default-deny pass)"
-expect "the gateway's ingress"                   allowed          "$(network_policy vertra-gateway-ingress pass)"
-expect "the no-metadata one"                     allowed          "$(network_policy vertra-no-metadata pass)"
-expect "a default deny letting in another namespace" "$NP_REFUSED" "$(network_policy vertra-default-deny 'spec["ingress"][0]["from"][0]["namespaceSelector"] = {}')"
-expect "a default deny letting in an address"    "$NP_REFUSED"    "$(network_policy vertra-default-deny 'spec["ingress"][0]["from"] = [{"ipBlock": {"cidr": "0.0.0.0/0"}}]')"
-expect "a default deny selecting some Pods"      "$NP_REFUSED"    "$(network_policy vertra-default-deny 'spec["podSelector"] = {"matchLabels": {"a": "b"}}')"
-expect "a default deny letting out everything"   "$NP_REFUSED"    "$(network_policy vertra-default-deny 'spec["policyTypes"] = ["Ingress", "Egress"]; spec["egress"] = [{}]')"
-expect "a gateway ingress from any namespace"    "$NP_REFUSED"    "$(network_policy vertra-gateway-ingress 'spec["ingress"][0]["from"][0]["namespaceSelector"] = {}')"
-expect "a gateway ingress for every Pod"         "$NP_REFUSED"    "$(network_policy vertra-gateway-ingress 'spec["podSelector"] = {}')"
-expect "a gateway ingress letting out everything" "$NP_REFUSED"   "$(network_policy vertra-gateway-ingress 'spec["policyTypes"] = ["Ingress", "Egress"]; spec["egress"] = [{}]')"
-expect "no-metadata without its exception"       "$NP_REFUSED"    "$(network_policy vertra-no-metadata 'del spec["egress"][0]["to"][0]["ipBlock"]["except"]')"
-expect "no-metadata excepting something else"    "$NP_REFUSED"    "$(network_policy vertra-no-metadata 'spec["egress"][0]["to"][0]["ipBlock"]["except"] = ["10.0.0.0/8"]')"
-expect "no-metadata letting out to Pods"         "$NP_REFUSED"    "$(network_policy vertra-no-metadata 'spec["egress"].append({"to": [{"podSelector": {}}]})')"
+expect "the default deny"                        allowed          "$(network_policy vennir-default-deny pass)"
+expect "the gateway's ingress"                   allowed          "$(network_policy vennir-gateway-ingress pass)"
+expect "the no-metadata one"                     allowed          "$(network_policy vennir-no-metadata pass)"
+expect "a default deny letting in another namespace" "$NP_REFUSED" "$(network_policy vennir-default-deny 'spec["ingress"][0]["from"][0]["namespaceSelector"] = {}')"
+expect "a default deny letting in an address"    "$NP_REFUSED"    "$(network_policy vennir-default-deny 'spec["ingress"][0]["from"] = [{"ipBlock": {"cidr": "0.0.0.0/0"}}]')"
+expect "a default deny selecting some Pods"      "$NP_REFUSED"    "$(network_policy vennir-default-deny 'spec["podSelector"] = {"matchLabels": {"a": "b"}}')"
+expect "a default deny letting out everything"   "$NP_REFUSED"    "$(network_policy vennir-default-deny 'spec["policyTypes"] = ["Ingress", "Egress"]; spec["egress"] = [{}]')"
+expect "a gateway ingress from any namespace"    "$NP_REFUSED"    "$(network_policy vennir-gateway-ingress 'spec["ingress"][0]["from"][0]["namespaceSelector"] = {}')"
+expect "a gateway ingress for every Pod"         "$NP_REFUSED"    "$(network_policy vennir-gateway-ingress 'spec["podSelector"] = {}')"
+expect "a gateway ingress letting out everything" "$NP_REFUSED"   "$(network_policy vennir-gateway-ingress 'spec["policyTypes"] = ["Ingress", "Egress"]; spec["egress"] = [{}]')"
+expect "no-metadata without its exception"       "$NP_REFUSED"    "$(network_policy vennir-no-metadata 'del spec["egress"][0]["to"][0]["ipBlock"]["except"]')"
+expect "no-metadata excepting something else"    "$NP_REFUSED"    "$(network_policy vennir-no-metadata 'spec["egress"][0]["to"][0]["ipBlock"]["except"] = ["10.0.0.0/8"]')"
+expect "no-metadata letting out to Pods"         "$NP_REFUSED"    "$(network_policy vennir-no-metadata 'spec["egress"].append({"to": [{"podSelector": {}}]})')"
 expect "a policy of another name"                "$NP_REFUSED"    "$(network_policy allow-all 'spec["ingress"] = [{}]')"
-expect "deleting the default deny"               "$NP_REFUSED"    "$(as_console -n "$TEAM_B" delete networkpolicy vertra-default-deny)"
+expect "deleting the default deny"               "$NP_REFUSED"    "$(as_console -n "$TEAM_B" delete networkpolicy vennir-default-deny)"
 
 echo "Console quota and limits:"
-expect "the team's quota"                        allowed          "$(as_console -n "$TEAM_A" create quota vertra-team-quota --hard=pods=10)"
+expect "the team's quota"                        allowed          "$(as_console -n "$TEAM_A" create quota vennir-team-quota --hard=pods=10)"
 expect "a quota of another name"                 "only ResourceQuota" "$(as_console -n "$TEAM_A" create quota other --hard=pods=10)"
 LIMITS='{"apiVersion":"v1","kind":"LimitRange","metadata":{"name":"NAME"},"spec":{"limits":[{"type":"Container","default":{"cpu":"1"}}]}}'
-expect "the team's limits"                       allowed          "$(echo "${LIMITS/NAME/vertra-team-limits}" | as_console -n "$TEAM_A" create -f -)"
+expect "the team's limits"                       allowed          "$(echo "${LIMITS/NAME/vennir-team-limits}" | as_console -n "$TEAM_A" create -f -)"
 expect "limits of another name"                  "only ResourceQuota" "$(echo "${LIMITS/NAME/other}" | as_console -n "$TEAM_A" create -f -)"
 
 echo "Console namespaces:"
-expect "create one labelled a team's"            allowed                      "$(new_namespace $RELEASE-new '{"vertra/team":"true"}')"
+expect "create one labelled a team's"            allowed                      "$(new_namespace $RELEASE-new '{"vennir/team":"true"}')"
 expect "create one without the label"            "only create a namespace"    "$(new_namespace $RELEASE-plain '{}')"
-expect "create a kube-* one"                     "protected"                  "$(new_namespace kube-$RELEASE '{"vertra/team":"true"}')"
-expect "retire a team's"                         allowed                      "$(as_console label namespace "$TEAM_A" vertra/team=retired --overwrite)"
-expect "label a namespace that isn't a team's"   "isn't a team's"             "$(as_console label namespace "$OTHER_NS" vertra/team=true)"
-expect "label the platform's own"                "protected"                  "$(as_console label namespace "$PLATFORM_NS" vertra/team=true)"
-expect "a label value other than true/retired"   "isn't a team's"             "$(as_console label namespace "$TEAM_A" vertra/team=yes --overwrite)"
+expect "create a kube-* one"                     "protected"                  "$(new_namespace kube-$RELEASE '{"vennir/team":"true"}')"
+expect "retire a team's"                         allowed                      "$(as_console label namespace "$TEAM_A" vennir/team=retired --overwrite)"
+expect "label a namespace that isn't a team's"   "isn't a team's"             "$(as_console label namespace "$OTHER_NS" vennir/team=true)"
+expect "label the platform's own"                "protected"                  "$(as_console label namespace "$PLATFORM_NS" vennir/team=true)"
+expect "a label value other than true/retired"   "isn't a team's"             "$(as_console label namespace "$TEAM_A" vennir/team=yes --overwrite)"
 expect "change another label too"                "isn't a team's"             "$(as_console label namespace "$TEAM_A" other=1)"
 expect "change an annotation"                    "isn't a team's"             "$(as_console annotate namespace "$TEAM_A" note=1)"
 
@@ -439,7 +439,7 @@ expect "an API's in a retired team's namespace"  "only mint tokens for API"   "$
 expect "no audience (the Kubernetes API's)"      "never the Kubernetes API"   "$(token "$TEAM_A" orders-api "")"
 expect "for the Kubernetes API"                  "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://kubernetes.default.svc)"
 expect "for GKE's API"                           "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://container.googleapis.com/v1/projects/p)"
-expect "for kernel-api"                          "never the Kubernetes API"   "$(token "$TEAM_A" orders-api vertra-kernel-api)"
+expect "for kernel-api"                          "never the Kubernetes API"   "$(token "$TEAM_A" orders-api vennir-kernel-api)"
 expect "lasting over an hour"                    "an hour at most"            "$(token "$TEAM_A" orders-api https://orders.example 7200)"
 
 echo "Console Jobs (image scans and catalog verifications):"
@@ -472,11 +472,11 @@ binding() {  # namespace, name, clusterrole, extra arguments
   local ns=$1 name=$2 role=$3; shift 3
   as_console -n "$ns" create rolebinding "$name" --clusterrole="$role" --serviceaccount="$SCHED_SA" "$@"
 }
-expect "the scheduler's logs binding"            allowed                "$(binding "$TEAM_A" vertra-scheduler-logs "$LOGS_ROLE")"
-expect "another ClusterRole"                     "only RBAC write"      "$(binding "$TEAM_A" vertra-scheduler-logs cluster-admin)"
-expect "another subject too"                     "only RBAC write"      "$(binding "$TEAM_A" vertra-scheduler-logs "$LOGS_ROLE" --serviceaccount="$TEAM_A:db-sa")"
+expect "the scheduler's logs binding"            allowed                "$(binding "$TEAM_A" vennir-scheduler-logs "$LOGS_ROLE")"
+expect "another ClusterRole"                     "only RBAC write"      "$(binding "$TEAM_A" vennir-scheduler-logs cluster-admin)"
+expect "another subject too"                     "only RBAC write"      "$(binding "$TEAM_A" vennir-scheduler-logs "$LOGS_ROLE" --serviceaccount="$TEAM_A:db-sa")"
 expect "another name"                            "only RBAC write"      "$(binding "$TEAM_A" anything "$LOGS_ROLE")"
-expect "in kube-system"                          "may only write in team" "$(binding kube-system vertra-scheduler-logs "$LOGS_ROLE")"
+expect "in kube-system"                          "may only write in team" "$(binding kube-system vennir-scheduler-logs "$LOGS_ROLE")"
 # (RBAC's own escalation check, or the fence: refused either way.)
 expect "a Role"                                  "forbidden"            "$(as_console -n "$TEAM_A" create role r --verb=get --resource=pods )"
 

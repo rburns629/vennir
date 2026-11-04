@@ -55,7 +55,7 @@ export function forModel(result: unknown): string {
 }
 
 /** A schema's properties as a short list: name, type, required, its wiring type, its description. */
-function fieldsOf(schema: unknown, hint: "x-vertra-needs" | "x-vertra-provides") {
+function fieldsOf(schema: unknown, hint: "x-vennir-needs" | "x-vennir-provides") {
   const s = typeof schema === "object" && schema !== null ? (schema as Record<string, unknown>) : {};
   const properties = (typeof s["properties"] === "object" && s["properties"] !== null ? s["properties"] : {}) as Record<string, Record<string, unknown>>;
   const required = Array.isArray(s["required"]) ? s["required"] : [];
@@ -130,7 +130,7 @@ const TOOLS: Tool[] = [
     spec: {
       name: "search_docs",
       description:
-        "Search Vertra's docs (guides, how it works, how to run it) for the sections that answer a question. Answer only from what this returns, citing each section's id, like [S1]. Set why to true only for a question of why something was decided: it adds design history (decisions, with rejected options), which is never how things work now.",
+        "Search Vennir's docs (guides, how it works, how to run it) for the sections that answer a question. Answer only from what this returns, citing each section's id, like [S1]. Set why to true only for a question of why something was decided: it adds design history (decisions, with rejected options), which is never how things work now.",
       parameters: {
         type: "object",
         required: ["query"],
@@ -205,14 +205,14 @@ const TOOLS: Tool[] = [
       const product = shared ? await findRunnableProduct(name) : undefined;
       if (!product) return { error: `No action "${name}" shared with this person. Use find_offerings.` };
       const types = new Map((await listWiringTypes()).map((t) => [t.name, t]));
-      const inputs = fieldsOf(product.inputSchema, "x-vertra-needs");
+      const inputs = fieldsOf(product.inputSchema, "x-vennir-needs");
       return {
         name,
         title: product.displayName ?? name,
         team: product.teamName,
         description: text(product.description, 600),
         inputs: inputs.map((i) => ({ ...i, ...(i.wiringType ? { wiringTypeMeans: text(types.get(i.wiringType)?.description, 200) } : {}) })),
-        outputs: fieldsOf(product.outputSchema, "x-vertra-provides"),
+        outputs: fieldsOf(product.outputSchema, "x-vennir-provides"),
       };
     },
   },

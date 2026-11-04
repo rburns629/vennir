@@ -1,4 +1,4 @@
-module github.com/rburns629/vertra/gateway
+module github.com/rburns629/vennir/gateway
 
 go 1.26.0
 

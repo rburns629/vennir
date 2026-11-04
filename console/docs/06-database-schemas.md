@@ -1,6 +1,6 @@
-# Where Vertra keeps its data
+# Where Vennir keeps its data
 
-Vertra has two PostgreSQL databases, one per service, and neither service ever reads the other's:
+Vennir has two PostgreSQL databases, one per service, and neither service ever reads the other's:
 
 - **The kernel's** (`execution_kernel`) holds the work itself: every execution, its tasks, their attempts, outputs, logs and events. The kernel knows nothing about people or teams beyond the namespace each task runs in.
 - **The console's** (`execution_console`) holds who may do what: teams, users, bots and their tokens, registered products, which secrets each team has, and which teams can see which execution.
@@ -310,13 +310,13 @@ People and bots alike.
 | Column | Type | Null | Meaning |
 | --- | --- | --- | --- |
 | `id` | uuid | no | |
-| `email` | text | no, unique | Kept lowercase however it was typed. A bot's is made up, such as `team-a-release-pipeline@bots.vertra.local`. |
+| `email` | text | no, unique | Kept lowercase however it was typed. A bot's is made up, such as `team-a-release-pipeline@bots.vennir.local`. |
 | `password_hash` | text | yes | An argon2 hash. Empty for bots, which use tokens, and for people who sign in only through single sign-on. |
 | `is_admin` | boolean | no | A platform admin: may act on every team and use the Admin page. |
 | `is_bot` | boolean | no | A machine identity, which signs in only with an API token. |
 | `order_templates` | text[] | yes | An ordering bot's templates (decision 23, `<team>/<name>`): the only ones it may run, and nothing else. Empty: not an ordering bot. |
 | `password_changed_at` | timestamptz | yes | Sessions issued before this are rejected, so changing a password signs out every other session. |
-| `must_change_password` | boolean | no | Its password was set by someone else (an admin's new account or reset, `vertra admin reset-password`): a session it signs in may only change it. |
+| `must_change_password` | boolean | no | Its password was set by someone else (an admin's new account or reset, `vennir admin reset-password`): a session it signs in may only change it. |
 | `oidc_subject` | text, unique | yes | The single sign-on account bound at the first sign-in through it (`<issuer> <sub>`): from then on only that account signs in as this person. |
 | `last_signed_in_at` | timestamptz | yes | Its last sign-in, with a password or single sign-on; empty if it never has. Shown on the Admin page's list of people. |
 | `email_kinds` | text[] | no | Which of their notifications are emailed to them too, when the install sends email: `run_failed`, `approval_waiting`, `product_not_ready`, `catalog_failing`, `step_refused` and `platform_alert` by default. |
@@ -454,7 +454,7 @@ Who changed what (`src/audit.ts`): one row per call that tried to change somethi
 | `at` | timestamptz | no | |
 | `actor_id` | uuid | yes | The caller (a user or a bot), or for a sign-in, who it signed in; null when unauthenticated. |
 | `method` | text | no | `RPC` (older rows: POST, PUT, PATCH or DELETE). |
-| `route` | text | no | The method, such as `vertra.console.v1.SecretService/PutSecret` (older rows: a REST route pattern, such as `/api/teams/:teamName/secrets/:secretName`). |
+| `route` | text | no | The method, such as `vennir.console.v1.SecretService/PutSecret` (older rows: a REST route pattern, such as `/api/teams/:teamName/secrets/:secretName`). |
 | `target` | jsonb | no | The identifying fields of the request (names, teams, images, emails, scopes, reasons) and the client's address (`clientIp`); never a secret value, password or token. |
 | `status` | integer | no | The answer's status, as HTTP would say it (200, 403, 409, ...): a refusal is recorded too. |
 | `request_id` | text | yes | The request's id, as in the logs. |
@@ -509,7 +509,7 @@ Which secrets each team has registered, never their values. The values live only
 
 ### wiring_types
 
-The catalog's wiring vocabulary, from each team's `teams/<team>/types.yaml`: the names a product's input uses to say what it needs (`x-vertra-needs`) and an output what it provides (`x-vertra-provides`), such as `gcp.project`. The order builder wires a cart by them (decision 25). A catalog release that has any replaces the whole set; an install whose catalog has none sets it with `ProductService/ReplaceWiringTypes` (an admin).
+The catalog's wiring vocabulary, from each team's `teams/<team>/types.yaml`: the names a product's input uses to say what it needs (`x-vennir-needs`) and an output what it provides (`x-vennir-provides`), such as `gcp.project`. The order builder wires a cart by them (decision 25). A catalog release that has any replaces the whole set; an install whose catalog has none sets it with `ProductService/ReplaceWiringTypes` (an admin).
 
 | Column | Type | Null | Meaning |
 | --- | --- | --- | --- |
@@ -702,7 +702,7 @@ What runs made: each resource a step reported in its outputs (`resources: [{type
 | `deleting_task_id` | text | yes | Its step for this resource. |
 | `delete_requested_by` | uuid | yes | Who asked. |
 | `deleted_at` | timestamptz | yes | When its cleanup step succeeded. |
-| `provides` | jsonb | no | What its step provided, by wiring type: `[{type, value, output}]`, each output its product types `x-vertra-provides` with a scalar value. A later run given that value is linked to it (`resource_links`), and an order can offer it. |
+| `provides` | jsonb | no | What its step provided, by wiring type: `[{type, value, output}]`, each output its product types `x-vennir-provides` with a scalar value. A later run given that value is linked to it (`resource_links`), and an order can offer it. |
 
 ### resource_links
 
@@ -713,7 +713,7 @@ What each resource depends on (decision 25), recorded when its run finishes: a r
 | `resource_id` | uuid | no | The resource that depends. With the next two, the key. Goes with it. |
 | `depends_on_id` | uuid | no | What it depends on; never itself. Goes with it. |
 | `input` | text | no | The input of the dependent's step it came in through. |
-| `wiring_type` | text | yes | That input's wiring type (`x-vertra-needs`); null for an untyped input wired from a step. |
+| `wiring_type` | text | yes | That input's wiring type (`x-vennir-needs`); null for an untyped input wired from a step. |
 
 ### resource_delete_requests
 
@@ -912,7 +912,7 @@ An ordering bot's callback (decision 23): where its orders' outcomes are posted,
 | `bot_id` | uuid | no | The ordering bot. |
 | `url_encrypted` | text | no | The callback URL, sealed as `team_webhooks.url_encrypted` is. Never sent back by the API. |
 | `host` | text | no | Its host, which is what people see. |
-| `secret_encrypted` | text | no | The secret each post is signed with (HMAC-SHA256, the `Vertra-Signature` header), sealed the same way. Shown once, when it's made. |
+| `secret_encrypted` | text | no | The secret each post is signed with (HMAC-SHA256, the `Vennir-Signature` header), sealed the same way. Shown once, when it's made. |
 | `updated_by` | uuid | yes | Who set it last. |
 | `updated_at` | timestamptz | no | |
 | `last_sent_at` | timestamptz | yes | The last post that went. |
@@ -927,7 +927,7 @@ A team's outcome webhook (decision 23): where each of its runs' outcomes is post
 | `team_id` | uuid | no | |
 | `url_encrypted` | text | no | The URL, sealed as `team_webhooks.url_encrypted` is. Never sent back by the API. |
 | `host` | text | no | Its host, which is what people see. |
-| `secret_encrypted` | text | no | The secret each post is signed with (`Vertra-Signature`), sealed the same way. Shown once, when it's made. |
+| `secret_encrypted` | text | no | The secret each post is signed with (`Vennir-Signature`), sealed the same way. Shown once, when it's made. |
 | `updated_by` | uuid | yes | Who set it last. |
 | `updated_at` | timestamptz | no | |
 | `last_sent_at` | timestamptz | yes | The last post that went. |

@@ -24,7 +24,7 @@ import {
   TaskState,
   ValidationIssuesSchema,
   type SubmitExecutionRequest,
-} from "../src/gen/vertra/kernel/v1/kernel_pb.js";
+} from "../src/gen/vennir/kernel/v1/kernel_pb.js";
 import { getExecution, KernelApiError, submissionRequest, submitExecution } from "../src/kernel/client.js";
 
 const seen: { authorization: string | null; submitted?: SubmitExecutionRequest }[] = [];

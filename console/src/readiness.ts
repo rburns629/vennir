@@ -93,7 +93,7 @@ async function submit(check: TeamProduct, log: FastifyBaseLogger): Promise<void>
     // the answer. Anything else (a cluster or kernel-api error, whose message
     // can carry the API server's response) is only logged: detail is shown
     // to everyone signed in.
-    const why = error instanceof ApiError ? error.message : "Vertra couldn't start its check: the platform didn't answer.";
+    const why = error instanceof ApiError ? error.message : "Vennir couldn't start its check: the platform didn't answer.";
     await db
       .update(productReadiness)
       .set({ state: "failed", detail: why.slice(0, 1000), checkedAt: sql`now()` })

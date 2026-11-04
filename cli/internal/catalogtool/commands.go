@@ -25,7 +25,7 @@ func (c *Catalog) layoutOK() bool {
 // failure never hides another's result.
 func (c *Catalog) Check(products []*Product, publishing bool) []*Product {
 	layout := c.layoutOK()
-	// A vertra.yaml that doesn't read is layoutOK's to report.
+	// A vennir.yaml that doesn't read is layoutOK's to report.
 	s, _ := c.Settings()
 	var passed []*Product
 	for _, p := range products {
@@ -84,7 +84,7 @@ func (c *Catalog) Products(ctx context.Context, command string, names []string, 
 		}
 		if problems := settings.Problems(); len(problems) > 0 {
 			for _, p := range problems {
-				c.errorAt(c.path("vertra.yaml"), p)
+				c.errorAt(c.path("vennir.yaml"), p)
 			}
 			return false, nil
 		}

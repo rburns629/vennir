@@ -11,14 +11,27 @@ import (
 
 var (
 	topLevelAPIVersion = regexp.MustCompile(`(?m)^apiVersion:`)
-	formerAPIVersion   = regexp.MustCompile(`(?m)^apiVersion:[ \t]*["']?` + regexp.QuoteMeta(FormerAPIVersion) + `["']?[ \t]*$`)
+	formerAPIVersion   = regexp.MustCompile(`(?m)^apiVersion:[ \t]*["']?(` + formerAPIVersions() + `)["']?[ \t]*$`)
+	// formerWrapperLine is CODEOWNERS' or .gitignore's line for the ./vertra
+	// wrapper, its cache (.vertra/) or vertra.yaml.
+	formerWrapperLine = regexp.MustCompile(`(?m)^(/?\.?)vertra(\.yaml|/)?(\s|$)`)
 )
+
+func formerAPIVersions() string {
+	var quoted []string
+	for _, f := range formerNames {
+		quoted = append(quoted, regexp.QuoteMeta(f.apiVersion()))
+	}
+	return strings.Join(quoted, "|")
+}
 
 // Migrate rewrites a catalog written in the format from before v2: each
 // team.yaml, product.yaml and dags/ file gets its apiVersion and kind, and
 // an action's requiredSecrets becomes its secretRefs. A catalog from before
-// the platform was renamed Vertra (2026-10-20) gets the new apiVersion, and
-// its acyclix.yaml becomes vertra.yaml. It edits the text, so comments and
+// the platform was renamed (formerNames) gets the new apiVersion, its
+// vertra.yaml or acyclix.yaml becomes vennir.yaml, and a Vertra catalog's
+// ./vertra wrapper goes once ./vennir is there (CODEOWNERS and .gitignore
+// following it). It edits the text, so comments and
 // layout stay as they were; a file already current is left alone. Teams,
 // the starters and the samples are all rewritten. It returns how many files
 // changed, and what it couldn't do.
@@ -40,15 +53,25 @@ func (c *Catalog) Migrate() (int, []string, error) {
 	}
 	changed := 0
 	var problems []string
-	if _, err := os.Stat(c.path(FormerSettingsFile)); err == nil {
-		if _, err := os.Stat(c.path("vertra.yaml")); err == nil {
-			problems = append(problems, FormerSettingsFile+": vertra.yaml exists too; merge them by hand")
-		} else if err := os.Rename(c.path(FormerSettingsFile), c.path("vertra.yaml")); err != nil {
+	for _, f := range formerNames {
+		old := f.settingsFile()
+		if _, err := os.Stat(c.path(old)); err != nil {
+			continue
+		}
+		if _, err := os.Stat(c.path("vennir.yaml")); err == nil {
+			problems = append(problems, old+": vennir.yaml exists too; merge them by hand")
+		} else if err := os.Rename(c.path(old), c.path("vennir.yaml")); err != nil {
 			return changed, problems, err
 		} else {
-			c.info("  %s: renamed vertra.yaml", FormerSettingsFile)
+			c.info("  %s: renamed vennir.yaml", old)
 			changed++
 		}
+	}
+	n, more, err := c.migrateWrapper()
+	changed += n
+	problems = append(problems, more...)
+	if err != nil {
+		return changed, problems, err
 	}
 	for _, t := range targets {
 		for _, pattern := range t.patterns {
@@ -112,4 +135,40 @@ func withHeader(text, kind string) string {
 	}
 	header := fmt.Sprintf("apiVersion: %s\nkind: %s\n", APIVersion, kind)
 	return strings.Join(lines[:i], "") + header + strings.Join(lines[i:], "")
+}
+
+// migrateWrapper removes a Vertra catalog's ./vertra once ./vennir (the
+// template's, pinned to a Vennir release) is there, and points CODEOWNERS'
+// and .gitignore's lines for it at ./vennir.
+func (c *Catalog) migrateWrapper() (int, []string, error) {
+	if !exists(c.path("vertra")) {
+		return 0, nil, nil
+	}
+	if !exists(c.path("vennir")) {
+		return 0, []string{"./vertra: copy ./vennir from the catalog template (pinned to a Vennir release), then run migrate again"}, nil
+	}
+	changed := 0
+	for _, name := range []string{".github/CODEOWNERS", ".gitignore"} {
+		data, err := os.ReadFile(c.path(name))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return changed, nil, err
+		}
+		text := formerWrapperLine.ReplaceAllString(string(data), "${1}vennir${2}${3}")
+		if text == string(data) {
+			continue
+		}
+		if err := os.WriteFile(c.path(name), []byte(text), 0o644); err != nil {
+			return changed, nil, err
+		}
+		c.info("  %s: ./vertra is ./vennir", name)
+		changed++
+	}
+	if err := os.Remove(c.path("vertra")); err != nil {
+		return changed, nil, err
+	}
+	c.info("  vertra: removed (./vennir runs vennir)")
+	return changed + 1, nil, nil
 }

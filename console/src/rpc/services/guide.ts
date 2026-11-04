@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 /**
- * GuideService (proto/vertra/console/v1/guide.proto): the guides in
+ * GuideService (proto/vennir/console/v1/guide.proto): the guides in
  * console/docs/ and the platform's docs in console/docs/reference/, and
  * searching them (guideSearch.ts), for anyone signed in (the same content
  * for everyone).
  */
 import type { ServiceImpl } from "@connectrpc/connect";
-import type { GuideService } from "../../gen/vertra/console/v1/guide_pb.js";
+import type { GuideService } from "../../gen/vennir/console/v1/guide_pb.js";
 import { Type } from "@sinclair/typebox";
 import { guideIndex } from "../../guideSearch.js";
 import { GuideId, GuideImagePath, listGuides, readGuide, readGuideImage } from "../../guides.js";

@@ -238,13 +238,13 @@ export function ChatSettingsCard() {
       {form.provider === "vertex" && (
         <Typography variant="caption" color="text.secondary">
           No key: the console signs in as its own Google identity, which needs <Mono>roles/aiplatform.user</Mono> in this project
-          (<Mono>vertra apply</Mono> grants it on GCP).
+          (<Mono>vennir apply</Mono> grants it on GCP).
         </Typography>
       )}
       {form.provider === "bedrock" && (
         <Typography variant="caption" color="text.secondary">
           No key: each request is signed as the console's own AWS identity, which needs <Mono>bedrock-mantle:CreateInference</Mono> on
-          this model in this region (<Mono>vertra apply</Mono> grants it on AWS, for the model it sets up).
+          this model in this region (<Mono>vennir apply</Mono> grants it on AWS, for the model it sets up).
         </Typography>
       )}
 

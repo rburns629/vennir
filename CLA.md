@@ -1,6 +1,6 @@
-# Vertra Individual Contributor License Agreement
+# Vennir Individual Contributor License Agreement
 
-Thank you for contributing to Vertra. This agreement makes clear the rights
+Thank you for contributing to Vennir. This agreement makes clear the rights
 you grant in your contributions, protecting you, the project and everyone who
 uses it. It's based on the Apache Software Foundation's Individual Contributor
 License Agreement. You keep the copyright in your contributions; this
@@ -11,8 +11,8 @@ You accept it once, by commenting `I have read the CLA and I accept it` on
 your first pull request, as the bot there asks. It then covers every
 contribution you make.
 
-"We" and "us" mean rburns629, the copyright holder of Vertra
-(<https://github.com/rburns629/vertra>), and its successors and assigns.
+"We" and "us" mean rburns629, the copyright holder of Vennir
+(<https://github.com/rburns629/vennir>), and its successors and assigns.
 
 ## 1. Definitions
 
@@ -21,7 +21,7 @@ the copyright owner, that accepts this agreement.
 
 "Contribution" means any original work of authorship, including any
 changes or additions to an existing work, that you intentionally submit to
-us for inclusion in Vertra or any other project we own or manage (the
+us for inclusion in Vennir or any other project we own or manage (the
 "Work"). "Submit" means any form of electronic, verbal or written
 communication sent to us or our representatives, including pull requests,
 issues, mailing lists and code review, but excluding communication you

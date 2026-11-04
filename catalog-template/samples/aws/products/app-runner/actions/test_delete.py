@@ -14,7 +14,7 @@ from botocore.exceptions import ClientError
 
 _MODULE_PATH = Path(__file__).parent / "delete.py"
 ARN = "arn:aws:apprunner:us-east-2:123456789012:service/web/0123abcd"
-MADE = {"Tags": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
+MADE = {"Tags": [{"Key": "vennir-made", "Value": "true"}, {"Key": "vennir-team", "Value": "web"}]}
 
 
 def _load():
@@ -65,7 +65,7 @@ class DeleteActionTest(unittest.TestCase):
         code, result, client, _ = self._run(
             {"type": "aws/app-runner-service", "id": ARN}, lambda c: setattr(c.list_tags_for_resource, "return_value", {"Tags": []})
         )
-        self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VERTRA"))
+        self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VENNIR"))
         client.delete_service.assert_not_called()
 
     def test_one_made_for_another_team_is_refused(self) -> None:

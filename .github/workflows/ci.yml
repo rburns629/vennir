@@ -16,7 +16,7 @@ name: ci
 #             settings in helm/values/, of every size preset, and of the charts' optional branches
 #             (backup destinations, a shared database, policies off), so a
 #             change that breaks a template fails here, not at helm upgrade.
-#   cli       gofmt, go vet and the unit tests of vertra (its catalog commands included), and macOS builds.
+#   cli       gofmt, go vet and the unit tests of vennir (its catalog commands included), and macOS builds.
 #   govulncheck  known vulnerabilities (Go's database) that the CLI's, the
 #             kernel's or the gateway's code can reach, in their modules or
 #             the standard library; weekly too, for new ones.
@@ -253,7 +253,7 @@ jobs:
           version: v4.3.0
       - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
         with:
-          cluster_name: vertra-ci
+          cluster_name: vennir-ci
       - name: Admission policies
         run: bash helm/tests/admission-policies.sh
       # The scheduler's tests against the cluster: its executor, and whole
@@ -290,7 +290,7 @@ jobs:
       # (they'd skip without it; CI must run them).
       - run: apk add --no-cache git
       - run: go test ./...
-      - run: GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/vertra
+      - run: GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/vennir
 
   govulncheck:
     runs-on: ubuntu-latest
@@ -349,7 +349,17 @@ jobs:
       - run: make proto
       - name: Nothing breaks the newest release's API
         run: |
-          release=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          # The newest release of these protos: releases before the rename
+          # (Vertra's, through 0.10.0) published proto/vertra, a package
+          # Vennir's API deliberately doesn't continue.
+          release=""
+          for tag in $(git tag --list 'v*' --sort=-v:refname); do
+            if git cat-file -e "$tag:proto/vennir" 2>/dev/null; then release=$tag; break; fi
+          done
+          if [ -z "$release" ]; then
+            echo "::notice::No release has published proto/vennir yet: nothing to compare with."
+            exit 0
+          fi
           echo "Comparing with $release"
           console/node_modules/.bin/buf breaking --against ".git#tag=$release"
       - name: The committed code matches the protos
@@ -364,7 +374,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The version vertra pins (cli/internal/tools/pins.go), checked
+      # The version vennir pins (cli/internal/tools/pins.go), checked
       # against its published checksum.
       - run: |
           curl -fsSLo tofu.tar.gz https://github.com/opentofu/opentofu/releases/download/v1.13.1/tofu_1.13.1_linux_amd64.tar.gz
@@ -403,12 +413,12 @@ jobs:
         with:
           fetch-depth: 0   # to see whether the template changed
       - run: bash .github/scripts/catalog-template.sh validate
-      # As a new catalog's CI runs it: a template needing a newer vertra than
-      # it pins fails here (release one, then .github/scripts/pin-vertra.sh),
+      # As a new catalog's CI runs it: a template needing a newer vennir than
+      # it pins fails here (release one, then .github/scripts/pin-vennir.sh),
       # not in every catalog made from it.
-      - name: Validate with the vertra the template pins
+      - name: Validate with the vennir the template pins
         env:
-          VERTRA_PINNED: "1"
+          VENNIR_PINNED: "1"
         run: bash .github/scripts/catalog-template.sh validate
       - name: Did the template change?
         id: changed
@@ -438,8 +448,8 @@ jobs:
       - name: Build
         env:
           COMPONENT: ${{ matrix.component }}
-        run: docker build --pull -t "vertra-ci/$COMPONENT:$GITHUB_SHA" "$COMPONENT/"
+        run: docker build --pull -t "vennir-ci/$COMPONENT:$GITHUB_SHA" "$COMPONENT/"
       - name: Scan
         env:
           COMPONENT: ${{ matrix.component }}
-        run: bash .github/scripts/scan-image.sh "vertra-ci/$COMPONENT:$GITHUB_SHA" "$COMPONENT"
+        run: bash .github/scripts/scan-image.sh "vennir-ci/$COMPONENT:$GITHUB_SHA" "$COMPONENT"

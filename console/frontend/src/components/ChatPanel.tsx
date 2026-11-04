@@ -248,7 +248,7 @@ function Rate({ question, turn, team, model }: { question: string; turn: Extract
 }
 
 /**
- * The chat agent's panel (decision 24): ask about Vertra and get answers
+ * The chat agent's panel (decision 24): ask about Vennir and get answers
  * from its docs (cited, each linked to its section), or say what you need
  * and get a cart to open and place yourself. The conversation is kept on
  * this page only; each question sends it whole (ChatService/Ask keeps
@@ -364,7 +364,7 @@ export function ChatPanel({
         </Box>
         <Box sx={{ flexGrow: 1, minWidth: 0, ml: 0.5 }}>
           <Typography component="h2" sx={{ m: 0, fontSize: 16, fontWeight: 600 }}>
-            Ask Vertra
+            Ask Vennir
           </Typography>
           <Typography variant="caption" color="text.secondary" noWrap component="div">
             Answers from the guides and your catalog · {model}

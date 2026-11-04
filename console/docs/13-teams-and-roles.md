@@ -1,6 +1,6 @@
 # Teams and roles
 
-This page is for anyone working in a team on Vertra: what the **Teams** page and a team's page show, what a member, a maintainer and an admin may each do, how you join a team or get access to another team's work, how single sign-on groups can decide who is in a team, and what retiring and purging a team mean. For the short version of the roles, see [Members and maintainers](01-getting-started.md#members-and-maintainers) in the walkthrough; this page goes into more detail without changing any of it.
+This page is for anyone working in a team on Vennir: what the **Teams** page and a team's page show, what a member, a maintainer and an admin may each do, how you join a team or get access to another team's work, how single sign-on groups can decide who is in a team, and what retiring and purging a team mean. For the short version of the roles, see [Members and maintainers](01-getting-started.md#members-and-maintainers) in the walkthrough; this page goes into more detail without changing any of it.
 
 ## What is a team?
 
@@ -154,7 +154,7 @@ Retiring is for a team that's going away. It can be undone.
 - **What happens:**
   - The team becomes read-only. Nothing new can be run, retried, added or changed for it (`TEAM_RETIRED`).
   - Its products are unregistered, so templates that use them stop working.
-  - Its namespace is relabelled `vertra/team=retired`, so the cluster starts nothing new there. Steps already running finish. Steps of its runs that hadn't started usually fail.
+  - Its namespace is relabelled `vennir/team=retired`, so the cluster starts nothing new there. Steps already running finish. Steps of its runs that hadn't started usually fail.
   - Its people keep its history: runs, outputs and logs stay visible.
 - **Undoing it:** an admin clicks **Restore <team>** in the same place, or the team's folder comes back in the catalog. The team works again. Products the catalog registers come back with its next release.
 

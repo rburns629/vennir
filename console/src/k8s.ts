@@ -88,7 +88,7 @@ const ESO_VERSION = "v1";
  * label existed), and finds its own RoleBindings by it.
  */
 const MANAGED_BY_LABEL = "app.kubernetes.io/managed-by";
-const MANAGED_BY = "vertra-console";
+const MANAGED_BY = "vennir-console";
 const MANAGED_LABELS = { [MANAGED_BY_LABEL]: MANAGED_BY };
 
 function isManaged(metadata: k8s.V1ObjectMeta | undefined): boolean {
@@ -116,7 +116,7 @@ export class ExternalSecretsMissingError extends Error {
   constructor(apiVersion: string) {
     super(
       `External Secrets Operator isn't installed on this cluster, or doesn't serve ${apiVersion}, so this can't be made. ` +
-        "With vertra: `vertra config set -e <env> externalSecrets true`, then `vertra apply <env>`; " +
+        "With vennir: `vennir config set -e <env> externalSecrets true`, then `vennir apply <env>`; " +
         "if it's installed, the file's apiVersion is one it doesn't serve (external-secrets.io/v1 is current).",
     );
   }
@@ -491,7 +491,7 @@ export async function deleteTeamNamespace(name: string, protectedNamespaces: str
  * (pullSecret.ts) and named by every step Pod (the kernel's
  * task_image_pull_secret). Never registered as a team secret, so never
  * mountable: only the kubelet uses it. */
-export const TEAM_PULL_SECRET = "vertra-pull";
+export const TEAM_PULL_SECRET = "vennir-pull";
 
 /** Writes the pull Secret into a team namespace, replacing the copy there.
  * Returns false when the namespace doesn't exist (yet). */
@@ -532,22 +532,22 @@ export async function writeRegistryTokenSecret(namespace: string, name: string, 
 /** The NetworkPolicy every team namespace holds (teamNetwork.ts). The
  * console's write fence accepts no other name but TEAM_GATEWAY_INGRESS,
  * and only these shapes. */
-export const TEAM_NETWORK_POLICY = "vertra-default-deny";
+export const TEAM_NETWORK_POLICY = "vennir-default-deny";
 
 /** With the gateway on, a second one: the gateway's Pods may reach the Pods
  * a team labels as API backends (API_BACKEND_LABEL: "true"), and nothing
  * else of the team's. */
-export const TEAM_GATEWAY_INGRESS = "vertra-gateway-ingress";
+export const TEAM_GATEWAY_INGRESS = "vennir-gateway-ingress";
 
 /** With teamNamespaces.blockMetadata (EKS), a third: no Pod in the namespace
  * may connect to the cloud's instance metadata server, so a step can't take
  * the node's credentials; everything else outward stays open. */
-export const TEAM_NO_METADATA = "vertra-no-metadata";
+export const TEAM_NO_METADATA = "vennir-no-metadata";
 
 /** The instance metadata server's address (EC2's). IPv4 only: the AWS VPC
  * CNI's policy agent on an IPv4 cluster can't hold an IPv6 block, and on
  * failing to it enforced none of the namespace's policies (proven on
- * standard-mode EKS, 2026-10-29); vertra's clusters are IPv4. The console
+ * standard-mode EKS, 2026-10-29); vennir's clusters are IPv4. The console
  * chart's write fence requires exactly this exception. */
 const METADATA_ADDRESS = "169.254.169.254/32";
 
@@ -561,7 +561,7 @@ export function noMetadataPolicy(namespace: string): k8s.V1NetworkPolicy {
     },
   };
 }
-export const API_BACKEND_LABEL = "vertra/api-backend";
+export const API_BACKEND_LABEL = "vennir/api-backend";
 
 /** The gateway-ingress policy for a team namespace. */
 export interface GatewayPods {
@@ -628,7 +628,7 @@ async function writeNetworkPolicy(namespace: string, body: k8s.V1NetworkPolicy):
 /** The RoleBinding in each team namespace letting the kernel's scheduler
  * read its steps' logs (schedulerLogs.ts): the console's only RBAC write,
  * held to exactly this by its write fence. */
-export const SCHEDULER_LOGS_BINDING = "vertra-scheduler-logs";
+export const SCHEDULER_LOGS_BINDING = "vennir-scheduler-logs";
 
 /** Creates or replaces a team namespace's scheduler-logs RoleBinding. False
  * when the namespace doesn't exist. */
@@ -656,8 +656,8 @@ export async function writeSchedulerLogsBinding(
 
 /** The ResourceQuota and LimitRange every team namespace holds when limits
  * are set (teamQuota.ts). The console's write fence accepts no other names. */
-export const TEAM_QUOTA = "vertra-team-quota";
-export const TEAM_LIMITS = "vertra-team-limits";
+export const TEAM_QUOTA = "vennir-team-quota";
+export const TEAM_LIMITS = "vennir-team-limits";
 
 export interface TeamQuota {
   /** What all its steps may request together: CPU, memory, and Pods at once. */
@@ -1063,11 +1063,11 @@ export async function listTaskPods(namespace: string): Promise<TaskPodSummary[]>
   return result.items.map((pod) => {
     const labels = pod.metadata?.labels ?? {};
     const container = pod.status?.containerStatuses?.[0];
-    const attempt = labels["vertra.dev/attempt"];
+    const attempt = labels["vennir.dev/attempt"];
     return {
       podName: pod.metadata?.name ?? "unknown",
-      executionId: labels["vertra.dev/execution-id"] ?? null,
-      taskKey: pod.metadata?.annotations?.["vertra.dev/task"] ?? null,
+      executionId: labels["vennir.dev/execution-id"] ?? null,
+      taskKey: pod.metadata?.annotations?.["vennir.dev/task"] ?? null,
       attempt: attempt ? Number(attempt) : null,
       image: pod.spec?.containers[0]?.image ?? null,
       serviceAccount: pod.spec?.serviceAccountName ?? null,

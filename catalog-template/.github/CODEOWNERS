@@ -6,7 +6,7 @@
 # then one line per team, then the paths only catalog admins may
 # approve, last, so no team line can override them. Owners must be
 # users or teams with write access to this repository; an unknown one is
-# ignored by GitHub and fails check-codeowners.yml. `./vertra catalog validate`
+# ignored by GitHub and fails check-codeowners.yml. `./vennir catalog validate`
 # checks the layout: every team has an owner, and the admin paths below
 # resolve to the same owners as the fallback.
 #
@@ -26,7 +26,7 @@
 # proposes, admins merge).
 /.github/ @your-org/catalog-admins
 /tools/ @your-org/catalog-admins
-/vertra.yaml @your-org/catalog-admins
-/vertra @your-org/catalog-admins
+/vennir.yaml @your-org/catalog-admins
+/vennir @your-org/catalog-admins
 /templates/ @your-org/catalog-admins
 /teams/*/secret-stores/ @your-org/catalog-admins

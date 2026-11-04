@@ -16,7 +16,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
-	catalogv1 "github.com/rburns629/vertra/cli/internal/gen/vertra/catalog/v1"
+	catalogv1 "github.com/rburns629/vennir/cli/internal/gen/vennir/catalog/v1"
 )
 
 // An API product (teams/<team>/apis/<name>/api.yaml, kind: Api) publishes a
@@ -29,7 +29,7 @@ import (
 const maxSpecBytes = 1 << 20
 
 // reservedPrefix is the gateway's own, never a team's.
-const reservedPrefix = "/.vertra/"
+const reservedPrefix = "/.vennir/"
 
 var methods = []string{"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 

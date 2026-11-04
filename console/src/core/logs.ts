@@ -7,7 +7,7 @@
  * - a step's lines, every level, to its own team (its namespace);
  * - its INFO lines to the run's other owners (its submitter, the team it
  *   was run for; core/runView.ts), never to another provider's member;
- * - an API backend's lines (a Pod a team labels vertra/api-backend), every
+ * - an API backend's lines (a Pod a team labels vennir/api-backend), every
  *   level, to its own team only: they belong to no run;
  * - the platform's own logs to admins only.
  *
@@ -47,7 +47,7 @@ export interface SearchLogsInput {
   executionId?: string | undefined;
   level?: (typeof LEVELS)[number] | undefined;
   source?: "step" | "api" | "platform" | undefined;
-  /** With source api: one API product's backend (its Pods' vertra/api label). */
+  /** With source api: one API product's backend (its Pods' vennir/api label). */
   api?: string | undefined;
   since?: Date | undefined;
   until?: Date | undefined;

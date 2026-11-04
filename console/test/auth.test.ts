@@ -27,7 +27,7 @@ async function makeUser(options: { admin?: boolean } = {}): Promise<{ id: string
 function rpc(procedure: string, body: object, token?: string, ip = "10.0.0.1") {
   return app.inject({
     method: "POST",
-    url: `/api/vertra.console.v1.${procedure}`,
+    url: `/api/vennir.console.v1.${procedure}`,
     headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
     payload: JSON.stringify(body),
     remoteAddress: ip,
@@ -270,7 +270,7 @@ describe("sign-ins in the audit log", () => {
     const rows = await db
       .select()
       .from(auditLog)
-      .where(and(eq(auditLog.route, "vertra.console.v1.AuthService/Login"), sql`${auditLog.target}->>'email' = ${email}`))
+      .where(and(eq(auditLog.route, "vennir.console.v1.AuthService/Login"), sql`${auditLog.target}->>'email' = ${email}`))
       .orderBy(auditLog.id);
     expect(rows.map((r) => [r.status, r.actorId, (r.target as { clientIp?: string }).clientIp])).toEqual([
       [401, null, "10.40.0.1"],

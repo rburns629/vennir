@@ -64,8 +64,8 @@ export function apiCall(runnable: Pick<Runnable, "kind" | "team" | "name">, para
       : ["RunAction", { product: runnable.name, inputs: parameters, ...forTeam }];
   const json = JSON.stringify(body, null, 2).replaceAll("'", "'\\''");
   return [
-    `curl -s -X POST "${origin}/api/vertra.console.v1.TemplateService/${method}" \\`,
-    `  -H "Authorization: Bearer $VERTRA_TOKEN" \\`,
+    `curl -s -X POST "${origin}/api/vennir.console.v1.TemplateService/${method}" \\`,
+    `  -H "Authorization: Bearer $VENNIR_TOKEN" \\`,
     `  -H "Content-Type: application/json" \\`,
     `  -d '${json}'`,
   ].join("\n");

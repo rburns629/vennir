@@ -1,7 +1,7 @@
 # execution-console on GKE (release `console`, namespace default):
 #   make gke-deploy VERSION=v<x.y.z>   (the release's signed chart and images)
-#   or: helm upgrade --install console oci://ghcr.io/rburns629/vertra/charts/execution-console --version <x.y.z> -n default \
-#     --reset-values --kube-context gke_my-gcp-project_us-central1_vertra-gke \
+#   or: helm upgrade --install console oci://ghcr.io/rburns629/vennir/charts/execution-console --version <x.y.z> -n default \
+#     --reset-values --kube-context gke_my-gcp-project_us-central1_vennir-gke \
 #     -f helm/values/gke/console.yaml
 # No bootstrapAdmin.password here on purpose: a fresh install's first admin
 # gets a random one, never printed; give it one with resetAdmin.js
@@ -10,7 +10,7 @@
 # no tag, so the release's chart runs its own (appVersion).
 # gke-deploy-console-from-source overrides both for a working-copy build.
 image:
-  repository: ghcr.io/rburns629/vertra/execution-console
+  repository: ghcr.io/rburns629/vennir/execution-console
   pullPolicy: IfNotPresent
 backup:
   enabled: false
@@ -37,13 +37,13 @@ registryCheck:
   gcpMetadataToken: true
 serviceAccount:
   annotations:
-    iam.gke.io/gcp-service-account: vertra-console-registry@my-gcp-project.iam.gserviceaccount.com
+    iam.gke.io/gcp-service-account: vennir-console-registry@my-gcp-project.iam.gserviceaccount.com
 # Scan Jobs pull the images they scan as the same read-only registry
 # identity (its Workload Identity binding must also name the scanner
 # ServiceAccount, console-execution-console-scanner).
 scanning:
   serviceAccountAnnotations:
-    iam.gke.io/gcp-service-account: vertra-console-registry@my-gcp-project.iam.gserviceaccount.com
+    iam.gke.io/gcp-service-account: vennir-console-registry@my-gcp-project.iam.gserviceaccount.com
 # The catalog's release, which this console reads and applies (catalog CI
 # pushes it from main). Signed with the same key as the images (the kernel
 # values' imageSignature), so it's verified the same way.
@@ -59,10 +59,10 @@ catalog:
 # The "Connect a source" wizard: where the PR goes, and what GCP, Azure and
 # AWS must trust for this cluster's ServiceAccounts.
 secretSources:
-  catalogRepo: my-org/vertra-catalog
-  clusterIssuer: https://container.googleapis.com/v1/projects/my-gcp-project/locations/us-central1/clusters/vertra-gke
+  catalogRepo: my-org/vennir-catalog
+  clusterIssuer: https://container.googleapis.com/v1/projects/my-gcp-project/locations/us-central1/clusters/vennir-gke
   gcpWorkloadIdentityPool: my-gcp-project.svc.id.goog
-  gkeClusterName: vertra-gke
+  gkeClusterName: vennir-gke
   gkeClusterLocation: us-central1
 
 # What each team's steps may use together (teamNamespaces.quota in the

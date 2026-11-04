@@ -45,7 +45,7 @@ const POLICY: Record<string, { label: string; about: ReactNode; code?: string }>
 
 /** The admission policies the kernel chart installs, which hold however the console is set. */
 const KERNEL_POLICIES: { label: string; about: ReactNode; code?: string }[] = [
-  { label: "Where steps may run", about: "Only in namespaces labelled vertra/team=true, never the platform's own.", code: "DISPATCH_REJECTED" },
+  { label: "Where steps may run", about: "Only in namespaces labelled vennir/team=true, never the platform's own.", code: "DISPATCH_REJECTED" },
   { label: "Where images may come from", about: <>The sources in <Link component={RouterLink} to="/admin/images">Image sources</Link>, which the console edits in place.</>, code: "IMAGE_NOT_ALLOWED" },
   { label: "Images are pinned", about: "Every image must name its digest.", code: "IMAGE_NOT_PINNED" },
   { label: "Catalog images are signed", about: <>When the install turns on <Mono>imageSignature</Mono>: checked by Sigstore&apos;s policy-controller.</>, code: "IMAGE_NOT_SIGNED" },
@@ -252,7 +252,7 @@ export function AuditCopyCard() {
         {copy && !copy.enabled && (
           <Typography variant="body2" color="text.secondary">
             The audit log is in the console&apos;s database only. Its entries are hash-chained, but nothing checks the chain until they&apos;re
-            copied to a bucket that refuses deletes: <Mono>audit.export</Mono> in vertra.yaml (gcp, aws).
+            copied to a bucket that refuses deletes: <Mono>audit.export</Mono> in vennir.yaml (gcp, aws).
           </Typography>
         )}
         {copy?.enabled && (

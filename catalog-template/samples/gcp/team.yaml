@@ -1,7 +1,7 @@
 # Descriptive metadata about the gcp team itself -- see the top-level
 # README.md's own team.yaml section for the full convention and why
 # this deliberately lists no products.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Team
 name: gcp
 displayName: GCP
@@ -20,7 +20,7 @@ help:
   chat: "#gcp-team-help"
   url: https://example.com/runbooks
 # Where other teams may aim these products. Each projectId input is a
-# gcp.project target (x-vertra-needs in product.yaml): when another team
+# gcp.project target (x-vennir-needs in product.yaml): when another team
 # runs one, the project must match a rule for that team, or the run is
 # refused before it starts. Your own team isn't limited. Narrow it to each
 # consumer's projects, for example:

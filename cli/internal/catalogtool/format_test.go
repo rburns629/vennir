@@ -34,7 +34,7 @@ func errorsOf(t *testing.T, check func(*Catalog) bool, c *Catalog) string {
 	return out.String()
 }
 
-const productV2 = `apiVersion: vertra.dev/v2
+const productV2 = `apiVersion: vennir.dev/v2
 kind: Product
 name: %s
 team: %s
@@ -66,14 +66,14 @@ func productFile(name, team, shareWith string) string {
 func TestFormatVersionIsRequired(t *testing.T) {
 	c := catalogWith(t, map[string]string{
 		"teams/a/team.yaml": "name: a\ndisplayName: A\ndescription: A\nowner: a\n",
-		"teams/b/team.yaml": "apiVersion: vertra.dev/v2\nkind: Product\nname: b\ndisplayName: B\ndescription: B\nowner: b\n",
-		"teams/c/team.yaml": "apiVersion: vertra.dev/v1\nkind: Team\nname: c\ndisplayName: C\ndescription: C\nowner: c\n",
+		"teams/b/team.yaml": "apiVersion: vennir.dev/v2\nkind: Product\nname: b\ndisplayName: B\ndescription: B\nowner: b\n",
+		"teams/c/team.yaml": "apiVersion: vennir.dev/v1\nkind: Team\nname: c\ndisplayName: C\ndescription: C\nowner: c\n",
 	})
 	out := errorsOf(t, (*Catalog).ValidateTeams, c)
 	for _, want := range []string{
-		"teams/a/team.yaml: written in the catalog format from before v2 (it has no apiVersion): ./vertra catalog migrate rewrites it",
+		"teams/a/team.yaml: written in the catalog format from before v2 (it has no apiVersion): ./vennir catalog migrate rewrites it",
 		"teams/b/team.yaml: kind 'Product': this file is kind Team",
-		"teams/c/team.yaml: apiVersion 'vertra.dev/v1': this vertra reads vertra.dev/v2",
+		"teams/c/team.yaml: apiVersion 'vennir.dev/v1': this vennir reads vennir.dev/v2",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("no %q in:\n%s", want, out)
@@ -81,7 +81,7 @@ func TestFormatVersionIsRequired(t *testing.T) {
 	}
 }
 
-const goodTemplate = `apiVersion: vertra.dev/v2
+const goodTemplate = `apiVersion: vennir.dev/v2
 kind: Template
 name: chain
 displayName: Chain
@@ -142,7 +142,7 @@ func TestTemplateChecks(t *testing.T) {
 }
 
 func TestDagChecks(t *testing.T) {
-	dag := `apiVersion: vertra.dev/v2
+	dag := `apiVersion: vennir.dev/v2
 kind: Dag
 name: d
 tasks:
@@ -160,7 +160,7 @@ tasks:
 }
 
 func TestMigrate(t *testing.T) {
-	v1Product := strings.Replace(strings.Replace(productFile("mine", "a", "[]"), "apiVersion: vertra.dev/v2\nkind: Product\n", "", 1),
+	v1Product := strings.Replace(strings.Replace(productFile("mine", "a", "[]"), "apiVersion: vennir.dev/v2\nkind: Product\n", "", 1),
 		"    shareWith: []\n", "    requiredSecrets:\n      - name: token\n", 1)
 	c := catalogWith(t, map[string]string{
 		"teams/a/team.yaml":                  "# The A team.\nname: a\ndisplayName: A\ndescription: A\nowner: a\n",
@@ -182,13 +182,13 @@ func TestMigrate(t *testing.T) {
 		}
 		return string(data)
 	}
-	if got := read("teams/a/team.yaml"); !strings.HasPrefix(got, "# The A team.\napiVersion: vertra.dev/v2\nkind: Team\nname: a\n") {
+	if got := read("teams/a/team.yaml"); !strings.HasPrefix(got, "# The A team.\napiVersion: vennir.dev/v2\nkind: Team\nname: a\n") {
 		t.Errorf("team.yaml:\n%s", got)
 	}
 	if got := read("teams/a/products/mine/product.yaml"); !strings.Contains(got, "    secretRefs:\n      - name: token") || strings.Contains(got, "requiredSecrets") {
 		t.Errorf("product.yaml:\n%s", got)
 	}
-	if got := read("teams/a/dags/try.yaml"); !strings.HasPrefix(got, "apiVersion: vertra.dev/v2\nkind: Dag\n") {
+	if got := read("teams/a/dags/try.yaml"); !strings.HasPrefix(got, "apiVersion: vennir.dev/v2\nkind: Dag\n") {
 		t.Errorf("dags/try.yaml:\n%s", got)
 	}
 	// What it wrote is valid v2, and a second run changes nothing.
@@ -202,41 +202,76 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
-// A catalog from before the platform was renamed Vertra: its apiVersion and
-// settings file are rewritten, and both are refused, pointing at migrate,
-// until they are.
+// A catalog from before the platform was renamed Vennir, or before that
+// Vertra: its apiVersion and settings file are rewritten, and both are
+// refused, pointing at migrate, until they are.
 func TestMigrateFromBeforeTheRename(t *testing.T) {
-	old := strings.Replace(productFile("mine", "a", "[]"), "apiVersion: "+APIVersion, "apiVersion: "+FormerAPIVersion, 1)
-	c := catalogWith(t, map[string]string{
-		"teams/a/products/mine/product.yaml":                    "# Mine.\n" + old,
-		"teams/a/products/mine/Dockerfile":                      "FROM alpine:3@sha256:" + strings.Repeat("a", 64) + "\nUSER 65532:65532\n",
-		"teams/a/products/mine/tests/run/says-hi/request.json":  `{"inputs": {"text": "hi"}}`,
-		"teams/a/products/mine/tests/run/says-hi/expected.json": `{"status": "succeeded"}`,
-		FormerSettingsFile:                                      "registry: registry.example/catalog\n",
-	})
-	if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateProduct(c.AllProducts()[0]) }, c); !strings.Contains(out, "./vertra catalog migrate rewrites it to "+APIVersion) {
-		t.Errorf("the old apiVersion: %s", out)
-	}
-	if _, err := c.Settings(); err == nil || !strings.Contains(err.Error(), "./vertra catalog migrate renames it") {
-		t.Errorf("the old settings file: %v", err)
-	}
+	for _, f := range formerNames {
+		old := strings.Replace(productFile("mine", "a", "[]"), "apiVersion: "+APIVersion, "apiVersion: "+f.apiVersion(), 1)
+		c := catalogWith(t, map[string]string{
+			"teams/a/products/mine/product.yaml":                    "# Mine.\n" + old,
+			"teams/a/products/mine/Dockerfile":                      "FROM alpine:3@sha256:" + strings.Repeat("a", 64) + "\nUSER 65532:65532\n",
+			"teams/a/products/mine/tests/run/says-hi/request.json":  `{"inputs": {"text": "hi"}}`,
+			"teams/a/products/mine/tests/run/says-hi/expected.json": `{"status": "succeeded"}`,
+			f.settingsFile(): "registry: registry.example/catalog\n",
+		})
+		if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateProduct(c.AllProducts()[0]) }, c); !strings.Contains(out, "the platform was called "+f.name+" until "+f.until+": ./vennir catalog migrate rewrites it to "+APIVersion) {
+			t.Errorf("%s: the old apiVersion: %s", f.name, out)
+		}
+		if _, err := c.Settings(); err == nil || !strings.Contains(err.Error(), "./vennir catalog migrate renames it") {
+			t.Errorf("%s: the old settings file: %v", f.name, err)
+		}
 
-	changed, problems, err := c.Migrate()
-	if err != nil || len(problems) != 0 || changed != 2 {
+		changed, problems, err := c.Migrate()
+		if err != nil || len(problems) != 0 || changed != 2 {
+			t.Fatalf("%s: changed=%d problems=%v err=%v", f.name, changed, problems, err)
+		}
+		data, _ := os.ReadFile(filepath.Join(c.Root, "teams/a/products/mine/product.yaml"))
+		if !strings.HasPrefix(string(data), "# Mine.\napiVersion: "+APIVersion+"\nkind: Product\n") {
+			t.Errorf("%s: product.yaml:\n%s", f.name, data)
+		}
+		if s, err := c.Settings(); err != nil || s.Registry != "registry.example/catalog" {
+			t.Errorf("%s: settings = %+v, %v", f.name, s, err)
+		}
+		if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateProduct(c.AllProducts()[0]) }, c); out != "" {
+			t.Errorf("%s: the migrated product doesn't validate:\n%s", f.name, out)
+		}
+		if again, _, _ := c.Migrate(); again != 0 {
+			t.Errorf("%s: a second migrate changed %d file(s)", f.name, again)
+		}
+	}
+}
+
+// A Vertra catalog's ./vertra goes once the template's ./vennir is copied
+// in, and CODEOWNERS' and .gitignore's lines for it follow.
+func TestMigrateReplacesTheVertraWrapper(t *testing.T) {
+	c := catalogWith(t, map[string]string{
+		"vertra":             "#!/bin/sh\n",
+		".github/CODEOWNERS": "* @org/admins\n/vertra @org/admins\n/vertra.yaml @org/admins\n/teams/vertra-ish/ @org/t\n",
+		".gitignore":         ".vertra/\nimages/\n",
+	})
+	if _, problems, _ := c.Migrate(); len(problems) != 1 || !strings.Contains(problems[0], "copy ./vennir from the catalog template") {
+		t.Fatalf("without ./vennir: %v", problems)
+	}
+	if !exists(filepath.Join(c.Root, "vertra")) {
+		t.Fatal("./vertra removed before ./vennir was there")
+	}
+	if err := os.WriteFile(filepath.Join(c.Root, "vennir"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if changed, problems, err := c.Migrate(); err != nil || len(problems) != 0 || changed != 3 {
 		t.Fatalf("changed=%d problems=%v err=%v", changed, problems, err)
 	}
-	data, _ := os.ReadFile(filepath.Join(c.Root, "teams/a/products/mine/product.yaml"))
-	if !strings.HasPrefix(string(data), "# Mine.\napiVersion: "+APIVersion+"\nkind: Product\n") {
-		t.Errorf("product.yaml:\n%s", data)
+	owners, _ := os.ReadFile(filepath.Join(c.Root, ".github/CODEOWNERS"))
+	if string(owners) != "* @org/admins\n/vennir @org/admins\n/vennir.yaml @org/admins\n/teams/vertra-ish/ @org/t\n" {
+		t.Errorf("CODEOWNERS:\n%s", owners)
 	}
-	if s, err := c.Settings(); err != nil || s.Registry != "registry.example/catalog" {
-		t.Errorf("settings = %+v, %v", s, err)
+	ignore, _ := os.ReadFile(filepath.Join(c.Root, ".gitignore"))
+	if string(ignore) != ".vennir/\nimages/\n" {
+		t.Errorf(".gitignore:\n%s", ignore)
 	}
-	if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateProduct(c.AllProducts()[0]) }, c); out != "" {
-		t.Errorf("the migrated product doesn't validate:\n%s", out)
-	}
-	if again, _, _ := c.Migrate(); again != 0 {
-		t.Errorf("a second migrate changed %d file(s)", again)
+	if exists(filepath.Join(c.Root, "vertra")) {
+		t.Error("./vertra kept")
 	}
 }
 
@@ -312,7 +347,7 @@ func TestReservedTeamNames(t *testing.T) {
 	team := func(name string) string {
 		return "apiVersion: " + APIVersion + "\nkind: Team\nname: " + name + "\ndisplayName: X\ndescription: X\nowner: x\n"
 	}
-	for _, name := range []string{"bases", "catalog-release", "vertra-system", "kube-system", "kube-x"} {
+	for _, name := range []string{"bases", "catalog-release", "vennir-system", "kube-system", "kube-x"} {
 		c := catalogWith(t, map[string]string{"teams/" + name + "/team.yaml": team(name)})
 		if out := errorsOf(t, (*Catalog).ValidateTeams, c); !strings.Contains(out, "no team may be called '"+name+"'") {
 			t.Errorf("%s: %q", name, out)
@@ -322,7 +357,7 @@ func TestReservedTeamNames(t *testing.T) {
 			t.Errorf("the schema accepts %s", name)
 		}
 	}
-	for _, name := range []string{"base", "kube", "my-bases", "vertra"} {
+	for _, name := range []string{"base", "kube", "my-bases", "vennir"} {
 		c := catalogWith(t, map[string]string{"teams/" + name + "/team.yaml": team(name)})
 		if out := errorsOf(t, (*Catalog).ValidateTeams, c); out != "" {
 			t.Errorf("%s was refused: %s", name, out)
@@ -449,7 +484,7 @@ func TestErrorHelp(t *testing.T) {
 	}
 }
 
-// An input schema's form hints (x-vertra-order, -group, -widget,
+// An input schema's form hints (x-vennir-order, -group, -widget,
 // -pattern-message) are checked: a misspelt widget or a non-number order is
 // named, so a form doesn't silently ignore it.
 func TestFormHintsAreChecked(t *testing.T) {
@@ -458,13 +493,13 @@ func TestFormHintsAreChecked(t *testing.T) {
 	}
 	validate := func(c *Catalog) bool { return c.ValidateProduct(c.AllProducts()[0]) }
 	good := catalogWith(t, map[string]string{"teams/a/products/mine/product.yaml": withHints(
-		`x-vertra-order: 1, x-vertra-group: Project, x-vertra-widget: textarea, pattern: "^[a-z]+$", x-vertra-pattern-message: lowercase letters`)})
-	if out := errorsOf(t, validate, good); strings.Contains(out, "x-vertra") {
+		`x-vennir-order: 1, x-vennir-group: Project, x-vennir-widget: textarea, pattern: "^[a-z]+$", x-vennir-pattern-message: lowercase letters`)})
+	if out := errorsOf(t, validate, good); strings.Contains(out, "x-vennir") {
 		t.Errorf("good hints refused:\n%s", out)
 	}
-	bad := catalogWith(t, map[string]string{"teams/a/products/mine/product.yaml": withHints(`x-vertra-widget: bigbox, x-vertra-order: first`)})
+	bad := catalogWith(t, map[string]string{"teams/a/products/mine/product.yaml": withHints(`x-vennir-widget: bigbox, x-vennir-order: first`)})
 	out := errorsOf(t, validate, bad)
-	for _, want := range []string{"x-vertra-widget", "x-vertra-order"} {
+	for _, want := range []string{"x-vennir-widget", "x-vennir-order"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("no %q in:\n%s", want, out)
 		}

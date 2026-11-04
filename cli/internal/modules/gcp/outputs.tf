@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# What vertra turns into Helm values and kubectl access.
+# What vennir turns into Helm values and kubectl access.
 
 output "cluster" {
   value = {
@@ -50,8 +50,8 @@ output "backup" {
 # Standard mode: where steps run (the chart's scheduler.taskPlacement).
 output "step_placement" {
   value = local.standard ? {
-    nodeSelector = { "vertra.dev/pool" = "steps" }
-    tolerations  = [{ key = "vertra.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
+    nodeSelector = { "vennir.dev/pool" = "steps" }
+    tolerations  = [{ key = "vennir.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
     } : {
     # Autopilot: Spot Pods, except at `scaled` (on-demand).
     nodeSelector = local.pools.spot ? { "cloud.google.com/gke-spot" = "true" } : {}

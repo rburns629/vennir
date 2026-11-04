@@ -172,7 +172,7 @@ Each row shows **What** (linked, when the product gave a link), **Made for**, **
 
 | State | Means |
 | --- | --- |
-| **Made** | It exists, as far as Vertra knows |
+| **Made** | It exists, as far as Vennir knows |
 | **Deleting** | Its cleanup is running; the pill links to that run |
 | **Delete failed** | Its cleanup failed; the pill links to the run. You can try again |
 | **Deleted** | Its cleanup succeeded |

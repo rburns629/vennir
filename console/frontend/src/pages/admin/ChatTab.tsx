@@ -95,7 +95,7 @@ export function ChatTab() {
   return (
     <AdminCard title="Chat answers" status={<Aside>Kept 90 days</Aside>}>
         <Typography variant="body2" color="text.secondary">
-          What people rated in Ask Vertra, with the question and answer. A wrong answer is usually a doc to fix (the agent answers from the
+          What people rated in Ask Vennir, with the question and answer. A wrong answer is usually a doc to fix (the agent answers from the
           docs), or a question to add to the agent&apos;s question set. Kept 90 days.
         </Typography>
         {error && <Alert severity="error">{error}</Alert>}

@@ -38,7 +38,7 @@ jobs:
       # Via env, never pasted into a script: typed input must not be able to
       # run as shell.
       TEAM: ${{ inputs.team }}
-      VERTRA_REGISTRY: ${{ vars.VERTRA_REGISTRY }}
+      VENNIR_REGISTRY: ${{ vars.VENNIR_REGISTRY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -53,10 +53,10 @@ jobs:
             echo "::error::'$TEAM' isn't a valid team name."; exit 1
           fi
           # The catalog's own repositories, beside the teams', and platform
-          # namespaces: never a team's (./vertra catalog validate refuses
+          # namespaces: never a team's (./vennir catalog validate refuses
           # them as team names), so never deleted as one.
           case "$TEAM" in
-            bases|catalog-release|vertra-system|kube-*)
+            bases|catalog-release|vennir-system|kube-*)
               echo "::error::'$TEAM' can't be a team's name: <registry>/$TEAM isn't a team's images."; exit 1 ;;
           esac
           # Its products are still in the release while its folder is here.
@@ -67,7 +67,7 @@ jobs:
       # Registry-specific, so only where this catalog says how. Artifact
       # Registry, signed in the way ci.yml publishes.
       - id: gcp
-        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.VERTRA_REGISTRY != ''
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.VENNIR_REGISTRY != ''
         uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -79,7 +79,7 @@ jobs:
         # Every image under <registry>/<team>/, all tags. A failed list
         # is never read as "nothing left".
         run: |
-          prefix="$VERTRA_REGISTRY/$TEAM"
+          prefix="$VENNIR_REGISTRY/$TEAM"
           if ! images=$(gcloud artifacts docker images list "$prefix" --format='value(package)' | sort -u); then
             echo "::error::Couldn't list the images under $prefix."; exit 1
           fi
@@ -96,7 +96,7 @@ jobs:
         run: |
           {
             if [ "$IMAGES_DELETED" != "true" ]; then
-              echo "Images under \`$VERTRA_REGISTRY/$TEAM/\` weren't deleted here (no registry sign-in configured for it): delete them in your registry."
+              echo "Images under \`$VENNIR_REGISTRY/$TEAM/\` weren't deleted here (no registry sign-in configured for it): delete them in your registry."
             fi
             if grep -q "^/teams/$TEAM/" .github/CODEOWNERS 2>/dev/null; then
               echo "- Remove the \`/teams/$TEAM/\` line from .github/CODEOWNERS."

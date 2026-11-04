@@ -341,7 +341,7 @@ function requireRetireRight(caller: AuthUser | undefined): void {
  * Retire: the reversible first step of removing a platform (an admin,
  * or the catalog release that no longer has the team's folder). The team becomes read-only and its
  * products unregistered; members keep its history. Its namespace is
- * relabelled vertra/team=retired (when the console manages them), which
+ * relabelled vennir/team=retired (when the console manages them), which
  * stops the kernel dispatching new steps there; anything running finishes.
  */
 export async function retireTeam(caller: AuthUser | undefined, name: string, log: FastifyBaseLogger) {

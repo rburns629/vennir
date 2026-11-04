@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
-	"github.com/rburns629/vertra/kernel/internal/executor"
+	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/rburns629/vennir/kernel/internal/executor"
 )
 
 // A product's cap: at most so many of its steps claimed or running at once,

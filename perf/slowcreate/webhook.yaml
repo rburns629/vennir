@@ -51,7 +51,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: slowcreate
 webhooks:
-  - name: slowcreate.perf.vertra.dev
+  - name: slowcreate.perf.vennir.dev
     rules:
       - apiGroups: [batch]
         apiVersions: [v1]

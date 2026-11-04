@@ -9,10 +9,10 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/install"
-	"github.com/rburns629/vertra/cli/internal/platform"
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/install"
+	"github.com/rburns629/vennir/cli/internal/platform"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // writers are the Deployments that write to the databases, stopped while
@@ -27,7 +27,7 @@ var writers = []string{
 // restoreRecord keeps the writers' copies while a restore runs, so a
 // restore that failed partway can be run again and still start them at
 // what they were.
-const restoreRecord = "vertra-restore"
+const restoreRecord = "vennir-restore"
 
 // restoreScript replaces both databases with the dumps at $1 (the
 // kernel's) and $2 (the console's), as the Postgres superuser, keeping
@@ -58,20 +58,20 @@ rm -f "$1" "$2"`
 // restores, and starts them again at the copies they had. If it fails
 // partway, what writes stays stopped and running it again finishes the
 // job. It says when the backup's schema is older than the one replaced,
-// which `vertra apply` migrates forward.
+// which `vennir apply` migrates forward.
 func Restore(ctx context.Context, r *run.Runner, c *config.Config, out io.Writer, p Pair) error {
 	deps, err := platform.Deployments(ctx, r, c)
 	if err != nil {
 		return err
 	}
 	if platform.Asleep(deps) {
-		return fmt.Errorf("the platform is asleep: `vertra wake` first")
+		return fmt.Errorf("the platform is asleep: `vennir wake` first")
 	}
 	kernelBefore, consoleBefore := schemaVersions(ctx, r, c)
 
 	// The dumps go in and are checked first: a bad one stops nothing.
 	fmt.Fprintln(out, "Copying the backup into the Postgres Pod and checking it...")
-	const kernelIn, consoleIn = "/tmp/vertra-restore-kernel.pgdump", "/tmp/vertra-restore-console.pgdump"
+	const kernelIn, consoleIn = "/tmp/vennir-restore-kernel.pgdump", "/tmp/vennir-restore-console.pgdump"
 	for _, f := range [][2]string{{p.Kernel, kernelIn}, {p.Console, consoleIn}} {
 		if err := copyIn(ctx, r, c, f[0], f[1]); err != nil {
 			return err
@@ -123,7 +123,7 @@ func Restore(ctx context.Context, r *run.Runner, c *config.Config, out io.Writer
 	}
 	older := isOlder(kernelAfter, kernelBefore) || isOlder(consoleAfter, consoleBefore)
 	// kernel-api and the scheduler aren't ready until the schema is current:
-	// with an older one, they wait for vertra apply instead.
+	// with an older one, they wait for vennir apply instead.
 	for _, name := range writers {
 		if replicas[name] == 0 || older {
 			continue
@@ -139,7 +139,7 @@ func Restore(ctx context.Context, r *run.Runner, c *config.Config, out io.Writer
 		return err
 	}
 	if older {
-		fmt.Fprintln(out, "The backup's schema is older than the one it replaced: run `vertra apply` to migrate it forward (kernel-api and the scheduler wait until then).")
+		fmt.Fprintln(out, "The backup's schema is older than the one it replaced: run `vennir apply` to migrate it forward (kernel-api and the scheduler wait until then).")
 	}
 	return nil
 }

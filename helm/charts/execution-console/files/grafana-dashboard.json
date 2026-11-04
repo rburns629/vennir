@@ -1,8 +1,8 @@
 {
-  "title": "Vertra",
-  "uid": "vertra-overview",
+  "title": "Vennir",
+  "uid": "vennir-overview",
   "tags": [
-    "vertra"
+    "vennir"
   ],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -13,7 +13,7 @@
     "from": "now-6h",
     "to": "now"
   },
-  "description": "Vertra's steps, console and gateway. Shipped with the execution-console chart (monitoring.dashboard).",
+  "description": "Vennir's steps, console and gateway. Shipped with the execution-console chart (monitoring.dashboard).",
   "templating": {
     "list": [
       {
@@ -109,7 +109,7 @@
     {
       "type": "timeseries",
       "title": "Longest wait to start",
-      "description": "How long the oldest READY step has been ready. VertraStepsWaiting fires past the chart's readyWaitSeconds.",
+      "description": "How long the oldest READY step has been ready. VennirStepsWaiting fires past the chart's readyWaitSeconds.",
       "id": 3,
       "datasource": {
         "type": "prometheus",
@@ -425,7 +425,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (code) (increase(console_rpc_requests_total{namespace=~\"$namespace\", procedure=\"vertra.console.v1.AuthService/Login\", code!=\"ok\"}[15m]))",
+          "expr": "sum by (code) (increase(console_rpc_requests_total{namespace=~\"$namespace\", procedure=\"vennir.console.v1.AuthService/Login\", code!=\"ok\"}[15m]))",
           "legendFormat": "{{code}}",
           "datasource": {
             "type": "prometheus",
@@ -540,7 +540,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (outcome) (rate(vertra_gateway_requests_total{namespace=~\"$namespace\"}[5m]))",
+          "expr": "sum by (outcome) (rate(vennir_gateway_requests_total{namespace=~\"$namespace\"}[5m]))",
           "legendFormat": "{{outcome}}",
           "datasource": {
             "type": "prometheus",
@@ -591,7 +591,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, answered_by) (rate(vertra_gateway_request_duration_seconds_bucket{namespace=~\"$namespace\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, answered_by) (rate(vennir_gateway_request_duration_seconds_bucket{namespace=~\"$namespace\"}[5m])))",
           "legendFormat": "{{answered_by}}",
           "datasource": {
             "type": "prometheus",
@@ -642,7 +642,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (api) (rate(vertra_gateway_requests_total{namespace=~\"$namespace\", outcome=\"backend_error\"}[5m]))",
+          "expr": "sum by (api) (rate(vennir_gateway_requests_total{namespace=~\"$namespace\", outcome=\"backend_error\"}[5m]))",
           "legendFormat": "{{api}}",
           "datasource": {
             "type": "prometheus",

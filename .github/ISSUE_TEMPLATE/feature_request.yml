@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest something Vertra should do.
+description: Suggest something Vennir should do.
 labels: [enhancement]
 body:
   - type: textarea

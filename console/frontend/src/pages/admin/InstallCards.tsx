@@ -68,7 +68,7 @@ export function InstallStats({ summary }: { summary: AdminSummary }) {
               {install.environmentLabel}
               {cloud && (
                 <Box component="span" title="Products whose catalog files list other clouds are shown here but not run" sx={{ display: "block" }}>
-                  Cloud: {cloud} (set by vertra)
+                  Cloud: {cloud} (set by vennir)
                 </Box>
               )}
             </>
@@ -292,7 +292,7 @@ function stepsOf(s: AdminSummary): Step[] {
       title: "Connect the catalog",
       doneText: "Catalog connected",
       to: "/admin/catalog",
-      how: <>Make the repository your teams publish from: {code("vertra catalog create")}. Its first release is pulled within minutes.</>,
+      how: <>Make the repository your teams publish from: {code("vennir catalog create")}. Its first release is pulled within minutes.</>,
     },
     {
       done: s.imagePolicy === null ? null : s.imagePolicy.allowed.length > 0,
@@ -320,7 +320,7 @@ function stepsOf(s: AdminSummary): Step[] {
       title: "Optional: single sign-on",
       doneText: "Single sign-on",
       to: "/admin/sign-in",
-      how: <>In <Link component={RouterLink} to="/admin/sign-in">Single sign-on and groups</Link> (Google, Entra ID, Okta…), or {code("vertra sso google")}. Passwords keep working.</>,
+      how: <>In <Link component={RouterLink} to="/admin/sign-in">Single sign-on and groups</Link> (Google, Entra ID, Okta…), or {code("vennir sso google")}. Passwords keep working.</>,
     },
   ];
 }
@@ -379,7 +379,7 @@ export function FirstRunChecklist({ summary }: { summary: AdminSummary }) {
       <Typography variant="caption" color="text.secondary">
         The whole of it is in the guide{" "}
         <Link component={RouterLink} to="/docs/reference-setup">
-          Set up Vertra
+          Set up Vennir
         </Link>
         .
       </Typography>
@@ -463,7 +463,7 @@ export function EveryPart({ summary: s }: { summary: AdminSummary }) {
       tone: s.sso.enabled ? "ok" : "off",
       detail: s.sso.enabled
         ? `On · ${s.sso.label || "single sign-on"}${s.sso.allowedDomains.length > 0 ? `, for ${s.sso.allowedDomains.join(", ")}` : ""}.${requiring.length > 0 ? ` Required by ${list(requiring)}.` : ""}`
-        : <>Off: passwords only. Set up in Single sign-on and groups, or {code("vertra sso google")}.</>,
+        : <>Off: passwords only. Set up in Single sign-on and groups, or {code("vennir sso google")}.</>,
       where: "both",
     });
   }
@@ -509,7 +509,7 @@ export function EveryPart({ summary: s }: { summary: AdminSummary }) {
       to: "/admin/catalog",
       tone: state.tone,
       detail: !s.catalog.release
-        ? <>Off: teams and products are only what admins make here. {code("vertra catalog create")}</>
+        ? <>Off: teams and products are only what admins make here. {code("vennir catalog create")}</>
         : `${applied}${s.catalog.newestVersion ? ", following the newest version" : ""}.${state.tone === "ok" ? "" : ` ${state.text}.`}`,
       where: "both",
     });
@@ -650,7 +650,7 @@ export function EveryPart({ summary: s }: { summary: AdminSummary }) {
         </Typography>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, fontSize: 12, color: "text.secondary" }}>
           <span><Pill tone="info">Here</Pill> in this console</span>
-          <span><Pill tone="neutral">Install</Pill> vertra.yaml, then vertra apply</span>
+          <span><Pill tone="neutral">Install</Pill> vennir.yaml, then vennir apply</span>
           <span><Pill tone="neutral">Both</Pill> the install turns it on; it&apos;s run here</span>
         </Box>
       </Box>

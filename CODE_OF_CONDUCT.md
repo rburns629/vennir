@@ -1,6 +1,6 @@
 # Code of Conduct
 
-Vertra follows the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).
+Vennir follows the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).
 Everyone who takes part in the project, in issues, pull requests,
 discussions or anywhere else it's represented, is expected to follow it.
 

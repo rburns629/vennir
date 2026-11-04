@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
-  <!-- Vertra's mark: three steps, two feeding the third (the A in DAG). -->
+  <!-- Vennir's mark: three steps, two feeding the third (the A in DAG). -->
   <rect width="32" height="32" rx="7" fill="#16191F"/>
   <g transform="translate(4 4)" stroke="#8FB0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="5" cy="6" r="2.5"/>

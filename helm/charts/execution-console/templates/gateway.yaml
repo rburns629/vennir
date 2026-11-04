@@ -30,11 +30,11 @@ metadata:
     {{- include "execution-console.labels" . | nindent 4 }}
   annotations:
     # Kept across upgrades and uninstalls: backends may have cached its
-    # public key (/.vertra/jwks.json).
+    # public key (/.vennir/jwks.json).
     helm.sh/resource-policy: keep
 type: Opaque
 data:
-  # The Ed25519 seed Vertra-Caller is signed with: generated once.
+  # The Ed25519 seed Vennir-Caller is signed with: generated once.
   seed: {{ if $existing }}{{ index $existing.data "seed" }}{{ else }}{{ randAlphaNum 32 | b64enc }}{{ end }}
 ---
 apiVersion: v1
@@ -185,14 +185,14 @@ spec:
             - name: DATABASE_IAM_ACCOUNT
               value: {{ . | quote }}
             - name: DATABASE_IAM_TOKEN_FILE
-              value: /var/run/secrets/vertra/db-token/token
+              value: /var/run/secrets/vennir/db-token/token
             {{- end }}
             # Sessions are checked with the console's public key (its JWKS,
             # GET /api/auth/jwks): the gateway never holds JWT_SECRET.
             - name: CONSOLE_URL
               value: "http://{{ include "execution-console.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}"
             - name: SIGNING_KEY_FILE
-              value: /var/run/secrets/vertra/signing/seed
+              value: /var/run/secrets/vennir/signing/seed
             - name: GATEWAY_ISSUER
               value: {{ .Values.gateway.publicUrl | default .Values.gateway.url | default (printf "http://%s.%s.svc.cluster.local:8080" $name .Release.Namespace) | quote }}
             - name: BACKEND_HOSTS
@@ -220,23 +220,23 @@ spec:
           # Up to ten minutes to start: on a fresh install it waits for the
           # console's migration to make its database role.
           startupProbe:
-            httpGet: {path: /.vertra/health, port: http}
+            httpGet: {path: /.vennir/health, port: http}
             periodSeconds: 5
             failureThreshold: 120
           readinessProbe:
-            httpGet: {path: /.vertra/health, port: http}
+            httpGet: {path: /.vennir/health, port: http}
             periodSeconds: 5
           livenessProbe:
-            httpGet: {path: /.vertra/health, port: http}
+            httpGet: {path: /.vennir/health, port: http}
             periodSeconds: 10
           resources:
             {{- toYaml .Values.gateway.resources | nindent 12 }}
           volumeMounts:
             - name: signing
-              mountPath: /var/run/secrets/vertra/signing
+              mountPath: /var/run/secrets/vennir/signing
               readOnly: true
             {{- if $dbAccount }}
-            - {name: db-token, mountPath: /var/run/secrets/vertra/db-token, readOnly: true}
+            - {name: db-token, mountPath: /var/run/secrets/vennir/db-token, readOnly: true}
             {{- end }}
             {{- include "execution-console.tlsMounts" . | nindent 12 }}
       volumes:

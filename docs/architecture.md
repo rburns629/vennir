@@ -1,26 +1,28 @@
 # Architecture
 
-What Vertra is, how its pieces fit together, how a DAG becomes running
+What Vennir is, how its pieces fit together, how a DAG becomes running
 containers, and why it's built the way it is. For running it, see
 [operations.md](operations.md); for its security model,
 [security-model.md](security-model.md); for every file, the
 [repository map](repository-map.md); for the kernel's code, call by call,
 [`kernel/ARCHITECTURE.md`](../kernel/ARCHITECTURE.md).
 
-The platform was called Acyclix until 2026-10-20; older notes, tags and
-installs may still use that name (`vertra catalog migrate` converts a catalog).
+The platform was called Acyclix until 2026-10-20, then Vertra until
+2026-11-03; older notes, tags, releases (through 0.10.0, at
+`ghcr.io/rburns629/vertra`) and installs may still use those names
+(`vennir catalog migrate` converts a catalog).
 
-## What Vertra is
+## What Vennir is
 
-Vertra runs DAGs of containerized steps on Kubernetes. A team submits a
+Vennir runs DAGs of containerized steps on Kubernetes. A team submits a
 DAG; each step is one action of a **product**, a container image published
-from a reviewed **catalog** repository. Vertra runs each step as a
+from a reviewed **catalog** repository. Vennir runs each step as a
 Kubernetes Job in the team's own namespace, passes each step's outputs to
 the steps that depend on it, and keeps each team's credentials to that
 team's reviewed products.
 
 A step can be anything packaged as a container: a hello-world script, a
-database migration, creating cloud infrastructure. Vertra doesn't decide
+database migration, creating cloud infrastructure. Vennir doesn't decide
 *which* steps a request needs: whatever submits the DAG does. It runs the
 DAG it's given, reliably, and keeps one team's work and secrets away from
 every other team's.
@@ -190,7 +192,7 @@ in `docs/architecture/` (`5-states`), with the rest of the diagrams.
   (and, on kernel-api's port, the console) may reach them, and no metric is labelled with a user, a team or a token.
 - **Health:** `/health/live` (the process is up; never touches the
   database) and `/health/ready` (the database answers; for kernel-api, at
-  this code's schema) on kernel-api and the console; `/.vertra/health` on
+  this code's schema) on kernel-api and the console; `/.vennir/health` on
   the gateway; the scheduler's liveness is its heartbeat
   (`kernel check-heartbeat`).
 - **Audit:** every console call that changes something, with who, what,
@@ -237,7 +239,7 @@ in `docs/architecture/` (`5-states`), with the rest of the diagrams.
 - **Every API route under `/api`.** The console serves its API and the web
   app from one origin; a prefix keeps a page reload from ever hitting an
   API route.
-- **Kubernetes only.** There's no Docker-only mode: the isolation Vertra
+- **Kubernetes only.** There's no Docker-only mode: the isolation Vennir
   promises is Kubernetes', and `kind` makes it local.
 
 ## Agreed direction
@@ -284,7 +286,7 @@ what's still open is in [`TODO.md`](../TODO.md).
 - **Languages and APIs** (decided 2026-10-20). The console stays
   TypeScript, its API moves to Connect (protos, generated clients, gRPC
   available). The kernel is Go, against the same schema (2026-10-20),
-  and the catalog tool is part of `vertra` (`vertra catalog ...`, decided 2026-10-21). Products keep any
+  and the catalog tool is part of `vennir` (`vennir catalog ...`, decided 2026-10-21). Products keep any
   language and JSON Schema.
 
 ## Glossary

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // Only the add-ons an apply recorded are offered to destroy, once each, in
@@ -69,15 +69,15 @@ func TestRecordIfMissing(t *testing.T) {
 }
 
 // The team namespaces destroy may delete are the console's, by its label;
-// those labelled vertra/team by hand are listed apart.
+// those labelled vennir/team by hand are listed apart.
 func TestTeamNamespaces(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "kubectl")
 	body := `#!/bin/sh
 echo "$@" >> "` + dir + `/args"
 case "$*" in
-  *"managed-by=vertra-console"*) printf 'platform payments' ;;
-  *"managed-by!=vertra-console"*) printf 'default legacy' ;;
+  *"managed-by=vennir-console"*) printf 'platform payments' ;;
+  *"managed-by!=vennir-console"*) printf 'default legacy' ;;
 esac
 `
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
@@ -92,7 +92,7 @@ esac
 		t.Errorf("made %v, others %v", made, others)
 	}
 	args, _ := os.ReadFile(filepath.Join(dir, "args"))
-	if !strings.Contains(string(args), "get namespace -l vertra/team,app.kubernetes.io/managed-by=vertra-console") {
+	if !strings.Contains(string(args), "get namespace -l vennir/team,app.kubernetes.io/managed-by=vennir-console") {
 		t.Errorf("args: %s", args)
 	}
 

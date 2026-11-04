@@ -119,7 +119,7 @@ export function CatalogCard() {
       >
         {status && !status.release && (
           <Alert severity="info">
-            No catalog is configured (the console chart&apos;s <Mono>catalog.release</Mono>; <Mono>vertra catalog create</Mono> makes one).
+            No catalog is configured (the console chart&apos;s <Mono>catalog.release</Mono>; <Mono>vennir catalog create</Mono> makes one).
             Teams and products are only what admins make here.
           </Alert>
         )}

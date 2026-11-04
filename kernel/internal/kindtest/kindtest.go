@@ -133,7 +133,7 @@ func buildAndLoad(tag string) (string, error) {
 		return "", err
 	}
 	if out, _ := exec.Command("docker", "container", "inspect", "-f", "{{.State.Running}}", "kind-registry").Output(); strings.TrimSpace(string(out)) == "true" {
-		ref := localRegistry + "/vertra-test/" + tag
+		ref := localRegistry + "/vennir-test/" + tag
 		if err := run("docker", "tag", tag, ref); err != nil {
 			return "", err
 		}
@@ -147,7 +147,7 @@ func buildAndLoad(tag string) (string, error) {
 			return "", fmt.Errorf("docker inspect %s: %v", ref, err)
 		}
 		for _, digest := range strings.Fields(string(out)) {
-			if strings.HasPrefix(digest, localRegistry+"/vertra-test/") {
+			if strings.HasPrefix(digest, localRegistry+"/vennir-test/") {
 				return digest, nil
 			}
 		}

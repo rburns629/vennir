@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-/** ObserveService (proto/vertra/console/v1/observe.proto): core/observe.ts and core/logs.ts over Connect. */
+/** ObserveService (proto/vennir/console/v1/observe.proto): core/observe.ts and core/logs.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { Type } from "@sinclair/typebox";
@@ -7,7 +7,7 @@ import { listAlerts } from "../../core/alerts.js";
 import { searchLogs, SearchLogsQuery, type SearchLogsInput } from "../../core/logs.js";
 import { getAuditCopy, getImageSbom, getMetrics, getSecurity, listAudit, ListAuditQuery } from "../../core/observe.js";
 import { getUsage } from "../../core/usage.js";
-import type { ObserveService } from "../../gen/vertra/console/v1/observe_pb.js";
+import type { ObserveService } from "../../gen/vennir/console/v1/observe_pb.js";
 import { timestamp, unsetIfEmpty } from "../convert.js";
 import { callerOf, logOf } from "../context.js";
 import { check } from "../validate.js";

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-// Package vertra catalog validates, builds, tests, scans and publishes a
+// Package vennir catalog validates, builds, tests, scans and publishes a
 // catalog's products, and manages its teams and SecretStores through the
 // console. It's the one implementation behind both ways of publishing: the
 // catalog's CI workflows call it, and so does a laptop in local mode
-// (./vertra catalog publish, or make catalog-publish in the platform
-// repository). Settings come from vertra.yaml at the catalog's root,
+// (./vennir catalog publish, or make catalog-publish in the platform
+// repository). Settings come from vennir.yaml at the catalog's root,
 // overridable by environment variables.
 package catalogtool
 
@@ -19,7 +19,7 @@ import (
 
 // Catalog is one catalog repository, and where its output goes.
 type Catalog struct {
-	// Root is the repository's top folder (where ./vertra is).
+	// Root is the repository's top folder (where ./vennir is).
 	Root   string
 	Stdout io.Writer
 	Stderr io.Writer

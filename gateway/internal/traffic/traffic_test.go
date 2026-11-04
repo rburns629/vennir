@@ -28,12 +28,18 @@ func TestCountsAddUpInTheConsolesTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
+	// Closed after the cleanups below (they run last-in, first-out): a
+	// deferred Close runs first, and they'd find it closed.
+	t.Cleanup(pool.Close)
 	var teamID, apiID string
 	if err := pool.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-traffic-' || substr(md5(random()::text), 1, 6)) RETURNING id::text`).Scan(&teamID); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID) })
+	t.Cleanup(func() {
+		if _, err := pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID); err != nil {
+			t.Errorf("removing the test's team: %v", err)
+		}
+	})
 	if err := pool.QueryRow(ctx, `INSERT INTO apis (team_id, name, display_name, openapi, backend_url, service_account)
 		VALUES ($1::uuid, 'orders', 'Orders', '{}', 'https://x', 'orders-api') RETURNING id::text`, teamID).Scan(&apiID); err != nil {
 		t.Fatal(err)
@@ -106,12 +112,18 @@ func TestABadRowDoesntStopTheRest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
+	// Closed after the cleanups below (they run last-in, first-out): a
+	// deferred Close runs first, and they'd find it closed.
+	t.Cleanup(pool.Close)
 	var teamID, apiID string
 	if err := pool.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-traffic-' || substr(md5(random()::text), 1, 6)) RETURNING id::text`).Scan(&teamID); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID) })
+	t.Cleanup(func() {
+		if _, err := pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID); err != nil {
+			t.Errorf("removing the test's team: %v", err)
+		}
+	})
 	if err := pool.QueryRow(ctx, `INSERT INTO apis (team_id, name, display_name, openapi, backend_url, service_account)
 		VALUES ($1::uuid, 'orders', 'Orders', '{}', 'https://x', 'orders-api') RETURNING id::text`, teamID).Scan(&apiID); err != nil {
 		t.Fatal(err)

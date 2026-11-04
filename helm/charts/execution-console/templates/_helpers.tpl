@@ -145,7 +145,7 @@ capabilities: {drop: ["ALL"]}
 
 {{/*
 The gateway's Pods: its Deployment selects them by these, and each team
-namespace's vertra-gateway-ingress lets them reach the team's API backends.
+namespace's vennir-gateway-ingress lets them reach the team's API backends.
 */}}
 {{- define "execution-console.gatewaySelectorLabels" -}}
 {{ include "execution-console.selectorLabels" . }}
@@ -172,15 +172,15 @@ database-url, or, with this chart's own Postgres, keys in its own Secret.
 
 {{/*
 TLS inside the cluster. databaseTls ends a URL for this chart's own Postgres
-(tls.yaml): TLS required, checked against its CA at /etc/vertra/tls-db.
+(tls.yaml): TLS required, checked against its CA at /etc/vennir/tls-db.
 tlsVolumes/tlsMounts give a Pod that CA and the kernel chart's
 (tls.kernelCaSecret: kernel-api's, and the kernel's Postgres's when the
-console's database is there) at /etc/vertra/tls; tlsEnv makes Node trust
+console's database is there) at /etc/vennir/tls; tlsEnv makes Node trust
 the kernel's for kernel-api.
 */}}
 {{- define "execution-console.databaseTls" -}}
 {{- if and .Values.tls.enabled .Values.postgres.enabled -}}
-?sslmode=verify-full&sslrootcert=/etc/vertra/tls-db/ca.crt
+?sslmode=verify-full&sslrootcert=/etc/vennir/tls-db/ca.crt
 {{- end -}}
 {{- end -}}
 
@@ -211,16 +211,16 @@ the kernel's for kernel-api.
 
 {{- define "execution-console.tlsMounts" -}}
 {{- if .Values.tls.kernelCaSecret }}
-- {name: kernel-ca, mountPath: /etc/vertra/tls, readOnly: true}
+- {name: kernel-ca, mountPath: /etc/vennir/tls, readOnly: true}
 {{- end }}
 {{- if or (and .Values.tls.enabled .Values.postgres.enabled) .Values.database.caSecret }}
-- {name: db-ca, mountPath: /etc/vertra/tls-db, readOnly: true}
+- {name: db-ca, mountPath: /etc/vennir/tls-db, readOnly: true}
 {{- end }}
 {{- end -}}
 
 {{- define "execution-console.tlsEnv" -}}
 {{- if .Values.tls.kernelCaSecret }}
-- {name: NODE_EXTRA_CA_CERTS, value: /etc/vertra/tls/ca.crt}
+- {name: NODE_EXTRA_CA_CERTS, value: /etc/vennir/tls/ca.crt}
 {{- end }}
 {{- end -}}
 

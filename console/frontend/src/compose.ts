@@ -2,8 +2,8 @@
 /**
  * Compose: a template built in the browser from actions, each input given
  * a value, asked for when it runs (a parameter), or wired from an earlier
- * step's output. Wiring is matched by type: an input's x-vertra-needs and
- * an output's x-vertra-provides (the catalog's wiring types), else by the
+ * step's output. Wiring is matched by type: an input's x-vennir-needs and
+ * an output's x-vennir-provides (the catalog's wiring types), else by the
  * same name. What it makes is a catalog template (kind: Template), to
  * propose in the catalog repository, or, when every step is the person's
  * own team's and nothing is asked, a DAG they can run now.
@@ -40,7 +40,7 @@ export interface Field {
   name: string;
   type: string;
   required: boolean;
-  /** Its wiring type: x-vertra-needs on an input, x-vertra-provides on an output. */
+  /** Its wiring type: x-vennir-needs on an input, x-vennir-provides on an output. */
   wiring: string | null;
   description: string;
   schema: Record<string, unknown>;
@@ -48,7 +48,7 @@ export interface Field {
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-function fieldsOf(schema: Record<string, unknown>, hint: "x-vertra-needs" | "x-vertra-provides"): Field[] {
+function fieldsOf(schema: Record<string, unknown>, hint: "x-vennir-needs" | "x-vennir-provides"): Field[] {
   const properties = isRecord(schema["properties"]) ? schema["properties"] : {};
   const required = Array.isArray(schema["required"]) ? schema["required"] : [];
   return Object.entries(properties).map(([name, raw]) => {
@@ -64,8 +64,8 @@ function fieldsOf(schema: Record<string, unknown>, hint: "x-vertra-needs" | "x-v
   });
 }
 
-export const inputsOf = (p: Pick<Product, "inputSchema">) => fieldsOf(p.inputSchema, "x-vertra-needs");
-export const outputsOf = (p: Pick<Product, "outputSchema">) => fieldsOf(p.outputSchema, "x-vertra-provides");
+export const inputsOf = (p: Pick<Product, "inputSchema">) => fieldsOf(p.inputSchema, "x-vennir-needs");
+export const outputsOf = (p: Pick<Product, "outputSchema">) => fieldsOf(p.outputSchema, "x-vennir-provides");
 
 /** "gcp-platform-project-create" → "project.create" in its own team, else "gcp-platform/project.create". */
 export function actionRef(product: Pick<Product, "name" | "action" | "teamName">, forTeam: string): string {
@@ -184,7 +184,7 @@ export function templateOf(draft: Draft, products: Map<string, Product>): Record
     };
   });
   return {
-    apiVersion: "vertra.dev/v2",
+    apiVersion: "vennir.dev/v2",
     kind: "Template",
     name: draft.name,
     displayName: draft.displayName || draft.name,

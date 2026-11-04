@@ -23,12 +23,12 @@ func TestExtractGitArchive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(filepath.Join(root, "vertra"))
+	info, err := os.Stat(filepath.Join(root, "vennir"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Mode().Perm()&0o100 == 0 {
-		t.Errorf("./vertra is %v, not executable", info.Mode().Perm())
+		t.Errorf("./vennir is %v, not executable", info.Mode().Perm())
 	}
 	if _, err := os.Stat(filepath.Join(root, "templates", "team", "team.yaml")); err != nil {
 		t.Error(err)
@@ -58,22 +58,22 @@ func archiveOf(t *testing.T, headers ...tar.Header) []byte {
 }
 
 func TestExtractRefuses(t *testing.T) {
-	vertra := tar.Header{Name: "catalog-template/vertra", Typeflag: tar.TypeReg, Mode: 0o755}
+	vennir := tar.Header{Name: "catalog-template/vennir", Typeflag: tar.TypeReg, Mode: 0o755}
 	for name, h := range map[string]tar.Header{
 		"outside":   {Name: "catalog-template/../evil", Typeflag: tar.TypeReg, Mode: 0o644},
 		"elsewhere": {Name: "other/file", Typeflag: tar.TypeReg, Mode: 0o644},
 		"symlink":   {Name: "catalog-template/link", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"},
 	} {
 		dir := t.TempDir()
-		if _, err := extract(archiveOf(t, vertra, h), dir); err == nil {
+		if _, err := extract(archiveOf(t, vennir, h), dir); err == nil {
 			t.Errorf("%s: extracted", name)
 		}
 		if _, err := os.Stat(filepath.Join(filepath.Dir(dir), "evil")); err == nil {
 			t.Errorf("%s: wrote outside", name)
 		}
 	}
-	if _, err := extract(archiveOf(t, tar.Header{Name: "catalog-template/README.md", Typeflag: tar.TypeReg, Mode: 0o644}), t.TempDir()); err == nil || !strings.Contains(err.Error(), "./vertra") {
-		t.Errorf("no ./vertra: %v", err)
+	if _, err := extract(archiveOf(t, tar.Header{Name: "catalog-template/README.md", Typeflag: tar.TypeReg, Mode: 0o644}), t.TempDir()); err == nil || !strings.Contains(err.Error(), "./vennir") {
+		t.Errorf("no ./vennir: %v", err)
 	}
 }
 

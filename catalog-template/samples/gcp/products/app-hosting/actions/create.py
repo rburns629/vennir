@@ -40,12 +40,12 @@ from google.cloud import run_v2
 # What this product made, so it reports (and its delete removes) only
 # those, never a service deployed some other way; and how a retry that finds
 # the service it made a moment ago still reports it.
-MADE_BY_LABEL = ("vertra-made", "true")
+MADE_BY_LABEL = ("vennir-made", "true")
 # And for which team (the request's forTeam, the team the run is for, not
 # the one it runs in: a Kubernetes namespace name, so always a valid label
 # value), so it's reported, and deleted, only for that team: another team's
 # service, even one this product made, isn't theirs.
-TEAM_LABEL = "vertra-team"
+TEAM_LABEL = "vennir-team"
 
 INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")

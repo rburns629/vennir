@@ -98,7 +98,7 @@ spec:
               value: "{{ include "execution-kernel.fullname" . }}-postgres"
             {{- if .Values.tls.enabled }}
             - {name: PGSSLMODE, value: verify-full}
-            - {name: PGSSLROOTCERT, value: /etc/vertra/tls/ca.crt}
+            - {name: PGSSLROOTCERT, value: /etc/vennir/tls/ca.crt}
             {{- end }}
             - name: PGUSER
               value: {{ .Values.postgres.auth.username | quote }}

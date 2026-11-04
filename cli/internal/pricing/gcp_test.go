@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/plan"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/plan"
 )
 
 // testdata/gcp-skus.json: real catalog entries (October 2026), the ones the
@@ -165,7 +165,7 @@ func TestUnpricedPartsAreNamed(t *testing.T) {
 
 	a := config.Default("aws")
 	a.Monitoring = config.Monitoring{Enabled: true, Provider: "amazon"}
-	a.Signing, a.Catalog.Owner, a.Catalog.Repository = "kms", "octocat", "vertra-catalog"
+	a.Signing, a.Catalog.Owner, a.Catalog.Repository = "kms", "octocat", "vennir-catalog"
 	a.Database.Type = "managed"
 	p := awsPrices()
 	p.RDS = map[string][2]float64{"db.t4g.small": {0.032, 0.065}}

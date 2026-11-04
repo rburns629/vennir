@@ -4,7 +4,7 @@
 // a caller's request to /<team>/<api>/<path> is forwarded to that API's
 // backend exactly as sent (method, path, query, headers, body), with the
 // caller's credential swapped for the backend's and the caller named in a
-// signed Vertra-Caller header, and the answer streamed back unchanged; but
+// signed Vennir-Caller header, and the answer streamed back unchanged; but
 // only if the API's OpenAPI document describes it. In order:
 //
 //  1. the API exists, and here (an internet-reachable one, on the public
@@ -28,7 +28,7 @@
 //     behind a trusted proxy the address it saw (never what the caller said);
 //     a cookie the backend sets is kept to the API's own path
 //
-// Every answer says who gave it: Vertra-Answered-By: gateway or backend.
+// Every answer says who gave it: Vennir-Answered-By: gateway or backend.
 // Logs and metrics name the API, team, caller and outcome; never a body, a
 // header's value or a credential.
 package gateway
@@ -56,21 +56,21 @@ import (
 	verrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/rburns629/vertra/gateway/internal/auth"
-	"github.com/rburns629/vertra/gateway/internal/caller"
-	"github.com/rburns629/vertra/gateway/internal/limits"
-	"github.com/rburns629/vertra/gateway/internal/store"
-	"github.com/rburns629/vertra/gateway/internal/traffic"
+	"github.com/rburns629/vennir/gateway/internal/auth"
+	"github.com/rburns629/vennir/gateway/internal/caller"
+	"github.com/rburns629/vennir/gateway/internal/limits"
+	"github.com/rburns629/vennir/gateway/internal/store"
+	"github.com/rburns629/vennir/gateway/internal/traffic"
 )
 
 // AnsweredBy says who answered: gateway or backend.
-const AnsweredBy = "Vertra-Answered-By"
+const AnsweredBy = "Vennir-Answered-By"
 
 // TeamHeader picks the team a caller in several calls as.
-const TeamHeader = "Vertra-Team"
+const TeamHeader = "Vennir-Team"
 
 // RequestIDHeader is the gateway's id for a request, on both sides.
-const RequestIDHeader = "Vertra-Request-Id"
+const RequestIDHeader = "Vennir-Request-Id"
 
 // Gateway serves the published APIs.
 type Gateway struct {
@@ -120,10 +120,10 @@ type Metrics struct {
 // NewMetrics registers the gateway's metrics.
 func NewMetrics(reg prometheus.Registerer) *Metrics {
 	m := &Metrics{
-		Requests: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "vertra_gateway_requests_total",
+		Requests: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "vennir_gateway_requests_total",
 			Help: "Requests, by API and outcome (forwarded, blocked, invalid, unauthenticated, forbidden, limited, paused, held, unavailable, backend_error)."},
 			[]string{"api", "outcome"}),
-		Duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "vertra_gateway_request_duration_seconds",
+		Duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "vennir_gateway_request_duration_seconds",
 			Help: "How long requests took, by API and who answered.", Buckets: prometheus.DefBuckets}, []string{"api", "answered_by"}),
 	}
 	reg.MustRegister(m.Requests, m.Duration)
@@ -161,10 +161,10 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	requestID := newID()
 	w.Header().Set(RequestIDHeader, requestID)
 	switch r.URL.Path {
-	case "/.vertra/health":
+	case "/.vennir/health":
 		g.answer(w, http.StatusOK, "OK", "The gateway is up.")
 		return
-	case "/.vertra/jwks.json":
+	case "/.vennir/jwks.json":
 		keys, err := g.Signer.JWKS()
 		if err != nil {
 			g.answer(w, http.StatusInternalServerError, "INTERNAL", "")
@@ -234,7 +234,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		}
 		switch {
 		case errors.Is(err, auth.ErrUnauthenticated):
-			w.Header().Set("WWW-Authenticate", `Bearer realm="vertra"`)
+			w.Header().Set("WWW-Authenticate", `Bearer realm="vennir"`)
 			return g.refuse(w, o.as("unauthenticated"), http.StatusUnauthorized, "UNAUTHENTICATED", "Sign in: Authorization: Bearer <a session or bot token>.")
 		case errors.Is(err, auth.ErrOrdersOnly):
 			return g.refuse(w, o.as("forbidden"), http.StatusForbidden, "ORDERS_ONLY", "This bot places orders in the console: it calls no API.")
@@ -386,7 +386,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	return result
 }
 
-// callingTeam is the team the caller calls as: the one in Vertra-Team if
+// callingTeam is the team the caller calls as: the one in Vennir-Team if
 // they're in it and it may call; else their own team that owns the API;
 // else the first of theirs it's shared with.
 func (g *Gateway) callingTeam(who *auth.Caller, api *store.API, asked string) (string, bool) {
@@ -420,7 +420,7 @@ func notInSpec(problems []*verrors.ValidationError) bool {
 
 // forwardHeaders are the caller's headers, less what's only for the
 // gateway: hop-by-hop ones, their Authorization (the gateway's sign-in,
-// never the backend's), any Vertra-* (which only the gateway sets), and
+// never the backend's), any Vennir-* (which only the gateway sets), and
 // what a caller could claim about where it's from (Forwarded,
 // X-Forwarded-*, X-Real-Ip): X-Forwarded-For is set to client, the caller's
 // address as clientAddress worked it out.
@@ -438,7 +438,7 @@ func forwardHeaders(in http.Header, client string) http.Header {
 	out.Del("Forwarded")
 	out.Del("X-Real-Ip")
 	for k := range out {
-		if lower := strings.ToLower(k); strings.HasPrefix(lower, "vertra-") || strings.HasPrefix(lower, "x-forwarded-") {
+		if lower := strings.ToLower(k); strings.HasPrefix(lower, "vennir-") || strings.HasPrefix(lower, "x-forwarded-") {
 			out.Del(k)
 		}
 	}

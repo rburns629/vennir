@@ -18,7 +18,7 @@ func buildEnvCatalog(t *testing.T) *Catalog {
 	files := product("mine", "[]")
 	files["teams/b/products/theirs/product.yaml"] = productFile("theirs", "b", "[]")
 	files["teams/b/products/theirs/Dockerfile"] = "FROM scratch\nUSER 65532:65532\n"
-	files["vertra.yaml"] = "registry: registry.test/catalog\nbuildEnvironments: [a]\n"
+	files["vennir.yaml"] = "registry: registry.test/catalog\nbuildEnvironments: [a]\n"
 	return catalogWith(t, files)
 }
 
@@ -39,7 +39,7 @@ echo "docker $*" >> "` + log + `"
 case "$1" in
   load) echo "Loaded image: $FAKE_LOADED" ;;
   save) touch "$3" ;;
-  build) echo "secret NPM_TOKEN=$VERTRA_BUILD_SECRET_NPM_TOKEN" >> "` + log + `" ;;
+  build) echo "secret NPM_TOKEN=$VENNIR_BUILD_SECRET_NPM_TOKEN" >> "` + log + `" ;;
 esac
 `
 	gh := `#!/bin/sh
@@ -97,7 +97,7 @@ func TestBuildSecretsAreOfferedByNameNeverAsTheirOwnVariables(t *testing.T) {
 		t.Fatal("not built")
 	}
 	got := calls(t, log)
-	if !strings.Contains(got, "--secret id=NPM_TOKEN,env=VERTRA_BUILD_SECRET_NPM_TOKEN") {
+	if !strings.Contains(got, "--secret id=NPM_TOKEN,env=VENNIR_BUILD_SECRET_NPM_TOKEN") {
 		t.Errorf("NPM_TOKEN not offered as a BuildKit secret:\n%s", got)
 	}
 	if !strings.Contains(got, "secret NPM_TOKEN=s3cret") {
@@ -109,10 +109,10 @@ func TestBuildSecretsAreOfferedByNameNeverAsTheirOwnVariables(t *testing.T) {
 
 	for raw, want := range map[string]string{
 		`{"BAD-NAME": "x"}`:                "build secret 'BAD-NAME': a name of letters, digits and _",
-		`{"A": "s3cret",`:                  "VERTRA_BUILD_SECRETS isn't a JSON object of strings",
-		`{"A": ["s3cret"]}`:                "VERTRA_BUILD_SECRETS isn't a JSON object of strings",
-		`"just a string"`:                  "VERTRA_BUILD_SECRETS isn't a JSON object of strings",
-		`{"A": 5, "B": "x"}`:               "VERTRA_BUILD_SECRETS isn't a JSON object of strings",
+		`{"A": "s3cret",`:                  "VENNIR_BUILD_SECRETS isn't a JSON object of strings",
+		`{"A": ["s3cret"]}`:                "VENNIR_BUILD_SECRETS isn't a JSON object of strings",
+		`"just a string"`:                  "VENNIR_BUILD_SECRETS isn't a JSON object of strings",
+		`{"A": 5, "B": "x"}`:               "VENNIR_BUILD_SECRETS isn't a JSON object of strings",
 		`{"COSIGN_PRIVATE_KEY": "s3cret"}`: "secret COSIGN_PRIVATE_KEY reached a team's build: it's a repository secret, which every job and pull request gets; move it to the catalog-publish Environment",
 	} {
 		c.Getenv = func(key string) string {
@@ -169,8 +169,8 @@ func TestATeamsEnvironmentBuildsItsProducts(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(images, "a", "mine.tar"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("FAKE_LOADED", "vertra-catalog/b/theirs:ci")
-	if out := errorsOf(t, func(c *Catalog) bool { return c.Load(mine) }, c); !strings.Contains(out, "holds vertra-catalog/b/theirs:ci, not just vertra-catalog/a/mine:ci") {
+	t.Setenv("FAKE_LOADED", "vennir-catalog/b/theirs:ci")
+	if out := errorsOf(t, func(c *Catalog) bool { return c.Load(mine) }, c); !strings.Contains(out, "holds vennir-catalog/b/theirs:ci, not just vennir-catalog/a/mine:ci") {
 		t.Errorf("another product's image loaded: %s", out)
 	}
 	t.Setenv("FAKE_LOADED", mine.LocalImage())
@@ -213,14 +213,14 @@ func TestBuildingForAnEnvironmentSavesOneTeamsImages(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("%v %v", ok, err)
 	}
-	if !strings.Contains(calls(t, log), "docker save --output "+filepath.Join(out, "a", "mine.tar")+" vertra-catalog/a/mine:ci") {
+	if !strings.Contains(calls(t, log), "docker save --output "+filepath.Join(out, "a", "mine.tar")+" vennir-catalog/a/mine:ci") {
 		t.Errorf("not saved for publish --images:\n%s", calls(t, log))
 	}
 }
 
 func TestBuildEnvironmentsNameTheCatalogsTeams(t *testing.T) {
 	files := product("mine", "[]")
-	files["vertra.yaml"] = "buildEnvironments: [a, a, nobody, ../teams/a]\n"
+	files["vennir.yaml"] = "buildEnvironments: [a, a, nobody, ../teams/a]\n"
 	c := catalogWith(t, files)
 	out := errorsOf(t, (*Catalog).ValidateBuildEnvironments, c)
 	for _, want := range []string{"'a' is listed twice", "'nobody' isn't a team of this catalog", "'../teams/a' isn't a team of this catalog"} {

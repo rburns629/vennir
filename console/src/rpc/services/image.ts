@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-/** ImageService (proto/vertra/console/v1/image.proto): core/images.ts over Connect. */
+/** ImageService (proto/vennir/console/v1/image.proto): core/images.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import { AcceptReason, acceptScan, Digest, imagePolicy, listScans, rescan, setImagePolicy } from "../../core/images.js";
-import { ScanStatus, type ImageService } from "../../gen/vertra/console/v1/image_pb.js";
+import { ScanStatus, type ImageService } from "../../gen/vennir/console/v1/image_pb.js";
 import type { ScanFindings, ScanRow } from "../../scanning.js";
 import { timestamp } from "../convert.js";
 import { callerOf, logOf } from "../context.js";

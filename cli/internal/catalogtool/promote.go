@@ -92,7 +92,7 @@ func (c *Catalog) Promote(ctx context.Context, version, from string, wait time.D
 	}
 	if problems := s.Problems(); len(problems) > 0 {
 		for _, p := range problems {
-			c.errorAt(c.path("vertra.yaml"), p)
+			c.errorAt(c.path("vennir.yaml"), p)
 		}
 		return false, nil
 	}
@@ -115,7 +115,7 @@ func (c *Catalog) Promote(ctx context.Context, version, from string, wait time.D
 		reference, made, err = promoteRelease(ctx, s, version, from)
 	}
 	if err != nil {
-		c.errorAt(c.path("vertra.yaml"), "promoting failed: "+err.Error())
+		c.errorAt(c.path("vennir.yaml"), "promoting failed: "+err.Error())
 		return false, nil
 	}
 	if !made {

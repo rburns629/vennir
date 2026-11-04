@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // AWS's prices: the Price List Query API (only served from us-east-1,

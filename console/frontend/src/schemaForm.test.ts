@@ -70,24 +70,24 @@ describe("a richer form", () => {
     type: "object",
     required: ["projectId", "regions"],
     properties: {
-      note: { type: "string", "x-vertra-widget": "textarea" },
+      note: { type: "string", "x-vennir-widget": "textarea" },
       labels: { type: "object", additionalProperties: { type: "string" } },
-      regions: { type: "array", items: { type: "string", pattern: "^[a-z]+-[a-z]+[0-9]$" }, minItems: 1, maxItems: 3, "x-vertra-group": "Where" },
+      regions: { type: "array", items: { type: "string", pattern: "^[a-z]+-[a-z]+[0-9]$" }, minItems: 1, maxItems: 3, "x-vennir-group": "Where" },
       projectId: {
         type: "string",
         minLength: 6,
         maxLength: 30,
         pattern: "^[a-z][a-z0-9-]*$",
-        "x-vertra-pattern-message": "Lowercase letters, digits and hyphens, starting with a letter.",
-        "x-vertra-order": 1,
-        "x-vertra-group": "Project",
+        "x-vennir-pattern-message": "Lowercase letters, digits and hyphens, starting with a letter.",
+        "x-vennir-order": 1,
+        "x-vennir-group": "Project",
       },
-      replicas: { type: "integer", minimum: 1, maximum: 10, "x-vertra-group": "Where" },
+      replicas: { type: "integer", minimum: 1, maximum: 10, "x-vennir-group": "Where" },
     },
   };
   const fields = fieldsOf(rich) ?? [];
 
-  it("orders fields by x-vertra-order, then as written, under their groups", () => {
+  it("orders fields by x-vennir-order, then as written, under their groups", () => {
     expect(fields.map((f) => f.name)).toEqual(["projectId", "note", "labels", "regions", "replicas"]);
     expect(groupsOf(fields).map((g) => [g.group, g.fields.map((f) => f.name)])).toEqual([
       ["Project", ["projectId"]],

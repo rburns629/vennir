@@ -1,6 +1,6 @@
 # Step 5: two products, the second using the first one's output.
 # CHANGE: try-anna (four times) to your team.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Dag
 name: name-then-hello
 tasks:

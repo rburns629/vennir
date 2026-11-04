@@ -62,7 +62,7 @@ const ids: Record<string, string> = {};
 
 const inputSchema = {
   type: "object",
-  properties: { projectId: { type: "string", "x-vertra-needs": "gcp.project" } },
+  properties: { projectId: { type: "string", "x-vennir-needs": "gcp.project" } },
 };
 
 beforeAll(async () => {
@@ -108,7 +108,7 @@ afterAll(async () => {
   await db.delete(products).where(like(products.name, `${prefix}%`));
   const ours = await db.select({ id: teams.id }).from(teams).where(like(teams.name, `${prefix}%`));
   if (ours.length > 0) await db.delete(teams).where(inArray(teams.id, ours.map((t) => t.id)));
-  await db.delete(usersTable).where(like(usersTable.email, `${prefix}-ci-%@bots.vertra.local`));
+  await db.delete(usersTable).where(like(usersTable.email, `${prefix}-ci-%@bots.vennir.local`));
   await users.cleanUp();
   await app.close();
 });
@@ -227,7 +227,7 @@ describe("deciding", () => {
   });
 
   it("never the maintainer who made the bot that submitted it", async () => {
-    const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vertra.local`;
+    const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vennir.local`;
     const minted = await call<{ token: string }>(tokens["maintainer"], "TokenService/CreateBotToken", { team: owner, email, label: "ci" });
     expect(minted.code).toBe("ok");
     const asBot = await call<{ executionId: string }>(minted.body.token, "TemplateService/RunAction", { product: wipe, inputs: { projectId: `${apps}-dev` } });
@@ -253,7 +253,7 @@ describe("deciding", () => {
   it("never a bot, even a maintainer's", async () => {
     const { executionId } = await run("maintainer", wipe);
     vi.mocked(getExecution).mockResolvedValue(awaiting(executionId));
-    const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vertra.local`;
+    const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vennir.local`;
     const minted = await call<{ token: string }>(tokens["maintainer2"], "TokenService/CreateBotToken", { team: owner, email, label: "approver" });
     const refused = await call(minted.body.token, "ExecutionService/DecideApproval", { executionId, taskId: "run", approve: true, reason: "" });
     expect(refused.code).toBe("permission_denied");
@@ -264,7 +264,7 @@ describe("deciding", () => {
   it("never whoever made or changed a schedule its bot runs, nor a bot's maker's bot's maker", async () => {
     const [ownerTeam] = await db.select({ id: teams.id }).from(teams).where(eq(teams.name, owner));
     const bot = async () => {
-      const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vertra.local`;
+      const email = `${prefix}-ci-${randomUUID().slice(0, 6)}@bots.vennir.local`;
       const [user] = await db.insert(usersTable).values({ email, isBot: true }).returning();
       await db.insert(teamMemberships).values({ userId: user!.id, teamId: ownerTeam!.id, role: "maintainer" });
       return user!.id;

@@ -55,5 +55,5 @@ export function FailureHelp({ help }: { help: Help }) {
 
 /** Whose words the explanation is. */
 export function explainedBy(help: Help): string {
-  return help.fromOwner ? `Explanation written by ${help.team} for this error code.` : "Explanation from Vertra.";
+  return help.fromOwner ? `Explanation written by ${help.team} for this error code.` : "Explanation from Vennir.";
 }

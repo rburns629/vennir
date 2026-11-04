@@ -15,7 +15,7 @@ import { apiState, backendAllowed, backendNamespace } from "../src/core/apis.js"
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, findTeamByName } from "../src/db/queries.js";
 import { apiProblems, apiTraffic, apis, gatewayState, teams } from "../src/db/schema.js";
-import { ApiSchema } from "../src/gen/vertra/catalog/v1/release_pb.js";
+import { ApiSchema } from "../src/gen/vennir/catalog/v1/release_pb.js";
 import { buildApp } from "../src/index.js";
 import { ensureServiceAccount } from "../src/k8s.js";
 import { caller, rpcClient } from "./rpc.js";
@@ -30,7 +30,7 @@ vi.mock("../src/k8s.js", async (importOriginal) => ({
 // here, since catalog_sync is one row other test files write too.
 vi.mock("../src/db/queries.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/db/queries.js")>()),
-  catalogRepository: vi.fn(() => Promise.resolve("github.com/acme/vertra-catalog")),
+  catalogRepository: vi.fn(() => Promise.resolve("github.com/acme/vennir-catalog")),
 }));
 
 const prefix = `api-${randomUUID().slice(0, 6)}`;
@@ -95,7 +95,7 @@ beforeAll(async () => {
   app = await buildApp();
   config.gateway.backendHosts = ["*.example.run.app"];
   config.gateway.internetTeams = [owner];
-  config.gateway.url = "http://gateway.vertra-system.svc:8080";
+  config.gateway.url = "http://gateway.vennir-system.svc:8080";
   config.gateway.publicUrl = "https://api.example.com";
   await Promise.all([createTeam(owner), createTeam(consumer), createTeam(outsider)]);
   await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
@@ -187,7 +187,7 @@ describe("who sees what", () => {
 
   it("offers whoever may not call it an issue asking its team to share it, and nobody else", async () => {
     const ask = new URL((await listFor("outsider")).find((a) => a.name === "orders")?.askForAccessUrl ?? "");
-    expect(`${ask.origin}${ask.pathname}`).toBe("https://github.com/acme/vertra-catalog/issues/new");
+    expect(`${ask.origin}${ask.pathname}`).toBe("https://github.com/acme/vennir-catalog/issues/new");
     expect(ask.searchParams.get("title")).toBe(`Share ${owner}/orders with ${outsider}`);
     expect(ask.searchParams.get("body")).toContain(`[\`teams/${owner}/apis/orders/api.yaml\`]`);
     expect(ask.searchParams.get("body")).toContain(`shareWith: [${outsider}]`);

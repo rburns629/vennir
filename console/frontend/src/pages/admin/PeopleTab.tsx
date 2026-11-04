@@ -95,8 +95,8 @@ function SigningIn({ teams }: { teams: Team[] }) {
         <Link component={RouterLink} to="/admin/sign-in">
           Single sign-on and groups →
         </Link>
-        , unless the install sets the provider (<Box component="span" sx={mono}>vertra sso google</Box>, or{" "}
-        <Box component="span" sx={mono}>vertra sso off</Box> to stop).
+        , unless the install sets the provider (<Box component="span" sx={mono}>vennir sso google</Box>, or{" "}
+        <Box component="span" sx={mono}>vennir sso off</Box> to stop).
       </Typography>
     </AdminCard>
   );
@@ -356,7 +356,7 @@ export function PeopleTab() {
 
       <Card sx={{ px: 3, py: 2 }}>
         <Typography variant="body2" color="text.secondary">
-          If no admin can sign in: from a machine that can reach the cluster, <Box component="span" sx={mono}>vertra admin reset-password &lt;env&gt;</Box>. It
+          If no admin can sign in: from a machine that can reach the cluster, <Box component="span" sx={mono}>vennir admin reset-password &lt;env&gt;</Box>. It
           gives the install&apos;s first admin (or <Box component="span" sx={mono}>--email</Box>&apos;s) a new password, shown once.
         </Typography>
       </Card>

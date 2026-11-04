@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-// Package consoleapi is the little of the console's API vertra needs:
+// Package consoleapi is the little of the console's API vennir needs:
 // signing in as the admin, revoking the tokens catalogs once held, having
 // the console apply its catalog's release now, and running a DAG. It calls the console's Connect services (generated
 // from proto/ into internal/gen). Tokens and passwords pass through memory
@@ -18,8 +18,8 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	consolev1 "github.com/rburns629/vertra/cli/internal/gen/vertra/console/v1"
-	"github.com/rburns629/vertra/cli/internal/gen/vertra/console/v1/consolev1connect"
+	consolev1 "github.com/rburns629/vennir/cli/internal/gen/vennir/console/v1"
+	"github.com/rburns629/vennir/cli/internal/gen/vennir/console/v1/consolev1connect"
 )
 
 // callTimeout bounds each call but a watch, which lasts as long as its run.

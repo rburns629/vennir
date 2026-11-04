@@ -1145,7 +1145,7 @@ export async function rerun(caller: AuthUser | undefined, executionId: string, l
   await ensureServiceAccounts(tasksInfo);
 
   // Every field carries over except requestId: kernel-api treats it as
-  // identifying this specific submission (proto/vertra/kernel/v1),
+  // identifying this specific submission (proto/vennir/kernel/v1),
   // so reusing the original would return the same execution. A stored DAG
   // from before pinning has tags; they're pinned now.
   const pinnedReplay = await pinned(replayed as Record<string, unknown>, context);

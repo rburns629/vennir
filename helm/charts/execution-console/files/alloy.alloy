@@ -1,12 +1,12 @@
-// Vertra's log collector (values: logs). Reads the output of every step's
-// Pod, of the API backends teams run (Pods labelled vertra/api-backend:
+// Vennir's log collector (values: logs). Reads the output of every step's
+// Pod, of the API backends teams run (Pods labelled vennir/api-backend:
 // "true"), and of the platform's own, through the Kubernetes API, and sends
 // it to Loki labelled for Observe's log search (console/src/core/logs.ts):
 //
 //   labels:              namespace (a step's or backend's team), component
 //                        (step, api or platform), app (a platform Pod's
 //                        component, a backend's app), api (the API product
-//                        a backend serves, its Pod's vertra/api label),
+//                        a backend serves, its Pod's vennir/api label),
 //                        level
 //   structured metadata: execution_id, task, attempt, image, pod
 //
@@ -26,7 +26,7 @@ discovery.relabel "pods" {
   // Steps (the kernel's Jobs, in team namespaces), API backends and the
   // platform's own Pods.
   rule {
-    source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_label_vertra_dev_execution_id", "__meta_kubernetes_pod_label_vertra_api_backend"]
+    source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_label_vennir_dev_execution_id", "__meta_kubernetes_pod_label_vennir_api_backend"]
     regex         = sys.env("PLATFORM_NAMESPACE") + `;.*;.*|.+;.+;.*|.+;;true`
     action        = "keep"
   }
@@ -41,7 +41,7 @@ discovery.relabel "pods" {
     replacement  = "api"
   }
   rule {
-    source_labels = ["__meta_kubernetes_pod_label_vertra_dev_execution_id"]
+    source_labels = ["__meta_kubernetes_pod_label_vennir_dev_execution_id"]
     regex         = `.+`
     target_label  = "component"
     replacement   = "step"
@@ -69,22 +69,22 @@ discovery.relabel "pods" {
     target_label  = "app"
   }
   // Which of the team's API products a backend serves, when it says
-  // (vertra/api: <name>): searched by API.
+  // (vennir/api: <name>): searched by API.
   rule {
-    source_labels = ["component", "__meta_kubernetes_pod_label_vertra_api"]
+    source_labels = ["component", "__meta_kubernetes_pod_label_vennir_api"]
     regex         = `api;(.+)`
     target_label  = "api"
   }
   rule {
-    source_labels = ["__meta_kubernetes_pod_label_vertra_dev_execution_id"]
+    source_labels = ["__meta_kubernetes_pod_label_vennir_dev_execution_id"]
     target_label  = "execution_id"
   }
   rule {
-    source_labels = ["__meta_kubernetes_pod_annotation_vertra_dev_task"]
+    source_labels = ["__meta_kubernetes_pod_annotation_vennir_dev_task"]
     target_label  = "task"
   }
   rule {
-    source_labels = ["__meta_kubernetes_pod_label_vertra_dev_attempt"]
+    source_labels = ["__meta_kubernetes_pod_label_vennir_dev_attempt"]
     target_label  = "attempt"
   }
   rule {
@@ -99,10 +99,10 @@ discovery.relabel "pods" {
 
 loki.source.kubernetes "pods" {
   targets    = discovery.relabel.pods.output
-  forward_to = [loki.process.vertra.receiver]
+  forward_to = [loki.process.vennir.receiver]
 }
 
-loki.process "vertra" {
+loki.process "vennir" {
   forward_to = [loki.write.loki.receiver]
 
   // --- credentials, by shape (the kernel's patterns) ---

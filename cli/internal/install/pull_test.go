@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // pullFixture is a released chart's package (execution-kernel/Chart.yaml
@@ -67,7 +67,7 @@ func pullCount(pulls string) int {
 	return strings.Count(string(b), "pull")
 }
 
-// knowing makes this vertra know a release's charts by these sums.
+// knowing makes this vennir know a release's charts by these sums.
 func knowing(t *testing.T, version, kernelSum string) {
 	saved := releaseChartSums
 	t.Cleanup(func() { releaseChartSums = saved })
@@ -130,7 +130,7 @@ func TestAReleasedChartIsCheckedThenUnpackedAndKept(t *testing.T) {
 		t.Error("an added file was kept")
 	}
 	// A kept package that no longer matches, or none (a chart pulled before
-	// vertra kept its package), is pulled and checked again.
+	// vennir kept its package), is pulled and checked again.
 	if err := os.WriteFile(kept, []byte("tampered"), 0o644); err != nil {
 		t.Fatal(err)
 	}

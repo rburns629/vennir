@@ -20,7 +20,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
+	"github.com/rburns629/vennir/kernel/internal/domain"
 )
 
 // Toleration is one Pod toleration, as the Pod spec spells it.
@@ -80,7 +80,7 @@ type Settings struct {
 	// DatabaseSetup is what `kernel database-setup` does, as a managed
 	// server's administrator (DATABASE_URL names its maintenance database);
 	// on RDS signing in with the password in DatabaseAdminSecret, a Secrets
-	// Manager secret's ARN (RDS keeps it there; nothing else of Vertra's).
+	// Manager secret's ARN (RDS keeps it there; nothing else of Vennir's).
 	DatabaseSetup       DatabaseSetup
 	DatabaseAdminSecret string
 
@@ -117,7 +117,7 @@ type Settings struct {
 	SleeperAPIPodSelector string
 	// The sleeper's own CronJob: suspended while asleep, so it doesn't start
 	// a Pod (on EKS Auto Mode, a node) every few minutes to find nothing to
-	// do. Waking resumes it (vertra wake). Empty: never suspended.
+	// do. Waking resumes it (vennir wake). Empty: never suspended.
 	SleeperCronJob string
 	// A scheduled sleep (--now) waits this long for unfinished executions.
 	SleeperScheduledWait time.Duration
@@ -182,7 +182,7 @@ type Settings struct {
 	TaskCapacityPlacements map[string]Placement
 	// Labels added to every step Pod, for webhooks that act on a label
 	// (AKS Workload Identity's azure.workload.identity/use). Never the
-	// kernel's own: app and vertra.dev/* are refused.
+	// kernel's own: app and vennir.dev/* are refused.
 	TaskPodLabels map[string]string
 	// The imagePullSecret every step Pod names, for private registries: the
 	// console copies the platform's pull Secret into each team namespace
@@ -330,7 +330,7 @@ func Load(getenv func(string) string) (Settings, error) {
 		DatabaseIAMRegion:               r.str("DATABASE_IAM_REGION", ""),
 		DatabaseAdminSecret:             r.str("DATABASE_ADMIN_SECRET", ""),
 		APIAuth:                         r.str("API_AUTH", "tokenreview"),
-		APITokenAudience:                r.str("API_TOKEN_AUDIENCE", "vertra-kernel-api"),
+		APITokenAudience:                r.str("API_TOKEN_AUDIENCE", "vennir-kernel-api"),
 		APIPort:                         r.integer("API_PORT", 8000, true),
 		APITLSCertFile:                  r.str("API_TLS_CERT_FILE", ""),
 		APITLSKeyFile:                   r.str("API_TLS_KEY_FILE", ""),
@@ -371,7 +371,7 @@ func Load(getenv func(string) string) (Settings, error) {
 		TaskLogMaxBytes:        r.integer("TASK_LOG_MAX_BYTES", 1_048_576, true),
 		TaskLogRefresh:         r.seconds("TASK_LOG_REFRESH_SECONDS", 60, true),
 		ExecutionRetentionDays: r.integer("EXECUTION_RETENTION_DAYS", 90, false),
-		HeartbeatFile:          r.str("SCHEDULER_HEARTBEAT_FILE", "/tmp/vertra-scheduler-heartbeat"),
+		HeartbeatFile:          r.str("SCHEDULER_HEARTBEAT_FILE", "/tmp/vennir-scheduler-heartbeat"),
 		MetricsPort:            r.integer("METRICS_PORT", 9090, true),
 		ProfilingAddress:       r.str("PROFILING_ADDRESS", ""),
 	}
@@ -448,7 +448,7 @@ func podLabelProblem(key, value string) string {
 	if errs := validation.IsValidLabelValue(value); len(errs) > 0 {
 		return fmt.Sprintf("%q's value %q isn't a label value: %s", key, value, strings.Join(errs, "; "))
 	}
-	if key == "app" || strings.HasPrefix(key, "vertra.dev/") {
+	if key == "app" || strings.HasPrefix(key, "vennir.dev/") {
 		return fmt.Sprintf("%q is the kernel's own label", key)
 	}
 	return ""

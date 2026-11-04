@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	catalogv1 "github.com/rburns629/vertra/cli/internal/gen/vertra/catalog/v1"
+	catalogv1 "github.com/rburns629/vennir/cli/internal/gen/vennir/catalog/v1"
 )
 
 // A release pushed as an artifact reads back as itself, under its commit's
@@ -31,7 +31,7 @@ func TestAReleaseIsPushedAsAnArtifactAConsoleCanRead(t *testing.T) {
 	defer server.Close()
 	host := strings.TrimPrefix(server.URL, "http://")
 	s := Settings{Registry: host + "/catalog-products"}
-	release := &catalogv1.Release{Commit: "abc123", Repository: "github.com/my-org/vertra-catalog",
+	release := &catalogv1.Release{Commit: "abc123", Repository: "github.com/my-org/vennir-catalog",
 		Teams:    []*catalogv1.Team{{Name: "platform"}},
 		Products: []*catalogv1.ProductAction{{Name: "platform-hello-greet", Image: host + "/catalog-products/platform/hello@sha256:" + strings.Repeat("a", 64), Action: "greet", Team: "platform"}}}
 
@@ -216,7 +216,7 @@ func TestInCIAReleasePinsEachProductsOwnCommit(t *testing.T) {
 	ctx := context.Background()
 
 	files := product("mine", "[]")
-	files["teams/a/team.yaml"] = "apiVersion: vertra.dev/v2\nkind: Team\nname: a\ndisplayName: A\ndescription: A\nowner: \"@acme/team-a\"\ncontact: a@acme.com\n"
+	files["teams/a/team.yaml"] = "apiVersion: vennir.dev/v2\nkind: Team\nname: a\ndisplayName: A\ndescription: A\nowner: \"@acme/team-a\"\ncontact: a@acme.com\n"
 	c := catalogWith(t, files)
 	git := gitIn(t, c.Root)
 	git("init", "-q")
@@ -305,8 +305,8 @@ func TestBuildReleasePinsEachPublishedProduct(t *testing.T) {
 	files := product("mine", "[b]")
 	files["teams/a/products/mine/product.yaml"] = strings.Replace(files["teams/a/products/mine/product.yaml"],
 		"owner: x\n", "owner: x\ntokenAudiences: [sts.amazonaws.com]\n", 1)
-	files["teams/a/team.yaml"] = "apiVersion: vertra.dev/v2\nkind: Team\nname: a\ndisplayName: A\ndescription: A\nowner: \"@acme/team-a\"\ncontact: a@acme.com\n"
-	files["teams/a/dags/hello.yaml"] = `apiVersion: vertra.dev/v2
+	files["teams/a/team.yaml"] = "apiVersion: vennir.dev/v2\nkind: Team\nname: a\ndisplayName: A\ndescription: A\nowner: \"@acme/team-a\"\ncontact: a@acme.com\n"
+	files["teams/a/dags/hello.yaml"] = `apiVersion: vennir.dev/v2
 kind: Template
 name: hello
 displayName: Hello
@@ -329,7 +329,7 @@ steps:
 	c := catalogWith(t, files)
 	var out strings.Builder
 	c.Stdout, c.Stderr = &out, &out
-	release, err := c.BuildRelease(context.Background(), s, "c1", "github.com/my-org/vertra-catalog")
+	release, err := c.BuildRelease(context.Background(), s, "c1", "github.com/my-org/vennir-catalog")
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}

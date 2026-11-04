@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 /**
  * Which installs a product is for: its clouds (product.yaml's, else its
- * team.yaml's) against this install's (config.installCloud, which vertra
+ * team.yaml's) against this install's (config.installCloud, which vennir
  * sets). One that isn't for this install is listed, marked, never checked
  * (readiness.ts) and never run: a run naming it is refused here, before
  * anything is submitted.

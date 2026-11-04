@@ -2,16 +2,16 @@
 
 Everything the console does, a pipeline can do over HTTP: submit a DAG, wait for it, read its outputs and logs. A team's bot signs in with an API token; every method is listed in the [API reference](api-reference.md).
 
-Each method is one URL, `POST /api/vertra.console.v1.<Service>/<Method>`, taking a JSON body and returning JSON: the Connect protocol, which is plain HTTP, so `curl` and `jq` are all you need. The same methods can be called over gRPC, or with a typed client generated from the protos in the platform's repository (`proto/vertra/console/v1`).
+Each method is one URL, `POST /api/vennir.console.v1.<Service>/<Method>`, taking a JSON body and returning JSON: the Connect protocol, which is plain HTTP, so `curl` and `jq` are all you need. The same methods can be called over gRPC, or with a typed client generated from the protos in the platform's repository (`proto/vennir/console/v1`).
 
-In the examples, the console is `https://vertra.example.com` and the team is `team-a`. Lines starting with `$` are what you type; the lines under them are what you get back.
+In the examples, the console is `https://vennir.example.com` and the team is `team-a`. Lines starting with `$` are what you type; the lines under them are what you get back.
 
 ## 1. Get a token
 
 In the console, open your team → **Automation → Add a bot**, say what will use it, and copy the token: it's shown only once. Only a maintainer of the team can add a bot. The bot acts as a maintainer of your team, and of nothing else: it can submit and retry your team's DAGs. Its address is your team's alone: another team's bot's address is refused, so choose a new one. Store the token as a secret in your pipeline, for example:
 
 ```console
-$ gh secret set VERTRA_TOKEN --repo <your-org>/<your-repo>
+$ gh secret set VENNIR_TOKEN --repo <your-org>/<your-repo>
 ```
 
 A token lasts 90 days unless you choose otherwise when you make it (30 days, a year, two years, or until revoked); the bot's card shows when each expires. An expired token is refused like a revoked one. To rotate one before it expires, add a bot again with the same answer to "What will use it?": that gives the same bot a second token. Put the new token in your pipeline, then revoke the old one on the bot's card. Revoking stops a token at once.
@@ -25,8 +25,8 @@ only branch it may run from). Then, in the job, ask the CI for an ID token
 for this install's audience (shown there) and exchange it:
 
 ```console
-$ curl -s -X POST "$VERTRA/api/vertra.console.v1.AuthService/ExchangeToken" -H "Content-Type: application/json" -d "{\"idToken\":\"$ID_TOKEN\"}"
-{"token":"eyJ…","email":"team-a-release-pipeline@bots.vertra.local","expiresAt":"…"}
+$ curl -s -X POST "$VENNIR/api/vennir.console.v1.AuthService/ExchangeToken" -H "Content-Type: application/json" -d "{\"idToken\":\"$ID_TOKEN\"}"
+{"token":"eyJ…","email":"team-a-release-pipeline@bots.vennir.local","expiresAt":"…"}
 ```
 
 The token it gives back is good for an hour, as that bot; nothing is stored
@@ -35,10 +35,10 @@ in your pipeline. A token from any other repository or branch is refused.
 Every call sends its token as a bearer token. A small helper keeps the examples short:
 
 ```console
-$ export VERTRA=https://vertra.example.com
-$ call() { curl -s -X POST "$VERTRA/api/vertra.console.v1.$1" -H "Authorization: Bearer $VERTRA_TOKEN" -H "Content-Type: application/json" -d "${2:-{\}}"; }
+$ export VENNIR=https://vennir.example.com
+$ call() { curl -s -X POST "$VENNIR/api/vennir.console.v1.$1" -H "Authorization: Bearer $VENNIR_TOKEN" -H "Content-Type: application/json" -d "${2:-{\}}"; }
 $ call AuthService/GetMe
-{"userId":"3f0c…","email":"team-a-release-pipeline@bots.vertra.local","teamNames":["team-a"],"isAdmin":false}
+{"userId":"3f0c…","email":"team-a-release-pipeline@bots.vennir.local","teamNames":["team-a"],"isAdmin":false}
 ```
 
 ## 2. Submit a DAG
@@ -144,8 +144,8 @@ team's maintainers change the list on its card). An order runs for your
 team, under your team's caps, quota and approvals:
 
 ```bash
-curl -X POST "$CONSOLE/api/vertra.console.v1.TemplateService/RunTemplate" \
-  -H "Authorization: Bearer $VERTRA_TOKEN" -H "Content-Type: application/json" \
+curl -X POST "$CONSOLE/api/vennir.console.v1.TemplateService/RunTemplate" \
+  -H "Authorization: Bearer $VENNIR_TOKEN" -H "Content-Type: application/json" \
   -d '{"team": "platform", "name": "app-on-cloud-run", "onBehalfOf": "my-team",
        "requestId": "order-1042", "parameters": {"name": "shop-api"}}'
 ```
@@ -173,7 +173,7 @@ the console posts:
  "state": "SUCCEEDED", "finishedAt": "2026-10-27T15:04:05Z"}
 ```
 
-with a `Vertra-Signature: t=<unix seconds>,v1=<hex>` header, where `v1` is the
+with a `Vennir-Signature: t=<unix seconds>,v1=<hex>` header, where `v1` is the
 HMAC-SHA256 of `<t>.<body>` with the secret. Check it, and that `t` is recent
 (say within five minutes), before trusting the post:
 
@@ -186,7 +186,7 @@ function verified(secret, header, body) {
 }
 ```
 
-`examples/order-receiver` in the Vertra repository is a whole receiver in Go.
+`examples/order-receiver` in the Vennir repository is a whole receiver in Go.
 
 Answer with any 2xx. Anything else, or no answer in 10 seconds, is tried
 again every 30 seconds, five times in all; the card shows the last error. A

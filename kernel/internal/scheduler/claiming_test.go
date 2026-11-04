@@ -12,8 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
-	"github.com/rburns629/vertra/kernel/internal/executor"
+	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/rburns629/vennir/kernel/internal/executor"
 )
 
 func newPass(db DB, owner string, lease time.Duration, now time.Time, set ...func(*Options)) *pass {

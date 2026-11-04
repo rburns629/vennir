@@ -26,7 +26,7 @@ export default defineConfig({
       DOCS_DIR: "docs",
       // No cluster: a Kubernetes call a test didn't mock fails, rather than
       // reaching whatever cluster this machine's kubeconfig points at.
-      KUBECONFIG: "/nonexistent/vertra-tests-have-no-cluster",
+      KUBECONFIG: "/nonexistent/vennir-tests-have-no-cluster",
       // Most tests stub the registry; the ones about pinning turn it on.
       IMAGE_PINNING: "off",
     },

@@ -1,13 +1,13 @@
 # Operations
 
-Installing, upgrading and running Vertra: on your machine with `kind`, and
+Installing, upgrading and running Vennir: on your machine with `kind`, and
 on a cloud cluster. For how it works, see [architecture.md](architecture.md);
 for what it enforces, [security-model.md](security-model.md).
 
-`vertra`, the installer, does the cloud setup, the install and the catalog
-repository in one place: [Setting up Vertra](setup.md). This page is what it
+`vennir`, the installer, does the cloud setup, the install and the catalog
+repository in one place: [Setting up Vennir](setup.md). This page is what it
 does underneath, and how to do it by hand: `make` targets on `kind` while
-working on Vertra itself, and the Helm charts directly anywhere else. Either
+working on Vennir itself, and the Helm charts directly anywhere else. Either
 way, the charts are complete on their own: `helm install` creates both
 databases, generates their passwords and creates the first admin. Every
 chart setting, with its default, is in the charts' `values.yaml`
@@ -21,11 +21,11 @@ Needs Docker (running), `kind`, `kubectl`, `helm` and `curl`.
 make quickstart    # from nothing (or any state) to a running install; safe to re-run
 ```
 
-It creates the `kind` cluster `vertra-local` and a local registry
+It creates the `kind` cluster `vennir-local` and a local registry
 (`localhost:5001`, where task images live), builds both platform images,
-installs both charts into `vertra-system` with `helm/values/kind/*.yaml`,
+installs both charts into `vennir-system` with `helm/values/kind/*.yaml`,
 creates the team `team-a`, and port-forwards the console to
-http://localhost:18080. Sign in as `admin@example.com` / `vertra-local`:
+http://localhost:18080. Sign in as `admin@example.com` / `vennir-local`:
 that password is set only in the kind values, for a cluster nobody else can
 reach. Never use it anywhere else.
 
@@ -35,7 +35,7 @@ Every day:
 | --- | --- |
 | `make up` | Resumes the node, clears Pods stuck as Unknown, port-forwards the console |
 | `make down` | Stops the node and keeps everything (never `kind delete cluster` unless you mean to start over) |
-| `make logs` | Tails kernel-api, the scheduler and the console together (any install: `vertra logs <env> -f`) |
+| `make logs` | Tails kernel-api, the scheduler and the console together (any install: `vennir logs <env> -f`) |
 | `make catalog-publish` | Publishes `catalog-template/` with its `local` sample team (one product in five languages); `CATALOG=<folder>` publishes your own catalog, `SAMPLES=` other samples |
 | `make kind-deploy` | Rebuilds both platform images and upgrades both releases (`kind-deploy-kernel`, `kind-deploy-console` for one) |
 | `make test` | Starts a throwaway Postgres on `127.0.0.1:55432` and runs the kernel's, gateway's, console's and frontend's tests |
@@ -49,7 +49,7 @@ Each step is the same product in another language, chained with
 
 Needs Kubernetes 1.30 or later, Helm 4, and a CNI that enforces
 NetworkPolicy (GKE Dataplane V2, which Autopilot always has; on EKS the
-VPC CNI's network policy agent, off until asked for: `vertra` turns it on,
+VPC CNI's network policy agent, off until asked for: `vennir` turns it on,
 and on a cluster of your own set the `vpc-cni` add-on's
 `{"enableNetworkPolicy": "true"}`, or in Auto Mode the `kube-system`
 ConfigMap `amazon-vpc-cni` with `enable-network-policy-controller: "true"`;
@@ -57,13 +57,13 @@ on AKS a network policy engine). Without it, no policy below holds.
 
 1. **Images and charts.** Each release publishes both images (amd64 and
    arm64, scanned, signed keyless by the release workflow) and both charts
-   to `ghcr.io/rburns629/vertra`, and the charts default to the images
+   to `ghcr.io/rburns629/vennir`, and the charts default to the images
    released with them: install from
-   `oci://ghcr.io/rburns629/vertra/charts/execution-kernel` and
+   `oci://ghcr.io/rburns629/vennir/charts/execution-kernel` and
    `…/execution-console` with `--version <release>`. To run your own build
    instead, push `kernel/` and `console/` to your registry and set
    `image.repository` and `image.tag` (or `image.digest`).
-2. **The platform namespace**, e.g. `vertra-system`. It's never a team's:
+2. **The platform namespace**, e.g. `vennir-system`. It's never a team's:
    the kernel's dispatch policy refuses to run steps in it. Keep who may
    create Pods there to administrators (NetworkPolicies trust its labels).
 3. **Optional components**, before the charts that use them:
@@ -76,9 +76,9 @@ on AKS a network policy engine). Without it, no policy below holds.
      its ServiceAccount may read by that name and nothing else.
    - **Syncing secrets from a vault:** External Secrets Operator
      (`helm repo add external-secrets https://charts.external-secrets.io`;
-     `vertra config set externalSecrets true` has `vertra apply` install it,
+     `vennir config set externalSecrets true` has `vennir apply` install it,
      pinned). On EKS a team's store signs in by IRSA, which needs the
-     cluster's OIDC issuer registered in IAM: `vertra` does that for a
+     cluster's OIDC issuer registered in IAM: `vennir` does that for a
      cluster it makes; the Team page's guide has the command otherwise.
      EKS Pod Identity doesn't work for a store.
 4. **Values.** Copy `helm/values/gke/` (or `kind/`) as a starting point;
@@ -102,13 +102,13 @@ on AKS a network policy engine). Without it, no policy below holds.
    waits for the hook; wait for the rollout after it.
 
    ```
-   CHARTS=oci://ghcr.io/rburns629/vertra/charts; V=<release, e.g. 0.1.0>; SIZE=minimal
+   CHARTS=oci://ghcr.io/rburns629/vennir/charts; V=<release, e.g. 0.1.0>; SIZE=minimal
    helm pull $CHARTS/execution-kernel --version $V --untar; helm pull $CHARTS/execution-console --version $V --untar
-   helm install kernel ./execution-kernel -n vertra-system -f execution-kernel/sizes/$SIZE.yaml -f <values>/kernel.yaml
-   helm install console ./execution-console -n vertra-system -f execution-console/sizes/$SIZE.yaml -f <values>/console.yaml
-   kubectl -n vertra-system rollout status deployment -l 'app.kubernetes.io/instance in (kernel,console)'
+   helm install kernel ./execution-kernel -n vennir-system -f execution-kernel/sizes/$SIZE.yaml -f <values>/kernel.yaml
+   helm install console ./execution-console -n vennir-system -f execution-console/sizes/$SIZE.yaml -f <values>/console.yaml
+   kubectl -n vennir-system rollout status deployment -l 'app.kubernetes.io/instance in (kernel,console)'
    # No password set: give the first admin one (printed only to you; changed at the first sign-in)
-   kubectl -n vertra-system exec deploy/console-execution-console -- node dist/db/resetAdmin.js <email>
+   kubectl -n vennir-system exec deploy/console-execution-console -- node dist/db/resetAdmin.js <email>
    ```
 
    Upgrades (`helm upgrade`) can use `--wait`: they migrate before the
@@ -149,7 +149,7 @@ size preset's `scheduler.taskDefaultResources`):
 | kernel-api | 100m | 256Mi | Always, per copy |
 | Scheduler | 100m | 512Mi | Always, per copy |
 | Console | 100m | 512Mi | Always, per copy |
-| Postgres | 250m | 512Mi | Per instance: one when the kernel's holds the console's database (what `vertra` does), two otherwise |
+| Postgres | 250m | 512Mi | Per instance: one when the kernel's holds the console's database (what `vennir` does), two otherwise |
 | Trivy server | 100m | 512Mi, and 4Gi ephemeral storage | While scans run (`scanning.idleMinutes`) |
 | Gateway | 50m | 64Mi | `gateway.enabled` |
 | Loki, Alloy | 100m, 50m | 256Mi, 128Mi | `logs.enabled` |
@@ -193,7 +193,7 @@ its certificate issued and renewed for you:
     proving the host over HTTP through the same Ingress class (the host must
     resolve to the Ingress from the internet);
   - a Secret you keep: `tlsSecretName`;
-  - or the cloud's, through `annotations` (what `vertra` does on GKE and
+  - or the cloud's, through `annotations` (what `vennir` does on GKE and
     EKS).
 
   `httpsOnly` (on) refuses plain HTTP for the controllers the chart knows:
@@ -209,15 +209,15 @@ Either way, the console sends Strict-Transport-Security, so a browser that
 has seen it keeps to HTTPS; set `trustProxy` to the load balancer's
 addresses so sign-in limits see real clients.
 
-`vertra` does this on an existing cluster: `vertra init` asks whether the
+`vennir` does this on an existing cluster: `vennir init` asks whether the
 console is reached at a hostname, which Ingress class serves it, and where
 its certificate comes from (Let's Encrypt, or a ClusterIssuer of yours), and
 offers to install cert-manager (pinned) if the cluster hasn't got it
 (`console.public`, `console.hostname`, `console.ingressClass`,
-`console.tls.*` in vertra.yaml). `vertra apply` then says which DNS record
+`console.tls.*` in vennir.yaml). `vennir apply` then says which DNS record
 the hostname needs (an A record to the Ingress controller's address, or a
 CNAME to its name), waits for it to resolve when run interactively, and
-reports the certificate's state; `vertra status` shows both. Let's Encrypt
+reports the certificate's state; `vennir status` shows both. Let's Encrypt
 can't issue until the record resolves. On gcp with a hostname of yours,
 apply names the A record to the console's reserved address the same way.
 
@@ -227,7 +227,7 @@ controller and a Gateway at once) and a private test CA
 the console's `ingress` or `gatewayApi` in a values file under `_local/`
 (`make kind-deploy-console KIND_CONSOLE_VALUES=_local/...`), port-forward
 Traefik (`kubectl -n traefik port-forward svc/traefik 28443:443`) and check
-with `curl --cacert` (the CA is `ca.crt` in `cert-manager/vertra-test-ca`)
+with `curl --cacert` (the CA is `ca.crt` in `cert-manager/vennir-test-ca`)
 and `--resolve <host>:28443:127.0.0.1`.
 
 ### Cloud identities
@@ -241,17 +241,17 @@ what it needs:
 | --- | --- | --- |
 | The console's | Read manifests in the registries it checks and pins (`registryCheck`) | `serviceAccount.annotations` |
 | The image scanner's | Pull from those registries | `scanning.serviceAccountAnnotations` |
-| `vertra-pg-backup` | Write to the backup bucket | You create it ([Backups](#backups)) |
+| `vennir-pg-backup` | Write to the backup bucket | You create it ([Backups](#backups)) |
 | A team's `eso-<cloud>` | Read that team's secrets in its vault | The team's SecretStore file |
 | A product's own | Whatever that product does | The product's `serviceAccount`; an admin adds the binding |
 
 For a registry that needs a password instead, put a
 `kubernetes.io/dockerconfigjson` Secret in the platform namespace and name
 it in `registryCheck.pullSecretName`; with `registryCheck.copyToTeams`, the
-console copies it into every team namespace as `vertra-pull` and the
+console copies it into every team namespace as `vennir-pull` and the
 kernel's `scheduler.taskImagePullSecret` names it on step Pods.
 
-How each binding is made, per cloud (`vertra` makes all of them for an
+How each binding is made, per cloud (`vennir` makes all of them for an
 install of its own; `helm/values/gke/` and `helm/values/eks/` are examples
 of the values it writes):
 
@@ -261,19 +261,19 @@ of the values it writes):
 | policy-controller (`policy-controller-webhook`) | The same, read-only on the products' registry | The same, by Pod Identity |
 | A team's `eso-<cloud>` (its SecretStore) | Its Google service account, by the annotation in the store file | IRSA: the `eks.amazonaws.com/role-arn` annotation, a role trusting the cluster's OIDC issuer (registered in IAM once per cluster) for `system:serviceaccount:<team>:eso-aws` only. Pod Identity doesn't work for a store |
 | A product's own | Its Google service account, by the annotation an admin adds | A Pod Identity association for `<team>/<serviceAccount>`, which an admin adds |
-| Catalog CI (GitHub Actions) | Workload Identity Federation, main only | An IAM OIDC provider for GitHub's issuer (the account's one, shared by its installs: `vertra destroy` leaves it), a role trusting the repository's main only |
+| Catalog CI (GitHub Actions) | Workload Identity Federation, main only | An IAM OIDC provider for GitHub's issuer (the account's one, shared by its installs: `vennir destroy` leaves it), a role trusting the repository's main only |
 
 ### Signing in with Google
 
-With `vertra`: `vertra sso google <env>` says which two pages of the Google
+With `vennir`: `vennir sso google <env>` says which two pages of the Google
 Cloud console to open and the exact redirect URI to paste, reads the
 client's downloaded JSON (checking it's a web client with that URI), asks
 which Workspace domains may sign in, and saves the settings (the file's
-path, never its secret). `vertra apply` then writes the secret into a
-Kubernetes Secret through stdin and turns it on; `vertra sso off` turns it
+path, never its secret). `vennir apply` then writes the secret into a
+Kubernetes Secret through stdin and turns it on; `vennir sso off` turns it
 off. If the console's address changes later (made public, a new hostname or
 address), `apply` stops until the new URI is added to the client and
-`vertra sso google` is rerun. By hand, with Helm:
+`vennir sso google` is rerun. By hand, with Helm:
 
 1. In the Google Cloud console for a project in your Workspace
    organization, set up the OAuth consent screen (Google Auth Platform) with
@@ -282,7 +282,7 @@ address), `apply` stops until the new URI is added to the client and
    `/api/auth/oidc/callback` (`http://localhost:18080/...` for a
    port-forward).
 2. Put its secret in a Secret in the console's namespace:
-   `kubectl -n vertra-system create secret generic console-sso --from-file=client-secret=<file>`.
+   `kubectl -n vennir-system create secret generic console-sso --from-file=client-secret=<file>`.
 3. Set the console chart's `sso`: `issuer: https://accounts.google.com`, the
    `clientId`, `clientSecret.name: console-sso`, the same `redirectUrl`, and
    `allowedDomains` (your Workspace domains). On kind, keep these in a file
@@ -297,7 +297,7 @@ sign-in** on the team's page (`TeamService/SetTeamSignIn`), and its members'
 passwords stop working, including sessions they already have (the console
 and the gateway both refuse them). Someone in several teams uses Google if
 any of them requires it. Admins are exempt, so an admin can still get in if
-Google can't be reached; `vertra admin reset-password` remains the way back
+Google can't be reached; `vennir admin reset-password` remains the way back
 for a lost password. A team that can't use Google simply leaves it off.
 
 ### The API gateway
@@ -315,7 +315,7 @@ message), or `gateway.closed` keeps it closed; a team's maintainers pause
 one of theirs from its page. With `gateway.ingress`, an Ingress serves the
 public listener at `gateway.ingress.host`. Its NetworkPolicy lets it reach
 anything but the cloud metadata server; narrow it with `gateway.egress`.
-Backend credentials: `googleIdToken` needs `gateway.gcp` (vertra sets it
+Backend credentials: `googleIdToken` needs `gateway.gcp` (vennir sets it
 on GKE; the API's Google service account grants its ServiceAccount's
 principal `roles/iam.serviceAccountOpenIdTokenCreator`), and `awsSigV4` a
 role whose trust policy accepts the cluster's OIDC issuer for
@@ -324,54 +324,54 @@ role whose trust policy accepts the cluster's OIDC issuer for
 so a GKE install calls AWS backends with no AWS cluster). A Lambda
 function URL needs both `lambda:InvokeFunctionUrl` and
 `lambda:InvokeFunction` on the role. On kind, `make kind-deploy-console` builds
-it and allows backends in the `vertra-samples` namespace.
+it and allows backends in the `vennir-samples` namespace.
 
 ### Reading another install's catalog
 
 One catalog serves many installs. One install owns its repository (its
-`catalog` block: its registry, its `signing`; `vertra catalog create`
+`catalog` block: its registry, its `signing`; `vennir catalog create`
 refuses a repository that already publishes to another install's registry
 unless `--take-over`, which moves it); an install that reads it
-sets `externalCatalog.registry` in its vertra.yaml (the image source, and
+sets `externalCatalog.registry` in its vennir.yaml (the image source, and
 where its release lives) and the owner's signer in `catalogSignature`:
 `publicKeyFile` (a generated key's or the owner's KMS key's public half,
 `cosign public-key --key <kms uri>`), and/or `repository` (the catalog
 repository, `owner/name`, whose `ci.yml` on main signs keyless). On gcp and
 aws the reader then refuses what that signer didn't sign as the owner does,
-releases and images: `vertra apply` installs policy-controller. Elsewhere
+releases and images: `vennir apply` installs policy-controller. Elsewhere
 (kind, an existing cluster) only releases are checked.
 
 The registry's owner then lets the reader in, with no key stored anywhere:
-after the reader's first `vertra apply`, which prints the command with its
-flags filled in, the owner runs `vertra catalog grant` in its own
+after the reader's first `vennir apply`, which prints the command with its
+flags filled in, the owner runs `vennir catalog grant` in its own
 environment (it shows what it will change and asks; `--yes` doesn't). It
 grants read on the catalog's registry (its products' images and its
 release) and nothing else, to exactly the reader's identity:
 
-| Owner | Reader | Granted to | `vertra catalog grant` makes |
+| Owner | Reader | Granted to | `vennir catalog grant` makes |
 | --- | --- | --- | --- |
 | gcp | gcp, another project | its console, scanner, nodes and (verifying) policy-controller service accounts (`--service-account`) | `roles/artifactregistry.reader` on the repository for each |
-| gcp | aws, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`) | in the pool `vertra-installs`, a provider `vertra-<reader>` trusting that issuer for that subject alone, mapped to the subject `<reader>:<subject>`; `roles/artifactregistry.reader` on the repository for that principal |
-| aws | gcp, another AWS account, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`) | an IAM OIDC provider for the issuer (audience `sts.amazonaws.com`), and a role `vertra-reader-<reader>` only that subject may assume by web identity, whose one policy may `ecr:GetAuthorizationToken` and pull and list tags in `<prefix>/*` |
+| gcp | aws, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`) | in the pool `vennir-installs`, a provider `vennir-<reader>` trusting that issuer for that subject alone, mapped to the subject `<reader>:<subject>`; `roles/artifactregistry.reader` on the repository for that principal |
+| aws | gcp, another AWS account, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`) | an IAM OIDC provider for the issuer (audience `sts.amazonaws.com`), and a role `vennir-reader-<reader>` only that subject may assume by web identity, whose one policy may `ecr:GetAuthorizationToken` and pull and list tags in `<prefix>/*` |
 
 ```
-vertra catalog grant prod --reader vertra-eks \
+vennir catalog grant prod --reader vennir-eks \
   --issuer https://oidc.eks.us-east-2.amazonaws.com/id/<id> \
-  --subject system:serviceaccount:vertra-system:console-execution-console
+  --subject system:serviceaccount:vennir-system:console-execution-console
 ```
 
 A federated reader then sets what the grant prints and applies again:
-`vertra config set externalCatalog.gcpWorkloadIdentityProvider
-projects/<number>/locations/global/workloadIdentityPools/vertra-installs/providers/vertra-<reader>`
+`vennir config set externalCatalog.gcpWorkloadIdentityProvider
+projects/<number>/locations/global/workloadIdentityPools/vennir-installs/providers/vennir-<reader>`
 (an Artifact Registry), or `externalCatalog.awsRoleArn
-arn:aws:iam::<owner's account>:role/vertra-reader-<reader>` (ECR). Its
+arn:aws:iam::<owner's account>:role/vennir-reader-<reader>` (ECR). Its
 console exchanges its own ServiceAccount token, projected for the other
 side, for a short-lived credential: an hour's Google token (Workload
 Identity Federation), or the role's credentials (AWS
 `AssumeRoleWithWebIdentity`) and with them ECR's registry token. It uses
 it itself and hands it, renewed every policy sync, to the kubelet and
-policy-controller (`vertra-pull` in each team namespace) and its verify
-and scan Jobs (`vertra-registry-token`). An EKS reader of another
+policy-controller (`vennir-pull` in each team namespace) and its verify
+and scan Jobs (`vennir-registry-token`). An EKS reader of another
 account's ECR reads the same way, so its own roles (the verifier's
 included) still read only its own registry. On aws the grant is a role
 rather than a repository policy: ECR creates each product's repository on
@@ -379,9 +379,9 @@ its first push, and a role scoped to the prefix covers those too.
 
 Running the grant again changes nothing; `--revoke` takes it away (the
 binding and the provider; the role and its policy). On aws the role is
-named by `--reader` alone, so when `vertra-reader-<reader>` already trusts
+named by `--reader` alone, so when `vennir-reader-<reader>` already trusts
 another issuer or subject (another reader with the same cluster name,
-`vertra` by default), the grant and the revoke both refuse and say whom it
+`vennir` by default), the grant and the revoke both refuse and say whom it
 trusts: give this reader another `--reader`, or pass `--replace` to change
 (or delete) that role anyway. The pool, and an IAM
 OIDC provider, stay: neither lets anyone in by itself. Readers set up with
@@ -393,19 +393,19 @@ go.
 ### Catalog versions
 
 An install applies every release its catalog's `main` publishes (`latest`)
-unless it follows versions: `vertra config set -e <env> catalogVersion
+unless it follows versions: `vennir config set -e <env> catalogVersion
 newest` (the newest `vX.Y.Z`; the console chart's `catalog.newestVersion`)
 or `catalogVersion v1.4.0` (pinned: `catalog.release` ends `:v1.4.0`), then
-`vertra apply`. A version is made by a `vX.Y.Z` Git tag in the catalog
+`vennir apply`. A version is made by a `vX.Y.Z` Git tag in the catalog
 repository, which tags the release `main` already published for that commit
-(`vertra catalog promote`, catalog-template's `version.yml`): the same
+(`vennir catalog promote`, catalog-template's `version.yml`): the same
 digests and signature, so a production install following `newest` gets
 what a test install on `latest` already ran, when someone cuts the tag. To
 roll back, pin the previous version; versions never move. The Admin page's
 Catalog card shows the version applied, and its section says which versions
 the install follows, how often it looks (`catalog.pollSeconds`), who may sign
 a release, and the registry of another install's catalog it reads
-(`catalog.external`, which vertra sets with `externalCatalog`; display only,
+(`catalog.external`, which vennir sets with `externalCatalog`; display only,
 labelled "as configured": nothing the console reads confirms it).
 
 ### Sizes, sleeping and headroom
@@ -424,7 +424,7 @@ connections), and how many connections each process holds (the kernel's
 Postgres's `max_connections`. Postgres has no CPU limit, so it can take a
 burst. `auto` scales the console and kernel-api from one to three
 copies on CPU load, and needs the cluster's metrics API (metrics-server;
-built into GKE, EKS Auto Mode and AKS Automatic). `vertra` picks one
+built into GKE, EKS Auto Mode and AKS Automatic). `vennir` picks one
 from its `size` setting. A preset doesn't say where steps run: Spot is
 `scheduler.taskPlacement`. Labels every step Pod needs, such as AKS
 Workload Identity's `azure.workload.identity/use: "true"`, go in
@@ -455,7 +455,7 @@ in its own memory.
   unfinished or recently finished, nobody using the console (the console
   records its last use in its `activity` ConfigMap) and kernel-api not
   restarted; `schedule` also sleeps it at set times once nothing runs.
-  Volumes stay. Wake it with `vertra wake`, or by scaling each
+  Volumes stay. Wake it with `vennir wake`, or by scaling each
   Deployment back to the copies recorded in the
   `kernel-execution-kernel-sleep` ConfigMap (the database first). While
   asleep, the console and kernel-api don't answer, so catalog CI fails
@@ -492,7 +492,7 @@ Which Prometheus is `monitoring.provider`, the same in both charts:
 
 - **operator**: the Prometheus Operator's resources (kube-prometheus-stack;
   VictoriaMetrics's operator reads the same), each off by default because
-  it needs that operator's CRDs. On kind or an existing cluster, `vertra
+  it needs that operator's CRDs. On kind or an existing cluster, `vennir
   init` finds one and offers it (`--monitoring operator`), reading which
   labels its Prometheus selects PodMonitors and rules by and which
   namespace it scrapes from, so nothing needs looking up.
@@ -502,15 +502,15 @@ Which Prometheus is `monitoring.provider`, the same in both charts:
   public). Its collector runs in `monitoring.google.collectorNamespace`:
   `gmp-system`, or `gke-gmp-system` on Autopilot; list that in
   `metricsFrom`. It's billed per sample ingested ($0.06 a million):
-  Vertra's few hundred series every 30 s are about 35 million a month, a
-  few dollars. `VertraSchedulerDown` also needs GKE's kube-state-metrics
+  Vennir's few hundred series every 30 s are about 35 million a month, a
+  few dollars. `VennirSchedulerDown` also needs GKE's kube-state-metrics
   package; without it, it never fires. Alerts go wherever the cluster's
-  managed Alertmanager sends them (configured apart). `vertra init` offers
+  managed Alertmanager sends them (configured apart). `vennir init` offers
   it on gcp (`--monitoring google`).
 - **bundled**: a Prometheus of the console chart's own
   (`monitoring.prometheus.enabled`): one Pod and a volume
   (`monitoring.prometheus.size`, 2Gi; `retentionDays`, 15), scraping this
-  namespace's Vertra Pods (kernel-api over TLS, checked against the
+  namespace's Vennir Pods (kernel-api over TLS, checked against the
   kernel's CA) through a Role that lists only this namespace's Pods, and
   evaluating both charts' alerts. The kernel chart's come as a ConfigMap
   it reloads when a kernel upgrade changes them (within a minute). Only
@@ -529,20 +529,20 @@ Which Prometheus is `monitoring.provider`, the same in both charts:
       - podSelector: {matchLabels: {app.kubernetes.io/instance: console, app.kubernetes.io/component: prometheus}}
   ```
 
-  `vertra init` offers it on every target (`--monitoring bundled`).
-  Without kube-state-metrics, its `VertraSchedulerDown` is a scheduler
+  `vennir init` offers it on every target (`--monitoring bundled`).
+  Without kube-state-metrics, its `VennirSchedulerDown` is a scheduler
   Pod that can't be scraped, or is but finishes no passes.
-- **amazon** (`vertra` on aws, `--monitoring amazon`): the bundled
+- **amazon** (`vennir` on aws, `--monitoring amazon`): the bundled
   Prometheus writing to an Amazon Managed Service for Prometheus workspace
   the aws module makes, and sending its alerts to the workspace's
   Alertmanager, which publishes them to an SNS topic (`<name>-alerts`); an
   email (`monitoring.alertEmail`, the first admin's by default) is
-  subscribed and confirms by email. It runs as `vertra-prometheus`, whose
+  subscribed and confirms by email. It runs as `vennir-prometheus`, whose
   Pod Identity role may only write to that workspace and raise alerts in
   it. Collected in the cluster rather than by AWS's agentless scraper
   (about $29 a month more), so kernel-api's certificate is still checked
   and only that one Pod may reach the metrics ports. A few dollars a month:
-  Vertra's samples and SNS's emails. In the charts it's `bundled` with
+  Vennir's samples and SNS's emails. In the charts it's `bundled` with
   `remoteWrite` and `alertmanager` set.
 
 - `monitoring.podMonitor.enabled` (both charts; not bundled): PodMonitors
@@ -551,16 +551,16 @@ Which Prometheus is `monitoring.provider`, the same in both charts:
   (kube-prometheus-stack: `release: <its release name>`).
 - `monitoring.alerts.enabled` (both charts): PrometheusRules (Rules; a
   rule file with bundled; `helm/tests/prometheus-rules.sh` evaluates them).
-  `VertraSchedulerDown` (no pass in 10 minutes while the scheduler should
+  `VennirSchedulerDown` (no pass in 10 minutes while the scheduler should
   be running; needs kube-state-metrics, so an install that's asleep isn't
-  down), `VertraSchedulerFailing`, `VertraStepsWaiting` (the oldest ready
+  down), `VennirSchedulerFailing`, `VennirStepsWaiting` (the oldest ready
   step waited past `monitoring.alerts.readyWaitSeconds`),
-  `VertraStepsUnschedulable` (started steps kept having no node with room
+  `VennirStepsUnschedulable` (started steps kept having no node with room
   for `monitoring.alerts.unschedulableMinutes`, 15: the cluster at its node
   limit, or out of a quota; counted across the scheduler replacing each
   Pod at its start timeout),
-  `VertraConsoleFailing`, `VertraSignInBurst`, `VertraCatalogNotApplying`
-  and `VertraGatewayBackendUnreachable`.
+  `VennirConsoleFailing`, `VennirSignInBurst`, `VennirCatalogNotApplying`
+  and `VennirGatewayBackendUnreachable`.
 - `monitoring.dashboard.enabled` (console chart): the Grafana dashboard
   (`files/grafana-dashboard.json`: steps, the console, the gateway) as a
   ConfigMap labelled for Grafana's dashboard sidecar; set
@@ -571,14 +571,14 @@ Which Prometheus is `monitoring.provider`, the same in both charts:
   once any of `podMonitor`, `alerts`, `dashboard` or `prometheus` is on.
 - `monitoring.prometheusUrl` (console chart, `""`): the Prometheus whose
   alerts Observe's **Metrics** shows, quiet, pending or firing (the
-  console reads its `/api/v1/rules`, keeping the charts' `vertra-*`
+  console reads its `/api/v1/rules`, keeping the charts' `vennir-*`
   groups). Any Prometheus that evaluates the charts' rules: the cluster's
   (kube-prometheus-stack's `http://<release>-kube-prometheus-prometheus.<namespace>.svc:9090`)
   or one outside it, such as one on your machine for kind
   (`http://host.docker.internal:9090`). Empty: the bundled one when it's
   on, else none. A Prometheus with a NetworkPolicy of its own must admit
   the console's Pods. One Prometheus shared by several installs shows
-  each install's Vertra alerts on every one of them.
+  each install's Vennir alerts on every one of them.
 - `monitoring.google.project` and `monitoring.google.cluster` (console
   chart, `""`): with `monitoring.provider: google` and no `prometheusUrl`,
   where Observe's alerts come from, since GKE's managed Prometheus serves
@@ -588,10 +588,10 @@ Which Prometheus is `monitoring.provider`, the same in both charts:
   its own Google service account, which needs `roles/monitoring.viewer`
   there. Google keeps no firing alert's own text, so each shows its rule's
   summary and its labels. Without the role, the rules show with their state
-  unknown, saying what's missing. `vertra` sets both and grants the role.
+  unknown, saying what's missing. `vennir` sets both and grants the role.
   GKE's in-cluster rule evaluator (`rule-evaluator.gke-gmp-system.svc:19092`)
   does serve `/api/v1/rules`, with live states and each alert's text, but
-  it's an internal endpoint, not a published API, so `vertra` doesn't point
+  it's an internal endpoint, not a published API, so `vennir` doesn't point
   `prometheusUrl` at it (decided 2026-11-02).
 
 The metrics, for alerts and dashboards of your own:
@@ -609,8 +609,8 @@ The metrics, for alerts and dashboards of your own:
 | `console_rpc_requests_total`, `console_rpc_request_duration_seconds` | `procedure` (and `code`) | The console's API calls |
 | `console_catalog_syncs_total` | `outcome` (`unchanged`, `applied`, `applied_with_problems`, `failed`) | Catalog release checks |
 | `console_image_scans_total` | `status` (`passed`, `failed`, `error`) | Image scans finished |
-| `vertra_gateway_requests_total` | `api`, `outcome` | Gateway requests, by what happened to them |
-| `vertra_gateway_request_duration_seconds` | `api`, `answered_by` | Gateway request times |
+| `vennir_gateway_requests_total` | `api`, `outcome` | Gateway requests, by what happened to them |
+| `vennir_gateway_request_duration_seconds` | `api`, `answered_by` | Gateway request times |
 
 **Health.** kernel-api and the console answer `GET /health/live` (the
 process is up) and `GET /health/ready` on their API ports: kernel-api's is
@@ -635,14 +635,14 @@ no setting for it.
 ### The audit log's copy
 
 The console chart's `audit.export.keepDays` and `audit.export.lock` (0 and
-false; vertra sets them from `audit.keepDays` and `audit.lock`) only tell the
+false; vennir sets them from `audit.keepDays` and `audit.lock`) only tell the
 Admin page what the bucket keeps, which shows them "as configured": the
 bucket enforces them, and the console's identity may write and read the
 bucket's objects but not read its retention or lock back.
 
 The console hash-chains its audit log: each entry's hash covers the entry
 before it, so changing, removing or adding one breaks every later hash. With
-the console chart's `audit.export` (vertra: `audit.export` in vertra.yaml, on
+the console chart's `audit.export` (vennir: `audit.export` in vennir.yaml, on
 gcp and aws), every `minutes` it checks the new entries' chain and copies
 them as one JSON-lines object (`<prefix><yyyy>/<mm>/<dd>/<first>-<last>.jsonl`)
 to a bucket that refuses deletes and overwrites, create-only on its side
@@ -669,16 +669,16 @@ a restart.
   bucket can't be deleted until the last object's retention lapses. That's
   the point, and it's permanent: decide before you set it.
 
-`vertra destroy` never deletes the audit bucket. On kind, `make
+`vennir destroy` never deletes the audit bucket. On kind, `make
 kind-audit-store` runs SeaweedFS (S3 with Object Lock) with a bucket locked
 for a day; point `audit.export` at it in a values file under `_local/`.
 
 ### Logs
 
 Observe's Logs tab searches every step's output, the API backends teams
-run in their namespaces (Pods labelled `vertra/api-backend: "true"`, each
-team its own; also labelled `vertra/api: <name>`, searchable by API), and, for admins, the platform's own, when the console chart's `logs.enabled` is on (`vertra`:
-`logs.enabled` in vertra.yaml). Grafana Alloy collects through the
+run in their namespaces (Pods labelled `vennir/api-backend: "true"`, each
+team its own; also labelled `vennir/api: <name>`, searchable by API), and, for admins, the platform's own, when the console chart's `logs.enabled` is on (`vennir`:
+`logs.enabled` in vennir.yaml). Grafana Alloy collects through the
 Kubernetes API, redacting credentials, into one Loki; the console queries
 Loki with each caller's visibility added. Each step's Job is kept
 `scheduler.releaseFinishedAfterSeconds` (kernel chart, 30) after it
@@ -689,10 +689,10 @@ finishes so the collector reads it all.
 - `logs.storage`: `filesystem` (kind's: every log on Loki's volume),
   `gcs` or `s3` with a `bucket`. Loki always has a volume of `size` for
   its write-ahead log and the index it uploads every 15 minutes, so a
-  restart loses nothing (`vertra` gives it 2Gi with a bucket). Loki's identity goes on its ServiceAccount
+  restart loses nothing (`vennir` gives it 2Gi with a bucket). Loki's identity goes on its ServiceAccount
   (`serviceAccountName`, `serviceAccountAnnotations`).
 
-Archiving is the bucket's: on gcp and aws, `vertra` creates
+Archiving is the bucket's: on gcp and aws, `vennir` creates
 `<project>-<name>-logs` (GCS) or `<name>-logs-<account>-<region>` (S3)
 with a lifecycle rule moving Loki's chunks (`fake/`) to the Archive class
 (GCS) or Glacier Instant Retrieval (S3) after `searchDays`, and deleting
@@ -704,16 +704,16 @@ stay in Standard (at a negligible cost). Archived
 storage costs a fraction of a cent per GB-month, but has a minimum stay
 (GCS Archive 365 days, Glacier IR 90), billed if deleted earlier. A volume
 has no archive class: logs are kept on it until `keepDays`.
-`vertra destroy` keeps the logs bucket unless you delete the data too.
+`vennir destroy` keeps the logs bucket unless you delete the data too.
 
 ### Uninstalling
 
-`vertra destroy` does this for you (setup.md says what it keeps). By hand,
+`vennir destroy` does this for you (setup.md says what it keeps). By hand,
 the console first, then the kernel:
 
 ```
-helm uninstall console -n vertra-system --wait
-helm uninstall kernel -n vertra-system --wait
+helm uninstall console -n vennir-system --wait
+helm uninstall kernel -n vennir-system --wait
 ```
 
 That removes the platform's Pods, Services, RBAC and admission policies.
@@ -724,13 +724,13 @@ It leaves:
   (`kernel-execution-kernel-db`, `console-execution-console`): the data
   only opens with the passwords it was made with, and installing the same
   release names again reads them back. Delete both when you mean to:
-  `kubectl -n vertra-system delete pvc -l 'app.kubernetes.io/instance in (kernel,console)'` and
-  `kubectl -n vertra-system delete secret kernel-execution-kernel-db console-execution-console`
-  (`vertra destroy` asks). Switching to `existingSecret` later leaves the
+  `kubectl -n vennir-system delete pvc -l 'app.kubernetes.io/instance in (kernel,console)'` and
+  `kubectl -n vennir-system delete secret kernel-execution-kernel-db console-execution-console`
+  (`vennir destroy` asks). Switching to `existingSecret` later leaves the
   kernel's kept Secret behind too; delete it the same way.
 - **The team namespaces**, with their Secrets, ServiceAccounts and anything
   steps made there. The console created them, not Helm. Delete them with
-  `kubectl delete namespace -l vertra/team` (retired ones included).
+  `kubectl delete namespace -l vennir/team` (retired ones included).
 - **The migration hooks' leftovers.** Helm doesn't delete hook resources
   on uninstall. The console's last migrate Job (kept for its log) and its
   `<console>-execution-console-migrate-config` ConfigMap stay. The kernel's
@@ -742,7 +742,7 @@ It leaves:
   start: run the upgrade again. Delete what's left with
   `kubectl -n <namespace> delete job/<console>-execution-console-migrate configmap/<console>-execution-console-migrate-config secret/<kernel>-execution-kernel-db-migrate --ignore-not-found`
   (`<console>` and `<kernel>` are the release names, `console` and
-  `kernel`; `<namespace>` is the platform's, `vertra-system`, or `default`
+  `kernel`; `<namespace>` is the platform's, `vennir-system`, or `default`
   on the GKE values' existing install).
 - Anything outside the charts: buckets, cloud identities, the registry, and
   the platform namespace itself.
@@ -772,7 +772,7 @@ to know:
 - An install with no console host (`ingress.host` or `gatewayApi.host`),
   no `notifications.consoleUrl` and no `keyless.audience` has keyless bots
   turned off. Before, it accepted CI tokens minted for the constant
-  audience `vertra`. To keep keyless sign-in, set `keyless.audience` (and
+  audience `vennir`. To keep keyless sign-in, set `keyless.audience` (and
   have each CI job request a token for it).
 
 **Changes an upgrade must carry together** (since 2026-11-03):
@@ -786,13 +786,13 @@ to know:
 - **An AWS install's catalog repository.** The catalog publish role now
   trusts only jobs whose OIDC subject names `main`, so the repository's
   tokens must carry their branch even in an Environment (subject claims
-  `repo`, `context`, `ref`). `vertra apply` sets that before it changes the
+  `repo`, `context`, `ref`). `vennir apply` sets that before it changes the
   role, with `gh` signed in as an admin of the repository; without `gh` it
   stops and gives the one command that sets it. Until it's set, publishing
   from the `catalog-publish` Environment is refused.
-- **A catalog's `ci.yml` and its `./vertra` pin** (after 0.9.0). Catalog CI
+- **A catalog's `ci.yml` and its `./vennir` pin** (after 0.9.0). Catalog CI
   on `main` now plans, builds teams' products in their own Environments
-  (`buildEnvironments`), then publishes, with commands only `vertra` after
+  (`buildEnvironments`), then publishes, with commands only `vennir` after
   0.9.0 has, and a sign-in step in `.github/actions/`. Take the template's
   `.github/workflows/`, `.github/actions/` and the pin in one pull request
   (the catalog guide, "Updating your catalog").
@@ -807,12 +807,12 @@ Check what's really running with
 
 ### Choosing the version
 
-With `vertra`, the release an install runs is the `vertra` key in
-vertra.yaml (`source` builds the working copy instead):
-`vertra config set -e <env> vertra <x.y.z>`, then `vertra apply <env>`.
-`vertra check` says when a newer release is out; `apply`'s screen names
+With `vennir`, the release an install runs is the `vennir` key in
+vennir.yaml (`source` builds the working copy instead):
+`vennir config set -e <env> vennir <x.y.z>`, then `vennir apply <env>`.
+`vennir check` says when a newer release is out; `apply`'s screen names
 the releases an upgrade passes over (their migrations run in order, but
-read their notes) and says when `vertra` itself is older than the release;
+read their notes) and says when `vennir` itself is older than the release;
 it refuses an older release than the one installed.
 With Helm, it's the charts' `--version`; each chart defaults to the images
 released with it. Upgrade the kernel first, as on install.
@@ -832,10 +832,10 @@ databases:
 - The console doesn't check its schema. Older console code against a newer
   schema isn't tested; don't rely on it.
 
-So take a backup before an upgrade: `vertra backup <env>`, or by running
+So take a backup before an upgrade: `vennir backup <env>`, or by running
 the backup CronJob by hand (and the console's,
 `console-execution-console-pg-backup`, when it has its own Postgres):
-`kubectl -n vertra-system create job --from=cronjob/kernel-execution-kernel-pg-backup pre-upgrade`.
+`kubectl -n vennir-system create job --from=cronjob/kernel-execution-kernel-pg-backup pre-upgrade`.
 To go back: install the previous release's charts, then restore that backup
 ([Restoring](#backups)).
 
@@ -844,14 +844,14 @@ To go back: install the previous release's charts, then restore that backup
 Each chart can run its own Postgres (`postgres.enabled`), a single replica
 on a volume (the kernel's runs as its own user, 999, from the start on a
 volume made since 2026-10-29, which its claim marks
-`vertra.dev/postgres-layout: nonroot`; one made before keeps the image's
+`vennir.dev/postgres-layout: nonroot`; one made before keeps the image's
 way, starting as root to take ownership, until it's
-[moved](#moving-postgres-to-its-own-user): `postgres.nonRoot`); or use an external database, such as the managed one `vertra`
+[moved](#moving-postgres-to-its-own-user): `postgres.nonRoot`); or use an external database, such as the managed one `vennir`
 makes on Google Cloud or AWS (below). On a small install the kernel's
 Postgres can also hold the console's database (`postgres.consoleDatabase`),
 where the console signs in as its own role, which owns only its database.
 The kernel's processes sign in as a role of their own too
-(`postgres.auth.kernelUsername`, `vertra_kernel`), which owns only the
+(`postgres.auth.kernelUsername`, `vennir_kernel`), which owns only the
 kernel's database and isn't a superuser; the step before each migration
 makes it, sets its password from the release's Secret, and hands it the
 database and everything in it, so an upgrade from an install that used the
@@ -866,7 +866,7 @@ superuser's `postgres-password`, the kernel role's `kernel-password`;
 upgrade. To rotate the superuser's:
 
 ```
-NS=vertra-system; PG=deploy/kernel-execution-kernel-postgres; SECRET=kernel-execution-kernel-db
+NS=vennir-system; PG=deploy/kernel-execution-kernel-postgres; SECRET=kernel-execution-kernel-db
 NEW=$(openssl rand -hex 24)
 # 1. The role, sent on stdin so it never shows in a process list.
 printf "ALTER ROLE postgres PASSWORD '%s';\n" "$NEW" | kubectl -n $NS exec -i $PG -- psql -q -U postgres -v ON_ERROR_STOP=1
@@ -885,14 +885,14 @@ A console with its own Postgres is the same with its Secret
 (`console-execution-console`, deployment `console-execution-console-postgres`),
 then restart the console, and the gateway if it runs.
 
-When the kernel's Postgres holds the console's database (what `vertra`
+When the kernel's Postgres holds the console's database (what `vennir`
 installs), the console signs in as the role `console`, whose password is in
 `kernel-execution-kernel-console-db` (keys `password` and `database-url`).
 Every kernel install and upgrade sets the role's password from that Secret
 (the `console-db` hook Job), so change both together:
 
 ```
-NS=vertra-system; PG=deploy/kernel-execution-kernel-postgres; SECRET=kernel-execution-kernel-console-db
+NS=vennir-system; PG=deploy/kernel-execution-kernel-postgres; SECRET=kernel-execution-kernel-console-db
 NEW=$(openssl rand -hex 24)
 printf "ALTER ROLE console PASSWORD '%s';\n" "$NEW" | kubectl -n $NS exec -i $PG -- psql -q -U postgres -v ON_ERROR_STOP=1
 URL=$(kubectl -n $NS get secret $SECRET -o jsonpath='{.data.database-url}' | base64 -d | sed "s|^\([^:]*://[^:]*\):[^@]*@|\1:$NEW@|")
@@ -905,7 +905,7 @@ connections are trusted there. The console's other secret, the one that
 signs sessions, is under [Rotating secrets](#rotating-secrets).
 
 **A managed database (gcp).** With `database.type: managed` (asked by
-`vertra init` on gcp, or `--database managed`), the gcp module makes Cloud SQL
+`vennir init` on gcp, or `--database managed`), the gcp module makes Cloud SQL
 for PostgreSQL 16 instead of the in-cluster Postgres: both databases on one
 instance, its machine and `max_connections` following the size
 (`minimal`: `db-g1-small`; `resilient` and `auto`: 1 vCPU, 3.75 GB;
@@ -913,7 +913,7 @@ instance, its machine and `max_connections` following the size
 second zone with `database.highAvailability` (`--database-ha`, on by
 default for `resilient` and `scaled`). It has a private IP only, in the
 install's own network, and accepts only TLS, which each service checks
-against the instance's own CA (`vertra-db-ca`).
+against the instance's own CA (`vennir-db-ca`).
 
 There are no database passwords. The kernel, the console and the gateway
 each sign in as their own Google service account (Cloud SQL's IAM database
@@ -923,7 +923,7 @@ mount the CA from `database.caSecret`). Their Cloud SQL roles (Client and
 Instance User) hold for this instance only, by an IAM condition, not for
 every instance in the project. Before the charts, every apply runs
 `kernel database-setup` once as a fourth identity, the database
-administrator (`vertra-db-admin`), the only one in `cloudsqlsuperuser`: it
+administrator (`vennir-db-admin`), the only one in `cloudsqlsuperuser`: it
 opens `execution_kernel` to the kernel alone and `execution_console` to the
 console alone, which gives the gateway what it reads, as with the in-cluster
 Postgres. Each service then owns its own tables; none can read another's.
@@ -936,7 +936,7 @@ TLS forced and checked in full (`verify-full`) against Amazon's RDS
 certificates for the region. Each service signs in as its own role (EKS
 Pod Identity) with a 15-minute token signed locally (`database.iamAuth:
 aws`, `database.region`). RDS requires an administrator with a password: it
-keeps it in Secrets Manager itself (it's in no state file of Vertra's), and
+keeps it in Secrets Manager itself (it's in no state file of Vennir's), and
 only `kernel database-setup`'s role may read it, to make the two databases
 and the services' users (members of `rds_iam`) and open each database to
 its own service alone.
@@ -944,13 +944,13 @@ its own service alone.
 Cloud SQL and RDS back it up daily, with point-in-time recovery, keeping
 `database.backups.retentionDays` backups (at most 35 on RDS); the
 backup Jobs and their bucket aren't made. It runs whether or not the
-platform sleeps, and the approval screen prices it. `vertra destroy`
-deletes it only when told to delete data (on RDS, with the snapshots `vertra
+platform sleeps, and the approval screen prices it. `vennir destroy`
+deletes it only when told to delete data (on RDS, with the snapshots `vennir
 backup` took, which RDS would otherwise keep).
 
 **Moving an install onto it.** For an install whose data is in the
-in-cluster Postgres, `vertra config set -e <env> database.type managed`,
-then `vertra apply`, moves it: once the server is made and opened to the
+in-cluster Postgres, `vennir config set -e <env> database.type managed`,
+then `vennir apply`, moves it: once the server is made and opened to the
 services, the writers stop and a Job in the cluster per database pipes
 `pg_dump` from the in-cluster Postgres into `pg_restore` on the server,
 signed in as that database's own service (`kernel database-token` writes
@@ -963,10 +963,10 @@ stay stopped and applying again copies only the rest (what's done stays
 current, nothing having written since). The in-cluster backups' bucket is
 kept, its old backups ageing out as before. Proven on GKE (Cloud SQL) and
 EKS (RDS), 2026-10-29. The in-cluster Postgres's volume is kept as the way
-back, until you delete its claim. (`vertra backup --to <folder>` first keeps
+back, until you delete its claim. (`vennir backup --to <folder>` first keeps
 a copy on your machine too.)
 
-`vertra backup` takes an on-demand backup of the server, and `vertra
+`vennir backup` takes an on-demand backup of the server, and `vennir
 backups` lists them. To restore:
 
 ```
@@ -983,7 +983,7 @@ aws rds restore-db-instance-to-point-in-time --source-db-instance-identifier <na
 NetworkPolicies admit only the platform's own Pods. To look at one:
 
 ```
-kubectl -n vertra-system exec -it deploy/kernel-execution-kernel-postgres -- psql -U postgres -d execution_kernel
+kubectl -n vennir-system exec -it deploy/kernel-execution-kernel-postgres -- psql -U postgres -d execution_kernel
 # or execution_console (in the console's Postgres, or the kernel's when it holds both)
 ```
 
@@ -1019,15 +1019,15 @@ root (`postgres.nonRoot: auto` leaves it so, on every upgrade). Moving it
 to run as its own user (999) is one explicit upgrade, with Postgres down
 for a restart:
 
-1. **Back it up first**, and check the backup is there: `vertra backup
+1. **Back it up first**, and check the backup is there: `vennir backup
    <env>` (or `--to <folder>`), or the CronJob run by hand ([Upgrading](#upgrading)).
    A move changes only permissions, never data, but a backup is the way
    back from anything.
 2. **Upgrade with `postgres.nonRoot: true`**: with Helm,
-   `--set postgres.nonRoot=true` on the usual upgrade; with `vertra`, in
+   `--set postgres.nonRoot=true` on the usual upgrade; with `vennir`, in
    the file its `values:` names (`postgres: {nonRoot: true}`), then
-   `vertra apply <env>`. The claim is marked
-   `vertra.dev/postgres-layout: nonroot`, so `auto` keeps the new layout
+   `vennir apply <env>`. The claim is marked
+   `vennir.dev/postgres-layout: nonroot`, so `auto` keeps the new layout
    afterwards; the setting can go back to `auto`.
 
 What happens: the old Pod stops (the Deployment recreates, never two at
@@ -1050,7 +1050,7 @@ It refuses, changing nothing, when a move isn't safe: no `pgdata/` on a
 volume that holds something else (Postgres would start an empty database
 beside it), a file in it not owned by 999, or data from another Postgres
 major than the image's. Postgres doesn't start; the Pod shows `Init:Error`
-and says why (`kubectl -n vertra-system logs deploy/kernel-execution-kernel-postgres
+and says why (`kubectl -n vennir-system logs deploy/kernel-execution-kernel-postgres
 -c postgres-layout`, or `describe`). The upgrade's migration hook then
 waits for a database that won't come, so stop the upgrade and go back
 with `helm rollback kernel <the revision before>`, which runs no
@@ -1081,11 +1081,11 @@ default) come from a CA each chart makes at install and keeps; each lasts
 upgrade, the kernel first:
 
 ```
-kubectl -n vertra-system delete secret kernel-execution-kernel-tls kernel-execution-kernel-tls-ca
+kubectl -n vennir-system delete secret kernel-execution-kernel-tls kernel-execution-kernel-tls-ca
 helm upgrade kernel ...    # a new CA and certificates; Postgres and kernel-api restart with them
-kubectl -n vertra-system rollout restart deployment kernel-execution-kernel-scheduler
+kubectl -n vennir-system rollout restart deployment kernel-execution-kernel-scheduler
 helm upgrade console ...   # then restart the console and the gateway, which read the CA at start
-kubectl -n vertra-system rollout restart deployment console-execution-console console-execution-console-gateway
+kubectl -n vennir-system rollout restart deployment console-execution-console console-execution-console-gateway
 ```
 
 For the console's own Postgres (when it has one), the same with
@@ -1102,9 +1102,9 @@ Secret and read back on every upgrade; the chart's `jwtSecret` overrides
 it. To rotate it:
 
 ```
-kubectl -n vertra-system patch secret console-execution-console --type json -p '[{"op":"remove","path":"/data/jwt-secret"}]'
+kubectl -n vennir-system patch secret console-execution-console --type json -p '[{"op":"remove","path":"/data/jwt-secret"}]'
 helm upgrade console ...   # your usual upgrade: a new one is generated
-kubectl -n vertra-system rollout restart deployment console-execution-console
+kubectl -n vennir-system rollout restart deployment console-execution-console
 ```
 
 A changed Secret restarts nothing by itself, hence the restart. The
@@ -1121,8 +1121,8 @@ last ones it read for up to ten). Then:
 ## Backups
 
 Off by default, for the bundled Postgres only. With the installer, turn them
-on with `vertra config set -e <env> database.backups.enabled true`, then
-`vertra apply <env>`; with Helm alone, the charts' `backup.enabled`. A CronJob
+on with `vennir config set -e <env> database.backups.enabled true`, then
+`vennir apply <env>`; with Helm alone, the charts' `backup.enabled`. A CronJob
 in each chart runs `pg_dump -Fc`, checks the dump with `pg_restore --list`,
 names it `<release>/<UTC timestamp>.pgdump` (with the console's database, on
 a shared instance, as `<backupPrefix>/<same timestamp>.pgdump`), and copies it
@@ -1136,11 +1136,11 @@ to `backup.destination`:
 | `pvc` | `cp`, deleting dumps older than `pvc.keepDays` | Nothing | On kind |
 
 For the cloud destinations, the copy runs as `backup.serviceAccountName`
-(default `vertra-pg-backup`). Create it in the platform namespace and bind
+(default `vennir-pg-backup`). Create it in the platform namespace and bind
 it to an identity that may write to the bucket and nothing else: on GCS,
 `roles/storage.objectCreator` and `roles/storage.objectViewer` on the bucket
 (`gsutil` lists before writing); on S3, `s3:PutObject`, on a versioned bucket
-so an overwrite can't destroy an earlier dump. vertra's aws module does
+so an overwrite can't destroy an earlier dump. vennir's aws module does
 this, and expires noncurrent versions as long after as current ones: an
 overwritten dump stays the full retention after the overwrite, but every
 dump is stored (and billed) for twice the retention, since expiring a
@@ -1149,19 +1149,19 @@ as long as you need with a lifecycle rule on the bucket. For `pvc`, create the c
 (`backup.pvc.claimName`): most storage classes bind a volume only once a Pod
 uses it, which would hang `helm upgrade --wait`.
 
-**With `vertra`:** `vertra backup <env>` runs the backup Job now and waits
+**With `vennir`:** `vennir backup <env>` runs the backup Job now and waits
 (or, with `--to <folder>`, dumps both databases to this machine, from any
-install's in-cluster Postgres, kind included); `vertra backups <env>` lists
-the bucket's; `vertra restore <env> <time>` (or `--from <folder>`) does
+install's in-cluster Postgres, kind included); `vennir backups <env>` lists
+the bucket's; `vennir restore <env> <time>` (or `--from <folder>`) does
 everything below: it checks both dumps in the Postgres Pod before stopping
-anything, dumps the databases as they are to `~/.vertra/backups/<env>/` first,
+anything, dumps the databases as they are to `~/.vennir/backups/<env>/` first,
 stops the writers and the sleeper, restores, grants, and starts them again
 at their copies (proven on kind, 2026-10-29, a failed restore resumed
 included). A restore that fails partway leaves the writers stopped; running
 it again finishes. If the backup's schema is older than the one it replaced,
-`vertra apply` migrates it forward. With a managed database, `vertra backup`
-takes the cloud's on-demand backup and `vertra backups` lists them;
-restoring one is the cloud's (`vertra restore` says how).
+`vennir apply` migrates it forward. With a managed database, `vennir backup`
+takes the cloud's on-demand backup and `vennir backups` lists them;
+restoring one is the cloud's (`vennir restore` says how).
 
 **Restoring by hand** (proven on kind, replacing both live databases on a
 shared instance; with two instances, restore each on its own):
@@ -1177,9 +1177,9 @@ kubectl -n $NS exec -i deploy/kernel-execution-kernel-postgres -- sh -c 'cat > /
 kubectl -n $NS exec -i deploy/kernel-execution-kernel-postgres -- sh -c 'cat > /tmp/console.pgdump' < console.pgdump
 # 4. Inside the Pod (kubectl exec -it ... -- sh):
 export PGUSER=postgres
-# The kernel's own role owns its database (vertra_kernel; postgres on an
+# The kernel's own role owns its database (vennir_kernel; postgres on an
 # install from before it had one).
-K=vertra_kernel; [ "$(psql -Atc "SELECT 1 FROM pg_roles WHERE rolname = '$K'")" = 1 ] || K=postgres
+K=vennir_kernel; [ "$(psql -Atc "SELECT 1 FROM pg_roles WHERE rolname = '$K'")" = 1 ] || K=postgres
 dropdb --force execution_kernel && createdb -O $K execution_kernel
 pg_restore --exit-on-error --no-owner --role=$K -d execution_kernel /tmp/kernel.pgdump
 dropdb --force execution_console && createdb -O console execution_console
@@ -1189,7 +1189,7 @@ psql -c 'REVOKE CONNECT ON DATABASE execution_kernel FROM PUBLIC' \
      -c 'GRANT CONNECT ON DATABASE execution_console TO console' \
      -c "GRANT CONNECT ON DATABASE execution_kernel TO $K"
 # With the API gateway on, its role reads the console's database too:
-psql -c 'GRANT CONNECT ON DATABASE execution_console TO vertra_gateway'
+psql -c 'GRANT CONNECT ON DATABASE execution_console TO vennir_gateway'
 rm /tmp/*.pgdump
 # 5. Start everything again, each at the copies noted in step 2.
 kubectl -n $NS scale deployment kernel-execution-kernel-api --replicas=<as before>
@@ -1213,7 +1213,7 @@ cluster and restoring both databases as above:
   A catalog team's namespace comes back when a catalog release is applied:
   press **Sync now** on the Admin page's Catalog card, which applies the
   current release again even though it hasn't changed. Any other team's
-  namespace has to be created by hand, labelled `vertra/team=true` (and
+  namespace has to be created by hand, labelled `vennir/team=true` (and
   `pod-security.kubernetes.io/enforce=restricted`, as the console would).
 - **Team secrets' values are gone.** The console records each secret's name
   and keys, never its value, and the values lived only in the old cluster's
@@ -1243,21 +1243,21 @@ Both charts ship NetworkPolicies (`networkPolicy.enabled`, on by default):
 
 So a step can reach neither database nor kernel-api.
 
-Each team namespace gets one too, `vertra-default-deny`, written by the
+Each team namespace gets one too, `vennir-default-deny`, written by the
 console with the namespace and rewritten on every policy resync (console
 chart, `teamNamespaces.defaultDenyIngress`, on by default; only when the
 console manages team namespaces). Its Pods accept connections only from
 Pods in the same namespace, so teams can't reach each other. With the
-gateway on, a second one, `vertra-gateway-ingress`, lets the gateway's Pods
-(and nothing else) reach the Pods a team labels `vertra/api-backend: "true"`:
+gateway on, a second one, `vennir-gateway-ingress`, lets the gateway's Pods
+(and nothing else) reach the Pods a team labels `vennir/api-backend: "true"`:
 an API product whose backend runs in the team's own namespace
 (`samples/local/apis/greetings`; on kind, `make kind-sample-api`). A
 namespace the console doesn't manage needs the same policies from whoever
 made it. Outbound traffic isn't restricted, except, with
 `teamNamespaces.blockMetadata` (on EKS), a third policy,
-`vertra-no-metadata`, which lets a team's Pods out anywhere but the
+`vennir-no-metadata`, which lets a team's Pods out anywhere but the
 instance metadata server (`169.254.169.254`; IPv4 clusters, which are
-what `vertra` makes), so a step can't take its node's role. Never turn it on for GKE: Workload Identity is
+what `vennir` makes), so a step can't take its node's role. Never turn it on for GKE: Workload Identity is
 served at that address.
 
 ## The chat agent
@@ -1272,14 +1272,14 @@ never places one). It's off until the console chart's `chat.model` is set, with
 scoring it;
 `chat.vertex.location` global, or a region to keep requests in it),
 signed in as the console's Workload Identity with no key, its Google
-service account needing `roles/aiplatform.user` there: what `vertra`
-sets up on GCP (`chat.off` in vertra.yaml turns it off, `chat.model`
+service account needing `roles/aiplatform.user` there: what `vennir`
+sets up on GCP (`chat.off` in vennir.yaml turns it off, `chat.model`
 picks another); `bedrock`, Claude in Amazon Bedrock in
 `chat.bedrock.region` (on with no `chat.model`: Claude Sonnet 5,
 `anthropic.claude-sonnet-5`, open to every Bedrock account), each
 request signed (SigV4) as the console's own AWS identity, its EKS Pod
 Identity, with no key: its role needs `bedrock-mantle:CreateInference`
-there, which `vertra` grants on AWS for that one model (the condition
+there, which `vennir` grants on AWS for that one model (the condition
 `bedrock-mantle:Model`; the scanner's Jobs have a role of their own,
 without it); `openai-compatible`, with `chat.endpoint` the
 model's base URL (`.../v1`): LM Studio or Ollama on a laptop (kind's values
@@ -1287,7 +1287,7 @@ point at `host.docker.internal:1234`), any other server of
 `/chat/completions`; or `anthropic`, Claude
 through Anthropic's API (`chat.model` such as `claude-haiku-5-5`). A key,
 when one's needed, is a Secret named in `chat.apiKeySecret` (key
-`api-key`): `kubectl -n vertra-system create secret generic console-chat-key
+`api-key`): `kubectl -n vennir-system create secret generic console-chat-key
 --from-file=api-key=<file>`. What a person asks, and what
 the agent's tools find for them, goes to the model: on a cloud, use one in
 the install's own. Each person may ask 30 questions an hour and 200 a day
@@ -1312,7 +1312,7 @@ provider, left out, the install's is used. An admin's settings that stop
 working (a key that no longer unseals after `JWT_SECRET` changes) turn chat
 off and say why there, rather than falling back.
 
-It answers only about Vertra. A short check of each question, by the same
+It answers only about Vennir. A short check of each question, by the same
 model with no tools, answers anything else with one fixed sentence
 (`offTopic`), and the prompt holds the same scope; an answer from neither
 the docs it cites nor the platform's tools is never shown, the console's
@@ -1364,27 +1364,27 @@ ten seconds, and every run ended as expected.
 **The first admin's password is lost**, or was never known (a chart
 install that set none: the account gets a random one that is never printed,
 since a Job's log may be shipped to Cloud Logging or Loki and kept there).
-`vertra apply` gives a fresh install's first admin a password it generates,
+`vennir apply` gives a fresh install's first admin a password it generates,
 in a Secret it deletes once the console is installed, and saves it to
-`admin-password`; nothing logs it. `vertra admin
+`admin-password`; nothing logs it. `vennir admin
 reset-password <env>` gives that admin (or `--email` another) a new random
 password from inside the console's Pod, saved to `admin-password` in the
 environment's folder (readable only by you, never printed): only someone
 with access to the cluster can. Every session the account had is signed out,
 and the reset is in the audit log. The admin then has to choose their own
 password before doing anything else, as anyone given a password by someone
-else does (a new account's, or an admin's reset of theirs). Without vertra: `kubectl exec
-deploy/console-execution-console -n vertra-system -- node
+else does (a new account's, or an admin's reset of theirs). Without vennir: `kubectl exec
+deploy/console-execution-console -n vennir-system -- node
 dist/db/resetAdmin.js <email>`.
 
 **Installed before 2026-11-03, and the first admin hasn't signed in yet?**
 Its generated password was printed to the migrate Job's log, which the
-cluster's logging may still keep, and it still works: run `vertra admin
+cluster's logging may still keep, and it still works: run `vennir admin
 reset-password <env>` (or `resetAdmin.js` above) now.
 
 **An admin account appeared after an upgrade.** Every console install and
 upgrade creates an admin with the console chart's `bootstrapAdmin.email`
-(`admin.email` in vertra.yaml) when no account has that email: the first
+(`admin.email` in vennir.yaml) when no account has that email: the first
 admin's account was deleted, or the setting changed. Its password is
 random and shown nowhere: give it one as for a lost password (above), if
 it's to be used. Delete the account on the Admin page
@@ -1419,8 +1419,8 @@ in sooner, delete their row from `sign_in_failures` (and
 
 | Code | Meaning |
 | --- | --- |
-| `DISPATCH_REJECTED` | Its namespace isn't labelled `vertra/team=true` |
-| `TEAM_RETIRED` | Its team's namespace is labelled `vertra/team=retired` (retired while the run was going) |
+| `DISPATCH_REJECTED` | Its namespace isn't labelled `vennir/team=true` |
+| `TEAM_RETIRED` | Its team's namespace is labelled `vennir/team=retired` (retired while the run was going) |
 | `IMAGE_NOT_ALLOWED` | Its image isn't under an allowed source (Admin page) |
 | `IMAGE_NOT_PINNED`, `IMAGE_SCAN_FAILED` | Not pinned by digest; a failed scan |
 | `IMAGE_NOT_SIGNED` | Not signed by the catalog's key (with policy-controller) |
@@ -1460,7 +1460,7 @@ didn't parse. Run `actionlint` on it; a common cause is using `secrets` in a
 step's `if:` (move it to `env:` and test that).
 
 **The catalog release doesn't apply.** The Admin page's Catalog card shows
-the last check's error and what was applied, and `VertraCatalogNotApplying`
+the last check's error and what was applied, and `VennirCatalogNotApplying`
 fires after an hour of failures. A failed check applies nothing: the last
 release applied stays in force. The console logs each failure as
 `catalog_sync_failed`. The usual causes:
@@ -1484,7 +1484,7 @@ the current release even if it hasn't changed.
 
 **On kind:**
 - Docker Desktop restarted and the node stopped (`docker ps -a` shows
-  `vertra-local-control-plane` as `Exited`): `make up`. If `docker start`
+  `vennir-local-control-plane` as `Exited`): `make up`. If `docker start`
   itself fails, restart Docker Desktop.
 - The console stopped answering after a redeploy: its port-forward was on
   the old Pod; `make up`.
@@ -1494,9 +1494,9 @@ the current release even if it hasn't changed.
 - Forgotten local admin password:
 
   ```
-  HASH=$(kubectl -n vertra-system exec deploy/console-execution-console -- \
-    node -e "require('./dist/auth/password.js').hashPassword('vertra-local').then(console.log)")
-  kubectl -n vertra-system exec deploy/kernel-execution-kernel-postgres -- \
+  HASH=$(kubectl -n vennir-system exec deploy/console-execution-console -- \
+    node -e "require('./dist/auth/password.js').hashPassword('vennir-local').then(console.log)")
+  kubectl -n vennir-system exec deploy/kernel-execution-kernel-postgres -- \
     psql -U postgres -d execution_console -c "UPDATE users SET password_hash = '$HASH' WHERE email = 'admin@example.com';"
   ```
 

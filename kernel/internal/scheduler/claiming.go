@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
+	"github.com/rburns629/vennir/kernel/internal/domain"
 )
 
 // Claiming uses SELECT ... FOR UPDATE SKIP LOCKED, so several schedulers
