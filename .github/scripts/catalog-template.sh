@@ -27,6 +27,12 @@ rm -rf "$work/.vennir"
 # This checkout's vennir, not the template's pinned release; or, with
 # VENNIR_PINNED=1, the pinned release, as a new catalog's CI runs it.
 if [ "${VENNIR_PINNED:-}" = 1 ]; then
+  # Between a rename and its first release there's no vennir to pin (the
+  # Vertra releases can't read this format): say so rather than fail.
+  if grep -q '^version=""$' "$template/vennir"; then
+    echo "::notice::catalog-template pins no vennir release yet; pin the first one (.github/scripts/pin-vennir.sh)"
+    exit 0
+  fi
   unset VENNIR_BIN
 elif [ -z "${VENNIR_BIN:-}" ]; then
   VENNIR_BIN=$(bash "$root/.github/scripts/build-vennir.sh")

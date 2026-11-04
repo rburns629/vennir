@@ -8,13 +8,15 @@ import (
 	"testing"
 )
 
+// Newest first, from Vennir's first release: the repository's earlier
+// tags are Vertra's.
 func TestParseKeepsReleasesNewestFirst(t *testing.T) {
-	got, err := parse([]byte(`[{"tag_name":"v0.5.1"},{"tag_name":"v0.10.0"},{"tag_name":"v0.6.0-rc.1","prerelease":true},
-		{"tag_name":"v0.9.0","draft":true},{"tag_name":"v0.5.2"},{"tag_name":"nightly"}]`))
+	got, err := parse([]byte(`[{"tag_name":"v0.11.1"},{"tag_name":"v0.12.0"},{"tag_name":"v0.13.0-rc.1","prerelease":true},
+		{"tag_name":"v0.14.0","draft":true},{"tag_name":"v0.11.2"},{"tag_name":"nightly"},{"tag_name":"v0.10.0"},{"tag_name":"v0.9.0"}]`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"0.10.0", "0.5.2", "0.5.1"}; !slices.Equal(got, want) {
+	if want := []string{"0.12.0", "0.11.2", "0.11.1"}; !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }

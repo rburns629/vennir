@@ -23,6 +23,12 @@ import (
 // Repository is where Vennir is released.
 const Repository = "rburns629/vennir"
 
+// First is Vennir's first release. The repository's earlier ones are
+// Vertra's (the platform's name until 2026-11-03), published under
+// ghcr.io/rburns629/vertra and signed by that repository's workflow, which
+// this vennir can't install: the vertra CLI does.
+const First = "0.11.0"
+
 const (
 	listURL       = "https://api.github.com/repos/" + Repository + "/releases?per_page=100"
 	cacheLifetime = 24 * time.Hour
@@ -103,7 +109,7 @@ func parse(body []byte) ([]string, error) {
 	var versions []string
 	for _, r := range list {
 		v := strings.TrimPrefix(r.TagName, "v")
-		if !r.Draft && !r.Prerelease && Valid(v) {
+		if !r.Draft && !r.Prerelease && Valid(v) && Compare(v, First) >= 0 {
 			versions = append(versions, v)
 		}
 	}
