@@ -236,6 +236,10 @@ it was seen.
 
 ## Testing and housekeeping
 
+- [ ] **Deploy vennir.io from CI.** `site/` is deployed by hand
+  (`site/README.md`). A workflow on main that deploys it, signing in to
+  Google Cloud by Workload Identity Federation (no stored key) as an account
+  that may only deploy Firebase Hosting, would keep it in step with the repo.
 - [ ] **Switch to Sigstore's newer signature format** once policy-controller
   reads it (catalog CI signs with `--new-bundle-format=false`). Checked
   2026-10-29: the installed policy-controller (chart 0.10.8, app 0.13.1) has

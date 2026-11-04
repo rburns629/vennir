@@ -219,6 +219,10 @@ its own directory.
   `vennir-perf` (`perf/README.md`: the runbook, and what's been found).
   Never run them on `vennir-local` or a shared cluster; every Makefile kind
   target takes `KIND_CLUSTER=vennir-perf`.
+- **`site/`**: vennir.io, the public website. Plain static pages with no
+  build step, on Firebase Hosting in the Google Cloud project `general-513718`
+  (`site/README.md`). Its pages were drawn on the mockups canvas first, like
+  the console's.
 - **`_local/`** (gitignored): personal scratch space, such as a clone of
   your own catalog repository.
 - `examples/`: fake demo products (`project-product`,
