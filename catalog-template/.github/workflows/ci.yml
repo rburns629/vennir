@@ -24,6 +24,14 @@ name: catalog-ci
 # edits a workflow can print them. Without Environments (a private repository
 # on GitHub Free), use only what needs no secret: OIDC to the registry, and
 # keyless or KMS signing. `vertra catalog create` warns about any it finds.
+#
+# A team whose builds need values of their own (a private package registry's
+# token) is listed in vertra.yaml's buildEnvironments, and its secrets go in
+# its own Environment, team-<name>, which `./vertra catalog environments`
+# makes and limits to main. On main its products are built there (the build
+# job), each secret offered to docker build by name, and publish loads the
+# images; a pull request only validates them. Values a step uses when it
+# runs are the console's team secrets (secretRefs), never these.
 
 on:
   # No paths filter: `check` is a required status check on main (README,
@@ -57,9 +65,14 @@ permissions:
 
 jobs:
   # Pull requests and the weekly run: validate, build, test and scan. Never
-  # pushes anything, so it needs no credentials.
+  # pushes anything, so it needs no credentials. A team that builds in its
+  # own Environment has its products only validated on a pull request,
+  # which can't have that Environment's secrets; weekly, the build job
+  # builds them there and this loads them.
   check:
-    if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+    needs: build
+    if: >-
+      !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -70,11 +83,19 @@ jobs:
       - name: Lint the workflows
         if: github.event_name == 'pull_request'
         run: actionlint
+      - name: Download the images teams' Environments built
+        if: github.event_name == 'schedule' && needs.build.result != 'skipped'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: images-*
+          merge-multiple: true
+          path: images
       - name: Check the changed products
         env:
           # Empty (the weekly run) checks everything.
           BASE: ${{ github.event.pull_request.base.sha }}
-        run: ./vertra catalog check --changed "$BASE"
+          IMAGES: ${{ github.event_name == 'schedule' && 'images' || '' }}
+        run: ./vertra catalog check --changed "$BASE" --images "$IMAGES"
 
   # main, before publishing: gitleaks and Semgrep (security.yml), so a
   # finding stops the publish even if it was merged.
@@ -84,9 +105,93 @@ jobs:
     permissions:
       contents: read
 
+  # main: which of the products publish will choose are built in their
+  # team's own Environment (./vertra catalog plan), once it has checked each
+  # such Environment can be used from main only. It signs in to the
+  # registry only to see what isn't published yet, as publish does.
+  plan:
+    if: >-
+      github.ref == 'refs/heads/main' && inputs.version == '' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    environment: catalog-publish
+    permissions:
+      contents: read
+      actions: read     # teams' Environments' branch rules
+      id-token: write   # registry sign-in through OIDC
+    outputs:
+      builds: ${{ steps.plan.outputs.builds }}
+    env:
+      VERTRA_REGISTRY: ${{ vars.VERTRA_REGISTRY }}
+      VERTRA_SIGNING_MODE: ${{ vars.VERTRA_SIGNING_MODE }}
+      VERTRA_SIGNING_KEY: ${{ vars.VERTRA_SIGNING_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0   # to diff against the push's previous commit
+      - uses: ./.github/actions/registry-sign-in
+        with:
+          registry: ${{ vars.VERTRA_REGISTRY }}
+          gcp-workload-identity-provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          gcp-service-account: ${{ vars.PUBLISH_GCP_SERVICE_ACCOUNT }}
+          aws-role-arn: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Plan the teams' builds
+        id: plan
+        env:
+          BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./vertra catalog plan --changed "$BASE" --out plan.json
+          echo "builds=$(cat plan.json)" >> "$GITHUB_OUTPUT"
+
+  # main: each team that builds in its own Environment, in it (team-<name>,
+  # main only): its secrets are offered to docker build by name (a
+  # Dockerfile reads one with RUN --mount=type=secret,id=NAME, so it's never
+  # in a layer), and the images are saved for publish, or the weekly check,
+  # to load, test, scan, push and sign. It holds no registry credential and
+  # can't sign in to a cloud, pushes nothing, and no other team's job sees
+  # its secrets.
+  build:
+    needs: plan
+    if: needs.plan.outputs.builds != '' && needs.plan.outputs.builds != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false   # one team's failure never stops another's build
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.builds) }}
+    environment: team-${{ matrix.team }}
+    permissions:
+      contents: read
+    env:
+      # Not a credential: what the images are built for follows from it.
+      VERTRA_REGISTRY: ${{ vars.VERTRA_REGISTRY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build team ${{ matrix.team }}'s products
+        env:
+          # The plan's product folders (lowercase names, so splitting is safe).
+          PRODUCTS: ${{ join(matrix.products, ' ') }}
+          VERTRA_BUILD_SECRETS: ${{ toJSON(secrets) }}
+        run: |
+          read -ra products <<< "$PRODUCTS"
+          ./vertra catalog build --out images "${products[@]}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: images-${{ matrix.team }}
+          path: images
+          retention-days: 1
+          if-no-files-found: error
+
   # main: the same checks, then push and sign each product that passed, then
   # the release. Runs in the catalog-publish Environment, which only main may
   # use, so a workflow edited in a pull request never gets its credentials.
+  # A team's products built in its own Environment are loaded from that
+  # build (--images), never built here.
   # One run at a time, in order: a release names the images as of its commit.
   # With a version it only tags a release main already published and signed
   # (`vertra catalog promote`), so it signs nothing; it queues apart, so a
@@ -94,13 +199,16 @@ jobs:
   # Weekly (the schedule), it mirrors the approved bases instead: the same
   # sign-in, no products published.
   publish:
-    needs: security
-    # Products only once security passed; a version and the weekly bases
-    # mirror publish no product, so they don't wait for it (it's skipped).
+    needs: [security, plan, build]
+    # Products only once security passed and the plan was made; a version
+    # and the weekly bases mirror publish no product, so they don't wait for
+    # either. A team's failed build fails its own products here, as a failed
+    # check does.
     if: >-
       !cancelled() && github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') &&
-      (needs.security.result == 'success' || (needs.security.result == 'skipped' && (inputs.version != '' || github.event_name == 'schedule')))
+      (needs.security.result == 'success' || (needs.security.result == 'skipped' && (inputs.version != '' || github.event_name == 'schedule'))) &&
+      (needs.plan.result == 'success' || inputs.version != '' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
     environment: catalog-publish
     concurrency:
@@ -120,35 +228,15 @@ jobs:
       - name: Install scanners and cosign
         if: inputs.version == ''
         run: bash .github/scripts/install-scanners.sh trivy osv-scanner cosign
-
-      - name: Sign in to Google Cloud
-        id: gcp
-        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
-        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+      - uses: ./.github/actions/registry-sign-in
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.PUBLISH_GCP_SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
-        if: steps.gcp.outcome == 'success'
-      - name: Sign Docker in to Artifact Registry
-        if: steps.gcp.outcome == 'success'
-        run: gcloud auth configure-docker "${VERTRA_REGISTRY%%/*}" --quiet
-      - name: Sign in to AWS
-        id: aws
-        if: vars.AWS_ROLE_ARN != ''
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          registry: ${{ vars.VERTRA_REGISTRY }}
+          gcp-workload-identity-provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          gcp-service-account: ${{ vars.PUBLISH_GCP_SERVICE_ACCOUNT }}
+          aws-role-arn: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
-      - name: Sign Docker in to ECR
-        if: steps.aws.outcome == 'success'
-        run: aws ecr get-login-password | docker login --username AWS --password-stdin "${VERTRA_REGISTRY%%/*}"
-      - name: Sign in to the registry with a username and password
-        if: vars.REGISTRY_USERNAME != ''
-        env:
-          REGISTRY_USERNAME: ${{ vars.REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-        run: echo "$REGISTRY_PASSWORD" | docker login "${VERTRA_REGISTRY%%/*}" -u "$REGISTRY_USERNAME" --password-stdin
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Copy the approved base images into the registry
         if: github.event_name == 'schedule' && hashFiles('bases.yaml') != ''
@@ -157,6 +245,13 @@ jobs:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: ./vertra catalog bases mirror
 
+      - name: Download the images teams' Environments built
+        if: inputs.version == '' && github.event_name != 'schedule' && needs.build.result != 'skipped'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: images-*
+          merge-multiple: true
+          path: images
       - name: Check, push and sign the changed products, then release the catalog
         if: inputs.version == '' && github.event_name != 'schedule'
         env:
@@ -165,7 +260,7 @@ jobs:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
-          ./vertra catalog publish --changed "$BASE"
+          ./vertra catalog publish --changed "$BASE" --images images
           ./vertra catalog release
 
       - name: Make the version

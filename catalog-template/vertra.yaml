@@ -26,3 +26,10 @@ signing:
   # COSIGN_PASSWORD), gcpkms://..., awskms://..., azurekms://... or
   # hashivault://...
   key: ""
+
+# Teams whose builds need values of their own, such as a private package
+# registry's token. Each team's products are built on main in its own GitHub
+# Environment, team-<name>, which `./vertra catalog environments` makes and
+# limits to main; a pull request only validates them. README, "Values your
+# builds need". Never overridden by an environment variable.
+buildEnvironments: []

@@ -15,18 +15,22 @@ func (c *Catalog) layoutOK() bool {
 	apis := c.ValidateAPIs()
 	bases := c.ValidateBases()
 	types := c.ValidateWiringTypes()
-	return teams && owners && dags && apis && bases && types
+	environments := c.ValidateBuildEnvironments()
+	return teams && owners && dags && apis && bases && types && environments
 }
 
 // Check validates, builds, tests and scans, and returns the products that
-// passed all of it. Every product is tried, so one failure never hides
-// another's result.
-func (c *Catalog) Check(products []*Product) []*Product {
+// passed all of it (checkProduct: some are loaded rather than built, and
+// some only validated unless publishing). Every product is tried, so one
+// failure never hides another's result.
+func (c *Catalog) Check(products []*Product, publishing bool) []*Product {
 	layout := c.layoutOK()
+	// A vertra.yaml that doesn't read is layoutOK's to report.
+	s, _ := c.Settings()
 	var passed []*Product
 	for _, p := range products {
 		end := c.group(p.Label())
-		if c.ValidateProduct(p) && c.Build(p) && c.Test(p) && c.Scan(p) {
+		if c.checkProduct(p, s, publishing) {
 			c.info("PASS %s", p.Label())
 			passed = append(passed, p)
 		} else {
@@ -124,7 +128,7 @@ func (c *Catalog) Products(ctx context.Context, command string, names []string, 
 		products = publishable
 	}
 
-	passed := c.Check(products)
+	passed := c.Check(products, command == "publish")
 	// A breaking change fails every product's run, as a layout problem does:
 	// it's the catalog's contract, not one product's build.
 	if changedSince != nil && !c.Compatibility(*changedSince, passed) {

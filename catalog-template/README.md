@@ -776,6 +776,67 @@ the release's signature isn't one the install trusts, or the team's
 namespace isn't there. Fix it in the catalog and merge again; the next
 release retries everything.
 
+### Values your builds need
+
+Keep values out of the repository: every team can read every team's
+folder, so anything committed (an address, a host name, an account) is
+visible to all of them, and stays in history for good. Where a value goes
+depends on when it's needed:
+
+| When | Where | How it's read |
+|---|---|---|
+| A step runs (a database host, a private IP, a password, an API key) | a team secret in the console, synced from your vault | your action lists it in `secretRefs` and reads `/platform/secrets/<name>/<key>` |
+| An image builds (a private package registry's token) | your team's GitHub Environment, `team-<team>` | `RUN --mount=type=secret,id=<NAME>` in your Dockerfile |
+
+Neither goes in a template's or DAG's inputs (a run's inputs are shown to
+anyone who can see the run), in `result.json`, or in an image.
+
+**Values a build needs.** A team whose builds need one is listed in
+[vertra.yaml](vertra.yaml)'s `buildEnvironments`. On `main` its products are
+then built in a job of their own, in the team's Environment (which only
+`main` may use), with each of that Environment's secrets offered to `docker
+build` under its own name. The images are handed to the publish job, which
+tests, scans, pushes and signs them as it does every other product. The
+build job holds no registry credential and pushes nothing, and no other
+team's job gets the Environment's secrets. A pull request can't have them,
+so it only validates such a team's products; `main` builds, tests and scans
+them before anything is published, and a failed build fails only that
+team's products.
+
+To set one up, in this order:
+
+1. A pull request adds the team to `buildEnvironments` in `vertra.yaml`
+   (catalog admins approve it).
+2. A catalog admin runs `./vertra catalog environments`, which makes
+   `team-<team>` and limits it to `main`. Run it again any time: it changes
+   only what isn't so, and keeps the Environment's secrets and reviewers.
+3. Add the team's secrets to that Environment (Settings → Environments, or
+   `gh secret set NPM_TOKEN --env team-<team>`). Never at repository level:
+   every job and pull request gets those, and the build refuses the catalog's
+   own (`COSIGN_PRIVATE_KEY`, `COSIGN_PASSWORD`, `REGISTRY_PASSWORD`) if
+   they're there.
+
+`main`'s plan job refuses to build a listed team whose Environment doesn't
+exist or can be used from another branch. Then read the secret in the
+Dockerfile, in the one `RUN` that needs it:
+
+```dockerfile
+RUN --mount=type=secret,id=NPM_TOKEN,required=true \
+    NPM_TOKEN="$(cat /run/secrets/NPM_TOKEN)" npm ci
+```
+
+A secret mounted this way is never in a layer. Don't copy it into one, or
+write it into a file the image keeps: the image's scan fails on a secret it
+finds. To build on a laptop, hand it the values as JSON:
+`VERTRA_BUILD_SECRETS='{"NPM_TOKEN":"..."}' ./vertra catalog check
+teams/<team>/products/<product>`.
+
+The separation depends on `main` being protected (code-owner review, with
+`.github/` and `vertra.yaml` approved by catalog admins: "Protecting main"),
+and on GitHub Environments, which a private repository has only on a paid
+plan. On GitHub Free a private catalog has no per-team separation in CI: a
+team that needs build values there keeps a catalog repository of its own.
+
 ### Base images
 
 [bases.yaml](bases.yaml) lists the base images the catalog approves. Each
@@ -857,9 +918,11 @@ with it. Then:
    the version and each platform's SHA-256, after checking each binary
    downloads anonymously and matches the release. Merge it as any change.
 2. **Copy what the template changed at that release**, after comparing:
-   `.github/workflows/`, `.github/scripts/`, `.semgrep/`, `.gitignore`, and
-   `tools/` (the schemas your editor reads; `./vertra` has its own copy).
-   You may have changed some of these yourself.
+   `.github/workflows/`, `.github/actions/`, `.github/scripts/`,
+   `.semgrep/`, `.gitignore`, and `tools/` (the schemas your editor reads;
+   `./vertra` has its own copy). You may have changed some of these
+   yourself. Copy them in the same pull request as the pin: a workflow can
+   run commands only the new `./vertra` has.
 3. **Leave the rest:** `teams/` and `vertra.yaml` are yours, and
    `samples/` and `templates/` are examples: take what's new from them by
    hand, as you'd copy a starter.

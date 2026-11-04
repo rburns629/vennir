@@ -12,6 +12,9 @@ package main
 //	vertra catalog validate [PRODUCT ...]   product.yaml and team.yaml, tests present
 //	vertra catalog check    [PRODUCT ...]   validate, build, test and scan: what a PR runs
 //	vertra catalog publish  [PRODUCT ...]   check, then push and sign
+//	vertra catalog plan     --out FILE      the builds teams' own Environments must make
+//	vertra catalog build    --out DIR PRODUCT ...   build one team's products in its Environment
+//	vertra catalog environments [--repo OWNER/NAME]   make teams' Environments, main only
 //	vertra catalog release                  push and sign the catalog's release: every team,
 //	                                        SecretStore, product and template, as of this commit
 //	vertra catalog promote  VERSION [--from COMMIT]   tag a commit's release vX.Y.Z (a Git tag's CI does)
@@ -43,7 +46,7 @@ func catalogCommands() []*cobra.Command {
 	for _, name := range []string{"validate", "check", "publish"} {
 		cmds = append(cmds, catalogProductsCmd(name))
 	}
-	return append(cmds, catalogChangedCmd(), catalogSecretStoresCmd(), catalogReleaseCmd(), catalogPromoteCmd(), catalogBasesCmd(), catalogMigrateCmd())
+	return append(cmds, catalogPlanCmd(), catalogBuildCmd(), catalogEnvironmentsCmd(), catalogChangedCmd(), catalogSecretStoresCmd(), catalogReleaseCmd(), catalogPromoteCmd(), catalogBasesCmd(), catalogMigrateCmd())
 }
 
 func openCatalog() (*catalogtool.Catalog, error) {
@@ -83,7 +86,7 @@ func catalogProductsCmd(name string) *cobra.Command {
 		"check":    "Validate, build, test and scan: what a pull request runs",
 		"publish":  "Check, then push and sign each product",
 	}[name]
-	var changed string
+	var changed, images string
 	cmd := &cobra.Command{
 		Use:   name + " [PRODUCT ...]",
 		Short: short,
@@ -96,10 +99,83 @@ func catalogProductsCmd(name string) *cobra.Command {
 			if cmd.Flags().Changed("changed") {
 				since = &changed
 			}
+			c.Images = images
 			return catalogResult(c.Products(cmd.Context(), name, args, since))
 		},
 	}
 	cmd.Flags().StringVar(&changed, "changed", "", "the products changed since `REF`")
+	if name != "validate" {
+		cmd.Flags().StringVar(&images, "images", "", "load the images teams' own Environments built from `DIR` (vertra catalog build's --out)")
+	}
+	return cmd
+}
+
+func catalogPlanCmd() *cobra.Command {
+	var changed, out string
+	cmd := &cobra.Command{
+		Use:   "plan --out FILE",
+		Short: "Write the builds publishing needs from teams' own Environments (buildEnvironments), as JSON",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			c, err := openCatalog()
+			if err != nil {
+				return err
+			}
+			var since *string
+			if cmd.Flags().Changed("changed") {
+				since = &changed
+			}
+			builds, ok, err := c.Plan(cmd.Context(), since)
+			if err != nil || !ok {
+				return catalogResult(ok, err)
+			}
+			data, err := json.Marshal(builds)
+			if err != nil {
+				return err
+			}
+			return os.WriteFile(out, append(data, '\n'), 0o644)
+		},
+	}
+	cmd.Flags().StringVar(&changed, "changed", "", "the products changed since `REF` (and, in CI, those not yet published), as publish chooses")
+	cmd.Flags().StringVar(&out, "out", "", "the `FILE` to write")
+	_ = cmd.MarkFlagRequired("out")
+	return cmd
+}
+
+func catalogBuildCmd() *cobra.Command {
+	var out string
+	cmd := &cobra.Command{
+		Use:   "build --out DIR PRODUCT ...",
+		Short: "Build one team's products in its own Environment, its secrets offered to docker build, and save the images for publish --images",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			c, err := openCatalog()
+			if err != nil {
+				return err
+			}
+			return catalogResult(c.BuildForEnvironment(args, out))
+		},
+	}
+	cmd.Flags().StringVar(&out, "out", "", "the `DIR` to save the images in")
+	_ = cmd.MarkFlagRequired("out")
+	return cmd
+}
+
+func catalogEnvironmentsCmd() *cobra.Command {
+	var repo string
+	cmd := &cobra.Command{
+		Use:   "environments",
+		Short: "Make each buildEnvironments team's GitHub Environment (team-<name>) and limit it to main; run by a catalog admin",
+		Args:  cobra.NoArgs,
+		RunE: func(*cobra.Command, []string) error {
+			c, err := openCatalog()
+			if err != nil {
+				return err
+			}
+			return catalogResult(c.Environments(repo))
+		},
+	}
+	cmd.Flags().StringVar(&repo, "repo", "", "the catalog's GitHub repository, `OWNER/NAME` (default: its origin remote's)")
 	return cmd
 }
 

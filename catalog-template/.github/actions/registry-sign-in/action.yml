@@ -1,0 +1,70 @@
+name: registry-sign-in
+description: >-
+  Signs Docker in to the catalog's registry by whichever sign-in is set (see
+  ci.yml's header): Google Cloud or AWS through GitHub's OIDC token (the job
+  needs id-token: write), or a username and password. catalog-ci's plan and
+  publish jobs use it, both in the catalog-publish Environment; a team's
+  build job never does.
+
+inputs:
+  registry:
+    description: vars.VERTRA_REGISTRY
+    required: true
+  gcp-workload-identity-provider:
+    description: vars.GCP_WORKLOAD_IDENTITY_PROVIDER
+    default: ""
+  gcp-service-account:
+    description: vars.PUBLISH_GCP_SERVICE_ACCOUNT
+    default: ""
+  aws-role-arn:
+    description: vars.AWS_ROLE_ARN
+    default: ""
+  aws-region:
+    description: vars.AWS_REGION
+    default: ""
+  username:
+    description: vars.REGISTRY_USERNAME
+    default: ""
+  password:
+    description: secrets.REGISTRY_PASSWORD
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Sign in to Google Cloud
+      id: gcp
+      if: inputs.gcp-workload-identity-provider != ''
+      uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+      with:
+        workload_identity_provider: ${{ inputs.gcp-workload-identity-provider }}
+        service_account: ${{ inputs.gcp-service-account }}
+    - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+      if: steps.gcp.outcome == 'success'
+    - name: Sign Docker in to Artifact Registry
+      if: steps.gcp.outcome == 'success'
+      shell: bash
+      env:
+        VERTRA_REGISTRY: ${{ inputs.registry }}
+      run: gcloud auth configure-docker "${VERTRA_REGISTRY%%/*}" --quiet
+    - name: Sign in to AWS
+      id: aws
+      if: inputs.aws-role-arn != ''
+      uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+      with:
+        role-to-assume: ${{ inputs.aws-role-arn }}
+        aws-region: ${{ inputs.aws-region }}
+    - name: Sign Docker in to ECR
+      if: steps.aws.outcome == 'success'
+      shell: bash
+      env:
+        VERTRA_REGISTRY: ${{ inputs.registry }}
+      run: aws ecr get-login-password | docker login --username AWS --password-stdin "${VERTRA_REGISTRY%%/*}"
+    - name: Sign in to the registry with a username and password
+      if: inputs.username != ''
+      shell: bash
+      env:
+        VERTRA_REGISTRY: ${{ inputs.registry }}
+        REGISTRY_USERNAME: ${{ inputs.username }}
+        REGISTRY_PASSWORD: ${{ inputs.password }}
+      run: echo "$REGISTRY_PASSWORD" | docker login "${VERTRA_REGISTRY%%/*}" -u "$REGISTRY_USERNAME" --password-stdin

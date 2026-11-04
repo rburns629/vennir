@@ -47,6 +47,14 @@ last one was.
   certificate).
 - [ ] **A narrowed schema's refusal at checkout**, seen on a cluster: tested
   in the kernel, but no runnable sample provides a target type yet.
+- [ ] **A team building in its own Environment** (built 2026-11-03,
+  `buildEnvironments`): in a real catalog repository, `./vertra catalog
+  environments` making `team-<team>` main only (and keeping a hand-added
+  reviewer); the plan job reading its rules with the job's token (`actions:
+  read`) and refusing one open to another branch; a Dockerfile reading a
+  secret through `RUN --mount=type=secret`; the image handed to publish,
+  loaded, scanned, pushed and signed; the weekly check loading it; a pull
+  request only validating it.
 - [ ] **Deploy GKE from a release once** (`make gke-deploy VERSION=...`,
   which deploys the release's signed charts and images, each signature
   checked against the release workflow's identity at that tag first): the

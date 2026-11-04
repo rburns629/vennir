@@ -790,6 +790,12 @@ to know:
   role, with `gh` signed in as an admin of the repository; without `gh` it
   stops and gives the one command that sets it. Until it's set, publishing
   from the `catalog-publish` Environment is refused.
+- **A catalog's `ci.yml` and its `./vertra` pin** (after 0.9.0). Catalog CI
+  on `main` now plans, builds teams' products in their own Environments
+  (`buildEnvironments`), then publishes, with commands only `vertra` after
+  0.9.0 has, and a sign-in step in `.github/actions/`. Take the template's
+  `.github/workflows/`, `.github/actions/` and the pin in one pull request
+  (the catalog guide, "Updating your catalog").
 
 **Images reused under the same tag.** With `pullPolicy: IfNotPresent` (the
 default) and a reused tag such as `:latest`, a node that already has the old
