@@ -187,13 +187,13 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2C08A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 22px; margin-top: 2px"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
       <div style="display: flex; flex-direction: column; gap: 8px">
         <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">Signing in locally</span>
-        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">After <span class="mono" style="font-size: 14px; color: #E8EAEE">make quickstart</span>, sign in as <span class="mono" style="font-size: 14px; color: #E8EAEE">admin@example.com</span> with the password <span class="mono" style="font-size: 14px; color: #F2C08A">vennir-local</span>. It's set only in the kind values, for a cluster nobody else can reach: never use it anywhere else. <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span> generates the first admin's password instead, prints it once at the end of the first apply, and asks you to change it at the first sign-in.</p>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">After <span class="mono" style="font-size: 14px; color: #E8EAEE">make quickstart</span>, sign in as <span class="mono" style="font-size: 14px; color: #E8EAEE">admin@example.com</span> with the password <span class="mono" style="font-size: 14px; color: #F2C08A">vennir-local</span>. It's set only in the kind values, for a cluster nobody else can reach: never use it anywhere else. <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span> generates the first admin's password instead, never prints it, and saves it to <span class="mono" style="font-size: 14px; color: #E8EAEE">deploy/&lt;env&gt;/admin-password</span>, readable only by you; you change it at the first sign-in.</p>
       </div>
     </div>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
       <div class="card" style="overflow: hidden">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
-          <span class="mono" style="font-size: 13px; color: #C9CED8">Runs → Submit new</span>
+          <span class="mono" style="font-size: 13px; color: #C9CED8">Runs → Submit a DAG</span>
           <span class="chip">your first DAG</span>
         </div>
 <pre class="code">{
@@ -223,7 +223,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       </div>
       <div style="display: flex; flex-direction: column; gap: 20px">
         <h3 style="margin: 0; font-size: 22px; font-weight: 600; color: #FFFFFF">Try it with no catalog at all</h3>
-        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">After <span class="mono" style="font-size: 14px; color: #E8EAEE">make quickstart</span>, paste this into <b style="color: #FFFFFF; font-weight: 600">Runs → Submit new</b>. Both images are the fake products in <a href="https://github.com/rburns629/vennir/tree/main/examples">examples/</a>. <span class="mono" style="font-size: 14px; color: #E8EAEE">create-project</span> outputs <span class="mono" style="font-size: 14px; color: #E8EAEE">{"projectId": "hello-123"}</span>, and <span class="mono" style="font-size: 14px; color: #E8EAEE">deploy-app</span> runs next with it filled in.</p>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">After <span class="mono" style="font-size: 14px; color: #E8EAEE">make quickstart</span>, paste this into <b style="color: #FFFFFF; font-weight: 600">Runs → Submit a DAG</b>. Both images are the fake products in <a href="https://github.com/rburns629/vennir/tree/main/examples">examples/</a>. <span class="mono" style="font-size: 14px; color: #E8EAEE">create-project</span> outputs <span class="mono" style="font-size: 14px; color: #E8EAEE">{"projectId": "hello-123"}</span>, and <span class="mono" style="font-size: 14px; color: #E8EAEE">deploy-app</span> runs next with it filled in.</p>
         <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">Then publish real products to the local registry, with no Git hosting or CI. Each is validated, built, tested and scanned the way catalog CI does it, then registered with the console.</p>
         <div class="card" style="overflow: hidden">
           <div style="padding: 12px 20px; border-bottom: 1px solid #1F2430"><span class="mono" style="font-size: 13px; color: #C9CED8">Local mode</span></div>
@@ -415,9 +415,9 @@ helm install console ./execution-console <span class="k">-n</span> vennir-system
 kubectl <span class="k">-n</span> vennir-system rollout status deployment \
   <span class="k">-l</span> <span class="s">'app.kubernetes.io/instance in (kernel,console)'</span>
 
-<span class="c"># The first admin's password, shown once</span>
-kubectl <span class="k">-n</span> vennir-system logs \
-  job/console-execution-console-migrate
+<span class="c"># The first admin's password: never printed, so set one</span>
+kubectl <span class="k">-n</span> vennir-system exec deploy/console-execution-console -- \
+  node dist/db/resetAdmin.js &lt;email&gt;
 
 <span class="c"># kernel-api must stay ClusterIP</span>
 kubectl <span class="k">-n</span> vennir-system port-forward \
@@ -470,7 +470,7 @@ kubectl <span class="k">-n</span> vennir-system port-forward \
 <span class="c"># waits for the first release, has the console</span>
 <span class="c"># apply it, and runs a starter end to end.</span></pre>
           </div>
-          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Starters come in Python, TypeScript, Go, PowerShell and Rust. On GitHub Free, a private repository has no Environments or branch rules; publishing is still limited to <span class="mono" style="font-size: 14px; color: #E8EAEE">main</span> by its cloud federation. In 0.x, <span class="mono" style="font-size: 14px; color: #E8EAEE">catalog create</span> needs an install made from a source checkout, until released CLIs embed the template.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Starters come in Python, TypeScript, Go, PowerShell and Rust. On GitHub Free, a private repository has no Environments or branch rules; publishing is still limited to <span class="mono" style="font-size: 14px; color: #E8EAEE">main</span> by its cloud federation. A released <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span> carries the catalog template for its own version, so make the catalog with the same version the install runs.</p>
           <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On kind or your own cluster, start from <a href="https://github.com/rburns629/vennir/tree/main/catalog-template">catalog-template/</a> by hand and publish with <span class="mono" style="font-size: 14px; color: #E8EAEE">./vennir catalog publish</span> or <span class="mono" style="font-size: 14px; color: #E8EAEE">make catalog-publish</span>.</p>
         </div>
         <div class="card" style="overflow: hidden">

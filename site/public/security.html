@@ -74,7 +74,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
     <div class="card rise" style="overflow: hidden; animation-delay: 120ms">
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
         <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">At a glance</span>
-        <span class="chip">reviewed 2026-10-28</span>
+        <span class="chip">reviewed 2026-11-04</span>
       </div>
       <dl style="margin: 0; display: flex; flex-direction: column">
         <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
@@ -279,6 +279,11 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2">The console writing Secrets, ServiceAccounts, RBAC, ExternalSecrets, NetworkPolicies or quotas outside team namespaces, or in any shape but its own</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #8B93A3">refused write</td>
             </tr>
+            <tr>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-console/templates/console-jobs-policy.yaml" class="mono" style="font-size: 13px">console-jobs-policy.yaml</a></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2">A Job the console makes in the platform's namespace that isn't one of its image scans or catalog verifications as it builds them: another image, identity, Secret or token, root, or anything from the node</td>
+              <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #8B93A3">refused Job</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -393,7 +398,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Every change on file, and no credential in the logs.</h2>
         <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 18px">
           <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">A hash-chained audit log.</b> Every call that can change something, allowed or refused, and every sign-in: who, what it named, the outcome. Never a value, password or token.</span></li>
-          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">A write-once copy.</b> With <span class="mono" style="font-size: 15px; color: #E8EAEE">audit.export</span>, entries go to a bucket that refuses deletes and overwrites (GCS retention, S3 Object Lock), compared with the database entry by entry every hour.</span></li>
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">A write-once copy.</b> With <span class="mono" style="font-size: 15px; color: #E8EAEE">audit.export</span>, entries go to a bucket that refuses deletes and overwrites (GCS retention, S3 Object Lock), compared with the database entry by entry, a few at a time, round and round.</span></li>
           <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Credentials redacted.</b> PEM keys, cloud keys, GitHub, Slack and Stripe tokens, bearer tokens and JWTs are redacted from logs before anything is stored, by the kernel and by the log collector.</span></li>
           <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Signed releases.</b> Each version's kernel, console and gateway images are scanned, then signed keyless by the release workflow, as are the charts and the <span class="mono" style="font-size: 15px; color: #E8EAEE">vennir</span> binaries.</span></li>
         </ul>

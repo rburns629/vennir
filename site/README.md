@@ -10,6 +10,8 @@ Google Cloud project `general-513718`. There is no build step. What's in
 - `public/site.js`: the only script. It plays the home page's run, copies the
   install command, and filters the Docs page's guides. It writes only its own
   constant text into the page.
+- `public/diagrams/`: copies of `docs/architecture/`'s SVGs the pages show.
+  After `generate.py` changes one, copy it here again.
 - `firebase.json`: clean URLs, a short cache, and the security headers. The
   Content-Security-Policy allows scripts from the site alone, and styles and
   fonts from Google Fonts. Inline `style` attributes are allowed, because the
