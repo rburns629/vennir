@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vennir security model</title>
+<meta name="description" content="Vennir runs DAGs of container steps as Kubernetes Jobs: each step a product your platform teams published and reviewed, running as its own identity with only its own team's secrets.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A0C10}
+a{color:#A9BCFF}a:hover{color:#D3DDFF}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px;box-sizing:border-box}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;padding:0 20px;border-radius:8px;font-size:15px;font-weight:500;text-decoration:none;box-sizing:border-box;transition:background-color .15s ease,border-color .15s ease,transform .14s ease}
+.btn-primary{background:#7C9BFF;color:#0A0C10}
+.btn-primary:hover{background:#A9BCFF;color:#0A0C10}
+.btn-ghost{border:1px solid #2A3040;color:#E8EAEE}
+.btn-ghost:hover{border-color:#7C9BFF;color:#FFFFFF}
+.eyebrow{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#7C9BFF}
+.card{background:#11141B;border:1px solid #1F2430;border-radius:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-family:'IBM Plex Mono',ui-monospace,monospace;border:1px solid #2A3040;color:#C9CED8;white-space:nowrap}
+.code{margin:0;padding:20px 22px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;line-height:1.7;color:#C9CED8;white-space:pre;overflow-x:auto}
+.k{color:#A9BCFF}.s{color:#F2C08A}.c{color:#6B7385}.v{color:#8FD6B4}
+.nav-link{color:#C9CED8;text-decoration:none;font-size:15px;display:inline-flex;align-items:center;min-height:44px}
+.nav-link:hover{color:#FFFFFF}
+.bar{height:10px;border-radius:5px}
+@media (prefers-reduced-motion: no-preference){
+  .btn:hover{transform:translateY(-1px)}
+  .pulse{animation:pulse 1.8s ease-in-out infinite}
+  .grow-x{transform-origin:left;animation:growx 1.1s cubic-bezier(.2,.7,.2,1) both}
+  .rise{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+  .run-bar{transition:width .9s cubic-bezier(.2,.7,.2,1),left .9s cubic-bezier(.2,.7,.2,1),background-color .3s ease}
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes growx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (max-width: 600px){h1{font-size:40px!important}h2{font-size:32px!important}}
+</style>
+</head>
+<body>
+<div style="font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #E8EAEE; background: #0A0C10; min-height: 100vh">
+
+  <!-- Nav -->
+  <header style="border-bottom: 1px solid #161A22">
+    <nav class="wrap" aria-label="Main" style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; min-height: 72px">
+      <a href="/" style="display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 19px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7 7.5l3.5 8.5M17 7.5l-3.5 8.5"></path></svg>Vennir</a>
+      <div style="display: flex; align-items: center; gap: 28px; flex-wrap: wrap">
+        <a class="nav-link" href="/product">Product</a>
+        <a class="nav-link" href="/use-cases">Use cases</a>
+        <a class="nav-link" href="/security" aria-current="page" style="color: #FFFFFF; text-decoration: underline; text-decoration-color: #7C9BFF; text-decoration-thickness: 2px; text-underline-offset: 10px">Security</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/changelog">Changelog</a>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.6 2.8 5.6 3.1 5.6 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.2 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"></path></svg>GitHub</a>
+        <a class="btn btn-primary" href="/get-started">Get started</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section id="top" class="wrap" style="padding-top: 88px; padding-bottom: 88px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(480px, 100%), 1fr)); gap: 56px; align-items: center">
+    <div class="rise" style="display: flex; flex-direction: column; gap: 28px">
+      <span class="eyebrow">Security model · 0.x</span>
+      <h1 style="margin: 0; font-size: 56px; line-height: 1.06; font-weight: 700; letter-spacing: -0.025em; color: #FFFFFF; text-wrap: balance">A team's secrets reach its own reviewed products. Nothing else.</h1>
+      <p style="margin: 0; font-size: 19px; line-height: 1.6; color: #AEB5C2; max-width: 580px; text-wrap: pretty">The console checks every rule before anything runs, and admission policies in the cluster check them again on every step's Job. This page is the short version of the security model: what's enforced, by which layer, and what isn't yet.</p>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap">
+        <a class="btn btn-primary" href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md">Read the full security model</a>
+        <a class="btn btn-ghost" href="#gaps">What isn't enforced yet</a>
+      </div>
+    </div>
+    <div class="card rise" style="overflow: hidden; animation-delay: 120ms">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+        <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">At a glance</span>
+        <span class="chip">reviewed 2026-10-28</span>
+      </div>
+      <dl style="margin: 0; display: flex; flex-direction: column">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
+          <dt style="font-size: 14px; font-weight: 600; color: #FFFFFF">Where do secret values live?</dt>
+          <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">In Kubernetes Secrets in the owning team's namespace, or synced there from the team's own vault. Vennir's databases keep secret names and key names, never values.</dd>
+        </div>
+        <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
+          <dt style="font-size: 14px; font-weight: 600; color: #FFFFFF">Can one team's step reach another team's secret?</dt>
+          <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">No. A step runs in its own team's namespace, and a Pod can only mount Secrets from its own namespace.</dd>
+        </div>
+        <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
+          <dt style="font-size: 14px; font-weight: 600; color: #FFFFFF">Can the console read a secret?</dt>
+          <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">No. It can write and delete Secrets in team namespaces, but its role has no get or list.</dd>
+        </div>
+        <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 6px">
+          <dt style="font-size: 14px; font-weight: 600; color: #FFFFFF">Does anything hold if the console is bypassed?</dt>
+          <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Yes: namespaces, image sources, pins and scans, identities and secrets, signatures. Not if the console itself is compromised; <a href="#compromised">see why</a>.</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- Where each check happens -->
+  <section id="checks" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <span class="eyebrow">Where each check happens</span>
+          <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Checked at the door, then again by the cluster.</h2>
+        </div>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Every run passes four places on its way to a Pod. Each refusal comes back on the step as a code that says why, and the ones in the cluster are non-retryable.</p>
+      </div>
+
+      <figure aria-label="The path of a run: console, kernel, cluster admission, the step's Pod, with the checks made at each" style="margin: 0; display: flex; flex-direction: column; gap: 20px">
+        <div class="mono" aria-hidden="true" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: #8B93A3">
+          <span class="chip" style="height: 30px; padding: 0 12px">person or bot</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3A4256" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+          <span class="chip" style="height: 30px; padding: 0 12px; border-color: #2F5BD3; color: #A9BCFF">console</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3A4256" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+          <span class="chip" style="height: 30px; padding: 0 12px; border-color: #2F5BD3; color: #A9BCFF">kernel-api → scheduler</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3A4256" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+          <span class="chip" style="height: 30px; padding: 0 12px; border-color: #2F5BD3; color: #A9BCFF">Kubernetes API server, admission</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3A4256" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+          <span class="chip" style="height: 30px; padding: 0 12px; border-color: #2E5A47; color: #8FD6B4">the step's Job and Pod</span>
+        </div>
+        <ol style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 20px">
+          <li class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 14px; border-top: 2px solid #7C9BFF">
+            <span class="mono" style="font-size: 13px; color: #7C9BFF">01 · Console</span>
+            <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">Who you are, and what you may run</h3>
+            <ul style="margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.55; color: #AEB5C2">
+              <li>A member or maintainer of every team named, or an admin</li>
+              <li>The step runs as its product's declared ServiceAccount, or <span class="mono" style="color: #E8EAEE">default</span></li>
+              <li>Each secret listed is registered for the step's team</li>
+              <li>The image pinned to its digest, and scanned</li>
+              <li>Literal inputs fit the action's schema; targets allowed for the team; approvals marked</li>
+            </ul>
+            <span class="mono" style="margin-top: auto; font-size: 12px; line-height: 1.6; color: #F2C08A">INPUT_INVALID · TARGET_NOT_ALLOWED · ORDERS_ONLY</span>
+          </li>
+          <li class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 14px; border-top: 2px solid #7C9BFF">
+            <span class="mono" style="font-size: 13px; color: #7C9BFF">02 · Kernel</span>
+            <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">Only the console, and only clean data</h3>
+            <ul style="margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.55; color: #AEB5C2">
+              <li>kernel-api accepts only the console's ServiceAccount token, checked by TokenReview (401, 403)</li>
+              <li>A reference only to a direct dependency</li>
+              <li>Resolved inputs checked before a step starts, outputs when it ends</li>
+              <li>Credential shapes refused in inputs and outputs, redacted from logs</li>
+              <li>A step needing approval held, never claimed, until a maintainer decides</li>
+            </ul>
+            <span class="mono" style="margin-top: auto; font-size: 12px; line-height: 1.6; color: #F2C08A">OUTPUT_INVALID · INPUT_CONTAINS_CREDENTIAL · OUTPUT_CONTAINS_CREDENTIAL</span>
+          </li>
+          <li class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 14px; border-top: 2px solid #8FD6B4">
+            <span class="mono" style="font-size: 13px; color: #8FD6B4">03 · Cluster admission</span>
+            <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">The same rules, on the scheduler's Job</h3>
+            <ul style="margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.55; color: #AEB5C2">
+              <li>Only namespaces labelled <span class="mono" style="color: #E8EAEE">vennir/team=true</span>, never the platform's</li>
+              <li>Only allowed image sources, pinned, with a passing scan</li>
+              <li>Only the product's own ServiceAccount, and its team's registered Secrets, as volumes</li>
+              <li>Signed images, with policy-controller installed</li>
+              <li>Only hardened Jobs, while hardening is on</li>
+            </ul>
+            <span class="mono" style="margin-top: auto; font-size: 12px; line-height: 1.6; color: #F2C08A">DISPATCH_REJECTED · IMAGE_NOT_ALLOWED · IMAGE_NOT_PINNED · IMAGE_SCAN_FAILED · IDENTITY_NOT_ALLOWED · IMAGE_NOT_SIGNED</span>
+          </li>
+          <li class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 14px; border-top: 2px solid #8FD6B4">
+            <span class="mono" style="font-size: 13px; color: #8FD6B4">04 · The step's Pod</span>
+            <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">Fenced while it runs</h3>
+            <ul style="margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.55; color: #AEB5C2">
+              <li>Pod Security <span class="mono" style="color: #E8EAEE">restricted</span>: non-root, read-only root filesystem, no capabilities</li>
+              <li>No Kubernetes API token</li>
+              <li>Secrets as read-only files, only those it lists</li>
+              <li>Connections in only from its own namespace</li>
+              <li>Over its memory, its time, or its namespace's quota: stopped</li>
+            </ul>
+            <span class="mono" style="margin-top: auto; font-size: 12px; line-height: 1.6; color: #F2C08A">TASK_TIMEOUT · RESOURCES_NOT_ALLOWED</span>
+          </li>
+        </ol>
+        <figcaption style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 14px; line-height: 1.6; color: #8B93A3">
+          <span style="display: inline-flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 14px; height: 2px; background: #7C9BFF"></span>Checked by Vennir's own processes</span>
+          <span style="display: inline-flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 14px; height: 2px; background: #8FD6B4"></span>Enforced by Kubernetes itself, so it holds for a Job the console never saw</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- The boundaries -->
+  <section id="boundaries" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
+      <span class="eyebrow">The boundaries</span>
+      <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Six lines no step crosses.</h2>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Within a team, secrets are shared on purpose: the team chooses which step gets which. Between teams, and between reviewed and unreviewed code, nothing is.</p>
+    </div>
+    <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">A team's secrets, its reviewed products only</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Only a registered product of the team may mount its secrets. An image that isn't one runs with none, and a Secret the team never registered can't be mounted at all, not even a SecretStore's own credential.</p>
+        <span class="mono" style="font-size: 12px; color: #F2C08A">IDENTITY_NOT_ALLOWED</span>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Each step, only the secrets it lists</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Each Secret in a step's <span class="mono" style="font-size: 14px; color: #E8EAEE">secretRefs</span> is mounted read-only at <span class="mono" style="font-size: 14px; color: #E8EAEE">/platform/secrets/&lt;name&gt;/&lt;key&gt;</span>, never as an environment variable. A template's steps get exactly their action's.</p>
+        <span class="mono" style="font-size: 12px; color: #F2C08A">secretRefs, per step</span>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">An identity per product</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A step runs as the ServiceAccount its <span class="mono" style="font-size: 14px; color: #E8EAEE">product.yaml</span> declares, and no other product can run as it, so one product's cloud permissions never become all of a team's. Tokens for another cloud are for the audiences it declares, an hour at most.</p>
+        <span class="mono" style="font-size: 12px; color: #F2C08A">serviceAccount · tokenAudiences</span>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Images pinned, scanned, signed</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The console pins every image to its digest at submission and scans each digest with Trivy before it's registered or run, and daily while in use: a fixable HIGH or CRITICAL, or a secret in a layer, fails it. Where you require it, catalog CI's signature too.</p>
+        <span class="mono" style="font-size: 12px; color: #F2C08A">IMAGE_NOT_PINNED · IMAGE_SCAN_FAILED · IMAGE_NOT_SIGNED</span>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Nobody claims another team's name</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A product name and an image repository belong to the first team that registers them. Catalog CI derives each image's path from its team's folder, so one team can't publish under another's.</p>
+        <span class="mono" style="font-size: 12px; color: #F2C08A">&lt;registry&gt;/&lt;team&gt;/&lt;product&gt;</span>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Two people before a sensitive step</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A product can require a maintainer's approval, always or for other teams' runs, and say where other teams may aim it. Whoever submitted the run can't approve it, even as a maintainer.</p>
+        <span class="mono" style="font-size: 12px; color: #F2C08A">APPROVAL_DECLINED · APPROVAL_EXPIRED · TARGET_NOT_ALLOWED</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- The cluster's guardrails -->
+  <section id="admission" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <span class="eyebrow">The second check</span>
+          <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Admission policies the API server applies.</h2>
+        </div>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">ValidatingAdmissionPolicies installed by the charts, plus Sigstore's policy-controller where you want signatures. The console keeps their lists of products, secrets and digests current.</p>
+      </div>
+      <div class="card" style="overflow-x: auto">
+        <table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 15px; line-height: 1.55">
+          <thead>
+            <tr style="text-align: left">
+              <th scope="col" style="padding: 16px 22px; font-size: 13px; font-weight: 600; color: #C9CED8; border-bottom: 1px solid #1F2430">Policy</th>
+              <th scope="col" style="padding: 16px 22px; font-size: 13px; font-weight: 600; color: #C9CED8; border-bottom: 1px solid #1F2430">What it refuses</th>
+              <th scope="col" style="padding: 16px 22px; font-size: 13px; font-weight: 600; color: #C9CED8; border-bottom: 1px solid #1F2430">Refusal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/dispatch-policy.yaml" class="mono" style="font-size: 13px">dispatch-policy.yaml</a></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">A Job outside a namespace labelled <span class="mono" style="font-size: 13px; color: #E8EAEE">vennir/team=true</span>, or in the platform's own; a Job that isn't hardened while <span class="mono" style="font-size: 13px; color: #E8EAEE">taskPodHardening</span> is on</td>
+              <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">DISPATCH_REJECTED</td>
+            </tr>
+            <tr>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/image-policy.yaml" class="mono" style="font-size: 13px">image-policy.yaml</a></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">An image outside the source registry set at install and the sources admins add</td>
+              <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IMAGE_NOT_ALLOWED</td>
+            </tr>
+            <tr>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/scan-policy.yaml" class="mono" style="font-size: 13px">scan-policy.yaml</a></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">An image not pinned by digest, or a digest that failed its scan, unless an admin accepted it</td>
+              <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IMAGE_NOT_PINNED<br>IMAGE_SCAN_FAILED</td>
+            </tr>
+            <tr>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/identity-policy.yaml" class="mono" style="font-size: 13px">identity-policy.yaml</a></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">Any ServiceAccount but <span class="mono" style="font-size: 13px; color: #E8EAEE">default</span> unless it's the registered product's own; any Secret not registered for its team; Secrets any way but a volume; a token for an audience the product didn't declare</td>
+              <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IDENTITY_NOT_ALLOWED</td>
+            </tr>
+            <tr>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/image-signature.yaml" class="mono" style="font-size: 13px">image-signature.yaml</a></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">An image catalog CI didn't sign (a generated key, a cloud KMS key, or keyless), where policy-controller is installed</td>
+              <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IMAGE_NOT_SIGNED</td>
+            </tr>
+            <tr>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/purge-policy.yaml" class="mono" style="font-size: 13px">purge-policy.yaml</a></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">A purger deleting a team namespace that isn't labelled retired. None is configured by default, so whoever retires a namespace can't also delete it</td>
+              <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #8B93A3; border-bottom: 1px solid #171B24">refused delete</td>
+            </tr>
+            <tr>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-console/templates/namespace-policy.yaml" class="mono" style="font-size: 13px">namespace-policy.yaml</a></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">The console making or adopting a namespace that isn't a team's, changing a team namespace beyond its team label, or touching kube-* or the platform's own</td>
+              <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #8B93A3; border-bottom: 1px solid #171B24">refused write</td>
+            </tr>
+            <tr>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-console/templates/write-fence-policy.yaml" class="mono" style="font-size: 13px">write-fence-policy.yaml</a></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2">The console writing Secrets, ServiceAccounts, RBAC, ExternalSecrets, NetworkPolicies or quotas outside team namespaces, or in any shape but its own</td>
+              <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #8B93A3">refused write</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #8B93A3; max-width: 860px">The dispatch, image, scan and identity policies check the scheduler's requests only. Anyone else your cluster lets create Pods in a team namespace, such as a cluster administrator, meets only Pod Security and, where installed, policy-controller.</p>
+    </div>
+  </section>
+
+  <!-- Network and transport -->
+  <section id="network" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
+      <span class="eyebrow">Network and transport</span>
+      <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Teams can't reach each other, or the node's credentials.</h2>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">All of it needs a network plugin that enforces NetworkPolicy: Calico, Cilium, GKE Dataplane V2, or on EKS the VPC CNI's policy agent, which <span class="mono" style="font-size: 16px; color: #E8EAEE">vennir</span> turns on.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 20px">
+      <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Between team namespaces</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Every team namespace holds <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir-default-deny</span>: its Pods accept connections only from their own namespace, and from the API gateway to the backends a team publishes.</p>
+      </div>
+      <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Around the platform</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Only the platform's own Pods reach its Postgres, and only the console reaches kernel-api. A step reaches neither, nor the scanner, Loki or any metrics port.</p>
+      </div>
+      <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">The metadata server</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On GKE, Workload Identity's: a step gets only its own ServiceAccount's Google identity. On EKS, <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir-no-metadata</span> blocks 169.254.169.254. Elsewhere, it's yours to close.</p>
+      </div>
+      <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">TLS inside the cluster</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On by default: each chart makes its own CA, kernel-api serves only HTTPS, Postgres accepts only TLS, and every client checks the server with <span class="mono" style="font-size: 14px; color: #E8EAEE">verify-full</span>. Metrics, scanner and Loki ports stay plain, fenced by policy.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- The console's write fence and a compromised component -->
+  <section id="compromised" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 56px; align-items: start">
+      <div style="display: flex; flex-direction: column; gap: 24px">
+        <span class="eyebrow">The console's write fence</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">The most privileged part, fenced and named as such.</h2>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">The console writes Secrets, product ServiceAccounts, ExternalSecrets, SecretStores and each team's network policy through one cluster-wide role. The write fence confines that role to team namespaces. The console can't change the fence, checks it's in force before it starts, and refuses to start without it.</p>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Its only RBAC write is one fixed RoleBinding per team namespace, so the scheduler can read its steps' logs there.</p>
+      </div>
+      <div class="card" style="overflow: hidden">
+        <div style="padding: 14px 20px; border-bottom: 1px solid #1F2430; font-size: 15px; font-weight: 600; color: #FFFFFF">If a component were compromised</div>
+        <dl style="margin: 0; display: flex; flex-direction: column">
+          <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
+            <dt class="mono" style="font-size: 14px; color: #F2C08A">console</dt>
+            <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Could rewrite the image, identity and scan policies and run a step with any team's secrets: Kubernetes doesn't apply admission policies to admission policies. Still holding: steps only in team namespaces, no writes outside them, no reading Secrets, policy-controller's signatures.</dd>
+          </div>
+          <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
+            <dt class="mono" style="font-size: 14px; color: #C9CED8">kernel-api</dt>
+            <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Its ServiceAccount may only ask whose a token is. A task it wrote still has to pass every Job policy.</dd>
+          </div>
+          <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
+            <dt class="mono" style="font-size: 14px; color: #C9CED8">scheduler</dt>
+            <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Creates Jobs and ConfigMaps only in team namespaces, deletes only its own <span class="mono" style="color: #E8EAEE">ek-</span> ones, and every Job meets the policies.</dd>
+          </div>
+          <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
+            <dt class="mono" style="font-size: 14px; color: #C9CED8">gateway</dt>
+            <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Mints tokens only for <span class="mono" style="color: #E8EAEE">*-api</span> ServiceAccounts in team namespaces, reads the database as its own role, and verifies sessions with a public key it can't sign with.</dd>
+          </div>
+          <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 6px">
+            <dt class="mono" style="font-size: 14px; color: #C9CED8">sleeper</dt>
+            <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Changes replica counts through the scale subresource: it can stop the platform, not change it.</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- People and bots -->
+  <section id="identity" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
+      <span class="eyebrow">People and pipelines</span>
+      <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Sessions that end, bots with no key to leak.</h2>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A session only says who you are. Teams, roles and admin are read from the database on every request, so removing someone takes effect at once.</p>
+    </div>
+    <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Sessions</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">EdDSA-signed tokens lasting 8 hours by default, sent as a bearer header, never a cookie. Signing out revokes that session at the console and the gateway; a password change ends all of them.</p>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Single sign-on</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Any OpenID Connect provider, with PKCE, a verified email and allowed domains. Groups can map to teams. An admin can make a team refuse its members' passwords.</p>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Passwords</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">argon2id hashes; a password someone else set must be changed first. Guessing is limited per address and slowed per email, counted in Postgres so every console copy agrees.</p>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Keyless bots</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A CI job signs in with its own OIDC token (GitHub Actions and gitlab.com by default), bound to exact claims and this console's audience, for an hour's session. The pipeline holds no Vennir secret.</p>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Tokens that expire</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Where a token is needed, it's shown once and kept only as its SHA-256. It expires in 90 days unless its maker chose otherwise, and can be revoked at any time.</p>
+      </li>
+      <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Ordering bots, narrowly</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A storefront's bot orders only the templates its team lists for it, at a capped rate, and its callbacks are signed with HMAC-SHA256 so the receiver can refuse forgeries.</p>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Audit, logs, supply chain -->
+  <section id="audit" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 56px; align-items: start">
+      <div style="display: flex; flex-direction: column; gap: 24px">
+        <span class="eyebrow">The record</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Every change on file, and no credential in the logs.</h2>
+        <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 18px">
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">A hash-chained audit log.</b> Every call that can change something, allowed or refused, and every sign-in: who, what it named, the outcome. Never a value, password or token.</span></li>
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">A write-once copy.</b> With <span class="mono" style="font-size: 15px; color: #E8EAEE">audit.export</span>, entries go to a bucket that refuses deletes and overwrites (GCS retention, S3 Object Lock), compared with the database entry by entry every hour.</span></li>
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Credentials redacted.</b> PEM keys, cloud keys, GitHub, Slack and Stripe tokens, bearer tokens and JWTs are redacted from logs before anything is stored, by the kernel and by the log collector.</span></li>
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Signed releases.</b> Each version's kernel, console and gateway images are scanned, then signed keyless by the release workflow, as are the charts and the <span class="mono" style="font-size: 15px; color: #E8EAEE">vennir</span> binaries.</span></li>
+        </ul>
+      </div>
+      <div class="card" style="overflow: hidden">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+          <span class="mono" style="font-size: 13px; color: #C9CED8">Check a release's image yourself</span>
+          <span class="chip">cosign</span>
+        </div>
+<pre class="code"><span class="c"># Nothing verifies these at install yet; you can, by hand.</span>
+<span class="c">$</span> cosign verify \
+    ghcr.io/&lt;owner&gt;/&lt;repo&gt;/execution-kernel:&lt;version&gt; \
+    <span class="k">--certificate-identity-regexp</span> \
+      <span class="s">'https://github.com/&lt;owner&gt;/&lt;repo&gt;/.github/workflows/release.yml@.*'</span> \
+    <span class="k">--certificate-oidc-issuer</span> \
+      <span class="s">https://token.actions.githubusercontent.com</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- No standing credentials -->
+  <section id="federation" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <span class="eyebrow">No standing credentials</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Federation instead of keys, wherever the platform allows it.</h2>
+      </div>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">An image is the same secret-free bytes for every team. What a step authenticates with is attached when it runs, and it's short-lived wherever the target supports it.</p>
+    </div>
+    <div class="card" style="overflow-x: auto">
+      <table style="width: 100%; min-width: 680px; border-collapse: collapse; font-size: 15px; line-height: 1.55">
+        <thead>
+          <tr style="text-align: left">
+            <th scope="col" style="padding: 16px 22px; font-size: 13px; font-weight: 600; color: #C9CED8; border-bottom: 1px solid #1F2430">Who</th>
+            <th scope="col" style="padding: 16px 22px; font-size: 13px; font-weight: 600; color: #C9CED8; border-bottom: 1px solid #1F2430">Signs in to</th>
+            <th scope="col" style="padding: 16px 22px; font-size: 13px; font-weight: 600; color: #C9CED8; border-bottom: 1px solid #1F2430">With</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">A step</th>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">Its cloud</td>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">Its product's own ServiceAccount: GKE Workload Identity, EKS Pod Identity, or an hour's token per declared audience for another cloud</td>
+          </tr>
+          <tr>
+            <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">Catalog CI</th>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">The registry, and the signing key</td>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">GitHub's OIDC token, trusted only for the repository's <span class="mono" style="font-size: 13px; color: #E8EAEE">main</span>; no console or cluster credential at all</td>
+          </tr>
+          <tr>
+            <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">A team's vault</th>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">GCP Secret Manager, AWS Secrets Manager</td>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">External Secrets Operator as the team's own workload identity; one cloud identity per team's store</td>
+          </tr>
+          <tr>
+            <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">The platform</th>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">A managed database</td>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">IAM database authentication: each service as its own identity, a short-lived token, no password of Vennir's</td>
+          </tr>
+          <tr>
+            <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">Another install</th>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">Your catalog's registry</td>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #E8EAEE">vennir catalog grant</span>, naming exactly its identity; never a key</td>
+          </tr>
+          <tr>
+            <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF">The installer</th>
+            <td style="padding: 16px 22px; color: #AEB5C2">Your cloud and git host</td>
+            <td style="padding: 16px 22px; color: #AEB5C2">Your own sign-ins; <span class="mono" style="font-size: 13px; color: #E8EAEE">vennir</span> holds no credentials, and its config file holds only names</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Not yet enforced -->
+  <section id="gaps" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+      <div style="display: flex; flex-direction: column; gap: 16px; max-width: 800px">
+        <span class="eyebrow" style="color: #F2C08A">What isn't enforced yet</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Vennir is 0.x, and not production-ready. These gaps are why.</h2>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Each one is tracked in <a href="https://github.com/rburns629/vennir/blob/main/TODO.md">TODO.md</a> and described in the <a href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md#not-yet-enforced">security model</a>.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 20px">
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">A compromised console can loosen three policies</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Kubernetes can't guard an admission policy from its editor, so the console could allow any image, ServiceAccount or Secret. Accepted for now: treat the console as the most privileged component.</p>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Token groups are read at sign-in only</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Someone who leaves a group the provider reports in its token stays in its team until the session ends. Google Workspace groups are read again every hour. Shorten <span class="mono" style="font-size: 14px; color: #E8EAEE">JWT_TTL</span> where that matters.</p>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Reads aren't audited</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Who looked at a run's outputs or logs, or a team's secrets' names, isn't recorded. Not decided yet.</p>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Without the copy, the audit log can be rewritten</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">It lives in the console's database. Someone who can write there could rewrite the chain after a change. Turn on <span class="mono" style="font-size: 14px; color: #E8EAEE">audit.export</span>, or ship the audit log lines to a SIEM.</p>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Step hardening is a chart setting</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">With <span class="mono" style="font-size: 14px; color: #E8EAEE">taskPodHardening: false</span>, only Pod Security holds a step, and only in namespaces the console created; in an adopted one it runs as root with an API token.</p>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">A raw DAG shows every step's outputs</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Every team named in a raw DAG sees all its steps' outputs. A template run's providers see only their own steps in full. To decide: filter by team, or require every team for reads.</p>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Some limits that are yours today</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">No second factor for password accounts (use single sign-on). Outgoing traffic from steps isn't restricted. Encrypting etcd, Postgres disks and backups is the operator's. Nothing verifies Vennir's own signatures at install.</p>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Not yet proven</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Syncing from Azure Key Vault, HashiCorp Vault and 1Password: the console recognises them, but only GCP Secret Manager and AWS Secrets Manager are proven end to end. Azure isn't an install target yet.</p>
+        </div>
+      </div>
+      <div class="card" style="padding: 26px 28px; display: flex; flex-direction: column; gap: 12px">
+        <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Out of scope</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A malicious product that a reviewer approved; a compromised cluster administrator, node or control plane; side channels between Pods on one node; the security of a team's own vault and the identities it trusts.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Report a vulnerability -->
+  <section id="report" style="border-top: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 96px; padding-bottom: 96px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 24px">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"></path><path d="M12 8v5M12 16h.01"></path></svg>
+      <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; max-width: 760px; text-wrap: balance">Found a vulnerability? Tell us privately.</h2>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2; max-width: 660px">Use the repository's Security tab, Report a vulnerability, never a public issue. You'll hear back within 5 working days, and a fix is released before details are published, within 90 days unless we agree otherwise. Only the latest 0.x release gets security fixes.</p>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center">
+        <a class="btn btn-primary" href="https://github.com/rburns629/vennir/security/advisories/new">Report a vulnerability</a>
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/blob/main/SECURITY.md">Read SECURITY.md</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer style="border-top: 1px solid #161A22; background: #0D1015">
+    <div class="wrap" style="padding-top: 48px; padding-bottom: 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 32px">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <span style="display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; color: #FFFFFF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7 7.5l3.5 8.5M17 7.5l-3.5 8.5"></path></svg>Vennir</span>
+        <span style="font-size: 14px; line-height: 1.6; color: #8B93A3">Every team’s automation, one workflow. Nobody’s credentials shared.</span>
+      </div>
+      <nav aria-label="Product" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Product</span>
+        <a class="nav-link" href="/product" style="font-size: 14px">Product</a>
+        <a class="nav-link" href="/use-cases" style="font-size: 14px">Use cases</a>
+        <a class="nav-link" href="/security" style="font-size: 14px">Security</a>
+        <a class="nav-link" href="/get-started" style="font-size: 14px">Get started</a>
+        <a class="nav-link" href="/changelog" style="font-size: 14px">Changelog</a>
+      </nav>
+      <nav aria-label="Docs" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Docs</span>
+        <a class="nav-link" href="/docs" style="font-size: 14px">All docs</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
+      </nav>
+      <nav aria-label="Project" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Project</span>
+        <a class="nav-link" href="/community" style="font-size: 14px">Community</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir" style="font-size: 14px">GitHub</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
+      </nav>
+    </div>
+  </footer>
+</div>
+<script src="/site.js" defer></script>
+</body>
+</html>

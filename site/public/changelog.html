@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vennir changelog</title>
+<meta name="description" content="Vennir runs DAGs of container steps as Kubernetes Jobs: each step a product your platform teams published and reviewed, running as its own identity with only its own team's secrets.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A0C10}
+a{color:#A9BCFF}a:hover{color:#D3DDFF}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px;box-sizing:border-box}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;padding:0 20px;border-radius:8px;font-size:15px;font-weight:500;text-decoration:none;box-sizing:border-box;transition:background-color .15s ease,border-color .15s ease,transform .14s ease}
+.btn-primary{background:#7C9BFF;color:#0A0C10}
+.btn-primary:hover{background:#A9BCFF;color:#0A0C10}
+.btn-ghost{border:1px solid #2A3040;color:#E8EAEE}
+.btn-ghost:hover{border-color:#7C9BFF;color:#FFFFFF}
+.eyebrow{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#7C9BFF}
+.card{background:#11141B;border:1px solid #1F2430;border-radius:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-family:'IBM Plex Mono',ui-monospace,monospace;border:1px solid #2A3040;color:#C9CED8;white-space:nowrap}
+.code{margin:0;padding:20px 22px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;line-height:1.7;color:#C9CED8;white-space:pre;overflow-x:auto}
+.k{color:#A9BCFF}.s{color:#F2C08A}.c{color:#6B7385}.v{color:#8FD6B4}
+.nav-link{color:#C9CED8;text-decoration:none;font-size:15px;display:inline-flex;align-items:center;min-height:44px}
+.nav-link:hover{color:#FFFFFF}
+.bar{height:10px;border-radius:5px}
+@media (prefers-reduced-motion: no-preference){
+  .btn:hover{transform:translateY(-1px)}
+  .pulse{animation:pulse 1.8s ease-in-out infinite}
+  .grow-x{transform-origin:left;animation:growx 1.1s cubic-bezier(.2,.7,.2,1) both}
+  .rise{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+  .run-bar{transition:width .9s cubic-bezier(.2,.7,.2,1),left .9s cubic-bezier(.2,.7,.2,1),background-color .3s ease}
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes growx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (max-width: 600px){h1{font-size:40px!important}h2{font-size:32px!important}}
+</style>
+</head>
+<body>
+<div style="font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #E8EAEE; background: #0A0C10; min-height: 100vh">
+
+  <!-- Nav -->
+  <header style="border-bottom: 1px solid #161A22">
+    <nav class="wrap" aria-label="Main" style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; min-height: 72px">
+      <a href="/" style="display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 19px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7 7.5l3.5 8.5M17 7.5l-3.5 8.5"></path></svg>Vennir</a>
+      <div style="display: flex; align-items: center; gap: 28px; flex-wrap: wrap">
+        <a class="nav-link" href="/product">Product</a>
+        <a class="nav-link" href="/use-cases">Use cases</a>
+        <a class="nav-link" href="/security">Security</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/changelog" aria-current="page" style="color: #FFFFFF; text-decoration: underline; text-decoration-color: #7C9BFF; text-decoration-thickness: 2px; text-underline-offset: 10px">Changelog</a>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.6 2.8 5.6 3.1 5.6 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.2 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"></path></svg>GitHub</a>
+        <a class="btn btn-primary" href="/get-started">Get started</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="wrap" style="padding-top: 88px; padding-bottom: 72px; display: flex; flex-direction: column; gap: 24px">
+      <span class="eyebrow">Changelog</span>
+      <h1 style="margin: 0; font-size: 56px; line-height: 1.05; font-weight: 700; letter-spacing: -0.025em; color: #FFFFFF; text-wrap: balance; max-width: 900px">What changed, release by release.</h1>
+      <p style="margin: 0; font-size: 19px; line-height: 1.6; color: #AEB5C2; max-width: 680px; text-wrap: pretty">Vennir is 0.x: releases come often, and only the latest gets security fixes. Each release attaches the two Helm charts and vennir for Linux and macOS, with checksums.</p>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap">
+      <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/releases">All releases on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+      <a class="btn btn-ghost" href="#unreleased">On main, not yet released</a>
+    </div>
+  </section>
+  <!-- Unreleased -->
+  <section id="unreleased" aria-labelledby="unrel-h" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 96px; padding-bottom: 96px; display: flex; flex-direction: column; gap: 40px">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 24px 32px; align-items: end">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <span style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><span class="eyebrow">Unreleased</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">on main since v0.11.0</span></span>
+          <h2 id="unrel-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Coming in the next release.</h2>
+        </div>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Merged, tested and on <a href="https://github.com/rburns629/vennir/compare/v0.11.0...main">main</a>, but not in a tagged release yet. Build from main to try it, or wait for the tag.</p>
+      </div>
+      <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+        <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 14px">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Guides for getting going</h3>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Onboarding, from installing Vennir to a first deploy, and where to host it: kind, GKE, EKS or your own cluster.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Deploying to Google Cloud and to AWS from Vennir: every step a team takes so its products can make resources there.</span></li>
+          </ul>
+        </li>
+        <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 14px">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">The API gateway and the network</h3>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">The API gateway, start to finish: turning it on, publishing a backend, calling it, and putting it on the internet.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Addresses and firewall rules: which address each part uses, how to find it, and when a fixed outbound address is worth it.</span></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </section>
+  <!-- Releases -->
+  <section aria-labelledby="rel-h" class="wrap" style="padding-top: 112px; padding-bottom: 96px; display: flex; flex-direction: column; gap: 24px">
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 760px; padding-bottom: 16px">
+      <span class="eyebrow">Releases</span>
+      <h2 id="rel-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Newest first.</h2>
+    </div>
+    <div>
+      <article id="v0-11-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.11.0</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">4 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.11.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.10.0...v0.11.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.10.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Vertra is now Vennir</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>A new name, everywhere.</b> The CLI is <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span>, catalog files say <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir.dev/v2</span>, team namespaces carry <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir/team</span> and the platform runs in <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir-system</span>. Images and charts are published under ghcr.io/rburns629/vennir; releases through 0.10.0 stay under the old name.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>A clean break.</b> A Vennir console doesn't read a Vertra catalog release: publish the catalog again with <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span>, which moves a catalog repository's wrapper and files over to the new names.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-10-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.10.0</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">4 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.10.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.9.0...v0.10.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.9.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Values a team's builds need</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Build environments per team.</b> A catalog can give a team's image builds values of their own, from a GitHub Environment only main may use. Each such team's builds run in a job of their own; pull requests only validate them.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Publishing's credentials stay out.</b> The signing key and registry password are refused if they would reach a team's build.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-9-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.9.0</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">4 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.9.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.8.0...v0.9.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.8.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">The security review's findings, fixed</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Who may do what, tightened.</b> A bot belongs to the one team that made it; products are registered by the catalog or an admin, never a team's maintainers; a catalog release registers products only in the teams it names; single sign-on linking an account makes it the only way in.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>The gateway checks callers as the console does,</b> forwards only what an API's OpenAPI document declares, and lets an API use an in-cluster backend only in its own team's namespace.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>The cluster holds more.</b> A step's container is held to what the executor builds; the console may run only its scans and verifications as Jobs; the kernel signs in to Postgres as a role of its own.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Releases you can trust.</b> A catalog release pins each product to the signed image of its own commit; every chart <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span> installs is checked by its SHA-256 first; the release scans what it pushes and can't half-publish a version.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Limits.</b> Each person may ask the chat agent 30 questions an hour and 200 a day; bots none.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-8-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.8.0</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">3 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.8.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.7.0...v0.8.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.7.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Clouds per product, and dispatch that doesn't wait</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>A product says which clouds' installs it's for,</b> and the samples say theirs.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>A scheduler pass records what finished, and commits it, before it dispatches;</b> the signature check looks at a step's Pod, not its Job, so dispatch never waits on it.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Image sources say where they don't apply:</b> an added source doesn't run where signed images are required.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-7-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.7.0</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">2 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.7.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.6.0...v0.7.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.6.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">What the billed run found</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Proven on a real cloud.</b> Benchmarks on a GKE cluster, and fixes from the paid proof run: apply's approval screen, the gateway's problems, who may call an API, and a refused SecretStore.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>A generated admin password is saved to a file, never printed.</b></span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Observe's alerts on GKE's managed Prometheus,</b> and an alert for steps with no node to run on.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>The gcp samples retry safely:</b> they write a result when signing in fails, and wait on a build an earlier attempt left running.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-6-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.6.0</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">31 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.6.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.5.2...v0.6.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.5.2<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">The redesigned console</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Every page redesigned:</b> Home, Catalog, Cart, Compose, Runs, Teams, APIs, Observe and Admin, with a guide linked from each page, the Ask panel, and a resizable, collapsible sidebar.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Ask Vennir about a failed run,</b> from its failure card.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Monitoring three ways:</b> the cluster's Prometheus operator, a managed service (GKE's or Amazon's), or one bundled in the console chart, with the install's alerts on Observe.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Cross-cloud catalogs.</b> An install reads another's catalog across accounts and clouds; <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir catalog grant</span> gives exactly one reader access, and <span class="mono" style="font-size: 14px; color: #E8EAEE">--revoke</span> undoes it.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Managed databases:</b> Cloud SQL on GCP and RDS on AWS, each service signing in as its own identity, with no passwords of Vennir's.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Per-team usage,</b> on Observe's Usage tab and the Teams page.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>The <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span> CLI:</b> backup, backups and restore; logs for the platform or one run's steps; upgrade advice; help and man pages for every command.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-5-2" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.5.2</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">29 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.5.2" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.5.1...v0.5.2" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.5.1<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Ordering from outside, the cart, and Ask</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Ordering bots and order callbacks.</b> A storefront may run only the templates listed for it, at a rate it can't exceed (429 with Retry-After), and hears each outcome as signed JSON. A team can have its runs' outcomes posted the same way.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>The cart.</b> Add actions from the Catalog and Vennir wires them by type, offers what's already deployed, and suggests what's optional. Teams define their own wiring types in the catalog.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Ask, the chat agent.</b> On every page, answering only about Vennir from the docs it ships with, citations checked. Claude through Anthropic's API or Amazon Bedrock, or Gemini on Vertex AI; admins pick the model.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>What a run made, and what depends on it.</b> Each resource says what it provides and needs; deleting something another resource uses waits for an admin.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Hardening.</b> TLS inside the cluster from each chart's own CA; the gateway signs in as its own database role and checks sessions with the console's public key; sign-ins audited; sign-out ends the session; bot tokens expire; a named image USER refused at once (IMAGE_USER_NOT_ALLOWED); NetworkPolicies enforced on EKS with no metadata server for steps.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Docs in the console,</b> every guide searchable, in categories with a path through them.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>A performance baseline:</b> phase 1 benchmarks, and the scheduler's per-step database work batched.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-5-1" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.5.1</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">27 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.5.1" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.5.0...v0.5.1" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.5.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Approved base images</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Approved base images,</b> mirrored into the catalog's own registry, so products build on bases the catalog vouches for.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>A team's page says who owns it</b> in the catalog.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-5-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.5.0</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">27 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.5.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.4.0...v0.5.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.4.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Caps, capacity, SBOMs and alerts</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Per-product limits.</b> product.yaml's maxRunning caps how many steps of a product run at once, and a product chooses its capacity: spot or onDemand.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>SBOMs.</b> Catalog CI attests each image's software bill of materials, offered in Observe.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>SecretStores on AWS,</b> set up by vennir, each store's cloud identity belonging to one team alone.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Admin alerts</b> on refused steps and platform changes, in a chat channel.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">A step's timeout now counts from its container's start, not from when it was created.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-4-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.4.0</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">26 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.4.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.3.2...v0.4.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.3.2<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Catalog versions</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Catalog versions,</b> made by a Git tag in the catalog repository from what main already published, nothing rebuilt. An install follows one version, or the newest.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Reading another install's catalog</b> enforces the owner's signer.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>One owner per catalog repository.</b></span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-3-2" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.3.2</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">26 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.3.2" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.3.1...v0.3.2" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.3.1<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Signing proven on EKS</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">AWS KMS catalog signing works: vennir reads the key's public half as JSON, and signing is proven on EKS.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Catalog signing set up by vennir, proven on GKE.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-3-1" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.3.1</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">26 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.3.1" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.3.0...v0.3.1" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.3.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Keyless signing with cosign 3</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Keyless catalog signing works with cosign 3, and policy-controller upgrades go through.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The catalog template pins vennir 0.3.0 and is checked with its pin.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-3-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.3.0</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">26 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.3.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.2.2...v0.3.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.2.2<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Signing, single sign-on, and a new console</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Catalog signing</b> with a KMS key or keyless, set up by vennir.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Single sign-on</b> set up by admins, required per team, with groups mapped to teams (Google Workspace groups read by the console as itself).</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Per-team resource limits,</b> enforced by the cluster.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>A hash-chained audit log,</b> copied to write-once storage.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Automation:</b> keyless bots signing in with a CI job's own identity, schedules on a cron as one of a team's bots, and notifications in the console, on chat webhooks and by email.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>Before a run:</b> readiness per install from products' check actions, and previews from their plan actions. After it: what a run made, kept past the run and deletable later.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>The console redesigned:</b> Runs, the run timeline, Catalog, Compose, Team, Admin and Observe pages, run forms made from schemas, and an image scans page.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">HTTPS for the console from the chart, non-root required for the kernel and console Pods, and cleanup for the gcp and aws samples. Dependency updates across every project.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-2-2" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.2.2</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">21 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.2.2" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.2.1...v0.2.2" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.2.1<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Chart signing fix</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The release signs the Helm charts with Docker's credentials too.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-2-1" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.2.1</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">21 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/tree/v0.2.1" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Tag on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.2.0...v0.2.1" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.2.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <span style="font-size: 13px; line-height: 1.5; color: #8B93A3">A tag without release notes.</span>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Image scan fix</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Go 1.27.3 and x/net 0.60.0, so the release's image scan passes.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-2-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.2.0</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">21 Oct 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/tree/v0.2.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Tag on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/commits/v0.2.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">History to v0.2.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <span style="font-size: 13px; line-height: 1.5; color: #8B93A3">A tag without release notes.</span>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">The first tagged release</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>The kernel in Go,</b> with kernel-api and the console's API on Connect. The Python kernel and the REST API are gone.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>One command line.</b> vennir installs the platform and runs the catalog tool too (vennir catalog validate, check, publish, release and more), and the project took its name, Vennir.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b>vennir releases</b> for Linux and macOS (amd64 and arm64), signed; a catalog's ./vennir wrapper downloads a pinned one by its SHA-256.</span></li>
+          </ul>
+        </div>
+      </article>
+    </div>
+    <p style="margin: 0; padding-top: 24px; border-top: 1px solid #1F2430; font-size: 15px; line-height: 1.6; color: #8B93A3">Before v0.2.0 there were no tagged releases. The full history is in the <a href="https://github.com/rburns629/vennir/commits/main">commit log</a>.</p>
+  </section>
+
+  <!-- Footer -->
+  <footer style="border-top: 1px solid #161A22; background: #0D1015">
+    <div class="wrap" style="padding-top: 48px; padding-bottom: 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 32px">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <span style="display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; color: #FFFFFF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7 7.5l3.5 8.5M17 7.5l-3.5 8.5"></path></svg>Vennir</span>
+        <span style="font-size: 14px; line-height: 1.6; color: #8B93A3">Every team’s automation, one workflow. Nobody’s credentials shared.</span>
+      </div>
+      <nav aria-label="Product" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Product</span>
+        <a class="nav-link" href="/product" style="font-size: 14px">Product</a>
+        <a class="nav-link" href="/use-cases" style="font-size: 14px">Use cases</a>
+        <a class="nav-link" href="/security" style="font-size: 14px">Security</a>
+        <a class="nav-link" href="/docs" style="font-size: 14px">Docs</a>
+        <a class="nav-link" href="/changelog" style="font-size: 14px">Changelog</a>
+      </nav>
+      <nav aria-label="Docs" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Docs</span>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
+      </nav>
+      <nav aria-label="Project" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Project</span>
+        <a class="nav-link" href="https://github.com/rburns629/vennir" style="font-size: 14px">GitHub</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
+      </nav>
+      <nav aria-label="Community" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Community</span>
+        <a class="nav-link" href="/community" style="font-size: 14px">Community</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/issues" style="font-size: 14px">Issues</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/pulls" style="font-size: 14px">Pull requests</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/CODE_OF_CONDUCT.md" style="font-size: 14px">Code of conduct</a>
+      </nav>
+    </div>
+  </footer>
+</div>
+<script src="/site.js" defer></script>
+</body>
+</html>

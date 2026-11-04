@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vennir use cases</title>
+<meta name="description" content="Vennir runs DAGs of container steps as Kubernetes Jobs: each step a product your platform teams published and reviewed, running as its own identity with only its own team's secrets.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A0C10}
+a{color:#A9BCFF}a:hover{color:#D3DDFF}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px;box-sizing:border-box}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;padding:0 20px;border-radius:8px;font-size:15px;font-weight:500;text-decoration:none;box-sizing:border-box;transition:background-color .15s ease,border-color .15s ease,transform .14s ease}
+.btn-primary{background:#7C9BFF;color:#0A0C10}
+.btn-primary:hover{background:#A9BCFF;color:#0A0C10}
+.btn-ghost{border:1px solid #2A3040;color:#E8EAEE}
+.btn-ghost:hover{border-color:#7C9BFF;color:#FFFFFF}
+.eyebrow{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#7C9BFF}
+.card{background:#11141B;border:1px solid #1F2430;border-radius:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-family:'IBM Plex Mono',ui-monospace,monospace;border:1px solid #2A3040;color:#C9CED8;white-space:nowrap}
+.code{margin:0;padding:20px 22px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;line-height:1.7;color:#C9CED8;white-space:pre;overflow-x:auto}
+.k{color:#A9BCFF}.s{color:#F2C08A}.c{color:#6B7385}.v{color:#8FD6B4}
+.nav-link{color:#C9CED8;text-decoration:none;font-size:15px;display:inline-flex;align-items:center;min-height:44px}
+.nav-link:hover{color:#FFFFFF}
+.bar{height:10px;border-radius:5px}
+@media (prefers-reduced-motion: no-preference){
+  .btn:hover{transform:translateY(-1px)}
+  .pulse{animation:pulse 1.8s ease-in-out infinite}
+  .grow-x{transform-origin:left;animation:growx 1.1s cubic-bezier(.2,.7,.2,1) both}
+  .rise{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+  .run-bar{transition:width .9s cubic-bezier(.2,.7,.2,1),left .9s cubic-bezier(.2,.7,.2,1),background-color .3s ease}
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes growx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (max-width: 600px){h1{font-size:40px!important}h2{font-size:32px!important}}
+</style>
+</head>
+<body>
+<div style="font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #E8EAEE; background: #0A0C10; min-height: 100vh">
+
+  <!-- Nav -->
+  <header style="border-bottom: 1px solid #161A22">
+    <nav class="wrap" aria-label="Main" style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; min-height: 72px">
+      <a href="/" style="display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 19px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7 7.5l3.5 8.5M17 7.5l-3.5 8.5"></path></svg>Vennir</a>
+      <div style="display: flex; align-items: center; gap: 28px; flex-wrap: wrap">
+        <a class="nav-link" href="/product">Product</a>
+        <a class="nav-link" href="/use-cases" aria-current="page" style="color: #FFFFFF; text-decoration: underline; text-decoration-color: #7C9BFF; text-decoration-thickness: 2px; text-underline-offset: 8px">Use cases</a>
+        <a class="nav-link" href="/security">Security</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/changelog">Changelog</a>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.6 2.8 5.6 3.1 5.6 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.2 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"></path></svg>GitHub</a>
+        <a class="btn btn-primary" href="/get-started">Get started</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section id="top" class="wrap" style="padding-top: 88px; padding-bottom: 72px; display: flex; flex-direction: column; gap: 48px">
+    <div class="rise" style="display: flex; flex-direction: column; gap: 24px; max-width: 860px">
+      <span class="eyebrow">Use cases</span>
+      <h1 style="margin: 0; font-size: 60px; line-height: 1.05; font-weight: 700; letter-spacing: -0.025em; color: #FFFFFF; text-wrap: balance">What runs on Vennir, taken from the samples you can run.</h1>
+      <p style="margin: 0; font-size: 19px; line-height: 1.6; color: #AEB5C2; max-width: 740px; text-wrap: pretty">Every use case here is a sample in the repository, with a link to it, or a way of ordering the platform is built for. In each sample one team owns every product; in your catalog, each product belongs to the team that owns that work, and the teams that order it are others.</p>
+    </div>
+    <nav aria-label="Use cases on this page" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+      <a href="#self-service" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">Self-service from a platform team</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">the pattern</span></span>
+      </a>
+      <a href="#gcp" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">A new service on Google Cloud</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">samples/gcp</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">billed</span></span>
+      </a>
+      <a href="#aws" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">Storage, an app and a database on AWS</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">samples/aws</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">billed</span></span>
+      </a>
+      <a href="#apis" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">A backend you run, as an API</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">local · gcp · aws</span></span>
+      </a>
+      <a href="#local" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">One product, five languages</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">samples/local</span><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">no cloud</span></span>
+      </a>
+      <a href="#ticket" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">What a run made, cleaned up later</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">local/ticket</span><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">no cloud</span></span>
+      </a>
+      <a href="#storefront" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">A storefront ordering through a bot</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">ordering bot</span></span>
+      </a>
+      <a href="#ci" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">CI running templates, keyless</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">GitHub Actions · GitLab</span></span>
+      </a>
+    </nav>
+  </section>
+
+  <!-- Self-service: the pattern -->
+  <section id="self-service" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+      <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
+        <span class="eyebrow">The pattern</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">A platform team offers. Other teams order. Neither hands over a key.</h2>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">This is what Vennir is built for. The team that knows a cloud, a database or a ticketing system publishes what it does as products, with its own identity and its own secrets. Every other team orders from the catalog, within the limits the owning team set.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 20px">
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 14px">
+          <span class="mono" style="font-size: 13px; color: #7C9BFF">The owning team</span>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">Publishes, and sets the limits</h3>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.55; color: #AEB5C2">
+            <li>Which teams may run each action <span class="mono" style="font-size: 13px; color: #E8EAEE">shareWith</span></li>
+            <li>Where each team may aim it <span class="mono" style="font-size: 13px; color: #E8EAEE">allowedTargets</span></li>
+            <li>Whose runs wait for its maintainers <span class="mono" style="font-size: 13px; color: #E8EAEE">approval</span></li>
+            <li>What its errors mean <span class="mono" style="font-size: 13px; color: #E8EAEE">errors</span>, <span class="mono" style="font-size: 13px; color: #E8EAEE">help</span></li>
+          </ul>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 14px">
+          <span class="mono" style="font-size: 13px; color: #7C9BFF">Each install</span>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">Checks, twice</h3>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.55; color: #AEB5C2">
+            <li>Whether the product is ready here</li>
+            <li>Inputs and outputs against their schemas</li>
+            <li>A target against the owning team's rules</li>
+            <li>Identity, secrets and image, again in the cluster</li>
+          </ul>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 14px">
+          <span class="mono" style="font-size: 13px; color: #7C9BFF">The ordering team</span>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">Orders, and sees its runs</h3>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.55; color: #AEB5C2">
+            <li>From the Catalog, a cart, or a template's form</li>
+            <li>Or from a pipeline, a schedule or a bot</li>
+            <li>Follows, cancels and retries its own runs</li>
+            <li>Never sees the owning team's secrets</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="overflow: hidden">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+          <span class="mono" style="font-size: 13px; color: #C9CED8">samples/gcp/team.yaml</span>
+          <span class="chip">abridged</span>
+        </div>
+<pre class="code"><span class="k">kind</span>: Team
+<span class="k">name</span>: gcp
+<span class="k">help</span>:
+  <span class="k">chat</span>: <span class="s">"#gcp-team-help"</span>               <span class="c"># where people ask when a step fails</span>
+<span class="k">allowedTargets</span>:
+  - <span class="k">teams</span>: [<span class="s">"*"</span>]
+    <span class="k">gcp.project</span>: [<span class="s">"sandbox-*"</span>]          <span class="c"># any team, in sandbox projects</span>
+  - <span class="k">teams</span>: [<span class="s">"*"</span>]
+    <span class="k">gcp.project</span>: [<span class="s">"shared-*"</span>]
+    <span class="k">approval</span>: <span class="v">true</span>                   <span class="c"># shared projects, once a gcp maintainer approves</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- GCP -->
+  <section id="gcp" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <span class="eyebrow">samples/gcp</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">A new service on Google Cloud.</h2>
+      </div>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A project, an image built from source, a Cloud Run service, and a Cloud SQL database for it. Every action looks before it creates, so a retried step is harmless.</p>
+    </div>
+    <figure class="card" aria-label="The gcp sample's DAG: project, then build-image, then app-hosting" style="margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 18px">
+      <figcaption class="mono" style="font-size: 13px; color: #8B93A3">dags/gcp-hello-world-dag.yaml · three steps · team gcp</figcaption>
+      <ol style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); gap: 12px">
+        <li style="border: 1px solid #2A3040; border-radius: 10px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <span class="mono" style="font-size: 14px; color: #FFFFFF">project.create</span>
+          <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">gcp</span><span class="chip">as gcp-project</span></span>
+          <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Finds the project, or creates it under a folder and links billing.</span>
+          <span class="mono" style="font-size: 12px; color: #8FD6B4">projectId →</span>
+        </li>
+        <li style="border: 1px solid #2A3040; border-radius: 10px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <span class="mono" style="font-size: 14px; color: #FFFFFF">build-image.create</span>
+          <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">gcp</span><span class="chip">as gcp-build-image</span></span>
+          <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Builds an image with Cloud Build from a source archive in GCS, unless it exists.</span>
+          <span class="mono" style="font-size: 12px; color: #8FD6B4">imageUri →</span>
+        </li>
+        <li style="border: 1px solid #2A3040; border-radius: 10px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <span class="mono" style="font-size: 14px; color: #FFFFFF">app-hosting.create</span>
+          <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">gcp</span><span class="chip">as gcp-app-hosting</span></span>
+          <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Deploys the image to Cloud Run, or returns the existing service's URL.</span>
+          <span class="mono" style="font-size: 12px; color: #8FD6B4">serviceUrl</span>
+        </li>
+        <li style="border: 1px dashed #3A4256; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <span class="mono" style="font-size: 14px; color: #FFFFFF">cloud-sql.create</span>
+          <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">gcp</span><span class="chip">as gcp-cloud-sql</span><span class="chip">optional</span></span>
+          <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">A Cloud SQL instance; the cart suggests it for app-hosting's database input.</span>
+          <span class="mono" style="font-size: 12px; color: #8FD6B4">connectionName → app-hosting</span>
+        </li>
+      </ol>
+    </figure>
+    <dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+      <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+        <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who it's for</dt>
+        <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">App teams who need somewhere to run a service, without a Google Cloud role of their own.</dd>
+      </div>
+      <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+        <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who owns which step</dt>
+        <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The gcp team owns all four. Each runs as its own ServiceAccount, granted only what it does: project can't touch Cloud Run, app-hosting can't make projects.</dd>
+      </div>
+      <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+        <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Credentials</dt>
+        <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">None stored: GKE Workload Identity, optionally impersonating a second account named in the team's gcp-target secret.</dd>
+      </div>
+      <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+        <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Proven</dt>
+        <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On GKE Autopilot, 2026-10-25: a project, a Cloud Run service and a Cloud SQL instance made and deleted. The readiness checks are built, not yet run on a cloud.</dd>
+      </div>
+    </dl>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap">
+      <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/tree/main/catalog-template/samples/gcp">The gcp sample on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/blob/main/catalog-template/samples/gcp/dags/gcp-hello-world-dag.yaml">Its DAG</a>
+    </div>
+  </section>
+
+  <!-- AWS -->
+  <section id="aws" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <span class="eyebrow">samples/aws</span>
+          <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Storage, an app and a database on AWS.</h2>
+        </div>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">An S3 bucket with public access blocked, an App Runner service told its name, and an encrypted RDS for PostgreSQL instance whose password no step ever sees.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
+        <figure class="card" aria-label="The aws sample's DAG: a bucket, then an App Runner service" style="margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+          <figcaption class="mono" style="font-size: 13px; color: #8B93A3">dags/aws-hello-world-dag.yaml · two steps · team aws</figcaption>
+          <div style="border: 1px solid #2A3040; border-radius: 10px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+            <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">s3-bucket.create</span><span class="chip">as aws-s3-bucket</span></span>
+            <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Finds the bucket, or creates it. A name another account owns fails as BUCKET_NAME_TAKEN.</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding-left: 18px">
+            <span aria-hidden="true" style="width: 1px; height: 22px; background: #3A4256"></span>
+            <span class="mono" style="font-size: 12px; color: #8FD6B4">bucketName → environment.BUCKET</span>
+          </div>
+          <div style="border: 1px solid #2A3040; border-radius: 10px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+            <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">app-runner.create</span><span class="chip">as aws-app-runner</span></span>
+            <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Deploys an image as an App Runner service and waits for it to run, or returns the existing one's URL.</span>
+          </div>
+          <div style="border: 1px dashed #3A4256; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+            <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">rds-postgres.create</span><span class="chip">as aws-rds-postgres</span></span>
+            <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">RDS generates the password and keeps it in Secrets Manager; the step outputs only that secret's ARN.</span>
+          </div>
+        </figure>
+        <dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+          <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who it's for</dt>
+            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Teams on AWS who need a bucket, a web service or a database, without an IAM role of their own.</dd>
+          </div>
+          <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who owns which step</dt>
+            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The aws team owns all three, each bound to its own IAM role with only the actions it calls.</dd>
+          </div>
+          <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Careful deletes</dt>
+            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A bucket that holds objects is refused (BUCKET_NOT_EMPTY); the database keeps a final snapshot. Nothing without the vennir-made tag is deleted.</dd>
+          </div>
+          <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Proven</dt>
+            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On EKS Auto Mode with Pod Identity (2026-10-19, deletes 2026-10-25). Its SecretStore and readiness checks aren't proven yet.</dd>
+          </div>
+        </dl>
+      </div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap">
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/tree/main/catalog-template/samples/aws">The aws sample on GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/blob/main/catalog-template/samples/aws/dags/aws-hello-world-dag.yaml">Its DAG</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- APIs -->
+  <section id="apis" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <span class="eyebrow">API products</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">A backend your team runs, offered to other teams as an API.</h2>
+      </div>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">The owning team adds an api.yaml and its OpenAPI file; calling teams sign in as they do at the console. The gateway forwards only what the spec describes and signs in to the backend itself, per request.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 20px">
+      <a class="card" href="https://github.com/rburns629/vennir/tree/main/catalog-template/samples/local/apis/greetings" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; text-decoration: none">
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">local/greetings</span><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">no cloud</span></span>
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">A Service in the team's namespace</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">No backend credential: it checks the gateway's signed Vennir-Caller on every request, and says which team called. Shared with every team, 60 a minute.</p>
+        <span class="mono" style="font-size: 13px; color: #A9BCFF">See the sample →</span>
+      </a>
+      <a class="card" href="https://github.com/rburns629/vennir/tree/main/catalog-template/samples/gcp/apis/hello-world" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; text-decoration: none">
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">gcp/hello-world</span><span class="chip">googleIdToken</span></span>
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">The Cloud Run service app-hosting deployed</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The service refuses anyone unsigned. The gateway federates its own ServiceAccount and presents a Google ID token; only GET / is forwarded.</p>
+        <span class="mono" style="font-size: 13px; color: #A9BCFF">See the sample →</span>
+      </a>
+      <a class="card" href="https://github.com/rburns629/vennir/tree/main/catalog-template/samples/aws/apis/orders" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; text-decoration: none">
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">aws/orders</span><span class="chip">awsSigV4</span></span>
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">A Lambda function URL that requires IAM</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Each request signed with SigV4 as a role the gateway assumes with its own ServiceAccount's token. Shared with the web team only, at 600 a minute.</p>
+        <span class="mono" style="font-size: 13px; color: #A9BCFF">See the sample →</span>
+      </a>
+    </div>
+    <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #8B93A3">Who calls: the teams in <span class="mono" style="color: #C9CED8">shareWith</span>, each with its own rate. The local one runs on kind; the cloud two are still to be proven in their billed run (<a href="https://github.com/rburns629/vennir/blob/main/TODO.md">TODO.md</a>).</p>
+  </section>
+
+  <!-- Local five languages -->
+  <section id="local" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <span class="eyebrow">samples/local</span>
+          <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">One product, five languages, no cloud.</h2>
+        </div>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">The same small text product in Python, TypeScript, Go, PowerShell and Rust. It proves an install end to end on your laptop, and it's the starter a new team copies for the language it uses.</p>
+      </div>
+      <figure class="card" aria-label="Five steps, each taking the previous step's text" style="margin: 0; overflow: hidden">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+          <span class="mono" style="font-size: 13px; color: #C9CED8">five-languages · each step takes the previous step's text</span>
+          <span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Succeeded</span>
+        </div>
+        <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column">
+          <li style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px 20px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #171B24">
+            <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">title-case</span><span class="chip">Python</span></span>
+            <span class="mono" style="font-size: 13px; color: #8FD6B4; overflow-wrap: anywhere">Hello From Five Languages</span>
+          </li>
+          <li style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px 20px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #171B24">
+            <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">reverse</span><span class="chip">TypeScript</span></span>
+            <span class="mono" style="font-size: 13px; color: #8FD6B4; overflow-wrap: anywhere">segaugnaL eviF morF olleH</span>
+          </li>
+          <li style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px 20px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #171B24">
+            <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">slug</span><span class="chip">Go</span></span>
+            <span class="mono" style="font-size: 13px; color: #8FD6B4; overflow-wrap: anywhere">segaugnal-evif-morf-olleh</span>
+          </li>
+          <li style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px 20px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #171B24">
+            <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">upper-case</span><span class="chip">PowerShell</span></span>
+            <span class="mono" style="font-size: 13px; color: #8FD6B4; overflow-wrap: anywhere">SEGAUGNAL-EVIF-MORF-OLLEH</span>
+          </li>
+          <li style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px 20px; align-items: center; padding: 14px 20px">
+            <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">rot13</span><span class="chip">Rust</span></span>
+            <span class="mono" style="font-size: 13px; color: #8FD6B4; overflow-wrap: anywhere">FRTNHTANY-RIVS-ZBES-BYYRU</span>
+          </li>
+        </ol>
+        <div class="mono" style="padding: 12px 20px; border-top: 1px solid #1F2430; background: #0D1015; font-size: 12px; color: #8B93A3">input: hello from five languages</div>
+      </figure>
+      <dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+        <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+          <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who it's for</dt>
+          <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Anyone proving an install end to end, and a new team: vennir catalog create copies the starters for the languages it picks.</dd>
+        </div>
+        <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+          <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who owns which step</dt>
+          <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The local team owns all five. They need no secrets and no ServiceAccount of their own, so they run as soon as the team is published.</dd>
+        </div>
+        <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+          <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Tested like it runs</dt>
+          <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Contract tests run against the built image, the request mounted at /platform/input, with no network.</dd>
+        </div>
+        <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+          <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Also as a template</dt>
+          <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">shout-backwards chains two of them behind a one-field form, shared with every team.</dd>
+        </div>
+      </dl>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap">
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/tree/main/catalog-template/samples/local">The local sample on GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/blob/main/catalog-template/samples/local/dags/shout-backwards.yaml">The template</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ticket -->
+  <section id="ticket" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 56px; align-items: center">
+    <div style="display: flex; flex-direction: column; gap: 24px">
+      <span class="eyebrow">samples/local/products/ticket</span>
+      <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">What a run made, kept after the run, and deleted on purpose.</h2>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A pretend ticketing system, nothing really created, that shows the whole life of a resource: preview it, make it, wire something to it, and delete it later from What runs made.</p>
+      <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
+        <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Preview.</b> plan says what open would do, for Preview and for whoever approves.</span></li>
+        <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Wiring.</b> Put a watch alone in the cart and the order adds open for it, or offers a ticket you have.</span></li>
+        <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Cleanup.</b> Delete runs close or unwatch. A ticket still watched waits for an admin, unless its watches go first.</span></li>
+        <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Capacity.</b> maxRunning: 2, as a ticketing system that limits its calls would ask.</span></li>
+      </ul>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap">
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/tree/main/catalog-template/samples/local/products/ticket">The ticket sample on GitHub</a>
+      </div>
+    </div>
+    <figure class="card" aria-label="What runs made: a ticket and a watch that depends on it" style="margin: 0; overflow: hidden">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+        <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">What runs made</span>
+        <span class="mono" style="font-size: 12px; color: #8B93A3">made for local</span>
+      </div>
+      <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 8px">
+        <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">T-dd864760</span><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Made</span></span>
+        <span style="font-size: 14px; color: #C9CED8">Rotate the staging certificate</span>
+        <span class="mono" style="font-size: 12px; color: #8B93A3">local/ticket · by ticket.open · Used by W-eb026c68</span>
+        <span style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px"><span class="mono" style="display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #6B4A1F; color: #F2C08A; font-size: 12px">Ask an admin</span></span>
+      </div>
+      <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 8px">
+        <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">W-eb026c68</span><span class="chip" style="border-color: #2F5BD3; color: #A9BCFF"><span class="pulse" style="width: 7px; height: 7px; border-radius: 50%; background: #7C9BFF"></span>Deleting</span></span>
+        <span style="font-size: 14px; color: #C9CED8">release-oncall on T-dd864760</span>
+        <span class="mono" style="font-size: 12px; color: #8B93A3">local/ticket-watch · by ticket.watch · Uses T-dd864760</span>
+      </div>
+      <div style="padding: 14px 20px; background: #0D1015; font-size: 14px; line-height: 1.6; color: #AEB5C2">Once the watch is Deleted, the ticket's Delete runs close for the team it was made for.</div>
+    </figure>
+  </section>
+
+  <!-- Storefront -->
+  <section id="storefront" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <span class="eyebrow">Ordering bots</span>
+          <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Your own storefront, ordering through a bot.</h2>
+        </div>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A self-service page or an event consumer places orders for your team: it runs the published templates you list for its bot, and nothing else, and hears back when each one finishes.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
+        <div class="card" style="overflow: hidden">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+            <span class="mono" style="font-size: 13px; color: #C9CED8">your storefront, placing an order</span>
+            <span class="chip">ordering bot</span>
+          </div>
+<pre class="code"><span class="c"># the samples' one template; yours will be your own</span>
+curl -X POST <span class="s">"$VENNIR/api/vennir.console.v1.TemplateService/RunTemplate"</span> \
+  -H <span class="s">"Authorization: Bearer $VENNIR_TOKEN"</span> -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"team": "local", "name": "shout-backwards",
+       "onBehalfOf": "[YOUR TEAM]", "requestId": "order-1042",
+       "parameters": {"text": "hello world"}}'</span>
+
+<span class="c"># the same requestId again returns the run already started</span>
+<span class="c"># not on its list: TEMPLATE_NOT_ORDERABLE · anything else: ORDERS_ONLY</span>
+
+<span class="c"># later, posted to your callback URL</span>
+<span class="k">Vennir-Signature</span>: t=&lt;unix seconds&gt;,v1=&lt;hex&gt;
+{<span class="s">"type"</span>: <span class="s">"order.finished"</span>, <span class="s">"requestId"</span>: <span class="s">"order-1042"</span>,
+ <span class="s">"template"</span>: <span class="s">"local/shout-backwards"</span>, <span class="s">"state"</span>: <span class="s">"SUCCEEDED"</span>, …}</pre>
+        </div>
+        <dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+          <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who it's for</dt>
+            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A team that runs its own ordering page or system and wants Vennir behind it.</dd>
+          </div>
+          <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who owns which step</dt>
+            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The template's steps stay their products' teams', with their identities and approvals. The order runs for your team, under its quota.</dd>
+          </div>
+          <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Limits</dt>
+            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">60 orders a minute unless the install says otherwise; past it, 429 with Retry-After.</dd>
+          </div>
+          <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Hearing back</dt>
+            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A signed post to an https URL under a host the install allows, retried five times. examples/order-receiver is a receiver in Go.</dd>
+          </div>
+        </dl>
+      </div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap">
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/tree/main/examples/order-receiver">The order receiver on GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/blob/main/console/docs/14-bots-and-automation.md">Bots and automation guide</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CI keyless -->
+  <section id="ci" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <span class="eyebrow">Keyless bots</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">CI running templates, with nothing stored to leak.</h2>
+      </div>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A release pipeline runs your team's templates or submits its DAGs as a team bot that signs in with the CI job's own identity, from one repository and, if you choose, one branch.</p>
+    </div>
+    <ol aria-label="How a CI job signs in" style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+      <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+        <span class="mono" style="font-size: 13px; color: #7C9BFF">1 · The job</span>
+        <span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Asks GitHub Actions or GitLab for an ID token for this install's audience.</span>
+      </li>
+      <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+        <span class="mono" style="font-size: 13px; color: #7C9BFF">2 · ExchangeToken</span>
+        <span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">The console checks the repository and branch against the bot's card. Any other is refused.</span>
+      </li>
+      <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+        <span class="mono" style="font-size: 13px; color: #7C9BFF">3 · An hour as the bot</span>
+        <span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">A token good for one hour, with exactly what the bot may do in its team.</span>
+      </li>
+      <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+        <span class="mono" style="font-size: 13px; color: #8FD6B4">4 · RunTemplate</span>
+        <span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Runs the template; a requestId from the CI run makes a retried job the same run.</span>
+      </li>
+    </ol>
+    <div class="card" style="overflow: hidden">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+        <span class="mono" style="font-size: 13px; color: #C9CED8">.gitlab-ci.yml</span>
+        <span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Keyless</span>
+      </div>
+<pre class="code"><span class="k">deploy</span>:
+  <span class="k">id_tokens</span>:
+    <span class="k">VENNIR_ID_TOKEN</span>:
+      <span class="k">aud</span>: [THE AUDIENCE THE BOT'S CARD SHOWS]
+  <span class="k">script</span>:
+    - export VENNIR_TOKEN=$(jq -n --arg t <span class="s">"$VENNIR_ID_TOKEN"</span> <span class="s">'{idToken: $t}'</span> | curl -s -X POST $VENNIR/api/vennir.console.v1.AuthService/ExchangeToken -H <span class="s">'Content-Type: application/json'</span> -d @- | jq -r .token)
+    - <span class="c"># then RunTemplate or SubmitExecution, as the bot, for an hour</span></pre>
+    </div>
+    <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #8B93A3">A bot is always made with a token; once CI sign-in works, revoke it and the card shows Keyless. Which CIs an install accepts is its setting (GitHub Actions and gitlab.com by default). <a href="https://github.com/rburns629/vennir/blob/main/console/docs/14-bots-and-automation.md">The guide</a>.</p>
+  </section>
+
+  <!-- Final call -->
+  <section style="border-top: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 96px; padding-bottom: 96px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 24px">
+      <h2 style="margin: 0; font-size: 48px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; max-width: 760px; text-wrap: balance">Start from a sample. Make it your team's.</h2>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2; max-width: 620px">A new catalog repository starts from catalog-template, with the samples to copy from. Adding a product needs no change to Vennir itself.</p>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center">
+        <a class="btn btn-primary" href="/get-started">Get started</a>
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/tree/main/catalog-template">The catalog template</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer style="border-top: 1px solid #161A22; background: #0D1015">
+    <div class="wrap" style="padding-top: 48px; padding-bottom: 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 32px">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <span style="display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; color: #FFFFFF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7 7.5l3.5 8.5M17 7.5l-3.5 8.5"></path></svg>Vennir</span>
+        <span style="font-size: 14px; line-height: 1.6; color: #8B93A3">Every team’s automation, one workflow. Nobody’s credentials shared.</span>
+      </div>
+      <nav aria-label="Product" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Product</span>
+        <a class="nav-link" href="/product" style="font-size: 14px">Product</a>
+        <a class="nav-link" href="/use-cases" style="font-size: 14px">Use cases</a>
+        <a class="nav-link" href="/security" style="font-size: 14px">Security</a>
+        <a class="nav-link" href="/get-started" style="font-size: 14px">Get started</a>
+        <a class="nav-link" href="/changelog" style="font-size: 14px">Changelog</a>
+      </nav>
+      <nav aria-label="Docs" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Docs</span>
+        <a class="nav-link" href="/docs" style="font-size: 14px">All docs</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
+      </nav>
+      <nav aria-label="Project" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Project</span>
+        <a class="nav-link" href="/community" style="font-size: 14px">Community</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir" style="font-size: 14px">GitHub</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
+      </nav>
+    </div>
+  </footer>
+</div>
+<script src="/site.js" defer></script>
+</body>
+</html>

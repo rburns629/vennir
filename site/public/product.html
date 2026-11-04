@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vennir product tour</title>
+<meta name="description" content="Vennir runs DAGs of container steps as Kubernetes Jobs: each step a product your platform teams published and reviewed, running as its own identity with only its own team's secrets.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A0C10}
+a{color:#A9BCFF}a:hover{color:#D3DDFF}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px;box-sizing:border-box}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;padding:0 20px;border-radius:8px;font-size:15px;font-weight:500;text-decoration:none;box-sizing:border-box;transition:background-color .15s ease,border-color .15s ease,transform .14s ease}
+.btn-primary{background:#7C9BFF;color:#0A0C10}
+.btn-primary:hover{background:#A9BCFF;color:#0A0C10}
+.btn-ghost{border:1px solid #2A3040;color:#E8EAEE}
+.btn-ghost:hover{border-color:#7C9BFF;color:#FFFFFF}
+.eyebrow{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#7C9BFF}
+.card{background:#11141B;border:1px solid #1F2430;border-radius:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-family:'IBM Plex Mono',ui-monospace,monospace;border:1px solid #2A3040;color:#C9CED8;white-space:nowrap}
+.code{margin:0;padding:20px 22px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;line-height:1.7;color:#C9CED8;white-space:pre;overflow-x:auto}
+.k{color:#A9BCFF}.s{color:#F2C08A}.c{color:#6B7385}.v{color:#8FD6B4}
+.nav-link{color:#C9CED8;text-decoration:none;font-size:15px;display:inline-flex;align-items:center;min-height:44px}
+.nav-link:hover{color:#FFFFFF}
+.bar{height:10px;border-radius:5px}
+@media (prefers-reduced-motion: no-preference){
+  .btn:hover{transform:translateY(-1px)}
+  .pulse{animation:pulse 1.8s ease-in-out infinite}
+  .grow-x{transform-origin:left;animation:growx 1.1s cubic-bezier(.2,.7,.2,1) both}
+  .rise{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+  .run-bar{transition:width .9s cubic-bezier(.2,.7,.2,1),left .9s cubic-bezier(.2,.7,.2,1),background-color .3s ease}
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes growx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (max-width: 600px){h1{font-size:40px!important}h2{font-size:32px!important}}
+</style>
+</head>
+<body>
+<div style="font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #E8EAEE; background: #0A0C10; min-height: 100vh">
+
+  <!-- Nav -->
+  <header style="border-bottom: 1px solid #161A22">
+    <nav class="wrap" aria-label="Main" style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; min-height: 72px">
+      <a href="/" style="display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 19px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7 7.5l3.5 8.5M17 7.5l-3.5 8.5"></path></svg>Vennir</a>
+      <div style="display: flex; align-items: center; gap: 28px; flex-wrap: wrap">
+        <a class="nav-link" href="/product" aria-current="page" style="color: #FFFFFF; text-decoration: underline; text-decoration-color: #7C9BFF; text-decoration-thickness: 2px; text-underline-offset: 8px">Product</a>
+        <a class="nav-link" href="/use-cases">Use cases</a>
+        <a class="nav-link" href="/security">Security</a>
+        <a class="nav-link" href="/docs">Docs</a>
+        <a class="nav-link" href="/changelog">Changelog</a>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.6 2.8 5.6 3.1 5.6 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.2 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"></path></svg>GitHub</a>
+        <a class="btn btn-primary" href="/get-started">Get started</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section id="top" class="wrap" style="padding-top: 88px; padding-bottom: 72px; display: flex; flex-direction: column; gap: 48px">
+    <div class="rise" style="display: flex; flex-direction: column; gap: 24px; max-width: 860px">
+      <span class="eyebrow">Product</span>
+      <h1 style="margin: 0; font-size: 60px; line-height: 1.05; font-weight: 700; letter-spacing: -0.025em; color: #FFFFFF; text-wrap: balance">The whole platform, one part at a time.</h1>
+      <p style="margin: 0; font-size: 19px; line-height: 1.6; color: #AEB5C2; max-width: 720px; text-wrap: pretty">A catalog your teams publish to, templates that chain their products, five ways to order, a gateway for the APIs teams already run, a page that shows what everything did, a chat agent that answers from the docs, and one CLI to install and run it all. Here is each part, as it works today in 0.x.</p>
+    </div>
+    <nav aria-label="On this page" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+      <a href="#catalog" style="background: #11141B; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; text-decoration: none">
+        <span class="mono" style="font-size: 12px; color: #7C9BFF">01</span>
+        <span style="font-size: 17px; font-weight: 600; color: #FFFFFF">Catalog and products</span>
+        <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">product.yaml, schemas, readiness, errors, capacity, approvals, sharing</span>
+      </a>
+      <a href="#templates" style="background: #11141B; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; text-decoration: none">
+        <span class="mono" style="font-size: 12px; color: #7C9BFF">02</span>
+        <span style="font-size: 17px; font-weight: 600; color: #FFFFFF">Templates and DAGs</span>
+        <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">Outputs into inputs, parameters, previews</span>
+      </a>
+      <a href="#ordering" style="background: #11141B; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; text-decoration: none">
+        <span class="mono" style="font-size: 12px; color: #7C9BFF">03</span>
+        <span style="font-size: 17px; font-weight: 600; color: #FFFFFF">Ordering</span>
+        <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">Run forms, the cart, schedules, bots, the API, callbacks</span>
+      </a>
+      <a href="#apis" style="background: #11141B; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; text-decoration: none">
+        <span class="mono" style="font-size: 12px; color: #7C9BFF">04</span>
+        <span style="font-size: 17px; font-weight: 600; color: #FFFFFF">API products and the gateway</span>
+        <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">The OpenAPI file as the allowlist</span>
+      </a>
+      <a href="#observe" style="background: #11141B; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; text-decoration: none">
+        <span class="mono" style="font-size: 12px; color: #7C9BFF">05</span>
+        <span style="font-size: 17px; font-weight: 600; color: #FFFFFF">Observe</span>
+        <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">Logs, metrics, monitoring, the audit log</span>
+      </a>
+      <a href="#ask" style="background: #11141B; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; text-decoration: none">
+        <span class="mono" style="font-size: 12px; color: #7C9BFF">06</span>
+        <span style="font-size: 17px; font-weight: 600; color: #FFFFFF">Ask Vennir</span>
+        <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">Cited answers and proposed carts</span>
+      </a>
+      <a href="#cli" style="background: #11141B; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; text-decoration: none">
+        <span class="mono" style="font-size: 12px; color: #7C9BFF">07</span>
+        <span style="font-size: 17px; font-weight: 600; color: #FFFFFF">The console and the vennir CLI</span>
+        <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">Install, sleep, back up, read logs, run the catalog</span>
+      </a>
+      <a href="#not-yet" style="background: #11141B; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; text-decoration: none">
+        <span class="mono" style="font-size: 12px; color: #F2C08A">0.x</span>
+        <span style="font-size: 17px; font-weight: 600; color: #FFFFFF">What isn't done yet</span>
+        <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">Said plainly, with where it's tracked</span>
+      </a>
+    </nav>
+  </section>
+
+  <!-- 01 Catalog and products -->
+  <section id="catalog" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+      <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
+        <span class="eyebrow">01 · Catalog and products</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">A product is a folder: a Dockerfile, its tests, and one product.yaml.</h2>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Each team keeps its products in a catalog repository. The product.yaml says what the container's actions take and return, who may use them, how hard they may be pushed, and what to tell people when they fail. CI checks it, builds and scans the image, and publishes one signed release that every install pulls.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
+        <div class="card" style="overflow: hidden">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+            <span class="mono" style="font-size: 13px; color: #C9CED8">samples/local/products/ticket/product.yaml</span>
+            <span class="chip">abridged</span>
+          </div>
+<pre class="code"><span class="k">apiVersion</span>: vennir.dev/v2
+<span class="k">kind</span>: Product
+<span class="k">name</span>: ticket
+<span class="k">team</span>: local
+<span class="k">check</span>: check            <span class="c"># is it ready on this install?</span>
+<span class="k">maxRunning</span>: <span class="v">2</span>          <span class="c"># at most two of its steps at once</span>
+<span class="k">errors</span>:
+  <span class="k">MISSING_INPUT</span>:
+    <span class="k">means</span>: <span class="s">It wasn't given what it needs.</span>
+    <span class="k">do</span>: <span class="s">Fill in the missing input and run it again.</span>
+<span class="k">actions</span>:
+  - <span class="k">name</span>: open
+    <span class="k">idempotent</span>: <span class="v">true</span>     <span class="c"># the same title, the same ticket</span>
+    <span class="k">maxAttempts</span>: <span class="v">2</span>
+    <span class="k">shareWith</span>: [<span class="s">"*"</span>]
+    <span class="k">cleanup</span>: {<span class="k">action</span>: close}
+    <span class="k">plan</span>: plan           <span class="c"># for Preview</span>
+    <span class="k">input</span>:
+      <span class="k">required</span>: [title]
+      <span class="k">properties</span>:
+        <span class="k">title</span>: {<span class="k">type</span>: string, <span class="k">maxLength</span>: <span class="v">200</span>}
+    <span class="k">output</span>:
+      <span class="k">properties</span>:
+        <span class="k">ticket</span>:
+          <span class="k">type</span>: string
+          <span class="k">x-vennir-provides</span>: local.ticket</pre>
+        </div>
+
+        <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+          <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Actions with schemas</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Each action's input and output are JSON Schema, enforced at submit, before the step starts and when it finishes. The run form is built from the same schema.</p>
+            <span class="mono" style="font-size: 12px; color: #F2C08A">INPUT_INVALID · OUTPUT_INVALID</span>
+          </li>
+          <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Readiness checks</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A check action asks the cloud who the product is and whether it may do its job, changing nothing. Each install runs it on registration, on a new image, daily, and on Check now.</p>
+            <span class="mono" style="font-size: 12px; color: #8B93A3">ready · principal · missing</span>
+          </li>
+          <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Errors explained by their owners</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A product says what each of its codes means and what to do; team.yaml says where to ask. The failed step shows both, and whether a retry is safe.</p>
+            <span class="mono" style="font-size: 12px; color: #8B93A3">errors · help · idempotent</span>
+          </li>
+          <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Capacity</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Cap a product's steps per install, keep two runs off the same project, choose Spot or on-demand nodes where the install offers both, and size each step.</p>
+            <span class="mono" style="font-size: 12px; color: #8B93A3">maxRunning · concurrencyKey · capacity · resources</span>
+          </li>
+          <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Approvals</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A step can wait for a maintainer of the product's team: always, only when another team runs it, or for named teams. Whoever started the run can never approve it.</p>
+            <span class="mono" style="font-size: 12px; color: #F2C08A">APPROVAL_DECLINED · APPROVAL_EXPIRED</span>
+          </li>
+          <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Sharing and targets</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">shareWith names the teams that may run an action; visibility: hidden keeps it to yours. team.yaml lists which projects or accounts each team may aim your identity at.</p>
+            <span class="mono" style="font-size: 12px; color: #F2C08A">TARGET_NOT_ALLOWED</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Three product-shaped visuals -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 20px">
+        <figure class="card" aria-label="Readiness pills as the catalog shows them" style="margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 18px">
+          <figcaption style="display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">Readiness, per install</span>
+            <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">The same product can be ready on one install and not on another.</span>
+          </figcaption>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <span class="chip" style="border-color: #2E5A47; color: #8FD6B4"><span style="width: 7px; height: 7px; border-radius: 50%; background: #8FD6B4"></span>Ready</span>
+            <span class="chip" style="border-color: #6B4A1F; color: #F2C08A"><span style="width: 7px; height: 7px; border-radius: 50%; background: #F2C08A"></span>Not ready</span>
+            <span class="chip" style="border-color: #6B4A1F; color: #F2C08A">Check failed</span>
+            <span class="chip" style="border-color: #2F5BD3; color: #A9BCFF"><span class="pulse" style="width: 7px; height: 7px; border-radius: 50%; background: #7C9BFF"></span>Checking</span>
+            <span class="chip">Not checked yet</span>
+          </div>
+          <div style="border: 1px solid #2A3040; border-radius: 8px; background: #0D1015; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+            <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 13px; color: #FFFFFF">gcp/cloud-sql</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">Not ready</span></span>
+            <span class="mono" style="font-size: 12px; line-height: 1.6; color: #AEB5C2">Acts as gcp-cloud-sql</span>
+            <span class="mono" style="font-size: 12px; line-height: 1.6; color: #F2C08A">Missing: roles/cloudsql.admin on a project its instances go in</span>
+          </div>
+        </figure>
+
+        <figure class="card" aria-label="A failed step, explained by the team that owns the product" style="margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+          <figcaption style="display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">A failure, in its owner's words</span>
+            <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">From product.yaml's errors and team.yaml's help.</span>
+          </figcaption>
+          <div style="border: 1px solid #2A3040; border-radius: 8px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+            <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 13px; color: #FFFFFF">ticket.open · Failed</span><span class="mono" style="font-size: 12px; color: #F2C08A">MISSING_INPUT</span></span>
+            <span style="font-size: 14px; line-height: 1.55; color: #C9CED8"><b style="color: #FFFFFF; font-weight: 600">Means</b> It wasn't given what it needs.</span>
+            <span style="font-size: 14px; line-height: 1.55; color: #C9CED8"><b style="color: #FFFFFF; font-weight: 600">Do</b> Fill in the missing input and run it again.</span>
+            <span style="font-size: 14px; line-height: 1.55; color: #C9CED8"><b style="color: #FFFFFF; font-weight: 600">Safe to retry?</b> Yes: the action is idempotent.</span>
+            <span class="mono" style="font-size: 12px; color: #8B93A3">Ask in #local-samples</span>
+          </div>
+        </figure>
+
+        <figure class="card" aria-label="A step awaiting a maintainer's approval" style="margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+          <figcaption style="display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">Two people agree before it runs</span>
+            <span style="font-size: 14px; line-height: 1.5; color: #AEB5C2">Undecided for 3 days by default, it expires.</span>
+          </figcaption>
+          <div style="border: 1px solid #2A3040; border-radius: 8px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+            <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 13px; color: #FFFFFF">app-hosting.create</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">Awaiting approval</span></span>
+            <span style="font-size: 14px; line-height: 1.55; color: #C9CED8">Waiting for an approval from a maintainer of its team.</span>
+            <span style="display: flex; gap: 8px; flex-wrap: wrap">
+              <span class="mono" style="display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 6px; background: #7C9BFF; color: #0A0C10; font-size: 12px">Approve</span>
+              <span class="mono" style="display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #2A3040; color: #E8EAEE; font-size: 12px">Decline…</span>
+              <span class="mono" style="display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #2A3040; color: #E8EAEE; font-size: 12px">Preview what it would do</span>
+            </span>
+          </div>
+        </figure>
+      </div>
+      <p style="margin: 0; font-size: 15px; color: #8B93A3">Every field: <a href="https://github.com/rburns629/vennir/blob/main/catalog-template/README.md">the catalog guide</a> and <a href="https://github.com/rburns629/vennir/blob/main/catalog-template/tools/product.schema.json">product.schema.json</a>.</p>
+    </div>
+  </section>
+
+  <!-- 02 Templates and DAGs -->
+  <section id="templates" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
+      <span class="eyebrow">02 · Templates and DAGs</span>
+      <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Chain actions once. Let anyone run the chain with a form.</h2>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A template names actions, never images, so it keeps working as products release. Its parameters become the form; each step's inputs are values, parameters, or another step's output. Every step still runs as its own product's identity, in its own team's namespace, whoever runs the template.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
+      <div class="card" style="overflow: hidden">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+          <span class="mono" style="font-size: 13px; color: #C9CED8">samples/local/dags/shout-backwards.yaml</span>
+          <span class="chip">kind: Template</span>
+        </div>
+<pre class="code"><span class="k">apiVersion</span>: vennir.dev/v2
+<span class="k">kind</span>: Template
+<span class="k">name</span>: shout-backwards
+<span class="k">shareWith</span>: [<span class="s">"*"</span>]
+<span class="k">parameters</span>:                  <span class="c"># becomes the run form</span>
+  <span class="k">required</span>: [text]
+  <span class="k">properties</span>:
+    <span class="k">text</span>: {<span class="k">type</span>: string, <span class="k">title</span>: Text, <span class="k">maxLength</span>: <span class="v">1000</span>}
+<span class="k">examples</span>:                    <span class="c"># offered under "Use this"</span>
+  - {<span class="k">name</span>: a palindrome, <span class="k">parameters</span>: {<span class="k">text</span>: never odd or even}}
+<span class="k">steps</span>:
+  - <span class="k">id</span>: shout
+    <span class="k">action</span>: upper-case.transform
+    <span class="k">inputs</span>: {<span class="k">text</span>: {<span class="k">$param</span>: text}}
+  - <span class="k">id</span>: backwards
+    <span class="k">action</span>: reverse.transform
+    <span class="k">dependsOn</span>: [shout]
+    <span class="k">inputs</span>:
+      <span class="k">text</span>: {<span class="k">$fromStep</span>: shout, <span class="k">$output</span>: text}</pre>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 20px">
+        <figure class="card" aria-label="A preview of what a step would do" style="margin: 0; overflow: hidden">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+            <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">What it would do</span>
+            <span class="chip">Preview · changes nothing</span>
+          </div>
+          <div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+            <span class="mono" style="font-size: 13px; color: #FFFFFF">ticket.open</span>
+            <span style="font-size: 14px; color: #C9CED8">Opens ticket T-dd864760.</span>
+            <div style="display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; align-items: center; padding: 12px 14px; border-radius: 8px; background: #0D1015; border: 1px solid #1F2430">
+              <span class="chip" style="border-color: #2E5A47; color: #8FD6B4">create</span>
+              <span class="mono" style="font-size: 12px; color: #C9CED8; overflow-wrap: anywhere">local/ticket · T-dd864760 · Rotate the staging certificate</span>
+            </div>
+            <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">A product's plan action says what the real one would do. A step that needs an earlier step's output is listed as not previewed, with why.</span>
+          </div>
+        </figure>
+        <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 16px">
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Outputs into inputs.</b> <span class="mono" style="font-size: 14px; color: #E8EAEE">$fromStep</span> reads a step in dependsOn; the kernel fills it in when the next step starts, and checks it against the schema then.</span></li>
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Checked before merge.</b> <span class="mono" style="font-size: 14px; color: #E8EAEE">./vennir catalog validate</span> checks every action exists, is shared with the team, and gets the inputs it needs.</span></li>
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Or write the DAG yourself.</b> A <span class="mono" style="font-size: 14px; color: #E8EAEE">kind: Dag</span> names images and teams directly; the console pins each <span class="mono" style="font-size: 14px; color: #E8EAEE">:latest</span> to its digest at submit.</span></li>
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Compose in the console.</b> Build one from the actions shared with you, then propose it to the catalog as a pull request.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 Ordering -->
+  <section id="ordering" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <span class="eyebrow">03 · Ordering</span>
+          <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Pick what you need. The order wires itself.</h2>
+        </div>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Products type their inputs and outputs (a project, a region, a database), so the cart can work out which step feeds which, what you already have, and what to ask once. Each step is still checked as if you ran it alone: a cart never lets you do more than you could step by step.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
+        <!-- Cart plan -->
+        <figure class="card" aria-label="A cart's plan: app hosting ordered alone, wired to what the team has" style="margin: 0; overflow: hidden">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">Cart</span>
+              <span class="mono" style="font-size: 12px; color: #8B93A3">For team: web · 2 steps</span>
+            </div>
+            <span class="mono" style="display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 6px; background: #7C9BFF; color: #0A0C10; font-size: 13px">Place order</span>
+          </div>
+          <div style="padding: 14px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 600; color: #C9CED8">Asked once for the whole order</span>
+            <span style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap"><span class="mono" style="font-size: 13px; color: #E8EAEE">gcp.region</span><span class="mono" style="font-size: 13px; padding: 4px 10px; border: 1px solid #2A3040; border-radius: 6px; color: #FFFFFF">us-central1</span></span>
+          </div>
+          <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 10px">
+            <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">gcp/app-hosting.create</span><span class="chip">in your cart</span></span>
+            <div style="display: grid; grid-template-columns: minmax(0, 150px) minmax(0, 1fr); gap: 6px 14px; font-size: 13px">
+              <span class="mono" style="color: #8B93A3">projectId</span><span class="mono" style="color: #A9BCFF">Uses sandbox-web-1</span>
+              <span class="mono" style="color: #8B93A3">region</span><span class="mono" style="color: #C9CED8">Asked once for the order: gcp.region</span>
+              <span class="mono" style="color: #8B93A3">serviceName</span><span class="mono" style="color: #FFFFFF">shop-api</span>
+              <span class="mono" style="color: #8B93A3">image</span><span class="mono" style="color: #8FD6B4">From build-image's imageUri</span>
+            </div>
+          </div>
+          <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 10px">
+            <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">gcp/build-image.create</span><span class="chip">in your cart</span></span>
+            <div style="display: grid; grid-template-columns: minmax(0, 150px) minmax(0, 1fr); gap: 6px 14px; font-size: 13px">
+              <span class="mono" style="color: #8B93A3">projectId</span><span class="mono" style="color: #A9BCFF">Uses sandbox-web-1</span>
+              <span class="mono" style="color: #8B93A3">sourceArchiveUrl</span><span class="mono" style="color: #FFFFFF; overflow-wrap: anywhere">gs://[YOUR BUCKET]/shop-api.zip</span>
+              <span class="mono" style="color: #8B93A3">imageUri</span><span class="mono" style="color: #FFFFFF; overflow-wrap: anywhere">[YOUR REPOSITORY]/shop-api:1</span>
+            </div>
+          </div>
+          <div style="padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+            <span style="font-size: 13px; color: #AEB5C2">Optional: cloudSqlConnectionName</span>
+            <span class="mono" style="font-size: 12px; color: #A9BCFF">Add cloud-sql.create</span>
+          </div>
+        </figure>
+
+        <!-- Ways to order -->
+        <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+          <li style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Catalog and run forms</h3>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Every template and action, with its readiness. Run opens a form from its schema; targets offer only what the owning team allows yours.</p>
+          </li>
+          <li style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Schedules</h3>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">A template or action on a timetable, as one of the team's bots, at most every five minutes, in your time zone.</p>
+          </li>
+          <li style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">The API</h3>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Connect services under /api: submit a DAG, run a template, place a cart. A repeated requestId returns the run already started.</p>
+          </li>
+          <li style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Keyless bots</h3>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">A GitHub Actions or GitLab job exchanges its own ID token for an hour as a bot, from one repository and, if you like, one branch.</p>
+          </li>
+          <li style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Ordering bots</h3>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">For a storefront: it may run only the templates you list, 60 orders a minute by default, under your team's quota and approvals.</p>
+          </li>
+          <li style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Callbacks and webhooks</h3>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Signed posts when an order or a run finishes, to hosts your install allows. Chat notifications to Slack, Google Chat or Teams.</p>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card" style="overflow: hidden">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+          <span class="mono" style="font-size: 13px; color: #C9CED8">.github/workflows/order.yml</span>
+          <span class="chip" style="border-color: #2E5A47; color: #8FD6B4">no stored token</span>
+        </div>
+<pre class="code"><span class="k">permissions</span>:
+  <span class="k">id-token</span>: write          <span class="c"># the job's own identity, instead of a stored token</span>
+<span class="k">env</span>:
+  <span class="k">VENNIR</span>: https://[YOUR CONSOLE]
+  <span class="k">AUD</span>: [THE AUDIENCE THE BOT'S CARD SHOWS]
+<span class="k">steps</span>:
+  - <span class="k">name</span>: Sign in to Vennir
+    <span class="k">run</span>: |
+      ID=$(curl -sH <span class="s">"Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN"</span> <span class="s">"$ACTIONS_ID_TOKEN_REQUEST_URL&amp;audience=$AUD"</span> | jq -r .value)
+      TOKEN=$(jq -n --arg t <span class="s">"$ID"</span> <span class="s">'{idToken: $t}'</span> | curl -s -X POST $VENNIR/api/vennir.console.v1.AuthService/ExchangeToken \
+        -H <span class="s">'Content-Type: application/json'</span> -d @- | jq -r .token)
+      echo <span class="s">"::add-mask::$TOKEN"</span>; echo <span class="s">"VENNIR_TOKEN=$TOKEN"</span> &gt;&gt; <span class="s">"$GITHUB_ENV"</span>
+  - <span class="k">name</span>: Run a template
+    <span class="k">run</span>: |
+      curl -X POST $VENNIR/api/vennir.console.v1.TemplateService/RunTemplate \
+        -H <span class="s">"Authorization: Bearer $VENNIR_TOKEN"</span> -H <span class="s">"Content-Type: application/json"</span> \
+        -d <span class="s">"$(jq -nc --arg r "ci-$GITHUB_RUN_ID" '{team: "local", name: "shout-backwards", requestId: $r, parameters: {text: "hello world"}}')"</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 API products -->
+  <section id="apis" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
+      <span class="eyebrow">04 · API products and the gateway</span>
+      <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Publish a backend you already run. Its OpenAPI file is the allowlist.</h2>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A Service in your namespace, a Cloud Run service or a Lambda function URL: add an api.yaml and its OpenAPI file to your catalog folder. The gateway answers at <span class="mono" style="font-size: 16px; color: #E8EAEE">/&lt;team&gt;/&lt;name&gt;/</span>, signs callers in as the console does, and forwards only what the spec describes, with a credential it mints per request. Nothing is stored.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
+      <div class="card" style="overflow: hidden">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+          <span class="mono" style="font-size: 13px; color: #C9CED8">samples/aws/apis/orders/api.yaml</span>
+          <span class="chip">kind: Api</span>
+        </div>
+<pre class="code"><span class="k">apiVersion</span>: vennir.dev/v2
+<span class="k">kind</span>: Api
+<span class="k">name</span>: orders
+<span class="k">spec</span>: openapi.yaml             <span class="c"># what may be forwarded</span>
+<span class="k">backend</span>:
+  <span class="k">url</span>: https://abcdefghijklmnopqrstuvwxyz012345.lambda-url.us-east-2.on.aws
+  <span class="k">auth</span>:
+    <span class="k">awsSigV4</span>:                  <span class="c"># signed per request, no key</span>
+      <span class="k">roleArn</span>: arn:aws:iam::123456789012:role/vennir-orders-api
+      <span class="k">region</span>: us-east-2
+      <span class="k">service</span>: lambda
+<span class="k">shareWith</span>: [web]
+<span class="k">limits</span>:
+  <span class="k">default</span>: <span class="v">300/min</span>
+  <span class="k">web</span>: <span class="v">600/min</span>
+<span class="k">timeout</span>: <span class="v">15s</span>
+<span class="k">maxRequest</span>: <span class="v">16KiB</span></pre>
+      </div>
+      <figure class="card" aria-label="What the gateway checks, in order" style="margin: 0; overflow: hidden">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+          <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">What happens to a request</span>
+          <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Live</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">Held</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">Paused</span></span>
+        </div>
+        <ol style="margin: 0; padding: 8px 0; list-style: none; display: flex; flex-direction: column">
+          <li style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 20px"><span class="mono" style="font-size: 12px; color: #7C9BFF">1</span><span style="font-size: 14px; color: #C9CED8">The API exists here</span><span class="mono" style="font-size: 12px; color: #F2C08A">404</span></li>
+          <li style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 20px"><span class="mono" style="font-size: 12px; color: #7C9BFF">2</span><span style="font-size: 14px; color: #C9CED8">It's open: not closed, paused or held</span><span class="mono" style="font-size: 12px; color: #F2C08A">503</span></li>
+          <li style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 20px"><span class="mono" style="font-size: 12px; color: #7C9BFF">3</span><span style="font-size: 14px; color: #C9CED8">You're signed in</span><span class="mono" style="font-size: 12px; color: #F2C08A">401</span></li>
+          <li style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 20px"><span class="mono" style="font-size: 12px; color: #7C9BFF">4</span><span style="font-size: 14px; color: #C9CED8">It's shared with your team</span><span class="mono" style="font-size: 12px; color: #F2C08A">403</span></li>
+          <li style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 20px"><span class="mono" style="font-size: 12px; color: #7C9BFF">5</span><span style="font-size: 14px; color: #C9CED8">The body isn't too large</span><span class="mono" style="font-size: 12px; color: #F2C08A">413</span></li>
+          <li style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 20px"><span class="mono" style="font-size: 12px; color: #7C9BFF">6</span><span style="font-size: 14px; color: #C9CED8">The method and path are in the spec</span><span class="mono" style="font-size: 12px; color: #F2C08A">404</span></li>
+          <li style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 20px"><span class="mono" style="font-size: 12px; color: #7C9BFF">7</span><span style="font-size: 14px; color: #C9CED8">Parameters, headers and body fit</span><span class="mono" style="font-size: 12px; color: #F2C08A">400</span></li>
+          <li style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 20px"><span class="mono" style="font-size: 12px; color: #7C9BFF">8</span><span style="font-size: 14px; color: #C9CED8">Your team is within its rate</span><span class="mono" style="font-size: 12px; color: #F2C08A">429</span></li>
+          <li style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 9px 20px"><span class="mono" style="font-size: 12px; color: #8FD6B4">9</span><span style="font-size: 14px; color: #FFFFFF">Forwarded, with the backend's own credential and a signed Vennir-Caller</span><span class="mono" style="font-size: 12px; color: #8FD6B4">→</span></li>
+        </ol>
+        <div style="padding: 14px 20px; border-top: 1px solid #1F2430; background: #0D1015; font-size: 14px; line-height: 1.6; color: #AEB5C2">Traffic per endpoint and per calling team for the API's own team; a maintainer can pause it with a message during an incident. Bodies and header values are never recorded.</div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 05 Observe -->
+  <section id="observe" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <span class="eyebrow">05 · Observe</span>
+          <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">What ran, what was refused, and who changed what.</h2>
+        </div>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">One page with four tabs: Security checks, Metrics, Logs and the Audit log. Everyone can open it; what each person sees follows what they may see elsewhere.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
+        <!-- Run trace -->
+        <figure class="card" aria-label="A run's trace, and whose lines are visible to whom" style="margin: 0; overflow: hidden">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">Logs · From: Steps · Team: local</span>
+              <span class="mono" style="font-size: 12px; color: #8B93A3">as a member of local sees it</span>
+            </div>
+            <span class="chip" style="border-color: #2E5A47; color: #8FD6B4">redacted before kept</span>
+          </div>
+          <div class="mono" style="padding: 14px 20px; font-size: 12px; line-height: 1.9; color: #AEB5C2; overflow-x: auto; white-space: nowrap">
+            <div><span style="color: #8B93A3">12:04:10</span> <span style="color: #8FD6B4">info </span> local · open · attempt 1 · opened T-dd864760</div>
+            <div><span style="color: #8B93A3">12:04:11</span> <span style="color: #C9CED8">debug</span> local · open · attempt 1 · Authorization: [redacted bearer token]</div>
+            <div><span style="color: #8B93A3">12:04:15</span> <span style="color: #8FD6B4">info </span> local · watch · attempt 1 · watching T-dd864760</div>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid #1F2430">
+            <div style="padding: 14px 20px; border-right: 1px solid #1F2430; display: flex; flex-direction: column; gap: 4px">
+              <span style="font-size: 13px; font-weight: 600; color: #FFFFFF">Your teams' steps</span>
+              <span style="font-size: 13px; color: #AEB5C2">Every level</span>
+            </div>
+            <div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 4px">
+              <span style="font-size: 13px; font-weight: 600; color: #FFFFFF">Another team's, in a run you own</span>
+              <span style="font-size: 13px; color: #AEB5C2">Its JSON info lines only</span>
+            </div>
+          </div>
+        </figure>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 20px">
+          <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Security checks</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Each check marked Enforced, Off here or Not yet, read from this install's settings; 7 days of refusals; every image with its last scan and SBOM.</p>
+          </div>
+          <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Metrics</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Waiting and running now, wait to start at the 95th percentile, why steps failed, step times per product: from kernel-api's own tables.</p>
+          </div>
+          <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Monitoring</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Prometheus metrics from every component, with alerts and a Grafana dashboard, through your Prometheus Operator, GKE's or Amazon's managed Prometheus, or a bundled one.</p>
+          </div>
+          <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 600; color: #FFFFFF">Audit log</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Every change, allowed or refused, hash-chained; optionally copied to a bucket that refuses deletes and compared entry by entry.</p>
+            <span class="chip" style="align-self: flex-start; border-color: #2E5A47; color: #8FD6B4">Chain intact</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 Ask Vennir -->
+  <section id="ask" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 56px; align-items: center">
+    <div style="display: flex; flex-direction: column; gap: 24px">
+      <span class="eyebrow">06 · Ask Vennir</span>
+      <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">A chat agent that cites the docs and fills a cart. You place the order.</h2>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">It acts as the person asking, so it sees only what they may. Its only effect is a proposed cart, which they open and place themselves. A question that isn't about Vennir gets a fixed sentence; an answer resting on neither the docs it cites nor its tools' results is replaced.</p>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 14px; font-weight: 600; color: #C9CED8">Models, chosen by an admin</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <span class="chip" style="height: 30px; padding: 0 12px">Gemini on Vertex AI · no key</span>
+          <span class="chip" style="height: 30px; padding: 0 12px">Claude in Amazon Bedrock · no key</span>
+          <span class="chip" style="height: 30px; padding: 0 12px">Claude through Anthropic's API</span>
+          <span class="chip" style="height: 30px; padding: 0 12px">OpenAI-compatible: LM Studio, Ollama</span>
+        </div>
+        <span style="font-size: 14px; line-height: 1.6; color: #8B93A3">On a cloud, choose the install's own: nothing then leaves it. With Anthropic's API or an outside server, the conversation does. Nothing is kept unless someone rates an answer (90 days).</span>
+      </div>
+    </div>
+    <figure class="card" aria-label="An answer in Ask Vennir, with citations and a proposed cart" style="margin: 0; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid #1F2430">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg>
+        <span style="font-size: 15px; font-weight: 600; color: #FFFFFF">Ask Vennir</span>
+      </div>
+      <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px">
+        <div style="align-self: flex-end; max-width: 85%; padding: 12px 14px; border-radius: 10px; background: #1A2033; font-size: 14px; line-height: 1.55; color: #E8EAEE">I need a Cloud Run service for shop-api. What do I order?</div>
+        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 1.6; color: #C9CED8">
+          <span>Order <span class="mono" style="color: #FFFFFF">gcp/app-hosting.create</span>. It needs a project: your team already has <span class="mono" style="color: #FFFFFF">sandbox-web-1</span>, and the cart will offer it. Your runs of it wait for a gcp maintainer only when they aim at a <span class="mono" style="color: #FFFFFF">shared-*</span> project.<sup style="color: #A9BCFF">1</sup></span>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <span class="chip" style="color: #A9BCFF">1 · Finding and running things from the catalog</span>
+          </div>
+          <div style="border: 1px solid #2A3040; border-radius: 8px; background: #0D1015; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+            <span class="mono" style="font-size: 12px; color: #C9CED8">Proposed cart · 1 action · for web</span>
+            <span class="mono" style="display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 6px; background: #7C9BFF; color: #0A0C10; font-size: 12px">Open in cart</span>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </section>
+
+  <!-- 07 Console and CLI -->
+  <section id="cli" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
+      <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
+        <span class="eyebrow">07 · The console and the vennir CLI</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">A console for the people who order. A CLI for the people who run it.</h2>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">The console is the one front door: Catalog, Runs, What runs made, APIs, Observe, your teams, and Admin, each page linking the guide that explains it. <span class="mono" style="font-size: 16px; color: #E8EAEE">vennir</span> installs it on kind, Google Cloud, AWS or a cluster you have, and keeps each environment as one folder of settings, never a secret.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
+        <ul class="card" style="margin: 0; padding: 8px 0; list-style: none; display: flex; flex-direction: column">
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #FFFFFF">init · apply</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Ask the questions; show what it will create and cost, and do it on approval</span></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #FFFFFF">check · status</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Tools, sign-in, cluster and what's installed, changing nothing</span></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #FFFFFF">sleep · wake</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Scale to zero, keeping the data; or on a schedule, or when idle</span></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #FFFFFF">backup · backups · restore</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Both databases as one pair, to the bucket or a folder; restore asks first</span></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #FFFFFF">logs · console</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">The platform's logs or one run's steps; port-forward the console</span></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #FFFFFF">config · tools · sso</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Change a setting, fetch pinned tools, turn on Google sign-in</span></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #FFFFFF">catalog create · grant</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Make a catalog; let another install read it, keyless</span></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #FFFFFF">catalog validate · check</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Schemas; then build, test with no network, and scan</span></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px; border-bottom: 1px solid #171B24"><span class="mono" style="font-size: 13px; color: #FFFFFF">catalog publish · release · promote</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Push pinned, signed images; push the signed release; version it</span></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 210px) minmax(0, 1fr); gap: 16px; padding: 12px 22px"><span class="mono" style="font-size: 13px; color: #FFFFFF">destroy</span><span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Remove what it made, asking about each kind of data first</span></li>
+        </ul>
+        <div class="card" style="overflow: hidden">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #1F2430">
+            <span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%; background: #2A3040"></span>
+            <span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%; background: #2A3040"></span>
+            <span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%; background: #2A3040"></span>
+            <span class="mono" style="margin-left: 8px; font-size: 13px; color: #8B93A3">a day with vennir</span>
+          </div>
+<pre class="code"><span class="c"># change a setting, then make the install match it</span>
+<span class="c">$</span> vennir config set -e dev size resilient
+<span class="c">$</span> vennir apply dev --plan-only
+
+<span class="c"># before an upgrade</span>
+<span class="c">$</span> vennir backup dev --to ~/vennir-dumps
+<span class="c">$</span> vennir config set -e dev vennir [VERSION]
+<span class="c">$</span> vennir apply dev
+
+<span class="c"># one run's steps, while their Pods are there</span>
+<span class="c">$</span> vennir logs dev --execution 3f2c9a7e-0b1d-4a51-9c6e-2d8f4b7a1e05
+
+<span class="c"># the evening</span>
+<span class="c">$</span> vennir sleep dev
+<span class="c">$</span> vennir config set -e dev scaleDown.schedule <span class="s">"0 20 * * 1-5"</span>
+
+<span class="c"># in your catalog repository, what CI runs</span>
+<span class="c">$</span> ./vennir catalog check teams/web/products/site
+<span class="c">$</span> ./vennir catalog publish teams/web/products/site &amp;&amp; ./vennir catalog release</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- What isn't done -->
+  <section id="not-yet" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <span class="eyebrow" style="color: #F2C08A">Vennir is 0.x</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">What isn't done yet.</h2>
+      </div>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Everything above is built. These are the gaps, from the repository's own list.</p>
+    </div>
+    <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+      <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 8px">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Chat through Bedrock, unproven</h3>
+        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">The console's signed requests pass IAM for its model; one real answer is still to come.</p>
+      </li>
+      <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 8px">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Sample readiness checks, unproven</h3>
+        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">The gcp and aws samples' checks are built, not yet run on a cloud.</p>
+      </li>
+      <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 8px">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Teams from the directory</h3>
+        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Membership is set in Vennir, or follows mapped single sign-on groups.</p>
+      </li>
+      <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 8px">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Small console gaps</h3>
+        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Schedules can't be edited, only paused or deleted; there's no button to ask for access to an API.</p>
+      </li>
+      <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 8px">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">An MCP server, and Azure</h3>
+        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Planned last. The Azure sample exists and is unproven.</p>
+      </li>
+    </ul>
+    <p style="margin: 0; font-size: 15px; color: #8B93A3">The full list: <a href="https://github.com/rburns629/vennir/blob/main/TODO.md">TODO.md</a>. What is and isn't enforced: <a href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md">the security model</a>.</p>
+  </section>
+
+  <!-- Final call -->
+  <section style="border-top: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 96px; padding-bottom: 96px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 24px">
+      <h2 style="margin: 0; font-size: 48px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; max-width: 760px; text-wrap: balance">See it on your laptop, then see what teams build with it.</h2>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center">
+        <a class="btn btn-primary" href="/get-started">Get started</a>
+        <a class="btn btn-ghost" href="/use-cases">Use cases</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer style="border-top: 1px solid #161A22; background: #0D1015">
+    <div class="wrap" style="padding-top: 48px; padding-bottom: 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 32px">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <span style="display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; color: #FFFFFF"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7 7.5l3.5 8.5M17 7.5l-3.5 8.5"></path></svg>Vennir</span>
+        <span style="font-size: 14px; line-height: 1.6; color: #8B93A3">Every team’s automation, one workflow. Nobody’s credentials shared.</span>
+      </div>
+      <nav aria-label="Product" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Product</span>
+        <a class="nav-link" href="/product" style="font-size: 14px">Product</a>
+        <a class="nav-link" href="/use-cases" style="font-size: 14px">Use cases</a>
+        <a class="nav-link" href="/security" style="font-size: 14px">Security</a>
+        <a class="nav-link" href="/get-started" style="font-size: 14px">Get started</a>
+        <a class="nav-link" href="/changelog" style="font-size: 14px">Changelog</a>
+      </nav>
+      <nav aria-label="Docs" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Docs</span>
+        <a class="nav-link" href="/docs" style="font-size: 14px">All docs</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
+      </nav>
+      <nav aria-label="Project" style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Project</span>
+        <a class="nav-link" href="/community" style="font-size: 14px">Community</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir" style="font-size: 14px">GitHub</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
+        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
+      </nav>
+    </div>
+  </footer>
+</div>
+<script src="/site.js" defer></script>
+</body>
+</html>
