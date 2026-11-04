@@ -287,7 +287,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         </li>
         <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
           <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">A record nobody can rewrite</h3>
-          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Every call is in a hash-chained audit log, copied to a bucket that refuses deletes and compared with the database every hour.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Every call is in a hash-chained audit log, copied to a bucket that refuses deletes and compared with the database entry by entry, a few at a time, round and round.</p>
           <span class="mono" style="font-size: 12px; color: #F2C08A">audit.export</span>
         </li>
       </ul>

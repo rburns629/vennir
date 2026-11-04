@@ -149,12 +149,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <span class="chip">diagram</span>
       </div>
       <div style="padding: 24px">
-        <div role="img" aria-label="Placeholder for the diagram docs/architecture/6-the-pieces.svg" style="min-height: 520px; border: 1px dashed #3A4256; border-radius: 10px; background: #0D1015; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px; text-align: center; box-sizing: border-box">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="8.5" y="16" width="7" height="5" rx="1"></rect><path d="M6.5 8v3h11V8M12 11v5"></path></svg>
-          <span class="mono" style="font-size: 15px; color: #FFFFFF">6-the-pieces.svg</span>
-          <span style="font-size: 15px; line-height: 1.6; color: #AEB5C2; max-width: 380px">The pieces, at a glance: the catalog repository and its CI, the registry, people and bots, and the cluster with vennir-system, its two Postgres databases, team namespaces and admission policies.</span>
-          <span class="chip" style="border-color: #6B4A1F; color: #F2C08A">[PLACE THE SVG HERE]</span>
-        </div>
+        <div style="background: #FFFFFF; border-radius: 10px; padding: 24px; display: flex; justify-content: center; overflow-x: auto"><img src="/diagrams/6-the-pieces.svg" width="763" height="653" alt="The pieces, at a glance: the catalog repository and its CI, the registry, people and bots, and the cluster with vennir-system, its two Postgres databases, team namespaces and admission policies." style="display: block; max-width: 100%; height: auto"></div>
       </div>
       <figcaption style="padding: 0 24px 20px; font-size: 14px; line-height: 1.6; color: #8B93A3">A catalog's CI pushes images and a signed release; each console pulls it. The console hands authorized DAGs to kernel-api; the scheduler starts one Job per step in a team namespace.</figcaption>
     </figure>
@@ -236,7 +231,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <li data-doc style="background: #11141B; display: flex">
             <a href="https://github.com/rburns629/vennir/blob/main/console/docs/12-observe.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Observe</span>
-              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Security checks, metrics, logs and the audit log, and who sees what on each.</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Security checks, metrics, usage, logs and the audit log, and who sees what on each.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/12</span>
             </a>
           </li>
