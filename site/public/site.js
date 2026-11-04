@@ -5,6 +5,15 @@
 (function () {
   "use strict";
 
+  // Firebase also serves the site at the project's own addresses; send
+  // visitors to vennir.io, the one every page names as canonical. Preview
+  // channels (a "--" in the name) stay where they are.
+  var host = location.hostname;
+  if (/\.(web\.app|firebaseapp\.com)$/.test(host) && host.indexOf("--") === -1) {
+    location.replace("https://vennir.io" + location.pathname + location.search + location.hash);
+    return;
+  }
+
   // The hero's run, phase by phase: project, then the database, then the app
   // once a maintainer approves, then the ticket; then it starts over. Still on
   // phase 2 (waiting for approval) for anyone who asks for less motion.
