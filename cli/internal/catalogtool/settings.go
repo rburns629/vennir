@@ -20,6 +20,21 @@ type Settings struct {
 	// Platform the images are built for, such as linux/amd64; empty: see
 	// BuildPlatform.
 	Platform string
+	// BuildEnvironments are the teams whose products are built in a GitHub
+	// Environment of their own (team-<name>, main only), with that
+	// Environment's secrets offered to docker build (buildenv.go).
+	BuildEnvironments []string
+}
+
+// BuildsInEnvironment says whether team's products are built only in its
+// own Environment.
+func (s Settings) BuildsInEnvironment(team string) bool {
+	for _, t := range s.BuildEnvironments {
+		if t == team {
+			return true
+		}
+	}
+	return false
 }
 
 var platformPattern = regexp.MustCompile(`^[a-z0-9]+/[a-z0-9]+(/[a-z0-9]+)?$`)
@@ -51,7 +66,8 @@ func (c *Catalog) Settings() (Settings, error) {
 			Mode string `yaml:"mode"`
 			Key  string `yaml:"key"`
 		} `yaml:"signing"`
-		Platform string `yaml:"platform"`
+		Platform          string   `yaml:"platform"`
+		BuildEnvironments []string `yaml:"buildEnvironments"`
 	}
 	data, err := os.ReadFile(c.path("vertra.yaml"))
 	if err == nil {
@@ -79,6 +95,9 @@ func (c *Catalog) Settings() (Settings, error) {
 		SigningMode: or("VERTRA_SIGNING_MODE", mode),
 		SigningKey:  or("VERTRA_SIGNING_KEY", file.Signing.Key),
 		Platform:    or("VERTRA_PLATFORM", file.Platform),
+		// Never from the environment: which teams' values reach which
+		// builds is the catalog admins' file, reviewed like the workflow.
+		BuildEnvironments: file.BuildEnvironments,
 	}, nil
 }
 

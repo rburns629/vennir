@@ -30,6 +30,10 @@ type Catalog struct {
 	SummaryPath string
 	// Getenv reads settings and credentials (os.Getenv outside tests).
 	Getenv func(string) string
+	// Images is where the images teams' own Environments built are
+	// (<team>/<product>.tar, BuildForEnvironment), for check and publish to
+	// load rather than build: catalog CI's --images.
+	Images string
 }
 
 // New returns the catalog at root, writing to the process's output.

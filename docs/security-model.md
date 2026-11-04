@@ -69,6 +69,15 @@ only by the team's registered products.
   removes the registration and the Secret or ExternalSecret the console
   created. Tasks already running keep what they mounted.
 
+Values a team's *builds* need (a private package registry's token) are
+the one exception, and never reach the console or a step: they live in the
+team's own GitHub Environment in its catalog repository, `team-<team>`,
+which only `main` may use, and catalog CI offers them to that team's
+`docker build` as BuildKit secrets, never in a layer. The job that builds
+with them holds no registry or cloud credential; the publish job, in
+`catalog-publish`, tests, scans, pushes and signs the images it made. The
+catalog guide's "Values your builds need" says which values go where.
+
 ### What a secret can hold
 
 A secret is a set of named keys, each mounted as a file at

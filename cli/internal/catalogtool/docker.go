@@ -41,6 +41,11 @@ type runResult struct {
 // run runs a command; with capture, its output is returned rather than
 // shown. A command that can't start is an error; one that fails isn't.
 func (c *Catalog) run(timeout time.Duration, capture bool, name string, args ...string) (runResult, error) {
+	return c.runWith(timeout, capture, nil, name, args...)
+}
+
+// runWith is run with env (KEY=value) added to the process's own.
+func (c *Catalog) runWith(timeout time.Duration, capture bool, env []string, name string, args ...string) (runResult, error) {
 	ctx := context.Background()
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -48,6 +53,9 @@ func (c *Catalog) run(timeout time.Duration, capture bool, name string, args ...
 		defer cancel()
 	}
 	cmd := exec.CommandContext(ctx, name, args...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	var stdout, stderr bytes.Buffer
 	if capture {
 		cmd.Stdout, cmd.Stderr = &stdout, &stderr
@@ -102,8 +110,17 @@ func (c *Catalog) Build(p *Product) bool {
 			c.info("  building for %s", platform)
 			args = append(args, "--platform", platform)
 		}
+		var secrets, env []string
+		if secrets, env, err = c.buildSecrets(); err == nil && len(secrets) > 0 {
+			c.info("  offering build secrets %s", strings.Join(secrets, ", "))
+			for _, name := range secrets {
+				args = append(args, "--secret", "id="+name+",env="+buildSecretPrefix+name)
+			}
+		}
 		var result runResult
-		result, err = c.run(0, false, binary, append(args, "-t", p.LocalImage(), p.Dir)...)
+		if err == nil {
+			result, err = c.runWith(0, false, env, binary, append(args, "-t", p.LocalImage(), p.Dir)...)
+		}
 		if err == nil && result.code != 0 {
 			err = errors.New("docker build failed")
 		}

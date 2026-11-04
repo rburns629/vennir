@@ -310,6 +310,32 @@ installs that follow versions (catalogVersion: newest, or a pinned one).`,
 		example: `  ./vertra catalog promote v1.4.0
   ./vertra catalog promote v1.4.1 --from 3f2c9e1`,
 	},
+	"vertra catalog plan": {
+		long: `Writes, as JSON, the builds publishing needs from teams that build in a
+GitHub Environment of their own (buildEnvironments in vertra.yaml): each
+such team's products publish would choose. In CI it first refuses any
+team whose Environment, team-<name>, can be used from more than main.
+Catalog CI's plan job; its build jobs read it.`,
+		example: `  ./vertra catalog plan --changed origin/main --out plan.json`,
+	},
+	"vertra catalog build": {
+		long: `Builds one team's products in its own Environment, offering each of the
+Environment's secrets (VERTRA_BUILD_SECRETS, a JSON object) to docker
+build as a BuildKit secret of its own name, then saves each image to
+DIR/<team>/<product>.tar for publish --images to load, test, scan, push
+and sign. It pushes nothing. A Dockerfile reads a secret with
+RUN --mount=type=secret,id=NAME, so it never lands in a layer.`,
+		example: `  VERTRA_BUILD_SECRETS='{"NPM_TOKEN":"..."}' ./vertra catalog build --out images teams/web/products/site`,
+	},
+	"vertra catalog environments": {
+		long: `Makes the GitHub Environment (team-<name>) of each team buildEnvironments
+lists in vertra.yaml, and limits it to main, so no pull request can have
+its secrets; its secrets, reviewers and wait timer are kept. Run it as a
+catalog admin (gh signed in as one) after listing a team, before adding
+the team's secrets to its Environment.`,
+		example: `  ./vertra catalog environments
+  ./vertra catalog environments --repo your-org/catalog`,
+	},
 	"vertra catalog changed": {
 		long:    `Lists the products changed since a ref, as JSON: what CI checks and publishes.`,
 		example: `  ./vertra catalog changed --base origin/main`,
