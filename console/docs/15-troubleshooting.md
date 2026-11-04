@@ -104,10 +104,18 @@ Images are scanned again daily while they're in use. So an image that ran yester
 
 **What to do:** on the **Products** page, open the product. It shows who the product acts as, what's missing, and a link to **The check run** with its logs.
 
-- If it's your team's product, fix what's missing (often a secret on the **Secrets** tab, or a cloud grant for the identity shown), then click **Check now**.
+- If it's your team's product, fix what's missing (often a secret on the **Secrets** tab, or a cloud grant for the identity shown), then click **Check now**. Every grant the cloud samples need, and how: [Deploy to Google Cloud](19-deploy-to-gcp.md), [Deploy to AWS](20-deploy-to-aws.md).
 - If it's another team's, tell them. When a check finds a product not ready, its team's maintainers and the admins are notified, but a word from you helps.
 
 A run may fail until the product is ready.
+
+## A step can't connect to its target
+
+**What you see:** a step fails with a connection timeout or refused connection to a database, a partner's API or a service, while other steps' calls work, or it works on one run and not the next.
+
+**Why:** the target lets in only addresses it knows, and Vennir's steps leave from the cluster's nodes, whose addresses aren't fixed on a cloud install: they change as nodes come and go.
+
+**What to do:** use the target's own sign-in instead of an address rule where it has one (IAM for Cloud SQL, RDS, Cloud Run, Lambda), or give the cluster a fixed outbound address. [Addresses and firewall rules](22-addresses-and-firewalls.md) shows how to find the current addresses and both ways out.
 
 ## I can't sign in
 

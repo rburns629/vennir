@@ -126,3 +126,6 @@ false` and `vennir apply`.
 ## Next
 
 [Setting up Vennir](../setup.md): `vennir init`, what each question decides, and what to expect from `vennir apply`.
+This page readies the account Vennir runs in. Letting products create
+resources in your accounts (a role per product through EKS Pod Identity,
+other accounts, readiness) is [Deploy to AWS](../../console/docs/20-deploy-to-aws.md).

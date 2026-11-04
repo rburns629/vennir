@@ -22,6 +22,12 @@ export interface DocQuestion {
 
 export const DOC_QUESTIONS: DocQuestion[] = [
   // Using Vennir
+  { question: "where do I start, installing vennir for my company?", answers: ["17-onboarding :: Onboarding: from installing Vennir to your first deploy", "17-onboarding :: The path at a glance"] },
+  { question: "should we host vennir on GKE or EKS?", answers: ["18-where-to-host :: The short answer", "18-where-to-host :: What each one gives you"] },
+  { question: "how do I let my product create projects and Cloud Run services in google cloud?", answers: ["19-deploy-to-gcp :: Deploy to Google Cloud from Vennir", "19-deploy-to-gcp :: 4. Grant each product only what it does"] },
+  { question: "how do I give my product an IAM role so it can make S3 buckets?", answers: ["20-deploy-to-aws :: 2. A role for each product", "20-deploy-to-aws :: 3. Bind each role to its product"] },
+  { question: "how do I make the API gateway reachable from the internet?", answers: ["21-api-gateway :: Putting it on the internet"] },
+  { question: "what IP address do steps come from, for a firewall allowlist?", answers: ["22-addresses-and-firewalls :: Which address is which", "22-addresses-and-firewalls :: Finding the outbound addresses now"] },
   { question: "how do I get started trying vennir?", answers: ["01-getting-started :: Try Vennir end to end", "01-getting-started :: Six words to know"] },
   { question: "how do I give my product a password or API key?", answers: ["01-getting-started :: Step 4: Give it a secret", "04-secrets-explained :: Step 1 — registering one"] },
   { question: "can I pass one product's output into another?", answers: ["01-getting-started :: Step 5: Chain two products", "07-how-data-moves :: How a value moves from one task to the next"] },
@@ -67,7 +73,7 @@ export const DOC_QUESTIONS: DocQuestion[] = [
   { question: "how do I test my product before publishing", answers: ["reference-catalog-guide :: Testing"] },
   { question: "what will CI refuse in my catalog pull request", answers: ["reference-catalog-guide :: What CI blocks"] },
   { question: "I want to change a product other teams already use", answers: ["reference-catalog-guide :: Changing a product other teams use", "reference-catalog-guide :: Versions"] },
-  { question: "how do I publish an existing backend through the gateway", answers: ["reference-catalog-guide :: API products (`apis/`)", "reference-operations :: The API gateway"] },
+  { question: "how do I publish an existing backend through the gateway", answers: ["reference-catalog-guide :: API products (`apis/`)", "reference-operations :: The API gateway", "21-api-gateway :: 2. Publish an API"] },
   { question: "how do I onboard a new team to the catalog", answers: ["reference-catalog-guide :: Onboarding a team", "reference-catalog-onboarding-with-ai :: Onboarding a team or product, with an AI assistant"] },
   { question: "who has to approve changes to my team's products", answers: ["reference-catalog-guide :: Who approves what"] },
   { question: "what should a product never print or return", answers: ["reference-catalog-guide :: The container contract", "reference-security-model :: Rules for product authors"] },
@@ -99,7 +105,7 @@ export const DOC_QUESTIONS: DocQuestion[] = [
   // How it works
   { question: "what guarantees does execution have, can a step run twice", answers: ["reference-architecture :: Guarantees and their limits"] },
   { question: "what parts make up vennir", answers: ["reference-architecture :: The pieces", "reference-architecture :: What Vennir is"] },
-  { question: "who can delete something a run made", answers: ["reference-security-model :: What a run made, and deleting it"] },
+  { question: "who can delete something a run made", answers: ["reference-security-model :: What a run made, and deleting it", "10-ordering-and-the-cart :: Where do I find what a run made, and how do I delete it?"] },
   { question: "what security checks aren't enforced yet", answers: ["reference-security-model :: Not yet enforced"] },
   // The console's own guides (10-16)
   { question: "the catalog says not ready, can I still run it?", answers: ['10-ordering-and-the-cart :: What does "Not ready" mean on a product?'] },

@@ -190,6 +190,10 @@ of truth — rotations and even accidental deletions fix themselves.
 
 ---
 
+## And values a build needs?
+
+Everything above is for values a step uses while it **runs**. A value a team's image needs while it's **built** (a private package registry's token, say) never reaches the console or a step: it lives in the team's own GitHub Environment in the catalog repository, `team-<team>`, which only `main` may use, and catalog CI hands it to that team's `docker build` without putting it in the image. The catalog guide's [Values your builds need](catalog-guide.md#publishing) says which values go where, and how a catalog admin sets it up.
+
 ## Where to go deeper
 
 - `docs/security-model.md` in the Vennir repository — the same model,

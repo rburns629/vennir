@@ -2,6 +2,8 @@
 
 In about an hour you take a trial team from nothing to a product that runs on Vennir, reads a secret, and passes its output to a second product. Every step copies a sample from the catalog's `templates/` folder: they run anywhere, call no cloud, and cost nothing.
 
+This assumes Vennir is installed and has a catalog. If it isn't yet, or you're the one installing it, start with [Onboarding](17-onboarding.md), which comes back here for the team's part.
+
 You need:
 
 - **A Vennir console account.** A Vennir admin creates it; there is no sign-up page.
@@ -45,12 +47,12 @@ Who's in a team is read on every request, so being added, removed or changed tak
 
 ## Step 1: Claim your team
 
-One pull request creates your team. Merging it sets up your namespace and your team in the console, both named `team-a`.
+One pull request creates your team. Once it's merged, the catalog's next release makes your team in the console and its namespace in the cluster, both named `team-a`, within a few minutes.
 
 1. In the catalog repo, create a branch and copy `templates/team/team.yaml` to `teams/team-a/team.yaml`.
 2. Change every line marked `CHANGE`. The `name` must match the folder name.
 3. Add your team's line to `.github/CODEOWNERS`, with the other teams' lines: `/teams/team-a/ @<your-org>/<your-team>`. From then on, your team approves changes to your products.
-4. Open a pull request. A catalog admin approves it, since it changes `.github/`. The `check-new-team-names` check fails if the name is taken or was used before; pick another.
+4. Open a pull request. A catalog admin approves it, since it changes `.github/`. `./vennir catalog validate` (and CI) refuses a name that's the platform's own (`vennir-system`, `kube-…`, `bases`, `catalog-release`); a name a removed team had stays reserved, and each install refuses it when it applies the release, saying so on **Admin → Catalog**: then pick another.
 5. Merge once it's approved.
 6. Ask a Vennir admin to add you to the `team-a` team. A new team starts empty, so its first person comes from an admin, as a maintainer; after that, its maintainers add teammates on the Members tab, as members or maintainers ([what each may do](#members-and-maintainers)).
 
@@ -71,7 +73,7 @@ Copy the `hello` sample, rename three things, and merge: CI builds it, tests it,
    ```
 
 4. Open a pull request. CI checks `product.yaml`, builds the image, runs its tests (each `tests/<action>/<case>/` folder: a `request.json` and the `expected.json` its result must contain), and scans it for fixable vulnerabilities, baked-in secrets and malicious packages. Nothing is published from a pull request.
-5. Get one approval and merge. CI then pushes the image tagged with the commit, signs it, and registers each action with the console, pinned by digest.
+5. Get one approval and merge. CI then pushes the image tagged with the commit, signs it, and publishes the catalog's release; within a few minutes each install applies it, registering each action pinned by digest.
 
 **You're done when** the console's product list (**Catalog → Every product**) lists `team-a-hello-greet`. Its image is `<registry>/team-a/hello:latest` (CI also tags it with the commit).
 
@@ -182,7 +184,7 @@ teams/team-a/products/hello/
 
 Each sample builds, passes its tests and passes CI's security scan exactly as it is, and CI checks that on every change to `templates/`, so a copy starts from green. Every line you must change is marked `CHANGE`.
 
-For a real cloud product, the catalog's `gcp/` team has working examples that create projects, build images and deploy to Cloud Run; they call real Google Cloud APIs and cost money.
+For a real cloud product, the catalog's `samples/gcp` and `samples/aws` teams have working examples that create projects, Cloud Run services, Cloud SQL instances, S3 buckets, App Runner services and RDS databases; they call real cloud APIs and cost money. [Deploy to Google Cloud](19-deploy-to-gcp.md) and [Deploy to AWS](20-deploy-to-aws.md) take you through them.
 
 ## Guardrails
 
@@ -195,7 +197,8 @@ Some rules are enforced for you and fail loudly; the rest are yours, and reviewe
 | The image builds and at least one `actions/test_*.py` passes inside it | CI | Every pull request |
 | No high or critical vulnerability that has a fix; no secret baked into the image; no known-malicious package | CI scans | Every pull request |
 | The image runs as a non-root `USER`; no risky code patterns; no committed credentials | CI code and secret scans | Every pull request |
-| A team name is new and never reused | `check-new-team-names` | Team pull request |
+| A team name isn't the platform's own | `./vennir catalog validate`, in CI | Team pull request |
+| A team name was never used by a removed team | Each install, applying the release | After merge (**Admin → Catalog** says why) |
 | A secret-store file holds only your source and its identity, in your namespace | `check-secret-stores` | Secret-store pull request |
 | Tasks only run images from the catalog's registry (or a source an admin allowed), and on GKE only images catalog CI signed | The cluster | Every task |
 | A task only gets secrets added for its own team, only if it's one of the team's products, and only those it lists | The console, then the cluster | Every submission |
@@ -267,6 +270,5 @@ Known gaps today:
 - **AWS and 1Password syncing** have guides in the console but haven't been tested end to end. Expect rough edges and tell us what you hit.
 - **No "sync now".** A secret changed in your vault reaches Vennir within an hour.
 - **One namespace per team.** Separate environments by secret name for now, for example `db-password-prod`.
-- **The console is served over plain HTTP** while HTTPS is set up. Don't reuse a password you use elsewhere.
 
 **Cleaning up a trial team:** a pull request that deletes `teams/team-a/` retires it ([what that means](#if-your-team-is-retired)); a Vennir admin can then remove it for good. Its name stays reserved.

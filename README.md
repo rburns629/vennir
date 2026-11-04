@@ -3,9 +3,9 @@
 **Run DAGs of container steps on Kubernetes, where each step comes from a
 reviewed catalog and every team's secrets stay sealed off from the rest.**
 
-*Vennir* is named for the "A" in DAG: a workflow is a directed *acyclic*
-graph, so it never loops back. Steps run in order, each one building on what
-the steps before it produced, and every run moves forward to an end.
+A workflow is a directed *acyclic* graph (a DAG): it never loops back. Steps
+run in order, each one building on what the steps before it produced, and
+every run moves forward to an end.
 
 > **Status: 0.x, not production-ready yet.** The engine, console, API
 > gateway and isolation model work, and are tested on kind, GKE and EKS:
@@ -111,7 +111,7 @@ to run again (it rebuilds from your checkout).
 
 Sign in as `admin@example.com` with the password `vennir-local`. That
 password is set only for this local cluster; never use it anywhere else.
-Then open **Runs → Submit new**, paste the JSON above, and watch both
+Then open **Runs → Submit a DAG**, paste the JSON above, and watch both
 steps finish.
 
 `make logs` follows every component's logs, `make down` stops the cluster
@@ -122,7 +122,7 @@ CI needed: `make catalog-publish` publishes `catalog-template/` with its
 `local` sample team (one product in five languages), and
 `make catalog-publish CATALOG=<catalog folder>` publishes your own. Each product is
 validated, built, tested and security-scanned the same way catalog CI does it,
-then pushed to the local registry and registered with the console.
+then pushed to the local registry with a release the console applies.
 
 ## How it fits together
 
@@ -171,6 +171,8 @@ scope, is in [`docs/security-model.md`](docs/security-model.md).
 
 ## Learn more
 
+- [Onboarding](console/docs/17-onboarding.md): the whole path in order, from
+  getting `vennir` to a first resource deployed to Google Cloud or AWS
 - [`docs/setup.md`](docs/setup.md): installing it for real with `vennir`, on
   Google Cloud, AWS or a cluster you have, start to finish
 - [`docs/architecture.md`](docs/architecture.md): how it works and why

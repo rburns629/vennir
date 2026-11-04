@@ -1,6 +1,6 @@
 # APIs and the gateway
 
-An API product is a backend a team already runs, published through this install's gateway. This page is for both sides: if you want to call another team's API, it says how to find it, get access and call it, and what each error means; if your team owns an API, it says how to read its traffic, pause it, find its backend's logs, and what an admin can see and do. Publishing an API is done in the catalog, and the [catalog guide](catalog-guide.md#api-products-apis) explains it.
+An API product is a backend a team already runs, published through this install's gateway. This page is for both sides: if you want to call another team's API, it says how to find it, get access and call it, and what each error means; if your team owns an API, it says how to read its traffic, pause it, find its backend's logs, and what an admin can see and do. Publishing an API is done in the catalog, and the [catalog guide](catalog-guide.md#api-products-apis) explains it. To set the gateway up, publish a first API with each kind of backend, or put it on the internet, follow [the API gateway, start to finish](21-api-gateway.md).
 
 ## What is an API product?
 

@@ -769,7 +769,7 @@ then `./vennir catalog release`, signed in to the registry with `docker login`.
 
 If a merged product doesn't show up on an install, the install refused
 it: each console applies a release item by item, and keeps a list of what
-it couldn't apply, with why (Admin → Catalog & images, which only admins
+it couldn't apply, with why (Admin → Catalog, which only admins
 see, so ask one). The usual reasons: the install's own scan failed the
 image (`IMAGE_SCAN_FAILED`: a vulnerability published since your CI ran),
 the release's signature isn't one the install trusts, or the team's
