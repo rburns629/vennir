@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-// Package run runs the external tools vertra drives (kubectl, helm,
+// Package run runs the external tools vennir drives (kubectl, helm,
 // kind, docker, the cloud CLIs): always as an argument list, never through
 // a shell, so no value can become part of a command line.
 package run
@@ -17,7 +17,7 @@ import (
 )
 
 // Runner runs commands. Tool names are resolved through Resolve, so a tool
-// downloaded into vertra's own directory is used without being on PATH.
+// downloaded into vennir's own directory is used without being on PATH.
 type Runner struct {
 	// Verbose echoes each command before running it.
 	Verbose bool
@@ -167,7 +167,7 @@ func firstArg(args []string) string {
 	return ""
 }
 
-// valued are the flags vertra puts before a command's word that take a
+// valued are the flags vennir puts before a command's word that take a
 // value.
 var valued = map[string]bool{"--context": true, "--namespace": true, "-n": true, "--kube-context": true, "--profile": true, "--region": true, "--project": true}
 

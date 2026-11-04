@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-/** ApiService (proto/vertra/console/v1/api.proto): core/apis.ts over Connect. */
+/** ApiService (proto/vennir/console/v1/api.proto): core/apis.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import { getApi, getApiTraffic, getGateway, listApis, pauseApi, setGatewayClosed, type ApiView } from "../../core/apis.js";
 import { timestamp } from "../convert.js";
-import { ApiState, type ApiService } from "../../gen/vertra/console/v1/api_pb.js";
+import { ApiState, type ApiService } from "../../gen/vennir/console/v1/api_pb.js";
 import { callerOf } from "../context.js";
 import { check } from "../validate.js";
 

@@ -1,7 +1,7 @@
 # One of five language samples (Python, TypeScript, Go, PowerShell, Rust):
 # the same contract, text in and text out, in each language. Chain them with
 # the DAG in its team's README.md (samples/local/README.md).
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: upper-case
 team: local

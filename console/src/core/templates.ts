@@ -15,7 +15,7 @@
  *     covers: everyone ("*"), or members of the teams it lists, who then
  *     run it on behalf of one of those teams (the run records which);
  *   - a step of another team's action: only when that action is shared with
- *     the template's team (vertra catalog checks too; this holds for hand-made
+ *     the template's team (vennir catalog checks too; this holds for hand-made
  *     products and changed sharing);
  *   - an action on its own, as a one-step template whose parameters are its
  *     inputs: as a template, by the action's shareWith.

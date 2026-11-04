@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-/** ExecutionService (proto/vertra/console/v1/execution.proto): core/executions.ts over Connect. */
+/** ExecutionService (proto/vennir/console/v1/execution.proto): core/executions.ts over Connect. */
 import { Code, type HandlerContext, type ServiceImpl } from "@connectrpc/connect";
 import { fromJson, type JsonObject, type JsonValue } from "@bufbuild/protobuf";
 import { Type } from "@sinclair/typebox";
@@ -22,7 +22,7 @@ import {
   TaskState,
   type Dag,
   type ExecutionService,
-} from "../../gen/vertra/console/v1/execution_pb.js";
+} from "../../gen/vennir/console/v1/execution_pb.js";
 import { KernelApiError } from "../../kernel/client.js";
 import { timestamp, unsetIfEmpty } from "../convert.js";
 import { callerOf, currentCallerOf, logOf } from "../context.js";

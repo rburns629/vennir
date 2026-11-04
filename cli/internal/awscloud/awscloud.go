@@ -17,10 +17,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vertra/cli/internal/cluster"
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/run"
-	"github.com/rburns629/vertra/cli/internal/tools"
+	"github.com/rburns629/vennir/cli/internal/cluster"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/tools"
 )
 
 // args adds the config's profile and region to an aws command.
@@ -87,7 +87,7 @@ func Inspect(ctx context.Context, r *run.Runner, c *config.Config) State {
 	)
 	if regionErr != nil {
 		if strings.Contains(regionErr.Error(), "service control policy") {
-			s.Problems = append(s.Problems, fmt.Sprintf("your AWS organization's policy (an SCP) denies %s to this account: choose a region it allows (`vertra config set aws.region <region>`), or have the organization's management account allow it", c.AWS.Region))
+			s.Problems = append(s.Problems, fmt.Sprintf("your AWS organization's policy (an SCP) denies %s to this account: choose a region it allows (`vennir config set aws.region <region>`), or have the organization's management account allow it", c.AWS.Region))
 		} else {
 			s.Problems = append(s.Problems, fmt.Sprintf("can't use %s: %v", c.AWS.Region, regionErr))
 		}
@@ -112,7 +112,7 @@ func chatWarning(ctx context.Context, r *run.Runner, c *config.Config) string {
 	case err != nil:
 		return fmt.Sprintf("couldn't ask Amazon Bedrock whether this account may use %s, the chat's model: %v", model, err)
 	case !authorized:
-		return fmt.Sprintf("this account isn't authorized for %s in Amazon Bedrock, so the console's chat fails: request access (Bedrock console: Model catalog, the model), have an admin answer with an Anthropic API key (Admin, Chat), or `vertra config set chat.off true`", model)
+		return fmt.Sprintf("this account isn't authorized for %s in Amazon Bedrock, so the console's chat fails: request access (Bedrock console: Model catalog, the model), have an admin answer with an Anthropic API key (Admin, Chat), or `vennir config set chat.off true`", model)
 	}
 	return ""
 }
@@ -148,7 +148,7 @@ func Registry(account string, c *config.Config) string {
 // PlatformPrefix is the ECR prefix for platform images built from source
 // ("" when installing a release).
 func PlatformPrefix(c *config.Config) string {
-	if c.Vertra != "source" {
+	if c.Vennir != "source" {
 		return ""
 	}
 	return c.Cluster.Name + "-platform"
@@ -295,9 +295,9 @@ func InCluster(mode string, spot bool) string {
 		return `apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: vertra-gp3
+  name: vennir-gp3
   labels:
-    app.kubernetes.io/managed-by: vertra
+    app.kubernetes.io/managed-by: vennir
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: ebs.csi.aws.com
@@ -315,9 +315,9 @@ parameters:
 	return `apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: vertra-gp3
+  name: vennir-gp3
   labels:
-    app.kubernetes.io/managed-by: vertra
+    app.kubernetes.io/managed-by: vennir
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: ebs.csi.eks.amazonaws.com
@@ -338,21 +338,21 @@ data:
 apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
-  name: vertra-steps
+  name: vennir-steps
   labels:
-    app.kubernetes.io/managed-by: vertra
+    app.kubernetes.io/managed-by: vennir
 spec:
   template:
     metadata:
       labels:
-        vertra.dev/pool: steps
+        vennir.dev/pool: steps
     spec:
       nodeClassRef:
         group: eks.amazonaws.com
         kind: NodeClass
         name: default
       taints:
-        - key: vertra.dev/steps
+        - key: vennir.dev/steps
           value: "true"
           effect: NoSchedule
       requirements:
@@ -383,24 +383,24 @@ func consoleZone(c *config.Config) string {
 const IngressClass = `apiVersion: eks.amazonaws.com/v1
 kind: IngressClassParams
 metadata:
-  name: vertra-alb
+  name: vennir-alb
   labels:
-    app.kubernetes.io/managed-by: vertra
+    app.kubernetes.io/managed-by: vennir
 spec:
   scheme: internet-facing
 ---
 apiVersion: networking.k8s.io/v1
 kind: IngressClass
 metadata:
-  name: vertra-alb
+  name: vennir-alb
   labels:
-    app.kubernetes.io/managed-by: vertra
+    app.kubernetes.io/managed-by: vennir
 spec:
   controller: eks.amazonaws.com/alb
   parameters:
     apiGroup: eks.amazonaws.com
     kind: IngressClassParams
-    name: vertra-alb
+    name: vennir-alb
 `
 
 // CertificateStatus is an ACM certificate's status (ISSUED,
@@ -444,7 +444,7 @@ func PointAt(ctx context.Context, r *run.Runner, c *config.Config, zoneID, host,
 // Auto Mode outside OpenTofu's state).
 func LoadBalancersIn(ctx context.Context, r *run.Runner, c *config.Config, vpcCIDR string) ([]string, error) {
 	vpc, err := r.Output(ctx, "aws", args(c, "ec2", "describe-vpcs", "--filters", "Name=cidr,Values="+vpcCIDR,
-		"Name=tag:vertra-environment,Values="+c.Cluster.Name, "--query", "Vpcs[0].VpcId")...)
+		"Name=tag:vennir-environment,Values="+c.Cluster.Name, "--query", "Vpcs[0].VpcId")...)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +508,7 @@ func publicKeyPEM(out string) (string, error) {
 
 // LeftVolumes are EBS volumes a namespace's claims made that nothing has
 // attached: what a cluster deleted without its volume claims leaves. Every
-// install's namespace is vertra-system by default, and a sleeping install's
+// install's namespace is vennir-system by default, and a sleeping install's
 // database volume is unattached too, so they're told apart by the cluster
 // the EBS driver tagged them with: mine name this cluster, unknown name
 // none (to check by hand), and another cluster's aren't returned.

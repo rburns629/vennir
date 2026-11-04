@@ -23,12 +23,20 @@ var (
 	apiSchema      = sync.OnceValue(func() *jsonschema.Schema { return embeddedSchema("api.schema.json") })
 )
 
-// APIVersion is the catalog format this vertra reads and writes.
-const APIVersion = "vertra.dev/v2"
+// APIVersion is the catalog format this vennir reads and writes.
+const APIVersion = "vennir.dev/v2"
 
-// FormerAPIVersion is format v2 under the platform's name until 2026-10-20,
-// Acyclix: ./vertra catalog migrate rewrites it to APIVersion.
-const FormerAPIVersion = "acyclix.dev/v2"
+// formerName is a name the platform had before: a catalog in format v2
+// under it (its apiVersion, its settings file, its ./<id> wrapper) is
+// rewritten by ./vennir catalog migrate.
+type formerName struct{ name, id, until string }
+
+// formerNames, newest first: Acyclix until 2026-10-20, then Vertra until
+// 2026-11-03.
+var formerNames = []formerName{{"Vertra", "vertra", "2026-11-03"}, {"Acyclix", "acyclix", "2026-10-20"}}
+
+func (f formerName) apiVersion() string   { return f.id + ".dev/v2" }
+func (f formerName) settingsFile() string { return f.id + ".yaml" }
 
 // formatProblem is why doc isn't a format-v2 file of one of kinds, or "".
 // A document that isn't an object is left to its schema to describe.
@@ -39,13 +47,15 @@ func formatProblem(doc any, kinds ...string) string {
 	}
 	version, present := m["apiVersion"]
 	if !present {
-		return "written in the catalog format from before v2 (it has no apiVersion): ./vertra catalog migrate rewrites it"
+		return "written in the catalog format from before v2 (it has no apiVersion): ./vennir catalog migrate rewrites it"
 	}
-	if version == FormerAPIVersion {
-		return fmt.Sprintf("apiVersion %s: the platform was renamed Vertra on 2026-10-20: ./vertra catalog migrate rewrites it to %s", FormerAPIVersion, APIVersion)
+	for _, f := range formerNames {
+		if version == f.apiVersion() {
+			return fmt.Sprintf("apiVersion %s: the platform was called %s until %s: ./vennir catalog migrate rewrites it to %s", f.apiVersion(), f.name, f.until, APIVersion)
+		}
 	}
 	if version != APIVersion {
-		return fmt.Sprintf("apiVersion %s: this vertra reads %s", pyRepr(version), APIVersion)
+		return fmt.Sprintf("apiVersion %s: this vennir reads %s", pyRepr(version), APIVersion)
 	}
 	if !contains(kinds, fmt.Sprint(m["kind"])) {
 		return fmt.Sprintf("kind %s: this file is kind %s", pyRepr(m["kind"]), strings.Join(kinds, " or "))
@@ -101,7 +111,7 @@ func reservedTeamName(name string) string {
 		return "<registry>/bases/ holds the catalog's mirrored base images (bases.yaml)"
 	case name == ReleaseRepositoryName:
 		return "<registry>/" + ReleaseRepositoryName + " is the catalog's release"
-	case name == "vertra-system" || strings.HasPrefix(name, "kube-"):
+	case name == "vennir-system" || strings.HasPrefix(name, "kube-"):
 		return "it's a platform namespace"
 	}
 	return ""
@@ -174,7 +184,7 @@ func (c *Catalog) ValidateTeams() bool {
 // adminPaths are what only the catalog admins (the fallback's owners) may
 // approve: what CI runs and publishes with, the starters, and SecretStores.
 var adminPaths = []string{".github/CODEOWNERS", ".github/workflows/ci.yml", "tools/product.schema.json",
-	"vertra.yaml", "vertra", "templates/hello/product.yaml", "teams/x/secret-stores/secretstore.yaml"}
+	"vennir.yaml", "vennir", "templates/hello/product.yaml", "teams/x/secret-stores/secretstore.yaml"}
 
 var (
 	// A team's own line: /teams/<team>/.

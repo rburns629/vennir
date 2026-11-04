@@ -1,6 +1,6 @@
 # A sample: RDS for PostgreSQL, with real AWS API calls (billed).
 # Its own IAM role, by EKS Pod Identity: see the aws team's README.md.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: rds-postgres
 team: aws
@@ -25,7 +25,7 @@ actions:
   idempotent: true
   maxAttempts: 3
   script: actions/create.py
-  # An instance it creates is tagged vertra-made=true and vertra-team=<team>
+  # An instance it creates is tagged vennir-made=true and vennir-team=<team>
   # and reported as a resource; delete removes it, keeping a final snapshot
   # (and refuses any instance without both tags for the run's team).
   cleanup:
@@ -58,7 +58,7 @@ actions:
       masterUsername:
         type: string
         description: The master user's name.
-        default: vertra_admin
+        default: vennir_admin
   output:
     type: object
     required:

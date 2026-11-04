@@ -354,8 +354,8 @@ export function ApisPage() {
                 </Fact>
               )}
               <Fact label="Signed in as">
-                You, or one of your team’s bots: <Mono sx={{ fontSize: 12 }}>Authorization: Bearer $VERTRA_TOKEN</Mono>. It stops at the
-                gateway; the backend gets who called in <Mono sx={{ fontSize: 12 }}>Vertra-Caller</Mono>.
+                You, or one of your team’s bots: <Mono sx={{ fontSize: 12 }}>Authorization: Bearer $VENNIR_TOKEN</Mono>. It stops at the
+                gateway; the backend gets who called in <Mono sx={{ fontSize: 12 }}>Vennir-Caller</Mono>.
               </Fact>
               <Fact label="Limits">
                 Counted per calling team, a minute at a time: the API’s own limit for your team, or the gateway’s default.

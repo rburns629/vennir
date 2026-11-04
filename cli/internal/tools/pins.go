@@ -13,7 +13,7 @@ type Pin struct {
 	SHA256 map[string]string
 }
 
-// The tools vertra may download. To upgrade one: change its version and
+// The tools vennir may download. To upgrade one: change its version and
 // take the four sums from the release's published checksums (kubectl:
 // dl.k8s.io/release/<v>/bin/<os>/<arch>/kubectl.sha256; helm:
 // get.helm.sh/helm-<v>-<os>-<arch>.tar.gz.sha256sum; kind: the release's
@@ -64,7 +64,7 @@ var pins = map[string]Pin{
 	},
 }
 
-// Pinned returns a tool's pinned version, if vertra can download it.
+// Pinned returns a tool's pinned version, if vennir can download it.
 func Pinned(tool string) (string, bool) {
 	p, ok := pins[tool]
 	return p.Version, ok
@@ -78,7 +78,7 @@ type ChartPin struct {
 	SHA256  string
 }
 
-// The third-party charts vertra installs, each checked against its sum
+// The third-party charts vennir installs, each checked against its sum
 // before Helm installs it (PullChart). To upgrade one: change its version,
 // then `helm pull <chart> --repo <repo> --version <v>` and take the .tgz's
 // `shasum -a 256`. Pick releases at least two weeks old.

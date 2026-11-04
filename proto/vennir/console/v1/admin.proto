@@ -1,0 +1,244 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// Running the platform: counts, the audit log, the cluster policies the
+// console keeps current, and the catalog it registers from. Admins only.
+service AdminService {
+  // Platform-wide counts, for the admin home page.
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Every request that tried to change something, allowed or refused,
+  // newest first: who, what, what it named (never a secret value, password
+  // or token) and the outcome.
+  rpc ListAuditEntries(ListAuditEntriesRequest) returns (ListAuditEntriesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Whether the cluster's policies are current: the last outcome of
+  // rewriting each from the console's database.
+  rpc GetPolicySync(GetPolicySyncRequest) returns (GetPolicySyncResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Rewrites them now.
+  rpc SyncPolicies(SyncPoliciesRequest) returns (SyncPoliciesResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // The catalog release this console last applied (teams, products and
+  // SecretStores), what it couldn't apply, and how its last look went.
+  rpc GetCatalogStatus(GetCatalogStatusRequest) returns (GetCatalogStatusResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Reads the catalog's release now, and applies it, even if it's the one
+  // already applied. The console also looks every few minutes by itself.
+  rpc SyncCatalog(SyncCatalogRequest) returns (SyncCatalogResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Lets the catalog's release manage a team it didn't make (one made by
+  // hand, or before this console read releases), then syncs. Until then a
+  // release that names such a team leaves it, its products and its
+  // SecretStores alone: a new catalog folder never takes over an existing
+  // team's namespace and secrets unless an admin says so.
+  rpc AdoptCatalogTeam(AdoptCatalogTeamRequest) returns (AdoptCatalogTeamResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // This install: the console's version, and which of its optional parts
+  // are on (each set in vennir.yaml, or the console chart's values).
+  rpc GetInstall(GetInstallRequest) returns (GetInstallResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message GetInstallRequest {}
+
+message GetInstallResponse {
+  // The console's image tag, such as 0.4.0; "development" when built locally.
+  string version = 1;
+  // ENVIRONMENT_LABEL: the name the sidebar shows.
+  string environment_label = 2;
+  // Single sign-on's provider ("Google"), or empty when it's off.
+  string sso_provider = 3;
+  // Log search (Loki), and for how many days back.
+  bool logs = 4;
+  int32 log_search_days = 5;
+  // The audit log's write-once copy.
+  bool audit_copy = 6;
+  // The API gateway.
+  bool gateway = 7;
+  // A catalog release is read, and whether its signature is checked.
+  bool catalog = 8;
+  bool catalog_signed = 9;
+  // Every image is scanned before it runs.
+  bool scanning = 10;
+  // How long runs' records are kept.
+  int32 run_retention_days = 11;
+  // Which catalog releases are applied: latest, newest (the newest vX.Y.Z)
+  // or one version; empty with no catalog.
+  string catalog_version = 12;
+  // How often the console looks for a new release, in seconds.
+  int32 catalog_poll_seconds = 13;
+  // Who may sign a release: how many public keys are trusted, and a
+  // keyless identity's issuer and subject pattern (empty: none).
+  int32 catalog_signer_keys = 14;
+  string catalog_keyless_issuer = 15;
+  string catalog_keyless_subject = 16;
+  // Another install's catalog, read from its registry, as the install is
+  // configured (vennir.yaml's externalCatalog; nothing the console reads
+  // confirms it); empty when this install's own (or none).
+  string external_catalog = 17;
+  // Email: whether it's sent, through which SMTP host, from which address.
+  // Never its credentials.
+  bool email = 18;
+  string email_host = 19;
+  string email_from = 20;
+  // Prometheus: operator, google or bundled; empty when monitoring is off.
+  string monitoring_provider = 21;
+  // Where the install's Grafana is, for its dashboard; empty when unknown.
+  string grafana_url = 22;
+  // How long a session lasts before signing in again: 8h, 30m, 1d.
+  string session_length = 23;
+  // The audit copy's bucket: how many days it keeps each copy (0: not
+  // known here), and whether that retention is locked, as the install is
+  // configured (vennir.yaml's audit.keepDays and audit.lock). The bucket
+  // enforces them; the console can't read them back from it.
+  int32 audit_keep_days = 24;
+  bool audit_lock = 25;
+  // How often the cluster policies are rewritten whatever changed, in seconds.
+  int32 policy_sync_seconds = 26;
+  // Catalog images run only if signed: whether the kernel chart's signature
+  // policy (a policy-controller ClusterImagePolicy) exists in the cluster.
+  // Unset when the console couldn't tell.
+  optional bool image_signatures_required = 27;
+  // Images in use are scanned again once their verdict is this old, in hours.
+  int32 rescan_hours = 28;
+}
+
+message GetCatalogStatusRequest {}
+
+message GetCatalogStatusResponse {
+  CatalogStatus status = 1;
+}
+
+message SyncCatalogRequest {}
+
+message SyncCatalogResponse {
+  CatalogStatus status = 1;
+}
+
+message AdoptCatalogTeamRequest {
+  string name = 1;
+}
+
+message AdoptCatalogTeamResponse {
+  CatalogStatus status = 1;
+}
+
+message CatalogStatus {
+  // Where the release is read from; empty when no catalog is configured.
+  string release = 1;
+  // The release last applied: its digest, its catalog commit, its
+  // repository, when.
+  string digest = 2;
+  string commit = 3;
+  string repository = 4;
+  google.protobuf.Timestamp applied_at = 5;
+  // What applying it couldn't do, one item at a time.
+  repeated CatalogProblem problems = 6;
+  // The last look, and why it failed (nothing was applied then).
+  google.protobuf.Timestamp checked_at = 7;
+  string error = 8;
+  // Whether it follows the newest version (a vX.Y.Z tag) instead of
+  // release's own tag, and the version applied, when it was one.
+  bool newest_version = 9;
+  string version = 10;
+  // What the applied release held; unset before one was applied (or by a
+  // console older than this field).
+  CatalogCounts applied = 11;
+}
+
+// What a catalog release held: what it applied, problems aside.
+message CatalogCounts {
+  int32 teams = 1;
+  // Products by image, each with one or more actions.
+  int32 products = 2;
+  int32 actions = 3;
+  int32 templates = 4;
+  int32 apis = 5;
+  int32 secret_stores = 6;
+}
+
+message CatalogProblem {
+  // "product web-site-deploy", "team web", ...
+  string item = 1;
+  string message = 2;
+  // Set when the problem is a team the catalog didn't make: its name, for
+  // AdoptCatalogTeam.
+  string adoptable_team = 3;
+}
+
+message GetStatsRequest {}
+
+message GetStatsResponse {
+  int64 teams = 1;
+  int64 users = 2;
+  int64 products = 3;
+  int64 executions = 4;
+}
+
+message AuditEntry {
+  int64 id = 1;
+  google.protobuf.Timestamp at = 2;
+  optional string actor_id = 3;
+  optional string actor_email = 4;
+  bool actor_is_bot = 5;
+  // What was called: an HTTP method and route, or an RPC's procedure.
+  string method = 6;
+  string route = 7;
+  // What it named.
+  google.protobuf.Struct target = 8;
+  // The outcome, as an HTTP status.
+  int32 status = 9;
+  optional string request_id = 10;
+}
+
+message ListAuditEntriesRequest {
+  // Older than this entry id; the newest when unset.
+  int64 before = 1;
+  // Only this account's.
+  string actor_id = 2;
+  // 100 when unset, at most 500.
+  int32 limit = 3;
+}
+
+message ListAuditEntriesResponse {
+  repeated AuditEntry entries = 1;
+  // Pass as `before` for the next page; 0 on the last.
+  int64 next_before = 2;
+}
+
+message PolicySyncOutcome {
+  // False: there's nothing to write to (not configured, or not installed).
+  bool applies = 1;
+  bool ok = 2;
+  google.protobuf.Timestamp at = 3;
+  optional string error = 4;
+}
+
+message GetPolicySyncRequest {}
+
+message GetPolicySyncResponse {
+  // By policy (identityPolicy, scanPolicy, ...); a policy missing here
+  // hasn't been synced since the console started.
+  map<string, PolicySyncOutcome> outcomes = 1;
+}
+
+message SyncPoliciesRequest {}
+
+message SyncPoliciesResponse {
+  map<string, PolicySyncOutcome> outcomes = 1;
+}

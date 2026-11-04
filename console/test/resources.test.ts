@@ -161,12 +161,12 @@ beforeAll(async () => {
   // A project and a service in it, typed: the service needs what the project provides.
   const removeResource = { inputSchema: { type: "object", required: ["resource"], properties: { resource: { type: "object" } } } };
   await register("proj", "create", {
-    outputSchema: { type: "object", properties: { projectId: { type: "string", "x-vertra-provides": PROJECT } } },
+    outputSchema: { type: "object", properties: { projectId: { type: "string", "x-vennir-provides": PROJECT } } },
     cleanup: { action: "delete", inputs: null },
   });
   await register("proj", "delete", removeResource);
   await register("svc", "create", {
-    inputSchema: { type: "object", properties: { project: { type: "string", "x-vertra-needs": PROJECT } } },
+    inputSchema: { type: "object", properties: { project: { type: "string", "x-vennir-needs": PROJECT } } },
     cleanup: { action: "delete", inputs: null },
   });
   await register("svc", "delete", removeResource);
@@ -443,7 +443,7 @@ const linked = async (token: string, query: string) =>
 
 describe("what depends on what (decision 25)", () => {
   it("keeps what a step provided, by wiring type", () => {
-    const schema = { properties: { projectId: { "x-vertra-provides": "gcp.project" }, size: {}, nested: { "x-vertra-provides": "x.y" } } };
+    const schema = { properties: { projectId: { "x-vennir-provides": "gcp.project" }, size: {}, nested: { "x-vennir-provides": "x.y" } } };
     expect(providedBy(schema, { projectId: "p-1", size: 3, nested: { a: 1 } })).toEqual([{ type: "gcp.project", value: "p-1", output: "projectId" }]);
   });
 
@@ -457,7 +457,7 @@ describe("what depends on what (decision 25)", () => {
     expect(before?.dependents).toEqual([]);
     // Typed later (a new catalog release): what it made is brought up to it,
     // and what took its value as that type now depends on it.
-    const typed = { type: "object", properties: { noteId: { type: "string", "x-vertra-provides": PROJECT } } };
+    const typed = { type: "object", properties: { noteId: { type: "string", "x-vennir-provides": PROJECT } } };
     expect(await refreshProvides(`${prov}-note-create`, typed)).toBe(1);
     expect(await refreshProvides(`${prov}-note-create`, typed)).toBe(0);
     const [after] = await linked(consumerToken, `${prefix}-n1`);

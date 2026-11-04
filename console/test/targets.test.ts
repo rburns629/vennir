@@ -2,7 +2,7 @@
 /**
  * Allowed targets (X1): another team may aim a team's products only where
  * that team's allowedTargets let it. Checked before anything runs, from the
- * input's x-vertra-needs type; the owning team's own people aren't limited.
+ * input's x-vennir-needs type; the owning team's own people aren't limited.
  */
 import { randomUUID } from "node:crypto";
 import { eq, inArray, like } from "drizzle-orm";
@@ -59,7 +59,7 @@ const users = rpcClient(() => app);
 const inputSchema = {
   type: "object",
   required: ["projectId"],
-  properties: { projectId: { type: "string", "x-vertra-needs": "gcp.project" }, label: { type: "string" } },
+  properties: { projectId: { type: "string", "x-vennir-needs": "gcp.project" }, label: { type: "string" } },
 };
 
 beforeAll(async () => {
@@ -96,7 +96,7 @@ beforeAll(async () => {
       image: `registry.example/${team}/source:1`,
       action: "make",
       teamId,
-      outputSchema: { type: "object", properties: { projectId: { type: "string", "x-vertra-provides": "gcp.project" } } },
+      outputSchema: { type: "object", properties: { projectId: { type: "string", "x-vennir-provides": "gcp.project" } } },
     });
     await upsertTemplate({
       teamId,

@@ -176,6 +176,6 @@ describe("a product's check", () => {
     expect((await call<{ started?: boolean }>(maintainerToken, "ProductService/CheckProduct", { name: `${prov}-svc-create` })).body.started).toBe(true);
     const row = await readinessRow();
     expect(row?.state).toBe("failed");
-    expect(row?.detail).toBe("Vertra couldn't start its check: the platform didn't answer.");
+    expect(row?.detail).toBe("Vennir couldn't start its check: the platform didn't answer.");
   });
 });

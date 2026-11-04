@@ -1,6 +1,6 @@
 # Performance benchmarks
 
-Measuring Vertra's throughput and latency, and checking it stays correct
+Measuring Vennir's throughput and latency, and checking it stays correct
 under load, on a kind cluster of its own. Phase 1 (2026-10-28): one
 end-to-end driver, the scheduler and Postgres alone, and what they found.
 Numbers from kind are this machine's, not GKE's or EKS's: kind's node is a
@@ -28,7 +28,7 @@ container sharing the laptop's CPUs, memory and disk with everything else.
 - `kernel/internal/scheduler/perf_test.go`: the scheduler and Postgres
   alone, with the fake executor (steps finish as they start), 1, 2 and 4
   schedulers, committed transactions on the test database; checks every run
-  succeeds and no step starts twice. Only with `VERTRA_PERF=1`.
+  succeeds and no step starts twice. Only with `VENNIR_PERF=1`.
 - `pgbench/run.sh <label>`: Postgres alone, as it's sized in the cluster:
   pgbench from a Pod of the kernel release (the NetworkPolicy admits only
   those), over TLS, in a scratch database it drops after, with 8 and 64
@@ -40,28 +40,28 @@ container sharing the laptop's CPUs, memory and disk with everything else.
   top of `helm/values/kind/`: at most 40 steps running at once (so a large
   scenario queues instead of starting hundreds of Pods on a laptop), and a
   catalog of its own in the registry (`localhost:5001/perf-catalog`), so
-  publishing it never touches what `vertra-local` applies.
+  publishing it never touches what `vennir-local` applies.
 
 ## Running it
 
-The perf cluster is `vertra-perf`, separate from `vertra-local`. Docker
+The perf cluster is `vennir-perf`, separate from `vennir-local`. Docker
 Desktop's VM is small (8 GB here), so stop the other cluster, and anything
 else heavy (a local model: `lms unload --all`), while measuring:
 
 ```console
-$ make down                                   # vertra-local, data kept
-$ make quickstart KIND_CLUSTER=vertra-perf    # once; rerunnable
-$ make kind-deploy-kernel KIND_CLUSTER=vertra-perf KIND_KERNEL_VALUES=perf/kind-kernel.yaml
-$ make kind-deploy-console KIND_CLUSTER=vertra-perf KIND_CONSOLE_VALUES=perf/kind-console.yaml
-$ make up KIND_CLUSTER=vertra-perf
-$ make catalog-publish KIND_CLUSTER=vertra-perf SAMPLES=perf CATALOG_REGISTRY=localhost:5001/perf-catalog
+$ make down                                   # vennir-local, data kept
+$ make quickstart KIND_CLUSTER=vennir-perf    # once; rerunnable
+$ make kind-deploy-kernel KIND_CLUSTER=vennir-perf KIND_KERNEL_VALUES=perf/kind-kernel.yaml
+$ make kind-deploy-console KIND_CLUSTER=vennir-perf KIND_CONSOLE_VALUES=perf/kind-console.yaml
+$ make up KIND_CLUSTER=vennir-perf
+$ make catalog-publish KIND_CLUSTER=vennir-perf SAMPLES=perf CATALOG_REGISTRY=localhost:5001/perf-catalog
 ```
 
 Then, with a token (the local admin's session, kind only):
 
 ```console
-$ export VERTRA_TOKEN=$(curl -s -X POST localhost:18080/api/vertra.console.v1.AuthService/Login \
-    -H 'Content-Type: application/json' -d '{"email":"admin@example.com","password":"vertra-local"}' | jq -r .token)
+$ export VENNIR_TOKEN=$(curl -s -X POST localhost:18080/api/vennir.console.v1.AuthService/Login \
+    -H 'Content-Type: application/json' -d '{"email":"admin@example.com","password":"vennir-local"}' | jq -r .token)
 $ cd perf && go run . -scenario baseline
 ```
 
@@ -88,7 +88,7 @@ end cancelled or succeeded with every step ended.
 by side and fails on a clear regression: a p50 or p95 time a quarter worse
 (and half a second), throughput a quarter lower, or the newer run
 incorrect. The `perf` workflow (by hand, or weekly) runs baseline and burst
-on a runner's own `vertra-perf` and compares each with its last successful
+on a runner's own `vennir-perf` and compares each with its last successful
 run's; only burst's comparison can fail it, since baseline's 10 DAGs start
 on one scheduler poll and are one sample (the same commit twice: 2.5 and
 4.6 s at p50). Its first successful run (2026-10-31, after #55 made `make quickstart`, `make
@@ -96,34 +96,34 @@ up` and the driver's port-forward check work on Linux) took 12 minutes on
 a 4-CPU runner: baseline 2.5 s end to end at p50; burst 3.2 steps a
 second, 19 s end to end at p50; both correct. Every workload is capped (500
 DAGs, 50 steps, 5,000 steps in all; over 1,000 needs `-allow-large`). It
-refuses a cluster not named `vertra-perf*`, a console not on this machine,
+refuses a cluster not named `vennir-perf*`, a console not on this machine,
 and a port-forward to any other cluster's console.
 
-On a cloud cluster (GKE or EKS, a `vertra-perf*` one only, as on kind: an
-install made for benchmarks, never the Makefile's `vertra-gke` or another
+On a cloud cluster (GKE or EKS, a `vennir-perf*` one only, as on kind: an
+install made for benchmarks, never the Makefile's `vennir-gke` or another
 team's install), name its kubectl
 context exactly in place of `-cluster`, with the perf sample published to
 its registry and the forward the driver looks for:
 
 ```console
-$ kubectl --context <context> -n vertra-system port-forward svc/console-execution-console 18080:8080 &
+$ kubectl --context <context> -n vennir-system port-forward svc/console-execution-console 18080:8080 &
 $ go run . -context <context> -image <registry>/perf/noop:latest -scenario burst
 ```
 
 Its nodes aren't sampled (the report leaves out the node line); the cloud's
 own monitoring has them. The check is on the context's name, which kubectl
 lets you rename: never name a shared or production cluster's context
-`vertra-perf*`.
+`vennir-perf*`.
 
 The scheduler and Postgres alone, on the test database (`make test-db`):
 
 ```console
-$ cd kernel && VERTRA_PERF=1 TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55432/execution_kernel_test \
+$ cd kernel && VENNIR_PERF=1 TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55432/execution_kernel_test \
     go test ./internal/scheduler -run TestPerf -v
 ```
 
-Afterwards: `make down KIND_CLUSTER=vertra-perf`, `make up` for vertra-local.
-`kind delete cluster --name vertra-perf` removes it altogether.
+Afterwards: `make down KIND_CLUSTER=vennir-perf`, `make up` for vennir-local.
+`kind delete cluster --name vennir-perf` removes it altogether.
 
 ## Phase 1 findings (2026-10-28)
 
@@ -179,7 +179,7 @@ process held pgx's or node-postgres's default pool (pgx's is the node's CPUs,
 4 on a 2-CPU node). Now each size gives it memory with settings to match,
 no CPU limit, a /dev/shm of its own, and each process a pool the size sets,
 every process's together under `max_connections`. `pgbench/run.sh` on
-vertra-perf, same machine, 30 s each (transactions a second, mean latency):
+vennir-perf, same machine, 30 s each (transactions a second, mean latency):
 
 | | 8 clients, writes | 64 clients, writes | 8 clients, reads | 64 clients, reads |
 | --- | ---: | ---: | ---: | ---: |
@@ -341,14 +341,14 @@ milliseconds between the API server saving it and its answer arriving, and
 when it happens, the retry adopts it, as the unit tests say
 (`internal/scheduler/dispatch_test.go`, `internal/executor/kubernetes_test.go`).
 
-To see it again, on `vertra-perf` only:
+To see it again, on `vennir-perf` only:
 
 ```
-make kind-deploy-kernel KIND_CLUSTER=vertra-perf KIND_KERNEL_VALUES="perf/kind-kernel.yaml perf/slowcreate/kernel.yaml"
+make kind-deploy-kernel KIND_CLUSTER=vennir-perf KIND_KERNEL_VALUES="perf/kind-kernel.yaml perf/slowcreate/kernel.yaml"
 DELAY=2.96s JITTER=40ms perf/slowcreate/run.sh up
 go run . -scenario burst   # then the scheduler's "adopting" lines and the webhook's log
 perf/slowcreate/run.sh down
-make kind-deploy-kernel KIND_CLUSTER=vertra-perf KIND_KERNEL_VALUES=perf/kind-kernel.yaml
+make kind-deploy-kernel KIND_CLUSTER=vennir-perf KIND_KERNEL_VALUES=perf/kind-kernel.yaml
 ```
 
 The moment the kernel gives up moves with the machine: the webhook logs how
@@ -383,7 +383,7 @@ c6a.large.
 **3. Raising the cap on GKE met the project's quota first.** With 40 at once
 Autopilot couldn't add nodes (`SSD_TOTAL_GB`, 500 in the project): 0.41
 steps a second, container start p95 146 s, completion lag p50 11.7 s and
-p95 31 s, as Pods waited to be scheduled. `vertra apply` had warned of the
+p95 31 s, as Pods waited to be scheduled. `vennir apply` had warned of the
 quota. Nothing alerted on dispatched steps whose Pods couldn't be scheduled
 (one does now, #65), and completion lag rising with them is worth a look (it was:
 below).
@@ -402,7 +402,7 @@ step's reads too. A Job whose Pod waits for a node (or for its container)
 now rests until the watch reports a change, as a ready one did; one
 pulling its image, or with no Pod, is still read every pass.
 
-Reproduced on `vertra-perf` at GKE's proportions: 15 steps of a temporary
+Reproduced on `vennir-perf` at GKE's proportions: 15 steps of a temporary
 product whose Spot capacity was placed on a node label nothing has (so
 they waited for good), the client's limit lowered to 20 a second (15
 waiting want about 30), and a light load (40 one-step DAGs of a 1 s step,

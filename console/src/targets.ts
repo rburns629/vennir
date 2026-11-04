@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 /**
  * Allowed targets (X1): where another team may aim a team's products. An
- * action input typed (x-vertra-needs) as a kind of target names the
+ * action input typed (x-vennir-needs) as a kind of target names the
  * project, folder, account or subscription the owning team's identity acts
  * on; when another team runs it, the value must match one of the owning
  * team's rules for that team (team.yaml's allowedTargets, from the
@@ -17,7 +17,7 @@
  */
 import type { TargetRule } from "./db/schema.js";
 
-/** The kinds of target, as team.yaml and x-vertra-needs name them. */
+/** The kinds of target, as team.yaml and x-vennir-needs name them. */
 export const TARGET_TYPES = ["gcp.project", "gcp.folder", "aws.account", "azure.subscription"] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -29,7 +29,7 @@ export function targetInputs(inputSchema: unknown): Map<string, string> {
   const out = new Map<string, string>();
   const properties = isRecord(inputSchema) && isRecord(inputSchema["properties"]) ? inputSchema["properties"] : {};
   for (const [name, property] of Object.entries(properties)) {
-    const kind = isRecord(property) ? property["x-vertra-needs"] : undefined;
+    const kind = isRecord(property) ? property["x-vennir-needs"] : undefined;
     if (typeof kind === "string" && (TARGET_TYPES as readonly string[]).includes(kind)) out.set(name, kind);
   }
   return out;

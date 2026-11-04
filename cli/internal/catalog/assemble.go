@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rburns629/vertra/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/config"
 )
 
 // Options are what goes into the first commit.
@@ -27,19 +27,19 @@ type Options struct {
 	// changes, e.g. "@octocat" or "@my-org/catalog-admins".
 	Owners    string
 	Languages []string
-	// Registry goes into vertra.yaml, for running `vertra catalog` from a
+	// Registry goes into vennir.yaml, for running `vennir catalog` from a
 	// laptop (CI takes it from the repository's variables).
 	Registry string
 }
 
 // skipped are never copied: local build and tool state.
-var skipped = map[string]bool{".vertra": true, ".venv": true, "__pycache__": true, "node_modules": true, "target": true, ".pytest_cache": true}
+var skipped = map[string]bool{".vennir": true, ".venv": true, "__pycache__": true, "node_modules": true, "target": true, ".pytest_cache": true}
 
 // Assemble writes the catalog's first commit into dst (which must be empty
 // or missing), and returns the starters' product names.
 func Assemble(o Options, dst string) ([]string, error) {
-	if _, err := os.Stat(filepath.Join(o.Template, "vertra")); err != nil {
-		return nil, fmt.Errorf("%s isn't a catalog template (no ./vertra)", o.Template)
+	if _, err := os.Stat(filepath.Join(o.Template, "vennir")); err != nil {
+		return nil, fmt.Errorf("%s isn't a catalog template (no ./vennir)", o.Template)
 	}
 	if err := copyTree(o.Template, dst); err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func Assemble(o Options, dst string) ([]string, error) {
 		"owner":       owner,
 		"contact":     owner,
 	})
-	team = setFolded(team, "description", "The first team, created with the catalog by vertra.")
+	team = setFolded(team, "description", "The first team, created with the catalog by vennir.")
 	team = stripHeader(team)
 	if err := os.WriteFile(filepath.Join(teamDir, "team.yaml"), []byte(team), 0o644); err != nil {
 		return nil, err
@@ -109,8 +109,8 @@ func Assemble(o Options, dst string) ([]string, error) {
 		return nil, err
 	}
 
-	// Where it publishes, for `vertra catalog` from a laptop.
-	settings := filepath.Join(dst, "vertra.yaml")
+	// Where it publishes, for `vennir catalog` from a laptop.
+	settings := filepath.Join(dst, "vennir.yaml")
 	data, err = os.ReadFile(settings)
 	if err != nil {
 		return nil, err
@@ -193,8 +193,8 @@ func copyTree(src, dst string) error {
 	})
 }
 
-// Pin points a catalog's ./vertra at a released vertra: its version and each
-// platform's SHA-256, as .github/scripts/pin-vertra.sh does, so the
+// Pin points a catalog's ./vennir at a released vennir: its version and each
+// platform's SHA-256, as .github/scripts/pin-vennir.sh does, so the
 // catalog's CI runs the release its install does.
 func Pin(wrapper, version string, sums map[string]string) error {
 	data, err := os.ReadFile(wrapper)

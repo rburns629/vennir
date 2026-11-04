@@ -1,11 +1,11 @@
 # The kinds of thing this team's products make or name (decision 25): an
-# input that needs one says x-vertra-needs, an output that is one says
-# x-vertra-provides. The console's cart and chat agent wire orders by them:
+# input that needs one says x-vennir-needs, an output that is one says
+# x-vennir-provides. The console's cart and chat agent wire orders by them:
 # someone who orders app hosting and nothing else is offered a project they
 # already have, or gets this team's default provider (project.create) added,
 # and is asked once for a region. Any team's products may use these; only
 # this team defines them.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: WiringTypes
 types:
   - name: gcp.project

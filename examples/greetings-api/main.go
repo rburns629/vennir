@@ -3,7 +3,7 @@
 // The backend of the local sample's API product (catalog-template/samples/
 // local/apis/greetings): an HTTP service a team runs in its own namespace,
 // published through the install's gateway. The gateway forwards only what
-// the API's openapi.yaml describes, and adds a Vertra-Caller header: a JWT,
+// the API's openapi.yaml describes, and adds a Vennir-Caller header: a JWT,
 // signed by the gateway (EdDSA), naming who called and as which team. This
 // checks it against the gateway's public keys before answering, so a
 // request that didn't come through the gateway gets 401.
@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-// claims are the Vertra-Caller token's (gateway/internal/caller).
+// claims are the Vennir-Caller token's (gateway/internal/caller).
 type claims struct {
 	Issuer    string `json:"iss"`
 	Subject   string `json:"sub"`
@@ -78,14 +78,14 @@ func (k *keys) get(kid string) (ed25519.PublicKey, error) {
 	return nil, fmt.Errorf("no key %q at %s", kid, k.url)
 }
 
-// caller checks the Vertra-Caller token: the gateway's signature, not
+// caller checks the Vennir-Caller token: the gateway's signature, not
 // expired, for this backend (aud: its origin, as the API's backend.url has
 // it), and for this API (api: <team>/<name>), so another API pointed at the
 // same origin can't call it under its own spec and sharing.
 func (k *keys) caller(r *http.Request, audience, api string) (*claims, error) {
-	parts := strings.Split(r.Header.Get("Vertra-Caller"), ".")
+	parts := strings.Split(r.Header.Get("Vennir-Caller"), ".")
 	if len(parts) != 3 {
-		return nil, errors.New("no Vertra-Caller token: call it through the gateway")
+		return nil, errors.New("no Vennir-Caller token: call it through the gateway")
 	}
 	var header struct{ Alg, Kid string }
 	raw, err := base64.RawURLEncoding.DecodeString(parts[0])

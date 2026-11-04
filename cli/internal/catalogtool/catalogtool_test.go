@@ -64,7 +64,7 @@ func TestCodeownersMatching(t *testing.T) {
 	}{
 		{"*", "anything/at/all", true},
 		{"/tools/", "tools/product.schema.json", true},
-		{"/vertra", "vertra", true},
+		{"/vennir", "vennir", true},
 		{"/teams/*/secret-stores/", "teams/x/secret-stores/secretstore.yaml", true},
 		{"/teams/*/secret-stores/", "teams/x/products/p/product.yaml", false},
 		{"/teams/a/", "teams/ab/team.yaml", false},
@@ -289,12 +289,12 @@ func TestApprovedBasesAreMirroredAndUsed(t *testing.T) {
 	}
 
 	c := catalogWith(t, map[string]string{
-		"bases.yaml": "apiVersion: vertra.dev/v2\nkind: Bases\nbases:\n  - {name: python, image: \"" + source.String() + "\"}\n  - {name: python, image: \"x:1\"}\n",
+		"bases.yaml": "apiVersion: vennir.dev/v2\nkind: Bases\nbases:\n  - {name: python, image: \"" + source.String() + "\"}\n  - {name: python, image: \"x:1\"}\n",
 	})
 	if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateBases() }, c); !strings.Contains(out, "python is named twice") {
 		t.Errorf("a name twice: %s", out)
 	}
-	c = catalogWith(t, map[string]string{"bases.yaml": "apiVersion: vertra.dev/v2\nkind: Bases\nbases:\n  - {name: Python, image: \"python\"}\n"})
+	c = catalogWith(t, map[string]string{"bases.yaml": "apiVersion: vennir.dev/v2\nkind: Bases\nbases:\n  - {name: Python, image: \"python\"}\n"})
 	if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateBases() }, c); !strings.Contains(out, "bases.0") {
 		t.Errorf("a bad name and an untagged image: %s", out)
 	}

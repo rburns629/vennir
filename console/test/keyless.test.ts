@@ -25,7 +25,7 @@ const prefix = `kls-${randomUUID().slice(0, 6)}`;
 const team = `${prefix}-team`;
 const other = `${prefix}-other`;
 const ISSUER = `https://ci-${prefix}.example.test`;
-const AUDIENCE = `vertra-${prefix}`;
+const AUDIENCE = `vennir-${prefix}`;
 const SUBJECT = "repo:acme/app:ref:refs/heads/main";
 
 let app: FastifyInstance;
@@ -84,7 +84,7 @@ beforeEach(() => {
 afterAll(async () => {
   vi.unstubAllGlobals();
   await db.delete(teams).where(like(teams.name, `${prefix}%`));
-  await db.delete(usersTable).where(like(usersTable.email, `${prefix}-%@bots.vertra.local`));
+  await db.delete(usersTable).where(like(usersTable.email, `${prefix}-%@bots.vennir.local`));
   await users.cleanUp();
   await app.close();
 });
@@ -135,7 +135,7 @@ describe("a bot's identity overlapping another bot's", () => {
       const broader = await add(maintainerToken, { claims: { sub: victim.sub } });
       expect(broader.code).toBe("already_exists");
       expect(broader.failure).toBe("IDENTITY_OVERLAPS");
-      expect((await call(maintainerToken, "TokenService/CreateKeylessBot", { team, email: `${prefix}-broad@bots.vertra.local`, issuer: ISSUER, claims: { sub: victim.sub } })).failure).toBe("IDENTITY_OVERLAPS");
+      expect((await call(maintainerToken, "TokenService/CreateKeylessBot", { team, email: `${prefix}-broad@bots.vennir.local`, issuer: ISSUER, claims: { sub: victim.sub } })).failure).toBe("IDENTITY_OVERLAPS");
       // Narrower, with a claim of its own the other doesn't name: one token could carry both.
       expect((await add(maintainerToken, { claims: { sub: victim.sub, environment: "prod" } })).failure).toBe("IDENTITY_OVERLAPS");
       // The other bot still signs in.
@@ -161,7 +161,7 @@ describe("a keyless bot", () => {
   const made = (token: string, body: object) =>
     call<{ email?: string; identity?: { botEmail: string; claims: Record<string, string> } }>(token, "TokenService/CreateKeylessBot", {
       team,
-      email: `${prefix}-deploy@bots.vertra.local`,
+      email: `${prefix}-deploy@bots.vennir.local`,
       issuer: ISSUER,
       ...body,
     });
@@ -169,7 +169,7 @@ describe("a keyless bot", () => {
     (await call<{ bots?: { email: string; tokens?: unknown[] }[] }>(maintainerToken, "TokenService/ListBots", { team })).body.bots?.find((b) => b.email === email);
 
   it("is made with its identity and no token, by a maintainer, and only when the identity passes", async () => {
-    const email = `${prefix}-deploy@bots.vertra.local`;
+    const email = `${prefix}-deploy@bots.vennir.local`;
     expect((await made(memberToken, { claims: { sub: "repo:acme/deploy:ref:refs/heads/main" } })).code).toBe("permission_denied");
     const refused = await made(maintainerToken, { claims: { sub: "repo:acme/*" } });
     expect(refused.failure).toBe("BAD_IDENTITY");
@@ -180,8 +180,8 @@ describe("a keyless bot", () => {
     expect(ok.body).toMatchObject({ email, identity: { botEmail: email, claims: { sub: "repo:acme/deploy:ref:refs/heads/main" } } });
     expect((await tokensOf(email))?.tokens ?? []).toEqual([]);
     // The same identity again, for any bot: refused, as AddBotIdentity refuses it.
-    expect((await made(maintainerToken, { email: `${prefix}-again@bots.vertra.local`, claims: { sub: "repo:acme/deploy:ref:refs/heads/main" } })).code).toBe("already_exists");
-    expect(await tokensOf(`${prefix}-again@bots.vertra.local`)).toBeUndefined();
+    expect((await made(maintainerToken, { email: `${prefix}-again@bots.vennir.local`, claims: { sub: "repo:acme/deploy:ref:refs/heads/main" } })).code).toBe("already_exists");
+    expect(await tokensOf(`${prefix}-again@bots.vennir.local`)).toBeUndefined();
 
     // And it signs in.
     const session = await exchange(await sign({ sub: "repo:acme/deploy:ref:refs/heads/main" }));

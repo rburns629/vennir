@@ -21,9 +21,9 @@ import { Pill, type PillTone } from "../../components/Pill";
 import { when } from "../../time";
 import { errorMessage, listAllTeams, listAudit, type AuditEntryView, getAuditCopy, type AuditCopy } from "../../api";
 
-/** "vertra.console.v1.SecretService/PutSecret" → "Put secret", "catalog-sync" → "Catalog sync". */
+/** "vennir.console.v1.SecretService/PutSecret" → "Put secret", "catalog-sync" → "Catalog sync". */
 function actionName(route: string): { action: string; service: string } {
-  const [service = "", method] = route.replace(/^vertra\.console\.v1\./, "").split("/");
+  const [service = "", method] = route.replace(/^vennir\.console\.v1\./, "").split("/");
   const words = (method ?? service).replace(/([a-z])([A-Z])/g, "$1 $2").replace(/-/g, " ").toLowerCase();
   return { action: words.charAt(0).toUpperCase() + words.slice(1), service: method ? service.replace(/Service$/, "") : "" };
 }

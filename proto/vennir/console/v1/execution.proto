@@ -1,0 +1,438 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "vennir/console/v1/common.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// Executions: DAGs submitted to run, their tasks, events and logs.
+// Everything here is checked against the caller's teams first: an
+// execution is visible to a member of any team it names, and changed only
+// by a member of every one, or by whoever submitted it (a consumer's run of
+// another team's template, TemplateService).
+service ExecutionService {
+  // Executions the caller can see, newest first.
+  rpc ListExecutions(ListExecutionsRequest) returns (ListExecutionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Submits a DAG. Each task is checked before anything runs: its team is
+  // the caller's, it runs as its product's ServiceAccount (or "default",
+  // with no secrets, when it isn't a registered product), each secret is
+  // registered for its team, and its image comes from an allowed source,
+  // resolves to a digest and passed its scan. Problems come back together,
+  // as invalid_argument with Problem details.
+  rpc SubmitExecution(SubmitExecutionRequest) returns (SubmitExecutionResponse);
+  // An execution and its tasks, as they are now.
+  rpc GetExecution(GetExecutionRequest) returns (GetExecutionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // The execution as it is now, then again each time it changes, until it
+  // finishes or the caller stops listening.
+  rpc WatchExecution(WatchExecutionRequest) returns (stream WatchExecutionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // The execution's event log, oldest first, a page at a time.
+  rpc ListExecutionEvents(ListExecutionEventsRequest) returns (ListExecutionEventsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // What each task printed, credential shapes redacted.
+  rpc GetExecutionLogs(GetExecutionLogsRequest) returns (GetExecutionLogsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Cancels an execution. Cancelling one already cancelled changes nothing.
+  rpc CancelExecution(CancelExecutionRequest) returns (CancelExecutionResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Gives a failed task one more attempt, resuming its execution.
+  rpc RetryTask(RetryTaskRequest) returns (RetryTaskResponse);
+  // Runs the same DAG again as a new execution, checked again against the
+  // caller's current teams and secrets.
+  rpc RerunExecution(RerunExecutionRequest) returns (RerunExecutionResponse);
+  // Approves or declines a step awaiting approval. Only a maintainer of the
+  // step's team may, and never whoever submitted the run. Declined, the step
+  // fails with APPROVAL_DECLINED, failing its execution; approved, it runs,
+  // and stays approved if it's retried.
+  rpc DecideApproval(DecideApprovalRequest) returns (DecideApprovalResponse);
+  // What a step waiting for an approval would do, for whoever may decide on
+  // it: a run (a preview) of its product's plan action with the inputs it
+  // will get.
+  rpc PreviewStep(PreviewStepRequest) returns (PreviewStepResponse);
+  // The steps awaiting approval in the teams the caller maintains (every
+  // team, for an admin), the longest waiting first.
+  rpc ListPendingApprovals(ListPendingApprovalsRequest) returns (ListPendingApprovalsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+enum ExecutionState {
+  EXECUTION_STATE_UNSPECIFIED = 0;
+  EXECUTION_STATE_PENDING = 1;
+  EXECUTION_STATE_RUNNING = 2;
+  EXECUTION_STATE_SUCCEEDED = 3;
+  EXECUTION_STATE_FAILED = 4;
+  EXECUTION_STATE_CANCELLED = 5;
+}
+
+enum TaskState {
+  TASK_STATE_UNSPECIFIED = 0;
+  // Waiting for the tasks it depends on.
+  TASK_STATE_BLOCKED = 1;
+  // Waiting to be started.
+  TASK_STATE_READY = 2;
+  TASK_STATE_CLAIMED = 3;
+  TASK_STATE_RUNNING = 4;
+  TASK_STATE_SUCCEEDED = 5;
+  TASK_STATE_FAILED = 6;
+  TASK_STATE_CANCELLED = 7;
+  // Waiting for a maintainer of its team to approve it (product.yaml's
+  // approval, or a target team.yaml lets through only with one).
+  TASK_STATE_AWAITING_APPROVAL = 8;
+}
+
+// A DAG, as submitted.
+message Dag {
+  // A label for this execution; it can repeat.
+  string name = 1;
+  // Send the same one again (after a timeout, say) to get back the
+  // execution it started instead of starting another.
+  string request_id = 2;
+  // At least one.
+  repeated TaskDefinition tasks = 3;
+}
+
+// One task of a DAG: one action of one product.
+message TaskDefinition {
+  // Unique within the DAG.
+  string id = 1;
+  // A product's image; a tag is pinned to its digest at submission.
+  string image = 2;
+  string action = 3;
+  // The team it runs for, and the namespace it runs in.
+  string team = 4;
+  // Left unset, the task runs as its product's ServiceAccount, or
+  // "default" for an image that isn't a registered product.
+  optional string service_account = 5;
+  repeated string depends_on = 6;
+  // Secrets of the task's team, mounted at /platform/secrets/<name>/.
+  repeated string secret_refs = 7;
+  // The action's inputs. A value of {"$fromTask": "<id>", "$output":
+  // "<name>"} takes another task's output.
+  google.protobuf.Struct inputs = 8;
+  // 300 when unset.
+  optional int32 timeout_seconds = 9;
+  // 1 when unset.
+  optional int32 max_attempts = 10;
+  optional TaskResources resources = 11;
+}
+
+message ExecutionSummary {
+  string execution_id = 1;
+  string name = 2;
+  repeated string teams = 3;
+  // The submitter's account id; unset if that account was deleted.
+  optional string submitted_by = 4;
+  google.protobuf.Timestamp created_at = 5;
+  // Unspecified if the kernel couldn't be asked.
+  ExecutionState state = 6;
+  // Run from a template: <team>/<template>, or <team>/<product>.<action>
+  // for an action run alone. Empty for a DAG submitted as such.
+  string template = 7;
+  // How many of its steps are in each state (PENDING, RUNNING, SUCCEEDED,
+  // ...); empty if the kernel couldn't be asked.
+  map<string, int32> steps = 8;
+  // When it finished, once it has.
+  optional google.protobuf.Timestamp finished_at = 9;
+  // The submitter's email; unset if that account was deleted.
+  optional string submitted_by_email = 10;
+  // The steps claimed or running now, by step id; empty once it has
+  // finished (a cancelled run's last steps may still be stopping), or if
+  // the kernel couldn't be asked.
+  repeated RunningStep running = 11;
+  // The schedule that started it, by name; unset when none did, or it has
+  // since been deleted.
+  optional string schedule = 12;
+}
+
+// A step claimed or running: which, and which attempt.
+message RunningStep {
+  // The task's id from the DAG.
+  string task_id = 1;
+  string action = 2;
+  // From 1.
+  int32 attempt = 3;
+  int32 max_attempts = 4;
+}
+
+message Execution {
+  string execution_id = 1;
+  string name = 2;
+  ExecutionState state = 3;
+  repeated TaskStatus tasks = 4;
+  repeated string teams = 5;
+  // The submitter's email, "(deleted account)", or "the readiness check"
+  // for a product's check (the console's own run).
+  string submitted_by = 6;
+  google.protobuf.Timestamp created_at = 7;
+  // The DAG as submitted, images pinned.
+  Dag dag = 8;
+  // Why retrying or rerunning would be refused now, if it would.
+  optional RunBlocked run_blocked = 9;
+  // For a run of a template (TemplateService): which one, as
+  // <team>/<template> or, for an action run alone, <team>/<product>.<action>.
+  optional string template = 10;
+  // The parameters it ran with, and which of the submitter's teams it ran for.
+  google.protobuf.Struct template_parameters = 11;
+  optional string on_behalf_of = 12;
+  // The schedule that started it, by name; unset when none did, or it has
+  // since been deleted.
+  optional string schedule = 13;
+}
+
+// Why retrying or rerunning an execution would be refused now.
+message RunBlocked {
+  // TEAM_PURGED, TEAM_RETIRED, IMAGE_NOT_FOUND, IMAGE_NOT_ALLOWED,
+  // IMAGE_POLICY_NOT_CONFIGURED or IMAGE_NOT_RESOLVED.
+  string code = 1;
+  string message = 2;
+  // The DAG's images the registry no longer has (IMAGE_NOT_FOUND).
+  repeated string missing_images = 3;
+  // The DAG's images outside the allowed sources (IMAGE_NOT_ALLOWED).
+  repeated string disallowed_images = 4;
+  // The allowed sources, for IMAGE_NOT_ALLOWED.
+  repeated string allowed_sources = 5;
+}
+
+message TaskStatus {
+  // The task's id from the DAG.
+  string task_id = 1;
+  TaskState state = 2;
+  int32 attempt_count = 3;
+  google.protobuf.Struct outputs = 4;
+  optional Failure failure = 5;
+  repeated string depends_on = 6;
+  google.protobuf.Timestamp started_at = 7;
+  google.protobuf.Timestamp completed_at = 8;
+  // Every attempt, first to last: who asked for it and what acted in it.
+  repeated Attempt attempts = 9;
+  // Once it failed: what that means and what to do, whether retrying is
+  // safe, and whom to ask.
+  optional FailureHelp help = 10;
+  // Set when the step needs an approval.
+  optional Approval approval = 11;
+  // While it's ready but waiting its turn: another step with the same
+  // concurrency key (product.yaml's concurrencyKey) is running. The key's
+  // inputs, with their values; unset for a step whose inputs the caller
+  // can't see.
+  google.protobuf.Struct waiting_for = 12;
+  // While it's ready but waiting its turn because its product already has
+  // its most steps running (product.yaml's maxRunning).
+  bool waiting_for_cap = 13;
+}
+
+message Approval {
+  // The email of who approved it, and when; empty while it hasn't been.
+  string approved_by = 1;
+  google.protobuf.Timestamp approved_at = 2;
+  // While it awaits approval: since when.
+  google.protobuf.Timestamp awaiting_since = 3;
+  // Whether the caller may approve or decline it now.
+  bool can_decide = 4;
+  // Whether they can preview what it would do first (PreviewStep).
+  bool can_preview = 5;
+}
+
+message FailureHelp {
+  // Empty when nobody explained the code.
+  string means = 1;
+  string what_to_do = 2;
+  // The owning team's words (product.yaml's errors), not the platform's.
+  bool from_owner = 3;
+  // "safe" (its product is idempotent), "unsafe", or "unknown" (not a
+  // registered product).
+  string retry = 4;
+  // The team whose step it is, and where to ask it (team.yaml).
+  string team = 5;
+  string contact = 6;
+  string chat = 7;
+  string url = 8;
+}
+
+message Attempt {
+  int32 number = 1;
+  google.protobuf.Timestamp started_at = 2;
+  google.protobuf.Timestamp completed_at = 3;
+  optional Failure failure = 4;
+  // The email of who asked for it: whoever submitted the run for a first
+  // attempt, or retried it; empty for an automatic retry.
+  string requested_by = 5;
+  // submitted, retried or automatic_retry.
+  string trigger = 6;
+  // The identity it ran as, <team>/<serviceAccount>, and its image.
+  string acted_as = 7;
+  string image = 8;
+}
+
+message ListExecutionsRequest {
+  // 100 when unset, at most 1000.
+  PageRequest page = 1;
+  // Only executions naming this team.
+  string team = 2;
+  // Only executions whose name contains this.
+  string search = 3;
+  // Only executions created since.
+  google.protobuf.Timestamp since = 4;
+  // Only the caller's own.
+  bool mine = 5;
+}
+
+message ListExecutionsResponse {
+  repeated ExecutionSummary executions = 1;
+  // Empty on the last page.
+  string next_cursor = 2;
+  // How many days runs' records are kept; 0 keeps them forever.
+  int32 run_retention_days = 3;
+}
+
+message SubmitExecutionRequest {
+  Dag dag = 1;
+}
+
+message SubmitExecutionResponse {
+  string execution_id = 1;
+  // PENDING right after a submission.
+  ExecutionState state = 2;
+}
+
+message GetExecutionRequest {
+  string execution_id = 1;
+}
+
+message GetExecutionResponse {
+  Execution execution = 1;
+}
+
+message WatchExecutionRequest {
+  string execution_id = 1;
+}
+
+message WatchExecutionResponse {
+  Execution execution = 1;
+}
+
+message ExecutionEvent {
+  int64 id = 1;
+  // EXECUTION_CREATED, TASK_STARTED, TASK_FAILED and so on.
+  string event_type = 2;
+  // The task it's about, if any.
+  optional string task_id = 3;
+  google.protobuf.Struct payload = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message ListExecutionEventsRequest {
+  string execution_id = 1;
+  // Events after this id; from the start when unset.
+  int64 after = 2;
+}
+
+message ListExecutionEventsResponse {
+  repeated ExecutionEvent events = 1;
+  // Pass as `after` for the next page; 0 on the last.
+  int64 next_cursor = 2;
+}
+
+message GetExecutionLogsRequest {
+  string execution_id = 1;
+}
+
+message TaskLogs {
+  string task_id = 1;
+  // What the caller may see: every line for the step's team (and admins);
+  // for anyone else who can see the run, only lines the step logged as
+  // JSON with "level": "info" (a plain line counts as debug).
+  repeated string lines = 2;
+  // Lines held back from the caller (debug, warn, error, plain), and the
+  // team that sees them.
+  int32 hidden = 3;
+  string visible_to = 4;
+}
+
+message GetExecutionLogsResponse {
+  repeated TaskLogs tasks = 1;
+}
+
+message CancelExecutionRequest {
+  string execution_id = 1;
+}
+
+message CancelExecutionResponse {
+  string execution_id = 1;
+  ExecutionState state = 2;
+}
+
+message RetryTaskRequest {
+  string execution_id = 1;
+  string task_id = 2;
+}
+
+message RetryTaskResponse {
+  string execution_id = 1;
+  ExecutionState state = 2;
+}
+
+message RerunExecutionRequest {
+  string execution_id = 1;
+}
+
+message RerunExecutionResponse {
+  // The new execution.
+  string execution_id = 1;
+  ExecutionState state = 2;
+}
+
+message DecideApprovalRequest {
+  string execution_id = 1;
+  string task_id = 2;
+  // false declines it.
+  bool approve = 3;
+  // Why, when declining: shown with the step's failure. At most 500 characters.
+  string reason = 4;
+}
+
+message DecideApprovalResponse {
+  string execution_id = 1;
+  ExecutionState state = 2;
+}
+
+message PreviewStepRequest {
+  string execution_id = 1;
+  string task_id = 2;
+}
+
+message PreviewStepResponse {
+  // The preview run.
+  string execution_id = 1;
+}
+
+message ListPendingApprovalsRequest {}
+
+message ListPendingApprovalsResponse {
+  repeated PendingApproval approvals = 1;
+}
+
+message PendingApproval {
+  string execution_id = 1;
+  string execution_name = 2;
+  string task_id = 3;
+  string team = 4;
+  string image = 5;
+  string action = 6;
+  // The email of who submitted the run.
+  string requested_by = 7;
+  google.protobuf.Timestamp awaiting_since = 8;
+  // False when the caller submitted the run: someone else decides.
+  bool can_decide = 9;
+}

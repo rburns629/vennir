@@ -41,7 +41,7 @@ const kernelTokenFile = config.kernelApiTokenFile;
 
 beforeAll(async () => {
   app = await buildApp();
-  config.kernelApiTokenFile = tokenFile(["vertra-kernel-api"]);
+  config.kernelApiTokenFile = tokenFile(["vennir-kernel-api"]);
 });
 
 afterAll(async () => {
@@ -61,7 +61,7 @@ describe("token audiences", () => {
     expect(tokenAudienceProblems(["sts.amazonaws.com", "api://AzureADTokenExchange"])).toEqual([]);
     for (const audiences of [
       ["https://kubernetes.default.svc.cluster.local"],
-      ["vertra-kernel-api"],
+      ["vennir-kernel-api"],
       ["a,b"],
       ["with space"],
       [""],
@@ -88,7 +88,7 @@ describe("token audiences", () => {
     expect(kept.code).toBe("ok");
     expect(kept.body.product?.tokenAudiences).toEqual(["sts.amazonaws.com"]);
 
-    const refused = await register("api", ["vertra-kernel-api"]);
+    const refused = await register("api", ["vennir-kernel-api"]);
     expect(refused.code).toBe("invalid_argument");
   });
 });

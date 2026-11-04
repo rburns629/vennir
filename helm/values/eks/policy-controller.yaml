@@ -15,5 +15,5 @@ webhook:
     name: policy-controller-webhook
   namespaceSelector:
     matchExpressions:
-      - key: vertra/team
+      - key: vennir/team
         operator: Exists

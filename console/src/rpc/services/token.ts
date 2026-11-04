@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-/** TokenService (proto/vertra/console/v1/token.proto): core/tokens.ts over Connect. */
+/** TokenService (proto/vennir/console/v1/token.proto): core/tokens.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -21,7 +21,7 @@ import {
   TokenLabel,
 } from "../../core/tokens.js";
 import { addBotIdentity, createKeylessBot, listBotIdentities, removeBotIdentity } from "../../core/botIdentities.js";
-import type { TokenService } from "../../gen/vertra/console/v1/token_pb.js";
+import type { TokenService } from "../../gen/vennir/console/v1/token_pb.js";
 import { callerOf, logOf } from "../context.js";
 import { check } from "../validate.js";
 

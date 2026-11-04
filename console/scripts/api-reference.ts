@@ -23,10 +23,10 @@ import {
 /** Methods anyone may call, signed in or not: rpc/interceptors.ts's PUBLIC
  * (test/api-reference.test.ts keeps the two the same). */
 export const PUBLIC_METHODS = [
-  "vertra.console.v1.AuthService/GetEnvironment",
-  "vertra.console.v1.AuthService/Register",
-  "vertra.console.v1.AuthService/Login",
-  "vertra.console.v1.AuthService/ExchangeToken",
+  "vennir.console.v1.AuthService/GetEnvironment",
+  "vennir.console.v1.AuthService/Register",
+  "vennir.console.v1.AuthService/Login",
+  "vennir.console.v1.AuthService/ExchangeToken",
 ];
 
 interface Field {
@@ -65,7 +65,7 @@ const WELL_KNOWN: Record<string, string> = {
 const [imagePath] = process.argv.slice(2);
 if (!imagePath) throw new Error("usage: api-reference.ts IMAGE");
 const image = fromBinary(FileDescriptorSetSchema, readFileSync(imagePath));
-const files = image.file.filter((f) => f.package.startsWith("vertra."));
+const files = image.file.filter((f) => f.package.startsWith("vennir."));
 
 /** Every message's DescriptorProto by full name (".pkg.Name"), maps included. */
 const allMessages = new Map<string, DescriptorProto>();

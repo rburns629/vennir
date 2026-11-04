@@ -36,7 +36,7 @@ was Python until 2026-10-20 (decision 17 in `docs/assessment.md`).
 cmd/kernel/        The binary: a subcommand per process (api, scheduler, migrate,
                    sleep, database-setup), plus wait-for-postgres and check-heartbeat
                    for the chart, and database-token (a managed database's sign-in,
-                   written to a file for pg_restore, when vertra moves data in).
+                   written to a file for pg_restore, when vennir moves data in).
 internal/          Its packages (one Go module: go.mod here).
 ├── domain/        States, retry backoff, the result.json contract, input references,
 │                  DAG validation, credential shapes. No I/O.
@@ -52,7 +52,7 @@ internal/          Its packages (one Go module: go.mod here).
 ├── sleeper/       Putting an idle platform to sleep (a CronJob).
 ├── logging/       JSON logs.
 ├── metrics/       Prometheus metrics.
-├── gen/           KernelService's generated code (`make proto`, from proto/vertra/kernel/v1).
+├── gen/           KernelService's generated code (`make proto`, from proto/vennir/kernel/v1).
 ├── dbtest/        For tests: the test database, and throwaway ones.
 └── kindtest/      For tests: a real (kind) cluster and test images (fixture/: one of them).
 
@@ -575,7 +575,7 @@ fails rather than skips.
   `values.yaml` documents every option inline; `templates/` has one file
   per resource: kernel-api, kernel-scheduler, the migration hook Job
   (`kernel migrate`), the sleeper's CronJobs (`kernel sleep`).
-- **`../proto/vertra/kernel/v1/kernel.proto`** — KernelService; `make
+- **`../proto/vennir/kernel/v1/kernel.proto`** — KernelService; `make
   proto` writes `internal/gen` and the console's client.
 - **`../examples/project-product/`**, **`../examples/application-product/`**
   — the two fake product containers the kind tests run; each standalone,

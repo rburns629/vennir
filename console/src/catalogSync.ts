@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 /**
  * Pull-based catalog registration: this console reads its catalog's release
- * (proto/vertra/catalog/v1/release.proto) from the registry, verifies its
+ * (proto/vennir/catalog/v1/release.proto) from the registry, verifies its
  * signature where the install trusts one, and applies it. Catalog CI only
  * builds, tests, scans, signs and pushes; it holds no console credential,
  * and any number of installs read the same catalog.
@@ -51,7 +51,7 @@ import { db } from "./db/client.js";
 import { deleteApisExcept, deleteTemplatesExcept, findTeamByName, replaceWiringTypes, upsertApi, upsertTemplate } from "./db/queries.js";
 import type { BackendAuth } from "./db/schema.js";
 import { catalogSync, products, teams } from "./db/schema.js";
-import { ReleaseSchema, type BackendAuth as ReleaseBackendAuth, type Release } from "./gen/vertra/catalog/v1/release_pb.js";
+import { ReleaseSchema, type BackendAuth as ReleaseBackendAuth, type Release } from "./gen/vennir/catalog/v1/release_pb.js";
 import { createVerifyJob, deleteScanJob, ensureServiceAccount, readScanJob } from "./k8s.js";
 import { catalogSyncs } from "./metrics.js";
 import { fetchRelease, listTags } from "./registry.js";
@@ -241,7 +241,7 @@ function verifications(reference: string): { args: string[]; publicKey?: string 
   // identity of the Job's ServiceAccount (GKE Workload Identity, EKS), which
   // cosign reads only with --k8s-keychain.
   const keychain = config.scanning.pullSecretName ? [] : ["--k8s-keychain"];
-  // Catalog CI's key signatures go to no public log (`vertra catalog publish`'s signing).
+  // Catalog CI's key signatures go to no public log (`vennir catalog publish`'s signing).
   const tries: { args: string[]; publicKey?: string }[] = publicKeys.map((publicKey) => ({
     args: [...keychain, "--key", "env://COSIGN_PUBLIC_KEY", "--insecure-ignore-tlog=true", reference],
     publicKey,
@@ -467,7 +467,7 @@ export async function apply(release: Release, log: FastifyBaseLogger): Promise<C
   return problems;
 }
 
-/** A catalog version: a Git tag vX.Y.Z, as `vertra catalog promote` makes. */
+/** A catalog version: a Git tag vX.Y.Z, as `vennir catalog promote` makes. */
 const VERSION = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 /** The newest of `tags` that's a version, or null when none is. */

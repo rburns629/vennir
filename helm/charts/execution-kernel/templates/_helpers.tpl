@@ -150,12 +150,12 @@ capabilities: {drop: ["ALL"]}
 {{/*
 TLS inside the cluster (tls.yaml). databaseTls ends a URL for the bundled
 Postgres: TLS required, the server checked against this release's CA
-(verify-full), which tlsCaVolume and tlsCaMount put at /etc/vertra/tls in
+(verify-full), which tlsCaVolume and tlsCaMount put at /etc/vennir/tls in
 every Pod that connects to it or to kernel-api.
 */}}
 {{- define "execution-kernel.databaseTls" -}}
 {{- if and .Values.tls.enabled .Values.postgres.enabled -}}
-?sslmode=verify-full&sslrootcert=/etc/vertra/tls/ca.crt
+?sslmode=verify-full&sslrootcert=/etc/vennir/tls/ca.crt
 {{- end -}}
 {{- end -}}
 
@@ -228,10 +228,10 @@ really changes.
 
 {{- define "execution-kernel.tlsCaMount" -}}
 {{- if .Values.tls.enabled }}
-- {name: tls-ca, mountPath: /etc/vertra/tls, readOnly: true}
+- {name: tls-ca, mountPath: /etc/vennir/tls, readOnly: true}
 {{- end }}
 {{- if .Values.database.caSecret }}
-- {name: db-ca, mountPath: /etc/vertra/tls-db, readOnly: true}
+- {name: db-ca, mountPath: /etc/vennir/tls-db, readOnly: true}
 {{- end }}
 {{- end -}}
 
@@ -246,7 +246,7 @@ hostssl all  all  ::/0      scram-sha-256
 {{/*
 Whether the bundled Postgres runs as its user (999) from the start
 (postgres.nonRoot): "true" or "". auto: when its volume is new or was made
-that way (the claim's vertra.dev/postgres-layout: nonroot); a volume made
+that way (the claim's vennir.dev/postgres-layout: nonroot); a volume made
 before keeps the image's way, starting as root to take ownership of it,
 until "true" moves it (postgres-deployment.yaml's postgres-layout).
 */}}
@@ -257,7 +257,7 @@ true
 {{- else if eq $mode "auto" -}}
 {{- $pvc := lookup "v1" "PersistentVolumeClaim" .Release.Namespace (printf "%s-postgres" (include "execution-kernel.fullname" .)) -}}
 {{- $layout := "" -}}
-{{- if $pvc }}{{ $layout = index ($pvc.metadata.annotations | default dict) "vertra.dev/postgres-layout" | default "" }}{{ end -}}
+{{- if $pvc }}{{ $layout = index ($pvc.metadata.annotations | default dict) "vennir.dev/postgres-layout" | default "" }}{{ end -}}
 {{- if or (not .Values.postgres.persistence.enabled) (not $pvc) (eq $layout "nonroot") -}}
 true
 {{- end -}}

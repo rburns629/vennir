@@ -4,7 +4,7 @@ name: check-codeowners
 # doesn't exist or has no write access here, or a line it can't parse.
 # GitHub ignores such an owner silently, so a path whose only owner is
 # unknown needs no review at all; this check is how that's caught.
-# (`./vertra catalog validate` checks the layout, offline; this checks the
+# (`./vennir catalog validate` checks the layout, offline; this checks the
 # owners, which only GitHub knows.)
 #
 # No paths filter: make it a required status check on main, and a required

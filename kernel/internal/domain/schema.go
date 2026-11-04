@@ -28,7 +28,7 @@ func (noFetching) Load(url string) (any, error) {
 
 const schemaURL = "task:///schema.json"
 
-// printer words schema problems as vertra catalog does.
+// printer words schema problems as vennir catalog does.
 var printer = message.NewPrinter(language.English)
 
 // CompileSchema reads a schema, or says why it isn't one.

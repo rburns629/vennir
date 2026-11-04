@@ -29,26 +29,26 @@ last one was.
 - [ ] **Reading another install's catalog from ECR** (built 2026-10-30): a
   GKE reader of an EKS owner's ECR by AWS web identity
   (`externalCatalog.awsRoleArn`, `registryCheck.awsFederation`), and an EKS
-  reader in a second account; each granted with `vertra catalog grant`,
+  reader in a second account; each granted with `vennir catalog grant`,
   re-granted (no change) and revoked (refused within the hour): the release
   applied, a step pulled by the kubelet, policy-controller verifying through
-  `vertra-pull`, the scan Job signing in. Also: the GKE issuer accepted as
+  `vennir-pull`, the scan Job signing in. Also: the GKE issuer accepted as
   an IAM OIDC provider with no thumbprint, and gcloud accepting the prefixed
   `google.subject` mapping.
-- [ ] **What a run created, labelled `vertra-team` on the cloud**: the
+- [ ] **What a run created, labelled `vennir-team` on the cloud**: the
   samples label what they make with the run's team, and delete only what
   carries it (resources made before have none, and are refused until
   relabelled, as the sample READMEs say).
-- [ ] **The base images' weekly mirror** (`vertra catalog bases mirror` in
+- [ ] **The base images' weekly mirror** (`vennir catalog bases mirror` in
   catalog CI): copying is tested against a registry; the weekly run itself
   isn't seen yet.
-- [ ] **`vertra apply` waiting for a hostname's DNS record** on a cluster
-  whose Ingress has a public address (`vertra status` showing it and the
+- [ ] **`vennir apply` waiting for a hostname's DNS record** on a cluster
+  whose Ingress has a public address (`vennir status` showing it and the
   certificate).
 - [ ] **A narrowed schema's refusal at checkout**, seen on a cluster: tested
   in the kernel, but no runnable sample provides a target type yet.
 - [ ] **A team building in its own Environment** (built 2026-11-03,
-  `buildEnvironments`): in a real catalog repository, `./vertra catalog
+  `buildEnvironments`): in a real catalog repository, `./vennir catalog
   environments` making `team-<team>` main only (and keeping a hand-added
   reviewer); the plan job reading its rules with the job's token (`actions:
   read`) and refusing one open to another branch; a Dockerfile reading a
@@ -59,7 +59,7 @@ last one was.
   which deploys the release's signed charts and images, each signature
   checked against the release workflow's identity at that tag first): the
   one part of the billed run's plan not run (it installed the release with
-  `vertra apply` instead).
+  `vennir apply` instead).
 
 ## Found in the billed run (2026-10-31 and 2026-11-01)
 
@@ -73,7 +73,7 @@ it was seen.
   platform's own Secrets, policy-controller excludes the namespace, and the
   gateway's token fence matches kernel-api's ServiceAccount
   (`docs/security-model.md`, "Guardrails the cluster enforces"). The next
-  billed GKE run installs fresh into `vertra-system`: `GKE_NAMESPACE` in the
+  billed GKE run installs fresh into `vennir-system`: `GKE_NAMESPACE` in the
   Makefile, the values files' comments and `kernelApiUrl`
   (`helm/values/gke/console.yaml`), `allowReleaseNamespace` dropped,
   policy-controller's `NotIn default` dropped, and the Google service
@@ -112,7 +112,7 @@ it was seen.
   `deniedValues` isn't seen. It fails toward no problem: the apply stops
   when Google refuses the region.
 
-- [ ] **`vertra`: GitLab as a second git host, then the azure target**
+- [ ] **`vennir`: GitLab as a second git host, then the azure target**
   (last). The rest of `cli/DESIGN.md`'s build order is done; its decisions
   (targets, OpenTofu, sizes, the approval screen, git hosts behind one
   layer) are recorded there.
@@ -123,11 +123,11 @@ it was seen.
   own limit (`scheduler.taskStartTimeoutSeconds`, 10 minutes), past which it
   fails as `TASK_NOT_STARTED` (retryable) instead of a misleading
   `TASK_TIMEOUT`. Why a minimal install had three nodes (looked at in the
-  billed run): every Vertra Pod was on one; the other two, in other zones,
+  billed run): every Vennir Pod was on one; the other two, in other zones,
   held only GKE's own Pods (DaemonSets, konnectivity-agent spread across
   zones, balloon Pods). Autopilot bills Pods, so they cost nothing, but
   their boot disks count against the project's SSD quota: at 500 GB, a
-  step's node couldn't be added at 40 at once. `vertra apply` warns of the
+  step's node couldn't be added at 40 at once. `vennir apply` warns of the
   quota; a project raising it to 1000 GB was enough.
 
 ## Security
@@ -135,7 +135,7 @@ it was seen.
 - [ ] **Only the scheduler makes `ek-` Jobs and ConfigMaps in team
   namespaces** (found 2026-11-03, reviewing the suspended start): an
   admission policy refusing anyone else's create of a Job or ConfigMap named
-  `ek-` in a namespace labelled `vertra/team`. The suspended start leaves
+  `ek-` in a namespace labelled `vennir/team`. The suspended start leaves
   two ways in, both needing such rights: replacing the kernel's ConfigMap in
   the moment before the kubelet mounts it, and a Job made first under the
   attempt's name, as the kernel would make it but already resumed, which it
@@ -172,7 +172,7 @@ it was seen.
 
 ## Products and catalog
 
-- [ ] **`vertra catalog create` applies `main`'s ruleset** (found
+- [ ] **`vennir catalog create` applies `main`'s ruleset** (found
   2026-11-02). It creates the Environments but no ruleset, so a failing
   check, or a missing code-owner review, doesn't block a merge until someone
   adds one by hand (catalog README, "Protecting main", lists what to

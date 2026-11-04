@@ -2,7 +2,7 @@
 # with the version they describe: the Docs page's reference, and what the
 # chat agent answers from (guides.ts). One line each: the id here, what kind
 # of doc it is, and the file in the repository it's a copy of. Kinds:
-#   current    how Vertra works now
+#   current    how Vennir works now
 #   operating  installing and running it
 #   history    design history: decisions with their proposals and rejected
 #              options. It answers "why", never "what is" (decision 24).

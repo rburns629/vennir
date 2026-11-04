@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
-	"github.com/rburns629/vertra/kernel/internal/executor"
+	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/rburns629/vennir/kernel/internal/executor"
 )
 
 // Fake is an Executor that records what it was asked to do.

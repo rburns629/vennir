@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-/** SecretService (proto/vertra/console/v1/secret.proto): core/secrets.ts over Connect. */
+/** SecretService (proto/vennir/console/v1/secret.proto): core/secrets.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import type { JsonObject } from "@bufbuild/protobuf";
 import { Type } from "@sinclair/typebox";
@@ -16,7 +16,7 @@ import {
   teamSecrets,
   teamSecretStores,
 } from "../../core/secrets.js";
-import { SecretSource, type SecretService } from "../../gen/vertra/console/v1/secret_pb.js";
+import { SecretSource, type SecretService } from "../../gen/vennir/console/v1/secret_pb.js";
 import { timestamp } from "../convert.js";
 import { callerOf, logOf } from "../context.js";
 import { check } from "../validate.js";

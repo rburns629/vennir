@@ -123,7 +123,7 @@ export function ApiEndpoints({ api, traffic }: { api: ApiProduct; traffic?: ApiT
     selected &&
     [
       `curl -X ${selected.method} ${shellWord(base + sample(selected.path))} \\`,
-      `  -H "Authorization: Bearer $VERTRA_TOKEN"`,
+      `  -H "Authorization: Bearer $VENNIR_TOKEN"`,
       ...(["POST", "PUT", "PATCH"].includes(selected.method) ? [`  -H 'Content-Type: application/json' -d '{...}'`] : []),
     ].join("\n");
   const showTraffic = traffic !== undefined;
@@ -240,8 +240,8 @@ export function ApiEndpoints({ api, traffic }: { api: ApiProduct; traffic?: ApiT
           </Box>
           <Typography variant="body2" sx={{ fontSize: 12.5, lineHeight: 1.5 }}>
             Your <Mono>Authorization</Mono> header signs you in to the gateway and stops there. The backend gets your other headers, and
-            who you are in <Mono>Vertra-Caller</Mono>, signed by the gateway. Every answer says which answered:{" "}
-            <Mono>Vertra-Answered-By: gateway</Mono> or <Mono>backend</Mono>.
+            who you are in <Mono>Vennir-Caller</Mono>, signed by the gateway. Every answer says which answered:{" "}
+            <Mono>Vennir-Answered-By: gateway</Mono> or <Mono>backend</Mono>.
           </Typography>
         </Box>
       )}

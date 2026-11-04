@@ -18,17 +18,17 @@ DOCKER := $(shell command -v docker 2>/dev/null || echo $(DOCKER_DESKTOP_BIN)/do
 # kubectl's current-context: with a GKE context configured alongside it,
 # `make up` would otherwise force-delete "Unknown" pods on whichever
 # cluster kubectl happened to point at. One name decides the cluster, its
-# context and its node: KIND_CLUSTER=vertra-perf works on the performance
+# context and its node: KIND_CLUSTER=vennir-perf works on the performance
 # cluster (perf/README.md) and nothing else. The context is derived, never
 # set: a KIND_CONTEXT exported for some other tool must not send helm and
 # kubectl to another cluster while `kind load` uses this one.
-KIND_CLUSTER ?= vertra-local
+KIND_CLUSTER ?= vennir-local
 override KIND_CONTEXT := kind-$(KIND_CLUSTER)
 # Where the platform itself (kernel + console + their Postgres) is
 # installed. Deliberately not `default` -- that's the admins' own team
 # namespace, and tasks can never be dispatched into this one (see
 # helm/charts/execution-kernel/templates/dispatch-policy.yaml).
-PLATFORM_NAMESPACE ?= vertra-system
+PLATFORM_NAMESPACE ?= vennir-system
 KUBECTL := kubectl --context $(KIND_CONTEXT)
 # One definition, so `up`'s pgrep and `down`'s pkill always match the exact
 # command line that was started -- port included, so a forward someone
@@ -56,7 +56,7 @@ KIND_NODE ?= $(KIND_CLUSTER)-control-plane
 # at `kind create cluster` (make kind-cluster has the from-scratch
 # version); containerd is restarted only if its config actually changed,
 # and running Pods survive a containerd restart.
-# The registry's image, by digest (vertra's cluster.RegistryImage, the same).
+# The registry's image, by digest (vennir's cluster.RegistryImage, the same).
 KIND_REGISTRY_IMAGE := registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 kind-registry:
 	@if [ "$$($(DOCKER) inspect -f '{{.State.Running}}' $(KIND_REGISTRY_NAME) 2>/dev/null)" != "true" ]; then \
@@ -74,18 +74,18 @@ kind-registry:
 	@echo "Local registry ready: push to $(KIND_REGISTRY)/<image>, reference it the same way in DAGs."
 
 # ---------------------------------------------------------------------------
-# `make quickstart`: from nothing to a running Vertra on a local kind
+# `make quickstart`: from nothing to a running Vennir on a local kind
 # cluster, with the README's example ready to submit. Safe to run again: it
 # creates only what's missing, and on an existing cluster rebuilds the
 # images from this checkout and restarts the platform onto them.
-# A stopgap until the vertra CLI's installer exists.
+# A stopgap until the vennir CLI's installer exists.
 # ---------------------------------------------------------------------------
 # The team the README's example runs in.
 QUICKSTART_TEAM ?= team-a
 CONSOLE_URL := http://localhost:18080
 ADMIN_EMAIL := admin@example.com
 # Set only for local kind clusters, in helm/values/kind/console.yaml.
-ADMIN_PASSWORD := vertra-local
+ADMIN_PASSWORD := vennir-local
 
 quickstart: _quickstart-prereqs kind-cluster kind-registry kind-namespaces
 	$(DOCKER) build -t execution-kernel:latest kernel/
@@ -121,15 +121,15 @@ quickstart: _quickstart-prereqs kind-cluster kind-registry kind-namespaces
 	@pkill -f "$(PORT_FORWARD_MATCH)" 2>/dev/null || true
 	@$(MAKE) --no-print-directory up
 	@echo "Creating the console team $(QUICKSTART_TEAM)..."
-	@token=$$(curl -sf -X POST $(CONSOLE_URL)/api/vertra.console.v1.AuthService/Login -H 'Content-Type: application/json' \
+	@token=$$(curl -sf -X POST $(CONSOLE_URL)/api/vennir.console.v1.AuthService/Login -H 'Content-Type: application/json' \
 		-d '{"email":"$(ADMIN_EMAIL)","password":"$(ADMIN_PASSWORD)"}' | sed -n 's/.*"token":"\([^"]*\)".*/\1/p'); \
 	if [ -z "$$token" ]; then echo "Couldn't sign in to the console to create $(QUICKSTART_TEAM); create it on the Admin page."; exit 1; fi; \
-	answer=$$(curl -s -X POST $(CONSOLE_URL)/api/vertra.console.v1.TeamService/EnsureTeam \
+	answer=$$(curl -s -X POST $(CONSOLE_URL)/api/vennir.console.v1.TeamService/EnsureTeam \
 		-H "Authorization: Bearer $$token" -H 'Content-Type: application/json' -d '{"name":"$(QUICKSTART_TEAM)"}'); \
 	case "$$answer" in *'"created":true'*) echo "  created";; *'"created":false'*) echo "  already exists";; \
 		*) echo "  failed ($$answer); create it on the Admin page"; exit 1;; esac
 	@echo ""
-	@echo "Vertra is running."
+	@echo "Vennir is running."
 	@echo "  Console:  $(CONSOLE_URL)   (sign in as $(ADMIN_EMAIL) / $(ADMIN_PASSWORD), local only)"
 	@echo "  Try it:   Executions -> Submit new, and paste the example from README.md"
 	@echo "  Watch:    make logs        Stop: make down        Start again: make up"
@@ -178,7 +178,7 @@ kind-namespaces:
 	@for ns in $(PLATFORM_NAMESPACE) $(QUICKSTART_TEAM) execution-kernel; do \
 		$(KUBECTL) create namespace $$ns --dry-run=client -o yaml | $(KUBECTL) apply -f - > /dev/null; \
 	done
-	@$(KUBECTL) label namespace default $(QUICKSTART_TEAM) vertra/team=true --overwrite > /dev/null
+	@$(KUBECTL) label namespace default $(QUICKSTART_TEAM) vennir/team=true --overwrite > /dev/null
 	@echo "Namespaces ready: $(PLATFORM_NAMESPACE) (platform), $(QUICKSTART_TEAM) and default (teams), execution-kernel (tests)."
 
 # Fake product images used by the local demo DAGs, pushed to the local
@@ -197,7 +197,7 @@ console-docs:
 
 # The backend of the local sample's API product (samples/local/apis/greetings),
 # run in the local team's namespace as the team itself would run it: the
-# gateway reaches it through the console's vertra-gateway-ingress policy.
+# gateway reaches it through the console's vennir-gateway-ingress policy.
 # Publish the local sample first (make catalog-publish), so the namespace
 # and the API exist.
 kind-sample-api: kind-registry
@@ -208,7 +208,7 @@ kind-sample-api: kind-registry
 	$(KUBECTL) -n local rollout status deployment greetings --timeout=2m
 
 # Local mode: publish a catalog repository's products to kind without any Git
-# hosting or CI, with ./vertra (built from this checkout), the tool its CI runs:
+# hosting or CI, with ./vennir (built from this checkout), the tool its CI runs:
 # each product is validated, built, tested and scanned and pushed to the
 # local registry, then the catalog's release is, and the console is asked to
 # apply it now rather than at its next look (every team folder becomes a team
@@ -224,20 +224,20 @@ SAMPLES ?= local
 CATALOG_REGISTRY ?= $(KIND_REGISTRY)
 PRODUCTS ?=
 catalog-publish: kind-registry
-	@if [ -n "$(CATALOG)" ]; then test -x "$(CATALOG)/vertra" || { echo "No catalog at $(CATALOG)."; exit 1; }; fi
-	@# This checkout's vertra.
-	@VERTRA_BIN=$$(bash .github/scripts/build-vertra.sh) || exit 1; \
-	export VERTRA_BIN VERTRA_REGISTRY=$(CATALOG_REGISTRY); \
+	@if [ -n "$(CATALOG)" ]; then test -x "$(CATALOG)/vennir" || { echo "No catalog at $(CATALOG)."; exit 1; }; fi
+	@# This checkout's vennir.
+	@VENNIR_BIN=$$(bash .github/scripts/build-vennir.sh) || exit 1; \
+	export VENNIR_BIN VENNIR_REGISTRY=$(CATALOG_REGISTRY); \
 	if [ -z "$(CATALOG)" ]; then \
 		SAMPLES="$(SAMPLES)" bash .github/scripts/catalog-template.sh publish $(PRODUCTS) -- release; \
 	else \
-		(cd $(CATALOG) && ./vertra catalog publish $(PRODUCTS) && ./vertra catalog release); \
+		(cd $(CATALOG) && ./vennir catalog publish $(PRODUCTS) && ./vennir catalog release); \
 	fi || exit 1; \
 	token=$$(jq -nc --arg email "$(ADMIN_EMAIL)" --arg password "$(ADMIN_PASSWORD)" '{email: $$email, password: $$password}' \
-		| curl -sf -X POST -H 'Content-Type: application/json' -d @- $(CONSOLE_URL)/api/vertra.console.v1.AuthService/Login | jq -r '.token // empty'); \
+		| curl -sf -X POST -H 'Content-Type: application/json' -d @- $(CONSOLE_URL)/api/vennir.console.v1.AuthService/Login | jq -r '.token // empty'); \
 	[ -n "$$token" ] || { echo "Released; couldn't sign in to $(CONSOLE_URL) to sync now (make up?): the console applies it within a minute."; exit 0; }; \
 	curl -sf -X POST -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' -d '{}' \
-		$(CONSOLE_URL)/api/vertra.console.v1.AdminService/SyncCatalog \
+		$(CONSOLE_URL)/api/vennir.console.v1.AdminService/SyncCatalog \
 		| jq -r '.status | "Applied \(.commit // "-"): \((.problems // []) | length) problem(s)", ((.problems // [])[] | "  \(.item): \(.message)"), (.error // empty)'
 
 # Rebuild the platform from this checkout and deploy it to kind, with the
@@ -273,10 +273,10 @@ GATEWAY_API_VERSION := v1.6.3
 GATEWAY_API_SHA256 := 356c2b8e286a964dc20995435659ad1095386329974793af10bbfe3eff977fe5
 kind-tls:
 	@# Gateway API's resource definitions, which Traefik needs first: checked before applying.
-	curl -sSfL -o /tmp/vertra-gateway-api.yaml \
+	curl -sSfL -o /tmp/vennir-gateway-api.yaml \
 		https://github.com/kubernetes-sigs/gateway-api/releases/download/$(GATEWAY_API_VERSION)/standard-install.yaml
-	echo "$(GATEWAY_API_SHA256)  /tmp/vertra-gateway-api.yaml" | shasum -a 256 -c -
-	$(KUBECTL) apply --server-side -f /tmp/vertra-gateway-api.yaml
+	echo "$(GATEWAY_API_SHA256)  /tmp/vennir-gateway-api.yaml" | shasum -a 256 -c -
+	$(KUBECTL) apply --server-side -f /tmp/vennir-gateway-api.yaml
 	helm repo add jetstack https://charts.jetstack.io --force-update > /dev/null
 	helm repo add traefik https://traefik.github.io/charts --force-update > /dev/null
 	helm upgrade --install cert-manager jetstack/cert-manager --version $(CERT_MANAGER_VERSION) \
@@ -284,7 +284,7 @@ kind-tls:
 	helm upgrade --install traefik traefik/traefik --version $(TRAEFIK_CHART_VERSION) \
 		--kube-context $(KIND_CONTEXT) -n traefik --create-namespace --wait --timeout 10m -f helm/values/kind/traefik.yaml
 	$(KUBECTL) apply -f helm/values/kind/tls-test.yaml
-	$(KUBECTL) -n cert-manager wait --for=condition=Ready certificate/vertra-test-ca --timeout=2m
+	$(KUBECTL) -n cert-manager wait --for=condition=Ready certificate/vennir-test-ca --timeout=2m
 
 # Optional: a write-once store for the console's audit copy on kind
 # (SeaweedFS, S3 with Object Lock). Then deploy the console with audit.export
@@ -292,10 +292,10 @@ kind-tls:
 kind-audit-store:
 	@# Rerunnable: the bucket's Job is immutable, and the store's data is an
 	@# emptyDir, so the bucket is made again whenever the store restarts.
-	$(KUBECTL) -n vertra-audit-store delete job audit-bucket --ignore-not-found
+	$(KUBECTL) -n vennir-audit-store delete job audit-bucket --ignore-not-found
 	$(KUBECTL) apply -f helm/values/kind/audit-store.yaml
-	$(KUBECTL) -n vertra-audit-store rollout status deployment seaweedfs --timeout=5m
-	$(KUBECTL) -n vertra-audit-store wait --for=condition=complete job/audit-bucket --timeout=5m
+	$(KUBECTL) -n vennir-audit-store rollout status deployment seaweedfs --timeout=5m
+	$(KUBECTL) -n vennir-audit-store wait --for=condition=complete job/audit-bucket --timeout=5m
 
 kind-deploy-console:
 	$(DOCKER) build -t execution-console:latest console/
@@ -331,7 +331,7 @@ kind-deploy-eso:
 # stopped the node -- their Deployment/Job recreates them fresh once
 # deleted; needed after every real recovery seen so far, not a one-off.
 # Then starts the kubectl port-forward in the background (log:
-# /tmp/vertra-port-forward.log) so `make up` leaves execution-console
+# /tmp/vennir-port-forward.log) so `make up` leaves execution-console
 # actually reachable rather than just printing a reminder -- `make down`
 # kills it by matching this same command line via pkill.
 up:
@@ -361,7 +361,7 @@ up:
 	while ! curl -sf http://localhost:18080/health/ready > /dev/null 2>&1; do \
 		if ! pgrep -f "$(PORT_FORWARD_MATCH)" > /dev/null 2>&1; then \
 			nohup $(subst port-forward,port-"forward",$(PORT_FORWARD)) \
-				> /tmp/vertra-port-forward.log 2>&1 & \
+				> /tmp/vennir-port-forward.log 2>&1 & \
 		fi; \
 		i=$$((i + 1)); \
 		if [ $$((i % 5)) -eq 0 ]; then \
@@ -370,7 +370,7 @@ up:
 		fi; \
 		if [ "$$i" -gt 60 ]; then \
 			echo "Timed out after 2 minutes waiting for execution-console to become reachable."; \
-			echo "Check /tmp/vertra-port-forward.log."; \
+			echo "Check /tmp/vennir-port-forward.log."; \
 			exit 1; \
 		fi; \
 		sleep 2; \
@@ -459,10 +459,10 @@ proto:
 	$(BUF) generate --template buf.gen.frontend.yaml
 	@# The API reference page's data, comments included (console/scripts/api-reference.ts):
 	@# the console's API only; kernel-api's is internal.
-	$(BUF) build --path proto/vertra/console -o console/.api-image.binpb
+	$(BUF) build --path proto/vennir/console -o console/.api-image.binpb
 	cd console && npx tsx scripts/api-reference.ts .api-image.binpb > frontend/src/gen/api-reference.json; \
 		status=$$?; rm -f .api-image.binpb; exit $$status
-	$(DOCKER) run --rm -v "$(CURDIR)":/repo -v vertra-gocache:/root/.cache -v vertra-gomod:/go/pkg/mod \
+	$(DOCKER) run --rm -v "$(CURDIR)":/repo -v vennir-gocache:/root/.cache -v vennir-gomod:/go/pkg/mod \
 		-w /repo/cli $(GO_IMAGE) sh -c 'go build -o /tmp/plugins/ \
 			google.golang.org/protobuf/cmd/protoc-gen-go connectrpc.com/connect/cmd/protoc-gen-connect-go \
 		&& cd /repo && PATH=/tmp/plugins:$$PATH go run github.com/bufbuild/buf/cmd/buf@v$(BUF_VERSION) \
@@ -471,7 +471,7 @@ proto:
 			generate --template buf.gen.kernel.yaml'
 
 # ---------------------------------------------------------------------------
-TEST_DB_CONTAINER ?= vertra-test-db
+TEST_DB_CONTAINER ?= vennir-test-db
 TEST_DB_PORT ?= 55432
 TEST_DB_IMAGE ?= postgres:16.15@sha256:1beaa3084eee2676f20a9cd9928f0bf2c5bf674f8e49f81017912183d377c61c
 TEST_DB_HOST := postgres@127.0.0.1:$(TEST_DB_PORT)
@@ -501,16 +501,16 @@ test-db:
 		|| $(DOCKER) exec $(TEST_DB_CONTAINER) createdb -U postgres $$db; \
 	done
 	$(DOCKER) run --rm --network host -e DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(KERNEL_TEST_DB) \
-		-v "$(CURDIR)/kernel":/src -v vertra-gomod:/go/pkg/mod -w /src $(GO_IMAGE) go run ./cmd/kernel migrate
+		-v "$(CURDIR)/kernel":/src -v vennir-gomod:/go/pkg/mod -w /src $(GO_IMAGE) go run ./cmd/kernel migrate
 	cd console && DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(CONSOLE_TEST_DB) \
 		JWT_SECRET=unused-by-migrations-but-32-bytes-long KERNEL_API_URL=http://unused npm run --silent db:migrate
 
 test: test-db
 	$(DOCKER) run --rm --network host -e TEST_DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(KERNEL_TEST_DB) \
-		-v "$(CURDIR)":/src -v vertra-gomod:/go/pkg/mod -w /src/kernel $(GO_IMAGE) go test ./...
+		-v "$(CURDIR)":/src -v vennir-gomod:/go/pkg/mod -w /src/kernel $(GO_IMAGE) go test ./...
 	@# The gateway's tests read the console's test database, as in CI.
 	$(DOCKER) run --rm --network host -e TEST_DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(CONSOLE_TEST_DB) \
-		-v "$(CURDIR)":/src -v vertra-gomod:/go/pkg/mod -w /src/gateway $(GO_IMAGE) go test ./...
+		-v "$(CURDIR)":/src -v vennir-gomod:/go/pkg/mod -w /src/gateway $(GO_IMAGE) go test ./...
 	cd console && TEST_DATABASE_URL=postgresql://$(TEST_DB_HOST)/$(CONSOLE_TEST_DB) npm test
 	cd console/frontend && npm test
 
@@ -539,11 +539,11 @@ test-db-down:
 # repo is exactly what's deployed, nothing lingers from an earlier --set.
 # ---------------------------------------------------------------------------
 GKE_PROJECT ?= my-gcp-project
-GKE_CLUSTER ?= vertra-gke
+GKE_CLUSTER ?= vennir-gke
 GKE_CONTEXT ?= gke_$(GKE_PROJECT)_us-central1_$(GKE_CLUSTER)
 GKE_REGISTRY ?= us-central1-docker.pkg.dev/$(GKE_PROJECT)/platform-images
 # Still `default` on GKE until the platform is moved to its own namespace
-# there (it's vertra-system on kind).
+# there (it's vennir-system on kind).
 GKE_NAMESPACE ?= default
 GKE_KUBECTL := kubectl --context $(GKE_CONTEXT) -n $(GKE_NAMESPACE)
 # --force-conflicts: see KIND_HELM_UPGRADE.
@@ -572,7 +572,7 @@ _gke-confirm:
 # each signature checked against the release workflow's identity at exactly
 # that tag before anything is deployed.
 # make gke-deploy VERSION=v0.2.3
-RELEASE_REGISTRY ?= ghcr.io/rburns629/vertra
+RELEASE_REGISTRY ?= ghcr.io/rburns629/vennir
 RELEASE_IDENTITY = https://github.com/$(subst ghcr.io/,,$(RELEASE_REGISTRY))/.github/workflows/release.yml@refs/tags/$(VERSION)
 # The cosign the release signs with (install-scanners.sh's COSIGN_VERSION):
 # v3 stores signatures as OCI referrers, which v2 can't find.

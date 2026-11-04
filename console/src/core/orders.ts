@@ -2,8 +2,8 @@
 /**
  * The order builder (decision 23): OrderService/PreviewOrder. A cart of
  * actions becomes one run's steps, each input wired by its wiring type: an
- * input's x-vertra-needs to the one output in the cart whose
- * x-vertra-provides is the same type (the catalog's wiring_types).
+ * input's x-vennir-needs to the one output in the cart whose
+ * x-vennir-provides is the same type (the catalog's wiring_types).
  *
  *   - Nothing in the cart provides a required input's type: what the team
  *     (or the caller) already has of it is offered, none chosen
@@ -99,13 +99,13 @@ export interface OrderProblem {
 interface Field {
   name: string;
   required: boolean;
-  /** x-vertra-needs on an input, x-vertra-provides on an output. */
+  /** x-vennir-needs on an input, x-vennir-provides on an output. */
   wiring: string | null;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-function fields(schema: unknown, hint: "x-vertra-needs" | "x-vertra-provides"): Field[] {
+function fields(schema: unknown, hint: "x-vennir-needs" | "x-vennir-provides"): Field[] {
   const s = isRecord(schema) ? schema : {};
   const properties = isRecord(s["properties"]) ? s["properties"] : {};
   const required = Array.isArray(s["required"]) ? s["required"] : [];
@@ -152,7 +152,7 @@ export function planOrder(
   const problems: OrderProblem[] = [];
   const suggestions: OrderSuggestion[] = [];
 
-  const provides = (product: TeamProduct, type: string) => fields(product.outputSchema, "x-vertra-provides").some((o) => o.wiring === type);
+  const provides = (product: TeamProduct, type: string) => fields(product.outputSchema, "x-vennir-provides").some((o) => o.wiring === type);
   const provided = (type: string) => planned.some((s) => provides(s.product, type));
   const existingOf = (type: string) => existing.filter((r) => r.wiringType === type);
   const choiceFor = (step: string, input: string) => choices.find((c) => c.step === step && c.input === input);
@@ -161,7 +161,7 @@ export function planOrder(
   const added = new Set<string>();
   // A for...of over an array visits what's pushed onto it while it runs.
   for (const step of planned) {
-    for (const input of fields(step.product.inputSchema, "x-vertra-needs")) {
+    for (const input of fields(step.product.inputSchema, "x-vennir-needs")) {
       if (!input.required || !input.wiring || provided(input.wiring) || provides(step.product, input.wiring)) continue;
       const type = typeOf.get(input.wiring);
       if (!type || type.shared || !type.defaultProvider || added.has(type.defaultProvider)) continue;
@@ -177,13 +177,13 @@ export function planOrder(
 
   const steps: OrderStep[] = planned.map((s) => {
     const inputs: Record<string, OrderInput> = {};
-    for (const input of fields(s.product.inputSchema, "x-vertra-needs")) {
+    for (const input of fields(s.product.inputSchema, "x-vennir-needs")) {
       inputs[input.name] = { kind: "unset" };
       if (!input.wiring) continue;
       const options: OrderChoice[] = planned
         .filter((other) => other.id !== s.id)
         .flatMap((other) =>
-          fields(other.product.outputSchema, "x-vertra-provides")
+          fields(other.product.outputSchema, "x-vennir-provides")
             .filter((o) => o.wiring === input.wiring)
             .map((o) => ({ step: s.id, input: input.name, fromStep: other.id, fromOutput: o.name })),
         );

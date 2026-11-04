@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// checkout makes a directory that passes for a Vertra checkout.
+// checkout makes a directory that passes for a Vennir checkout.
 func checkout(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -36,7 +36,7 @@ func TestDefaultsAreValid(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := Default("existing")
-	c.Vertra = "0.1.0"
+	c.Vennir = "0.1.0"
 	c.Cluster.Context = "my-cluster"
 	c.TaskImages.Registry = "us-docker.pkg.dev/p/catalog"
 	c.Admin.Email = "admin@example.com"
@@ -48,7 +48,7 @@ func TestDefaultsAreValid(t *testing.T) {
 func TestValidateReportsEveryProblem(t *testing.T) {
 	c := validKind(t)
 	c.Target = "azure"
-	c.Vertra = "latest"
+	c.Vennir = "latest"
 	c.Size = "huge"
 	c.Namespace = "Not_A_Namespace"
 	c.Admin.Email = "nobody"
@@ -56,7 +56,7 @@ func TestValidateReportsEveryProblem(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected problems")
 	}
-	for _, want := range []string{"target: azure isn't supported", `vertra: "latest"`, `size: "huge"`, "namespace:", "admin.email:"} {
+	for _, want := range []string{"target: azure isn't supported", `vennir: "latest"`, `size: "huge"`, "namespace:", "admin.email:"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("missing %q in:\n%v", want, err)
 		}
@@ -86,15 +86,15 @@ func TestValidateSigning(t *testing.T) {
 
 func TestValidateCatalogSignature(t *testing.T) {
 	c := validKind(t)
-	c.CatalogSignature.Repository = "my-org/vertra-catalog"
+	c.CatalogSignature.Repository = "my-org/vennir-catalog"
 	if err := c.Validate(); err != nil {
 		t.Errorf("owner/name: %v", err)
 	}
-	c.CatalogSignature.Repository = "https://github.com/my-org/vertra-catalog"
+	c.CatalogSignature.Repository = "https://github.com/my-org/vennir-catalog"
 	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "isn't owner/name") {
 		t.Errorf("a URL: %v", err)
 	}
-	c.CatalogSignature.Repository = "my-org/vertra-catalog"
+	c.CatalogSignature.Repository = "my-org/vennir-catalog"
 	c.Signing = "keyless"
 	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "this install signs its own") {
 		t.Errorf("signing too: %v", err)
@@ -170,7 +170,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, FileName))
-	if !strings.HasPrefix(string(data), "# A Vertra install's settings") {
+	if !strings.HasPrefix(string(data), "# A Vennir install's settings") {
 		t.Errorf("no header:\n%s", data)
 	}
 	got, err := Load(dir)
@@ -302,7 +302,7 @@ func TestAWS(t *testing.T) {
 	c := Default("aws")
 	c.Source = checkout(t)
 	c.Admin.Email = "admin@example.com"
-	c.AWS = AWS{Profile: "vertra", Region: "us-east-1"}
+	c.AWS = AWS{Profile: "vennir", Region: "us-east-1"}
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -322,10 +322,10 @@ func TestExternalCatalog(t *testing.T) {
 	c := Default("aws")
 	c.Source = checkout(t)
 	c.Admin.Email = "admin@example.com"
-	c.AWS = AWS{Profile: "vertra", Region: "us-east-1"}
+	c.AWS = AWS{Profile: "vennir", Region: "us-east-1"}
 	c.ExternalCatalog = ExternalCatalog{
-		Registry:                    "us-central1-docker.pkg.dev/acyclix-dev/vertra-products",
-		GCPWorkloadIdentityProvider: "projects/123/locations/global/workloadIdentityPools/vertra-installs/providers/vertra-eks",
+		Registry:                    "us-central1-docker.pkg.dev/acyclix-dev/vennir-products",
+		GCPWorkloadIdentityProvider: "projects/123/locations/global/workloadIdentityPools/vennir-installs/providers/vennir-eks",
 	}
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
@@ -340,15 +340,15 @@ func TestExternalCatalog(t *testing.T) {
 	}
 	c.Catalog = Catalog{}
 	c.ExternalCatalog = ExternalCatalog{Registry: "123456789012.dkr.ecr.us-east-1.amazonaws.com/p",
-		GCPWorkloadIdentityProvider: "projects/123/locations/global/workloadIdentityPools/vertra-installs/providers/vertra-eks"}
+		GCPWorkloadIdentityProvider: "projects/123/locations/global/workloadIdentityPools/vennir-installs/providers/vennir-eks"}
 	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "only for an Artifact Registry") {
 		t.Errorf("an ECR registry with a Google provider: %v", err)
 	}
 
 	// Another account's ECR, or one read from another cloud: the owner's role.
 	c.Target, c.GCP = "gcp", GCP{Project: "reader-project", Region: "us-central1"}
-	c.ExternalCatalog = ExternalCatalog{Registry: "123456789012.dkr.ecr.us-east-1.amazonaws.com/vertra-products",
-		AWSRoleArn: "arn:aws:iam::123456789012:role/vertra-reader-gke"}
+	c.ExternalCatalog = ExternalCatalog{Registry: "123456789012.dkr.ecr.us-east-1.amazonaws.com/vennir-products",
+		AWSRoleArn: "arn:aws:iam::123456789012:role/vennir-reader-gke"}
 	if err := c.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -356,30 +356,30 @@ func TestExternalCatalog(t *testing.T) {
 		t.Error("a role is federation")
 	}
 	for role, want := range map[string]string{
-		"arn:aws:iam::210987654321:role/vertra-reader-gke": "it must be the registry owner's",
-		"vertra-reader-gke": "isn't arn:aws:iam::",
+		"arn:aws:iam::210987654321:role/vennir-reader-gke": "it must be the registry owner's",
+		"vennir-reader-gke": "isn't arn:aws:iam::",
 	} {
 		c.ExternalCatalog.AWSRoleArn = role
 		if err := c.Validate(); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: %v, want %q", role, err, want)
 		}
 	}
-	c.ExternalCatalog = ExternalCatalog{Registry: "us-central1-docker.pkg.dev/acyclix-dev/vertra-products",
-		AWSRoleArn: "arn:aws:iam::123456789012:role/vertra-reader-gke"}
+	c.ExternalCatalog = ExternalCatalog{Registry: "us-central1-docker.pkg.dev/acyclix-dev/vennir-products",
+		AWSRoleArn: "arn:aws:iam::123456789012:role/vennir-reader-gke"}
 	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "only for an Amazon ECR registry") {
 		t.Errorf("an Artifact Registry with a role: %v", err)
 	}
-	c.ExternalCatalog = ExternalCatalog{Registry: "123456789012.dkr.ecr.us-east-1.amazonaws.com/vertra-products",
-		AWSRoleArn:                  "arn:aws:iam::123456789012:role/vertra-reader-gke",
-		GCPWorkloadIdentityProvider: "projects/123/locations/global/workloadIdentityPools/vertra-installs/providers/vertra-eks"}
+	c.ExternalCatalog = ExternalCatalog{Registry: "123456789012.dkr.ecr.us-east-1.amazonaws.com/vennir-products",
+		AWSRoleArn:                  "arn:aws:iam::123456789012:role/vennir-reader-gke",
+		GCPWorkloadIdentityProvider: "projects/123/locations/global/workloadIdentityPools/vennir-installs/providers/vennir-eks"}
 	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "not both") {
 		t.Errorf("both: %v", err)
 	}
 }
 
 func TestECRRegistry(t *testing.T) {
-	account, region, prefix := ECRRegistry("123456789012.dkr.ecr.eu-west-2.amazonaws.com/vertra-products")
-	if account != "123456789012" || region != "eu-west-2" || prefix != "vertra-products" {
+	account, region, prefix := ECRRegistry("123456789012.dkr.ecr.eu-west-2.amazonaws.com/vennir-products")
+	if account != "123456789012" || region != "eu-west-2" || prefix != "vennir-products" {
 		t.Errorf("got %q %q %q", account, region, prefix)
 	}
 	if account, _, _ := ECRRegistry("us-central1-docker.pkg.dev/p/r"); account != "" {

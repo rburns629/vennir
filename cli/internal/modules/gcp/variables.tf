@@ -42,7 +42,7 @@ variable "size" {
 variable "namespace" {
   description = "The platform's Kubernetes namespace: its ServiceAccounts get the cloud identities."
   type        = string
-  default     = "vertra-system"
+  default     = "vennir-system"
 }
 
 variable "step_headroom" {
@@ -54,7 +54,7 @@ variable "step_headroom" {
 variable "task_registry" {
   description = "The Artifact Registry repository steps' images come from: created unless it already exists (create_task_registry = false)."
   type        = string
-  default     = "vertra-products"
+  default     = "vennir-products"
 }
 
 variable "create_task_registry" {
@@ -128,7 +128,7 @@ variable "audit_lock" {
 }
 
 variable "delete_data" {
-  description = "Let destroy delete the backup and logs buckets even when they hold data (vertra destroy asks first)."
+  description = "Let destroy delete the backup and logs buckets even when they hold data (vennir destroy asks first)."
   type        = bool
   default     = false
 }

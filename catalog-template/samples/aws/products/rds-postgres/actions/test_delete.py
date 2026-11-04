@@ -14,7 +14,7 @@ from botocore.exceptions import ClientError
 
 _MODULE_PATH = Path(__file__).parent / "delete.py"
 ARN = "arn:aws:rds:us-east-2:123456789012:db:orders-db"
-MADE = [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]
+MADE = [{"Key": "vennir-made", "Value": "true"}, {"Key": "vennir-team", "Value": "web"}]
 
 
 def _load():
@@ -68,9 +68,9 @@ class DeleteActionTest(unittest.TestCase):
 
     def test_one_made_some_other_way_is_refused(self) -> None:
         code, result, rds, _ = self._run(
-            {"type": "aws/rds-instance", "id": ARN}, {"DBInstanceStatus": "available", "TagList": [{"Key": "managed-by", "Value": "vertra"}]}
+            {"type": "aws/rds-instance", "id": ARN}, {"DBInstanceStatus": "available", "TagList": [{"Key": "managed-by", "Value": "vennir"}]}
         )
-        self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VERTRA"))
+        self.assertEqual((code, result["error"]["code"]), (1, "NOT_MADE_BY_VENNIR"))
         rds.delete_db_instance.assert_not_called()
 
     def test_one_made_for_another_team_is_refused(self) -> None:

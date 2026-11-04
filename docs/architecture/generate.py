@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Writes docs/architecture/vertra.drawio, and an SVG of each page.
+"""Writes docs/architecture/vennir.drawio, and an SVG of each page.
 
 Run from anywhere: python3 docs/architecture/generate.py
 
@@ -35,7 +35,7 @@ from xml.sax.saxutils import quoteattr
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-DRAWIO_FILE = HERE / "vertra.drawio"
+DRAWIO_FILE = HERE / "vennir.drawio"
 DRAWIO_CLI = [
     "/Applications/draw.io.app/Contents/MacOS/draw.io",
     shutil.which("drawio") or "",
@@ -294,7 +294,7 @@ def draw_packages(page: Page, title: str, subtitle: str, packages: list[Package]
 # ---------------------------------------------------------- kernel (Go)
 
 KERNEL = ROOT / "kernel"
-GO_MODULE = "github.com/rburns629/vertra/kernel/"
+GO_MODULE = "github.com/rburns629/vennir/kernel/"
 KERNEL_LAYERS = [
     ("domain", "internal/domain/  (rules, no I/O)", GREEN),
     ("config", "internal/config/  (settings, checked at startup)", GREY),
@@ -522,17 +522,17 @@ def console_packages() -> tuple[list[Package], set[tuple[str, str]]]:
 
 def system_page() -> Page:
     p = Page("1 · System")
-    p.vertex(20, 10, 1200, 30, "Vertra on GKE: what runs where", TITLE)
+    p.vertex(20, 10, 1200, 30, "Vennir on GKE: what runs where", TITLE)
     p.vertex(
         20, 40, 1500, 24,
-        "As deployed on vertra-gke. On kind the same pieces run in vertra-system, without GCP, image signing or ESO's cloud stores.",
+        "As deployed on vennir-gke. On kind the same pieces run in vennir-system, without GCP, image signing or ESO's cloud stores.",
         SUBTITLE,
     )
     actor = "shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;outlineConnect=0;" + FONT
     engineer = p.vertex(50, 170, 30, 60, "Platform engineer\n(browser)", actor)
     pipeline = p.vertex(50, 370, 30, 60, "Team pipeline\n(bot token)", actor)
 
-    p.vertex(20, 560, 290, 560, "GitHub · vertra-catalog", frame(GREY, dashed=False))
+    p.vertex(20, 560, 290, 560, "GitHub · vennir-catalog", frame(GREY, dashed=False))
     workflows = {}
     for i, (name, what) in enumerate(
         [
@@ -545,10 +545,10 @@ def system_page() -> Page:
         workflows[name] = p.titled(35, 600 + i * 84, 260, 70, name, what, GREY)
 
     p.vertex(340, 80, 1600, 1180, "GCP project · my-gcp-project", frame(BLUE, dashed=False))
-    p.vertex(360, 120, 1150, 1120, "GKE Autopilot · vertra-gke (us-central1)", frame(BLUE))
+    p.vertex(360, 120, 1150, 1120, "GKE Autopilot · vennir-gke (us-central1)", frame(BLUE))
     lb = p.titled(380, 230, 150, 80, "Service console", "LoadBalancer, public IP\nplain HTTP :80", BLUE)
 
-    p.vertex(560, 160, 500, 630, "namespace default  (the platform; vertra-system on kind)", frame(ORANGE))
+    p.vertex(560, 160, 500, 630, "namespace default  (the platform; vennir-system on kind)", frame(ORANGE))
     console = p.titled(590, 210, 200, 90, "execution-console", "Fastify /api + React SPA\nconsole/", ORANGE)
     console_db = p.vertex(610, 360, 160, 90, "Postgres\nexecution_console", database(YELLOW))
     kernel_api = p.titled(830, 210, 200, 90, "kernel-api", "Go, Connect, ClusterIP only\naccepts only the console's token", ORANGE)
@@ -556,11 +556,11 @@ def system_page() -> Page:
     scheduler = p.titled(830, 500, 200, 90, "kernel-scheduler", "poll, then claim → dispatch\nevery second", ORANGE)
     p.titled(590, 500, 200, 90, "pg-backup CronJobs", "daily pg_dump of both\ndatabases → Cloud Storage", GREY)
     gateway = p.titled(
-        590, 640, 200, 90, "execution-gateway", "API products: forwards what an\nAPI's OpenAPI document allows\noff on vertra-gke (gateway.enabled)",
+        590, 640, 200, 90, "execution-gateway", "API products: forwards what an\nAPI's OpenAPI document allows\noff on vennir-gke (gateway.enabled)",
         ORANGE, dashed=True,
     )
 
-    p.vertex(1090, 160, 400, 630, "namespace <team>  (label vertra/team=true)", frame(GREEN))
+    p.vertex(1090, 160, 400, 630, "namespace <team>  (label vennir/team=true)", frame(GREEN))
     config_map = p.titled(1110, 200, 170, 80, "ConfigMap ek-…", "request.json\n→ /platform/input", GREEN)
     service_account = p.titled(1300, 200, 170, 80, "ServiceAccount", "one per product", GREEN)
     job = p.titled(
@@ -575,7 +575,7 @@ def system_page() -> Page:
     api_server = p.titled(380, 830, 1110, 60, "Kubernetes API server", "every write below passes the admission policies", BLUE)
     for i, (name, what) in enumerate(
         [
-            ("dispatch-policy", "scheduler may create Jobs only\nin vertra/team=true namespaces"),
+            ("dispatch-policy", "scheduler may create Jobs only\nin vennir/team=true namespaces"),
             ("image-policy", "task images only from allowed\nsources (the Admin page edits it)"),
             ("identity-policy", "a step runs as its product's\nServiceAccount, or default"),
             ("image-signature", "GKE: catalog images must be\nsigned (ClusterImagePolicy)"),
@@ -626,7 +626,7 @@ def system_page() -> Page:
         points=[(690, 145), (1580, 145), (1580, 320)],
     )
     p.edge(
-        gateway, console_db, "reads, as\nvertra_gateway", EDGE + ends(0, 0.5, 0, 0.5),
+        gateway, console_db, "reads, as\nvennir_gateway", EDGE + ends(0, 0.5, 0, 0.5),
         points=[(575, 685), (575, 405)], label_offset=(10, 70),
     )
     p.edge(gateway, backend, "forwards checked\nrequests", EDGE + ends(1, 0.5, 0, 0.5) + "dashed=1;", label_offset=(-90, 0))
@@ -657,7 +657,7 @@ def system_page() -> Page:
             "whose admission policies can refuse them (DISPATCH_REJECTED, IMAGE_NOT_ALLOWED, IMAGE_NOT_SIGNED, IDENTITY_NOT_ALLOWED). ⑤ The Pod "
             "runs as its product's ServiceAccount with the team Secrets its step lists and writes result.json; the scheduler reads it, stores outputs and logs, "
             "releases the tasks that waited on it, and once that's committed deletes the Job. kernel-api and kernel-scheduler never call each other: "
-            "Postgres rows are their only channel. Where the gateway is on (the kind values; not vertra-gke, so it's dashed), an API product is called "
+            "Postgres rows are their only channel. Where the gateway is on (the kind values; not vennir-gke, so it's dashed), an API product is called "
             "through execution-gateway instead, which forwards only what its reviewed OpenAPI document describes, to its backend.",
             260,
         ),
@@ -674,12 +674,12 @@ def pieces_page() -> Page:
     p = Page("6 · The pieces")
     p.vertex(0, 0, 300, 150, "Catalog repository · one per organization", frame(GREY, dashed=False))
     p.titled(15, 32, 270, 48, "teams/<team>/products/<product>", "product.yaml · Dockerfile · actions · tests", GREY)
-    ci = p.titled(15, 90, 270, 48, "CI (./vertra)", "build → test → scan → sign → push, then release", GREY)
+    ci = p.titled(15, 90, 270, 48, "CI (./vennir)", "build → test → scan → sign → push, then release", GREY)
     registry = p.vertex(345, 30, 170, 95, "Registry\nproduct images\nsigned catalog-release", database(BLUE))
     people = p.titled(570, 40, 170, 70, "People and bots", "the console, its API,\nteams' pipelines", WHITE)
 
     p.vertex(0, 185, 760, 465, "Kubernetes cluster", frame(BLUE, dashed=False))
-    p.vertex(20, 220, 720, 215, "vertra-system · the platform", frame(ORANGE))
+    p.vertex(20, 220, 720, 215, "vennir-system · the platform", frame(ORANGE))
     scheduler = p.titled(40, 255, 190, 72, "kernel-scheduler", "claims ready steps,\nstarts and watches them", ORANGE)
     kernel_api = p.titled(285, 255, 190, 72, "kernel-api", "validates and stores DAGs;\nanswers only the console", ORANGE)
     console = p.titled(530, 255, 190, 72, "console", "UI + API: signs people in,\nauthorizes every request", ORANGE)
@@ -687,7 +687,7 @@ def pieces_page() -> Page:
     console_db = p.vertex(548, 350, 155, 72, "console\nPostgres", database(YELLOW))
     gateway = p.titled(375, 350, 150, 72, "gateway", "serves API products,\nas their OpenAPI allows", ORANGE)
 
-    p.vertex(20, 455, 420, 180, "Team namespaces · labelled vertra/team=true", frame(GREEN))
+    p.vertex(20, 455, 420, 180, "Team namespaces · labelled vennir/team=true", frame(GREEN))
     job = p.titled(40, 490, 380, 62, "One Job per step attempt", "its product's image · its inputs as a\nConfigMap · the secrets it lists", GREEN)
     backend = p.titled(40, 567, 380, 55, "API backends", "an API product's in-cluster Service", GREEN)
     policies = p.titled(530, 472, 210, 90, "Admission policies", "where steps may run, which\nimages (pinned, scanned,\nsigned), identity and secrets", RED)
@@ -780,7 +780,7 @@ def sequence_page() -> Page:
             f"fillColor=none;dashed=1;strokeColor={color};align=left;verticalAlign=top;spacingLeft=6;fontStyle=1;{FONT}fontSize=11;",
         )
 
-    message(0, 1, "POST /api/vertra.console.v1.ExecutionService/SubmitExecution {dag: {name, requestId?, tasks}}")
+    message(0, 1, "POST /api/vennir.console.v1.ExecutionService/SubmitExecution {dag: {name, requestId?, tasks}}")
     message(1, 1, "resolveCaller: session JWT or bot token → caller {teamNames, isAdmin, scopes} · requireCaller, audit (interceptors)")
     message(
         1, 1,

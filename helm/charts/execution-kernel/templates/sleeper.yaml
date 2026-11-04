@@ -7,7 +7,7 @@ any Deployment runs. It may also patch two CronJobs (its own, and the wake
 one), but only to suspend or resume them and set when they run: the
 admission policy below refuses any other change it makes to a CronJob, such
 as to the Job it runs. The ConfigMap exists whatever scaleDown says, since
-`vertra sleep` uses it too.
+`vennir sleep` uses it too.
 */}}
 {{- $fullname := include "execution-kernel.fullname" . }}
 {{- $state := printf "%s-sleep" $fullname }}

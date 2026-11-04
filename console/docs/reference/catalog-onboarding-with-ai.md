@@ -2,7 +2,7 @@
 
 For a team adding itself, or a new product, to this catalog with the help
 of Claude or another assistant. The procedure itself is this catalog's
-[README](../README.md) and the Vertra console's "Try Vertra end to end"
+[README](../README.md) and the Vennir console's "Try Vennir end to end"
 guide; this covers how to use an assistant for it, and what to check.
 
 **In short:** describe what you want; the assistant writes the files, runs
@@ -19,23 +19,23 @@ creates namespaces and publishes images.
    a real action script, its `product.yaml`, and contract tests. If the
    action reads a secret, its `secretRefs` names it exactly as the script
    reads it (`/platform/secrets/<name>/<key>`). Every file starts with
-   `apiVersion: vertra.dev/v2` and its `kind`, as the templates do.
+   `apiVersion: vennir.dev/v2` and its `kind`, as the templates do.
 2. **Proof it works.** Ask for the output of
-   `./vertra catalog check teams/<team>/products/<product>`, which
+   `./vennir catalog check teams/<team>/products/<product>`, which
    validates, builds, runs the tests and scans the image. "I wrote a test"
    isn't the same as "the tests passed".
 3. **A pull request, not a push to `main`.** Review it as you would a
    colleague's: what the action calls, what it outputs, what it logs.
 
 Once merged, CI publishes the product (pushes its image as the commit's tag,
-signs it, then moves `:latest` to it) and the catalog's release, which each Vertra install reads
+signs it, then moves `:latest` to it) and the catalog's release, which each Vennir install reads
 within a few minutes: it registers the product, and a new team folder gets
 its console team and namespace. A name already taken by a team the catalog
 didn't make waits for that install's admin to adopt it.
 
 ## What isn't automatic
 
-- **The team's first member**: a Vertra admin adds them.
+- **The team's first member**: a Vennir admin adds them.
 - **Cloud identity.** A product that calls a cloud API declares a
   `serviceAccount` in `product.yaml`; someone binds that ServiceAccount to
   a cloud identity (GKE Workload Identity, AKS Workload Identity, EKS Pod

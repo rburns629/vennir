@@ -9,11 +9,11 @@ import (
 )
 
 func managedCloud() *Cloud {
-	return &Cloud{Provider: "gcp", TaskRegistry: "us-central1-docker.pkg.dev/p/vertra-products", Database: &ManagedDatabase{
-		Provider: "gcp", Instance: "vertra-ab12", Host: "10.40.0.3", CACert: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
-		KernelUser: "vertra-kernel@p.iam", ConsoleUser: "vertra-console@p.iam", GatewayUser: "vertra-gateway@p.iam", AdminUser: "vertra-db-admin@p.iam",
-		KernelServiceAccount: "vertra-kernel@p.iam.gserviceaccount.com", GatewayServiceAccount: "vertra-gateway@p.iam.gserviceaccount.com",
-		AdminServiceAccount: "vertra-db-admin@p.iam.gserviceaccount.com",
+	return &Cloud{Provider: "gcp", TaskRegistry: "us-central1-docker.pkg.dev/p/vennir-products", Database: &ManagedDatabase{
+		Provider: "gcp", Instance: "vennir-ab12", Host: "10.40.0.3", CACert: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
+		KernelUser: "vennir-kernel@p.iam", ConsoleUser: "vennir-console@p.iam", GatewayUser: "vennir-gateway@p.iam", AdminUser: "vennir-db-admin@p.iam",
+		KernelServiceAccount: "vennir-kernel@p.iam.gserviceaccount.com", GatewayServiceAccount: "vennir-gateway@p.iam.gserviceaccount.com",
+		AdminServiceAccount: "vennir-db-admin@p.iam.gserviceaccount.com",
 	}}
 }
 
@@ -21,18 +21,18 @@ func managedCloud() *Cloud {
 // server against its CA; only node-postgres is told libpq's meaning.
 func TestManagedDatabaseURLs(t *testing.T) {
 	gcp := &ManagedDatabase{Provider: "gcp", Host: "10.40.0.3"}
-	aws := &ManagedDatabase{Provider: "aws", Host: "vertra.abc.us-east-2.rds.amazonaws.com"}
+	aws := &ManagedDatabase{Provider: "aws", Host: "vennir.abc.us-east-2.rds.amazonaws.com"}
 	for _, c := range []struct {
 		db   *ManagedDatabase
 		node bool
 		want string
 	}{
-		{gcp, false, "postgresql://vertra-kernel%40p.iam@10.40.0.3:5432/execution_kernel?sslmode=verify-ca&sslrootcert=/etc/vertra/tls-db/ca.crt"},
-		{gcp, true, "postgresql://vertra-kernel%40p.iam@10.40.0.3:5432/execution_kernel?uselibpqcompat=true&sslmode=verify-ca&sslrootcert=/etc/vertra/tls-db/ca.crt"},
+		{gcp, false, "postgresql://vennir-kernel%40p.iam@10.40.0.3:5432/execution_kernel?sslmode=verify-ca&sslrootcert=/etc/vennir/tls-db/ca.crt"},
+		{gcp, true, "postgresql://vennir-kernel%40p.iam@10.40.0.3:5432/execution_kernel?uselibpqcompat=true&sslmode=verify-ca&sslrootcert=/etc/vennir/tls-db/ca.crt"},
 		// RDS's certificate names its host: checked in full, by both drivers.
-		{aws, true, "postgresql://vertra-kernel%40p.iam@vertra.abc.us-east-2.rds.amazonaws.com:5432/execution_kernel?sslmode=verify-full&sslrootcert=/etc/vertra/tls-db/ca.crt"},
+		{aws, true, "postgresql://vennir-kernel%40p.iam@vennir.abc.us-east-2.rds.amazonaws.com:5432/execution_kernel?sslmode=verify-full&sslrootcert=/etc/vennir/tls-db/ca.crt"},
 	} {
-		if got := c.db.url("vertra-kernel@p.iam", "execution_kernel", c.node); got != c.want {
+		if got := c.db.url("vennir-kernel@p.iam", "execution_kernel", c.node); got != c.want {
 			t.Errorf("%s node=%v: %s, want %s", c.db.Provider, c.node, got, c.want)
 		}
 	}
@@ -47,9 +47,9 @@ func TestAManagedDatabaseReplacesTheInClusterOne(t *testing.T) {
 	for key, want := range map[string]string{
 		"postgres":            "map[enabled:false]",
 		"backup":              "map[enabled:false]",
-		"database":            "map[caSecret:vertra-db-ca iamAuth:gcp]",
-		"serviceAccount":      "map[annotations:map[iam.gke.io/gcp-service-account:vertra-kernel@p.iam.gserviceaccount.com]]",
-		"externalDatabaseUrl": "postgresql://vertra-kernel%40p.iam@10.40.0.3:5432/execution_kernel?sslmode=verify-ca&sslrootcert=/etc/vertra/tls-db/ca.crt",
+		"database":            "map[caSecret:vennir-db-ca iamAuth:gcp]",
+		"serviceAccount":      "map[annotations:map[iam.gke.io/gcp-service-account:vennir-kernel@p.iam.gserviceaccount.com]]",
+		"externalDatabaseUrl": "postgresql://vennir-kernel%40p.iam@10.40.0.3:5432/execution_kernel?sslmode=verify-ca&sslrootcert=/etc/vennir/tls-db/ca.crt",
 	} {
 		if got := fmt.Sprint(kernel[key]); got != want {
 			t.Errorf("kernel %s: %s, want %s", key, got, want)
@@ -57,26 +57,26 @@ func TestAManagedDatabaseReplacesTheInClusterOne(t *testing.T) {
 	}
 
 	console := ConsoleValues(c, "dev", Images{}, cloud)
-	if console["existingSecret"] != ConsoleDatabaseSecret || fmt.Sprint(console["database"]) != "map[caSecret:vertra-db-ca iamAuth:gcp]" {
+	if console["existingSecret"] != ConsoleDatabaseSecret || fmt.Sprint(console["database"]) != "map[caSecret:vennir-db-ca iamAuth:gcp]" {
 		t.Errorf("console: %v, %v", console["existingSecret"], console["database"])
 	}
 	gateway := console["gateway"].(map[string]any)
-	if fmt.Sprint(gateway["database"]) != "map[existingSecret:vertra-gateway-db role:vertra-gateway@p.iam]" ||
-		fmt.Sprint(gateway["serviceAccountAnnotations"]) != "map[iam.gke.io/gcp-service-account:vertra-gateway@p.iam.gserviceaccount.com]" {
+	if fmt.Sprint(gateway["database"]) != "map[existingSecret:vennir-gateway-db role:vennir-gateway@p.iam]" ||
+		fmt.Sprint(gateway["serviceAccountAnnotations"]) != "map[iam.gke.io/gcp-service-account:vennir-gateway@p.iam.gserviceaccount.com]" {
 		t.Errorf("gateway: %v, %v", gateway["database"], gateway["serviceAccountAnnotations"])
 	}
 }
 
 func TestDatabaseSetupRunsAsTheAdministratorAndOpensEachDatabaseToItsService(t *testing.T) {
-	m, err := databaseSetupManifest(managedCloud().Database, "ghcr.io/rburns629/vertra/execution-kernel:0.6.0")
+	m, err := databaseSetupManifest(managedCloud().Database, "ghcr.io/rburns629/vennir/execution-kernel:0.6.0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"serviceAccountName: vertra-db-admin",
+		"serviceAccountName: vennir-db-admin",
 		`command: ["/usr/local/bin/kernel", "database-setup"]`,
-		`"postgresql://vertra-db-admin%40p.iam@10.40.0.3:5432/postgres?sslmode=verify-ca&sslrootcert=/etc/vertra/tls-db/ca.crt"`,
-		`{\"grants\":[{\"database\":\"execution_kernel\",\"role\":\"vertra-kernel@p.iam\"},{\"database\":\"execution_console\",\"role\":\"vertra-console@p.iam\",\"regrant\":true}]}`,
+		`"postgresql://vennir-db-admin%40p.iam@10.40.0.3:5432/postgres?sslmode=verify-ca&sslrootcert=/etc/vennir/tls-db/ca.crt"`,
+		`{\"grants\":[{\"database\":\"execution_kernel\",\"role\":\"vennir-kernel@p.iam\"},{\"database\":\"execution_console\",\"role\":\"vennir-console@p.iam\",\"regrant\":true}]}`,
 		"{name: DATABASE_IAM_AUTH, value: gcp}",
 		"runAsNonRoot: true",
 	} {
@@ -109,8 +109,8 @@ func TestTheDatabaseVolumeGrowsWithTheSize(t *testing.T) {
 // and makes the databases and the services' users (members of rds_iam);
 // the services' values carry the region and no Google identities.
 func TestOnRDSSetupMakesTheUsersAndTheServicesSignInByRole(t *testing.T) {
-	db := &ManagedDatabase{Provider: "aws", Host: "vertra.abc.us-east-2.rds.amazonaws.com", Region: "us-east-2", CACert: "PEM",
-		KernelUser: "vertra_kernel", ConsoleUser: "vertra_console", GatewayUser: "vertra_gateway", AdminUser: "vertra_admin",
+	db := &ManagedDatabase{Provider: "aws", Host: "vennir.abc.us-east-2.rds.amazonaws.com", Region: "us-east-2", CACert: "PEM",
+		KernelUser: "vennir_kernel", ConsoleUser: "vennir_console", GatewayUser: "vennir_gateway", AdminUser: "vennir_admin",
 		AdminSecret: "arn:aws:secretsmanager:us-east-2:123456789012:secret:rds!db-abc"}
 	m, err := databaseSetupManifest(db, "img")
 	if err != nil {
@@ -119,9 +119,9 @@ func TestOnRDSSetupMakesTheUsersAndTheServicesSignInByRole(t *testing.T) {
 	for _, want := range []string{
 		`{name: DATABASE_ADMIN_SECRET, value: "arn:aws:secretsmanager:us-east-2:123456789012:secret:rds!db-abc"}`,
 		`{name: DATABASE_IAM_REGION, value: "us-east-2"}`,
-		`"postgresql://vertra_admin@vertra.abc.us-east-2.rds.amazonaws.com:5432/postgres?sslmode=verify-full&sslrootcert=/etc/vertra/tls-db/ca.crt"`,
+		`"postgresql://vennir_admin@vennir.abc.us-east-2.rds.amazonaws.com:5432/postgres?sslmode=verify-full&sslrootcert=/etc/vennir/tls-db/ca.crt"`,
 		`\"databases\":[\"execution_kernel\",\"execution_console\"]`,
-		`{\"name\":\"vertra_gateway\",\"memberOf\":[\"rds_iam\"]}`,
+		`{\"name\":\"vennir_gateway\",\"memberOf\":[\"rds_iam\"]}`,
 	} {
 		if !strings.Contains(m, want) {
 			t.Errorf("missing %s in:\n%s", want, m)
@@ -132,9 +132,9 @@ func TestOnRDSSetupMakesTheUsersAndTheServicesSignInByRole(t *testing.T) {
 	}
 	c := kindConfig()
 	c.Gateway.Enabled = true
-	cloud := &Cloud{Provider: "aws", TaskRegistry: "123456789012.dkr.ecr.us-east-2.amazonaws.com/vertra-products", Database: db}
+	cloud := &Cloud{Provider: "aws", TaskRegistry: "123456789012.dkr.ecr.us-east-2.amazonaws.com/vennir-products", Database: db}
 	kernel := KernelValues(c, Images{}, "", cloud)
-	if fmt.Sprint(kernel["database"]) != "map[caSecret:vertra-db-ca iamAuth:aws region:us-east-2]" || kernel["serviceAccount"] != nil {
+	if fmt.Sprint(kernel["database"]) != "map[caSecret:vennir-db-ca iamAuth:aws region:us-east-2]" || kernel["serviceAccount"] != nil {
 		t.Errorf("kernel: %v, %v", kernel["database"], kernel["serviceAccount"])
 	}
 	gateway := ConsoleValues(c, "dev", Images{}, cloud)["gateway"].(map[string]any)

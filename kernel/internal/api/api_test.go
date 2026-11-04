@@ -20,10 +20,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/rburns629/vertra/kernel/internal/dbtest"
-	kernelv1 "github.com/rburns629/vertra/kernel/internal/gen/vertra/kernel/v1"
-	"github.com/rburns629/vertra/kernel/internal/gen/vertra/kernel/v1/kernelv1connect"
-	"github.com/rburns629/vertra/kernel/internal/migrate"
+	"github.com/rburns629/vennir/kernel/internal/dbtest"
+	kernelv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1"
+	"github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1/kernelv1connect"
+	"github.com/rburns629/vennir/kernel/internal/migrate"
 )
 
 // kernel-api over HTTP, through the generated client, on a database of its
@@ -620,9 +620,9 @@ func TestHealth(t *testing.T) {
 }
 
 func TestEveryMethodNeedsAnAllowedCaller(t *testing.T) {
-	callers := &Callers{Audience: "vertra-kernel-api", Allowed: []string{"system:serviceaccount:vertra-system:console"}, Log: quiet,
+	callers := &Callers{Audience: "vennir-kernel-api", Allowed: []string{"system:serviceaccount:vennir-system:console"}, Log: quiet,
 		Review: func(_ context.Context, token, _ string) (string, error) {
-			return map[string]string{"console-token": "system:serviceaccount:vertra-system:console",
+			return map[string]string{"console-token": "system:serviceaccount:vennir-system:console",
 				"step-token": "system:serviceaccount:team-a:default"}[token], nil
 		}}
 	_, c := server(t, testPool, callers)

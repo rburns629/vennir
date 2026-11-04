@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
 // Package catalogtemplate holds catalog-template/ as released with this
-// CLI, so a released vertra makes catalogs whose format its own release's
+// CLI, so a released vennir makes catalogs whose format its own release's
 // console reads. The release workflow writes template.tgz (`git archive`
 // of catalog-template/) before building; a build from a checkout has it
-// empty and reads the checkout's (`vertra: source`).
+// empty and reads the checkout's (`vennir: source`).
 package catalogtemplate
 
 import (
@@ -29,13 +29,13 @@ func Embedded() bool { return len(archive) > 0 }
 // Extract writes the template into dir and returns its catalog-template/.
 func Extract(dir string) (string, error) {
 	if !Embedded() {
-		return "", errors.New("this vertra was built without the catalog template")
+		return "", errors.New("this vennir was built without the catalog template")
 	}
 	return extract(archive, dir)
 }
 
 // extract unpacks a gzipped tar of catalog-template/ into dir, keeping each
-// file's executable bit (./vertra, the scripts) and refusing anything but
+// file's executable bit (./vennir, the scripts) and refusing anything but
 // plain files and directories inside catalog-template/.
 func extract(data []byte, dir string) (string, error) {
 	gz, err := gzip.NewReader(bytes.NewReader(data))
@@ -88,8 +88,8 @@ func extract(data []byte, dir string) (string, error) {
 			return "", fmt.Errorf("the embedded catalog template has %q, not a file or directory", h.Name)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(root, "vertra")); err != nil {
-		return "", errors.New("the embedded catalog template has no ./vertra")
+	if _, err := os.Stat(filepath.Join(root, "vennir")); err != nil {
+		return "", errors.New("the embedded catalog template has no ./vennir")
 	}
 	return root, nil
 }

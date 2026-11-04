@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vertra API product (apis/<name>/api.yaml, kind: Api), format v2",
+  "title": "Vennir API product (apis/<name>/api.yaml, kind: Api), format v2",
   "description": "A backend the team already runs, published through the install's gateway. Its OpenAPI file is the allowlist: the gateway forwards only requests whose method and path it describes, with only the query parameters it declares, and whose parameters, declared headers and body fit its schemas (a body only where it declares one, with a Content-Type it can check), and blocks everything else.",
   "type": "object",
   "additionalProperties": false,
@@ -32,8 +32,8 @@
   },
   "properties": {
     "apiVersion": {
-      "description": "The catalog format: vertra.dev/v2. A file without it is from before v2: ./vertra catalog migrate rewrites it.",
-      "const": "vertra.dev/v2"
+      "description": "The catalog format: vennir.dev/v2. A file without it is from before v2: ./vennir catalog migrate rewrites it.",
+      "const": "vennir.dev/v2"
     },
     "kind": {
       "description": "What the file is: Api.",
@@ -72,7 +72,7 @@
           "maxLength": 500
         },
         "auth": {
-          "description": "The credential the gateway adds to each request, minted per request from the API's own ServiceAccount; nothing is stored. Left out: none (the backend checks Vertra-Caller, or nothing).",
+          "description": "The credential the gateway adds to each request, minted per request from the API's own ServiceAccount; nothing is stored. Left out: none (the backend checks Vennir-Caller, or nothing).",
           "type": "object",
           "additionalProperties": false,
           "minProperties": 1,

@@ -1,8 +1,8 @@
 # The performance-testing team (perf/README.md in the platform's
 # repository): one product that does nothing, for a fixed time, so a
-# benchmark measures Vertra and not a cloud. Never installed on a real
-# install; published only to the vertra-perf kind cluster.
-apiVersion: vertra.dev/v2
+# benchmark measures Vennir and not a cloud. Never installed on a real
+# install; published only to the vennir-perf kind cluster.
+apiVersion: vennir.dev/v2
 kind: Team
 name: perf
 displayName: Performance tests

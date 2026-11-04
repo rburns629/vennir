@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
-	"github.com/rburns629/vertra/kernel/internal/executor"
-	"github.com/rburns629/vertra/kernel/internal/kindtest"
-	"github.com/rburns629/vertra/kernel/internal/logging"
+	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/rburns629/vennir/kernel/internal/executor"
+	"github.com/rburns629/vennir/kernel/internal/kindtest"
+	"github.com/rburns629/vennir/kernel/internal/logging"
 )
 
 // Real passes, a real cluster (kind) and the real demo products

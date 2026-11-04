@@ -136,7 +136,7 @@ func CheckAWS(ctx context.Context, exec Exec, profile, region string) *AWS {
 		a.line("Region", region+note)
 	case a.Denied[region] != "":
 		a.problem(fmt.Sprintf("your organization's policy denies %s to this account (%s)", region, a.Denied[region]),
-			fmt.Sprintf("use one it allows: %s (`vertra config set aws.region <region>`), or have the management account allow %s", strings.Join(a.Allowed, ", "), region), "aws.md#regions")
+			fmt.Sprintf("use one it allows: %s (`vennir config set aws.region <region>`), or have the management account allow %s", strings.Join(a.Allowed, ", "), region), "aws.md#regions")
 	default:
 		a.problem("can't use "+region+" from this account", "choose another region: "+strings.Join(a.Allowed, ", "), "aws.md#regions")
 	}

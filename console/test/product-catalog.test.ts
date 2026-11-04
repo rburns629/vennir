@@ -65,7 +65,7 @@ const INPUT = { type: "object", additionalProperties: false, properties: { insta
 const OUTPUT = {
   type: "object",
   additionalProperties: false,
-  properties: { connection: { type: "string", title: "Connection", "x-vertra-provides": "gcp.cloudsql.connection" } },
+  properties: { connection: { type: "string", title: "Connection", "x-vennir-provides": "gcp.cloudsql.connection" } },
 };
 
 beforeAll(async () => {
@@ -75,7 +75,7 @@ beforeAll(async () => {
   await createTeam(prefix);
   admin = await newUser(true);
   member = await newUser(false);
-  const botEmail = `${prefix}-ci@bots.vertra.local`;
+  const botEmail = `${prefix}-ci@bots.vennir.local`;
   emails.push(botEmail);
   const { user: bot } = await createBotUser(botEmail);
   const token = generateApiToken();

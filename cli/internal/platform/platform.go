@@ -15,11 +15,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rburns629/vertra/cli/internal/cluster"
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/install"
-	"github.com/rburns629/vertra/cli/internal/run"
-	"github.com/rburns629/vertra/cli/internal/tools"
+	"github.com/rburns629/vennir/cli/internal/cluster"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/install"
+	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/tools"
 )
 
 // The kernel chart's ConfigMap holding each Deployment's replicas while the
@@ -230,7 +230,7 @@ func splitLines(s string) []string {
 
 // ConsoleAccess is how to reach the console from this machine.
 func ConsoleAccess(c *config.Config, env string) string {
-	return fmt.Sprintf("`vertra console %s`, then http://localhost:18080", env)
+	return fmt.Sprintf("`vennir console %s`, then http://localhost:18080", env)
 }
 
 // PortForward forwards localhost:port to the console until interrupted.
@@ -302,5 +302,5 @@ func supervise(ctx context.Context, out io.Writer, port int, command func(contex
 		time.Sleep(500 * time.Millisecond)
 	}
 	f.Stop()
-	return nil, fmt.Errorf("couldn't reach the console through a port-forward (is it awake? `vertra status`)")
+	return nil, fmt.Errorf("couldn't reach the console through a port-forward (is it awake? `vennir status`)")
 }

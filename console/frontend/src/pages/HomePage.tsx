@@ -674,14 +674,14 @@ function AskBox({ suggestions }: { suggestions: string[] }) {
     if (question.trim() && ask.open(question.trim(), { send: true })) setQuestion("");
   };
   return (
-    <Panel tone="info" icon={<ChatIcon sx={{ color: "primary.main" }} />} title="Ask Vertra">
+    <Panel tone="info" icon={<ChatIcon sx={{ color: "primary.main" }} />} title="Ask Vennir">
       <Box component="form" onSubmit={submit} sx={{ display: "flex", gap: 1 }}>
         <TextField
           size="small"
           placeholder="Ask about a run, a product or an error"
           value={question}
           onChange={(e) => { setQuestion(e.target.value); }}
-          slotProps={{ htmlInput: { "aria-label": "Ask Vertra" } }}
+          slotProps={{ htmlInput: { "aria-label": "Ask Vennir" } }}
           sx={{ flex: "1 1 auto", minWidth: 0, bgcolor: "background.paper", "& .MuiInputBase-root": { minHeight: 44 } }}
         />
         <Button type="submit" variant="contained" disabled={!question.trim()} sx={{ minHeight: 44 }}>

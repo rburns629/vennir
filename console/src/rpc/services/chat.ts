@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-/** ChatService (proto/vertra/console/v1/chat.proto): src/chat/agent.ts over Connect. */
+/** ChatService (proto/vennir/console/v1/chat.proto): src/chat/agent.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import { ask, askStream, type Answer, type AskRequest as AskQuestion } from "../../chat/agent.js";
@@ -8,7 +8,7 @@ import { listChatFeedback, rateAnswer } from "../../core/chatFeedback.js";
 import { countQuestion, getChatLimits, setChatLimits, type ChatLimitsView } from "../../core/chatLimits.js";
 import { getChatConfig, resetChatConfig, setChatConfig, testChatConfig, type ChatConfigInput, type ChatConfigView } from "../../core/chatSettings.js";
 import { currentChat } from "../../chat/settings.js";
-import type { AskRequest, AskStreamRequest, ChatConfigInput as ChatConfigMessage, ChatService } from "../../gen/vertra/console/v1/chat_pb.js";
+import type { AskRequest, AskStreamRequest, ChatConfigInput as ChatConfigMessage, ChatService } from "../../gen/vennir/console/v1/chat_pb.js";
 import { callerOf, logOf } from "../context.js";
 import { timestamp } from "../convert.js";
 import { check } from "../validate.js";

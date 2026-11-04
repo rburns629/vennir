@@ -21,7 +21,7 @@ const ChatPanel = lazy(() => import("../components/ChatPanel").then((m) => ({ de
 const PANEL_WIDTH = { xs: "100vw", sm: 480 };
 
 /**
- * Ask Vertra (decision 24) for the whole app: whether there's a model, and
+ * Ask Vennir (decision 24) for the whole app: whether there's a model, and
  * the chat panel, which any page can open (the sidebar's button, the
  * help's) and which keeps its conversation while closed.
  */
@@ -64,7 +64,7 @@ export function AskProvider({ children }: { children: ReactNode }) {
           open={open}
           onClose={() => { setOpen(false); }}
           keepMounted={opened}
-          slotProps={{ paper: { role: "dialog", "aria-label": "Ask Vertra", "aria-modal": true }, transition: { onEntered: () => { input.current?.focus(); } } }}
+          slotProps={{ paper: { role: "dialog", "aria-label": "Ask Vennir", "aria-modal": true }, transition: { onEntered: () => { input.current?.focus(); } } }}
         >
           {opened && (
             <Suspense
@@ -102,7 +102,7 @@ export function ChatLauncher({ placement, compact = false }: { placement: "sideb
       <ListItemButton
         disabled={off}
         onClick={() => { open(); }}
-        aria-label="Ask Vertra"
+        aria-label="Ask Vennir"
         sx={{
           // Its own height: the sidebar is a column, and ListItemButton grows to fill one.
           flex: "none",
@@ -124,14 +124,14 @@ export function ChatLauncher({ placement, compact = false }: { placement: "sideb
         </ListItemIcon>
         {!compact && (
           <ListItemText
-            primary="Ask Vertra"
+            primary="Ask Vennir"
             secondary={off ? "Not set up" : undefined}
             slotProps={{ primary: { sx: { fontSize: 14 } }, secondary: { sx: { fontSize: 12, color: "sidebar.textMuted" } } }}
           />
         )}
       </ListItemButton>
     ) : (
-      <IconButton aria-label="Ask Vertra" disabled={off} onClick={() => { open(); }}>
+      <IconButton aria-label="Ask Vennir" disabled={off} onClick={() => { open(); }}>
         <ChatIcon fontSize="small" />
       </IconButton>
     );
@@ -139,7 +139,7 @@ export function ChatLauncher({ placement, compact = false }: { placement: "sideb
   // A disabled control gets no hover: the tooltip sits on what holds it.
   if (!off && !compact) return trigger;
   return (
-    <Tooltip title={off ? why : "Ask Vertra"} {...(placement === "sidebar" ? SIDEBAR_TIP : { placement: "bottom" })}>
+    <Tooltip title={off ? why : "Ask Vennir"} {...(placement === "sidebar" ? SIDEBAR_TIP : { placement: "bottom" })}>
       <Box component="span" sx={{ display: placement === "sidebar" ? "block" : "inline-flex" }}>
         {trigger}
       </Box>

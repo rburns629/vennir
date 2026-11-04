@@ -10,7 +10,7 @@ import (
 // The attached SBOM names the image, not the scan's temporary archive.
 func TestTheSBOMNamesTheImage(t *testing.T) {
 	ref := "us-central1-docker.pkg.dev/p/catalog-products/gcp-app-hosting@sha256:f75f"
-	trivy := `{"bomFormat": "CycloneDX", "metadata": {"component": {"bom-ref": "x", "type": "container", "name": "/tmp/vertra-scan-123/image.tar"}}, "components": [{"name": "openssl"}]}`
+	trivy := `{"bomFormat": "CycloneDX", "metadata": {"component": {"bom-ref": "x", "type": "container", "name": "/tmp/vennir-scan-123/image.tar"}}, "components": [{"name": "openssl"}]}`
 	var got struct {
 		Metadata struct {
 			Component struct{ Name, Type string } `json:"component"`

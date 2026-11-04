@@ -23,15 +23,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/rburns629/vertra/gateway/internal/auth"
-	"github.com/rburns629/vertra/gateway/internal/caller"
-	"github.com/rburns629/vertra/gateway/internal/config"
-	"github.com/rburns629/vertra/gateway/internal/credentials"
-	"github.com/rburns629/vertra/gateway/internal/dbauth"
-	"github.com/rburns629/vertra/gateway/internal/gateway"
-	"github.com/rburns629/vertra/gateway/internal/limits"
-	"github.com/rburns629/vertra/gateway/internal/store"
-	"github.com/rburns629/vertra/gateway/internal/traffic"
+	"github.com/rburns629/vennir/gateway/internal/auth"
+	"github.com/rburns629/vennir/gateway/internal/caller"
+	"github.com/rburns629/vennir/gateway/internal/config"
+	"github.com/rburns629/vennir/gateway/internal/credentials"
+	"github.com/rburns629/vennir/gateway/internal/dbauth"
+	"github.com/rburns629/vennir/gateway/internal/gateway"
+	"github.com/rburns629/vennir/gateway/internal/limits"
+	"github.com/rburns629/vennir/gateway/internal/store"
+	"github.com/rburns629/vennir/gateway/internal/traffic"
 )
 
 func main() {

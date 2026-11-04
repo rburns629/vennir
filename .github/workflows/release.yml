@@ -2,7 +2,7 @@ name: release
 
 # On a version tag (v1.2.3, or v1.2.3-rc.1 for a pre-release):
 #
-#   preflight  refuses a tag whose commit isn't on main, a tag whose vertra
+#   preflight  refuses a tag whose commit isn't on main, a tag whose vennir
 #              code reaches a known vulnerability (govulncheck, as CI), and
 #              a version that's already published, even in part. A tag push
 #              runs the tagged commit's own copy of this file, so the main
@@ -24,16 +24,16 @@ name: release
 #              too, so they run the images just published), pushes them to
 #              oci://ghcr.io/<owner>/<repo>/charts, signs them, and creates
 #              the GitHub release with the packaged charts attached.
-#   cli        builds vertra for linux and darwin, amd64 and arm64, from this
+#   cli        builds vennir for linux and darwin, amd64 and arm64, from this
 #              tag (with its catalog template inside, for `catalog create`,
 #              and the charts' SHA-256s, which it checks them against),
 #              pushes each binary to ghcr.io/<owner>/<repo>/cli as one blob
 #              (tag <version>-<os>-<arch>; its digest is the binary's
 #              SHA-256), signs each, and attaches the binaries and
-#              vertra-checksums.txt and the manual pages (vertra-man.tar.gz)
-#              to the release. A catalog's ./vertra downloads its platform's
+#              vennir-checksums.txt and the manual pages (vennir-man.tar.gz)
+#              to the release. A catalog's ./vennir downloads its platform's
 #              blob anonymously by that SHA-256: pin a release with
-#              .github/scripts/pin-vertra.sh <version>.
+#              .github/scripts/pin-vennir.sh <version>.
 #   pin        for the highest version released, opens the pull request
 #              that pins it in the catalog template.
 #
@@ -49,7 +49,7 @@ name: release
 #
 # The packages are private on first push: make them public on GitHub (the
 # package's settings) once, so `helm install`, image pulls and a catalog's
-# ./vertra need no login.
+# ./vennir need no login.
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
@@ -90,7 +90,7 @@ jobs:
           fi
       - name: Whether it's the highest version
         # A backport (v0.7.1 after v0.8.0) is released, but doesn't move
-        # latest back or pin the template to an older vertra.
+        # latest back or pin the template to an older vennir.
         id: latest
         run: |
           latest=false
@@ -101,8 +101,8 @@ jobs:
                echo "The highest version tagged is $highest" ;;
           esac
           echo "latest=$latest" | tee -a "$GITHUB_OUTPUT"
-      - name: vertra's code reaches no known vulnerability
-        # As CI's govulncheck job, in the Go image vertra is built with. The
+      - name: vennir's code reaches no known vulnerability
+        # As CI's govulncheck job, in the Go image vennir is built with. The
         # version is pinned in both (here and ci.yml): bump them together.
         run: |
           image=$(sed -n 's/^GO_IMAGE ?= *//p' Makefile)
@@ -198,8 +198,8 @@ jobs:
           for line in "${platforms[@]}"; do
             platform="${line% *}" digest="${line#* }"
             docker pull -q --platform "${platform/-//}" "$image@$digest"
-            docker tag "$image@$digest" "vertra-release/$COMPONENT:$platform"
-            bash .github/scripts/scan-image.sh "vertra-release/$COMPONENT:$platform" "$COMPONENT" || failed=1
+            docker tag "$image@$digest" "vennir-release/$COMPONENT:$platform"
+            bash .github/scripts/scan-image.sh "vennir-release/$COMPONENT:$platform" "$COMPONENT" || failed=1
           done
           if [ "$failed" != 0 ]; then exit 1; fi
           echo "$COMPONENT=$REF" >> "$GITHUB_OUTPUT"
@@ -261,7 +261,7 @@ jobs:
     needs: [preflight, publish]
     runs-on: ubuntu-latest
     outputs:
-      # Each package's SHA-256, sha256sum's lines: what vertra checks a
+      # Each package's SHA-256, sha256sum's lines: what vennir checks a
       # pulled chart against (cli/internal/install/release-charts.sha256).
       sums: ${{ steps.package.outputs.sums }}
     permissions:
@@ -332,7 +332,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bash .github/scripts/install-scanners.sh oras cosign
-      - name: Build vertra for each platform
+      - name: Build vennir for each platform
         # In the Go image CI uses, pinned by digest (the Makefile's GO_IMAGE).
         env:
           CHART_SUMS: ${{ needs.charts.outputs.sums }}
@@ -340,7 +340,7 @@ jobs:
         run: |
           image=$(sed -n 's/^GO_IMAGE ?= *//p' Makefile)
           mkdir -p dist
-          # The charts' sums this vertra checks them against: this release's,
+          # The charts' sums this vennir checks them against: this release's,
           # and any earlier release's whose pin pull request hasn't merged
           # (from its attached packages' digests).
           sums=cli/internal/install/release-charts.sha256
@@ -360,12 +360,12 @@ jobs:
           for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
             docker run --rm -v "$PWD":/repo -w /repo/cli -e CGO_ENABLED=0 \
               -e GOOS="${platform%-*}" -e GOARCH="${platform#*-}" "$image" \
-              go build -trimpath -ldflags "-s -w -X main.Version=$TAG" -o "/repo/dist/vertra-$platform" ./cmd/vertra
+              go build -trimpath -ldflags "-s -w -X main.Version=$TAG" -o "/repo/dist/vennir-$platform" ./cmd/vennir
           done
           # The manual pages, the same for every platform: man1/*.1.
-          dist/vertra-linux-amd64 man dist/man
-          tar -C dist/man -czf dist/vertra-man.tar.gz man1
-          (cd dist && sha256sum vertra-* > vertra-checksums.txt && cat vertra-checksums.txt)
+          dist/vennir-linux-amd64 man dist/man
+          tar -C dist/man -czf dist/vennir-man.tar.gz man1
+          (cd dist && sha256sum vennir-* > vennir-checksums.txt && cat vennir-checksums.txt)
       - name: Sign in to GHCR
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -379,16 +379,16 @@ jobs:
           published="$PWD/.github/scripts/published.sh"
           cd dist
           {
-            echo "### vertra $TAG"
+            echo "### vennir $TAG"
             echo
-            echo "Pin it in a catalog's ./vertra: \`.github/scripts/pin-vertra.sh $version\`"
+            echo "Pin it in a catalog's ./vennir: \`.github/scripts/pin-vennir.sh $version\`"
             echo
             echo '| Platform | SHA-256 (the blob a catalog downloads) |'
             echo '| --- | --- |'
           } >> "$GITHUB_STEP_SUMMARY"
           for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
             ref="$registry:$version-$platform"
-            sum=$(sha256sum "vertra-$platform" | cut -d' ' -f1)
+            sum=$(sha256sum "vennir-$platform" | cut -d' ' -f1)
             status=0
             bash "$published" "$ref" > /dev/null || status=$?
             case "$status" in
@@ -397,8 +397,8 @@ jobs:
                    || { echo "::error::$ref is already published as $blob, not this build's sha256:$sum."; exit 1; }
                  echo "$ref is already this build's binary" ;;
               1) oras push "$ref" \
-                   --artifact-type application/vnd.vertra.cli.v1 \
-                   "vertra-$platform:application/vnd.vertra.cli.binary.v1" ;;
+                   --artifact-type application/vnd.vennir.cli.v1 \
+                   "vennir-$platform:application/vnd.vennir.cli.binary.v1" ;;
               *) exit 1 ;;
             esac
             digest=$(oras resolve "$ref")
@@ -408,16 +408,16 @@ jobs:
       - name: Attach to the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$TAG" dist/vertra-* --clobber
+        run: gh release upload "$TAG" dist/vennir-* --clobber
 
-  # The catalog template's ./vertra pinned to this release, as a pull
+  # The catalog template's ./vennir pinned to this release, as a pull
   # request against main (which is protected), for the highest version
   # released (not a pre-release, nor a backport): until it merges, a catalog
-  # made from the template by hand pins the previous release (`vertra
+  # made from the template by hand pins the previous release (`vennir
   # catalog create` pins its own). A backport's charts' sums still reach
-  # every later vertra: the cli job collects every release's.
+  # every later vennir: the cli job collects every release's.
   # Needs "Allow GitHub Actions to create and approve pull requests" on,
-  # and the cli package public (pin-vertra.sh downloads as a catalog does):
+  # and the cli package public (pin-vennir.sh downloads as a catalog does):
   # on a first release, make it public, then re-run this job. A pull
   # request this token opens doesn't start CI: close and reopen it.
   pin:
@@ -439,26 +439,26 @@ jobs:
           CHART_SUMS: ${{ needs.charts.outputs.sums }}
         run: |
           version="${TAG#v}"
-          branch="pin-vertra-$version"
-          bash .github/scripts/pin-vertra.sh "$version"
-          # And its charts' sums, for every vertra built after it.
+          branch="pin-vennir-$version"
+          bash .github/scripts/pin-vennir.sh "$version"
+          # And its charts' sums, for every vennir built after it.
           sums=cli/internal/install/release-charts.sha256
           while IFS= read -r line; do
             [ -z "$line" ] || grep -qxF "$line" "$sums" || printf '%s\n' "$line" >> "$sums"
           done <<< "$CHART_SUMS"
           if git diff --quiet; then
-            echo "catalog-template/vertra already pins $version, and its charts' sums are recorded"
+            echo "catalog-template/vennir already pins $version, and its charts' sums are recorded"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
-          git commit -am "chore: pin vertra $version in the catalog template, and record its charts' sums"
+          git commit -am "chore: pin vennir $version in the catalog template, and record its charts' sums"
           # A re-run (the setting was off, say) replaces its own branch.
           git push --force origin "$branch"
           if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
             echo "Its pull request is already open"
             exit 0
           fi
-          gh pr create --base main --head "$branch" --title "chore: pin vertra $version in the catalog template" \
-            --body "The catalog template's \`./vertra\` pinned to the release just made, by \`.github/scripts/pin-vertra.sh $version\` (each platform's binary checked to download anonymously and match \`vertra-checksums.txt\`), and its charts' SHA-256s added to \`cli/internal/install/release-charts.sha256\`, which vertra checks a pulled chart against. Opened by the release workflow: close and reopen it to run CI."
+          gh pr create --base main --head "$branch" --title "chore: pin vennir $version in the catalog template" \
+            --body "The catalog template's \`./vennir\` pinned to the release just made, by \`.github/scripts/pin-vennir.sh $version\` (each platform's binary checked to download anonymously and match \`vennir-checksums.txt\`), and its charts' SHA-256s added to \`cli/internal/install/release-charts.sha256\`, which vennir checks a pulled chart against. Opened by the release workflow: close and reopen it to run CI."

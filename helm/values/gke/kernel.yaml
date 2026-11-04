@@ -1,19 +1,19 @@
-# execution-kernel on GKE `vertra-gke` (release `kernel`, namespace
-# default; a new install uses its own, vertra-system):
+# execution-kernel on GKE `vennir-gke` (release `kernel`, namespace
+# default; a new install uses its own, vennir-system):
 #   make gke-deploy VERSION=v<x.y.z>   (the release's signed chart and images)
-#   or: helm upgrade --install kernel oci://ghcr.io/rburns629/vertra/charts/execution-kernel --version <x.y.z> -n default \
-#     --reset-values --force-conflicts --kube-context gke_my-gcp-project_us-central1_vertra-gke \
+#   or: helm upgrade --install kernel oci://ghcr.io/rburns629/vennir/charts/execution-kernel --version <x.y.z> -n default \
+#     --reset-values --force-conflicts --kube-context gke_my-gcp-project_us-central1_vennir-gke \
 #     -f helm/values/gke/kernel.yaml
 # A release's image, signed by its workflow (make gke-deploy VERSION=v...):
 # no tag, so the release's chart runs its own (appVersion).
 # gke-deploy-kernel-from-source overrides both for a working-copy build.
 image:
-  repository: ghcr.io/rburns629/vertra/execution-kernel
+  repository: ghcr.io/rburns629/vennir/execution-kernel
   pullPolicy: IfNotPresent
 backup:
   enabled: false
 # Only because this install runs the platform in `default`, which is also
-# an admins' team namespace. A new install in vertra-system drops this.
+# an admins' team namespace. A new install in vennir-system drops this.
 dispatchPolicy:
   allowReleaseNamespace: true
 # Where catalog CI publishes product images. The image policy seeds from

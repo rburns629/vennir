@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 #
 # Installs (up) or removes (down) the slowcreate webhook on the performance
-# cluster, vertra-perf, and nowhere else: every first create of a Job in the
+# cluster, vennir-perf, and nowhere else: every first create of a Job in the
 # perf namespace is held for DELAY (default 8s) before the API server makes
 # it, plus up to JITTER more at random. The kernel's Kubernetes request
 # timeout is 3 s here (perf/slowcreate/kernel.yaml): DELAY=8s shows a create
@@ -11,7 +11,7 @@
 # perf/README.md, "A create that timed out", has the runbook.
 set -euo pipefail
 
-CONTEXT=kind-vertra-perf
+CONTEXT=kind-vennir-perf
 NS=slowcreate
 IMAGE=localhost:5001/slowcreate:dev
 DELAY=${DELAY:-8s}

@@ -20,7 +20,7 @@ value: {{ $h.priority }}
 # Placeholders never push anything else out; they only make way.
 preemptionPolicy: Never
 globalDefault: false
-description: Vertra's warm headroom for steps; any step preempts it.
+description: Vennir's warm headroom for steps; any step preempts it.
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -53,7 +53,7 @@ describe("the audit log's copy", () => {
   });
 
   it("shows how far it has gone to everyone, and where it goes to admins only", async () => {
-    Object.assign(config.audit.export, { bucket: "acme-audit", provider: "gcs", prefix: "vertra-audit/" });
+    Object.assign(config.audit.export, { bucket: "acme-audit", provider: "gcs", prefix: "vennir-audit/" });
     // An entry of its own to wait: the newest of all may be another file's, which it deletes.
     const [own] = await db
       .insert(auditLog)
@@ -64,7 +64,7 @@ describe("the audit log's copy", () => {
     await db.insert(auditExport).values({ id: 1, lastId: through, lastHash: "", exportedAt: new Date(), checkedAt: new Date() });
 
     const admin = await copyAs(await signIn((await makeUser({ admin: true })).email));
-    expect(admin).toMatchObject({ enabled: true, destination: "gs://acme-audit/vertra-audit/", copiedThrough: String(through), brokenAt: "0" });
+    expect(admin).toMatchObject({ enabled: true, destination: "gs://acme-audit/vennir-audit/", copiedThrough: String(through), brokenAt: "0" });
     // At least the newest entry, and the sign-ins since.
     expect(Number(admin.waiting)).toBeGreaterThanOrEqual(1);
 
@@ -101,7 +101,7 @@ describe("the database compared with its copy", () => {
 
   /** Three entries of this file's, and a GCS bucket holding them as one copy (as the export writes it). */
   async function copied(tag: string) {
-    Object.assign(config.audit.export, { bucket: "acme-audit", provider: "gcs", prefix: "vertra-audit/" });
+    Object.assign(config.audit.export, { bucket: "acme-audit", provider: "gcs", prefix: "vennir-audit/" });
     const rows = await db
       .insert(auditLog)
       .values([1, 2, 3].map((n) => ({ actorId: null, method: "RPC", route: `${tag}-${String(n)}`, target: { n }, status: 200, requestId: `${prefix}-${tag}` })))
@@ -109,7 +109,7 @@ describe("the database compared with its copy", () => {
     const ids = rows.map((r) => r.id);
     const stored = await db.select().from(auditLog).where(inArray(auditLog.id, ids)).orderBy(asc(auditLog.id));
     const body = stored.map((row) => JSON.stringify(row)).join("\n") + "\n";
-    const name = `vertra-audit/2026/10/29/${String(ids[0]).padStart(12, "0")}-${String(ids[2]).padStart(12, "0")}.jsonl`;
+    const name = `vennir-audit/2026/10/29/${String(ids[0]).padStart(12, "0")}-${String(ids[2]).padStart(12, "0")}.jsonl`;
     await db.delete(auditExport);
     await db.insert(auditExport).values({ id: 1, comparedThrough: 0 });
     return { ids, name, body };

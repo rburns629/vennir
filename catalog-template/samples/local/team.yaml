@@ -1,7 +1,7 @@
 # A sample team that runs anywhere: no cloud, no secrets. Its products are
 # one small product written in five languages, and the starters a new team
 # copies from for the languages it picks.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Team
 name: local
 displayName: Local samples

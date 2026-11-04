@@ -19,13 +19,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vertra/cli/internal/cluster"
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/install"
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/cluster"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/install"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
-// The in-cluster Postgres, as the kernel chart makes it for vertra (its
+// The in-cluster Postgres, as the kernel chart makes it for vennir (its
 // consoleDatabase on, the chart's names).
 const (
 	postgresDeployment = install.KernelRelease + "-execution-kernel-postgres"
@@ -34,8 +34,8 @@ const (
 	consoleDatabase    = "execution_console"
 	consoleRole        = "console"
 	// The kernel's own login role (the kernel chart's postgres.auth.kernelUsername).
-	kernelRole  = "vertra_kernel"
-	gatewayRole = "vertra_gateway"
+	kernelRole  = "vennir_kernel"
+	gatewayRole = "vennir_gateway"
 	// The prefixes the backup CronJob stores each database's dumps under.
 	kernelPrefix  = install.KernelRelease
 	consolePrefix = "console"
@@ -57,7 +57,7 @@ func kubectl(c *config.Config, args ...string) []string {
 
 // Destination is where the backup CronJob copies dumps: "gs://bucket" or
 // "s3://bucket", from the kernel release's values; "" when backups are
-// off (or go somewhere vertra can't read, a volume or Azure).
+// off (or go somewhere vennir can't read, a volume or Azure).
 func Destination(ctx context.Context, r *run.Runner, c *config.Config) (string, error) {
 	out, err := r.Output(ctx, "helm", "get", "values", install.KernelRelease, "--kube-context", cluster.Context(c),
 		"--namespace", c.Namespace, "--all", "--output", "json")
@@ -93,7 +93,7 @@ func Destination(ctx context.Context, r *run.Runner, c *config.Config) (string, 
 // RunNow runs the backup CronJob now, as a Job of its own, and waits for
 // it: what it stored, as a pair.
 func RunNow(ctx context.Context, r *run.Runner, c *config.Config, destination string) (Pair, error) {
-	job := fmt.Sprintf("vertra-backup-%d", time.Now().Unix())
+	job := fmt.Sprintf("vennir-backup-%d", time.Now().Unix())
 	if err := r.Run(ctx, "kubectl", kubectl(c, "create", "job", job, "--from=cronjob/"+backupCronJob)...); err != nil {
 		return Pair{}, err
 	}

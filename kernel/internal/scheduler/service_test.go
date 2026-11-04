@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
-	"github.com/rburns629/vertra/kernel/internal/executor"
-	"github.com/rburns629/vertra/kernel/internal/executor/executortest"
+	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/rburns629/vennir/kernel/internal/executor"
+	"github.com/rburns629/vennir/kernel/internal/executor/executortest"
 )
 
 func twoTasks(outputKey string, attempts int) []TaskDef {
@@ -182,7 +182,7 @@ func TestAWiredTargetOutsideWhatItsOwnerAllowsFailsTheStepBeforeItStarts(t *test
 	narrowed := map[string]any{
 		"type": "object", "required": []any{"projectId"},
 		"properties": map[string]any{"projectId": map[string]any{"allOf": []any{
-			map[string]any{"type": "string", "x-vertra-needs": "gcp.project"},
+			map[string]any{"type": "string", "x-vennir-needs": "gcp.project"},
 			map[string]any{"anyOf": []any{
 				map[string]any{"type": "string", "pattern": "^apps-.*$"},
 				map[string]any{"type": "string", "pattern": "^shared\\.sandbox$"},
@@ -248,12 +248,12 @@ func TestDispatchRejectedByClusterPolicyFailsWithoutRetrying(t *testing.T) {
 	tx := txFor(t)
 	id := submit(t, tx, "idem-sched-dispatch-rejected", task("create-project", maxAttempts(3)))
 	exec := fake()
-	exec.StartError = &executor.DispatchRejected{Code: "DISPATCH_REJECTED", Message: "namespace test-team is not a Vertra team namespace"}
+	exec.StartError = &executor.DispatchRejected{Code: "DISPATCH_REJECTED", Message: "namespace test-team is not a Vennir team namespace"}
 	newTicker(t, tx, exec).tick(time.Now())
 	tk := tasksByKey(t, tx, id)["create-project"]
 	equal(t, "state", tk.State, domain.TaskFailed)
 	equal(t, "attempts", tk.AttemptCount, 1)
-	equal(t, "failure", tk.Failure, map[string]any{"code": "DISPATCH_REJECTED", "message": "namespace test-team is not a Vertra team namespace", "retryable": false})
+	equal(t, "failure", tk.Failure, map[string]any{"code": "DISPATCH_REJECTED", "message": "namespace test-team is not a Vennir team namespace", "retryable": false})
 	equal(t, "execution", executionState(t, tx, id), domain.ExecutionFailed)
 }
 

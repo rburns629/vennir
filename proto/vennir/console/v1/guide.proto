@@ -1,0 +1,100 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+// The guides the console shows (console/docs/). Anyone signed in.
+service GuideService {
+  // Every guide, in reading order: its id and title; then the platform's
+  // own docs (section "reference": architecture, operations, the security
+  // model, the catalog's guide).
+  rpc ListGuides(ListGuidesRequest) returns (ListGuidesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // One guide, as markdown.
+  rpc GetGuide(GetGuideRequest) returns (GetGuideResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // A figure a reference doc draws (docs/architecture/*.svg, copied with
+  // the docs), by its path from the docs: architecture/6-the-pieces.svg.
+  rpc GetGuideImage(GetGuideImageRequest) returns (GetGuideImageResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // The sections of the guides and reference docs that best match a
+  // question's words, best first: what the chat agent answers from.
+  rpc SearchGuides(SearchGuidesRequest) returns (SearchGuidesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message SearchGuidesRequest {
+  string query = 1;
+  // 5 when unset, at most 20.
+  int32 limit = 2;
+  // Design history too (kind "history"): for a question of why.
+  bool include_history = 3;
+}
+
+message SearchGuidesResponse {
+  repeated GuideHit hits = 1;
+}
+
+message GuideHit {
+  // The guide's id, and its title.
+  string guide = 1;
+  string title = 2;
+  // The section: its heading and those it's under, "Upgrading > Databases".
+  string heading = 3;
+  // About 600 characters of it, from where the words first appear.
+  string excerpt = 4;
+  double score = 5;
+  // The doc's kind, as Guide's.
+  string kind = 6;
+}
+
+message Guide {
+  // Such as 03-what-is-a-dag, or reference-operations.
+  string id = 1;
+  string title = 2;
+  // "guides" (using Vennir) or "reference" (the platform's own docs).
+  string section = 3;
+  // What it is: "guide" (using Vennir), "current" (how it works now),
+  // "operating" (installing and running it) or "history" (design history:
+  // decisions, with proposals and rejected options; it answers why, never
+  // what is).
+  string kind = 4;
+  // Its sections (its ## headings), in order: the Docs page shows a long
+  // doc a section to a page.
+  repeated GuideSection sections = 5;
+}
+
+message GuideSection {
+  string title = 1;
+  // The heading's anchor, as the page makes it (GitHub's): a heading used
+  // again gets -1, -2…
+  string anchor = 2;
+}
+
+message ListGuidesRequest {}
+
+message ListGuidesResponse {
+  repeated Guide guides = 1;
+}
+
+message GetGuideRequest {
+  string id = 1;
+}
+
+message GetGuideResponse {
+  string markdown = 1;
+}
+
+message GetGuideImageRequest {
+  string path = 1;
+}
+
+message GetGuideImageResponse {
+  // The SVG's text.
+  string svg = 1;
+}

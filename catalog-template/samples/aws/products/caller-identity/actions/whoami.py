@@ -54,7 +54,7 @@ def main() -> int:
     try:
         # AssumeRoleWithWebIdentity is called without AWS credentials: the token is the proof.
         sts = boto3.client("sts", region_name=region, config=Config(signature_version=UNSIGNED))
-        session = sts.assume_role_with_web_identity(RoleArn=role, RoleSessionName="vertra-caller-identity", WebIdentityToken=token)
+        session = sts.assume_role_with_web_identity(RoleArn=role, RoleSessionName="vennir-caller-identity", WebIdentityToken=token)
         credentials = session["Credentials"]
         who = boto3.client(
             "sts",

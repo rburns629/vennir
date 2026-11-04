@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Scans one platform image (kernel/ or console/), already built into the
 # local Docker daemon, and exits non-zero if it must not ship. Run by ci.yml.
-# (A copy of vertra-catalog's, which gates product images the same
+# (A copy of vennir-catalog's, which gates product images the same
 # way; the two repos are owned separately.)
 #
 # Blocks on:

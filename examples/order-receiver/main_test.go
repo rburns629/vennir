@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// sign is the console's Vertra-Signature (console/src/callbacks.ts).
+// sign is the console's Vennir-Signature (console/src/callbacks.ts).
 func sign(secret, body string, at time.Time) string {
 	t := strconv.FormatInt(at.Unix(), 10)
 	mac := hmac.New(sha256.New, []byte(secret))

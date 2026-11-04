@@ -11,12 +11,12 @@
  * And the ordering tasks (test/chatTasks.ts), judged by what the agent did:
  * the tools it used, in order; the cart it proposed, or that it proposed
  * none; what its answer must say. And the guardrails: questions that
- * aren't about Vertra (chatTasks.ts's OFF_TOPIC) answered with the scope
+ * aren't about Vennir (chatTasks.ts's OFF_TOPIC) answered with the scope
  * answer, and none of the question set's refused.
  *
- *   VERTRA_TOKEN=... npm run chat-eval            # every question, then the tasks
- *   VERTRA_TOKEN=... npm run chat-eval -- 5       # the first five questions, then the tasks
- *   TASKS_ONLY=1 VERTRA_TOKEN=... npm run chat-eval
+ *   VENNIR_TOKEN=... npm run chat-eval            # every question, then the tasks
+ *   VENNIR_TOKEN=... npm run chat-eval -- 5       # the first five questions, then the tasks
+ *   TASKS_ONLY=1 VENNIR_TOKEN=... npm run chat-eval
  *
  * CONSOLE_URL (http://localhost:18080) and TEAM (the token's first) as needed.
  * A model's run, not CI: real models are slow, and their answers vary.
@@ -26,7 +26,7 @@ import { CHAT_TASKS, OFF_TOPIC } from "../test/chatTasks.js";
 import { DOC_QUESTIONS } from "../test/docQuestions.js";
 
 const consoleUrl = (process.env["CONSOLE_URL"] ?? "http://localhost:18080").replace(/\/+$/, "");
-const token = process.env["VERTRA_TOKEN"] ?? "";
+const token = process.env["VENNIR_TOKEN"] ?? "";
 const limit = process.env["TASKS_ONLY"] ? 0 : Number(process.argv[2] ?? DOC_QUESTIONS.length);
 
 interface Answer {
@@ -43,7 +43,7 @@ interface Answer {
 }
 
 async function call<T>(method: string, body: unknown): Promise<T> {
-  const response = await fetch(`${consoleUrl}/api/vertra.console.v1.${method}`, {
+  const response = await fetch(`${consoleUrl}/api/vennir.console.v1.${method}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -54,7 +54,7 @@ async function call<T>(method: string, body: unknown): Promise<T> {
 const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)] ?? 0;
 
 async function main(): Promise<void> {
-  if (!token) throw new Error("VERTRA_TOKEN: a token for the console");
+  if (!token) throw new Error("VENNIR_TOKEN: a token for the console");
   const settings = await call<{ enabled?: boolean; model?: string }>("ChatService/GetChatSettings", {});
   if (!settings.enabled) throw new Error("Chat is off on this console: set chat.model.");
   const me = await call<{ teamNames?: string[] }>("AuthService/GetMe", {});
@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     );
   }
 
-  // The guardrails: what isn't about Vertra gets the scope answer.
+  // The guardrails: what isn't about Vennir gets the scope answer.
   const refusals = [];
   for (const q of OFF_TOPIC) {
     const started = Date.now();

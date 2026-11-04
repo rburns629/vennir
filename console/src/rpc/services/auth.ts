@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /**
- * AuthService (proto/vertra/console/v1/auth.proto): signing in, and who
+ * AuthService (proto/vennir/console/v1/auth.proto): signing in, and who
  * you are. The same rules as rpc/services/auth.ts and rpc/services/auth.ts, which it
  * replaces: open registration only when allowed, sign-in limited per
  * client and email and spaced out per account, the same failure (and
@@ -16,7 +16,7 @@ import { hashPassword, NewPassword, verifyAgainstNothing, verifyPassword } from 
 import { config } from "../../config.js";
 import { createUser, findUserByEmail, findUserById, recordSignIn, revokeSession, setUserPassword, teamRolesForUser } from "../../db/queries.js";
 import { newSession, ssoRequiredBy } from "../../auth/plugin.js";
-import type { AuthService } from "../../gen/vertra/console/v1/auth_pb.js";
+import type { AuthService } from "../../gen/vennir/console/v1/auth_pb.js";
 import { callerOf, kClientIp, kSignedIn, logOf } from "../context.js";
 import { badRequest, forbidden, rpcError, unauthenticated } from "../errors.js";
 import { FixedWindowLimit } from "../rateLimit.js";
@@ -53,7 +53,7 @@ export function authService(app: FastifyInstance): ServiceImpl<typeof AuthServic
       await registerLimit.take(`register:${ctx.values.get(kClientIp)}`, ctx);
       const { email, password } = check({ email: Email, password: NewPassword }, req);
       if (!config.allowSelfRegistration) {
-        throw forbidden("Accounts are created by an admin. Ask a Vertra admin for one.", "REGISTRATION_DISABLED");
+        throw forbidden("Accounts are created by an admin. Ask a Vennir admin for one.", "REGISTRATION_DISABLED");
       }
       if (await findUserByEmail(email)) {
         throw rpcError(Code.AlreadyExists, "CONFLICT", "Email already registered.");

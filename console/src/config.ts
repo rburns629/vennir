@@ -501,7 +501,7 @@ export const config = {
   // unset/wrong value is never a correctness bug, just a confusing badge
   // -- a sensible default is fine here, unlike the values above.
   environmentLabel: process.env["ENVIRONMENT_LABEL"] ?? "unlabeled environment",
-  // The cloud this install is on (INSTALL_CLOUD, which vertra sets): a
+  // The cloud this install is on (INSTALL_CLOUD, which vennir sets): a
   // product whose clouds leave it out is listed but never checked or run
   // here (core/clouds.ts). Empty: not known, so every product runs.
   installCloud: installCloud(),
@@ -602,7 +602,7 @@ export const config = {
     gcpServiceAccount: process.env["REGISTRY_GCP_SERVICE_ACCOUNT"] ?? "",
     awsRoleArn: process.env["REGISTRY_AWS_ROLE_ARN"] ?? "",
     hosts: (process.env["REGISTRY_FEDERATED_HOSTS"] ?? "").split(",").map((s) => s.trim()).filter(Boolean),
-    tokenFile: process.env["REGISTRY_FEDERATION_TOKEN_FILE"] ?? "/var/run/secrets/vertra/registry/token",
+    tokenFile: process.env["REGISTRY_FEDERATION_TOKEN_FILE"] ?? "/var/run/secrets/vennir/registry/token",
     tokenSecret: process.env["REGISTRY_TOKEN_SECRET"] ?? "",
   },
   // Every task's image is pinned to its digest at submission (routes/
@@ -681,9 +681,9 @@ export const config = {
       provider: auditExportProvider(),
       region: process.env["AUDIT_EXPORT_REGION"] ?? "",
       endpoint: process.env["AUDIT_EXPORT_ENDPOINT"] ?? "",
-      prefix: process.env["AUDIT_EXPORT_PREFIX"] ?? "vertra-audit/",
+      prefix: process.env["AUDIT_EXPORT_PREFIX"] ?? "vennir-audit/",
       minutes: positiveInt("AUDIT_EXPORT_MINUTES", 5),
-      // What the bucket keeps, as the install says it made it (vertra.yaml's
+      // What the bucket keeps, as the install says it made it (vennir.yaml's
       // audit.keepDays and audit.lock), for the Admin page only, which
       // labels them "as configured": the bucket enforces them, and the
       // console's identity may write and read its objects but not read the
@@ -726,10 +726,10 @@ export const config = {
   catalog: {
     release: process.env["CATALOG_RELEASE"] ?? "",
     // Follow the newest version (a vX.Y.Z tag of release's repository,
-    // `vertra catalog promote`) instead of release's own tag.
+    // `vennir catalog promote`) instead of release's own tag.
     newestVersion: process.env["CATALOG_NEWEST_VERSION"] === "true",
     pollSeconds: positiveInt("CATALOG_POLL_SECONDS", 300),
-    // release is another install's catalog (vertra.yaml's externalCatalog),
+    // release is another install's catalog (vennir.yaml's externalCatalog),
     // not this install's own, as the install says. Display only, labelled
     // "as configured": nothing the console reads tells the two apart (the
     // kernel's source registry is the other install's then too).
@@ -757,7 +757,7 @@ export const config = {
     purge: process.env["TEAM_NAMESPACES_PURGE"] === "true",
     // The kernel's dispatch policy runs steps only in namespaces with this
     // label set to "true"; "retired" stops it.
-    label: process.env["TEAM_NAMESPACE_LABEL"] ?? "vertra/team",
+    label: process.env["TEAM_NAMESPACE_LABEL"] ?? "vennir/team",
     // Pod Security level enforced in the namespaces it creates (the kernel's
     // step Pods meet `restricted`); empty for none.
     podSecurity: process.env["TEAM_NAMESPACE_POD_SECURITY"] ?? "",

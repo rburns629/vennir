@@ -17,7 +17,7 @@
 # project). From another cluster (EKS, kind) through a pool you made, the
 # subject is the token's: .../workloadIdentityPools/$POOL/subject/system:serviceaccount:gcp:hello-world-api
 # Replace the URL, project and account with yours.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Api
 name: hello-world
 displayName: Hello World on Cloud Run

@@ -5,8 +5,8 @@ package pricing
 import (
 	"fmt"
 
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/plan"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/plan"
 )
 
 // awsPlatformInstance is the instance Auto Mode would likely give the

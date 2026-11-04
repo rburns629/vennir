@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vertra/cli/internal/cluster"
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/cluster"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // ManagedDatabase is a managed database the module made (database.type
@@ -45,17 +45,17 @@ type ManagedDatabase struct {
 
 const (
 	// DatabaseCASecret holds the managed server's CA (ca.crt), mounted at
-	// /etc/vertra/tls-db by the charts (database.caSecret).
-	DatabaseCASecret = "vertra-db-ca"
+	// /etc/vennir/tls-db by the charts (database.caSecret).
+	DatabaseCASecret = "vennir-db-ca"
 	// The console's and the gateway's database URLs (no password in them).
-	ConsoleDatabaseSecret = "vertra-console-db"
-	GatewayDatabaseSecret = "vertra-gateway-db"
+	ConsoleDatabaseSecret = "vennir-console-db"
+	GatewayDatabaseSecret = "vennir-gateway-db"
 	// DatabaseAdminAccount is the ServiceAccount database-setup runs as,
 	// bound to the module's administrator identity.
-	DatabaseAdminAccount = "vertra-db-admin"
-	databaseSetupJob     = "vertra-database-setup"
+	DatabaseAdminAccount = "vennir-db-admin"
+	databaseSetupJob     = "vennir-database-setup"
 	// ReleaseImages is where released platform images are published.
-	ReleaseImages = "ghcr.io/rburns629/vertra"
+	ReleaseImages = "ghcr.io/rburns629/vennir"
 )
 
 // url is a service's URL for the managed server: its user, no password
@@ -67,10 +67,10 @@ const (
 //   - aws: the instance has a DNS name its certificate names: verify-full.
 func (db *ManagedDatabase) url(user, database string, node bool) string {
 	u := url.URL{Scheme: "postgresql", User: url.User(user), Host: db.Host + ":5432", Path: "/" + database}
-	q := "sslmode=verify-ca&sslrootcert=/etc/vertra/tls-db/ca.crt"
+	q := "sslmode=verify-ca&sslrootcert=/etc/vennir/tls-db/ca.crt"
 	switch {
 	case db.Provider == "aws":
-		q = "sslmode=verify-full&sslrootcert=/etc/vertra/tls-db/ca.crt"
+		q = "sslmode=verify-full&sslrootcert=/etc/vennir/tls-db/ca.crt"
 	case node:
 		q = "uselibpqcompat=true&" + q
 	}
@@ -149,7 +149,7 @@ func KernelImage(c *config.Config, img Images) string {
 	if img.Kernel != "" {
 		return img.Kernel + ":" + img.Tag
 	}
-	return ReleaseImages + "/execution-kernel:" + c.Vertra
+	return ReleaseImages + "/execution-kernel:" + c.Vennir
 }
 
 // EnsureManagedDatabase readies the cluster for a managed database before
@@ -171,7 +171,7 @@ func EnsureManagedDatabase(ctx context.Context, r *run.Runner, c *config.Config,
 kind: Secret
 metadata:
   name: %s
-  labels: {app.kubernetes.io/managed-by: vertra}
+  labels: {app.kubernetes.io/managed-by: vennir}
 stringData:
   ca.crt: |
 %s
@@ -180,7 +180,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: %s
-  labels: {app.kubernetes.io/managed-by: vertra}
+  labels: {app.kubernetes.io/managed-by: vennir}
 stringData:
   database-url: %q
 ---
@@ -188,7 +188,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: %s
-  labels: {app.kubernetes.io/managed-by: vertra}
+  labels: {app.kubernetes.io/managed-by: vennir}
 stringData:
   database-url: %q
 ---
@@ -196,7 +196,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: %s
-  labels: {app.kubernetes.io/managed-by: vertra}%s
+  labels: {app.kubernetes.io/managed-by: vennir}%s
 `, DatabaseCASecret, indent(db.CACert),
 		ConsoleDatabaseSecret, db.url(db.ConsoleUser, "execution_console", true),
 		GatewayDatabaseSecret, db.url(db.GatewayUser, "execution_console", false),
@@ -258,7 +258,7 @@ func databaseSetupManifest(db *ManagedDatabase, image string) (string, error) {
 kind: Job
 metadata:
   name: %s
-  labels: {app.kubernetes.io/managed-by: vertra}
+  labels: {app.kubernetes.io/managed-by: vennir}
 spec:
   backoffLimit: 3
   ttlSecondsAfterFinished: 3600
@@ -278,7 +278,7 @@ spec:
 %s
             - {name: DATABASE_SETUP, value: %q}
           volumeMounts:
-            - {name: db-ca, mountPath: /etc/vertra/tls-db, readOnly: true}
+            - {name: db-ca, mountPath: /etc/vennir/tls-db, readOnly: true}
           resources:
             requests: {cpu: 50m, memory: 64Mi}
             limits: {memory: 128Mi}

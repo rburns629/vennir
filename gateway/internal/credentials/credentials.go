@@ -213,7 +213,7 @@ func (m *Minter) awsCredentials(ctx context.Context, namespace, serviceAccount, 
 	}
 	c := out.Credentials
 	creds := &aws.Credentials{AccessKeyID: aws.ToString(c.AccessKeyId), SecretAccessKey: aws.ToString(c.SecretAccessKey),
-		SessionToken: aws.ToString(c.SessionToken), Source: "vertra-gateway", CanExpire: true, Expires: aws.ToTime(c.Expiration)}
+		SessionToken: aws.ToString(c.SessionToken), Source: "vennir-gateway", CanExpire: true, Expires: aws.ToTime(c.Expiration)}
 	m.remember(key, cached{aws: creds}, creds.Expires)
 	return creds, nil
 }
@@ -221,7 +221,7 @@ func (m *Minter) awsCredentials(ctx context.Context, namespace, serviceAccount, 
 // sessionName says which API's ServiceAccount assumed the role, within
 // AWS's 64 characters of [\w+=,.@-].
 func sessionName(namespace, serviceAccount string) string {
-	name := "vertra." + namespace + "." + serviceAccount
+	name := "vennir." + namespace + "." + serviceAccount
 	if len(name) > 64 {
 		name = name[:64]
 	}

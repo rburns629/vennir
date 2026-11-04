@@ -19,7 +19,7 @@ export interface ChatTask {
 }
 
 /**
- * Questions that aren't about Vertra, each to be answered with the scope
+ * Questions that aren't about Vennir, each to be answered with the scope
  * answer (offTopic), the model never asked: everyday ones, ones near the
  * platform's own subjects, and ones trying to talk it out of its scope.
  * The question set (docQuestions.ts) is the other half: none of those may

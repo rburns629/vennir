@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-/** ResourceService (proto/vertra/console/v1/resource.proto): core/resources.ts over Connect. */
+/** ResourceService (proto/vennir/console/v1/resource.proto): core/resources.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import { decideDeleteRequest, deleteResources, deleteRunResources, listDeleteRequests, listResources, type ResourceRef } from "../../core/resources.js";
-import type { ResourceService } from "../../gen/vertra/console/v1/resource_pb.js";
+import type { ResourceService } from "../../gen/vennir/console/v1/resource_pb.js";
 import { callerOf, logOf } from "../context.js";
 import { timestamp, unsetIfEmpty } from "../convert.js";
 import { check } from "../validate.js";

@@ -10,8 +10,8 @@
  * The form says what it can before sending (a required field, a pattern, a
  * length or a limit), on the field; the server checks the result against the
  * full schema (../../src/core/templates.ts), and its problems are put back on
- * their fields too. The catalog's form hints shape it: x-vertra-order,
- * x-vertra-group, x-vertra-widget (textarea) and x-vertra-pattern-message
+ * their fields too. The catalog's form hints shape it: x-vennir-order,
+ * x-vennir-group, x-vennir-widget (textarea) and x-vennir-pattern-message
  * (catalog-template/tools/product.schema.json).
  */
 
@@ -42,7 +42,7 @@ export interface Field {
   choices: unknown[];
   /** Long text gets a bigger box. */
   multiline: boolean;
-  /** The heading it's shown under (x-vertra-group), if any. */
+  /** The heading it's shown under (x-vennir-group), if any. */
   group: string | undefined;
   /** For a list: what each item is. */
   itemKind: "text" | "number" | "integer";
@@ -91,7 +91,7 @@ function rulesOf(property: Record<string, unknown>, kind: FieldKind): Rules {
   const source = kind === "list" && isRecord(property["items"]) ? { ...property["items"], ...property } : property;
   const rules: Rules = {
     pattern: str(source["pattern"]),
-    patternMessage: str(source["x-vertra-pattern-message"]),
+    patternMessage: str(source["x-vennir-pattern-message"]),
     minLength: num(source["minLength"]),
     maxLength: num(source["maxLength"]),
     minimum: num(source["minimum"]),
@@ -104,7 +104,7 @@ function rulesOf(property: Record<string, unknown>, kind: FieldKind): Rules {
   return Object.fromEntries(Object.entries(rules).filter(([, v]) => v !== undefined)) as Rules;
 }
 
-/** The form's fields in order (x-vertra-order first, then as written), or null when the schema has no properties to show (edit it as JSON). */
+/** The form's fields in order (x-vennir-order first, then as written), or null when the schema has no properties to show (edit it as JSON). */
 export function fieldsOf(schema: Record<string, unknown>): Field[] | null {
   const properties = schema["properties"];
   if (!isRecord(properties) || Object.keys(properties).length === 0) return null;
@@ -121,12 +121,12 @@ export function fieldsOf(schema: Record<string, unknown>): Field[] | null {
       description: str(property["description"]),
       required: required.has(name),
       choices: kind === "choice" ? (property["enum"] as unknown[]) : [],
-      multiline: kind === "json" || property["x-vertra-widget"] === "textarea" || (kind === "text" && maxLength !== undefined && maxLength > 200),
-      group: str(property["x-vertra-group"]),
+      multiline: kind === "json" || property["x-vennir-widget"] === "textarea" || (kind === "text" && maxLength !== undefined && maxLength > 200),
+      group: str(property["x-vennir-group"]),
       itemKind: SCALAR[String(items["type"])] ?? "text",
       rules: rulesOf(property, kind),
     };
-    return { field, order: num(property["x-vertra-order"]) ?? Number.POSITIVE_INFINITY, written };
+    return { field, order: num(property["x-vennir-order"]) ?? Number.POSITIVE_INFINITY, written };
   });
   fields.sort((a, b) => a.order - b.order || a.written - b.written);
   return fields.map((f) => f.field);

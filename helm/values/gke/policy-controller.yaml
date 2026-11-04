@@ -5,7 +5,7 @@
 #   helm upgrade --install policy-controller sigstore/policy-controller \
 #     --version 0.10.8 -n cosign-system --create-namespace \
 #     -f helm/values/gke/policy-controller.yaml
-# Its GSA (vertra-signature-verifier) has artifactregistry.reader on
+# Its GSA (vennir-signature-verifier) has artifactregistry.reader on
 # catalog-products, through Workload Identity.
 #
 # Two things that bit when it was rolled out (2026-10-01):
@@ -24,7 +24,7 @@ webhook:
   # Drop the NotIn once the platform has moved to its own namespace.
   namespaceSelector:
     matchExpressions:
-      - key: vertra/team
+      - key: vennir/team
         operator: Exists
       - key: kubernetes.io/metadata.name
         operator: NotIn
@@ -35,4 +35,4 @@ webhook:
   # them). See templates/image-signature.yaml.
   serviceAccount:
     annotations:
-      iam.gke.io/gcp-service-account: vertra-signature-verifier@my-gcp-project.iam.gserviceaccount.com
+      iam.gke.io/gcp-service-account: vennir-signature-verifier@my-gcp-project.iam.gserviceaccount.com

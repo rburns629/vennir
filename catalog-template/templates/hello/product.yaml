@@ -2,7 +2,7 @@
 # Copy the whole folder to teams/<your-team>/products/hello/ and CHANGE the
 # lines marked below. Nothing here is code: it describes the product for
 # people and for the console.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: hello                    # the folder name
 team: try-anna             # CHANGE: your team (the parent folder)

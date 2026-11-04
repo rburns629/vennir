@@ -9,7 +9,7 @@
 # lambda:InvokeFunctionUrl and lambda:InvokeFunction. For an API Gateway
 # that takes IAM, service is execute-api. Replace the URL, account and
 # role with yours.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Api
 name: orders
 displayName: Orders (Lambda)
@@ -21,7 +21,7 @@ backend:
   url: https://abcdefghijklmnopqrstuvwxyz012345.lambda-url.us-east-2.on.aws
   auth:
     awsSigV4:
-      roleArn: arn:aws:iam::123456789012:role/vertra-orders-api
+      roleArn: arn:aws:iam::123456789012:role/vennir-orders-api
       region: us-east-2
       service: lambda
 shareWith: [web]

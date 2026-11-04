@@ -112,7 +112,7 @@ describe("a webhook URL", () => {
     expect(webhookUrlProblem(SLACK)).toBeNull();
     expect(webhookUrlProblem("https://acme.webhook.office.com/webhookb2/x")).toBeNull();
     expect(webhookUrlProblem("http://hooks.slack.com/services/x")).toMatch(/https/);
-    expect(webhookUrlProblem("https://kernel-api.vertra-system.svc/x")).toMatch(/only go to/);
+    expect(webhookUrlProblem("https://kernel-api.vennir-system.svc/x")).toMatch(/only go to/);
     expect(webhookUrlProblem("https://hooks.slack.com.evil.example/x")).toMatch(/only go to/);
     expect(webhookUrlProblem("https://u:p@hooks.slack.com/x")).toMatch(/user name/);
   });
@@ -358,9 +358,9 @@ describe("the inbox", () => {
 
 describe("email", () => {
   it("sends what each person wants of theirs, once, when the install sends email", async () => {
-    Object.assign(config.notifications.email, { host: "smtp.example.test", from: "Vertra <vertra@example.test>" });
+    Object.assign(config.notifications.email, { host: "smtp.example.test", from: "Vennir <vennir@example.test>" });
     const consoleUrl = config.consoleUrl;
-    Object.assign(config, { consoleUrl: "https://vertra.example.test" });
+    Object.assign(config, { consoleUrl: "https://vennir.example.test" });
     try {
       // The member keeps the defaults (failures among them); the maintainer wants none.
       expect((await call(maintainerToken, "NotificationService/SetEmailPreferences", { kinds: [] })).code).toBe("ok");
@@ -377,7 +377,7 @@ describe("email", () => {
       await deliverEmails(silent);
       const ours = sent.filter((m) => m.subject.startsWith(prefix));
       expect(ours.map((m) => [m.to, m.subject])).toEqual([[member.email, `${prefix} mailed failed`]]);
-      expect(ours[0]?.text).toContain(`https://vertra.example.test/runs/${executionId}`);
+      expect(ours[0]?.text).toContain(`https://vennir.example.test/runs/${executionId}`);
     } finally {
       Object.assign(config, { consoleUrl });
       Object.assign(config.notifications.email, { host: "", from: "" });

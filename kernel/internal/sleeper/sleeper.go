@@ -2,7 +2,7 @@
 
 // Package sleeper puts an idle platform to sleep: scales its Deployments to
 // zero, so a quiet install costs only its databases' volumes. Waking is
-// explicit (`vertra wake`): a sleeping console can't wake itself. The
+// explicit (`vennir wake`): a sleeping console can't wake itself. The
 // chart runs `kernel sleep` as a CronJob: one look, then exit; `kernel
 // sleep --now` is a scheduled sleep, which waits for unfinished executions
 // first. A failure exits non-zero; the next run starts afresh.
@@ -22,11 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/rburns629/vertra/kernel/internal/config"
+	"github.com/rburns629/vennir/kernel/internal/config"
 )
 
 // AwakeReplicasKey is the state ConfigMap's key holding {deployment:
-// replicas} while asleep; vertra wake reads the same key.
+// replicas} while asleep; vennir wake reads the same key.
 const AwakeReplicasKey = "awakeReplicas"
 
 // LastActivity is the latest of the moments known (nil when none is).
@@ -235,7 +235,7 @@ func (p *Platform) resume(ctx context.Context, cronJob string) error {
 
 // Wake scales each Deployment back to what it was before sleeping (the
 // databases first), resumes the sleeper's CronJob, and stands the wake
-// CronJob down: what `vertra wake` does, from inside the cluster, for a
+// CronJob down: what `vennir wake` does, from inside the cluster, for a
 // schedule. Nothing recorded: already awake.
 func Wake(ctx context.Context, s config.Settings, p *Platform, log *slog.Logger) error {
 	callCtx, cancel := p.call(ctx)
@@ -304,7 +304,7 @@ func Run(ctx context.Context, s config.Settings, platform *Platform, activity Ac
 		}
 	}
 	if len(awake) == 0 {
-		// Asleep some other way (vertra sleep, by hand): stop looking.
+		// Asleep some other way (vennir sleep, by hand): stop looking.
 		if err := platform.Suspend(ctx, s.SleeperCronJob); err != nil {
 			return err
 		}

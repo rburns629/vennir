@@ -36,7 +36,7 @@ The text under each one is read from this install's own settings, so it names th
 | Logs redacted, and searched only by who may see them | Log search is on |
 | The console's writes fenced to team namespaces | The console's Secret, ServiceAccount and RBAC writes can't leave team namespaces |
 | Single sign-on | People may sign in with single sign-on; a team can require it |
-| Teams from the directory | Not yet: team membership is set in Vertra |
+| Teams from the directory | Not yet: team membership is set in Vennir |
 | A write-once copy of the audit log | The audit log is copied to storage that refuses deletes and overwrites ([the copy](#is-the-audit-log-intact-its-write-once-copy)) |
 
 **Off here** is a choice the install's admins made, not a fault, except for the audit copy, where it can mean the copy stopped. If a check you rely on is off, ask an admin.
@@ -142,7 +142,7 @@ Fill in what you know and press **Search**:
 | **From** | **Steps**, **API backends**, or (admins) **The platform** |
 | **Team** | One team's namespace, or **Any** |
 | **Run id** | One run's steps (only with **From: Steps**) |
-| **API** | One API product's backend (only with **From: API backends**): its Pods labelled `vertra/api: <name>` |
+| **API** | One API product's backend (only with **From: API backends**): its Pods labelled `vennir/api: <name>` |
 | **Level** | `debug`, `info`, `warn` or `error`, or **Any** |
 | **When** | **Last hour** up to **Last 30 days**, no further back than the install keeps searchable |
 
@@ -159,7 +159,7 @@ Credentials a step or backend prints are redacted before anything is kept. Older
 | Your teams' steps, every level | You |
 | Another team's steps in a run you own (you submitted it, or it's your team's template run or DAG) | Their `info` lines only |
 | Another team's steps in runs you don't own | No one but that team and admins |
-| An API backend's lines (Pods labelled `vertra/api-backend: "true"`), every level | Its own team and admins only: they belong to no run, so no caller sees them |
+| An API backend's lines (Pods labelled `vennir/api-backend: "true"`), every level | Its own team and admins only: they belong to no run, so no caller sees them |
 | The platform's own logs | Admins only |
 
 A step's lines count as `info` only when it logs them as JSON with `"level": "info"`. Anything else, plain lines included, stays with its team. A product that wants its consumers to see progress logs it as JSON `info`.

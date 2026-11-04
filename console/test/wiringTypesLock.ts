@@ -10,7 +10,7 @@ import pg from "pg";
 
 import { config } from "../src/config.js";
 
-const KEY = "select hashtext('vertra-tests:wiring_types')::bigint as key";
+const KEY = "select hashtext('vennir-tests:wiring_types')::bigint as key";
 
 /** Waits for the lock; the function it returns releases it. */
 export async function lockWiringTypes(): Promise<() => Promise<void>> {

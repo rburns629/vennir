@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# What vertra turns into Helm values and kubectl access.
+# What vennir turns into Helm values and kubectl access.
 
 output "cluster" {
   value = {
@@ -41,12 +41,12 @@ output "backup" {
   } : null
 }
 
-# Where steps run: the node pool vertra adds to Auto Mode
-# (vertra-steps), or standard mode's steps group; the same label and taint.
+# Where steps run: the node pool vennir adds to Auto Mode
+# (vennir-steps), or standard mode's steps group; the same label and taint.
 output "step_placement" {
   value = {
-    nodeSelector = { "vertra.dev/pool" = "steps" }
-    tolerations  = [{ key = "vertra.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
+    nodeSelector = { "vennir.dev/pool" = "steps" }
+    tolerations  = [{ key = "vennir.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
   }
 }
 
@@ -60,12 +60,12 @@ output "spot" {
 output "capacity_placements" {
   value = local.spot ? {
     spot = {
-      nodeSelector = { "vertra.dev/pool" = "steps", "karpenter.sh/capacity-type" = "spot" }
-      tolerations  = [{ key = "vertra.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
+      nodeSelector = { "vennir.dev/pool" = "steps", "karpenter.sh/capacity-type" = "spot" }
+      tolerations  = [{ key = "vennir.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
     }
     onDemand = {
-      nodeSelector = { "vertra.dev/pool" = "steps", "karpenter.sh/capacity-type" = "on-demand" }
-      tolerations  = [{ key = "vertra.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
+      nodeSelector = { "vennir.dev/pool" = "steps", "karpenter.sh/capacity-type" = "on-demand" }
+      tolerations  = [{ key = "vennir.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
     }
   } : {}
 }
@@ -94,7 +94,7 @@ output "signing" {
 }
 
 # The managed database: where it is, the users the services sign in as (no
-# passwords of Vertra's), and the administrator's password's secret, which
+# passwords of Vennir's), and the administrator's password's secret, which
 # only database-setup's role may read.
 output "database" {
   value = var.managed_database ? {

@@ -32,7 +32,7 @@ vi.mock("@aws-sdk/client-ecr", () => ({
 }));
 
 const HOST = "123456789012.dkr.ecr.us-east-2.amazonaws.com";
-const ROLE = "arn:aws:iam::123456789012:role/vertra-reader-vertra-gke";
+const ROLE = "arn:aws:iam::123456789012:role/vennir-reader-vennir-gke";
 const saved = { ...config.registryFederation };
 const savedEcrToken = config.registryEcrToken;
 let stsCalls: { url: string; body: URLSearchParams }[];
@@ -134,8 +134,8 @@ describe("registry federation to Amazon ECR", () => {
 
   it("signs the console's image checks in to the owner's registry", async () => {
     sts(200, credentials(3_600_000));
-    const image = `${HOST}/vertra-products/platform/p-${randomUUID().slice(0, 8)}:latest`;
-    expect(await checkImage(image, [`${HOST}/vertra-products/`])).toBe("available");
+    const image = `${HOST}/vennir-products/platform/p-${randomUUID().slice(0, 8)}:latest`;
+    expect(await checkImage(image, [`${HOST}/vennir-products/`])).toBe("available");
     expect(registryAuthorizations).toEqual([null, `Basic ${Buffer.from("AWS:ecr-password").toString("base64")}`]);
   });
 

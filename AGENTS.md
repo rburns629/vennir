@@ -1,13 +1,13 @@
 # Codebase guide
 
-Vertra runs pre-resolved DAGs of containerized "product" steps as
+Vennir runs pre-resolved DAGs of containerized "product" steps as
 Kubernetes Jobs, passing each step's outputs to the steps that depend on
 them, with each team's credentials kept to its own namespace and its own
 reviewed products. A step can be anything packaged as a container, from a
 hello-world script to creating cloud infrastructure. Long-form docs
 already exist — check them before re-deriving anything:
 
-- `docs/architecture.md`: what Vertra is, the pieces, the request flow,
+- `docs/architecture.md`: what Vennir is, the pieces, the request flow,
   the data, and the design decisions. Start here.
 - `docs/operations.md`: installing (kind and Helm), upgrading, databases,
   backups, network policies, troubleshooting.
@@ -33,7 +33,7 @@ already exist — check them before re-deriving anything:
 - `TODO.md`: the actionable follow-up list (security, access, operations,
   housekeeping). Check it before proposing work; update it when an item is
   done or a new one is found.
-- `cli/DESIGN.md`: the design for `vertra`, the installer CLI (Go,
+- `cli/DESIGN.md`: the design for `vennir`, the installer CLI (Go,
   OpenTofu for the cloud side); read it before working on `cli/`.
 - `catalog-template/`: what a new catalog repository starts as. Its docs
   (including `docs/onboarding-with-ai.md`) are for catalog teams, **not**
@@ -53,7 +53,7 @@ its own directory.
   coordinate only through Postgres rows (`cmd/kernel`; the subcommand
   picks the process):
   - `kernel api` (kernel-api, `internal/api`): KernelService
-    (`proto/vertra/kernel/v1`) over Connect, which accepts, reads,
+    (`proto/vennir/kernel/v1`) over Connect, which accepts, reads,
     cancels and retries executions. It accepts only the console, by its
     ServiceAccount token (`internal/api/auth.go`, TokenReview), and must
     only be reachable in-cluster. It has no users or teams.
@@ -87,7 +87,7 @@ its own directory.
     `package.json`.
   - The API is Connect services defined in `proto/` (`make proto`
     regenerates the console's, frontend's and CLI's code and the API
-    reference), served at `/api/vertra.console.v1.<Service>/<Method>` by
+    reference), served at `/api/vennir.console.v1.<Service>/<Method>` by
     `src/rpc/`. `src/rpc/services/*.ts` only map messages; what a method
     does lives in `src/core/`, which throws `ApiError` (`src/apiError.ts`)
     to refuse. A new method: its rpc in `proto/`, `make proto`, its logic in
@@ -96,14 +96,14 @@ its own directory.
     These writes are security-sensitive and idempotent (read, then
     create-or-replace; a product's ServiceAccount is create-only). The
     console's only RBAC write is one RoleBinding per team namespace,
-    `vertra-scheduler-logs`, letting the kernel's scheduler read its steps'
+    `vennir-scheduler-logs`, letting the kernel's scheduler read its steps'
     logs there (`src/schedulerLogs.ts`; its write fence allows nothing
     else); otherwise it only deletes the per-secret Roles older versions
     made.
 - **`gateway/`** (Go 1.26+, pgx, libopenapi-validator): the API gateway
   (decision 20, `docs/assessment.md`), forwarding to each API product's
   backend exactly what its OpenAPI document describes. It reads the
-  console's database as a role of its own (`vertra_gateway`, granted by
+  console's database as a role of its own (`vennir_gateway`, granted by
   `console/src/db/gatewayAccess.ts`: a column it starts to read is granted
   there) (published APIs; who callers are, checked exactly as
   `console/src/auth/plugin.ts` does, and kept in step with it), writing
@@ -119,10 +119,10 @@ its own directory.
   each cluster's settings for them and for the third-party charts (ESO,
   policy-controller; on kind, cert-manager and Traefik for `make kind-tls`). The Helm release names are
   `kernel` and `console`, installed into the platform's own namespace
-  `vertra-system`, never a team namespace.
+  `vennir-system`, never a team namespace.
 - **Task namespaces are allowlisted by an admission policy**
   (`helm/charts/execution-kernel/templates/dispatch-policy.yaml`). The scheduler
-  can only create Jobs in namespaces labelled `vertra/team=true`, and
+  can only create Jobs in namespaces labelled `vennir/team=true`, and
   never in its own. A rejection surfaces as a non-retryable
   `DISPATCH_REJECTED` task failure. New team namespaces need the label.
 - **Task images are allowlisted too** (`helm/charts/execution-kernel/templates/image-policy.yaml`).
@@ -169,9 +169,9 @@ its own directory.
   platform's own namespace, and it isn't installed on kind (it can't reach
   `localhost:5001`).
 - **Team lifecycle, namespaces included, is the console's**: creating a
-  team creates its namespace (`vertra/team=true`); a team can be
+  team creates its namespace (`vennir/team=true`); a team can be
   *retired* (reversible: read-only in the console, namespace relabelled
-  `vertra/team=retired`) and then *purged* (soft-deleted so its name stays
+  `vennir/team=retired`) and then *purged* (soft-deleted so its name stays
   reserved; `TeamService/PurgeTeam`). The namespace stays, labelled
   retired, for a cluster administrator to delete: the console may delete it
   only with `teamNamespaces.purge`, off on purpose so the identity that
@@ -184,9 +184,9 @@ its own directory.
   `ensureNotRetired` (`console/src/core/retired.ts`). Team lookups skip
   purged teams unless they use `findTeamByNameIncludingDeleted`.
 - **The console pulls the catalog** (`console/src/catalogSync.ts`): catalog
-  CI publishes images, then `./vertra catalog release` pushes the whole catalog
+  CI publishes images, then `./vennir catalog release` pushes the whole catalog
   as a signed OCI artifact, `<registry>/catalog-release`
-  (`proto/vertra/catalog/v1/release.proto`). Each console polls it
+  (`proto/vennir/catalog/v1/release.proto`). Each console polls it
   (`catalog.release` in the console chart), verifies it with a cosign Job
   when `catalog.signature` trusts a signer, and applies it with the old
   catalog token's rights: teams ensured, products registered, SecretStores
@@ -196,29 +196,29 @@ its own directory.
   holds no console or cluster credential, and serves any number of
   installs. A store's stored credential is set per install
   (`TeamService/SetSecretStoreCredential`).
-  An install can read another's catalog (`externalCatalog` in vertra.yaml);
+  An install can read another's catalog (`externalCatalog` in vennir.yaml);
   a Google Artifact Registry on another cloud it reads by Workload Identity
   Federation, the console handing the kubelet and its Jobs the hour's token
   (`console/src/registryFederation.ts`).
 - **`catalog-template/`**: what a new catalog repository starts as
-  (the `./vertra` wrapper, its workflows, the starter `templates/`, an empty `teams/`
+  (the `./vennir` wrapper, its workflows, the starter `templates/`, an empty `teams/`
   for the adopter's first team, and `samples/`: `local`, one no-cloud
   product in five languages that new teams copy starters from (and
   `ticket`, a sample of resources and cleanup), and `gcp`,
   `aws`, `azure`, billed cloud examples; azure unproven). It's
   versioned with the platform because its release format and schemas must
-  match the console's; `.github/scripts/catalog-template.sh` runs `vertra catalog`
+  match the console's; `.github/scripts/catalog-template.sh` runs `vennir catalog`
   in it with samples installed as teams (CI checks it that way, and
   `make catalog-publish` publishes it that way). A team's real products live in its own catalog
   repository, created from this, **not here**; adding a product needs no
   change to this repo. Its files are catalog format v2 (`apiVersion:
-  vertra.dev/v2` and a `kind`: Team, Product, Template, Dag); the schemas
-  are in `tools/` and embedded in vertra (`cli/internal/catalogtool/
+  vennir.dev/v2` and a `kind`: Team, Product, Template, Dag); the schemas
+  are in `tools/` and embedded in vennir (`cli/internal/catalogtool/
   schemas/`, kept equal by a test): change both together.
 - **`perf/`**: performance benchmarks on a kind cluster of their own,
-  `vertra-perf` (`perf/README.md`: the runbook, and what's been found).
-  Never run them on `vertra-local` or a shared cluster; every Makefile kind
-  target takes `KIND_CLUSTER=vertra-perf`.
+  `vennir-perf` (`perf/README.md`: the runbook, and what's been found).
+  Never run them on `vennir-local` or a shared cluster; every Makefile kind
+  target takes `KIND_CLUSTER=vennir-perf`.
 - **`_local/`** (gitignored): personal scratch space, such as a clone of
   your own catalog repository.
 - `examples/`: fake demo products (`project-product`,
@@ -304,7 +304,7 @@ go build -o /tmp/kernel ./cmd/kernel     # then e.g. /tmp/kernel api
 A schema change is a new `internal/migrate/sql/NNNN_name.sql`; the
 console's database guide (`console/docs/06-database-schemas.md`) documents
 it, and a test checks it does. kernel-api's API is
-`proto/vertra/kernel/v1/kernel.proto`: `make proto` after changing it.
+`proto/vennir/kernel/v1/kernel.proto`: `make proto` after changing it.
 
 - Integration and end-to-end tests use **real Postgres**: `make test` (repo
   root) starts a throwaway container on `127.0.0.1:55432`, migrates both test
@@ -350,11 +350,11 @@ CLI (`cd cli`, Go 1.26+; CI uses the `golang:1.27-alpine` image by digest):
 ```
 go test ./...                              # unit tests: config, prompts, values, the approval screen
 go vet ./... && gofmt -l .
-go build -o vertra ./cmd/vertra    # then e.g. ./vertra init dev; ./vertra apply dev
+go build -o vennir ./cmd/vennir    # then e.g. ./vennir init dev; ./vennir apply dev
 ```
 
-`vertra` keeps each environment in `./deploy/<env>/` (gitignored here),
-or wherever `--config`/`VERTRA_CONFIG` points. It only runs kubectl,
+`vennir` keeps each environment in `./deploy/<env>/` (gitignored here),
+or wherever `--config`/`VENNIR_CONFIG` points. It only runs kubectl,
 helm, docker and kind (each pinned and checksum-verified when it downloads
 them). To try it end to end without touching your own install, give it a
 kind cluster of its own (`--cluster-name`); it shares the `kind-registry`.

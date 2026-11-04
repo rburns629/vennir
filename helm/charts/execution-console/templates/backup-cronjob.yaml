@@ -111,7 +111,7 @@ spec:
                   value: {{ .Values.postgres.auth.database | quote }}
                 {{- if .Values.tls.enabled }}
                 - {name: PGSSLMODE, value: verify-full}
-                - {name: PGSSLROOTCERT, value: /etc/vertra/tls-db/ca.crt}
+                - {name: PGSSLROOTCERT, value: /etc/vennir/tls-db/ca.crt}
                 {{- end }}
               volumeMounts:
                 - name: backup

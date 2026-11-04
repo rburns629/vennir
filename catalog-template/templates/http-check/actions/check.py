@@ -54,7 +54,7 @@ def main() -> int:
         return fail("INVALID_INPUT", "inputs.url must be an https:// URL.", retryable=False)
     expect = inputs.get("expectStatus", 200)
 
-    request = urllib.request.Request(url, method="GET", headers={"User-Agent": "vertra-http-check"})
+    request = urllib.request.Request(url, method="GET", headers={"User-Agent": "vennir-http-check"})
     use_token = bool(inputs.get("useToken"))
     if use_token:
         if not TOKEN_PATH.is_file():

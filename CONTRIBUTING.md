@@ -1,4 +1,4 @@
-# Contributing to Vertra
+# Contributing to Vennir
 
 Thanks for helping. This page covers setting up, testing, and what a pull
 request needs. For security issues, see [`SECURITY.md`](SECURITY.md) instead.
@@ -46,8 +46,8 @@ make test-db-down     # removes it
 ```
 
 Integration tests use a real Postgres, not mocks. `make test-db` runs it as a
-throwaway container (`vertra-test-db`) on `127.0.0.1:55432`, apart from any
-Postgres you already run and from any Vertra install. To run a suite by hand
+throwaway container (`vennir-test-db`) on `127.0.0.1:55432`, apart from any
+Postgres you already run and from any Vennir install. To run a suite by hand
 against it, set `TEST_DATABASE_URL`:
 
 ```
@@ -101,7 +101,7 @@ to what you write, check that it allows you to contribute first.
 
 ## License
 
-Vertra is released under the [MIT License](LICENSE); your contributions are
+Vennir is released under the [MIT License](LICENSE); your contributions are
 covered by the [CLA](CLA.md). New source files start with the license identifier:
 
 ```

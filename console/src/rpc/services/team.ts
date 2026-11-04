@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-/** TeamService (proto/vertra/console/v1/team.proto): core/teams.ts over Connect. */
+/** TeamService (proto/vennir/console/v1/team.proto): core/teams.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import {
@@ -27,7 +27,7 @@ import {
   TeamName,
   unretireTeam,
 } from "../../core/teams.js";
-import { TaskPodState, TeamRole, type TeamService } from "../../gen/vertra/console/v1/team_pb.js";
+import { TaskPodState, TeamRole, type TeamService } from "../../gen/vennir/console/v1/team_pb.js";
 import type { TeamRole as Role } from "../../db/schema.js";
 import { timestamp } from "../convert.js";
 import { callerOf, logOf } from "../context.js";

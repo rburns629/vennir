@@ -74,7 +74,7 @@ func TestAMisconfigurationStopsTheSchedulerAtStartup(t *testing.T) {
 		"not a boolean":       {"TASK_POD_HARDENING": "maybe"},
 		"unknown auth":        {"API_AUTH": "none"},
 		"callers not a list":  {"API_ALLOWED_CALLERS": "system:serviceaccount:a:b"},
-		"kernel's label":      {"TASK_POD_LABELS": `{"vertra.dev/execution-id": "x"}`},
+		"kernel's label":      {"TASK_POD_LABELS": `{"vennir.dev/execution-id": "x"}`},
 		"app label":           {"TASK_POD_LABELS": `{"app": "other"}`},
 		"bad label key":       {"TASK_POD_LABELS": `{"has space": "true"}`},
 		"bad label value":     {"TASK_POD_LABELS": `{"team": "not/valid"}`},
@@ -100,7 +100,7 @@ func TestAMisconfigurationStopsTheSchedulerAtStartup(t *testing.T) {
 
 func TestTheAPIAndSleeperSettings(t *testing.T) {
 	s, err := load(t, map[string]string{
-		"API_ALLOWED_CALLERS":          `["system:serviceaccount:vertra-system:console"]`,
+		"API_ALLOWED_CALLERS":          `["system:serviceaccount:vennir-system:console"]`,
 		"SLEEPER_DEPLOYMENTS":          `["kernel-api", "console"]`,
 		"SLEEPER_DATABASE_DEPLOYMENTS": `["kernel-postgres"]`,
 		"SLEEPER_IDLE_AFTER_SECONDS":   "600",
@@ -108,8 +108,8 @@ func TestTheAPIAndSleeperSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.APIAuth != "tokenreview" || s.APITokenAudience != "vertra-kernel-api" || s.APIPort != 8000 || s.MaxTasksPerExecution != 500 ||
-		!reflect.DeepEqual(s.APIAllowedCallers, []string{"system:serviceaccount:vertra-system:console"}) ||
+	if s.APIAuth != "tokenreview" || s.APITokenAudience != "vennir-kernel-api" || s.APIPort != 8000 || s.MaxTasksPerExecution != 500 ||
+		!reflect.DeepEqual(s.APIAllowedCallers, []string{"system:serviceaccount:vennir-system:console"}) ||
 		!reflect.DeepEqual(s.SleeperDeployments, []string{"kernel-api", "console"}) ||
 		!reflect.DeepEqual(s.SleeperDatabases, []string{"kernel-postgres"}) ||
 		s.SleeperIdleAfter != 10*time.Minute || s.SleeperScheduledWait != 6*time.Hour {

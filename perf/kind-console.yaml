@@ -1,6 +1,6 @@
-# The console on the performance cluster (vertra-perf), on top of
+# The console on the performance cluster (vennir-perf), on top of
 # helm/values/kind/console.yaml: its catalog is the perf sample alone, under
 # a registry path of its own, so publishing it never changes what the
-# vertra-local cluster's console applies (both share the local registry).
+# vennir-local cluster's console applies (both share the local registry).
 catalog:
   release: localhost:5001/perf-catalog/catalog-release:latest

@@ -38,7 +38,7 @@ class Scripted implements ChatModel {
   readonly scopeSeen: ChatMessage[][] = [];
   constructor(
     private readonly replies: ((sent: ChatMessage[]) => Partial<ModelReply>)[],
-    private readonly scope = "VERTRA",
+    private readonly scope = "VENNIR",
   ) {}
   complete(messages: ChatMessage[], _tools: unknown, options?: CompleteOptions): Promise<ModelReply> {
     if (options?.quick) {
@@ -174,7 +174,7 @@ describe("answering from the docs", () => {
 });
 
 describe("guardrails", () => {
-  it("answers a question that isn't about Vertra with the same words, without asking the model", async () => {
+  it("answers a question that isn't about Vennir with the same words, without asking the model", async () => {
     const model = new Scripted([say("Paris.")], "OTHER");
     const answer = await ask(person([mine]), question("What's the capital of France?"), log, model);
     expect(answer).toMatchObject({ text: OFF_TOPIC, offTopic: true, citations: [], cart: null, steps: [] });
@@ -271,7 +271,7 @@ describe("as it goes", () => {
       name: "watching",
       complete: (_m, _t, options) => {
         signals.push(options?.signal);
-        return Promise.resolve({ content: options?.quick ? "VERTRA" : "The docs don't cover that.", toolCalls: [], finishReason: "stop" });
+        return Promise.resolve({ content: options?.quick ? "VENNIR" : "The docs don't cover that.", toolCalls: [], finishReason: "stop" });
       },
     };
     const gone = new AbortController();
@@ -435,7 +435,7 @@ describe("the openai-compatible model", () => {
     const fetchFn = vi.fn((_url: string, init: { headers: Record<string, string>; body: string }) => {
       sent.push({ headers: init.headers, body: JSON.parse(init.body) as Record<string, unknown> });
       return Promise.resolve(
-        new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "VERTRA" } }], usage: { prompt_tokens: 500, completion_tokens: 3, prompt_tokens_details: { cached_tokens: 200 } } })),
+        new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "VENNIR" } }], usage: { prompt_tokens: 500, completion_tokens: 3, prompt_tokens_details: { cached_tokens: 200 } } })),
       );
     });
     let tokens = 0;
@@ -591,7 +591,7 @@ describe("rating answers", () => {
     const rating = {
       rating: "down",
       question: `${prefix} how do I back up?`,
-      answer: "Run vertra config set backup.enabled [S1].",
+      answer: "Run vennir config set backup.enabled [S1].",
       citations: [{ id: "S1", guide: "reference-operations", title: "Operations", heading: "Backups", kind: "operating", link: "/docs/reference-operations#backups" }],
       steps: ["search_docs"],
       model: "claude-haiku-5-5",

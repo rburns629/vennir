@@ -1,6 +1,6 @@
-# How Vertra works under the hood
+# How Vennir works under the hood
 
-Vertra is built from ordinary pieces: Kubernetes, Helm, Postgres, a web app. Many of them are used in ways their manuals don't lead with. This guide lists each one: what the feature is normally for, what Vertra uses it for, why, and where to find it in the code. Read it with the architecture diagrams in `docs/architecture/` (system, classes, the submit-to-finished sequence, states) and [Where Vertra keeps its data](06-database-schemas.md).
+Vennir is built from ordinary pieces: Kubernetes, Helm, Postgres, a web app. Many of them are used in ways their manuals don't lead with. This guide lists each one: what the feature is normally for, what Vennir uses it for, why, and where to find it in the code. Read it with the architecture diagrams in `docs/architecture/` (system, classes, the submit-to-finished sequence, states) and [Where Vennir keeps its data](06-database-schemas.md).
 
 ```mermaid
 flowchart TB
@@ -55,14 +55,14 @@ flowchart TB
 
 ### Labels as a query index
 - **Normally:** labels group and select objects.
-- **Here:** every task Pod carries `vertra.dev/execution-id` and `vertra.dev/attempt`, plus the annotation `vertra.dev/task`. The Team page's **Running now** finds a team's live Pods by these labels, straight from Kubernetes, without asking the kernel.
+- **Here:** every task Pod carries `vennir.dev/execution-id` and `vennir.dev/attempt`, plus the annotation `vennir.dev/task`. The Team page's **Running now** finds a team's live Pods by these labels, straight from Kubernetes, without asking the kernel.
 - **Code:** `kernel/internal/executor/kubernetes.go` (`jobFor`), `console/src/k8s.ts` (`listTaskPods`).
 
 ## Isolation and security
 
 ### One namespace per team, with its state in a label
 - **Normally:** namespaces separate applications.
-- **Here:** a team's name is its namespace's name, and the namespace's label holds the team's state: `vertra/team=true` while active, `vertra/team=retired` once retired. Retiring a team is one label change, because the admission policies read the label.
+- **Here:** a team's name is its namespace's name, and the namespace's label holds the team's state: `vennir/team=true` while active, `vennir/team=retired` once retired. Retiring a team is one label change, because the admission policies read the label.
 - **Code:** `console/src/core/teams.ts` and `console/src/k8s.ts` (`setTeamNamespace`: the console creates and relabels it), limited by the console chart's `namespace-policy.yaml`; `console/src/db/schema.ts` (no separate namespace column, on purpose).
 
 ### Who may mount a Secret is an admission policy, not RBAC
@@ -73,7 +73,7 @@ flowchart TB
 ### Admission policies as the last line of defence
 - **Normally:** a ValidatingAdmissionPolicy enforces cluster-wide rules, written in CEL and run by the API server itself, with no webhook server to operate.
 - **Here:** five policies back up what the console already checks, so a bug in, or a way around, the console still can't cause harm:
-  - **dispatch-policy:** the scheduler may create Jobs and ConfigMaps only in namespaces labelled `vertra/team=true`, never in its own (GKE allows its own for now, until the platform moves out of `default`). `matchConditions` limits the rule to the scheduler's own identity.
+  - **dispatch-policy:** the scheduler may create Jobs and ConfigMaps only in namespaces labelled `vennir/team=true`, never in its own (GKE allows its own for now, until the platform moves out of `default`). `matchConditions` limits the rule to the scheduler's own identity.
   - **image-policy:** a task's image must come from an allowed source.
   - **identity-policy:** a task runs as `default` with no secrets, unless it's a registered product of its team, which runs as the ServiceAccount its product declares and may mount only secrets its team registered.
   - **scan-policy:** a task's image must be pinned to a digest, and that digest mustn't have failed its security scan.
@@ -100,7 +100,7 @@ flowchart TB
 ### Catalog CI with no cluster credentials
 - **Normally:** a GitOps pipeline holds credentials to apply what it merges.
 - **Here:** the catalog's workflows hold no console or cluster credential. They push images and a signed catalog release to the registry; each console pulls that release, verifies it, and applies it: it creates and retires team namespaces, registers products, and applies a team's reviewed SecretStore file after checking it holds nothing outside that team. Admission policies limit what the console itself may do to namespaces.
-- **Code:** `console/src/catalogSync.ts`, `console/src/core/teams.ts`, `console/src/secretStores.ts`, `vertra catalog secret-stores check` (`cli/internal/catalogtool/teams.go`).
+- **Code:** `console/src/catalogSync.ts`, `console/src/core/teams.ts`, `console/src/secretStores.ts`, `vennir catalog secret-stores check` (`cli/internal/catalogtool/teams.go`).
 
 ### Secrets synced from the cloud
 - **Normally:** Secrets are created by hand or by CI.
@@ -178,13 +178,13 @@ flowchart TB
 - **Code:** `console/src/index.ts`.
 
 ### An API defined by its protos
-- **Here:** the API is a set of Connect services, defined in protobuf (`proto/vertra/console/v1`): the console serves them, and its pages and `vertra` call them through clients generated from the same files, so a change to the contract shows up as a compile error in every caller, not a surprise at run time. The [API reference](api-reference.md) is generated from them too, comments included; a test fails if a service or method has no description.
+- **Here:** the API is a set of Connect services, defined in protobuf (`proto/vennir/console/v1`): the console serves them, and its pages and `vennir` call them through clients generated from the same files, so a change to the contract shows up as a compile error in every caller, not a surprise at run time. The [API reference](api-reference.md) is generated from them too, comments included; a test fails if a service or method has no description.
 - **Code:** `proto/`, `console/src/rpc/` (serving), `console/src/core/` (what each method does), `console/scripts/api-reference.ts`.
 
 ## The catalog pipeline
 
-- **A release, pulled:** on every merge to main, catalog CI publishes the changed products, then `vertra catalog release` pushes the whole catalog as one signed artifact beside the images (`<registry>/catalog-release`). Each console reads it every few minutes (or on **Sync now**), verifies its signature, and applies it. CI holds no console credential, and one catalog serves any number of installs.
-- **Teams from folders:** a team folder in `vertra-catalog` becomes a team: the release names it, and the console creates the team and its labelled namespace. A folder removed retires the team. Purging is an admin's action in the console, never a release's; the namespace stays, labelled retired, for a cluster administrator to delete.
+- **A release, pulled:** on every merge to main, catalog CI publishes the changed products, then `vennir catalog release` pushes the whole catalog as one signed artifact beside the images (`<registry>/catalog-release`). Each console reads it every few minutes (or on **Sync now**), verifies its signature, and applies it. CI holds no console credential, and one catalog serves any number of installs.
+- **Teams from folders:** a team folder in `vennir-catalog` becomes a team: the release names it, and the console creates the team and its labelled namespace. A folder removed retires the team. Purging is an admin's action in the console, never a release's; the namespace stays, labelled retired, for a cluster administrator to delete.
 - **Scan, then sign:** catalog CI builds each product, scans it, pushes it, and only then signs it with the KMS key, so "signed" means "passed the scans".
 - **Least-privilege CI:** CI signs in to the registry (on GCP, through Workload Identity Federation) and nothing else: no cluster, no console.
 - **Products register from the release:** the console registers each product action at the digest the release pins, scanning it first as any registration is, and unregisters what the release no longer has.
@@ -192,8 +192,8 @@ flowchart TB
 ## See it for yourself (kind)
 
 ```console
-$ K="kubectl --context kind-vertra-local"
-$ $K get ns -L vertra/team                          # team state as labels
+$ K="kubectl --context kind-vennir-local"
+$ $K get ns -L vennir/team                          # team state as labels
 $ $K get validatingadmissionpolicy kernel-execution-kernel-identity -o yaml   # products, team secrets
 $ $K get validatingadmissionpolicy                   # the admission policies
 $ $K get jobs,configmaps -A -w | grep ek-            # run a DAG and watch tasks come and go

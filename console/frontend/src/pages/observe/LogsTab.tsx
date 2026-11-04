@@ -275,7 +275,7 @@ export function LogsTab({
                   ))}
               </Select>
               <Typography id="logs-api-help" variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                One API: its backend&apos;s Pods labelled <Mono sx={{ fontSize: 11.5 }}>vertra/api: &lt;name&gt;</Mono>.
+                One API: its backend&apos;s Pods labelled <Mono sx={{ fontSize: 11.5 }}>vennir/api: &lt;name&gt;</Mono>.
               </Typography>
             </FormControl>
           )}

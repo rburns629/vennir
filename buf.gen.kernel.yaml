@@ -4,12 +4,12 @@ version: v2
 clean: true
 inputs:
   - directory: proto
-    paths: [proto/vertra/kernel]
+    paths: [proto/vennir/kernel]
 managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: github.com/rburns629/vertra/kernel/internal/gen
+      value: github.com/rburns629/vennir/kernel/internal/gen
 plugins:
   - local: protoc-gen-go
     out: kernel/internal/gen

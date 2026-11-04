@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // Dir is an environment's OpenTofu directory.
@@ -29,7 +29,7 @@ func In(r *run.Runner, envDir string) Dir {
 }
 
 const (
-	varsFile = "vertra.auto.tfvars.json"
+	varsFile = "vennir.auto.tfvars.json"
 	planFile = "tfplan"
 )
 

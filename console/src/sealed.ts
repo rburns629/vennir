@@ -10,7 +10,7 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:cr
 import { config } from "./config.js";
 
 const TAG_LENGTH = 16;
-const key = (purpose: string) => Buffer.from(hkdfSync("sha256", config.jwtSecret, "vertra", purpose, 32));
+const key = (purpose: string) => Buffer.from(hkdfSync("sha256", config.jwtSecret, "vennir", purpose, 32));
 
 export function seal(value: string, purpose: string): string {
   const iv = randomBytes(12);

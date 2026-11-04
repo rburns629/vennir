@@ -51,7 +51,7 @@ class DeleteActionTest(unittest.TestCase):
         return code, json.loads(self.module.OUTPUT_PATH.read_text()), client
 
     def made(self, state=None) -> MagicMock:
-        return MagicMock(labels={"vertra-made": "true", "vertra-team": "web"}, state=state or self.module.resourcemanager_v3.Project.State.ACTIVE)
+        return MagicMock(labels={"vennir-made": "true", "vennir-team": "web"}, state=state or self.module.resourcemanager_v3.Project.State.ACTIVE)
 
     def test_a_project_it_made_is_shut_down(self) -> None:
         code, result, client = self._run({"type": "gcp/project", "id": "web-1"}, self.made())
@@ -63,14 +63,14 @@ class DeleteActionTest(unittest.TestCase):
         code, result, client = self._run({"type": "gcp/project", "id": "prod"}, MagicMock(labels={}, state=1))
         self.assertEqual(code, 1)
         client.delete_project.assert_not_called()
-        self.assertEqual(result["error"]["code"], "NOT_MADE_BY_VERTRA")
+        self.assertEqual(result["error"]["code"], "NOT_MADE_BY_VENNIR")
 
     def test_a_project_made_for_another_team_is_refused(self) -> None:
         code, result, client = self._run({"type": "gcp/project", "id": "web-1"}, self.made(), team="data")
         self.assertEqual((code, result["error"]["code"]), (1, "NOT_THIS_TEAMS"))
         client.delete_project.assert_not_called()
         # Made before projects were labelled with their team: refused too.
-        code, result, client = self._run({"type": "gcp/project", "id": "old"}, MagicMock(labels={"vertra-made": "true"}, state=1))
+        code, result, client = self._run({"type": "gcp/project", "id": "old"}, MagicMock(labels={"vennir-made": "true"}, state=1))
         self.assertEqual((code, result["error"]["code"]), (1, "NOT_THIS_TEAMS"))
         client.delete_project.assert_not_called()
 

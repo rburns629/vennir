@@ -1,6 +1,6 @@
 # A sample: Resource group, with real Azure API calls (billed).
 # Not yet proven against a real account; see the azure team's README.md.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: resource-group
 team: azure

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-// order-receiver is what a system that orders from Vertra runs to hear back:
+// order-receiver is what a system that orders from Vennir runs to hear back:
 // it takes the console's signed callbacks (order.finished, run.finished) and
 // accepts only the ones that verify. A reference to copy, not a product.
 //
-// A callback carries Vertra-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256
+// A callback carries Vennir-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256
 // of "<t>.<body>"> with the callback's secret (shown once when it was set).
 // A post verifies when its time is within five minutes (an old one replayed
 // fails) and its HMAC matches, compared in constant time. Anything else is
@@ -37,7 +37,7 @@ import (
 // tolerance is how old (or how far ahead) a signature's time may be.
 const tolerance = 5 * time.Minute
 
-// verify checks a callback's Vertra-Signature header against its body.
+// verify checks a callback's Vennir-Signature header against its body.
 func verify(secret []byte, header string, body []byte, now time.Time) error {
 	var at, sig string
 	for _, part := range strings.Split(header, ",") {
@@ -51,7 +51,7 @@ func verify(secret []byte, header string, body []byte, now time.Time) error {
 	}
 	seconds, err := strconv.ParseInt(at, 10, 64)
 	if err != nil || sig == "" {
-		return errors.New("no t= and v1= in Vertra-Signature")
+		return errors.New("no t= and v1= in Vennir-Signature")
 	}
 	if age := now.Sub(time.Unix(seconds, 0)); age > tolerance || age < -tolerance {
 		return errors.New("signed too long ago (or ahead): a replay")
@@ -93,7 +93,7 @@ func main() {
 			http.Error(w, "unreadable", http.StatusBadRequest)
 			return
 		}
-		if err := verify(key, r.Header.Get("Vertra-Signature"), body, time.Now()); err != nil {
+		if err := verify(key, r.Header.Get("Vennir-Signature"), body, time.Now()); err != nil {
 			log.Warn("callback refused", "reason", err.Error())
 			http.Error(w, "unverified", http.StatusUnauthorized)
 			return

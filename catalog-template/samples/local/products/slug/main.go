@@ -1,5 +1,5 @@
 // slug's "transform" action: the text as a URL slug, such as
-// "Hello, Vertra World!" -> "hello-vertra-world". Letters in any script
+// "Hello, Vennir World!" -> "hello-vennir-world". Letters in any script
 // are kept; everything else becomes a single dash.
 //
 // The binary is the image's entrypoint: the platform passes the action as

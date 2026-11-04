@@ -33,7 +33,7 @@ func (c *console) call(ctx context.Context, method string, request, response any
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+"/api/vertra.console.v1."+method, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+"/api/vennir.console.v1."+method, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}

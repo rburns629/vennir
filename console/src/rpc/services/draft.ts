@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-/** DraftService (proto/vertra/console/v1/draft.proto): core/drafts.ts over Connect. */
+/** DraftService (proto/vennir/console/v1/draft.proto): core/drafts.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import type { JsonObject } from "@bufbuild/protobuf";
 import { Type } from "@sinclair/typebox";
 import { deleteDraft, listDrafts, saveDraft, type DraftView } from "../../core/drafts.js";
-import type { DraftService } from "../../gen/vertra/console/v1/draft_pb.js";
+import type { DraftService } from "../../gen/vennir/console/v1/draft_pb.js";
 import { callerOf } from "../context.js";
 import { timestamp } from "../convert.js";
 import { check } from "../validate.js";

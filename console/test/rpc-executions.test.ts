@@ -149,7 +149,7 @@ describe("submitting", () => {
     // Its audit entry names the run it started, so the run's teams see it.
     const { executionId } = response.json<{ executionId: string }>();
     const audited = await db.select().from(auditLog).where(sql`${auditLog.target}->>'executionId' = ${executionId}`);
-    expect(audited.map((e) => e.route)).toEqual(["vertra.console.v1.ExecutionService/SubmitExecution"]);
+    expect(audited.map((e) => e.route)).toEqual(["vennir.console.v1.ExecutionService/SubmitExecution"]);
   });
 
   it("refuses a team the caller isn't in, before kernel-api hears of it", async () => {
@@ -211,7 +211,7 @@ describe("watching", () => {
     try {
       const response = await app.inject({
         method: "POST",
-        url: "/api/vertra.console.v1.ExecutionService/WatchExecution",
+        url: "/api/vennir.console.v1.ExecutionService/WatchExecution",
         headers: { "content-type": "application/connect+json", authorization: `Bearer ${token}` },
         payload: envelope({ executionId }),
       });
@@ -230,7 +230,7 @@ describe("watching", () => {
     const executionId = await recorded([teamName]);
     const response = await app.inject({
       method: "POST",
-      url: "/api/vertra.console.v1.ExecutionService/WatchExecution",
+      url: "/api/vennir.console.v1.ExecutionService/WatchExecution",
       headers: { "content-type": "application/connect+json", authorization: `Bearer ${token}` },
       payload: envelope({ executionId }),
     });
@@ -257,7 +257,7 @@ describe("watching", () => {
     try {
       const response = await app.inject({
         method: "POST",
-        url: "/api/vertra.console.v1.ExecutionService/WatchExecution",
+        url: "/api/vennir.console.v1.ExecutionService/WatchExecution",
         headers: { "content-type": "application/connect+json", authorization: `Bearer ${leaverToken}` },
         payload: envelope({ executionId }),
       });
@@ -274,7 +274,7 @@ describe("watching", () => {
     const executionId = await recorded([teamName]);
     const response = await app.inject({
       method: "POST",
-      url: "/api/vertra.console.v1.ExecutionService/WatchExecution",
+      url: "/api/vennir.console.v1.ExecutionService/WatchExecution",
       headers: { "content-type": "application/connect+json", authorization: `Bearer ${outsider}` },
       payload: envelope({ executionId }),
     });

@@ -2,7 +2,7 @@
 # the token version, add the secret http-check-token in the console, then
 # set secretRefs: [http-check-token] and useToken: true.
 # CHANGE: try-anna (twice) to your team.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Dag
 name: check-a-site
 tasks:

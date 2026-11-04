@@ -1,5 +1,5 @@
 """Tests for aws/app-runner's check action, with boto3 mocked, so they run
-without an AWS account. `./vertra catalog check` runs them in the product's
+without an AWS account. `./vennir catalog check` runs them in the product's
 own image with its python3 (unittest, no pytest).
 """
 
@@ -37,7 +37,7 @@ class CheckActionTest(unittest.TestCase):
         self.sts, self.apprunner = MagicMock(), MagicMock()
         self.sts.get_caller_identity.return_value = {"Arn": ROLE_SESSION, "Account": "123456789012"}
         self.sts.assume_role.return_value = {
-            "AssumedRoleUser": {"Arn": "arn:aws:sts::123456789012:assumed-role/acts-as/vertra-check"},
+            "AssumedRoleUser": {"Arn": "arn:aws:sts::123456789012:assumed-role/acts-as/vennir-check"},
             "Credentials": {"AccessKeyId": "AKIAEXAMPLE", "SecretAccessKey": "not-a-secret", "SessionToken": "token"},
         }
 
@@ -88,8 +88,8 @@ class CheckActionTest(unittest.TestCase):
         self.module.TARGET_ROLE_FILE.write_text(TARGET + "\n")
         _, result = self._run()
         self.assertTrue(result["outputs"]["ready"])
-        self.assertEqual(result["outputs"]["principal"], "arn:aws:sts::123456789012:assumed-role/acts-as/vertra-check")
-        self.sts.assume_role.assert_called_once_with(RoleArn=TARGET, RoleSessionName="vertra-check")
+        self.assertEqual(result["outputs"]["principal"], "arn:aws:sts::123456789012:assumed-role/acts-as/vennir-check")
+        self.sts.assume_role.assert_called_once_with(RoleArn=TARGET, RoleSessionName="vennir-check")
         text = self.module.OUTPUT_PATH.read_text()
         for value in ("AKIAEXAMPLE", "not-a-secret", "token"):
             self.assertNotIn(value, text)

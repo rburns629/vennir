@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // fakeHelm returns a Runner whose helm copies the file $FAKE_CHART into
@@ -149,7 +149,7 @@ func serve(t *testing.T, path, sum, member string) string {
 	t.Cleanup(func() { delete(pins, "faketool") })
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	return filepath.Join(home, ".vertra", "bin")
+	return filepath.Join(home, ".vennir", "bin")
 }
 
 // file writes body to a new file: its path.
@@ -243,14 +243,14 @@ func TestDownloadExtractsTheMember(t *testing.T) {
 
 // With no home directory there's no tools directory: no download, and Path
 // finds tools on PATH only, never in a shared directory such as the temp
-// directory's vertra-bin (where the old fallback was).
+// directory's vennir-bin (where the old fallback was).
 func TestNoHomeNoToolsDirectory(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("home is USERPROFILE")
 	}
 	tmp := t.TempDir()
 	t.Setenv("TMPDIR", tmp)
-	planted := filepath.Join(tmp, "vertra-bin", "vertra-test-tool")
+	planted := filepath.Join(tmp, "vennir-bin", "vennir-test-tool")
 	if err := os.MkdirAll(filepath.Dir(planted), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +264,7 @@ func TestNoHomeNoToolsDirectory(t *testing.T) {
 	if _, err := Download(context.Background(), "kubectl"); err == nil || !strings.Contains(err.Error(), "no home directory") {
 		t.Errorf("err = %v", err)
 	}
-	if got := Path("vertra-test-tool"); got != "vertra-test-tool" {
+	if got := Path("vennir-test-tool"); got != "vennir-test-tool" {
 		t.Errorf("Path = %s", got)
 	}
 }

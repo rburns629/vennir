@@ -53,7 +53,7 @@ beforeAll(async () => {
   const b = await createTeam(teamB);
   admin = await newUser(true);
   memberA = await newUser(false, a.id);
-  const botEmail = `${prefix}-ci@bots.vertra.local`;
+  const botEmail = `${prefix}-ci@bots.vennir.local`;
   emails.push(botEmail);
   const { user: bot } = await createBotUser(botEmail);
   const token = generateApiToken();

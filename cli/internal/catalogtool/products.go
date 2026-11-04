@@ -42,7 +42,7 @@ func (p *Product) Label() string { return p.label }
 
 // LocalImage is what it's built as, before it passes.
 func (p *Product) LocalImage() string {
-	return fmt.Sprintf("vertra-catalog/%s/%s:ci", p.Team(), p.Name())
+	return fmt.Sprintf("vennir-catalog/%s/%s:ci", p.Team(), p.Name())
 }
 
 // Repository is where it's pushed: <registry>/<team>/<product>, from its
@@ -135,8 +135,8 @@ func (c *Catalog) usableBase(base string) bool {
 }
 
 // republishPaths are what every product is checked and published again
-// for when it changes: the tooling, its settings and the pinned vertra.
-var republishPaths = []string{"tools", "vertra.yaml", "vertra"}
+// for when it changes: the tooling, its settings and the pinned vennir.
+var republishPaths = []string{"tools", "vennir.yaml", "vennir"}
 
 // ChangedProducts are the product folders changed since base (committed or
 // not).
@@ -181,10 +181,10 @@ func (c *Catalog) ChangedProducts(base string, products []*Product) []string {
 	return changed
 }
 
-// root finds the catalog a command runs in: VERTRA_CATALOG_ROOT (set by
-// the ./vertra wrapper), else the working directory.
+// root finds the catalog a command runs in: VENNIR_CATALOG_ROOT (set by
+// the ./vennir wrapper), else the working directory.
 func Root() (string, error) {
-	root := os.Getenv("VERTRA_CATALOG_ROOT")
+	root := os.Getenv("VENNIR_CATALOG_ROOT")
 	if root == "" {
 		var err error
 		if root, err = os.Getwd(); err != nil {

@@ -57,7 +57,7 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
     title: "Get started",
     blurb: "Run your first DAG, and learn the one idea everything else builds on.",
     items: [
-      ["01-getting-started", "Try Vertra end to end"],
+      ["01-getting-started", "Try Vennir end to end"],
       ["03-what-is-a-dag", "What's a DAG?"],
     ],
   },
@@ -113,12 +113,12 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
   {
     id: "operate",
     title: "Install and operate",
-    blurb: "For admins: set Vertra up, connect your cloud, and run it day to day.",
+    blurb: "For admins: set Vennir up, connect your cloud, and run it day to day.",
     items: [
       {
         group: "Set up",
         items: [
-          ["reference-setup", "Set up Vertra"],
+          ["reference-setup", "Set up Vennir"],
           ["reference-clouds-gcp", "Get Google Cloud ready"],
           ["reference-clouds-aws", "Get AWS ready"],
           ["reference-clouds-github", "Get GitHub ready"],
@@ -138,7 +138,7 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
   },
   {
     id: "internals",
-    title: "How Vertra works",
+    title: "How Vennir works",
     blurb: "In depth: the pieces and how they fit, a run call by call, what keeps teams apart, the data, and why it's built this way.",
     items: [
       { doc: "reference-architecture", label: "Architecture", sections: "all" },
@@ -153,7 +153,7 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
           ["Secrets", ["where-secret-values-live", "how-a-secret-reaches-a-step", "who-can-read-a-secret"]],
           ["Runs and what they make", ["consumers-and-templates", "who-sees-a-run-that-spans-teams", "who-sees-a-steps-logs", "what-a-run-made-and-deleting-it", "schedules"]],
           ["Notifications", ["notifications-and-chat-webhooks", "email"]],
-          ["What the platform enforces", ["guardrails-the-cluster-enforces", "what-a-step-can-reach", "if-a-component-is-compromised", "the-consoles-writes", "the-api-gateway", "vertras-own-supply-chain", "audit", "what-vertra-stores", "rules-for-product-authors"]],
+          ["What the platform enforces", ["guardrails-the-cluster-enforces", "what-a-step-can-reach", "if-a-component-is-compromised", "the-consoles-writes", "the-api-gateway", "vennirs-own-supply-chain", "audit", "what-vennir-stores", "rules-for-product-authors"]],
           ["Limits", ["not-yet-enforced", "out-of-scope", "reporting-a-vulnerability"]],
         ],
       },
@@ -308,9 +308,9 @@ export const TASKS: { id: string; title: string; blurb: string; questions: Answe
   {
     id: "operate",
     title: "Install and operate",
-    blurb: "For admins: set Vertra up, connect your cloud, and run it day to day.",
+    blurb: "For admins: set Vennir up, connect your cloud, and run it day to day.",
     questions: [
-      { label: "Set up Vertra", guide: "reference-setup" },
+      { label: "Set up Vennir", guide: "reference-setup" },
       { label: "The Admin page, setting by setting", guide: "16-admin-settings" },
       { label: "Upgrading, backups, rotating secrets", guide: "reference-operations", section: "upgrading" },
     ],
@@ -323,7 +323,7 @@ export const IN_DEPTH: Answered[] = [
   { label: "Architecture", guide: "reference-architecture" },
   { label: "Security model", guide: "reference-security-model" },
   { label: "Under the hood", guide: "08-under-the-hood" },
-  { label: "Where Vertra keeps its data", guide: "06-database-schemas" },
+  { label: "Where Vennir keeps its data", guide: "06-database-schemas" },
   { label: "Repository map", guide: "reference-repository-map" },
 ];
 

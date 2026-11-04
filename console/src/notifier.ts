@@ -497,7 +497,7 @@ async function sendWaiting(log: FastifyBaseLogger): Promise<number> {
         from: config.notifications.email.from,
         to: d.email,
         subject: d.title,
-        text: `${message(d)}\n\nYou get these for your runs and your teams'. Choose which in Vertra: Preferences.`,
+        text: `${message(d)}\n\nYou get these for your runs and your teams'. Choose which in Vennir: Preferences.`,
       });
       await db.update(emailDeliveries).set({ sentAt: sql`now()`, attempts: d.attempts + 1 }).where(where);
       sent += 1;

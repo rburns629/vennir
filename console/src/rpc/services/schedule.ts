@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-/** ScheduleService (proto/vertra/console/v1/schedule.proto): core/schedules.ts over Connect. */
+/** ScheduleService (proto/vennir/console/v1/schedule.proto): core/schedules.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import type { JsonObject } from "@bufbuild/protobuf";
 import { Type } from "@sinclair/typebox";
 import { createSchedule, deleteSchedule, listSchedules, updateSchedule, type ScheduleView } from "../../core/schedules.js";
-import type { ScheduleService } from "../../gen/vertra/console/v1/schedule_pb.js";
+import type { ScheduleService } from "../../gen/vennir/console/v1/schedule_pb.js";
 import { callerOf } from "../context.js";
 import { timestamp } from "../convert.js";
 import { check } from "../validate.js";

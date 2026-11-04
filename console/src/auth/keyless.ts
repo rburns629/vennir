@@ -2,7 +2,7 @@
 /**
  * Keyless bots: a bot signs in with its CI's own OIDC identity (a GitHub
  * Actions or GitLab job's ID token) instead of a stored API token, so the
- * pipeline holds no Vertra secret at all.
+ * pipeline holds no Vennir secret at all.
  *
  * A team's maintainers give a bot identities (bot_identities): an issuer
  * the install allows (config.keyless.issuers) and the exact claims a token

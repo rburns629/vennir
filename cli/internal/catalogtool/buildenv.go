@@ -2,7 +2,7 @@
 
 package catalogtool
 
-// Build Environments. A team listed in vertra.yaml's buildEnvironments has
+// Build Environments. A team listed in vennir.yaml's buildEnvironments has
 // its products built in a GitHub Environment of its own, team-<name>, which
 // only main may use, so values its builds need (a private package
 // registry's token, say) reach that team's builds and nothing else. A job
@@ -38,11 +38,11 @@ import (
 // (catalog CI's toJSON(secrets)). Each is offered to docker build as a
 // BuildKit secret of its own name, which a Dockerfile reads with
 // RUN --mount=type=secret,id=NAME: never in a layer.
-const buildSecretsVariable = "VERTRA_BUILD_SECRETS"
+const buildSecretsVariable = "VENNIR_BUILD_SECRETS"
 
 // buildSecretPrefix names the variable each secret reaches docker in: its
 // own name could be one docker reads (DOCKER_HOST).
-const buildSecretPrefix = "VERTRA_BUILD_SECRET_"
+const buildSecretPrefix = "VENNIR_BUILD_SECRET_"
 
 // publishingSecrets are the catalog's own (catalog-publish's): one that
 // reaches a team's build is at repository level, where every job and pull
@@ -60,7 +60,7 @@ var (
 func environmentName(team string) string { return "team-" + team }
 
 // buildSecrets are the names offered to docker build and the variables
-// that carry them: none when VERTRA_BUILD_SECRETS isn't set.
+// that carry them: none when VENNIR_BUILD_SECRETS isn't set.
 func (c *Catalog) buildSecrets() ([]string, []string, error) {
 	raw := c.Getenv(buildSecretsVariable)
 	if raw == "" {
@@ -98,7 +98,7 @@ func (c *Catalog) buildSecrets() ([]string, []string, error) {
 func (c *Catalog) ValidateBuildEnvironments() bool {
 	s, err := c.Settings()
 	if err != nil {
-		c.errorAt(c.path("vertra.yaml"), err.Error())
+		c.errorAt(c.path("vennir.yaml"), err.Error())
 		return false
 	}
 	ok := true
@@ -106,10 +106,10 @@ func (c *Catalog) ValidateBuildEnvironments() bool {
 	for _, team := range s.BuildEnvironments {
 		switch {
 		case seen[team]:
-			c.errorAt(c.path("vertra.yaml"), fmt.Sprintf("buildEnvironments: %s is listed twice", quote(team)))
+			c.errorAt(c.path("vennir.yaml"), fmt.Sprintf("buildEnvironments: %s is listed twice", quote(team)))
 			ok = false
 		case !teamFolder.MatchString(team) || !isDir(c.path("teams", team)):
-			c.errorAt(c.path("vertra.yaml"), fmt.Sprintf("buildEnvironments: %s isn't a team of this catalog (teams/<team>/)", quote(team)))
+			c.errorAt(c.path("vennir.yaml"), fmt.Sprintf("buildEnvironments: %s isn't a team of this catalog (teams/<team>/)", quote(team)))
 			ok = false
 		}
 		seen[team] = true
@@ -119,7 +119,7 @@ func (c *Catalog) ValidateBuildEnvironments() bool {
 
 // checkProduct validates, builds, tests and scans one product. One whose
 // team builds in its own Environment is loaded from that build (--images),
-// or built where the Environment's values are (VERTRA_BUILD_SECRETS);
+// or built where the Environment's values are (VENNIR_BUILD_SECRETS);
 // anywhere else, such as a pull request, it's only validated, and never
 // published.
 func (c *Catalog) checkProduct(p *Product, s Settings, publishing bool) bool {
@@ -201,7 +201,7 @@ func (c *Catalog) BuildForEnvironment(names []string, out string) (bool, error) 
 	for _, p := range products {
 		switch {
 		case p.IsTemplate() || !s.BuildsInEnvironment(p.Team()):
-			return false, fmt.Errorf("%s: team %s doesn't build in an Environment of its own (buildEnvironments in vertra.yaml)", p.Label(), p.Team())
+			return false, fmt.Errorf("%s: team %s doesn't build in an Environment of its own (buildEnvironments in vennir.yaml)", p.Label(), p.Team())
 		case p.Team() != team:
 			return false, fmt.Errorf("one team's products per build, each team in its own Environment: %s and %s", team, p.Team())
 		}
@@ -256,7 +256,7 @@ func (c *Catalog) Plan(ctx context.Context, changedSince *string) ([]PlannedBuil
 	if changedSince != nil && c.Getenv("GITHUB_SHA") != "" {
 		if problems := s.Problems(); len(problems) > 0 {
 			for _, p := range problems {
-				c.errorAt(c.path("vertra.yaml"), p)
+				c.errorAt(c.path("vennir.yaml"), p)
 			}
 			return nil, false, nil
 		}
@@ -284,7 +284,7 @@ func (c *Catalog) Plan(ctx context.Context, changedSince *string) ([]PlannedBuil
 	for _, team := range teams {
 		if repo != "" {
 			if problem := c.environmentProblem(repo, team); problem != "" {
-				c.errorAt(c.path("vertra.yaml"), problem)
+				c.errorAt(c.path("vennir.yaml"), problem)
 				ok = false
 				continue
 			}
@@ -420,9 +420,9 @@ func (c *Catalog) environmentProblem(repo, team string) string {
 	case err != nil:
 		return fmt.Sprintf("reading Environment %s: %v", name, err)
 	case !e.exists:
-		return fmt.Sprintf("team %s builds in Environment %s, which doesn't exist (or this job's token can't read it: catalog-ci's plan job needs actions: read): a catalog admin runs ./vertra catalog environments", team, name)
+		return fmt.Sprintf("team %s builds in Environment %s, which doesn't exist (or this job's token can't read it: catalog-ci's plan job needs actions: read): a catalog admin runs ./vennir catalog environments", team, name)
 	case !e.mainOnly():
-		return fmt.Sprintf("Environment %s can be used from more than main, so a pull request could have its secrets: a catalog admin runs ./vertra catalog environments", name)
+		return fmt.Sprintf("Environment %s can be used from more than main, so a pull request could have its secrets: a catalog admin runs ./vennir catalog environments", name)
 	}
 	return ""
 }
@@ -440,7 +440,7 @@ func (c *Catalog) Environments(repo string) (bool, error) {
 		return false, nil
 	}
 	if len(s.BuildEnvironments) == 0 {
-		c.info("No team builds in an Environment of its own (buildEnvironments in vertra.yaml).")
+		c.info("No team builds in an Environment of its own (buildEnvironments in vennir.yaml).")
 		return true, nil
 	}
 	if repo == "" {
@@ -471,7 +471,7 @@ func (c *Catalog) ensureEnvironment(repo, name string) error {
 	if !e.custom {
 		e.update["deployment_branch_policy"] = map[string]any{"protected_branches": false, "custom_branch_policies": true}
 		body, _ := json.Marshal(e.update)
-		file, err := os.CreateTemp("", "vertra-environment-*.json")
+		file, err := os.CreateTemp("", "vennir-environment-*.json")
 		if err != nil {
 			return err
 		}

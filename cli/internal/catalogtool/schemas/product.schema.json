@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vertra product (product.yaml), format v2",
+  "title": "Vennir product (product.yaml), format v2",
   "description": "One product: a container image and the actions it runs. Its image path is derived from its folder, catalog/<team>/<name>/, so it has no image field.",
   "type": "object",
   "additionalProperties": false,
@@ -16,8 +16,8 @@
   ],
   "properties": {
     "apiVersion": {
-      "description": "The catalog format: vertra.dev/v2. A file without it is from before v2: ./vertra catalog migrate rewrites it.",
-      "const": "vertra.dev/v2"
+      "description": "The catalog format: vennir.dev/v2. A file without it is from before v2: ./vennir catalog migrate rewrites it.",
+      "const": "vennir.dev/v2"
     },
     "kind": {
       "description": "What the file is: Product.",
@@ -32,7 +32,7 @@
       "$ref": "#/$defs/dnsLabel"
     },
     "version": {
-      "description": "Its contract's version, 1 when left out. Raise it for a breaking change (an action, input or output removed or retyped, a new required input, a team no longer shared with): vertra catalog check refuses one otherwise, since other teams' templates rely on the contract.",
+      "description": "Its contract's version, 1 when left out. Raise it for a breaking change (an action, input or output removed or retyped, a new required input, a team no longer shared with): vennir catalog check refuses one otherwise, since other teams' templates rely on the contract.",
       "type": "integer",
       "minimum": 1
     },
@@ -395,34 +395,34 @@
       "description": "One field of the form the console builds from this schema. Any JSON Schema keyword; these hints only shape the form.",
       "type": "object",
       "properties": {
-        "x-vertra-order": {
+        "x-vennir-order": {
           "type": "integer",
           "description": "Where the field comes in the form: lower first; fields without one follow, in the order written."
         },
-        "x-vertra-group": {
+        "x-vennir-group": {
           "type": "string",
           "minLength": 1,
           "maxLength": 60,
           "description": "A heading the field is shown under, with the others that name it."
         },
-        "x-vertra-widget": {
+        "x-vennir-widget": {
           "enum": [
             "textarea"
           ],
           "description": "textarea: a big box, for long text."
         },
-        "x-vertra-pattern-message": {
+        "x-vennir-pattern-message": {
           "type": "string",
           "minLength": 1,
           "maxLength": 200,
           "description": "What the field's pattern means, said when a value doesn't match it (instead of the pattern itself)."
         },
-        "x-vertra-needs": {
+        "x-vennir-needs": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$",
           "description": "On an input: the kind of thing it names (a wiring type a team defines in teams/<team>/types.yaml, such as gcp.project). A target type is checked against allowedTargets for other teams; Compose offers earlier steps' outputs that provide it."
         },
-        "x-vertra-provides": {
+        "x-vennir-provides": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$",
           "description": "On an output: the kind of thing it is (a wiring type, such as gcp.project), so Compose can wire it into a later step's input that needs it."

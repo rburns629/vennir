@@ -1,9 +1,9 @@
-# execution-kernel on EKS (Auto Mode), as `vertra apply` writes it for an
-# install of its own (vertra.yaml target: aws): an example to start from
+# execution-kernel on EKS (Auto Mode), as `vennir apply` writes it for an
+# install of its own (vennir.yaml target: aws): an example to start from
 # when installing with Helm by hand. Account 123456789012, us-east-2,
-# install `vertra`, platform namespace vertra-system:
-#   helm upgrade --install kernel oci://ghcr.io/rburns629/vertra/charts/execution-kernel --version <x.y.z> \
-#     -n vertra-system --create-namespace --reset-values --force-conflicts \
+# install `vennir`, platform namespace vennir-system:
+#   helm upgrade --install kernel oci://ghcr.io/rburns629/vennir/charts/execution-kernel --version <x.y.z> \
+#     -n vennir-system --create-namespace --reset-values --force-conflicts \
 #     --kube-context <context> -f helm/values/eks/kernel.yaml
 # The release's own image (appVersion): no image block.
 backup:
@@ -18,7 +18,7 @@ postgres:
 # image policy seeds from this on first install; afterwards the Admin page
 # owns the list.
 imagePolicy:
-  sourceRegistry: 123456789012.dkr.ecr.us-east-2.amazonaws.com/vertra-products
+  sourceRegistry: 123456789012.dkr.ecr.us-east-2.amazonaws.com/vennir-products
 # Catalog images must carry catalog CI's signature (needs policy-controller,
 # policy-controller.yaml): the public half of the AWS KMS key only the
 # catalog's CI may sign with (`aws kms get-public-key`, as PEM), and/or its
@@ -37,22 +37,22 @@ scaleDown:
   enabled: true
   idleAfterMinutes: 120
 scheduler:
-  # Steps run on their own node pool (a Karpenter NodePool, vertra-steps:
-  # label vertra.dev/pool=steps, taint vertra.dev/steps=true:NoSchedule),
+  # Steps run on their own node pool (a Karpenter NodePool, vennir-steps:
+  # label vennir.dev/pool=steps, taint vennir.dev/steps=true:NoSchedule),
   # which scales from zero and takes Spot and on-demand nodes.
   taskPlacement:
     nodeSelector:
-      vertra.dev/pool: steps
+      vennir.dev/pool: steps
     tolerations:
-      - {key: vertra.dev/steps, operator: Equal, value: "true", effect: NoSchedule}
+      - {key: vennir.dev/steps, operator: Equal, value: "true", effect: NoSchedule}
   # Where a product asking for a kind of capacity (product.yaml's capacity)
   # runs instead: Karpenter's label picks one on the same pool.
   capacityPlacements:
     spot:
-      nodeSelector: {vertra.dev/pool: steps, karpenter.sh/capacity-type: spot}
+      nodeSelector: {vennir.dev/pool: steps, karpenter.sh/capacity-type: spot}
       tolerations:
-        - {key: vertra.dev/steps, operator: Equal, value: "true", effect: NoSchedule}
+        - {key: vennir.dev/steps, operator: Equal, value: "true", effect: NoSchedule}
     onDemand:
-      nodeSelector: {vertra.dev/pool: steps, karpenter.sh/capacity-type: on-demand}
+      nodeSelector: {vennir.dev/pool: steps, karpenter.sh/capacity-type: on-demand}
       tolerations:
-        - {key: vertra.dev/steps, operator: Equal, value: "true", effect: NoSchedule}
+        - {key: vennir.dev/steps, operator: Equal, value: "true", effect: NoSchedule}

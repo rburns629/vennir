@@ -24,7 +24,7 @@ describe("the docs' contents", () => {
   it("nests a long doc's sections under it, and reads on from one page to the next", () => {
     const categories = contentsOf(served);
     const place = placeOf(categories, "reference-security-model", "where-secret-values-live");
-    expect(place?.category.title).toBe("How Vertra works");
+    expect(place?.category.title).toBe("How Vennir works");
     expect(place?.groups.map((g) => g.label)).toEqual(["Security model", "Secrets"]);
     expect(place?.previous?.page.key).toBe("reference-security-model/tokens-for-another-cloud");
     expect(place?.next?.page.key).toBe("reference-security-model/how-a-secret-reaches-a-step");

@@ -13,7 +13,7 @@ import { config } from "./config.js";
 const PKCS8_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
 
 function derive(secret: string): { privateKey: KeyObject; publicKey: KeyObject } {
-  const seed = Buffer.from(hkdfSync("sha256", secret, "vertra", "session signing", 32));
+  const seed = Buffer.from(hkdfSync("sha256", secret, "vennir", "session signing", 32));
   const privateKey = createPrivateKey({ key: Buffer.concat([PKCS8_PREFIX, seed]), format: "der", type: "pkcs8" });
   return { privateKey, publicKey: createPublicKey(privateKey) };
 }

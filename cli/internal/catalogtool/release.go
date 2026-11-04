@@ -25,18 +25,18 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	catalogv1 "github.com/rburns629/vertra/cli/internal/gen/vertra/catalog/v1"
+	catalogv1 "github.com/rburns629/vennir/cli/internal/gen/vennir/catalog/v1"
 )
 
 // A catalog release is everything main says, as of one commit, for every
-// install to read (proto/vertra/catalog/v1/release.proto): consoles pull
+// install to read (proto/vennir/catalog/v1/release.proto): consoles pull
 // it, so CI needs no console credential and one catalog serves any number
 // of installs.
 const (
 	// ReleaseMediaType is the artifact's one layer: the release as JSON.
-	ReleaseMediaType = "application/vnd.vertra.catalog.release.v1+json"
+	ReleaseMediaType = "application/vnd.vennir.catalog.release.v1+json"
 	// ReleaseConfigMediaType marks the artifact as a release, not an image.
-	ReleaseConfigMediaType = "application/vnd.vertra.catalog.release.config.v1+json"
+	ReleaseConfigMediaType = "application/vnd.vennir.catalog.release.config.v1+json"
 	// ReleaseRepositoryName is the release's repository, under the registry
 	// beside the teams' (<registry>/<team>/<product>): no team may take it.
 	ReleaseRepositoryName = "catalog-release"
@@ -483,7 +483,7 @@ func (c *Catalog) Release(ctx context.Context) (bool, error) {
 	}
 	if problems := s.Problems(); len(problems) > 0 {
 		for _, p := range problems {
-			c.errorAt(c.path("vertra.yaml"), p)
+			c.errorAt(c.path("vennir.yaml"), p)
 		}
 		return false, nil
 	}
@@ -502,12 +502,12 @@ func (c *Catalog) Release(ctx context.Context) (bool, error) {
 	}
 	release, err := c.BuildRelease(ctx, s, commit, repository)
 	if err != nil {
-		c.errorAt(c.path("vertra.yaml"), err.Error())
+		c.errorAt(c.path("vennir.yaml"), err.Error())
 		return false, nil
 	}
 	reference, err := pushRelease(ctx, s, release, c.versionTag(), func(reference string) error { return c.sign(reference, s) })
 	if err != nil {
-		c.errorAt(c.path("vertra.yaml"), "releasing failed: "+err.Error())
+		c.errorAt(c.path("vennir.yaml"), "releasing failed: "+err.Error())
 		return false, nil
 	}
 	c.info("Released %d team(s) and %d product action(s) as %s", len(release.GetTeams()), len(release.GetProducts()), reference)
@@ -516,7 +516,7 @@ func (c *Catalog) Release(ctx context.Context) (bool, error) {
 }
 
 // TargetTypes are the kinds of target a team's allowedTargets lists, and an
-// action input names with x-vertra-needs to be checked against them.
+// action input names with x-vennir-needs to be checked against them.
 var TargetTypes = []string{"gcp.project", "gcp.folder", "aws.account", "azure.subscription"}
 
 // teamSpec is a team.yaml; nil when there's none (validation asks for it).

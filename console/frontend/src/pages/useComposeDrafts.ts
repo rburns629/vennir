@@ -4,7 +4,7 @@ import { ApiError, errorMessage, deleteDraft, listDrafts, saveDraft, type Stored
 import type { Draft } from "../compose";
 
 /** Where drafts were kept before the console kept them. */
-const BROWSER_KEY = "vertra.compose.drafts";
+const BROWSER_KEY = "vennir.compose.drafts";
 const NAME = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 const SAVE_AFTER_MS = 1000;
 

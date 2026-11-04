@@ -1,5 +1,5 @@
 """Tests for aws/caller-identity's whoami action, with boto3 mocked, so they
-run without an AWS account. `./vertra catalog check` runs them in the
+run without an AWS account. `./vennir catalog check` runs them in the
 product's own image with its python3 (unittest, no pytest).
 """
 
@@ -15,8 +15,8 @@ from botocore import UNSIGNED
 from botocore.exceptions import ClientError
 
 _MODULE_PATH = Path(__file__).parent / "whoami.py"
-ROLE = "arn:aws:iam::123456789012:role/vertra-caller-identity"
-SESSION_ARN = "arn:aws:sts::123456789012:assumed-role/vertra-caller-identity/vertra-caller-identity"
+ROLE = "arn:aws:iam::123456789012:role/vennir-caller-identity"
+SESSION_ARN = "arn:aws:sts::123456789012:assumed-role/vennir-caller-identity/vennir-caller-identity"
 
 
 def _load():

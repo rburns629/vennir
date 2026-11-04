@@ -220,7 +220,7 @@ export function MembersTab({
                                   You
                                 </Typography>
                               )}
-                              {m.isAdmin && <Pill tone="warning">Vertra admin</Pill>}
+                              {m.isAdmin && <Pill tone="warning">Vennir admin</Pill>}
                             </Box>
                           )}
                         </Box>
@@ -396,8 +396,8 @@ function AddPerson({ teamName, sso, onAdded }: { teamName: string; sso: string; 
             }}
             helperText={
               sso
-                ? `They need a console account first; with ${sso} sign-in, they have one once they've signed in. No account yet? A Vertra admin can create one.`
-                : "They need a console account first. No account yet? Ask a Vertra admin to create one; it can join this team straight away."
+                ? `They need a console account first; with ${sso} sign-in, they have one once they've signed in. No account yet? A Vennir admin can create one.`
+                : "They need a console account first. No account yet? Ask a Vennir admin to create one; it can join this team straight away."
             }
           />
           <Box component="fieldset" sx={{ border: 0, p: 0, m: 0, display: "flex", flexDirection: "column", gap: 1 }}>

@@ -1,0 +1,229 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Bots and their API tokens. A team's bot acts as a member of that team;
+// an automation token belongs to no team and can do exactly what its scopes
+// say. A token is shown once, when it's made, and only its hash is kept.
+service TokenService {
+  // A team's bots and their tokens (never the tokens themselves).
+  rpc ListBots(ListBotsRequest) returns (ListBotsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Creates a bot, or a new token for an existing one.
+  rpc CreateBotToken(CreateBotTokenRequest) returns (CreateBotTokenResponse);
+  // Creates a bot that signs in only from CI, keyless (its team's
+  // maintainers): with no token, and the identity AddBotIdentity would add.
+  // The identity is checked first, so a refused one makes no bot.
+  rpc CreateKeylessBot(CreateKeylessBotRequest) returns (CreateKeylessBotResponse);
+  // Sets the templates an ordering bot may order (its team's maintainers):
+  // <team>/<name> each; it may run nothing else.
+  rpc SetBotOrders(SetBotOrdersRequest) returns (SetBotOrdersResponse);
+  // Sets where an ordering bot's orders' outcomes are posted, signed (its
+  // team's maintainers), under the install's allowed hosts; an empty url
+  // removes it. Its signing secret is returned when it's first set or
+  // rotated, and never again.
+  rpc SetBotCallback(SetBotCallbackRequest) returns (SetBotCallbackResponse);
+  // A team's bots' keyless identities (its members), and what this install
+  // accepts: its issuers and audience.
+  rpc ListBotIdentities(ListBotIdentitiesRequest) returns (ListBotIdentitiesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Lets a bot sign in with a CI's ID token carrying these exact claims, from
+  // an issuer the install allows (its team's maintainers). The claims name
+  // what the token is for (GitHub: repository; GitLab: project_path), and
+  // may narrow it (ref, environment). No patterns.
+  rpc AddBotIdentity(AddBotIdentityRequest) returns (AddBotIdentityResponse);
+  // Stops a keyless identity signing in (its team's maintainers).
+  rpc RemoveBotIdentity(RemoveBotIdentityRequest) returns (RemoveBotIdentityResponse);
+  // Revokes any token: a team's bot's (by a member) or any (by an admin).
+  rpc RevokeToken(RevokeTokenRequest) returns (RevokeTokenResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Automation tokens. Admins only.
+  rpc ListAutomationTokens(ListAutomationTokensRequest) returns (ListAutomationTokensResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // For platform automation such as the catalog's CI. Admins only.
+  rpc CreateAutomationToken(CreateAutomationTokenRequest) returns (CreateAutomationTokenResponse);
+}
+
+message TokenInfo {
+  string id = 1;
+  string label = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_used_at = 4;
+  // After this it authenticates nothing. Unset: until revoked.
+  google.protobuf.Timestamp expires_at = 5;
+}
+
+message Bot {
+  string id = 1;
+  string email = 2;
+  repeated TokenInfo tokens = 3;
+  // An ordering bot (decision 23): a member of its team that may run only
+  // these templates (<team>/<name>), nothing else.
+  bool ordering = 4;
+  repeated string order_templates = 5;
+  // An ordering bot's callback: its host (the URL isn't sent back), the last
+  // post that went, and why the last one didn't, if it didn't. Empty: none.
+  string callback_host = 6;
+  google.protobuf.Timestamp callback_last_sent_at = 7;
+  string callback_last_error = 8;
+}
+
+message AutomationToken {
+  string id = 1;
+  string label = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_used_at = 4;
+  // Such as teams:create, products:register, teams:retire.
+  repeated string scopes = 5;
+  string bot_email = 6;
+  // After this it authenticates nothing. Unset: until revoked.
+  google.protobuf.Timestamp expires_at = 7;
+}
+
+message ListBotsRequest {
+  string team = 1;
+}
+
+message ListBotsResponse {
+  repeated Bot bots = 1;
+}
+
+message CreateBotTokenRequest {
+  string team = 1;
+  // The bot's account; created if it doesn't exist.
+  string email = 2;
+  string label = 3;
+  // A new ordering bot: a member (not a maintainer) of the team that may
+  // run only order_templates (<team>/<name>), for a storefront or another
+  // system placing orders. Otherwise a pipeline's bot, a maintainer.
+  bool ordering = 4;
+  repeated string order_templates = 5;
+  // How many days the token lasts, 1 to 730. Left out, 90; 0, until
+  // revoked.
+  optional int32 expires_in_days = 6;
+}
+
+message CreateKeylessBotRequest {
+  string team = 1;
+  // The bot's account; created if it doesn't exist.
+  string email = 2;
+  // As CreateBotTokenRequest's.
+  bool ordering = 3;
+  repeated string order_templates = 4;
+  // As AddBotIdentityRequest's.
+  string issuer = 5;
+  map<string, string> claims = 6;
+}
+
+message CreateKeylessBotResponse {
+  string email = 1;
+  BotIdentity identity = 2;
+}
+
+message SetBotOrdersRequest {
+  string team = 1;
+  string email = 2;
+  // <team>/<name> each; empty: it may order nothing.
+  repeated string templates = 3;
+}
+
+message SetBotOrdersResponse {
+  repeated string templates = 1;
+}
+
+message SetBotCallbackRequest {
+  string team = 1;
+  string email = 2;
+  // https://, under the install's orders.callbackHosts; empty: remove it.
+  string url = 3;
+  // A new signing secret, the old one no longer valid.
+  bool rotate_secret = 4;
+}
+
+message SetBotCallbackResponse {
+  string host = 1;
+  // Set only when it's new (first set, or rotated): shown once.
+  string signing_secret = 2;
+}
+
+message CreateBotTokenResponse {
+  string email = 1;
+  // Shown once, never again.
+  string token = 2;
+  string token_id = 3;
+}
+
+message RevokeTokenRequest {
+  string token_id = 1;
+}
+
+message RevokeTokenResponse {}
+
+message ListAutomationTokensRequest {}
+
+message ListAutomationTokensResponse {
+  repeated AutomationToken tokens = 1;
+}
+
+message CreateAutomationTokenRequest {
+  string label = 1;
+  // At least one, each once.
+  repeated string scopes = 2;
+  // How many days the token lasts, 1 to 730. Left out, 90; 0, until
+  // revoked.
+  optional int32 expires_in_days = 3;
+}
+
+message CreateAutomationTokenResponse {
+  string token_id = 1;
+  string label = 2;
+  repeated string scopes = 3;
+  // Shown once, never again.
+  string token = 4;
+}
+
+message BotIdentity {
+  string id = 1;
+  string bot_id = 2;
+  string bot_email = 3;
+  string issuer = 4;
+  map<string, string> claims = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_used_at = 7;
+}
+
+message ListBotIdentitiesRequest {
+  string team = 1;
+}
+
+message ListBotIdentitiesResponse {
+  repeated BotIdentity identities = 1;
+  // What this install accepts.
+  repeated string issuers = 2;
+  string audience = 3;
+}
+
+message AddBotIdentityRequest {
+  string team = 1;
+  string bot_id = 2;
+  string issuer = 3;
+  map<string, string> claims = 4;
+}
+
+message AddBotIdentityResponse {
+  BotIdentity identity = 1;
+}
+
+message RemoveBotIdentityRequest {
+  string id = 1;
+}
+
+message RemoveBotIdentityResponse {}

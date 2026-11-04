@@ -32,7 +32,7 @@ import { bindOidcSubject, createSsoUser, findUserByEmail, findUserByOidcSubject,
 import { newSession } from "./plugin.js";
 import { writeAuditEntry } from "../audit.js";
 
-const COOKIE = "vertra_oidc";
+const COOKIE = "vennir_oidc";
 const COOKIE_PATH = "/api/auth/oidc";
 const COOKIE_SECONDS = 600;
 const GOOGLE = "https://accounts.google.com";

@@ -6,7 +6,7 @@ version: v2
 clean: true
 inputs:
   - directory: proto
-    paths: [proto/vertra/console]
+    paths: [proto/vennir/console]
 plugins:
   - local: console/node_modules/.bin/protoc-gen-es
     out: console/frontend/src/gen

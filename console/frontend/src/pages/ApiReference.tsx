@@ -262,7 +262,7 @@ function Types({ reference }: { reference: Reference }) {
   );
 }
 
-/** The console API, from the protos (proto/vertra/console/v1) it's built from. */
+/** The console API, from the protos (proto/vennir/console/v1) it's built from. */
 export function ApiReference() {
   const [reference, setReference] = useState<Reference | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -295,14 +295,14 @@ export function ApiReference() {
         </Typography>
         <Typography variant="body2" sx={{ mb: 1 }}>
           Everything the console does, its pages included, goes through this API. Each method is one URL,{" "}
-          <Mono>POST /api/vertra.console.v1.&lt;Service&gt;/&lt;Method&gt;</Mono>, taking and returning JSON
+          <Mono>POST /api/vennir.console.v1.&lt;Service&gt;/&lt;Method&gt;</Mono>, taking and returning JSON
           (the Connect protocol: plain HTTP, so curl works). Sign in with a bearer token: a session from{" "}
           <Mono>AuthService/Login</Mono>, or a bot's or automation token. A refusal answers{" "}
           <Mono>{'{"code": "permission_denied", "message": "…", "details": […]}'}</Mono>, with a stable code
           (such as <Mono>TEAM_RETIRED</Mono>) in its <Mono>Failure</Mono> detail.
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Generated from the protos in the platform's repository (<Mono>proto/vertra/console/v1</Mono>), which
+          Generated from the protos in the platform's repository (<Mono>proto/vennir/console/v1</Mono>), which
           are the contract: generate a typed client from them for any language, and call the same methods over
           gRPC or Connect as well as JSON.
         </Typography>

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-// Package install installs Vertra's two Helm releases: the charts from a
+// Package install installs Vennir's two Helm releases: the charts from a
 // source checkout or a release, their images built from source (and loaded
 // onto kind, or pushed to a registry) or the released ones, and the values
-// vertra generates from the config, with the user's own values last.
+// vennir generates from the config, with the user's own values last.
 package install
 
 import (
@@ -21,12 +21,12 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/rburns629/vertra/cli/internal/cluster"
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/gcp"
-	"github.com/rburns629/vertra/cli/internal/plan"
-	"github.com/rburns629/vertra/cli/internal/run"
-	"github.com/rburns629/vertra/cli/internal/tools"
+	"github.com/rburns629/vennir/cli/internal/cluster"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/gcp"
+	"github.com/rburns629/vennir/cli/internal/plan"
+	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/tools"
 )
 
 // Cloud is what a cloud target's OpenTofu module made, for the values.
@@ -104,7 +104,7 @@ func ConsoleHostname(c *config.Config, ip string) string {
 }
 
 // certificateName is the console's Google-managed certificate.
-const certificateName = "vertra-console"
+const certificateName = "vennir-console"
 
 // EnsureCertificate creates (or updates) the Google-managed certificate for
 // the console's hostname. Google issues it once the name resolves to the
@@ -116,7 +116,7 @@ metadata:
   name: %s
   namespace: %s
   labels:
-    app.kubernetes.io/managed-by: vertra
+    app.kubernetes.io/managed-by: vennir
 spec:
   domains: [%q]
 `, certificateName, c.Namespace, host)
@@ -134,17 +134,17 @@ func CertificateStatus(ctx context.Context, r *run.Runner, c *config.Config) str
 // PrometheusServiceAccountName is the bundled Prometheus's ServiceAccount
 // with Amazon Managed Prometheus (the console chart's
 // monitoring.prometheus.serviceAccountName), bound to the module's role.
-const PrometheusServiceAccountName = "vertra-prometheus"
+const PrometheusServiceAccountName = "vennir-prometheus"
 
 // LokiServiceAccountName is the Kubernetes ServiceAccount Loki runs as (the
 // console chart's logs.serviceAccountName), bound to the module's logs
 // identity.
-const LokiServiceAccountName = "vertra-loki"
+const LokiServiceAccountName = "vennir-loki"
 
 // BackupServiceAccountName is the Kubernetes ServiceAccount the database
 // backups run as (the kernel chart's backup.serviceAccountName), bound to
 // the module's backup identity.
-const BackupServiceAccountName = "vertra-pg-backup"
+const BackupServiceAccountName = "vennir-pg-backup"
 
 // Release names: fixed, so the console finds kernel-api's Service and the
 // database Secret by name.
@@ -152,7 +152,7 @@ const (
 	KernelRelease  = "kernel"
 	ConsoleRelease = "console"
 	// ReleaseCharts is where released charts are published.
-	ReleaseCharts = "oci://ghcr.io/rburns629/vertra/charts"
+	ReleaseCharts = "oci://ghcr.io/rburns629/vennir/charts"
 )
 
 // Chart is a chart's local directory (Dir), from a source checkout or, for
@@ -168,25 +168,25 @@ type Chart struct {
 // Charts returns the kernel and console charts for a config; dir is the
 // environment's directory.
 func Charts(c *config.Config, dir string) (kernel, console Chart) {
-	if c.Vertra == "source" {
+	if c.Vennir == "source" {
 		return Chart{Dir: filepath.Join(c.Source, "helm", "charts", "execution-kernel")},
 			Chart{Dir: filepath.Join(c.Source, "helm", "charts", "execution-console")}
 	}
-	pulled := filepath.Join(dir, "charts", c.Vertra)
-	return Chart{Dir: filepath.Join(pulled, "execution-kernel"), Remote: ReleaseCharts + "/execution-kernel", Version: c.Vertra},
-		Chart{Dir: filepath.Join(pulled, "execution-console"), Remote: ReleaseCharts + "/execution-console", Version: c.Vertra}
+	pulled := filepath.Join(dir, "charts", c.Vennir)
+	return Chart{Dir: filepath.Join(pulled, "execution-kernel"), Remote: ReleaseCharts + "/execution-kernel", Version: c.Vennir},
+		Chart{Dir: filepath.Join(pulled, "execution-console"), Remote: ReleaseCharts + "/execution-console", Version: c.Vennir}
 }
 
 // releaseChartSums are each released chart's SHA-256 (sha256sum's format:
 // "<sum>  execution-kernel-0.8.0.tgz"), the package its release pushed. The
-// release workflow adds its own to the vertra it builds, and to main in its
-// pin pull request, so a vertra knows every release up to its own.
+// release workflow adds its own to the vennir it builds, and to main in its
+// pin pull request, so a vennir knows every release up to its own.
 //
 //go:embed release-charts.sha256
 var releaseChartSums string
 
 // releaseChartSum is a released chart's SHA-256, or "" for a version this
-// vertra doesn't know.
+// vennir doesn't know.
 func releaseChartSum(name, version string) string {
 	for line := range strings.Lines(releaseChartSums) {
 		if sum, file, ok := strings.Cut(strings.TrimSpace(line), "  "); ok && file == name+"-"+version+".tgz" {
@@ -196,17 +196,17 @@ func releaseChartSum(name, version string) string {
 	return ""
 }
 
-// KnownRelease refuses a release whose charts this vertra can't check.
+// KnownRelease refuses a release whose charts this vennir can't check.
 func KnownRelease(version string) error {
 	for _, name := range []string{"execution-kernel", "execution-console"} {
 		if releaseChartSum(name, version) == "" {
-			return fmt.Errorf("this vertra has no recorded checksums for release %s's charts, so it can't check them: use that release's vertra, or a newer one (`vertra version`)", version)
+			return fmt.Errorf("this vennir has no recorded checksums for release %s's charts, so it can't check them: use that release's vennir, or a newer one (`vennir version`)", version)
 		}
 	}
 	return nil
 }
 
-// KnownReleases are the releases whose charts this vertra can check.
+// KnownReleases are the releases whose charts this vennir can check.
 func KnownReleases() []string {
 	var out []string
 	for line := range strings.Lines(releaseChartSums) {
@@ -221,7 +221,7 @@ func KnownReleases() []string {
 
 // Pull fetches a released chart into its Dir: the package, kept beside it
 // once per version, is checked against the release's SHA-256 on each apply
-// (and pulled again if it doesn't match, or a vertra before it kept none),
+// (and pulled again if it doesn't match, or a vennir before it kept none),
 // and Dir unpacked afresh from it, so what's installed is only ever the
 // checked package.
 func Pull(ctx context.Context, r *run.Runner, chart Chart) error {
@@ -281,7 +281,7 @@ type Images struct {
 // ImagesFor decides the platform images; a source build gets a fresh tag,
 // so each apply rolls the Pods onto what it just built.
 func ImagesFor(c *config.Config, now time.Time) Images {
-	if c.Vertra != "source" {
+	if c.Vennir != "source" {
 		return Images{}
 	}
 	tag := "src-" + now.UTC().Format("20060102-150405")
@@ -405,7 +405,7 @@ func KeepsVolume(c *config.Config, volume string) bool {
 	return volume != "" && (c.Target == "kind" || gibibytes(volume) > plan.Floors[c.Size].VolumeGiB)
 }
 
-// KernelValues are the values vertra generates for the kernel chart.
+// KernelValues are the values vennir generates for the kernel chart.
 // volume, when set, is the database volume's current size: kept when it's
 // larger than the size's (a volume can't shrink), and on kind (whose
 // volumes can't grow); otherwise the size's grows it.
@@ -465,7 +465,7 @@ func KernelValues(c *config.Config, img Images, volume string, cloud *Cloud) map
 		v["imagePolicy"] = map[string]any{"sourceRegistry": e.Registry}
 		if e.Federated() {
 			// The kubelet pulls them with the console's federated token.
-			scheduler["taskImagePullSecret"] = "vertra-pull"
+			scheduler["taskImagePullSecret"] = "vennir-pull"
 		}
 	}
 	if len(scheduler) > 0 {
@@ -485,7 +485,7 @@ func KernelValues(c *config.Config, img Images, volume string, cloud *Cloud) map
 	return v
 }
 
-// ConsoleValues are the values vertra generates for the console chart.
+// ConsoleValues are the values vennir generates for the console chart.
 func ConsoleValues(c *config.Config, env string, img Images, cloud *Cloud) map[string]any {
 	v := map[string]any{
 		"kernelApiUrl": fmt.Sprintf("https://%s-execution-kernel-api.%s.svc.cluster.local:8000", KernelRelease, c.Namespace),
@@ -536,7 +536,7 @@ func ConsoleValues(c *config.Config, env string, img Images, cloud *Cloud) map[s
 			v["ingress"] = map[string]any{
 				"enabled":   true,
 				"host":      cloud.ConsoleHost,
-				"className": "vertra-alb",
+				"className": "vennir-alb",
 				"annotations": map[string]any{
 					"alb.ingress.kubernetes.io/certificate-arn":  cloud.ConsoleCertificate,
 					"alb.ingress.kubernetes.io/listen-ports":     `[{"HTTPS":443}]`,
@@ -747,7 +747,7 @@ metadata:
   name: %s
   namespace: %s
   labels:
-    app.kubernetes.io/managed-by: vertra
+    app.kubernetes.io/managed-by: vennir
 %sautomountServiceAccountToken: false
 `, BackupServiceAccountName, c.Namespace, annotations)
 	return r.RunInput(ctx, manifest, "kubectl", "--context", cluster.Context(c), "apply", "-f", "-")
@@ -821,7 +821,7 @@ func FindPrometheus(ctx context.Context, r *run.Runner, c *config.Config) *Prome
 
 // monitoringValues are a chart's monitoring and metricsFrom (who may
 // scrape), for the Prometheus monitoring.provider names: the cluster's
-// operator as vertra init found it, GKE's managed collector, or the
+// operator as vennir init found it, GKE's managed collector, or the
 // console chart's own (console: this is the console chart's values), which
 // with amazon also writes to the module's workspace.
 func monitoringValues(c *config.Config, cloud *Cloud, console bool) (monitoring map[string]any, metricsFrom []any) {
@@ -884,7 +884,7 @@ func GoogleCollectorNamespace(c *config.Config) string {
 }
 
 // SSOSecretName is the Secret holding the Google OAuth client's secret.
-const SSOSecretName = "vertra-sso"
+const SSOSecretName = "vennir-sso"
 
 // GoogleClient is an OAuth client's downloaded JSON (Google Cloud console,
 // Clients, Download JSON): a web client, its id, secret and redirect URIs.
@@ -916,7 +916,7 @@ func ReadGoogleClient(path string) (*GoogleClient, error) {
 }
 
 // localSSORedirect is a private console's sign-in callback: the
-// port-forward's (vertra console, at its default port).
+// port-forward's (vennir console, at its default port).
 const localSSORedirect = "http://localhost:18080/api/auth/oidc/callback"
 
 func publicSSORedirect(host string) string {
@@ -924,7 +924,7 @@ func publicSSORedirect(host string) string {
 }
 
 // SSORedirect is where Google sends people back: the console's public
-// address, or the port-forward's (vertra console) when it has none. host
+// address, or the port-forward's (vennir console) when it has none. host
 // is the public name the cloud side gave it (gcp's nip.io name for its
 // reserved address, aws's in its zone), or "" when there's none yet; then
 // a configured hostname. Nothing in the cluster is read, so it's known as
@@ -937,7 +937,7 @@ func SSORedirect(c *config.Config, host string) (string, error) {
 		host = c.Console.Hostname
 	}
 	if host == "" {
-		return "", fmt.Errorf("the console's public address isn't known until the cloud side is made: `vertra apply` first")
+		return "", fmt.Errorf("the console's public address isn't known until the cloud side is made: `vennir apply` first")
 	}
 	return publicSSORedirect(host), nil
 }
@@ -954,7 +954,7 @@ func CheckSSORedirect(c *config.Config, host string) error {
 	if err != nil || c.SSO.RedirectURL == want {
 		return nil
 	}
-	return fmt.Errorf("Google sign-in sends people back to %s, but the console's callback is now %s: add it to the OAuth client's redirect URIs in Google's console, download its JSON again, and rerun `vertra sso google`, then apply",
+	return fmt.Errorf("Google sign-in sends people back to %s, but the console's callback is now %s: add it to the OAuth client's redirect URIs in Google's console, download its JSON again, and rerun `vennir sso google`, then apply",
 		c.SSO.RedirectURL, want)
 }
 
@@ -967,7 +967,7 @@ func EnsureSSOSecret(ctx context.Context, r *run.Runner, c *config.Config) error
 	}
 	manifest, _ := json.Marshal(map[string]any{
 		"apiVersion": "v1", "kind": "Secret",
-		"metadata":   map[string]any{"name": SSOSecretName, "namespace": c.Namespace, "labels": map[string]string{"app.kubernetes.io/managed-by": "vertra"}},
+		"metadata":   map[string]any{"name": SSOSecretName, "namespace": c.Namespace, "labels": map[string]string{"app.kubernetes.io/managed-by": "vennir"}},
 		"stringData": map[string]string{"client-secret": client.Secret},
 	})
 	return applySecret(ctx, r, c, SSOSecretName, string(manifest))
@@ -977,11 +977,11 @@ func EnsureSSOSecret(ctx context.Context, r *run.Runner, c *config.Config) error
 // through stdin, server-side: a client-side apply would keep a plaintext
 // copy of it in the kubectl.kubernetes.io/last-applied-configuration
 // annotation, which object exports and metadata tooling show. One an older
-// vertra's client-side apply left is removed, as the API server keeps an
+// vennir's client-side apply left is removed, as the API server keeps an
 // annotation it finds up to date.
 func applySecret(ctx context.Context, r *run.Runner, c *config.Config, name, manifest string) error {
 	k := []string{"--context", cluster.Context(c), "--namespace", c.Namespace}
-	if err := r.RunInput(ctx, manifest, "kubectl", append(k, "apply", "--server-side", "--field-manager=vertra", "--force-conflicts", "-f", "-")...); err != nil {
+	if err := r.RunInput(ctx, manifest, "kubectl", append(k, "apply", "--server-side", "--field-manager=vennir", "--force-conflicts", "-f", "-")...); err != nil {
 		return err
 	}
 	return r.Run(ctx, "kubectl", append(k, "annotate", "secret", name, lastApplied+"-")...)
@@ -989,7 +989,7 @@ func applySecret(ctx context.Context, r *run.Runner, c *config.Config, name, man
 
 const lastApplied = "kubectl.kubernetes.io/last-applied-configuration"
 
-// CertManagerChart is the cert-manager chart version vertra installs, on an
+// CertManagerChart is the cert-manager chart version vennir installs, on an
 // existing cluster that hasn't got it, for the console's certificate.
 var CertManagerChart = tools.ChartVersion("cert-manager")
 
@@ -1013,7 +1013,7 @@ func CertManager(ctx context.Context, r *run.Runner, c *config.Config) error {
 		"--set", "crds.enabled=true", "--wait", "--timeout", "10m")
 }
 
-// ExternalSecretsChart is External Secrets Operator's chart vertra installs
+// ExternalSecretsChart is External Secrets Operator's chart vennir installs
 // (externalSecrets), the same as `make kind-deploy-eso`: teams' SecretStores
 // sync their vaults' secrets through it.
 var ExternalSecretsChart = tools.ChartVersion("external-secrets")
@@ -1057,7 +1057,7 @@ func WriteValues(dir, name string, values map[string]any) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
-	header := "# Written by vertra apply from vertra.yaml; changes here are overwritten.\n"
+	header := "# Written by vennir apply from vennir.yaml; changes here are overwritten.\n"
 	return path, os.WriteFile(path, append([]byte(header), data...), 0o644)
 }
 
@@ -1074,12 +1074,12 @@ func Upgrade(ctx context.Context, r *run.Runner, c *config.Config, dir, release 
 		"upgrade", "--install", release, chart.Dir,
 		"--kube-context", cluster.Context(c), "--namespace", c.Namespace,
 		"--reset-values", "--timeout", "10m",
-		// Lowest first: the size preset, what vertra generates, yours.
+		// Lowest first: the size preset, what vennir generates, yours.
 		"-f", SizeValues(chart, c.Size),
 		"-f", generated,
 		// Others own fields Helm sets under server-side apply: the console
 		// edits the kernel's image and identity policies, and sleep, wake and
-		// the scanner's idling set replica counts. vertra's values win.
+		// the scanner's idling set replica counts. vennir's values win.
 		"--force-conflicts",
 	}
 	if !fresh {
@@ -1102,7 +1102,7 @@ func Installed(ctx context.Context, r *run.Runner, c *config.Config, release str
 }
 
 // InstalledIn is Installed for a release in another namespace (the charts
-// vertra installs beside the platform: policy-controller, External Secrets
+// vennir installs beside the platform: policy-controller, External Secrets
 // Operator).
 func InstalledIn(ctx context.Context, r *run.Runner, c *config.Config, namespace, release string) string {
 	out, err := r.Output(ctx, "helm", "list", "--kube-context", cluster.Context(c), "--namespace", namespace,
@@ -1128,9 +1128,9 @@ func Releases(ctx context.Context, r *run.Runner, c *config.Config) map[string]s
 	return map[string]string{KernelRelease: kernel, ConsoleRelease: console}
 }
 
-// FirstAdminSecret holds the first admin's password, which vertra
+// FirstAdminSecret holds the first admin's password, which vennir
 // generates, for the console's migrate Job, during a fresh install only.
-const FirstAdminSecret = "vertra-first-admin"
+const FirstAdminSecret = "vennir-first-admin"
 
 // NewPassword is a random password for the first admin.
 func NewPassword() string {
@@ -1148,7 +1148,7 @@ func GivePassword(ctx context.Context, r *run.Runner, c *config.Config, password
 kind: Secret
 metadata:
   name: %s
-  labels: {app.kubernetes.io/managed-by: vertra}
+  labels: {app.kubernetes.io/managed-by: vennir}
 stringData:
   password: %q
 `, FirstAdminSecret, password)
@@ -1201,7 +1201,7 @@ func ConsoleSubject(c *config.Config) string {
 }
 
 // Grant is what the catalog registry's owner runs, in its own environment,
-// to let this install read the catalog (`vertra catalog grant`), and what
+// to let this install read the catalog (`vennir catalog grant`), and what
 // this install does after.
 type Grant struct {
 	// Why: what the grant lets this install do.
@@ -1242,7 +1242,7 @@ func CatalogGrant(c *config.Config, cloud *Cloud) *Grant {
 		if c.VerifiesCatalog() && cloud.SigningVerifier != "" {
 			accounts = append(accounts, cloud.SigningVerifier)
 		}
-		command := "vertra catalog grant --reader " + reader
+		command := "vennir catalog grant --reader " + reader
 		for _, a := range accounts {
 			command += " --service-account " + a
 		}
@@ -1254,18 +1254,18 @@ func CatalogGrant(c *config.Config, cloud *Cloud) *Grant {
 	set := ""
 	switch {
 	case config.IsArtifactRegistry(e.Registry):
-		set = "vertra config set externalCatalog.gcpWorkloadIdentityProvider <the provider it prints>"
+		set = "vennir config set externalCatalog.gcpWorkloadIdentityProvider <the provider it prints>"
 	default:
 		if account, _, _ := config.ECRRegistry(e.Registry); account == "" {
 			return nil
 		}
-		set = "vertra config set externalCatalog.awsRoleArn <the role it prints>"
+		set = "vennir config set externalCatalog.awsRoleArn <the role it prints>"
 	}
 	return &Grant{
 		Why: "sign in to it with no stored key, as this cluster's console alone",
-		Command: fmt.Sprintf("vertra catalog grant --reader %s --issuer %s --subject %s",
+		Command: fmt.Sprintf("vennir catalog grant --reader %s --issuer %s --subject %s",
 			reader, cloud.ClusterIssuer, ConsoleSubject(c)),
-		Then: []string{set, "vertra apply"},
+		Then: []string{set, "vennir apply"},
 	}
 }
 
@@ -1329,7 +1329,7 @@ func CatalogSignerTrust(c *config.Config) map[string]any {
 	return trust
 }
 
-// PolicyControllerChart is Sigstore's policy-controller chart vertra
+// PolicyControllerChart is Sigstore's policy-controller chart vennir
 // installs when the catalog is signed; it enforces the kernel chart's
 // imageSignature.
 var PolicyControllerChart = tools.ChartVersion("policy-controller")
@@ -1350,7 +1350,7 @@ func PolicyController(ctx context.Context, r *run.Runner, c *config.Config, clou
 	args := []string{"upgrade", "--install", "policy-controller", chart,
 		"--kube-context", cluster.Context(c), "--namespace", "cosign-system", "--create-namespace",
 		"--set", "webhook.serviceAccount.name=" + PolicyControllerServiceAccount,
-		"--set-json", `webhook.namespaceSelector={"matchExpressions":[{"key":"vertra/team","operator":"Exists"}]}`,
+		"--set-json", `webhook.namespaceSelector={"matchExpressions":[{"key":"vennir/team","operator":"Exists"}]}`,
 		// Its webhook rewrites its own namespaceSelector, so Helm's server-side
 		// apply would conflict with it on every upgrade after the first.
 		"--force-conflicts",
@@ -1382,5 +1382,5 @@ func PolicyController(ctx context.Context, r *run.Runner, c *config.Config, clou
 
 // policyControllerProbe is a policy for no image, only ever dry-run.
 const policyControllerProbe = `{"apiVersion":"policy.sigstore.dev/v1beta1","kind":"ClusterImagePolicy",` +
-	`"metadata":{"name":"vertra-webhook-probe"},` +
-	`"spec":{"images":[{"glob":"vertra.invalid/**"}],"authorities":[{"static":{"action":"pass"}}]}}`
+	`"metadata":{"name":"vennir-webhook-probe"},` +
+	`"spec":{"images":[{"glob":"vennir.invalid/**"}],"authorities":[{"static":{"action":"pass"}}]}}`

@@ -80,7 +80,7 @@ spec:
         variables.labelled && namespaceObject.metadata.labels[{{ $label | quote }}] == "retired"
         ? "TEAM_RETIRED: team " + namespaceObject.metadata.name + " is retired, so nothing
         new runs in its namespace; an admin can un-retire it"
-        : "namespace " + namespaceObject.metadata.name + " is not a Vertra team
+        : "namespace " + namespaceObject.metadata.name + " is not a Vennir team
         namespace (it needs the label {{ $label }}=true), so tasks can't be
         dispatched into it"
       reason: Forbidden

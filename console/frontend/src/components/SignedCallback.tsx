@@ -106,7 +106,7 @@ export function SignedCallback({
         <Alert severity="success" onClose={() => { setSecret(null); }}>
           <Stack spacing={1}>
             <Typography variant="body2">
-              Its signing secret, shown only now. Each post carries <Mono>Vertra-Signature: t=…,v1=…</Mono>: the HMAC-SHA256 of{" "}
+              Its signing secret, shown only now. Each post carries <Mono>Vennir-Signature: t=…,v1=…</Mono>: the HMAC-SHA256 of{" "}
               <Mono>{"<t>.<body>"}</Mono> with this secret, in hex.
             </Typography>
             <CodeBlock code={secret} />

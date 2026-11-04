@@ -1,7 +1,7 @@
 # A sample: AWS from a cluster that isn't EKS (GKE, AKS, kind), signing in
 # with the step's own projected ServiceAccount token, by OIDC federation.
 # No key, no secret: see the aws team's README.md, AWS from another cluster.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: caller-identity
 team: aws

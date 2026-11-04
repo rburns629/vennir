@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/rburns629/vertra/cli/internal/install"
+	"github.com/rburns629/vennir/cli/internal/install"
 )
 
 func TestMoveJobsSignInAsTheirServiceAndReachThePostgres(t *testing.T) {
@@ -16,11 +16,11 @@ func TestMoveJobsSignInAsTheirServiceAndReachThePostgres(t *testing.T) {
 		db  *install.ManagedDatabase
 		tls bool
 	}{
-		{&install.ManagedDatabase{Provider: "gcp", Host: "10.0.0.5", KernelUser: "vertra-kernel@acme.iam"}, true},
-		{&install.ManagedDatabase{Provider: "aws", Host: "vertra.abc.us-east-2.rds.amazonaws.com", Region: "us-east-2", KernelUser: "kernel"}, false},
+		{&install.ManagedDatabase{Provider: "gcp", Host: "10.0.0.5", KernelUser: "vennir-kernel@acme.iam"}, true},
+		{&install.ManagedDatabase{Provider: "aws", Host: "vennir.abc.us-east-2.rds.amazonaws.com", Region: "us-east-2", KernelUser: "kernel"}, false},
 	} {
 		target := tc.db.URL(tc.db.KernelUser, "execution_kernel")
-		manifest := moveJob("vertra-move-kernel", "kernel-execution-kernel", "ghcr.io/x/execution-kernel:0.6.0", "postgres:16.15", "execution_kernel", tc.db, target, tc.tls)
+		manifest := moveJob("vennir-move-kernel", "kernel-execution-kernel", "ghcr.io/x/execution-kernel:0.6.0", "postgres:16.15", "execution_kernel", tc.db, target, tc.tls)
 		var job struct {
 			Spec struct {
 				Template struct {
@@ -61,7 +61,7 @@ func TestMoveJobsSignInAsTheirServiceAndReachThePostgres(t *testing.T) {
 		for _, m := range spec.InitContainers[0].VolumeMounts {
 			mounts[m.Name] = m.MountPath
 		}
-		if mounts["db-ca"] != "/etc/vertra/tls-db" || mounts["token"] != "/token" {
+		if mounts["db-ca"] != "/etc/vennir/tls-db" || mounts["token"] != "/token" {
 			t.Errorf("%s: token mounts %v", tc.db.Provider, mounts)
 		}
 		env := map[string]string{}

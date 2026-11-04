@@ -108,7 +108,7 @@ data:
   SMTP_FROM: {{ .from | quote }}
   SMTP_USERNAME: {{ .username | quote }}
   {{- if .passwordSecret.name }}
-  SMTP_PASSWORD_FILE: /var/run/secrets/vertra/smtp/password
+  SMTP_PASSWORD_FILE: /var/run/secrets/vennir/smtp/password
   {{- end }}
   {{- end }}
   {{- end }}
@@ -145,7 +145,7 @@ data:
   SCANNER_SERVER_URL: {{ printf "http://%s-trivy:4954" (include "execution-console.fullname" .) | quote }}
   SCANNER_IMAGE: {{ include "execution-console.image" .Values.scanning.image | quote }}
   SCANNER_SERVICE_ACCOUNT: {{ printf "%s-scanner" (include "execution-console.fullname" .) | quote }}
-  SCANNER_PULL_SECRET: {{ ternary "vertra-registry-token" .Values.registryCheck.pullSecretName (ne (include "execution-console.registryFederationAudience" .) "") | quote }}
+  SCANNER_PULL_SECRET: {{ ternary "vennir-registry-token" .Values.registryCheck.pullSecretName (ne (include "execution-console.registryFederationAudience" .) "") | quote }}
   SCAN_WAIT_SECONDS: {{ .Values.scanning.waitSeconds | quote }}
   SCAN_RESCAN_HOURS: {{ .Values.scanning.rescanHours | quote }}
   SCAN_POLICY_NAME: {{ .Values.scanning.policyName | quote }}
@@ -182,7 +182,7 @@ data:
   TEAM_SCHEDULER_SERVICE_ACCOUNT: {{ printf "%s/%s" .namespace .name | quote }}
   {{- end }}
   {{- if and .Values.gateway.enabled .Values.teamNamespaces.manage .Values.teamNamespaces.defaultDenyIngress }}
-  # The gateway's Pods, let into each team's API backends (vertra-gateway-ingress).
+  # The gateway's Pods, let into each team's API backends (vennir-gateway-ingress).
   TEAM_GATEWAY_NAMESPACE: {{ .Release.Namespace | quote }}
   {{- $labels := list }}
   {{- range $k, $v := (include "execution-console.gatewaySelectorLabels" . | fromYaml) }}

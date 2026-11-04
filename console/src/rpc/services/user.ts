@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-/** UserService (proto/vertra/console/v1/user.proto): core/users.ts over Connect. */
+/** UserService (proto/vennir/console/v1/user.proto): core/users.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { NewPassword } from "../../auth/password.js";
 import { AccountTeams, createAccount, deleteAccount, Email, listAccounts, resetPassword, setAdmin } from "../../core/users.js";
-import type { UserService } from "../../gen/vertra/console/v1/user_pb.js";
+import type { UserService } from "../../gen/vennir/console/v1/user_pb.js";
 import { callerOf, logOf } from "../context.js";
 import { check } from "../validate.js";
 

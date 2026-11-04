@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/rburns629/vertra/kernel/internal/domain"
+	"github.com/rburns629/vennir/kernel/internal/domain"
 )
 
 // One task attempt runs as a single-Pod Job. Its request goes in as a
@@ -279,12 +279,12 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 // the step runs, as whom, and with which Secrets: what a Job made by
 // anyone else would change.
 func sameAttempt(found, want *batchv1.Job) bool {
-	for _, key := range []string{"app", "vertra.dev/execution-id", "vertra.dev/attempt"} {
+	for _, key := range []string{"app", "vennir.dev/execution-id", "vennir.dev/attempt"} {
 		if found.Labels[key] != want.Labels[key] {
 			return false
 		}
 	}
-	if found.Annotations["vertra.dev/task"] != want.Annotations["vertra.dev/task"] {
+	if found.Annotations["vennir.dev/task"] != want.Annotations["vennir.dev/task"] {
 		return false
 	}
 	f, w := found.Spec.Template.Spec, want.Spec.Template.Spec
@@ -472,7 +472,7 @@ func (k *Kubernetes) jobFor(name string, task ResolvedTask) (*batchv1.Job, error
 	}
 	// So the console can show a Pod as "task X of execution Y": the task
 	// key is caller-chosen (maybe not a valid label), so an annotation.
-	labels := map[string]string{"app": "execution-kernel", "vertra.dev/execution-id": task.ExecutionID, "vertra.dev/attempt": strconv.Itoa(task.Attempt)}
+	labels := map[string]string{"app": "execution-kernel", "vennir.dev/execution-id": task.ExecutionID, "vennir.dev/attempt": strconv.Itoa(task.Attempt)}
 	// The deployment's own labels go on the Pod alone, under the kernel's.
 	podLabels := make(map[string]string, len(labels)+len(k.opts.PodLabels))
 	for key, value := range k.opts.PodLabels {
@@ -481,7 +481,7 @@ func (k *Kubernetes) jobFor(name string, task ResolvedTask) (*batchv1.Job, error
 	for key, value := range labels {
 		podLabels[key] = value
 	}
-	annotations := map[string]string{"vertra.dev/task": task.TaskKey}
+	annotations := map[string]string{"vennir.dev/task": task.TaskKey}
 	backoff := int32(0) // one attempt per Job: the scheduler owns retries
 	ttl := int32(k.opts.JobTTL.Seconds())
 	// A backstop: a Job the scheduler lost track of mustn't run forever. It
@@ -963,7 +963,7 @@ func (k *Kubernetes) logLines(raw []byte) []string {
 	}
 	lines = domain.RedactLines(splitLines(lines))
 	if len(lines) >= k.opts.LogMaxLines || len(raw) >= k.opts.LogMaxBytes {
-		lines = append([]string{fmt.Sprintf("[vertra: earlier output not kept; the last %d lines, at most %d bytes, are]", k.opts.LogMaxLines, k.opts.LogMaxBytes)}, lines...)
+		lines = append([]string{fmt.Sprintf("[vennir: earlier output not kept; the last %d lines, at most %d bytes, are]", k.opts.LogMaxLines, k.opts.LogMaxBytes)}, lines...)
 	}
 	return lines
 }
@@ -1086,9 +1086,9 @@ func (k *Kubernetes) ListAttempts(ctx context.Context) ([]LaunchedAttempt, error
 	}
 	var attempts []LaunchedAttempt
 	for _, job := range jobs.Items {
-		executionID := job.Labels["vertra.dev/execution-id"]
-		attempt, err := strconv.Atoi(job.Labels["vertra.dev/attempt"])
-		taskKey := job.Annotations["vertra.dev/task"]
+		executionID := job.Labels["vennir.dev/execution-id"]
+		attempt, err := strconv.Atoi(job.Labels["vennir.dev/attempt"])
+		taskKey := job.Annotations["vennir.dev/task"]
 		if executionID == "" || err != nil || attempt < 1 || taskKey == "" {
 			continue
 		}

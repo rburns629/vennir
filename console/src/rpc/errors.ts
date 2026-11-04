@@ -11,7 +11,7 @@
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { JsonObject } from "@bufbuild/protobuf";
-import { FailureSchema, ProblemSchema } from "../gen/vertra/console/v1/common_pb.js";
+import { FailureSchema, ProblemSchema } from "../gen/vennir/console/v1/common_pb.js";
 
 export function rpcError(
   code: Code,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-/** ProductService (proto/vertra/console/v1/product.proto): core/products.ts over Connect. */
+/** ProductService (proto/vennir/console/v1/product.proto): core/products.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import type { JsonObject } from "@bufbuild/protobuf";
 import { Type } from "@sinclair/typebox";
@@ -16,7 +16,7 @@ import {
   wiringTypes,
 } from "../../core/products.js";
 import type { ProductWithReleases } from "../../db/queries.js";
-import type { ProductService } from "../../gen/vertra/console/v1/product_pb.js";
+import type { ProductService } from "../../gen/vennir/console/v1/product_pb.js";
 import { timestamp } from "../convert.js";
 import { readinessOf, type ReadinessView } from "../../readiness.js";
 import { callerOf, logOf } from "../context.js";

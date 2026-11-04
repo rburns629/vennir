@@ -1,4 +1,4 @@
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: app-hosting
 team: gcp
@@ -27,7 +27,7 @@ actions:
     maxAttempts: 3
     script: actions/create.py
     # Deleting the service it deployed (only one it deployed for the run's
-    # team: create labels it vertra-made and vertra-team, and delete refuses
+    # team: create labels it vennir-made and vennir-team, and delete refuses
     # any other).
     cleanup:
       action: delete
@@ -38,7 +38,7 @@ actions:
       properties:
         projectId:
           type: string
-          x-vertra-needs: gcp.project  # a target: checked against allowedTargets for other teams
+          x-vennir-needs: gcp.project  # a target: checked against allowedTargets for other teams
           description: >-
             GCP project the service is deployed into. Typically supplied
             via $fromTask/$output from a gcp/project create task.
@@ -51,12 +51,12 @@ actions:
             -- this action never redeploys an existing service.
         region:
           type: string
-          x-vertra-needs: gcp.region
+          x-vennir-needs: gcp.region
           default: us-central1
           description: Cloud Run region.
         image:
           type: string
-          x-vertra-needs: gcp.container-image
+          x-vennir-needs: gcp.container-image
           description: >-
             Fully-qualified container image to deploy, built and pushed
             ahead of time, under the team's image-registry (its app-hosting
@@ -65,7 +65,7 @@ actions:
         cloudSqlConnectionName:
           type: string
           # Optional: the cart suggests a database (cloud-sql.create) for it.
-          x-vertra-needs: gcp.cloud-sql-instance
+          x-vennir-needs: gcp.cloud-sql-instance
           description: >-
             Optional. A Cloud SQL instance's connectionName (typically
             gcp/cloud-sql's own output, via $fromTask/$output) -- the

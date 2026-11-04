@@ -44,7 +44,7 @@ func TestUpgrade(t *testing.T) {
 		"passing some over":  {"0.5.0", "0.6.0", "0.6.0", versions, []string{"0.5.1, 0.5.2"}, false},
 		"back":               {"0.6.0", "0.5.2", "0.6.0", versions, nil, true},
 		"a newer one is out": {"0.5.1", "0.5.2", "0.6.0", versions, []string{"0.6.0 is out"}, false},
-		"vertra too old":     {"0.5.2", "0.6.0", "0.5.2", versions, []string{"get vertra 0.6.0"}, false},
+		"vennir too old":     {"0.5.2", "0.6.0", "0.5.2", versions, []string{"get vennir 0.6.0"}, false},
 		"a fresh install":    {"", "0.6.0", "0.6.0", versions, nil, false},
 		"from source":        {"0.1.0", "source", "dev", versions, nil, false},
 		"list unreadable":    {"0.5.0", "0.6.0", "0.6.0", nil, nil, false},
@@ -69,9 +69,9 @@ func TestUpgrade(t *testing.T) {
 
 func TestParseChecksums(t *testing.T) {
 	sha := func(c string) string { return strings.Repeat(c, 64) }
-	body := sha("a") + "  vertra-linux-amd64\n" + sha("b") + "  vertra-linux-arm64\n" +
-		sha("c") + "  vertra-darwin-amd64\n" + sha("d") + "  vertra-darwin-arm64\n" +
-		sha("e") + "  vertra-man.tar.gz\n"
+	body := sha("a") + "  vennir-linux-amd64\n" + sha("b") + "  vennir-linux-arm64\n" +
+		sha("c") + "  vennir-darwin-amd64\n" + sha("d") + "  vennir-darwin-arm64\n" +
+		sha("e") + "  vennir-man.tar.gz\n"
 	sums, err := parseChecksums(body, "0.6.0")
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestParseChecksums(t *testing.T) {
 	if len(sums) != 4 || sums["darwin-arm64"] != sha("d") || sums["linux-amd64"] != sha("a") {
 		t.Errorf("sums %v", sums)
 	}
-	if _, err := parseChecksums(sha("a")+"  vertra-linux-amd64\n", "0.6.0"); err == nil {
+	if _, err := parseChecksums(sha("a")+"  vennir-linux-amd64\n", "0.6.0"); err == nil {
 		t.Error("a release missing platforms was accepted")
 	}
 }

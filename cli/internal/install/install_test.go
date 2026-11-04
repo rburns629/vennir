@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rburns629/vertra/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/config"
 )
 
 func kindConfig() *config.Config {
 	c := config.Default("kind")
-	c.Source = "/src/vertra"
+	c.Source = "/src/vennir"
 	c.Admin.Email = "admin@example.com"
 	return c
 }
@@ -24,13 +24,13 @@ func kindConfig() *config.Config {
 func TestChartsFromSourceOrRelease(t *testing.T) {
 	c := kindConfig()
 	k, _ := Charts(c, "/deploy/dev")
-	if k.Dir != "/src/vertra/helm/charts/execution-kernel" || k.Remote != "" {
+	if k.Dir != "/src/vennir/helm/charts/execution-kernel" || k.Remote != "" {
 		t.Errorf("source: %+v", k)
 	}
-	if SizeValues(k, "minimal") != "/src/vertra/helm/charts/execution-kernel/sizes/minimal.yaml" {
+	if SizeValues(k, "minimal") != "/src/vennir/helm/charts/execution-kernel/sizes/minimal.yaml" {
 		t.Errorf("size: %s", SizeValues(k, "minimal"))
 	}
-	c.Vertra = "0.2.0"
+	c.Vennir = "0.2.0"
 	_, cons := Charts(c, "/deploy/dev")
 	if cons.Dir != "/deploy/dev/charts/0.2.0/execution-console" || cons.Remote != ReleaseCharts+"/execution-console" || cons.Version != "0.2.0" {
 		t.Errorf("release: %+v", cons)
@@ -51,7 +51,7 @@ func TestImagesFor(t *testing.T) {
 		t.Errorf("existing: %+v", img)
 	}
 
-	c.Vertra = "0.2.0"
+	c.Vennir = "0.2.0"
 	if img := ImagesFor(c, now); img.Build || img.Kernel != "" {
 		t.Errorf("release: %+v", img)
 	}
@@ -114,7 +114,7 @@ func TestValues(t *testing.T) {
 	}
 
 	v := ConsoleValues(c, "dev", img, nil)
-	if v["kernelApiUrl"] != "https://kernel-execution-kernel-api.vertra-system.svc.cluster.local:8000" {
+	if v["kernelApiUrl"] != "https://kernel-execution-kernel-api.vennir-system.svc.cluster.local:8000" {
 		t.Errorf("kernelApiUrl: %v", v["kernelApiUrl"])
 	}
 	if tls, _ := v["tls"].(map[string]any); tls["kernelCaSecret"] != "kernel-execution-kernel-tls-ca" {
@@ -131,7 +131,7 @@ func TestValues(t *testing.T) {
 		t.Error("a password must never be written to values")
 	}
 
-	c.Vertra = "0.2.0"
+	c.Vennir = "0.2.0"
 	if _, ok := ConsoleValues(c, "dev", ImagesFor(c, time.Now()), nil)["image"]; ok {
 		t.Error("a release should use the chart's own image")
 	}
@@ -141,23 +141,23 @@ func TestValues(t *testing.T) {
 // module registers it), for its teams' AWS SecretStores.
 func TestAnAWSConsoleKnowsTheIssuerStoresSignInWith(t *testing.T) {
 	c := kindConfig()
-	c.Catalog.Owner, c.Catalog.Repository = "octocat", "vertra-catalog"
+	c.Catalog.Owner, c.Catalog.Repository = "octocat", "vennir-catalog"
 	cloud := &Cloud{Provider: "aws", ClusterIssuer: "https://oidc.eks.us-east-2.amazonaws.com/id/ABC"}
 	got := fmt.Sprint(ConsoleValues(c, "dev", Images{}, cloud)["secretSources"])
-	if got != "map[catalogRepo:octocat/vertra-catalog clusterIssuer:https://oidc.eks.us-east-2.amazonaws.com/id/ABC]" {
+	if got != "map[catalogRepo:octocat/vennir-catalog clusterIssuer:https://oidc.eks.us-east-2.amazonaws.com/id/ABC]" {
 		t.Errorf("secretSources: %s", got)
 	}
 }
 
 func TestConsoleReadsTheCatalogsRelease(t *testing.T) {
 	c := kindConfig()
-	cloud := &Cloud{Provider: "gcp", TaskRegistry: "us-central1-docker.pkg.dev/p/vertra-products"}
+	cloud := &Cloud{Provider: "gcp", TaskRegistry: "us-central1-docker.pkg.dev/p/vennir-products"}
 	if _, ok := ConsoleValues(c, "dev", Images{}, cloud)["catalog"]; ok {
 		t.Error("no catalog repository, no release to read")
 	}
-	c.Catalog.Owner, c.Catalog.Repository = "octocat", "vertra-catalog"
+	c.Catalog.Owner, c.Catalog.Repository = "octocat", "vennir-catalog"
 	got := ConsoleValues(c, "dev", Images{}, cloud)["catalog"]
-	want := map[string]any{"release": "us-central1-docker.pkg.dev/p/vertra-products/catalog-release:latest"}
+	want := map[string]any{"release": "us-central1-docker.pkg.dev/p/vennir-products/catalog-release:latest"}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("catalog: %v, want %v", got, want)
 	}
@@ -165,13 +165,13 @@ func TestConsoleReadsTheCatalogsRelease(t *testing.T) {
 	// Following versions: one pinned, or the newest.
 	c.CatalogVersion = "v1.4.0"
 	got = ConsoleValues(c, "dev", Images{}, cloud)["catalog"]
-	want = map[string]any{"release": "us-central1-docker.pkg.dev/p/vertra-products/catalog-release:v1.4.0"}
+	want = map[string]any{"release": "us-central1-docker.pkg.dev/p/vennir-products/catalog-release:v1.4.0"}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("pinned: %v, want %v", got, want)
 	}
 	c.CatalogVersion = "newest"
 	got = ConsoleValues(c, "dev", Images{}, cloud)["catalog"]
-	want = map[string]any{"release": "us-central1-docker.pkg.dev/p/vertra-products/catalog-release:latest", "newestVersion": true}
+	want = map[string]any{"release": "us-central1-docker.pkg.dev/p/vennir-products/catalog-release:latest", "newestVersion": true}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("newest: %v, want %v", got, want)
 	}
@@ -182,34 +182,34 @@ func TestConsoleReadsTheCatalogsRelease(t *testing.T) {
 // with the console's token; and only releases the catalog's key signed.
 func TestAnExternalCatalogIsReadByFederation(t *testing.T) {
 	c := kindConfig()
-	c.Namespace = "vertra-system"
-	c.Cluster.Name = "vertra-eks"
-	cloud := &Cloud{Provider: "aws", TaskRegistry: "123456789012.dkr.ecr.us-east-1.amazonaws.com/vertra-products",
+	c.Namespace = "vennir-system"
+	c.Cluster.Name = "vennir-eks"
+	cloud := &Cloud{Provider: "aws", TaskRegistry: "123456789012.dkr.ecr.us-east-1.amazonaws.com/vennir-products",
 		ClusterIssuer: "https://oidc.eks.us-east-1.amazonaws.com/id/ABC"}
-	c.ExternalCatalog.Registry = "us-central1-docker.pkg.dev/acyclix-dev/vertra-products"
+	c.ExternalCatalog.Registry = "us-central1-docker.pkg.dev/acyclix-dev/vennir-products"
 	c.CatalogSignature.PublicKey = "-----BEGIN PUBLIC KEY-----\nk\n-----END PUBLIC KEY-----\n"
 
 	grant := CatalogGrant(c, cloud)
-	if grant == nil || grant.Command != "vertra catalog grant --reader vertra-eks --issuer https://oidc.eks.us-east-1.amazonaws.com/id/ABC "+
-		"--subject system:serviceaccount:vertra-system:console-execution-console" ||
+	if grant == nil || grant.Command != "vennir catalog grant --reader vennir-eks --issuer https://oidc.eks.us-east-1.amazonaws.com/id/ABC "+
+		"--subject system:serviceaccount:vennir-system:console-execution-console" ||
 		!strings.Contains(fmt.Sprint(grant.Then), "externalCatalog.gcpWorkloadIdentityProvider") {
 		t.Errorf("grant: %+v", grant)
 	}
 
-	c.ExternalCatalog.GCPWorkloadIdentityProvider = "projects/1/locations/global/workloadIdentityPools/vertra-installs/providers/vertra-eks"
+	c.ExternalCatalog.GCPWorkloadIdentityProvider = "projects/1/locations/global/workloadIdentityPools/vennir-installs/providers/vennir-eks"
 	kernel := KernelValues(c, Images{}, "", cloud)
-	if fmt.Sprint(kernel["imagePolicy"]) != "map[sourceRegistry:us-central1-docker.pkg.dev/acyclix-dev/vertra-products]" ||
-		fmt.Sprint(kernel["scheduler"]) != "map[taskImagePullSecret:vertra-pull]" {
+	if fmt.Sprint(kernel["imagePolicy"]) != "map[sourceRegistry:us-central1-docker.pkg.dev/acyclix-dev/vennir-products]" ||
+		fmt.Sprint(kernel["scheduler"]) != "map[taskImagePullSecret:vennir-pull]" {
 		t.Errorf("kernel: %v %v", kernel["imagePolicy"], kernel["scheduler"])
 	}
 	console := ConsoleValues(c, "dev", Images{}, cloud)
 	want := "map[ecrToken:true gcpFederation:map[hosts:[us-central1-docker.pkg.dev] serviceAccount: " +
-		"workloadIdentityProvider:projects/1/locations/global/workloadIdentityPools/vertra-installs/providers/vertra-eks]]"
+		"workloadIdentityProvider:projects/1/locations/global/workloadIdentityPools/vennir-installs/providers/vennir-eks]]"
 	if fmt.Sprint(console["registryCheck"]) != want {
 		t.Errorf("registryCheck: %v", console["registryCheck"])
 	}
 	catalog, _ := console["catalog"].(map[string]any)
-	if catalog["release"] != "us-central1-docker.pkg.dev/acyclix-dev/vertra-products/catalog-release:latest" ||
+	if catalog["release"] != "us-central1-docker.pkg.dev/acyclix-dev/vennir-products/catalog-release:latest" ||
 		!strings.Contains(fmt.Sprint(catalog["signature"]), "BEGIN PUBLIC KEY") || catalog["external"] != true {
 		t.Errorf("catalog: %v", catalog)
 	}
@@ -221,13 +221,13 @@ func TestAnExternalCatalogIsReadByFederation(t *testing.T) {
 // token.
 func TestAnExternalECRIsReadByWebIdentity(t *testing.T) {
 	c := kindConfig()
-	c.Target, c.Namespace, c.Cluster.Name, c.GCP.Project = "gcp", "vertra-system", "vertra-gke", "reader"
-	cloud := &Cloud{Provider: "gcp", ClusterIssuer: "https://container.googleapis.com/v1/projects/reader/locations/us-central1/clusters/vertra-gke"}
-	c.ExternalCatalog.Registry = "123456789012.dkr.ecr.us-east-2.amazonaws.com/vertra-products"
+	c.Target, c.Namespace, c.Cluster.Name, c.GCP.Project = "gcp", "vennir-system", "vennir-gke", "reader"
+	cloud := &Cloud{Provider: "gcp", ClusterIssuer: "https://container.googleapis.com/v1/projects/reader/locations/us-central1/clusters/vennir-gke"}
+	c.ExternalCatalog.Registry = "123456789012.dkr.ecr.us-east-2.amazonaws.com/vennir-products"
 
 	grant := CatalogGrant(c, cloud)
-	if grant == nil || grant.Command != "vertra catalog grant --reader vertra-gke --issuer "+cloud.ClusterIssuer+
-		" --subject system:serviceaccount:vertra-system:console-execution-console" ||
+	if grant == nil || grant.Command != "vennir catalog grant --reader vennir-gke --issuer "+cloud.ClusterIssuer+
+		" --subject system:serviceaccount:vennir-system:console-execution-console" ||
 		!strings.Contains(fmt.Sprint(grant.Then), "externalCatalog.awsRoleArn") {
 		t.Errorf("grant: %+v", grant)
 	}
@@ -235,15 +235,15 @@ func TestAnExternalECRIsReadByWebIdentity(t *testing.T) {
 		t.Error("no pull Secret before the role is set")
 	}
 
-	c.ExternalCatalog.AWSRoleArn = "arn:aws:iam::123456789012:role/vertra-reader-vertra-gke"
+	c.ExternalCatalog.AWSRoleArn = "arn:aws:iam::123456789012:role/vennir-reader-vennir-gke"
 	if CatalogGrant(c, cloud) != nil {
 		t.Error("granted: nothing more to print")
 	}
-	if fmt.Sprint(KernelValues(c, Images{}, "", cloud)["scheduler"]) != "map[taskImagePullSecret:vertra-pull]" {
+	if fmt.Sprint(KernelValues(c, Images{}, "", cloud)["scheduler"]) != "map[taskImagePullSecret:vennir-pull]" {
 		t.Errorf("kernel: %v", KernelValues(c, Images{}, "", cloud)["scheduler"])
 	}
 	check, _ := ConsoleValues(c, "dev", Images{}, cloud)["registryCheck"].(map[string]any)
-	if fmt.Sprint(check["awsFederation"]) != "map[hosts:[123456789012.dkr.ecr.us-east-2.amazonaws.com] roleArn:arn:aws:iam::123456789012:role/vertra-reader-vertra-gke]" ||
+	if fmt.Sprint(check["awsFederation"]) != "map[hosts:[123456789012.dkr.ecr.us-east-2.amazonaws.com] roleArn:arn:aws:iam::123456789012:role/vennir-reader-vennir-gke]" ||
 		check["gcpFederation"] != nil {
 		t.Errorf("registryCheck: %v", check)
 	}
@@ -254,9 +254,9 @@ func TestAnExternalECRIsReadByWebIdentity(t *testing.T) {
 // releases only.
 func TestAReaderTrustsTheCatalogsSigner(t *testing.T) {
 	c := kindConfig()
-	c.ExternalCatalog.Registry = "us-central1-docker.pkg.dev/acyclix-dev/vertra-products"
-	c.CatalogSignature.Repository = "my-org/vertra-catalog"
-	subject := `^https://github\.com/my-org/vertra-catalog/\.github/workflows/ci\.yml@refs/heads/main$`
+	c.ExternalCatalog.Registry = "us-central1-docker.pkg.dev/acyclix-dev/vennir-products"
+	c.CatalogSignature.Repository = "my-org/vennir-catalog"
+	subject := `^https://github\.com/my-org/vennir-catalog/\.github/workflows/ci\.yml@refs/heads/main$`
 
 	// kind: releases only.
 	if c.ChecksSignatures() || KernelValues(c, Images{}, "", nil)["imageSignature"] != nil {
@@ -268,7 +268,7 @@ func TestAReaderTrustsTheCatalogsSigner(t *testing.T) {
 	}
 
 	c.Target = "gcp"
-	cloud := &Cloud{Provider: "gcp", SigningVerifier: "vertra-r-verifier@p.iam.gserviceaccount.com"}
+	cloud := &Cloud{Provider: "gcp", SigningVerifier: "vennir-r-verifier@p.iam.gserviceaccount.com"}
 	if !c.ChecksSignatures() || c.ModuleSigning() != "verify" {
 		t.Errorf("gcp: checks %v, module %q", c.ChecksSignatures(), c.ModuleSigning())
 	}
@@ -286,12 +286,12 @@ func TestAReaderTrustsTheCatalogsSigner(t *testing.T) {
 	}
 	// The owner grants this install's own service accounts read, the
 	// verifier's among them.
-	c.Cluster.Name, c.GCP.Project = "vertra-r", "p"
-	cloud.ConsoleServiceAccount, cloud.ScannerServiceAccount = "vertra-r-console@p.iam.gserviceaccount.com", "vertra-r-scanner@p.iam.gserviceaccount.com"
+	c.Cluster.Name, c.GCP.Project = "vennir-r", "p"
+	cloud.ConsoleServiceAccount, cloud.ScannerServiceAccount = "vennir-r-console@p.iam.gserviceaccount.com", "vennir-r-scanner@p.iam.gserviceaccount.com"
 	grant := CatalogGrant(c, cloud)
-	if grant == nil || grant.Command != "vertra catalog grant --reader vertra-r --service-account vertra-r-console@p.iam.gserviceaccount.com "+
-		"--service-account vertra-r-scanner@p.iam.gserviceaccount.com --service-account vertra-r-nodes@p.iam.gserviceaccount.com "+
-		"--service-account vertra-r-verifier@p.iam.gserviceaccount.com" || len(grant.Then) != 0 {
+	if grant == nil || grant.Command != "vennir catalog grant --reader vennir-r --service-account vennir-r-console@p.iam.gserviceaccount.com "+
+		"--service-account vennir-r-scanner@p.iam.gserviceaccount.com --service-account vennir-r-nodes@p.iam.gserviceaccount.com "+
+		"--service-account vennir-r-verifier@p.iam.gserviceaccount.com" || len(grant.Then) != 0 {
 		t.Errorf("grant: %+v", grant)
 	}
 	// In its own project: nothing to grant.
@@ -314,7 +314,7 @@ func TestAReaderTrustsTheCatalogsSigner(t *testing.T) {
 func TestTheChatOnGCP(t *testing.T) {
 	c := kindConfig()
 	if _, ok := ConsoleValues(c, "dev", Images{}, nil)["chat"]; ok {
-		t.Error("kind: the chart's own chat values, not vertra's")
+		t.Error("kind: the chart's own chat values, not vennir's")
 	}
 	c.Target = "gcp"
 	c.GCP.Project = "acme-dev"
@@ -349,9 +349,9 @@ func TestTheChatOnGCP(t *testing.T) {
 // cluster's Workload Identity pool for minting Google ID tokens.
 func TestTheGatewaysValues(t *testing.T) {
 	c := kindConfig()
-	c.Namespace = "vertra-system"
+	c.Namespace = "vennir-system"
 	c.GCP.Project = "acme-dev"
-	cloud := &Cloud{Provider: "gcp", ClusterName: "vertra", ClusterLocation: "us-central1"}
+	cloud := &Cloud{Provider: "gcp", ClusterName: "vennir", ClusterLocation: "us-central1"}
 	img := Images{Gateway: "us-docker.pkg.dev/acme-dev/platform/execution-gateway", Tag: "src-1"}
 	if _, ok := ConsoleValues(c, "dev", img, cloud)["gateway"]; ok {
 		t.Error("off unless it's enabled")
@@ -360,10 +360,10 @@ func TestTheGatewaysValues(t *testing.T) {
 	gw, _ := ConsoleValues(c, "dev", img, cloud)["gateway"].(map[string]any)
 	gcp, _ := gw["gcp"].(map[string]any)
 	if gw["enabled"] != true || fmt.Sprint(gw["backendHosts"]) != "[*.a.run.app]" ||
-		gw["url"] != "http://console-execution-console-gateway.vertra-system.svc.cluster.local:8080" ||
+		gw["url"] != "http://console-execution-console-gateway.vennir-system.svc.cluster.local:8080" ||
 		fmt.Sprint(gw["image"]) != "map[repository:us-docker.pkg.dev/acme-dev/platform/execution-gateway tag:src-1]" ||
 		gcp["tokenAudience"] != "acme-dev.svc.id.goog" ||
-		gcp["stsAudience"] != "identitynamespace:acme-dev.svc.id.goog:https://container.googleapis.com/v1/projects/acme-dev/locations/us-central1/clusters/vertra" {
+		gcp["stsAudience"] != "identitynamespace:acme-dev.svc.id.goog:https://container.googleapis.com/v1/projects/acme-dev/locations/us-central1/clusters/vennir" {
 		t.Errorf("gateway = %v", gw)
 	}
 }
@@ -375,7 +375,7 @@ func TestWriteValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(path)
-	if !strings.HasPrefix(string(data), "# Written by vertra") || !strings.Contains(string(data), "replicaCount: 2") {
+	if !strings.HasPrefix(string(data), "# Written by vennir") || !strings.Contains(string(data), "replicaCount: 2") {
 		t.Errorf("got:\n%s", data)
 	}
 }
@@ -438,7 +438,7 @@ func TestCheckSSORedirect(t *testing.T) {
 		t.Errorf("public, its nip.io address not known yet: %v", err)
 	}
 	err := CheckSSORedirect(c, "console.1-2-3-4.nip.io")
-	if err == nil || !strings.Contains(err.Error(), "https://console.1-2-3-4.nip.io/api/auth/oidc/callback") || !strings.Contains(err.Error(), "vertra sso google") {
+	if err == nil || !strings.Contains(err.Error(), "https://console.1-2-3-4.nip.io/api/auth/oidc/callback") || !strings.Contains(err.Error(), "vennir sso google") {
 		t.Errorf("made public: %v", err)
 	}
 
@@ -465,8 +465,8 @@ func TestCheckSSORedirect(t *testing.T) {
 func TestASignedCatalogIsRequiredByBothCharts(t *testing.T) {
 	c := kindConfig()
 	c.Target = "gcp"
-	c.Catalog.Owner, c.Catalog.Repository = "octocat", "vertra-catalog"
-	cloud := &Cloud{Provider: "gcp", TaskRegistry: "us-central1-docker.pkg.dev/p/vertra-products", SigningPublicKey: "-----BEGIN PUBLIC KEY-----\nabc\n-----END PUBLIC KEY-----\n"}
+	c.Catalog.Owner, c.Catalog.Repository = "octocat", "vennir-catalog"
+	cloud := &Cloud{Provider: "gcp", TaskRegistry: "us-central1-docker.pkg.dev/p/vennir-products", SigningPublicKey: "-----BEGIN PUBLIC KEY-----\nabc\n-----END PUBLIC KEY-----\n"}
 	if _, on := KernelValues(c, Images{}, "", cloud)["imageSignature"]; on {
 		t.Error("signing off: no imageSignature")
 	}
@@ -488,12 +488,12 @@ func TestASignedCatalogIsRequiredByBothCharts(t *testing.T) {
 	}
 	subject := regexp.MustCompile(keyless["subjectRegExp"].(string))
 	for name, want := range map[string]bool{
-		"https://github.com/octocat/vertra-catalog/.github/workflows/ci.yml@refs/heads/main":       true,
-		"https://github.com/octocat/vertra-catalog/.github/workflows/ci.yml@refs/heads/feature":    false,
-		"https://github.com/octocat/vertra-catalog/.github/workflows/other.yml@refs/heads/main":    false,
-		"https://github.com/octocat/vertra-catalogs/.github/workflows/ci.yml@refs/heads/main":      false,
-		"https://github.com/someone/vertra-catalog/.github/workflows/ci.yml@refs/heads/main":       false,
-		"https://github.com/octocat/vertra-catalog/.github/workflows/ci.yml@refs/heads/main/extra": false,
+		"https://github.com/octocat/vennir-catalog/.github/workflows/ci.yml@refs/heads/main":       true,
+		"https://github.com/octocat/vennir-catalog/.github/workflows/ci.yml@refs/heads/feature":    false,
+		"https://github.com/octocat/vennir-catalog/.github/workflows/other.yml@refs/heads/main":    false,
+		"https://github.com/octocat/vennir-catalogs/.github/workflows/ci.yml@refs/heads/main":      false,
+		"https://github.com/someone/vennir-catalog/.github/workflows/ci.yml@refs/heads/main":       false,
+		"https://github.com/octocat/vennir-catalog/.github/workflows/ci.yml@refs/heads/main/extra": false,
 	} {
 		if subject.MatchString(name) != want {
 			t.Errorf("keyless subject %q: match %v", name, !want)
@@ -558,8 +558,8 @@ func TestMonitoringValues(t *testing.T) {
 	}
 	// The console reads which alerts fire from this project's, for this cluster.
 	c.GCP.Project = "acyclix-dev"
-	v = ConsoleValues(c, "dev", img, &Cloud{Provider: "gcp", ClusterName: "vertra-dev"})
-	if g := v["monitoring"].(map[string]any)["google"].(map[string]any); g["project"] != "acyclix-dev" || g["cluster"] != "vertra-dev" {
+	v = ConsoleValues(c, "dev", img, &Cloud{Provider: "gcp", ClusterName: "vennir-dev"})
+	if g := v["monitoring"].(map[string]any)["google"].(map[string]any); g["project"] != "acyclix-dev" || g["cluster"] != "vennir-dev" {
 		t.Errorf("google console: %v", g)
 	}
 }

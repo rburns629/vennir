@@ -14,7 +14,7 @@
  *     webhook.
  *
  * Each post is signed with its callback's secret (shown once, when it's
- * set): `Vertra-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of
+ * set): `Vennir-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of
  * "<t>.<body>">`, so a receiver checks it came from this install and isn't
  * an old one replayed. Like a team's chat webhook, the URL is sealed, only
  * under the install's allowed hosts (config.orders.callbackHosts), never
@@ -78,7 +78,7 @@ export function newCallback(
   };
 }
 
-/** The Vertra-Signature header for a body, at a time (unix seconds). */
+/** The Vennir-Signature header for a body, at a time (unix seconds). */
 export function signature(secret: string, body: string, at: number): string {
   return `t=${String(at)},v1=${createHmac("sha256", secret).update(`${String(at)}.${body}`).digest("hex")}`;
 }
@@ -162,7 +162,7 @@ export async function postCallback(url: string, secret: string, body: string): P
   if (problem) throw new Error(problem);
   const response = await fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json", "vertra-signature": signature(secret, body, Math.floor(Date.now() / 1000)) },
+    headers: { "content-type": "application/json", "vennir-signature": signature(secret, body, Math.floor(Date.now() / 1000)) },
     body,
     redirect: "error",
     signal: AbortSignal.timeout(10_000),

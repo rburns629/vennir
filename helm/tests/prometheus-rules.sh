@@ -13,9 +13,9 @@ cp helm/tests/prometheus/alerts.test.yaml "$work/"
 
 # A rendered ConfigMap's one rule file, as its own file.
 rule_file() { # chart, release, key
-  helm template "$2" "helm/charts/$1" -n vertra-system --show-only templates/monitoring.yaml \
+  helm template "$2" "helm/charts/$1" -n vennir-system --show-only templates/monitoring.yaml \
     --set monitoring.provider=bundled --set monitoring.alerts.enabled=true \
-    --set kernelApiUrl=https://kernel-execution-kernel-api.vertra-system.svc:8000 |
+    --set kernelApiUrl=https://kernel-execution-kernel-api.vennir-system.svc:8000 |
     awk -v key="  $3: |" '$0 == key {on=1; next} on && /^[^ ]/ {on=0} on {sub(/^    /, ""); print}'
 }
 rule_file execution-kernel kernel kernel.rules.yaml > "$work/rules/kernel.rules.yaml"

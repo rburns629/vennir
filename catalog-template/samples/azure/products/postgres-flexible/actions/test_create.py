@@ -1,5 +1,5 @@
 """Tests for azure/postgres-flexible's create action, with the Azure clients
-mocked, so they run without an Azure subscription. `./vertra catalog check` runs
+mocked, so they run without an Azure subscription. `./vennir catalog check` runs
 them in the product's own image with its python3 (unittest, no pytest), so
 they also prove the SDK's names the action imports exist.
 """

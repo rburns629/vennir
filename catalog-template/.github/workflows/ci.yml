@@ -1,17 +1,17 @@
 name: catalog-ci
 
-# A thin wrapper: everything it does is ./vertra catalog (the pinned vertra), the
+# A thin wrapper: everything it does is ./vennir catalog (the pinned vennir), the
 # same command a laptop runs in local mode. On main it publishes the changed
 # products, then the catalog's release (<registry>/catalog-release): every
 # team, product and SecretStore as of this commit, which each install's
 # console reads, verifies and applies by itself. So this holds no console or
 # cluster credential, and one catalog serves any number of installs. Where to
-# publish is vertra.yaml, overridden here by this repository's variables and
+# publish is vennir.yaml, overridden here by this repository's variables and
 # secrets:
 #
-#   vars.VERTRA_REGISTRY       where images and releases go: <registry>/<team>/<product>
-#   vars.VERTRA_SIGNING_MODE   none | key | keyless
-#   vars.VERTRA_SIGNING_KEY    for key: env://COSIGN_PRIVATE_KEY, gcpkms://..., awskms://...
+#   vars.VENNIR_REGISTRY       where images and releases go: <registry>/<team>/<product>
+#   vars.VENNIR_SIGNING_MODE   none | key | keyless
+#   vars.VENNIR_SIGNING_KEY    for key: env://COSIGN_PRIVATE_KEY, gcpkms://..., awskms://...
 #   secrets.COSIGN_PRIVATE_KEY, secrets.COSIGN_PASSWORD   for a generated key
 #
 # Registry sign-in, by whichever of these is set:
@@ -23,11 +23,11 @@ name: catalog-ci
 # level: every pull request's workflows get repository secrets, and one that
 # edits a workflow can print them. Without Environments (a private repository
 # on GitHub Free), use only what needs no secret: OIDC to the registry, and
-# keyless or KMS signing. `vertra catalog create` warns about any it finds.
+# keyless or KMS signing. `vennir catalog create` warns about any it finds.
 #
 # A team whose builds need values of their own (a private package registry's
-# token) is listed in vertra.yaml's buildEnvironments, and its secrets go in
-# its own Environment, team-<name>, which `./vertra catalog environments`
+# token) is listed in vennir.yaml's buildEnvironments, and its secrets go in
+# its own Environment, team-<name>, which `./vennir catalog environments`
 # makes and limits to main. On main its products are built there (the build
 # job), each secret offered to docker build by name, and publish loads the
 # images; a pull request only validates them. Values a step uses when it
@@ -40,7 +40,7 @@ on:
   pull_request:
   push:
     branches: [main]
-    paths: ["teams/**", "tools/**", "vertra.yaml", "vertra"]
+    paths: ["teams/**", "tools/**", "vennir.yaml", "vennir"]
   # Checks every product again: base images get new fixes, and the
   # vulnerability database new findings, without anything here changing.
   # And copies the approved base images (bases.yaml) into the registry again.
@@ -95,7 +95,7 @@ jobs:
           # Empty (the weekly run) checks everything.
           BASE: ${{ github.event.pull_request.base.sha }}
           IMAGES: ${{ github.event_name == 'schedule' && 'images' || '' }}
-        run: ./vertra catalog check --changed "$BASE" --images "$IMAGES"
+        run: ./vennir catalog check --changed "$BASE" --images "$IMAGES"
 
   # main, before publishing: gitleaks and Semgrep (security.yml), so a
   # finding stops the publish even if it was merged.
@@ -106,7 +106,7 @@ jobs:
       contents: read
 
   # main: which of the products publish will choose are built in their
-  # team's own Environment (./vertra catalog plan), once it has checked each
+  # team's own Environment (./vennir catalog plan), once it has checked each
   # such Environment can be used from main only. It signs in to the
   # registry only to see what isn't published yet, as publish does.
   plan:
@@ -122,16 +122,16 @@ jobs:
     outputs:
       builds: ${{ steps.plan.outputs.builds }}
     env:
-      VERTRA_REGISTRY: ${{ vars.VERTRA_REGISTRY }}
-      VERTRA_SIGNING_MODE: ${{ vars.VERTRA_SIGNING_MODE }}
-      VERTRA_SIGNING_KEY: ${{ vars.VERTRA_SIGNING_KEY }}
+      VENNIR_REGISTRY: ${{ vars.VENNIR_REGISTRY }}
+      VENNIR_SIGNING_MODE: ${{ vars.VENNIR_SIGNING_MODE }}
+      VENNIR_SIGNING_KEY: ${{ vars.VENNIR_SIGNING_KEY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0   # to diff against the push's previous commit
       - uses: ./.github/actions/registry-sign-in
         with:
-          registry: ${{ vars.VERTRA_REGISTRY }}
+          registry: ${{ vars.VENNIR_REGISTRY }}
           gcp-workload-identity-provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           gcp-service-account: ${{ vars.PUBLISH_GCP_SERVICE_ACCOUNT }}
           aws-role-arn: ${{ vars.AWS_ROLE_ARN }}
@@ -144,7 +144,7 @@ jobs:
           BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          ./vertra catalog plan --changed "$BASE" --out plan.json
+          ./vennir catalog plan --changed "$BASE" --out plan.json
           echo "builds=$(cat plan.json)" >> "$GITHUB_OUTPUT"
 
   # main: each team that builds in its own Environment, in it (team-<name>,
@@ -167,7 +167,7 @@ jobs:
       contents: read
     env:
       # Not a credential: what the images are built for follows from it.
-      VERTRA_REGISTRY: ${{ vars.VERTRA_REGISTRY }}
+      VENNIR_REGISTRY: ${{ vars.VENNIR_REGISTRY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -176,10 +176,10 @@ jobs:
         env:
           # The plan's product folders (lowercase names, so splitting is safe).
           PRODUCTS: ${{ join(matrix.products, ' ') }}
-          VERTRA_BUILD_SECRETS: ${{ toJSON(secrets) }}
+          VENNIR_BUILD_SECRETS: ${{ toJSON(secrets) }}
         run: |
           read -ra products <<< "$PRODUCTS"
-          ./vertra catalog build --out images "${products[@]}"
+          ./vennir catalog build --out images "${products[@]}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: images-${{ matrix.team }}
@@ -194,7 +194,7 @@ jobs:
   # build (--images), never built here.
   # One run at a time, in order: a release names the images as of its commit.
   # With a version it only tags a release main already published and signed
-  # (`vertra catalog promote`), so it signs nothing; it queues apart, so a
+  # (`vennir catalog promote`), so it signs nothing; it queues apart, so a
   # later push can't cancel it while it waits.
   # Weekly (the schedule), it mirrors the approved bases instead: the same
   # sign-in, no products published.
@@ -218,9 +218,9 @@ jobs:
       contents: read
       id-token: write   # cloud sign-in through OIDC, and keyless signing
     env:
-      VERTRA_REGISTRY: ${{ vars.VERTRA_REGISTRY }}
-      VERTRA_SIGNING_MODE: ${{ vars.VERTRA_SIGNING_MODE }}
-      VERTRA_SIGNING_KEY: ${{ vars.VERTRA_SIGNING_KEY }}
+      VENNIR_REGISTRY: ${{ vars.VENNIR_REGISTRY }}
+      VENNIR_SIGNING_MODE: ${{ vars.VENNIR_SIGNING_MODE }}
+      VENNIR_SIGNING_KEY: ${{ vars.VENNIR_SIGNING_KEY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -230,7 +230,7 @@ jobs:
         run: bash .github/scripts/install-scanners.sh trivy osv-scanner cosign
       - uses: ./.github/actions/registry-sign-in
         with:
-          registry: ${{ vars.VERTRA_REGISTRY }}
+          registry: ${{ vars.VENNIR_REGISTRY }}
           gcp-workload-identity-provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           gcp-service-account: ${{ vars.PUBLISH_GCP_SERVICE_ACCOUNT }}
           aws-role-arn: ${{ vars.AWS_ROLE_ARN }}
@@ -243,7 +243,7 @@ jobs:
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-        run: ./vertra catalog bases mirror
+        run: ./vennir catalog bases mirror
 
       - name: Download the images teams' Environments built
         if: inputs.version == '' && github.event_name != 'schedule' && needs.build.result != 'skipped'
@@ -260,12 +260,12 @@ jobs:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
-          ./vertra catalog publish --changed "$BASE" --images images
-          ./vertra catalog release
+          ./vennir catalog publish --changed "$BASE" --images images
+          ./vennir catalog release
 
       - name: Make the version
         if: inputs.version != ''
         env:
           VERSION: ${{ inputs.version }}
           COMMIT: ${{ inputs.commit }}
-        run: ./vertra catalog promote "$VERSION" --from "${COMMIT:-HEAD}" --wait 30m
+        run: ./vennir catalog promote "$VERSION" --from "${COMMIT:-HEAD}" --wait 30m

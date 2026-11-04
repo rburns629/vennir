@@ -102,7 +102,7 @@ def main() -> int:
                     ),
                     network=Network(public_network_access=inputs.get("publicNetworkAccess", "Disabled")),
                     backup=Backup(backup_retention_days=7),
-                    tags={"managed-by": "vertra"},
+                    tags={"managed-by": "vennir"},
                 ),
             ).result()
         # Idempotent: adding the same administrator again changes nothing.

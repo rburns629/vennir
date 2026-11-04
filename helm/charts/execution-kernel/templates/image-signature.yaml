@@ -23,7 +23,7 @@ So its identity must be able to read every registry used there, and a
 namespace the platform's own components run in must stay out of its scope
 (see helm/values/gke/policy-controller.yaml).
 
-Under policy-controller's default no-match-policy, deny, which vertra keeps,
+Under policy-controller's default no-match-policy, deny, which vennir keeps,
 a Pod whose image no policy covers is refused too: in team namespaces only
 signed images from the source registry run, whoever makes the Pod, a bound
 even a compromised console can't move. So images from the other allowed

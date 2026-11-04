@@ -4,7 +4,7 @@ name: catalog-version
 # versions apply. This run is the tag's own, which may not use the
 # catalog-publish Environment or the registry (both main-only), so it only
 # asks ci.yml on main to make it: main tags the release it published for the
-# tagged commit (`vertra catalog promote`); nothing is rebuilt or re-signed.
+# tagged commit (`vennir catalog promote`); nothing is rebuilt or re-signed.
 # A version never moves once made. A tag on a commit from before this file
 # existed runs nothing: run ci.yml on main by hand, with the version and
 # commit, instead. Protect v* tags (a ruleset) as you protect main.

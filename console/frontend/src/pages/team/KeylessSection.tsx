@@ -21,11 +21,11 @@ export const CI: Record<string, { name: string; repo: string; repoLabel: string;
         "permissions:",
         "  id-token: write   # the job's own identity, instead of a stored token",
         "steps:",
-        "  - name: Sign in to Vertra",
+        "  - name: Sign in to Vennir",
         "    run: |",
         `      ID=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=${audience}" | jq -r .value)`,
-        `      TOKEN=$(jq -n --arg t "$ID" '{idToken: $t}' | curl -s -X POST ${consoleUrl}/api/vertra.console.v1.AuthService/ExchangeToken -H 'Content-Type: application/json' -d @- | jq -r .token)`,
-        '      echo "::add-mask::$TOKEN"; echo "VERTRA_TOKEN=$TOKEN" >> "$GITHUB_ENV"',
+        `      TOKEN=$(jq -n --arg t "$ID" '{idToken: $t}' | curl -s -X POST ${consoleUrl}/api/vennir.console.v1.AuthService/ExchangeToken -H 'Content-Type: application/json' -d @- | jq -r .token)`,
+        '      echo "::add-mask::$TOKEN"; echo "VENNIR_TOKEN=$TOKEN" >> "$GITHUB_ENV"',
       ].join("\n"),
   },
   [GITLAB]: {
@@ -36,10 +36,10 @@ export const CI: Record<string, { name: string; repo: string; repoLabel: string;
       [
         "deploy:",
         "  id_tokens:",
-        "    VERTRA_ID_TOKEN:",
+        "    VENNIR_ID_TOKEN:",
         `      aud: ${audience}`,
         "  script:",
-        `    - export VERTRA_TOKEN=$(jq -n --arg t "$VERTRA_ID_TOKEN" '{idToken: $t}' | curl -s -X POST ${consoleUrl}/api/vertra.console.v1.AuthService/ExchangeToken -H 'Content-Type: application/json' -d @- | jq -r .token)`,
+        `    - export VENNIR_TOKEN=$(jq -n --arg t "$VENNIR_ID_TOKEN" '{idToken: $t}' | curl -s -X POST ${consoleUrl}/api/vennir.console.v1.AuthService/ExchangeToken -H 'Content-Type: application/json' -d @- | jq -r .token)`,
       ].join("\n"),
   },
 };

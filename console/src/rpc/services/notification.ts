@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-/** NotificationService (proto/vertra/console/v1/notification.proto): core/notifications.ts over Connect. */
+/** NotificationService (proto/vennir/console/v1/notification.proto): core/notifications.ts over Connect. */
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import {
@@ -16,7 +16,7 @@ import {
   setTeamWebhook,
   testTeamWebhook,
 } from "../../core/notifications.js";
-import type { NotificationService } from "../../gen/vertra/console/v1/notification_pb.js";
+import type { NotificationService } from "../../gen/vennir/console/v1/notification_pb.js";
 import { callerOf } from "../context.js";
 import { timestamp } from "../convert.js";
 import { check } from "../validate.js";

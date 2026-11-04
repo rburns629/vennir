@@ -3,8 +3,8 @@
 (its cleanup), and its databases with it. Given {"resource": {"type":
 "gcp/cloud-sql-instance", "id": "<project>:<region>:<instance>"}}.
 
-Only an instance carrying create's vertra-made label, and the run's team
-(request.json's forTeam) as its vertra-team label, is deleted: one made some other way,
+Only an instance carrying create's vennir-made label, and the run's team
+(request.json's forTeam) as its vennir-team label, is deleted: one made some other way,
 or made for another team, is refused, whoever asks. One already gone
 succeeds.
 """
@@ -23,8 +23,8 @@ from google.auth import impersonated_credentials
 from googleapiclient import discovery
 from googleapiclient.errors import HttpError
 
-MADE_BY_LABEL = ("vertra-made", "true")
-TEAM_LABEL = "vertra-team"
+MADE_BY_LABEL = ("vennir-made", "true")
+TEAM_LABEL = "vennir-team"
 CONNECTION_NAME = re.compile(r"^([a-z][a-z0-9-]{4,28}[a-z0-9]):([a-z0-9-]+):([a-z][a-z0-9-]{0,97})$")
 
 INPUT_PATH = Path("/platform/input/request.json")
@@ -132,7 +132,7 @@ def _run() -> int:
 
     labels = (instance.get("settings") or {}).get("userLabels") or {}
     if labels.get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
-        return _failure("NOT_MADE_BY_VERTRA", f"Cloud SQL instance '{connection}' wasn't made by this product (it has no {MADE_BY_LABEL[0]} label), so it isn't deleted")
+        return _failure("NOT_MADE_BY_VENNIR", f"Cloud SQL instance '{connection}' wasn't made by this product (it has no {MADE_BY_LABEL[0]} label), so it isn't deleted")
     if labels.get(TEAM_LABEL) != team:
         return _failure("NOT_THIS_TEAMS", f"Cloud SQL instance '{connection}' wasn't made for team '{team}' (its {TEAM_LABEL} label says otherwise), so it isn't deleted")
 

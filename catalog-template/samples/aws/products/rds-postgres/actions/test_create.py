@@ -1,5 +1,5 @@
 """Tests for aws/rds-postgres's create action, with boto3 mocked, so they run
-without an AWS account. `./vertra catalog check` runs them in the product's own
+without an AWS account. `./vennir catalog check` runs them in the product's own
 image with its python3 (unittest, no pytest).
 """
 
@@ -67,7 +67,7 @@ class CreateActionTest(unittest.TestCase):
 
     def test_an_instance_it_made_is_reported_when_found_again(self) -> None:
         def configure(rds):
-            rds.describe_db_instances.return_value = {"DBInstances": [{**AVAILABLE, "TagList": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}]}
+            rds.describe_db_instances.return_value = {"DBInstances": [{**AVAILABLE, "TagList": [{"Key": "vennir-made", "Value": "true"}, {"Key": "vennir-team", "Value": "web"}]}]}
         _, result, _ = self._run({"instanceId": "orders-db", "region": "eu-west-1"}, configure)
         self.assertEqual(result["outputs"]["resources"][0]["id"], AVAILABLE["DBInstanceArn"])
         # Made by this product for another team: not this team's to delete.
@@ -90,8 +90,8 @@ class CreateActionTest(unittest.TestCase):
         self.assertFalse(create["PubliclyAccessible"])
         self.assertTrue(create["StorageEncrypted"])
         self.assertEqual(result["outputs"]["masterUserSecretArn"], AVAILABLE["MasterUserSecret"]["SecretArn"])
-        self.assertIn({"Key": "vertra-made", "Value": "true"}, create["Tags"])
-        self.assertIn({"Key": "vertra-team", "Value": "web"}, create["Tags"])
+        self.assertIn({"Key": "vennir-made", "Value": "true"}, create["Tags"])
+        self.assertIn({"Key": "vennir-team", "Value": "web"}, create["Tags"])
         self.assertEqual(result["outputs"]["resources"][0], {
             "type": "aws/rds-instance", "id": AVAILABLE["DBInstanceArn"], "name": "orders-db",
             "link": "https://eu-west-1.console.aws.amazon.com/rds/home?region=eu-west-1#database:id=orders-db",

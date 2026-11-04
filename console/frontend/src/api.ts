@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 /**
  * The console API for the pages: plain objects over the generated Connect
- * clients (./gen, from proto/vertra/console/v1). Pages use these
+ * clients (./gen, from proto/vennir/console/v1). Pages use these
  * functions and types, never the messages, so the wire contract can change
  * without touching them.
  *
@@ -15,10 +15,10 @@ import { createClient, Code, ConnectError, type Interceptor } from "@connectrpc/
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { fromJson, type JsonObject, type JsonValue } from "@bufbuild/protobuf";
 import { timestampDate, timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
-import { AdminService } from "./gen/vertra/console/v1/admin_pb.js";
-import { AuthService } from "./gen/vertra/console/v1/auth_pb.js";
-import { ApiService, ApiState } from "./gen/vertra/console/v1/api_pb.js";
-import { ObserveService } from "./gen/vertra/console/v1/observe_pb.js";
+import { AdminService } from "./gen/vennir/console/v1/admin_pb.js";
+import { AuthService } from "./gen/vennir/console/v1/auth_pb.js";
+import { ApiService, ApiState } from "./gen/vennir/console/v1/api_pb.js";
+import { ObserveService } from "./gen/vennir/console/v1/observe_pb.js";
 import {
   DagSchema,
   ExecutionService,
@@ -26,24 +26,24 @@ import {
   TaskState,
   type Dag,
   type Execution,
-} from "./gen/vertra/console/v1/execution_pb.js";
-import { GuideService } from "./gen/vertra/console/v1/guide_pb.js";
-import { ImageService, ScanStatus, type ImagePolicy as ImagePolicyMessage, type ImageScan as ImageScanMessage } from "./gen/vertra/console/v1/image_pb.js";
-import { ProductService } from "./gen/vertra/console/v1/product_pb.js";
-import { SecretService, SecretSource } from "./gen/vertra/console/v1/secret_pb.js";
-import { TaskPodState, TeamRole, TeamService, type Team as TeamMessage } from "./gen/vertra/console/v1/team_pb.js";
-import { TokenService } from "./gen/vertra/console/v1/token_pb.js";
-import { UserService } from "./gen/vertra/console/v1/user_pb.js";
-import { FailureSchema, ProblemSchema } from "./gen/vertra/console/v1/common_pb.js";
-import { Runnable_Kind, TemplateService } from "./gen/vertra/console/v1/template_pb.js";
-import { ResourceService } from "./gen/vertra/console/v1/resource_pb.js";
-import { NotificationService } from "./gen/vertra/console/v1/notification_pb.js";
-import { ScheduleService } from "./gen/vertra/console/v1/schedule_pb.js";
-import { DraftService, type Draft as DraftMessage } from "./gen/vertra/console/v1/draft_pb.js";
-import { OrderService } from "./gen/vertra/console/v1/order_pb.js";
-import { ChatService, type AskResponse, type ChatConfig as ChatConfigMessage } from "./gen/vertra/console/v1/chat_pb.js";
+} from "./gen/vennir/console/v1/execution_pb.js";
+import { GuideService } from "./gen/vennir/console/v1/guide_pb.js";
+import { ImageService, ScanStatus, type ImagePolicy as ImagePolicyMessage, type ImageScan as ImageScanMessage } from "./gen/vennir/console/v1/image_pb.js";
+import { ProductService } from "./gen/vennir/console/v1/product_pb.js";
+import { SecretService, SecretSource } from "./gen/vennir/console/v1/secret_pb.js";
+import { TaskPodState, TeamRole, TeamService, type Team as TeamMessage } from "./gen/vennir/console/v1/team_pb.js";
+import { TokenService } from "./gen/vennir/console/v1/token_pb.js";
+import { UserService } from "./gen/vennir/console/v1/user_pb.js";
+import { FailureSchema, ProblemSchema } from "./gen/vennir/console/v1/common_pb.js";
+import { Runnable_Kind, TemplateService } from "./gen/vennir/console/v1/template_pb.js";
+import { ResourceService } from "./gen/vennir/console/v1/resource_pb.js";
+import { NotificationService } from "./gen/vennir/console/v1/notification_pb.js";
+import { ScheduleService } from "./gen/vennir/console/v1/schedule_pb.js";
+import { DraftService, type Draft as DraftMessage } from "./gen/vennir/console/v1/draft_pb.js";
+import { OrderService } from "./gen/vennir/console/v1/order_pb.js";
+import { ChatService, type AskResponse, type ChatConfig as ChatConfigMessage } from "./gen/vennir/console/v1/chat_pb.js";
 import type { BuiltStep } from "./compose";
-import { SsoService, type SsoSettings as SsoSettingsMessage } from "./gen/vertra/console/v1/sso_pb.js";
+import { SsoService, type SsoSettings as SsoSettingsMessage } from "./gen/vennir/console/v1/sso_pb.js";
 
 /** A refusal or failure, with the HTTP status REST would have used. */
 export class ApiError extends Error {
@@ -183,7 +183,7 @@ export interface Environment {
   selfRegistration: boolean;
   /** Single sign-on's provider ("Google") when it's on. Passwords still work, except for teams that require it. */
   ssoLabel: string;
-  /** The cloud this install is on (gcp, aws, azure, kind, existing), as vertra set it; empty when it isn't known. */
+  /** The cloud this install is on (gcp, aws, azure, kind, existing), as vennir set it; empty when it isn't known. */
   cloud: string;
 }
 
@@ -318,7 +318,7 @@ export interface TeamMember {
   id: string;
   email: string;
   isBot: boolean;
-  /** A Vertra admin (platform-wide), not just this team's member. */
+  /** A Vennir admin (platform-wide), not just this team's member. */
   isAdmin: boolean;
   role: Role;
   addedAt: string;
@@ -873,7 +873,7 @@ export function cloudList(clouds: readonly string[]): string {
   return clouds.length <= 1 ? (clouds[0] ?? "") : `${clouds.slice(0, -1).join(", ")} and ${clouds.at(-1) ?? ""}`;
 }
 
-/** A product's check's last answer on this install (proto/vertra/console/v1/product.proto). */
+/** A product's check's last answer on this install (proto/vennir/console/v1/product.proto). */
 export interface Readiness {
   state: "ready" | "not_ready" | "failed" | "checking" | "unchecked";
   principal: string | null;
@@ -1667,7 +1667,7 @@ export async function listTeamPods(teamName: string): Promise<TaskPod[]> {
 export interface DocSummary {
   id: string;
   title: string;
-  /** guides: for using Vertra; reference: the platform's own docs. */
+  /** guides: for using Vennir; reference: the platform's own docs. */
   section: "guides" | "reference";
   /** guide, current (how it works now), operating (running it), or history (decisions: why, not what is). */
   kind: string;
@@ -1804,7 +1804,7 @@ export interface ApiEndpoint {
   summary: string;
 }
 
-/** An API product (proto/vertra/console/v1/api.proto). */
+/** An API product (proto/vennir/console/v1/api.proto). */
 export interface ApiProduct {
   team: string;
   name: string;
@@ -2264,7 +2264,7 @@ export async function searchLogs(search: LogSearch): Promise<{ lines: LogLineVie
   };
 }
 
-/** Something a run made, as its step reported it (proto/vertra/console/v1/resource.proto). */
+/** Something a run made, as its step reported it (proto/vennir/console/v1/resource.proto). */
 export interface MadeResource {
   id: string;
   type: string;
@@ -2376,7 +2376,7 @@ export async function deleteRunResources(executionId: string): Promise<string> {
   return (await call(() => resourcesApi.deleteRunResources({ executionId }))).executionId;
 }
 
-/** Something you'd want to know (proto/vertra/console/v1/notification.proto). */
+/** Something you'd want to know (proto/vennir/console/v1/notification.proto). */
 export interface Notification {
   id: string;
   kind: "run_failed" | "run_succeeded" | "approval_waiting" | "catalog_failing" | "product_not_ready" | "step_refused" | "platform_alert";
@@ -2497,7 +2497,7 @@ export async function previewStep(executionId: string, taskId: string): Promise<
   return (await call(() => executions.previewStep({ executionId, taskId }))).executionId;
 }
 
-/** A team's schedule (proto/vertra/console/v1/schedule.proto). */
+/** A team's schedule (proto/vennir/console/v1/schedule.proto). */
 export interface Schedule {
   id: string;
   team: string;
@@ -2892,7 +2892,7 @@ export interface ChatAnswer {
   citations: ChatCitation[];
   /** It found nothing to answer from: the text says so, in the console's words. */
   uncited: boolean;
-  /** Not about Vertra: the text says what it helps with. */
+  /** Not about Vennir: the text says what it helps with. */
   offTopic: boolean;
   /** How much of the chat's context window the conversation takes, 0 to 100. */
   contextPercent: number;

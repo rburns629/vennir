@@ -1,9 +1,9 @@
-# Vertra
+# Vennir
 
 **Run DAGs of container steps on Kubernetes, where each step comes from a
 reviewed catalog and every team's secrets stay sealed off from the rest.**
 
-*Vertra* is named for the "A" in DAG: a workflow is a directed *acyclic*
+*Vennir* is named for the "A" in DAG: a workflow is a directed *acyclic*
 graph, so it never loops back. Steps run in order, each one building on what
 the steps before it produced, and every run moves forward to an end.
 
@@ -35,7 +35,7 @@ the steps before it produced, and every run moves forward to an end.
   every step's state, outputs, logs and the reason for any failure.
 
 A step can be anything packaged as a container, from a hello-world script to
-creating cloud infrastructure. Vertra doesn't need to understand what a step
+creating cloud infrastructure. Vennir doesn't need to understand what a step
 does.
 
 ## A first example
@@ -105,11 +105,11 @@ make quickstart
 ```
 
 It creates a local kind cluster and image registry, builds and installs
-Vertra, sets up the team `team-a`, and leaves the console at
+Vennir, sets up the team `team-a`, and leaves the console at
 **http://localhost:18080**. It takes a few minutes the first time, and is safe
 to run again (it rebuilds from your checkout).
 
-Sign in as `admin@example.com` with the password `vertra-local`. That
+Sign in as `admin@example.com` with the password `vennir-local`. That
 password is set only for this local cluster; never use it anywhere else.
 Then open **Runs → Submit new**, paste the JSON above, and watch both
 steps finish.
@@ -136,7 +136,7 @@ kernel/    the DAG engine: kernel-api accepts runs, kernel-scheduler claims
            client-go). Deliberately blind to what any step does.
 gateway/   the API gateway: forwards calls to teams' API products, exactly
            as each one's OpenAPI document describes. Go.
-cli/       vertra, the installer: a cloud (Google Cloud or AWS) or an
+cli/       vennir, the installer: a cloud (Google Cloud or AWS) or an
            existing cluster, from one config file. Go, with OpenTofu.
 helm/      the two Helm charts (execution-kernel, execution-console) and the
            admission policies that guard the cluster, plus per-environment
@@ -171,7 +171,7 @@ scope, is in [`docs/security-model.md`](docs/security-model.md).
 
 ## Learn more
 
-- [`docs/setup.md`](docs/setup.md): installing it for real with `vertra`, on
+- [`docs/setup.md`](docs/setup.md): installing it for real with `vennir`, on
   Google Cloud, AWS or a cluster you have, start to finish
 - [`docs/architecture.md`](docs/architecture.md): how it works and why
 - [`docs/operations.md`](docs/operations.md): installing, upgrading, backups,
@@ -187,4 +187,4 @@ scope, is in [`docs/security-model.md`](docs/security-model.md).
 - Contributions are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Found a vulnerability? Please report it privately: see
   [`SECURITY.md`](SECURITY.md).
-- Vertra is released under the [MIT License](LICENSE).
+- Vennir is released under the [MIT License](LICENSE).

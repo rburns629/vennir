@@ -13,7 +13,7 @@ const AUTH: Record<string, string> = {
   service_account_token: "a token for the API's own ServiceAccount, minted per request",
   google_id_token: "a Google ID token, minted per request",
   aws_sig_v4: "AWS SigV4, as a role it assumes per request",
-  "": "nothing: it checks Vertra-Caller, or nothing",
+  "": "nothing: it checks Vennir-Caller, or nothing",
 };
 
 /** What the gateway does with each request, in the order gateway/internal/gateway/gateway.go does it. */
@@ -26,7 +26,7 @@ const STEPS: [string, string][] = [
   ["In the spec?", "The method and path are an operation in its OpenAPI file; else 404, blocked."],
   ["Does it fit?", "Only the query parameters and body it declares, against that operation's schemas; else 400."],
   ["Within its limit", "The calling team's requests a minute; else 429."],
-  ["Forward", "Same method, path, query and body; Authorization swapped for the backend's, Vertra-Caller added; the caller's Forwarded and X-Forwarded-* dropped."],
+  ["Forward", "Same method, path, query and body; Authorization swapped for the backend's, Vennir-Caller added; the caller's Forwarded and X-Forwarded-* dropped."],
   ["Answer", "The backend's response; any cookie it sets is kept to this API's path."],
 ];
 /** The step the page highlights: what the "Blocked: not in the spec" table counts. */

@@ -1,6 +1,6 @@
-# execution-console on EKS, as `vertra apply` writes it (see kernel.yaml):
-#   helm upgrade --install console oci://ghcr.io/rburns629/vertra/charts/execution-console --version <x.y.z> \
-#     -n vertra-system --reset-values --kube-context <context> -f helm/values/eks/console.yaml
+# execution-console on EKS, as `vennir apply` writes it (see kernel.yaml):
+#   helm upgrade --install console oci://ghcr.io/rburns629/vennir/charts/execution-console --version <x.y.z> \
+#     -n vennir-system --reset-values --kube-context <context> -f helm/values/eks/console.yaml
 # Its ServiceAccount gets its AWS identity from an EKS Pod Identity
 # association (made outside the chart: no annotation), a role that may read
 # the products' ECR repositories; see docs/operations.md, Cloud identities.
@@ -10,7 +10,7 @@ environmentLabel: eks-prod
 installCloud: aws
 bootstrapAdmin:
   email: admin@example.com
-kernelApiUrl: https://kernel-execution-kernel-api.vertra-system.svc.cluster.local:8000
+kernelApiUrl: https://kernel-execution-kernel-api.vennir-system.svc.cluster.local:8000
 # kernel-api's HTTPS, and the kernel's Postgres, are checked against the
 # kernel chart's own CA.
 tls:
@@ -31,7 +31,7 @@ teamNamespaces:
 # The catalog's release, beside its images, and who may sign it (the same
 # signer as the kernel's imageSignature).
 catalog:
-  release: 123456789012.dkr.ecr.us-east-2.amazonaws.com/vertra-products/catalog-release:latest
+  release: 123456789012.dkr.ecr.us-east-2.amazonaws.com/vennir-products/catalog-release:latest
   signature:
     publicKeys:
       - |
@@ -40,6 +40,6 @@ catalog:
         -----END PUBLIC KEY-----
 # The cluster's issuer, which IAM trusts for a team's AWS SecretStore (IRSA;
 # register it with `aws iam create-open-id-connect-provider`, once per
-# cluster: vertra does for a cluster it makes).
+# cluster: vennir does for a cluster it makes).
 secretSources:
   clusterIssuer: https://oidc.eks.us-east-2.amazonaws.com/id/<id>

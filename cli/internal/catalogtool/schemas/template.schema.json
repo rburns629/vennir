@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vertra template (dags/<name>.yaml, kind: Template), format v2",
+  "title": "Vennir template (dags/<name>.yaml, kind: Template), format v2",
   "description": "A runnable DAG with parameters: what a consumer runs, filling in only the parameters. Steps name actions, not images, so a template keeps working as products release new images, and each step uses its action's own secretRefs.",
   "type": "object",
   "additionalProperties": false,
@@ -15,8 +15,8 @@
   ],
   "properties": {
     "apiVersion": {
-      "description": "The catalog format: vertra.dev/v2. A file without it is from before v2: ./vertra catalog migrate rewrites it.",
-      "const": "vertra.dev/v2"
+      "description": "The catalog format: vennir.dev/v2. A file without it is from before v2: ./vennir catalog migrate rewrites it.",
+      "const": "vennir.dev/v2"
     },
     "kind": {
       "description": "What the file is: Template.",
@@ -163,23 +163,23 @@
       "description": "One field of the form the console builds from this schema. Any JSON Schema keyword; these hints only shape the form.",
       "type": "object",
       "properties": {
-        "x-vertra-order": {
+        "x-vennir-order": {
           "type": "integer",
           "description": "Where the field comes in the form: lower first; fields without one follow, in the order written."
         },
-        "x-vertra-group": {
+        "x-vennir-group": {
           "type": "string",
           "minLength": 1,
           "maxLength": 60,
           "description": "A heading the field is shown under, with the others that name it."
         },
-        "x-vertra-widget": {
+        "x-vennir-widget": {
           "enum": [
             "textarea"
           ],
           "description": "textarea: a big box, for long text."
         },
-        "x-vertra-pattern-message": {
+        "x-vennir-pattern-message": {
           "type": "string",
           "minLength": 1,
           "maxLength": 200,

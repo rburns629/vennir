@@ -8,7 +8,7 @@ description: >-
 
 inputs:
   registry:
-    description: vars.VERTRA_REGISTRY
+    description: vars.VENNIR_REGISTRY
     required: true
   gcp-workload-identity-provider:
     description: vars.GCP_WORKLOAD_IDENTITY_PROVIDER
@@ -45,8 +45,8 @@ runs:
       if: steps.gcp.outcome == 'success'
       shell: bash
       env:
-        VERTRA_REGISTRY: ${{ inputs.registry }}
-      run: gcloud auth configure-docker "${VERTRA_REGISTRY%%/*}" --quiet
+        VENNIR_REGISTRY: ${{ inputs.registry }}
+      run: gcloud auth configure-docker "${VENNIR_REGISTRY%%/*}" --quiet
     - name: Sign in to AWS
       id: aws
       if: inputs.aws-role-arn != ''
@@ -58,13 +58,13 @@ runs:
       if: steps.aws.outcome == 'success'
       shell: bash
       env:
-        VERTRA_REGISTRY: ${{ inputs.registry }}
-      run: aws ecr get-login-password | docker login --username AWS --password-stdin "${VERTRA_REGISTRY%%/*}"
+        VENNIR_REGISTRY: ${{ inputs.registry }}
+      run: aws ecr get-login-password | docker login --username AWS --password-stdin "${VENNIR_REGISTRY%%/*}"
     - name: Sign in to the registry with a username and password
       if: inputs.username != ''
       shell: bash
       env:
-        VERTRA_REGISTRY: ${{ inputs.registry }}
+        VENNIR_REGISTRY: ${{ inputs.registry }}
         REGISTRY_USERNAME: ${{ inputs.username }}
         REGISTRY_PASSWORD: ${{ inputs.password }}
-      run: echo "$REGISTRY_PASSWORD" | docker login "${VERTRA_REGISTRY%%/*}" -u "$REGISTRY_USERNAME" --password-stdin
+      run: echo "$REGISTRY_PASSWORD" | docker login "${VENNIR_REGISTRY%%/*}" -u "$REGISTRY_USERNAME" --password-stdin

@@ -155,7 +155,7 @@ describe("API backends' log search", () => {
     expect(queries).toEqual([`{component="api", namespace="${teamB}", level="error"}`]);
   });
 
-  it("narrows to one API product's backend, its Pods' vertra/api label", async () => {
+  it("narrows to one API product's backend, its Pods' vennir/api label", async () => {
     queries.length = 0;
     await search(memberOfA, { source: "api", api: "orders" });
     expect(queries).toEqual([`{component="api", namespace=~"^(${teamA})$", api="orders"}`]);

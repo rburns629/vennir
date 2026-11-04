@@ -48,7 +48,7 @@ rules:
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["rolebindings"]
     {{- if (include "execution-console.schedulerLogs" . | fromJson) }}
-    # And one it writes: each team namespace's vertra-scheduler-logs
+    # And one it writes: each team namespace's vennir-scheduler-logs
     # (schedulerLogs.ts), the write fence's exact shape. Binding a
     # ClusterRole needs bind on it: on the kernel's logs-only one alone.
     verbs: ["list", "delete", "create", "update"]
@@ -79,7 +79,7 @@ rules:
     verbs: ["create", "update"]
   {{- end }}
   # Each team namespace's ResourceQuota and LimitRange (teamQuota.ts); the
-  # write fence accepts only vertra-team-quota and vertra-team-limits.
+  # write fence accepts only vennir-team-quota and vennir-team-limits.
   {{- if .Values.teamNamespaces.manage }}
   - apiGroups: [""]
     resources: ["resourcequotas", "limitranges"]

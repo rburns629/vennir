@@ -62,7 +62,7 @@ resource "google_compute_subnetwork" "this" {
 
 resource "google_service_account" "nodes" {
   account_id   = "${var.name}-nodes"
-  display_name = "Vertra ${var.name}: GKE nodes"
+  display_name = "Vennir ${var.name}: GKE nodes"
   depends_on   = [google_project_service.apis]
 }
 
@@ -95,7 +95,7 @@ resource "google_container_cluster" "this" {
   release_channel {
     channel = "REGULAR"
   }
-  # vertra destroy asks before deleting anything.
+  # vennir destroy asks before deleting anything.
   deletion_protection = false
 
   enable_autopilot = local.standard ? null : true
@@ -165,10 +165,10 @@ resource "google_container_node_pool" "steps" {
     oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
     disk_size_gb    = 50
     labels = {
-      "vertra.dev/pool" = "steps"
+      "vennir.dev/pool" = "steps"
     }
     taint {
-      key    = "vertra.dev/steps"
+      key    = "vennir.dev/steps"
       value  = "true"
       effect = "NO_SCHEDULE"
     }
@@ -185,7 +185,7 @@ resource "google_artifact_registry_repository" "tasks" {
   repository_id = var.task_registry
   location      = var.region
   format        = "DOCKER"
-  description   = "Vertra ${var.name}: the catalog's product images."
+  description   = "Vennir ${var.name}: the catalog's product images."
   depends_on    = [google_project_service.apis]
 }
 
@@ -194,7 +194,7 @@ resource "google_artifact_registry_repository" "platform" {
   repository_id = var.platform_registry
   location      = var.region
   format        = "DOCKER"
-  description   = "Vertra ${var.name}: the platform's images, built from source."
+  description   = "Vennir ${var.name}: the platform's images, built from source."
   depends_on    = [google_project_service.apis]
 }
 
@@ -213,7 +213,7 @@ resource "google_artifact_registry_repository_iam_member" "nodes_pull" {
 
 resource "google_service_account" "console" {
   account_id   = "${var.name}-console"
-  display_name = "Vertra ${var.name}: console (reads the task registry)"
+  display_name = "Vennir ${var.name}: console (reads the task registry)"
   depends_on   = [google_project_service.apis]
 }
 
@@ -265,7 +265,7 @@ resource "google_project_iam_member" "console_chat" {
 
 resource "google_service_account" "scanner" {
   account_id   = "${var.name}-scanner"
-  display_name = "Vertra ${var.name}: image scans (reads the task registry)"
+  display_name = "Vennir ${var.name}: image scans (reads the task registry)"
   depends_on   = [google_project_service.apis]
 }
 
@@ -307,7 +307,7 @@ resource "google_storage_bucket" "backups" {
 resource "google_service_account" "backup" {
   count        = var.backups ? 1 : 0
   account_id   = "${var.name}-backup"
-  display_name = "Vertra ${var.name}: database backups (one bucket)"
+  display_name = "Vennir ${var.name}: database backups (one bucket)"
   depends_on   = [google_project_service.apis]
 }
 
@@ -322,7 +322,7 @@ resource "google_service_account_iam_member" "backup_workload_identity" {
   count              = var.backups ? 1 : 0
   service_account_id = google_service_account.backup[0].name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "${local.ksa}/vertra-pg-backup]"
+  member             = "${local.ksa}/vennir-pg-backup]"
   depends_on         = [google_container_cluster.this]
 }
 
@@ -381,7 +381,7 @@ resource "google_sql_database_instance" "this" {
   name             = "${var.name}-${random_id.database[0].hex}"
   database_version = "POSTGRES_16"
   region           = var.region
-  # Only when destroy is told to delete data (vertra destroy asks first).
+  # Only when destroy is told to delete data (vennir destroy asks first).
   deletion_protection = !var.delete_data
   settings {
     edition                     = "ENTERPRISE"
@@ -412,7 +412,7 @@ resource "google_sql_database_instance" "this" {
       name  = "max_connections"
       value = tostring(local.database.max_connections)
     }
-    user_labels = { vertra-environment = var.name }
+    user_labels = { vennir-environment = var.name }
   }
   depends_on = [google_service_networking_connection.database]
 }
@@ -431,27 +431,27 @@ resource "google_sql_database" "this" {
 resource "google_service_account" "kernel_db" {
   count        = var.managed_database ? 1 : 0
   account_id   = "${var.name}-kernel"
-  display_name = "Vertra ${var.name}: the kernel's database identity"
+  display_name = "Vennir ${var.name}: the kernel's database identity"
   depends_on   = [google_project_service.apis]
 }
 
 resource "google_service_account" "gateway_db" {
   count        = var.managed_database ? 1 : 0
   account_id   = "${var.name}-gateway"
-  display_name = "Vertra ${var.name}: the gateway's database identity"
+  display_name = "Vennir ${var.name}: the gateway's database identity"
   depends_on   = [google_project_service.apis]
 }
 
 resource "google_service_account" "database_admin" {
   count        = var.managed_database ? 1 : 0
   account_id   = "${var.name}-db-admin"
-  display_name = "Vertra ${var.name}: opens each database to its service (kernel database-setup)"
+  display_name = "Vennir ${var.name}: opens each database to its service (kernel database-setup)"
   depends_on   = [google_project_service.apis]
 }
 
 # Connecting (cloudsql.client) and signing in (cloudsql.instanceUser), on
 # this instance only (an IAM condition: Cloud SQL has no instance-level
-# policy), so Vertra's identities can't reach another instance in the
+# policy), so Vennir's identities can't reach another instance in the
 # project.
 resource "google_project_iam_member" "database" {
   for_each = var.managed_database ? merge([for who, sa in {
@@ -487,7 +487,7 @@ resource "google_service_account_iam_member" "database_workload_identity" {
     "kernel-execution-kernel-api"       = google_service_account.kernel_db[0].name
     "kernel-execution-kernel-sleeper"   = google_service_account.kernel_db[0].name
     "console-execution-console-gateway" = google_service_account.gateway_db[0].name
-    "vertra-db-admin"                   = google_service_account.database_admin[0].name
+    "vennir-db-admin"                   = google_service_account.database_admin[0].name
   } : {}
   service_account_id = each.value
   role               = "roles/iam.workloadIdentityUser"
@@ -542,7 +542,7 @@ resource "google_storage_bucket" "logs" {
 resource "google_service_account" "logs" {
   count        = var.logs ? 1 : 0
   account_id   = "${var.name}-logs"
-  display_name = "Vertra ${var.name}: Loki's logs (one bucket)"
+  display_name = "Vennir ${var.name}: Loki's logs (one bucket)"
   depends_on   = [google_project_service.apis]
 }
 
@@ -557,7 +557,7 @@ resource "google_service_account_iam_member" "logs_workload_identity" {
   count              = var.logs ? 1 : 0
   service_account_id = google_service_account.logs[0].name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "${local.ksa}/vertra-loki]"
+  member             = "${local.ksa}/vennir-loki]"
   depends_on         = [google_container_cluster.this]
 }
 
@@ -615,7 +615,7 @@ resource "random_id" "pool" {
 resource "google_iam_workload_identity_pool" "github" {
   count                     = var.catalog_repository != "" ? 1 : 0
   workload_identity_pool_id = "${var.name}-gh-${random_id.pool[0].hex}"
-  display_name              = "Vertra ${var.name}: catalog CI"
+  display_name              = "Vennir ${var.name}: catalog CI"
   depends_on                = [google_project_service.apis]
 }
 
@@ -640,7 +640,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 resource "google_service_account" "publish" {
   count        = var.catalog_repository != "" ? 1 : 0
   account_id   = "${var.name}-publish"
-  display_name = "Vertra ${var.name}: catalog CI (pushes to the task registry)"
+  display_name = "Vennir ${var.name}: catalog CI (pushes to the task registry)"
   depends_on   = [google_project_service.apis]
 }
 
@@ -700,7 +700,7 @@ resource "google_kms_crypto_key_iam_member" "publish_signs" {
 resource "google_service_account" "verifier" {
   count        = var.signing != "none" ? 1 : 0
   account_id   = "${var.name}-verifier"
-  display_name = "Vertra ${var.name}: policy-controller (reads signatures from the task registry)"
+  display_name = "Vennir ${var.name}: policy-controller (reads signatures from the task registry)"
   depends_on   = [google_project_service.apis]
 }
 

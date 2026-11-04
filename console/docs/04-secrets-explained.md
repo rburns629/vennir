@@ -6,7 +6,7 @@ run into it — what a secret is here, how you register one, where it
 whether it's genuinely secure, what happens if it's ever deleted, and
 what ESO is and why it's a different thing from what came before it.
 No prior Kubernetes knowledge assumed. If you already know this system
-well, `docs/security-model.md` in the Vertra repository has the precise
+well, `docs/security-model.md` in the Vennir repository has the precise
 version: what each layer enforces, and what it doesn't yet.
 
 ---
@@ -177,7 +177,7 @@ Setting up the ESO path needs one extra, one-time step a direct-paste
 secret doesn't: a `SecretStore` — a privileged object naming which
 external vault a team's namespace may read from, and with what
 identity. Because that's a real scope grant (not just a value), it goes
-through a reviewed PR in `vertra-catalog`, the same review
+through a reviewed PR in `vennir-catalog`, the same review
 discipline a new product gets. Once that's approved and merged,
 registering the *individual* secrets that come from it is self-service
 again, same as direct-paste — no further PR per secret.
@@ -192,10 +192,10 @@ of truth — rotations and even accidental deletions fix themselves.
 
 ## Where to go deeper
 
-- `docs/security-model.md` in the Vertra repository — the same model,
+- `docs/security-model.md` in the Vennir repository — the same model,
   precisely: who can read a secret, what the cluster enforces, and vault
   sync with each supported vault.
 - `01-getting-started.md` and `02-sync-secrets-gcp.md` — registering a
   secret either way, step by step.
-- `docs/operations.md` in the Vertra repository, "Troubleshooting" —
+- `docs/operations.md` in the Vennir repository, "Troubleshooting" —
   a secret a task doesn't get, with the `kubectl` checks.

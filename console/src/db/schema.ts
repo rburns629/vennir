@@ -136,7 +136,7 @@ export const users = pgTable("users", {
   // changed since the account was created.
   passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
   // Its password was set by someone else (an admin's new account or reset,
-  // `vertra admin reset-password`): until its owner changes it, a session
+  // `vennir admin reset-password`): until its owner changes it, a session
   // it signs in may only change it (rpc/interceptors.ts).
   mustChangePassword: boolean("must_change_password").notNull().default(false),
   // The identity provider's id for this person (OIDC's iss and sub), bound
@@ -445,7 +445,7 @@ export const auditExport = pgTable("audit_export", {
 /**
  * The catalog's wiring vocabulary (each team's teams/<team>/types.yaml,
  * decision 25): the names a product's input uses to say what it needs
- * (x-vertra-needs) and an output what it provides (x-vertra-provides). The
+ * (x-vennir-needs) and an output what it provides (x-vennir-provides). The
  * order builder (core/orders.ts) wires carts by them. A catalog release
  * that has any replaces the whole set (catalogSync.ts); an install whose
  * catalog has none sets them with ProductService.ReplaceWiringTypes.
@@ -635,7 +635,7 @@ export const resources = pgTable(
     // Once its cleanup step succeeded.
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     // What its step provided, by wiring type (decision 25): each output its
-    // product types with x-vertra-provides, and its value. How a later run
+    // product types with x-vennir-provides, and its value. How a later run
     // that's given the value is linked to it (resourceLinks), and how a
     // cart offers it.
     provides: jsonb("provides").$type<Provided[]>().notNull().default([]),

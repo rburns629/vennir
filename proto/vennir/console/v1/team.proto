@@ -1,0 +1,391 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// Teams: the unit of tenancy. A team is a console team, a Kubernetes
+// namespace and a catalog folder, all one name. Its lifecycle: created,
+// retired (reversible, read-only), purged (its name stays reserved).
+service TeamService {
+  // Every team. Admins only.
+  rpc ListTeams(ListTeamsRequest) returns (ListTeamsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // A team's record and lifecycle. Anyone who may not see it gets
+  // not_found, as for a team that doesn't exist. A purged team is still
+  // returned, with deleted_at: its name stays reserved.
+  rpc GetTeam(GetTeamRequest) returns (GetTeamResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // What anyone signed in may know of a team (its page, for those not in
+  // it): where to ask it (team.yaml's contact and help), whether it's
+  // retired, and how many people are in it. Never its members, secrets or
+  // runs. not_found for no such team, or a purged one.
+  rpc GetTeamProfile(GetTeamProfileRequest) returns (GetTeamProfileResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Every team's owner, description, people and Pods running now, for an
+  // admin's list of teams: one call, not a profile and a Pod list for each.
+  // Admins only.
+  rpc ListTeamSummaries(ListTeamSummariesRequest) returns (ListTeamSummariesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Creates a team and its namespace. Admins, or a token with teams:create.
+  rpc CreateTeam(CreateTeamRequest) returns (CreateTeamResponse);
+  // Makes sure a team exists and is active, with its namespace: creates
+  // it, or un-retires it, any number of times. A purged team's name is
+  // refused (already_exists, NAME_RESERVED).
+  rpc EnsureTeam(EnsureTeamRequest) returns (EnsureTeamResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Read-only from now on, its products unlisted. Reversible.
+  rpc RetireTeam(RetireTeamRequest) returns (RetireTeamResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Undoes a retire (its catalog folder restored): writable again, its
+  // products registered again on the catalog's next CI run.
+  rpc UnretireTeam(UnretireTeamRequest) returns (UnretireTeamResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Irreversible: a retired team, with no unfinished executions, is
+  // soft-deleted so its name stays reserved. Its namespace is deleted only
+  // where the console may purge namespaces (off by default).
+  rpc PurgeTeam(PurgeTeamRequest) returns (PurgeTeamResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // The team's members, bots included.
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Adds someone with an account, as a member unless role says otherwise.
+  // A maintainer's (or an admin's). At most 30 an hour per caller.
+  rpc AddMember(AddMemberRequest) returns (AddMemberResponse);
+  // A maintainer's. Never the team's last maintainer (failed_precondition,
+  // LAST_MAINTAINER).
+  rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Makes someone a maintainer or a member: a maintainer's. Never leaves
+  // the team without a maintainer (failed_precondition, LAST_MAINTAINER).
+  rpc SetMemberRole(SetMemberRoleRequest) returns (SetMemberRoleResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Whether the team's members must sign in with single sign-on: then no
+  // password signs them in, and their password sessions end. Admins only;
+  // admins themselves are exempt. Has no effect while single sign-on is off.
+  rpc SetTeamSignIn(SetTeamSignInRequest) returns (SetTeamSignInResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Sets what the team's steps may use together (written to its namespace
+  // at once), or with use_default the install's limits again. Admins only.
+  rpc SetTeamQuota(SetTeamQuotaRequest) returns (SetTeamQuotaResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Applies the team's reviewed SecretStore file: only SecretStores in its
+  // namespace, credentials only from eso-auth, and ESO's own
+  // ServiceAccounts; anything else is refused with every problem listed.
+  rpc ApplySecretStore(ApplySecretStoreRequest) returns (ApplySecretStoreResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // Sets the stored credential the team's SecretStores may use (a vault
+  // provider's token): the Secret eso-auth, which no step can mount. This
+  // install's own: the catalog carries the stores, never their credential.
+  // A member of the team, or an admin.
+  rpc SetSecretStoreCredential(SetSecretStoreCredentialRequest) returns (SetSecretStoreCredentialResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // What's running in the team's namespace.
+  rpc ListPods(ListPodsRequest) returns (ListPodsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message Team {
+  string id = 1;
+  // Also the team's Kubernetes namespace.
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp retired_at = 4;
+  google.protobuf.Timestamp deleted_at = 5;
+  // Its members sign in with single sign-on only (while it's on).
+  bool require_sso = 6;
+  // Made by the catalog (a release adds, retires and restores it); else
+  // made here, and the catalog leaves it alone until an admin adopts it.
+  bool from_catalog = 7;
+  // What its steps may use together, as its namespace's ResourceQuota and
+  // LimitRange hold it: its own, else the install's.
+  TeamQuota quota = 8;
+  // True when the quota is the install's, not one an admin set for it.
+  bool quota_is_default = 9;
+  // The install's limits, which a team without its own has.
+  TeamQuota install_quota = 10;
+  // Who retired it: their email, or "the catalog"; empty while it isn't
+  // retired (or for a team retired before this was kept).
+  string retired_by = 11;
+}
+
+// A team's resource limits, as Kubernetes quantities ("4", "500m",
+// "16Gi"); empty: no limit. The cluster refuses a step over them: one that
+// can never fit fails (RESOURCES_NOT_ALLOWED), one waiting for the team's
+// other steps to finish waits.
+message TeamQuota {
+  // CPU all its steps may request together.
+  string cpu = 1;
+  // Memory all its steps may request together.
+  string memory = 2;
+  // How many of its Pods may exist at once.
+  string pods = 3;
+  // The most memory one step may ask for.
+  string step_memory = 4;
+}
+
+// What someone may do in a team. Any member sees the team's executions,
+// logs and Pods, and runs its actions; a maintainer also manages its
+// members and roles, secrets and bots, and submits raw DAGs for it.
+enum TeamRole {
+  TEAM_ROLE_UNSPECIFIED = 0;
+  TEAM_ROLE_MAINTAINER = 1;
+  TEAM_ROLE_MEMBER = 2;
+}
+
+message Member {
+  string id = 1;
+  string email = 2;
+  bool is_bot = 3;
+  // A Vennir admin, not just this team's member.
+  bool is_admin = 4;
+  google.protobuf.Timestamp added_at = 5;
+  TeamRole role = 6;
+  // How it signs in (a bot has neither): what requiring single sign-on
+  // would change for it.
+  bool has_password = 7;
+  bool uses_sso = 8;
+  // Their membership follows their single sign-on groups (the team is
+  // mapped to one): their role isn't changed, nor are they removed, here.
+  bool follows_groups = 9;
+  // Which of their groups give them their role here, as their last sign-in
+  // (or the hourly Google groups read) found them; empty when they were
+  // added by hand, or haven't signed in since this was recorded.
+  repeated string via_groups = 10;
+}
+
+message ListTeamsRequest {}
+
+message ListTeamsResponse {
+  repeated Team teams = 1;
+}
+
+message ListTeamSummariesRequest {}
+
+message ListTeamSummariesResponse {
+  repeated TeamSummary teams = 1;
+}
+
+// What an admin's list of teams shows of one.
+message TeamSummary {
+  string name = 1;
+  // team.yaml's owner in the catalog and its description; empty for a team
+  // made here.
+  string owner = 2;
+  string description = 3;
+  int32 people = 4;
+  // Its namespace's Pods not finished: starting, running, or unable to
+  // start. Unset when the cluster couldn't be asked.
+  optional int32 running = 5;
+}
+
+message GetTeamRequest {
+  string name = 1;
+}
+
+message GetTeamResponse {
+  Team team = 1;
+}
+
+message CreateTeamRequest {
+  string name = 1;
+}
+
+message CreateTeamResponse {
+  Team team = 1;
+}
+
+message EnsureTeamRequest {
+  string name = 1;
+}
+
+message EnsureTeamResponse {
+  Team team = 1;
+  // Whether this call created it.
+  bool created = 2;
+}
+
+message RetireTeamRequest {
+  string name = 1;
+}
+
+message RetireTeamResponse {
+  // How many of its products were unregistered (they return on its next
+  // catalog CI push once it's restored).
+  int32 unregistered_products = 1;
+}
+
+message UnretireTeamRequest {
+  string name = 1;
+}
+
+message UnretireTeamResponse {}
+
+message PurgeTeamRequest {
+  string name = 1;
+}
+
+message PurgeTeamResponse {
+  // Already purged before this call (which then retried the namespace's
+  // deletion, if the console may delete it).
+  bool already_purged = 1;
+  int32 revoked_bot_tokens = 2;
+  // False when the namespace stays, labelled retired, for an operator.
+  bool namespace_deleted = 3;
+}
+
+message ListMembersRequest {
+  string team = 1;
+}
+
+message ListMembersResponse {
+  repeated Member members = 1;
+}
+
+message AddMemberRequest {
+  string team = 1;
+  string email = 2;
+  // Unspecified: a member.
+  TeamRole role = 3;
+}
+
+message AddMemberResponse {}
+
+message RemoveMemberRequest {
+  string team = 1;
+  string user_id = 2;
+}
+
+message RemoveMemberResponse {}
+
+message SetMemberRoleRequest {
+  string team = 1;
+  string user_id = 2;
+  // Maintainer or member.
+  TeamRole role = 3;
+}
+
+message SetMemberRoleResponse {}
+
+message SetTeamSignInRequest {
+  string team = 1;
+  bool require_sso = 2;
+}
+
+message SetTeamSignInResponse {}
+
+message SetTeamQuotaRequest {
+  string team = 1;
+  TeamQuota quota = 2;
+  // The install's limits again: quota is ignored.
+  bool use_default = 3;
+}
+
+message SetTeamQuotaResponse {
+  Team team = 1;
+}
+
+message ApplySecretStoreRequest {
+  string team = 1;
+  // The file's objects, 1 to 20.
+  repeated google.protobuf.Struct documents = 2;
+  // For a provider that needs a stored credential: written to the
+  // Secret eso-auth, which no step can mount.
+  optional string credential = 3;
+}
+
+message ApplySecretStoreResponse {}
+
+message SetSecretStoreCredentialRequest {
+  string team = 1;
+  string credential = 2;
+}
+
+message SetSecretStoreCredentialResponse {}
+
+message ListPodsRequest {
+  string team = 1;
+}
+
+message ListPodsResponse {
+  repeated TaskPod pods = 1;
+}
+
+// A Pod in the team's namespace, as a task: which execution, task and
+// attempt it runs, and how it's doing.
+message TaskPod {
+  string pod_name = 1;
+  optional string execution_id = 2;
+  optional string task_id = 3;
+  optional int32 attempt = 4;
+  optional string image = 5;
+  optional string service_account = 6;
+  TaskPodState state = 7;
+  // Why it can't start or failed, in plain words, with Kubernetes' detail.
+  optional PodProblem problem = 8;
+  int32 restarts = 9;
+  google.protobuf.Timestamp started_at = 10;
+  google.protobuf.Timestamp finished_at = 11;
+  // Set when the execution is one this team is part of.
+  optional PodExecution execution = 12;
+}
+
+enum TaskPodState {
+  TASK_POD_STATE_UNSPECIFIED = 0;
+  TASK_POD_STATE_STARTING = 1;
+  TASK_POD_STATE_RUNNING = 2;
+  TASK_POD_STATE_CANT_START = 3;
+  TASK_POD_STATE_FINISHED = 4;
+  TASK_POD_STATE_FAILED = 5;
+}
+
+message PodProblem {
+  string title = 1;
+  string detail = 2;
+}
+
+message PodExecution {
+  string name = 1;
+  // Its task's position in the DAG, from 1, when known.
+  optional int32 task_number = 2;
+  optional int32 task_count = 3;
+}
+
+message GetTeamProfileRequest {
+  string name = 1;
+}
+
+message GetTeamProfileResponse {
+  string name = 1;
+  bool from_catalog = 2;
+  bool retired = 3;
+  // team.yaml's contact (who to ask), and its help: a chat and a page.
+  string contact = 4;
+  string help_chat = 5;
+  string help_url = 6;
+  int32 people = 7;
+  // team.yaml's owner in the catalog (a GitHub user or team); membership
+  // here is the console's, not the catalog's.
+  string owner = 8;
+  // team.yaml's description, from the catalog; empty for a team made here.
+  string description = 9;
+}

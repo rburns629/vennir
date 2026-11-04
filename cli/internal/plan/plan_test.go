@@ -7,7 +7,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/rburns629/vertra/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/config"
 )
 
 func TestWrap(t *testing.T) {
@@ -26,9 +26,9 @@ func TestWrap(t *testing.T) {
 
 func TestRenderAlignsAndWraps(t *testing.T) {
 	p := &Plan{
-		Title:    "Vertra source → kind (local) [dev]",
+		Title:    "Vennir source → kind (local) [dev]",
 		Settings: []Line{{Label: "Size", Text: "minimal"}, {Label: "Task images", Text: strings.Repeat("word ", 40)}},
-		Changes:  []Line{{Label: "Will create", Text: "kind cluster vertra"}},
+		Changes:  []Line{{Label: "Will create", Text: "kind cluster vennir"}},
 		Cost:     []Line{{Label: "Estimated cost", Text: "$0"}},
 		Notes:    []string{"a note"},
 	}
@@ -44,7 +44,7 @@ func TestRenderAlignsAndWraps(t *testing.T) {
 		"Size         minimal\n",
 		"Task images  word",
 		"\n             word", // continuation lines line up with the text
-		"Will create  kind cluster vertra",
+		"Will create  kind cluster vennir",
 		"Estimated cost  $0",
 		"Note  a note",
 	} {

@@ -43,7 +43,7 @@ import { SIDEBAR_TIP } from "./sidebarTip";
 
 /** The sidebar's width: dragged between these; under COMPACT_BELOW it keeps just the icons (Motion board). */
 const WIDTH = { default: 248, min: 72, max: 360, compactBelow: 150 } as const;
-const WIDTH_KEY = "vertra.sidebarWidth";
+const WIDTH_KEY = "vennir.sidebarWidth";
 
 interface NavItem {
   label: string;
@@ -106,7 +106,7 @@ function useSidebarWidth() {
   return [width, set] as const;
 }
 
-/** Two DAG steps feeding a third: the Vertra mark. */
+/** Two DAG steps feeding a third: the Vennir mark. */
 function Mark() {
   return (
     <Box component="svg" viewBox="0 0 24 24" sx={{ width: 22, height: 22, flexShrink: 0, color: "sidebar.accent" }} aria-hidden="true">
@@ -247,12 +247,12 @@ function Shell() {
           <Box
             component={RouterLink}
             to="/"
-            aria-label={compact ? "Vertra home" : undefined}
+            aria-label={compact ? "Vennir home" : undefined}
             onClick={() => { setNavOpen(false); }}
             sx={{ display: "flex", alignItems: "center", gap: 1.25, color: "sidebar.textStrong", textDecoration: "none", fontWeight: 600, fontSize: 17, minHeight: 32 }}
           >
             <Mark />
-            {!compact && "Vertra"}
+            {!compact && "Vennir"}
           </Box>
           {isDesktop && !compact && (
             <Tooltip title="Collapse the side menu to icons">
@@ -402,7 +402,7 @@ function Shell() {
               <IconButton edge="start" aria-label="Open navigation" onClick={() => { setNavOpen(true); }}>
                 <MenuIcon />
               </IconButton>
-              <Typography sx={{ fontWeight: 600, fontSize: 16, flexGrow: 1 }}>Vertra</Typography>
+              <Typography sx={{ fontWeight: 600, fontSize: 16, flexGrow: 1 }}>Vennir</Typography>
               <ChatLauncher placement="toolbar" />
               <NotificationBell />
             </Toolbar>
@@ -433,7 +433,7 @@ function Shell() {
   );
 }
 
-/** The shell, with Ask Vertra for every page in it. */
+/** The shell, with Ask Vennir for every page in it. */
 /** Pages that keep their state moving between their own sub-pages. */
 const KEEPS_STATE = ["/docs", "/admin"];
 

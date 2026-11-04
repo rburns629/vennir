@@ -125,7 +125,7 @@ def _build_tag(execution_id: str, task_id: str, image_uri: str, source_archive_u
     """The tag every build this step starts carries, so its later attempts
     find what an earlier one started: this step's only, not another run's."""
     digest = hashlib.sha256(f"{execution_id}\n{task_id}\n{image_uri}\n{source_archive_url}".encode()).hexdigest()
-    return f"vertra-{digest[:40]}"
+    return f"vennir-{digest[:40]}"
 
 
 def _latest_build(client: cloudbuild_v1.CloudBuildClient, project_id: str, tag: str) -> cloudbuild_v1.Build | None:

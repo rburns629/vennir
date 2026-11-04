@@ -122,7 +122,7 @@ export function ConnectSource({
                 ))}
                 <Box sx={{ bgcolor: "action.hover", borderRadius: 2, p: 2 }}>
                   <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    How Vertra signs in
+                    How Vennir signs in
                   </Typography>
                   <Facts rows={guide.signsInAs(teamName, facts, values).map(([k, v]) => [k, <Mono key={k}>{v}</Mono>])} />
                 </Box>
@@ -140,7 +140,7 @@ export function ConnectSource({
                 </Typography>
                 {!guide.tested && (
                   <Alert severity="info" sx={{ py: 0 }}>
-                    Not yet tested on this platform. If a step doesn't work as written, tell the Vertra team.
+                    Not yet tested on this platform. If a step doesn't work as written, tell the Vennir team.
                   </Alert>
                 )}
                 <CodeBlock code={guide.commands(teamName, facts, values)} />
@@ -211,7 +211,7 @@ export function ConnectSource({
                   <li>
                     <Typography variant="body2">
                       The catalog applies it to the cluster, and it shows up under "Where secrets come from" with whether
-                      Vertra could sign in.
+                      Vennir could sign in.
                     </Typography>
                   </li>
                 </Box>

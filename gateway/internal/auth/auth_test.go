@@ -92,7 +92,7 @@ func TestCallersSignInAsTheyDoAtTheConsole(t *testing.T) {
 		}
 	}
 	must(db.QueryRow(ctx, `INSERT INTO users (email, is_admin) VALUES ('gw-person@example.com', false) RETURNING id::text`).Scan(&userID))
-	must(db.QueryRow(ctx, `INSERT INTO users (email, is_bot) VALUES ('gw-bot@bots.vertra.local', true) RETURNING id::text`).Scan(&botID))
+	must(db.QueryRow(ctx, `INSERT INTO users (email, is_bot) VALUES ('gw-bot@bots.vennir.local', true) RETURNING id::text`).Scan(&botID))
 	must(db.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-test-web') RETURNING id::text`).Scan(&teamID))
 	for _, id := range []string{userID, botID} {
 		_, err := db.Exec(ctx, `INSERT INTO team_memberships (user_id, team_id, role) VALUES ($1, $2, 'member')`, id, teamID)
@@ -270,7 +270,7 @@ func TestAnOrderingBotCallsNoAPI(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	must(db.QueryRow(ctx, `INSERT INTO users (email, is_bot, order_templates) VALUES ('gw-orderer@bots.vertra.local', true, '{shop/order}') RETURNING id::text`).Scan(&botID))
+	must(db.QueryRow(ctx, `INSERT INTO users (email, is_bot, order_templates) VALUES ('gw-orderer@bots.vennir.local', true, '{shop/order}') RETURNING id::text`).Scan(&botID))
 	token := APITokenPrefix + "orderer-" + botID
 	sum := sha256.Sum256([]byte(token))
 	_, err := db.Exec(ctx, `INSERT INTO api_tokens (user_id, label, token_hash) VALUES ($1::uuid, 'orders', $2)`, botID, hex.EncodeToString(sum[:]))

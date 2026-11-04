@@ -3,7 +3,7 @@
 # (<product>.<action>, or <team>/<product>.<action> for another team's), not
 # images. Copy it into teams/<your-team>/dags/; nothing in it changes with
 # your team or registry.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Template
 name: 5-template
 displayName: Say hello

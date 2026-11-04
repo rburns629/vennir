@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-// Package config is an install's settings: deploy/<env>/vertra.yaml.
+// Package config is an install's settings: deploy/<env>/vennir.yaml.
 // Names and references only, never a secret, so it's safe to keep in a
 // private repository of your own.
 package config
@@ -21,7 +21,7 @@ import (
 )
 
 // FileName is the config file inside an environment's directory.
-const FileName = "vertra.yaml"
+const FileName = "vennir.yaml"
 
 // CurrentVersion is the config file format this CLI writes.
 const CurrentVersion = 1
@@ -37,9 +37,9 @@ var (
 // Config is one install's settings.
 type Config struct {
 	Version int `yaml:"version"`
-	// Vertra is the release to install, or "source" to build from Source.
-	Vertra string `yaml:"vertra"`
-	// Source is a checkout of the Vertra repository: charts from its
+	// Vennir is the release to install, or "source" to build from Source.
+	Vennir string `yaml:"vennir"`
+	// Source is a checkout of the Vennir repository: charts from its
 	// helm/charts, images built from its kernel/ and console/.
 	Source     string     `yaml:"source,omitempty"`
 	Target     string     `yaml:"target"`
@@ -62,7 +62,7 @@ type Config struct {
 	Admin        Admin    `yaml:"admin"`
 	// Console says how the console is reached from outside the cluster.
 	Console Console `yaml:"console,omitempty"`
-	// Catalog is the catalog repository `vertra catalog create` creates.
+	// Catalog is the catalog repository `vennir catalog create` creates.
 	Catalog Catalog `yaml:"catalog,omitempty"`
 	// ExternalCatalog: this install reads another install's catalog (its
 	// images and release, in that install's registry) instead of one of
@@ -92,7 +92,7 @@ type Config struct {
 	Logs Logs `yaml:"logs"`
 	// Audit: the audit log's write-once copy (gcp, aws).
 	Audit Audit `yaml:"audit,omitempty"`
-	// SSO: signing in with Google (vertra sso google sets it up).
+	// SSO: signing in with Google (vennir sso google sets it up).
 	SSO SSO `yaml:"sso,omitempty"`
 	// Chat: the console's chat agent. On gcp, Gemini through Vertex AI in
 	// the install's own project; on aws, Claude in Amazon Bedrock in its
@@ -106,11 +106,11 @@ type Config struct {
 	// as someone else (another account, profile or project) stops first.
 	Access Access `yaml:"access,omitempty"`
 	// Values is a Helm values file layered last, relative to the config's
-	// directory: anything vertra doesn't ask about.
+	// directory: anything vennir doesn't ask about.
 	Values string `yaml:"values,omitempty"`
 }
 
-// Cluster says which cluster, and whether vertra creates it.
+// Cluster says which cluster, and whether vennir creates it.
 type Cluster struct {
 	Create bool   `yaml:"create"`
 	Mode   string `yaml:"mode"`
@@ -255,7 +255,7 @@ type SSO struct {
 }
 
 // Monitoring is which Prometheus scrapes the platform and evaluates its
-// alerts (Provider): the cluster's Prometheus Operator (operator, as vertra
+// alerts (Provider): the cluster's Prometheus Operator (operator, as vennir
 // init found it: the namespace it scrapes from, and the labels it selects
 // PodMonitors and rules by), GKE's Managed Service for Prometheus
 // (google, gcp; billed per sample), one the console chart runs (bundled: a
@@ -280,7 +280,7 @@ type Console struct {
 	Public   bool   `yaml:"public,omitempty"`
 	Hostname string `yaml:"hostname,omitempty"`
 	// Zone (aws): a DNS zone the module creates in Route 53 for the
-	// console's address (e.g. vertra.example.com), which you delegate with
+	// console's address (e.g. vennir.example.com), which you delegate with
 	// its NS records; the hostname defaults to console.<zone>.
 	Zone string `yaml:"zone,omitempty"`
 	// IngressClass (existing clusters): the Ingress controller serving it.
@@ -297,7 +297,7 @@ type ConsoleTLS struct {
 	// LetsEncryptEmail: Let's Encrypt, through an Issuer the console chart
 	// makes, proving the hostname over HTTP through the Ingress.
 	LetsEncryptEmail string `yaml:"letsEncryptEmail,omitempty"`
-	// InstallCertManager: vertra installs cert-manager (pinned) when the
+	// InstallCertManager: vennir installs cert-manager (pinned) when the
 	// cluster hasn't got it.
 	InstallCertManager bool `yaml:"installCertManager,omitempty"`
 }
@@ -323,7 +323,7 @@ type Catalog struct {
 // ExternalCatalog is a catalog published to another install's registry.
 type ExternalCatalog struct {
 	// Registry holds its images and its release (catalog-release), such as
-	// us-central1-docker.pkg.dev/<project>/vertra-products: the image
+	// us-central1-docker.pkg.dev/<project>/vennir-products: the image
 	// policy's source, and where the console reads the release.
 	Registry string `yaml:"registry,omitempty"`
 	// GCPWorkloadIdentityProvider, for an Artifact Registry on another
@@ -338,7 +338,7 @@ type ExternalCatalog struct {
 	// AWSRoleArn, for an Amazon ECR registry this install can't read as
 	// itself (another account's, or read from another cloud): the owner's
 	// role that trusts this cluster's OIDC issuer for the console's
-	// ServiceAccount alone (`vertra catalog grant`). The console assumes it
+	// ServiceAccount alone (`vennir catalog grant`). The console assumes it
 	// with its projected token (AWS web identity), with no stored key, and
 	// hands the kubelet and its Jobs ECR's short-lived token.
 	AWSRoleArn string `yaml:"awsRoleArn,omitempty"`
@@ -423,9 +423,9 @@ type Admin struct {
 func Default(target string) *Config {
 	c := &Config{
 		Version:   CurrentVersion,
-		Vertra:    "source",
+		Vennir:    "source",
 		Target:    target,
-		Namespace: "vertra-system",
+		Namespace: "vennir-system",
 		Size:      "minimal",
 		ScaleDown: ScaleDown{Enabled: true, IdleAfter: "2h"},
 		Database:  Database{Type: "in-cluster", Backups: Backups{Enabled: false, RetentionDays: 30}},
@@ -434,16 +434,16 @@ func Default(target string) *Config {
 	}
 	switch target {
 	case "kind":
-		c.Cluster = Cluster{Create: true, Mode: "standard", Name: "vertra"}
+		c.Cluster = Cluster{Create: true, Mode: "standard", Name: "vennir"}
 		c.Kind = Kind{RegistryName: "kind-registry", RegistryPort: 5001}
 		c.TaskImages.Registry = "localhost:5001"
 	case "gcp":
-		c.Cluster = Cluster{Create: true, Mode: "auto", Name: "vertra"}
-		c.TaskImages = TaskImages{Create: true, Name: "vertra-products"}
+		c.Cluster = Cluster{Create: true, Mode: "auto", Name: "vennir"}
+		c.TaskImages = TaskImages{Create: true, Name: "vennir-products"}
 		c.Database.Backups.Enabled = true
 	case "aws":
-		c.Cluster = Cluster{Create: true, Mode: "auto", Name: "vertra"}
-		c.TaskImages = TaskImages{Create: true, Name: "vertra-products"}
+		c.Cluster = Cluster{Create: true, Mode: "auto", Name: "vennir"}
+		c.TaskImages = TaskImages{Create: true, Name: "vennir-products"}
 		c.Database.Backups.Enabled = true
 	case "existing":
 		c.Cluster = Cluster{Create: false, Mode: "existing"}
@@ -458,8 +458,8 @@ func (c *Config) FillDefaults() {
 	if c.Version == 0 {
 		c.Version = CurrentVersion
 	}
-	if c.Vertra == "" {
-		c.Vertra = d.Vertra
+	if c.Vennir == "" {
+		c.Vennir = d.Vennir
 	}
 	if c.Namespace == "" {
 		c.Namespace = d.Namespace
@@ -519,21 +519,21 @@ func (c *Config) Validate() error {
 	add := func(format string, args ...any) { problems = append(problems, fmt.Sprintf(format, args...)) }
 
 	if c.Version != CurrentVersion {
-		add("version: %d isn't a format this vertra reads (it writes %d)", c.Version, CurrentVersion)
+		add("version: %d isn't a format this vennir reads (it writes %d)", c.Version, CurrentVersion)
 	}
 	if !contains(Targets, c.Target) {
 		add("target: %q isn't one of %s", c.Target, strings.Join(Targets, ", "))
 	} else if !contains(Implemented, c.Target) {
-		add("target: %s isn't supported by this vertra yet (kind and existing are)", c.Target)
+		add("target: %s isn't supported by this vennir yet (kind and existing are)", c.Target)
 	}
-	if c.Vertra != "source" && !version.MatchString(c.Vertra) {
-		add("vertra: %q is neither a release version (like 0.1.0) nor \"source\"", c.Vertra)
+	if c.Vennir != "source" && !version.MatchString(c.Vennir) {
+		add("vennir: %q is neither a release version (like 0.1.0) nor \"source\"", c.Vennir)
 	}
-	if c.Vertra == "source" {
+	if c.Vennir == "source" {
 		if c.Source == "" {
-			add("source: needed when vertra is \"source\": the path to a Vertra checkout")
+			add("source: needed when vennir is \"source\": the path to a Vennir checkout")
 		} else if _, err := os.Stat(filepath.Join(c.Source, "helm", "charts", "execution-kernel", "Chart.yaml")); err != nil {
-			add("source: %s isn't a Vertra checkout (no helm/charts/execution-kernel)", c.Source)
+			add("source: %s isn't a Vennir checkout (no helm/charts/execution-kernel)", c.Source)
 		}
 	}
 	if !dnsLabel.MatchString(c.Namespace) {
@@ -593,7 +593,7 @@ func (c *Config) Validate() error {
 		if c.Cluster.Cloud != "" && c.Cluster.Cloud != "gcp" && c.Cluster.Cloud != "aws" && c.Cluster.Cloud != "azure" {
 			add("cluster.cloud: %q: gcp, aws or azure, the cloud the cluster is on (or empty)", c.Cluster.Cloud)
 		}
-		if c.Vertra == "source" && c.PlatformImages.Registry == "" {
+		if c.Vennir == "source" && c.PlatformImages.Registry == "" {
 			add("platformImages.registry: building from source onto an existing cluster needs a registry to push the images to")
 		}
 	}
@@ -625,7 +625,7 @@ func (c *Config) Validate() error {
 		}
 	}
 	if r := c.CatalogSignature.Repository; r != "" && !repoPattern.MatchString(r) {
-		add("catalogSignature.repository: %q isn't owner/name, such as my-org/vertra-catalog", r)
+		add("catalogSignature.repository: %q isn't owner/name, such as my-org/vennir-catalog", r)
 	}
 	if c.Signs() && (c.CatalogSignature.PublicKeyFile != "" || c.CatalogSignature.Repository != "") {
 		add("catalogSignature: for a catalog another install publishes; this install signs its own (signing: %s)", c.Signing)
@@ -663,7 +663,7 @@ func (c *Config) Validate() error {
 			add("sso.provider: %q: google, so far", c.SSO.Provider)
 		}
 		if c.SSO.ClientID == "" || c.SSO.ClientFile == "" {
-			add("sso: clientId and clientFile (vertra sso google sets them)")
+			add("sso: clientId and clientFile (vennir sso google sets them)")
 		}
 		if len(c.SSO.AllowedDomains) == 0 {
 			add("sso.allowedDomains: the Workspace domains whose people may sign in")
@@ -701,7 +701,7 @@ func (c *Config) Validate() error {
 	}
 	if c.Audit.Export {
 		if c.Target != "gcp" && c.Target != "aws" {
-			add("audit.export: only on gcp and aws, where vertra makes the bucket (elsewhere, set the console chart's audit.export)")
+			add("audit.export: only on gcp and aws, where vennir makes the bucket (elsewhere, set the console chart's audit.export)")
 		}
 		if c.Audit.KeepDays < 1 || c.Audit.KeepDays > 3650 {
 			add("audit.keepDays: %d isn't between 1 and 3650", c.Audit.KeepDays)
@@ -728,7 +728,7 @@ func (c *Config) Validate() error {
 	}
 	if c.Console.Public && c.Target == "aws" {
 		if !hostname.MatchString(c.Console.Zone) {
-			add("console.zone: %q: a DNS zone for the console's address, like vertra.example.com (Route 53 hosts it; you delegate it)", c.Console.Zone)
+			add("console.zone: %q: a DNS zone for the console's address, like vennir.example.com (Route 53 hosts it; you delegate it)", c.Console.Zone)
 		}
 		if c.Cluster.Mode != "auto" {
 			add("console.public: on aws, only with EKS Auto Mode so far (standard mode needs the AWS Load Balancer Controller)")
@@ -761,7 +761,7 @@ func (c *Config) Validate() error {
 			add("externalCatalog: an install reads its own catalog or another's, not both (catalog.owner is set)")
 		}
 		if !registryPath.MatchString(e.Registry) {
-			add("externalCatalog.registry: %q isn't <host>/<path>, such as us-central1-docker.pkg.dev/<project>/vertra-products", e.Registry)
+			add("externalCatalog.registry: %q isn't <host>/<path>, such as us-central1-docker.pkg.dev/<project>/vennir-products", e.Registry)
 		}
 		if e.GCPWorkloadIdentityProvider != "" && !wifProvider.MatchString(e.GCPWorkloadIdentityProvider) {
 			add("externalCatalog.gcpWorkloadIdentityProvider: %q isn't projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>", e.GCPWorkloadIdentityProvider)
@@ -798,12 +798,12 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Load reads and validates dir/vertra.yaml.
+// Load reads and validates dir/vennir.yaml.
 func Load(dir string) (*Config, error) {
 	data, err := os.ReadFile(filepath.Join(dir, FileName))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("no %s in %s: run `vertra init` first", FileName, dir)
+			return nil, fmt.Errorf("no %s in %s: run `vennir init` first", FileName, dir)
 		}
 		return nil, err
 	}
@@ -830,12 +830,12 @@ func Load(dir string) (*Config, error) {
 	return &c, nil
 }
 
-const header = `# A Vertra install's settings, written by vertra. Names and references
+const header = `# A Vennir install's settings, written by vennir. Names and references
 # only, never a secret: safe to keep in a private repository of your own.
-# Change a setting with ` + "`vertra config set <key> <value>`" + `, then ` + "`vertra apply`" + `.
+# Change a setting with ` + "`vennir config set <key> <value>`" + `, then ` + "`vennir apply`" + `.
 `
 
-// Save writes dir/vertra.yaml, creating dir.
+// Save writes dir/vennir.yaml, creating dir.
 func (c *Config) Save(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -847,7 +847,7 @@ func (c *Config) Save(dir string) error {
 	return os.WriteFile(filepath.Join(dir, FileName), append([]byte(header), data...), 0o644)
 }
 
-// AppliedFile is vertra.yaml as last applied, kept beside it: what the next
+// AppliedFile is vennir.yaml as last applied, kept beside it: what the next
 // apply's screen says changed since.
 const AppliedFile = "applied.yaml"
 
@@ -857,12 +857,12 @@ func (c *Config) SaveApplied(dir string) error {
 	if err != nil {
 		return err
 	}
-	head := "# vertra.yaml as last applied, written by vertra apply: its screen names what changed since.\n"
+	head := "# vennir.yaml as last applied, written by vennir apply: its screen names what changed since.\n"
 	return os.WriteFile(filepath.Join(dir, AppliedFile), append([]byte(head), data...), 0o644)
 }
 
 // Applied reads dir/applied.yaml; nil when there's none (an install applied
-// by an older vertra) or it can't be read, as it only informs the screen.
+// by an older vennir) or it can't be read, as it only informs the screen.
 func Applied(dir string) *Config {
 	data, err := os.ReadFile(filepath.Join(dir, AppliedFile))
 	if err != nil {
@@ -953,7 +953,7 @@ func Get(c *Config, key string) (string, error) {
 	}
 	found := find(node, strings.Split(key, "."))
 	if found == nil {
-		return "", fmt.Errorf("no setting %q (see `vertra config get` for every key)", key)
+		return "", fmt.Errorf("no setting %q (see `vennir config get` for every key)", key)
 	}
 	if found.Kind == yaml.ScalarNode {
 		return found.Value, nil
@@ -972,11 +972,11 @@ func Set(c *Config, key, value string) (*Config, error) {
 	kind, ok := settingKind(key)
 	switch {
 	case !ok:
-		return nil, fmt.Errorf("no setting %q (`vertra help settings` lists every key)", key)
+		return nil, fmt.Errorf("no setting %q (`vennir help settings` lists every key)", key)
 	case kind == reflect.Map:
-		return nil, fmt.Errorf("%q is a map of labels: edit vertra.yaml, then apply", key)
+		return nil, fmt.Errorf("%q is a map of labels: edit vennir.yaml, then apply", key)
 	case key == "version":
-		return nil, fmt.Errorf("version is the file's format, which vertra writes")
+		return nil, fmt.Errorf("version is the file's format, which vennir writes")
 	}
 	// A list is given comma-separated; empty is none.
 	set := &yaml.Node{Kind: yaml.ScalarNode, Value: value, Tag: scalarTag(value)}
@@ -1112,7 +1112,7 @@ func Dir(base, env string) (string, error) {
 	}
 	entries, err := os.ReadDir(base)
 	if err != nil {
-		return "", fmt.Errorf("no environments in %s: run `vertra init <env>` first", base)
+		return "", fmt.Errorf("no environments in %s: run `vennir init <env>` first", base)
 	}
 	var envs []string
 	for _, e := range entries {
@@ -1122,7 +1122,7 @@ func Dir(base, env string) (string, error) {
 	}
 	switch len(envs) {
 	case 0:
-		return "", fmt.Errorf("no environments in %s: run `vertra init <env>` first", base)
+		return "", fmt.Errorf("no environments in %s: run `vennir init <env>` first", base)
 	case 1:
 		return filepath.Join(base, envs[0]), nil
 	default:
@@ -1131,7 +1131,7 @@ func Dir(base, env string) (string, error) {
 }
 
 // Signs is whether this install's catalog is signed, and so required to be.
-// CatalogVersionPattern is a catalog version: vX.Y.Z, as `vertra catalog
+// CatalogVersionPattern is a catalog version: vX.Y.Z, as `vennir catalog
 // promote` makes them.
 var CatalogVersionPattern = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 

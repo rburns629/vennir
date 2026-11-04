@@ -133,7 +133,7 @@ func (c *Catalog) attestSBOM(p *Product, reference string, s Settings) error {
 	if err != nil {
 		return errors.New("signing needs cosign installed (.github/scripts/install-scanners.sh cosign)")
 	}
-	work, cleanup, err := tempDir("vertra-sbom-")
+	work, cleanup, err := tempDir("vennir-sbom-")
 	if err != nil {
 		return err
 	}

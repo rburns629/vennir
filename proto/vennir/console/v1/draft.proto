@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// Compose's drafts: templates being built, kept by the console for the team
+// each is for, so its members (and admins) see and change them from any
+// device. A draft is the page's own state, which the console keeps as it
+// is (at most 64 KiB, 100 a team). Each save names the version it changed,
+// so two people's edits never silently overwrite each other.
+service DraftService {
+  // The drafts of a team, or of every team you're in (every team, for an
+  // admin), newest first.
+  rpc ListDrafts(ListDraftsRequest) returns (ListDraftsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Saves a draft: a new one with version 0, else the version it changed.
+  // Refused (failed_precondition, DRAFT_CHANGED) when someone saved it
+  // since, or a new one's name is taken; the Failure carries the current
+  // version.
+  rpc SaveDraft(SaveDraftRequest) returns (SaveDraftResponse);
+  // Deletes a draft.
+  rpc DeleteDraft(DeleteDraftRequest) returns (DeleteDraftResponse);
+}
+
+message Draft {
+  string team = 1;
+  // Its template's name, and so its file's: lowercase letters, digits and
+  // dashes.
+  string name = 2;
+  // The page's own state, kept as it is.
+  google.protobuf.Struct body = 3;
+  // Counts up with each save.
+  int64 version = 4;
+  // Who saved it last; empty once their account is gone.
+  string updated_by = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message ListDraftsRequest {
+  // Empty: every team you're in.
+  string team = 1;
+}
+
+message ListDraftsResponse {
+  repeated Draft drafts = 1;
+}
+
+message SaveDraftRequest {
+  string team = 1;
+  string name = 2;
+  google.protobuf.Struct body = 3;
+  // The version this changes; 0 for a new draft.
+  int64 version = 4;
+}
+
+message SaveDraftResponse {
+  Draft draft = 1;
+}
+
+message DeleteDraftRequest {
+  string team = 1;
+  string name = 2;
+}
+
+message DeleteDraftResponse {}

@@ -36,12 +36,12 @@ from google.cloud.billing_v1.types import ProjectBillingInfo
 # What this product made, so it reports (and its delete removes) only
 # those: never a project someone made some other way. Also how a retry
 # that finds the project it made a moment ago still reports it.
-MADE_BY_LABEL = ("vertra-made", "true")
+MADE_BY_LABEL = ("vennir-made", "true")
 # And for which team (the request's forTeam, the team the run is for, not
 # the one it runs in: a Kubernetes namespace name, so always a valid label
 # value), so it's reported, and deleted, only for that team: another team's
 # project, even one this product made, isn't theirs.
-TEAM_LABEL = "vertra-team"
+TEAM_LABEL = "vennir-team"
 
 INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")

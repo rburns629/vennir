@@ -5,7 +5,7 @@
 # keeps the ticket after the run is gone, and its Delete runs close. Nothing
 # is really created here (a no-cloud sample): the ticket's id comes from its
 # title, so opening the same one twice gives the same ticket.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Product
 name: ticket
 team: local
@@ -47,7 +47,7 @@ actions:
           description: What the ticket is about, up to 200 characters.
           maxLength: 200
           pattern: "\\S"
-          x-vertra-pattern-message: can't be blank
+          x-vennir-pattern-message: can't be blank
     output:
       type: object
       additionalProperties: false
@@ -57,7 +57,7 @@ actions:
           type: string
           title: Ticket
           description: Its id, such as T-1a2b3c4d.
-          x-vertra-provides: local.ticket  # what watch's ticket is wired from
+          x-vennir-provides: local.ticket  # what watch's ticket is wired from
         resources:
           type: array
           title: Resources
@@ -118,7 +118,7 @@ actions:
           type: string
           title: Ticket
           description: The ticket to watch.
-          x-vertra-needs: local.ticket  # one of yours, or open added to the order
+          x-vennir-needs: local.ticket  # one of yours, or open added to the order
           pattern: "^T-[0-9a-f]{8}$"
         watcher:
           type: string
@@ -126,7 +126,7 @@ actions:
           description: Who is told when it changes, up to 100 characters.
           maxLength: 100
           pattern: "\\S"
-          x-vertra-pattern-message: can't be blank
+          x-vennir-pattern-message: can't be blank
     output:
       type: object
       additionalProperties: false
@@ -192,7 +192,7 @@ actions:
           title: Title
           maxLength: 200
           pattern: "\\S"
-          x-vertra-pattern-message: can't be blank
+          x-vennir-pattern-message: can't be blank
     output:
       type: object
       additionalProperties: false

@@ -15,13 +15,13 @@ Every action looks before it creates, so a retried step is harmless.
 ## Deleting what they made
 
 `project`, `app-hosting` and `cloud-sql` label what they create
-`vertra-made=true` and `vertra-team=<the team it was made for>` (the
+`vennir-made=true` and `vennir-team=<the team it was made for>` (the
 request's `forTeam`: the team the run is for, which for a shared product's
 run is the consumer's, not this one's), and report it as `resources`, with
 a `delete` action as their `cleanup`: Delete on the run page (or **What
 runs made**) runs it. A delete refuses anything without the label
-(`NOT_MADE_BY_VERTRA`), so a project or service that was only found, never
-made, is never deleted; and anything whose `vertra-team` isn't the run's
+(`NOT_MADE_BY_VENNIR`), so a project or service that was only found, never
+made, is never deleted; and anything whose `vennir-team` isn't the run's
 `forTeam` (`NOT_THIS_TEAMS`), so one team's delete, even run directly,
 can't remove another team's project. A request with no `forTeam` (a
 person's run for no team, by someone outside this team) is refused
@@ -36,13 +36,13 @@ step's five minutes to delete an instance: the step then succeeds with
 has no cleanup: the repository's own cleanup policies age images out.
 
 Made before they were labelled with a team (before 2026-11-03), a project,
-service or instance has `vertra-made` but no `vertra-team`, so its delete
+service or instance has `vennir-made` but no `vennir-team`, so its delete
 refuses it (`NOT_THIS_TEAMS`). Label it by hand with the team it was made
-for (`gcloud projects update <id> --update-labels=vertra-team=<team>`, and
+for (`gcloud projects update <id> --update-labels=vennir-team=<team>`, and
 the same with `gcloud run services update` or `gcloud sql instances patch`),
-then delete it again, or delete it outside Vertra.
+then delete it again, or delete it outside Vennir.
 Proven on GKE Autopilot (2026-10-25): a project, a Cloud Run service and a
-Cloud SQL instance made and deleted through Vertra.
+Cloud SQL instance made and deleted through Vennir.
 [dags/gcp-hello-world-dag.yaml](dags/gcp-hello-world-dag.yaml) chains the
 first three.
 

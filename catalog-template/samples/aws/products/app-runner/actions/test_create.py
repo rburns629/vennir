@@ -1,5 +1,5 @@
 """Tests for aws/app-runner's create action, with boto3 mocked, so they run
-without an AWS account. `./vertra catalog check` runs them in the product's own
+without an AWS account. `./vennir catalog check` runs them in the product's own
 image with its python3 (unittest, no pytest).
 """
 
@@ -62,7 +62,7 @@ class CreateActionTest(unittest.TestCase):
     def test_a_service_it_made_is_reported_when_found_again(self) -> None:
         def configure(client):
             client.list_services.return_value = {"ServiceSummaryList": [RUNNING]}
-            client.list_tags_for_resource.return_value = {"Tags": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
+            client.list_tags_for_resource.return_value = {"Tags": [{"Key": "vennir-made", "Value": "true"}, {"Key": "vennir-team", "Value": "web"}]}
         _, result, _ = self._run({"serviceName": "web", "image": "i", "region": "eu-west-1"}, configure)
         self.assertEqual(result["outputs"]["resources"][0]["id"], "arn:svc")
         # Made by this product for another team: not this team's to delete.
@@ -80,7 +80,7 @@ class CreateActionTest(unittest.TestCase):
         # A retry finding the service its last attempt was still creating.
         def configure(client):
             client.list_services.return_value = {"ServiceSummaryList": [{**RUNNING, "Status": "OPERATION_IN_PROGRESS"}]}
-            client.list_tags_for_resource.return_value = {"Tags": [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}]}
+            client.list_tags_for_resource.return_value = {"Tags": [{"Key": "vennir-made", "Value": "true"}, {"Key": "vennir-team", "Value": "web"}]}
             client.describe_service.side_effect = [
                 {"Service": {**RUNNING, "Status": "OPERATION_IN_PROGRESS"}},
                 {"Service": RUNNING},
@@ -139,7 +139,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(repository["ImageRepositoryType"], "ECR_PUBLIC")
         self.assertEqual(repository["ImageConfiguration"]["RuntimeEnvironmentVariables"], {"BUCKET": "b"})
         self.assertEqual(result["outputs"]["serviceUrl"], "https://abc.awsapprunner.com")
-        self.assertEqual(kwargs["Tags"], [{"Key": "vertra-made", "Value": "true"}, {"Key": "vertra-team", "Value": "web"}])
+        self.assertEqual(kwargs["Tags"], [{"Key": "vennir-made", "Value": "true"}, {"Key": "vennir-team", "Value": "web"}])
         self.assertEqual(result["outputs"]["resources"][0], {
             "type": "aws/app-runner-service", "id": "arn:svc", "name": "web",
             "link": "https://eu-west-1.console.aws.amazon.com/apprunner/home?region=eu-west-1#/services",

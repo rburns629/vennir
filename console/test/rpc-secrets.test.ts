@@ -68,7 +68,7 @@ describe("SecretService", () => {
     const [entry] = await db
       .select()
       .from(auditLog)
-      .where(and(eq(auditLog.actorId, member.id), eq(auditLog.route, "vertra.console.v1.SecretService/PutSecret")))
+      .where(and(eq(auditLog.actorId, member.id), eq(auditLog.route, "vennir.console.v1.SecretService/PutSecret")))
       .orderBy(desc(auditLog.id))
       .limit(1);
     expect(entry?.target).toMatchObject({ team: team.name, secretName: "api-key" });
@@ -88,7 +88,7 @@ describe("SecretService", () => {
   });
 
   it("refuses the reserved names", async () => {
-    for (const secretName of ["eso-auth", "vertra-pull"]) {
+    for (const secretName of ["eso-auth", "vennir-pull"]) {
       const response = await rpc("SecretService", "PutSecret", { team: team.name, secretName, data: { value: "x" } }, { token });
       expect(response.json<RpcError>().code).toBe("invalid_argument");
       expect(failureCode(response.json<RpcError>())).toBe("UNPROCESSABLE_ENTITY");

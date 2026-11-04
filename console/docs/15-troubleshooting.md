@@ -7,7 +7,7 @@ This page is for anyone whose run, step, image, secret or sign-in isn't doing wh
 Open the run from **Runs**. A failed run has a card at the top of its page:
 
 - **Failed at step N of M, <step>: <message>**, with the failure code below it.
-- **What it means** and **What to do**: the explanation. If the product's team wrote help for its own codes in `product.yaml`, you see their words, and the card says "Explanation written by <team> for this error code". Otherwise it says "Explanation from Vertra".
+- **What it means** and **What to do**: the explanation. If the product's team wrote help for its own codes in `product.yaml`, you see their words, and the card says "Explanation written by <team> for this error code". Otherwise it says "Explanation from Vennir".
 - **Safe to retry?**: whether the product says it's safe to run twice. "Yes" means it finds what an earlier attempt made instead of making it again. "With care" means the product doesn't say so: check what the failed attempt made before you retry.
 - **Ask <team>**: the owning team's chat channel, contact, and **Runbooks** link, from its `team.yaml`.
 - **Retry <step>** gives that step one more attempt. Hover over it if it's greyed out to see why. **Show its attempts and logs** opens the step.
@@ -117,13 +117,13 @@ A run may fail until the product is ready.
 | Sign-ins are refused for a while after several failures | After 10 failed sign-ins for an account, each new try must wait, up to a minute. Too many tries from one place also wait a few minutes | Wait, then try once with the right password. A successful sign-in clears the count |
 | `… signs in with <provider>: use that instead of a password.` | A team you're in requires single sign-on | Click **Sign in with <provider>** |
 | "That account isn't from a domain allowed to sign in here." | You signed in to your provider with an account outside the install's allowed email domains | Choose your work account |
-| "This email's Vertra account signs in with a different account." | Your Vertra account is already linked to another provider account | Ask an admin |
+| "This email's Vennir account signs in with a different account." | Your Vennir account is already linked to another provider account | Ask an admin |
 | "Your groups couldn't be read, so your teams can't be checked." | The install maps groups to teams, and your provider didn't send your groups, or Google's API failed | Try again shortly. If it persists, ask an admin to check the groups settings ([groups](13-teams-and-roles.md#how-do-single-sign-on-groups-decide-who-is-in-a-team)) |
 | "Single sign-on isn't on here any more" | An admin turned single sign-on off | Sign in with your password, or ask an admin for one |
 | "Your session has ended." | Sessions last 8 hours unless the install says otherwise, and changing or resetting a password signs you out everywhere else | Sign in again |
 | You're asked to choose a password before anything else | An admin created your account or reset your password | Choose your own: at least 12 characters |
 
-**Forgot your password?** There's no email reset. Ask a Vertra admin to reset it on [People](16-admin-settings.md#people). You choose your own when you next sign in. If every admin is locked out, someone with access to the cluster can run `vertra admin reset-password <env>`.
+**Forgot your password?** There's no email reset. Ask a Vennir admin to reset it on [People](16-admin-settings.md#people). You choose your own when you next sign in. If every admin is locked out, someone with access to the cluster can run `vennir admin reset-password <env>`.
 
 **Signed in, but you see no teams?** You're not in any team yet: see [How do I join a team?](13-teams-and-roles.md#how-do-i-join-a-team).
 

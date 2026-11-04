@@ -12,7 +12,7 @@ kernel's otherwise-identical migrate Job: confirmed directly, against a
 real cluster, that a hook-succeeded Job (and the Pod it owns, along with
 that Pod's logs) is gone essentially immediately after `helm install`
 returns. Its log says whether this install created the first admin
-(`vertra apply` reads that; never a password, which no log ever holds),
+(`vennir apply` reads that; never a password, which no log ever holds),
 so the Job is kept until the *next* install/upgrade creates a new one.
 */}}
 apiVersion: batch/v1

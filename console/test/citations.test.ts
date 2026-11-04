@@ -36,6 +36,6 @@ describe("citations", () => {
   });
 
   it("makes anchors as the Docs page does", () => {
-    expect(anchor("Upgrading `vertra-system` (Helm 4)!")).toBe("upgrading-vertra-system-helm-4");
+    expect(anchor("Upgrading `vennir-system` (Helm 4)!")).toBe("upgrading-vennir-system-helm-4");
   });
 });

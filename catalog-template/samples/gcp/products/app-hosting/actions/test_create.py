@@ -1,5 +1,5 @@
 """Tests for gcp/app-hosting's create action, with the Google Cloud clients
-mocked, so they run without a GCP account. `./vertra catalog check` runs them in
+mocked, so they run without a GCP account. `./vennir catalog check` runs them in
 the product's own image with its python3 (unittest, no pytest).
 """
 
@@ -135,7 +135,7 @@ class CreateActionTest(unittest.TestCase):
             self._write_request(_VALID_INPUTS)
             with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
                 client_cls.return_value.service_path.return_value = "projects/my-project/locations/us-central1/services/hello-world"
-                client_cls.return_value.get_service.return_value = MagicMock(uri="https://x", labels={"vertra-made": "true", "vertra-team": team})
+                client_cls.return_value.get_service.return_value = MagicMock(uri="https://x", labels={"vennir-made": "true", "vennir-team": team})
                 self.assertEqual(self.module.main(), 0)
             self.assertEqual("resources" in self._result()["outputs"], reported, team)
 
@@ -167,7 +167,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(call_kwargs["service_id"], "hello-world")
         submitted_image = call_kwargs["service"].template.containers[0].image
         self.assertEqual(submitted_image, _VALID_INPUTS["image"])
-        self.assertEqual(dict(call_kwargs["service"].labels), {"vertra-made": "true", "vertra-team": "web"})
+        self.assertEqual(dict(call_kwargs["service"].labels), {"vennir-made": "true", "vennir-team": "web"})
         # The team's runtime account, never the project's default compute one.
         self.assertEqual(call_kwargs["service"].template.service_account, _RUNTIME_ACCOUNT)
         self.assertEqual(exit_code, 0)

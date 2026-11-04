@@ -1,6 +1,6 @@
 # Architecture diagrams
 
-[`vertra.drawio`](vertra.drawio) opens in draw.io (desktop, diagrams.net, or the VS Code extension). It has six pages, each also exported as an SVG here:
+[`vennir.drawio`](vennir.drawio) opens in draw.io (desktop, diagrams.net, or the VS Code extension). It has six pages, each also exported as an SVG here:
 
 | Page | What it shows |
 | --- | --- |
@@ -11,7 +11,7 @@
 | [5 · States](5-states.svg) | The task and execution state machines, with the function that makes each transition. |
 | [6 · The pieces](6-the-pieces.svg) | The parts at a glance, the figure in [`architecture.md`](../architecture.md): as wide as the console's Docs page shows a figure, so it's shown at full size there. |
 
-The database tables are drawn in the console's guide, [`console/docs/06-database-schemas.md`](../../console/docs/06-database-schemas.md) (Docs → *Where Vertra keeps its data*).
+The database tables are drawn in the console's guide, [`console/docs/06-database-schemas.md`](../../console/docs/06-database-schemas.md) (Docs → *Where Vennir keeps its data*).
 
 ## Keeping them current
 
@@ -21,4 +21,4 @@ All six pages are written by [`generate.py`](generate.py). Pages 2 and 3 are rea
 $ python3 docs/architecture/generate.py
 ```
 
-It rewrites `vertra.drawio` and, when draw.io's desktop app is installed, the SVGs. Then `make console-docs`, which copies the SVGs into the console for its Docs page. A rerun overwrites the file, so change a layout in `generate.py` rather than by dragging boxes in draw.io. Pages 1, 4, 5 and 6 are laid out by hand in the script: update them when the deployment, the call path or the state rules change.
+It rewrites `vennir.drawio` and, when draw.io's desktop app is installed, the SVGs. Then `make console-docs`, which copies the SVGs into the console for its Docs page. A rerun overwrites the file, so change a layout in `generate.py` rather than by dragging boxes in draw.io. Pages 1, 4, 5 and 6 are laid out by hand in the script: update them when the deployment, the call path or the state rules change.

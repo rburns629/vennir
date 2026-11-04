@@ -30,7 +30,7 @@ let app: FastifyInstance;
 let token: string;
 
 beforeAll(async () => {
-  Object.assign(config, { activityConfigMap: "console-execution-console-activity", platformNamespace: "vertra-system" });
+  Object.assign(config, { activityConfigMap: "console-execution-console-activity", platformNamespace: "vennir-system" });
   app = await buildApp();
   await app.ready();
   const user = await createUser(email, await hashPassword("correct-horse-battery"));
@@ -53,7 +53,7 @@ describe("recording the console's activity", () => {
     const me = () => call(token, "AuthService/GetMe");
     expect((await me()).code).toBe("ok");
     expect(recordActivity).toHaveBeenCalledOnce();
-    expect(recordActivity).toHaveBeenCalledWith("vertra-system", "console-execution-console-activity", expect.any(Date));
+    expect(recordActivity).toHaveBeenCalledWith("vennir-system", "console-execution-console-activity", expect.any(Date));
     await me();
     expect(recordActivity).toHaveBeenCalledOnce();
   });

@@ -1,4 +1,4 @@
-module github.com/rburns629/vertra/kernel
+module github.com/rburns629/vennir/kernel
 
 go 1.26.0
 

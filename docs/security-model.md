@@ -1,11 +1,11 @@
 # Security model
 
-How Vertra keeps each team's secrets to that team's reviewed products: what's
+How Vennir keeps each team's secrets to that team's reviewed products: what's
 enforced today, by which layer, what isn't enforced yet, and what's out of
-scope. Written for security reviewers evaluating Vertra, and kept honest:
+scope. Written for security reviewers evaluating Vennir, and kept honest:
 where something is a plan rather than a fact, it says so.
 
-Last reviewed 2026-10-28, for 0.x. Vertra is not production-ready yet; the
+Last reviewed 2026-10-28, for 0.x. Vennir is not production-ready yet; the
 gaps in [Not yet enforced](#not-yet-enforced) are why.
 
 ## At a glance
@@ -13,7 +13,7 @@ gaps in [Not yet enforced](#not-yet-enforced) are why.
 | Question | Answer |
 | --- | --- |
 | Where do secret values live? | In Kubernetes Secrets, in the owning team's namespace. Synced secrets keep their source of truth in the team's own store (GCP Secret Manager and others, through External Secrets Operator). |
-| Does Vertra's database store secret values? | No. The console stores which secrets each team registered, and the names of their keys, never values. The kernel never sees them. |
+| Does Vennir's database store secret values? | No. The console stores which secrets each team registered, and the names of their keys, never values. The kernel never sees them. |
 | Who can read a secret? | Steps of its team's registered products that list it in `secretRefs`, and cluster administrators. Not the console: it writes Secrets but has no right to read them. See [Who can read a secret](#who-can-read-a-secret). |
 | Can one team's step reach another team's secret? | No. A step runs in its own team's namespace, and a Pod can only mount Secrets from its own namespace. |
 | Can one product reach another product's secret in the same team? | By design, yes: a team's secrets are the team's, and the team chooses per step which ones it gets (`secretRefs`). What a team can't do is give one to an image that isn't its registered product (it runs with no secrets), or mount a Secret it never registered. The console checks this at submit time, and an admission policy makes the cluster enforce it on every step's Job. A product's own cloud identity (its declared ServiceAccount) is still its own: another product can't run as it. |
@@ -21,17 +21,17 @@ gaps in [Not yet enforced](#not-yet-enforced) are why.
 | Can anything but the console submit work? | No. kernel-api accepts only the console's ServiceAccount token, issued for kernel-api alone and checked with a TokenReview. See [How kernel-api knows its caller](#how-kernel-api-knows-its-caller). |
 | Is anything enforced if the console is bypassed? | Yes: which namespaces steps may run in, which image sources they may use, that images are pinned and passed their scan, which ServiceAccount and Secrets a step may have, image signatures (with Sigstore's policy-controller installed) and who may delete a team namespace. These are admission policies the Kubernetes API server applies to the scheduler's Jobs. They don't hold if the console itself is compromised: it can rewrite three of them. See [If a component is compromised](#if-a-component-is-compromised). |
 | Are secrets encrypted at rest? | That depends on the cluster. Enabling encryption of Secrets at rest in etcd, ideally with a KMS provider, is the cluster operator's responsibility and a prerequisite for production. |
-| Is Vertra's own data encrypted at rest? | Only the few credentials the console keeps itself. Step inputs, outputs and logs, and the audit log, are plain in Postgres; encrypting its disks and backups is the operator's. See [What Vertra stores](#what-vertra-stores). |
-| Is traffic inside the cluster encrypted? | Yes, with each chart's `tls` (on by default): kernel-api serves HTTPS and the bundled Postgres instances accept only TLS, each with a certificate from its chart's own CA, which every client checks (`verify-full`). Metrics ports and the scanner's are plain; NetworkPolicies limit who reaches them. See [What Vertra stores](#what-vertra-stores). |
-| Where are the database passwords? | With the bundled Postgres, generated on install and kept in the releases' Secrets. With a managed database (`database.type: managed`) there are none of Vertra's: each service signs in as its own cloud identity with a short-lived token (IAM database authentication; Cloud SQL: an hour's Google token; Amazon RDS: a 15-minute token its role signs), over TLS checked against the server's CA, from inside the install's network only. A separate administrator identity, used only by `kernel database-setup`, opens each database to its own service alone; on RDS, whose administrator must have a password, RDS keeps it in Secrets Manager, readable only by that identity. See [Databases](operations.md#databases). |
-| What reaches logs and outputs? | Whatever a step prints or returns. Vertra stores step outputs and logs; a product must never print or return a secret. |
+| Is Vennir's own data encrypted at rest? | Only the few credentials the console keeps itself. Step inputs, outputs and logs, and the audit log, are plain in Postgres; encrypting its disks and backups is the operator's. See [What Vennir stores](#what-vennir-stores). |
+| Is traffic inside the cluster encrypted? | Yes, with each chart's `tls` (on by default): kernel-api serves HTTPS and the bundled Postgres instances accept only TLS, each with a certificate from its chart's own CA, which every client checks (`verify-full`). Metrics ports and the scanner's are plain; NetworkPolicies limit who reaches them. See [What Vennir stores](#what-vennir-stores). |
+| Where are the database passwords? | With the bundled Postgres, generated on install and kept in the releases' Secrets. With a managed database (`database.type: managed`) there are none of Vennir's: each service signs in as its own cloud identity with a short-lived token (IAM database authentication; Cloud SQL: an hour's Google token; Amazon RDS: a 15-minute token its role signs), over TLS checked against the server's CA, from inside the install's network only. A separate administrator identity, used only by `kernel database-setup`, opens each database to its own service alone; on RDS, whose administrator must have a password, RDS keeps it in Secrets Manager, readable only by that identity. See [Databases](operations.md#databases). |
+| What reaches logs and outputs? | Whatever a step prints or returns. Vennir stores step outputs and logs; a product must never print or return a secret. |
 
 ## Who is trusted
 
 | Actor | Trusted to | Limited by |
 | --- | --- | --- |
-| Cluster administrators | Everything; they can read any Secret | Outside Vertra's control |
-| Vertra admins (console) | Manage teams, people, bots, allowed image sources; act in any team | Console authorization; every admin action is logged |
+| Cluster administrators | Everything; they can read any Secret | Outside Vennir's control |
+| Vennir admins (console) | Manage teams, people, bots, allowed image sources; act in any team | Console authorization; every admin action is logged |
 | Catalog reviewers | Decide which product images exist, and which ServiceAccount and secrets each product declares | The catalog repository's review rules (CODEOWNERS, protected branches) |
 | Team maintainers | Manage their team: its people and their roles, register its secrets and choose which step gets which, its bots, raw DAGs, cancelling its runs | Console authorization (`auth/access.ts`): the maintainer role, per-product identity, registered team secrets |
 | Team members | See their team's runs, logs, Pods and secrets' names; run its actions and what's shared with it | The member role: nothing they can change |
@@ -59,7 +59,7 @@ secret's name and its key names. Only registered secrets can be mounted, and
 only by the team's registered products.
 
 - The console labels what it creates (`app.kubernetes.io/managed-by:
-  vertra-console`) and won't replace, or register, a Secret it didn't
+  vennir-console`) and won't replace, or register, a Secret it didn't
   create, such as a SecretStore's own credentials: that's refused with a 409.
   So a SecretStore's credentials can never be mounted by a step.
 - No RBAC is involved: mounting doesn't consult it, and steps don't read
@@ -81,7 +81,7 @@ catalog guide's "Values your builds need" says which values go where.
 ### What a secret can hold
 
 A secret is a set of named keys, each mounted as a file at
-`/platform/secrets/<secret>/<key>`; Vertra doesn't interpret the values.
+`/platform/secrets/<secret>/<key>`; Vennir doesn't interpret the values.
 Typical shapes: one opaque value under `value` (an API key, a webhook
 signing secret); a credential in several keys of one secret (`clientId` and
 `clientSecret`, `username` and `password`, `tls.crt` and `tls.key`); or a
@@ -121,7 +121,7 @@ store's own credential (for a vault that can't federate, such as a
 admin (Team page → Secrets → Stored credential, `TeamService/
 SetSecretStoreCredential`), never carried by the catalog; it's written to
 `eso-auth`, and can never be registered or mounted by a step. A synced secret rotates on the vault's side, with no
-change in Vertra.
+change in Vennir.
 
 | Vault | Sign-in | Stored credential | Proven |
 | --- | --- | --- | --- |
@@ -184,7 +184,7 @@ registered secrets, images, scans), and the cluster's policies hold as for
 any Job.
 
 Where another team may aim a team's products is the owning team's: an
-input typed as a target (`x-vertra-needs: gcp.project`, `gcp.folder`,
+input typed as a target (`x-vennir-needs: gcp.project`, `gcp.folder`,
 `aws.account`, `azure.subscription`) must match its team.yaml's
 `allowedTargets` for the running team, or the run is refused before it
 starts (`TARGET_NOT_ALLOWED`, `console/src/targets.ts`). The owning team's
@@ -203,7 +203,7 @@ asking: each tool calls the console's own code with their identity, so it
 sees what they may, and its only effect is a proposed cart, which they open
 and place themselves. Ordering bots can't use it. Its answers' citations
 are kept only when they name a section it retrieved, and links are the
-console's, not the model's. It answers only about Vertra: a question
+console's, not the model's. It answers only about Vennir: a question
 judged not about it (by a separate, tool-less call that treats the
 question as data) gets a fixed sentence and never reaches the agent, and an
 answer resting on neither the docs it cites nor its tools' results is
@@ -357,7 +357,7 @@ there's no token to leak.
 ## Keyless bots
 
 A bot can sign in with its CI job's own OIDC identity instead of a stored
-token, so a pipeline holds no Vertra secret. It can be made that way
+token, so a pipeline holds no Vennir secret. It can be made that way
 (`TokenService/CreateKeylessBot`: its identity is checked first, and no
 token is ever made), or have tokens revoked once its CI signs in. A team's
 maintainers bind a
@@ -394,7 +394,7 @@ posted, and a team an outcome webhook, where each of its runs' outcomes is
 is sealed with a key derived from `JWT_SECRET`, never sent back, only under
 the hosts the install allows (the console chart's `orders.callbackHosts`,
 none by default) and never redirected. Each post is signed with the bot's own
-secret (HMAC-SHA256 over the time and the body, `Vertra-Signature`), shown
+secret (HMAC-SHA256 over the time and the body, `Vennir-Signature`), shown
 once when it's made, so the receiver can refuse forged and replayed posts. A
 bot's post says which run and order it was and how it ended, never its
 outputs: those are read with `GetExecution`, as the bot. A team's carries
@@ -429,7 +429,7 @@ accepts only the collector's pushes and the console's queries
 anything is stored, with the kernel's patterns, and may read every Pod's
 logs in the cluster (a read-only ClusterRole on `pods` and `pods/log`:
 steps run in every team's namespace); it keeps only steps' Pods, the
-API backends teams run (Pods labelled `vertra/api-backend: "true"`) and the
+API backends teams run (Pods labelled `vennir/api-backend: "true"`) and the
 platform's own. An API backend's lines, every level, are for its own team
 only (they belong to no run, so no one else owns them); the platform's own
 logs are for admins only.
@@ -450,8 +450,8 @@ purged team counts for nobody), and may call an API only when it's shared
 with one of their teams. An ordering bot calls none (403 `ORDERS_ONLY`): it
 may only order its listed templates.
 The caller's `Authorization` stops at the gateway; the backend gets its own
-credential instead, minted per request, and `Vertra-Caller`, an EdDSA JWT
-the gateway signs (its key at `/.vertra/jwks.json`) naming the caller,
+credential instead, minted per request, and `Vennir-Caller`, an EdDSA JWT
+the gateway signs (its key at `/.vennir/jwks.json`) naming the caller,
 their team and the API. An API may only use an in-cluster backend in its
 own team's namespace (`<service>.<team>.svc`): one pointed at another
 team's is held, by the console and the gateway, whatever `backendHosts`
@@ -460,7 +460,7 @@ sharing; a backend should still check the token's `api` as well as its
 `aud` (the sample does). Only the cluster's default domain is read
 (`.svc.cluster.local`): on a cluster with another, and for short names,
 pod IPs or anything else that reaches inside the cluster, `backendHosts`
-alone decides, so list exactly the hosts each API may use. A caller's own `Vertra-*` headers are dropped,
+alone decides, so list exactly the hosts each API may use. A caller's own `Vennir-*` headers are dropped,
 and so is what it says of where it's from (`Forwarded`, `X-Forwarded-*`,
 `X-Real-Ip`): `X-Forwarded-For` is the gateway's own peer, or, on the
 public listener behind a proxy listed in `gateway.trustedProxies`, the last
@@ -493,7 +493,7 @@ a named audience that isn't the Kubernetes API's or kernel-api's, lasting an
 hour at most, so it can't mint the platform's or a team's other identities,
 or a token for the cluster itself. `-api` is reserved: no product may run as
 such a ServiceAccount, and an API's must end in it. It reads the
-console's database as a role of its own (`vertra_gateway`,
+console's database as a role of its own (`vennir_gateway`,
 `console/src/db/gatewayAccess.ts`): it may read the columns it needs to
 sign callers in and find APIs (never a password hash, a sealed value, a
 secret's name or the audit log) and write only its traffic counts
@@ -502,7 +502,7 @@ token was last used (`api_tokens.last_used_at`, as the console keeps it).
 A retired team's members and bots don't call as it. It checks sessions with the console's public key (its
 JWKS, `/api/auth/jwks`), so it can verify a session but never make one,
 and never holds `JWT_SECRET` (proven on kind 2026-10-28: the gateway
-connects as `vertra_gateway`, accepts a console session, refuses one signed
+connects as `vennir_gateway`, accepts a console session, refuses one signed
 any other way). Requests are logged and counted by
 API, team, caller and outcome, never with bodies, header values or
 credentials; the counts kept for each API's page (`api_traffic`, a week)
@@ -546,7 +546,7 @@ one thing on every call: that the caller is the console
 (`kernel/internal/api/auth.go`).
 
 - The console's Pod gets its ServiceAccount token projected for the
-  audience `vertra-kernel-api` (rotated by the kubelet, valid an hour), so
+  audience `vennir-kernel-api` (rotated by the kubelet, valid an hour), so
   the token is useless against the Kubernetes API or anything else.
 - kernel-api asks the API server whose token it is (a TokenReview, for that
   audience) and accepts only the ServiceAccounts in
@@ -626,7 +626,7 @@ can't be changed by hand (`TEAM_FOLLOWS_SSO_GROUPS`); bots and password
 accounts are managed there as ever.
 
 A password someone else set (a new account's temporary one, an admin's
-reset of someone else's, `vertra admin reset-password`) has to be changed
+reset of someone else's, `vennir admin reset-password`) has to be changed
 before anything else: until then its session may only read who it is and
 change it (`PASSWORD_CHANGE_REQUIRED`), and the gateway refuses it.
 
@@ -695,7 +695,7 @@ violations).
   remains the most privileged component and should be treated that way.
 - **Nobody, for the registry pull Secret.** With the console chart's
   `registryCheck.copyToTeams` on, the console copies the platform's
-  registry credential into every team namespace as `vertra-pull`, and the
+  registry credential into every team namespace as `vennir-pull`, and the
   kernel names it as every step Pod's `imagePullSecret`
   (`scheduler.taskImagePullSecret`). Only the kubelet uses it: the name is
   reserved, so it can never be registered as a team secret and mounted.
@@ -713,10 +713,10 @@ violations).
   `sts.amazonaws.com`); the role trusts that cluster's console
   ServiceAccount alone and may only pull and list tags in the catalog's
   `<prefix>/*`, and the token lapses within the hour once the role is
-  deleted. The owner makes either with `vertra catalog grant`, which names
+  deleted. The owner makes either with `vennir catalog grant`, which names
   exactly one reader's identity.
 - **Cluster administrators**, and anyone else the cluster's own RBAC lets read
-  Secrets in a team namespace. Vertra doesn't grant people Kubernetes
+  Secrets in a team namespace. Vennir doesn't grant people Kubernetes
   access, but doesn't prevent a cluster operator from doing so.
 
 ## Guardrails the cluster enforces
@@ -727,7 +727,7 @@ without going through the console:
 
 | Guardrail | What it refuses | Where |
 | --- | --- | --- |
-| Dispatch namespaces | Jobs in any namespace not labelled `vertra/team=true`, and in the platform's own namespace (`DISPATCH_REJECTED`), unless `dispatchPolicy.allowReleaseNamespace` is on: only for an install whose platform namespace is also a team's, as the GKE reference install's `default` is (`helm/values/gke/kernel.yaml`) | `helm/charts/execution-kernel/templates/dispatch-policy.yaml` |
+| Dispatch namespaces | Jobs in any namespace not labelled `vennir/team=true`, and in the platform's own namespace (`DISPATCH_REJECTED`), unless `dispatchPolicy.allowReleaseNamespace` is on: only for an install whose platform namespace is also a team's, as the GKE reference install's `default` is (`helm/values/gke/kernel.yaml`) | `helm/charts/execution-kernel/templates/dispatch-policy.yaml` |
 | Image sources | Images outside the allowed registries (`IMAGE_NOT_ALLOWED`) | `templates/image-policy.yaml` |
 | Image signatures | Where policy-controller is installed, any Pod in a team namespace whose image isn't signed by catalog CI under the source registry, whoever makes it (`IMAGE_NOT_SIGNED`): images from sources an admin added don't run there either (`no-match-policy` stays `deny`, so a compromised console adding a source can't get past it). It checks Pods, not the Jobs and other workloads that make them, which a second policy passes without verifying them (the webhook still admits them): a step's Job is made, and its Pod refused (the Job's `FailedCreate` event, which the kernel reads) | `templates/image-signature.yaml` |
 | Image scans | An image not pinned by digest (`IMAGE_NOT_PINNED`), or one whose digest failed its security scan unless an admin accepted it (`IMAGE_SCAN_FAILED`). The console scans every image before it's registered or run, and daily while in use, for each platform the cluster runs (the console chart's `scanning.platforms`; a multi-arch cluster lists every one) | `templates/scan-policy.yaml` |
@@ -739,7 +739,7 @@ without going through the console:
 An install whose platform namespace is also a team's (`allowReleaseNamespace`,
 as the GKE reference values' `default` is) loses more than the dispatch
 guardrail there:
-- the team's `vertra-default-deny` admits every Pod in the namespace to
+- the team's `vennir-default-deny` admits every Pod in the namespace to
   every other, so that team's steps can reach the platform's Postgres and
   kernel-api (passwords and TokenReview still hold; the network layer
   doesn't);
@@ -753,7 +753,7 @@ guardrail there:
 - the gateway's token fence matches kernel-api's ServiceAccount there;
 - the team's quota counts the platform's own Pods.
 
-`vertra` installs into `vertra-system` by default and always turns
+`vennir` installs into `vennir-system` by default and always turns
 `allowReleaseNamespace` off; the GKE reference install moves on its next
 run (`TODO.md`).
 
@@ -764,8 +764,8 @@ administrator, isn't checked by them: only Pod Security
 ([What a step can reach](#what-a-step-can-reach)) and, where it's installed,
 policy-controller's signature check apply to every Pod there.
 
-An install `vertra` makes sets up signing itself when its catalog is signed
-(`signing` in vertra.yaml, asked at `vertra init`): `kms`, a key in the
+An install `vennir` makes sets up signing itself when its catalog is signed
+(`signing` in vennir.yaml, asked at `vennir init`): `kms`, a key in the
 cloud's KMS (a GCP key ring with a fresh suffix, or an AWS ECC P-256 key)
 that only the catalog repository's CI, through its main-only federation, may
 sign with, its public half read at apply; or `keyless`, the repository's
@@ -774,7 +774,7 @@ sign with, its public half read at apply; or `keyless`, the repository's
 scoped to team namespaces and bound to an identity that may only read the
 task registry, gives the kernel's imageSignature and the console's
 catalog.signature the same signer, and sets the repository's
-VERTRA_SIGNING_* variables. Proven on GKE (2026-10-26), both modes: CI
+VENNIR_SIGNING_* variables. Proven on GKE (2026-10-26), both modes: CI
 signed images and releases; the console applied only signed releases ("no
 trusted signer signed the catalog release … nothing was applied" for one
 pushed unsigned); a signed starter ran and an image pushed by hand, unsigned,
@@ -788,7 +788,7 @@ its repository's keyless identity) and, on gcp and aws, enforces it on
 releases and images the same way, its policy-controller reading the
 owner's registry (as its own identity in another Google Cloud project;
 across clouds or AWS accounts, with the steps' pull Secret). The owner
-grants that read with `vertra catalog grant`, to the reader's identity
+grants that read with `vennir catalog grant`, to the reader's identity
 alone and on the catalog's registry alone: its service accounts, or its
 console's ServiceAccount from its cluster's issuer, never a key. A catalog version (decision 22) is a tag on a release
 main already signed, so it needs no signature of its own, and the tag's
@@ -805,7 +805,7 @@ CronJobs, its own and the wake one, and an admission policy in
 `timeZone`, never the Job they run. A stolen token of either can stop the
 platform, not change it.
 
-And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api (not the gateway, which forwards where catalogs say): a step's Pod can reach neither. Every team namespace also holds `vertra-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vertra-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vertra/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vertra-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vertra-team-quota`) and LimitRange (`vertra-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators (and it mustn't also be a team's: see [Guardrails the cluster enforces](#guardrails-the-cluster-enforces)). The bundled databases' passwords are generated on install.
+And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api (not the gateway, which forwards where catalogs say): a step's Pod can reach neither. Every team namespace also holds `vennir-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vennir-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vennir/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vennir-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vennir-team-quota`) and LimitRange (`vennir-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators (and it mustn't also be a team's: see [Guardrails the cluster enforces](#guardrails-the-cluster-enforces)). The bundled databases' passwords are generated on install.
 
 ## What a step can reach
 
@@ -855,19 +855,19 @@ the console's and the gateway's public ports, and Services in namespaces
 with no ingress policy; the cloud's metadata server too, except on EKS
 (below). It can't reach either Postgres, kernel-api, the image scanner,
 Loki, or any metrics port. All of this needs a CNI that enforces
-NetworkPolicy: on EKS, `vertra` turns enforcement on (the VPC CNI's
+NetworkPolicy: on EKS, `vennir` turns enforcement on (the VPC CNI's
 `enableNetworkPolicy` in standard mode, the `amazon-vpc-cni` ConfigMap in
 Auto Mode), off by default there.
 
 **The metadata server**, so the node's own cloud identity:
 
-- On GKE clusters `vertra` makes, the metadata server is Workload
+- On GKE clusters `vennir` makes, the metadata server is Workload
   Identity's (`GKE_METADATA`, `cli/internal/modules/gcp/main.tf`): a step
   gets only the Google identity bound to its own ServiceAccount, and none
   as `default`; never the node's.
-- On EKS, the console writes `vertra-no-metadata` into every team
+- On EKS, the console writes `vennir-no-metadata` into every team
   namespace (the console chart's `teamNamespaces.blockMetadata`, on in the
-  EKS values and in what `vertra` installs there): every Pod may connect
+  EKS values and in what `vennir` installs there): every Pod may connect
   anywhere but `169.254.169.254`, so a step can't ask for the node role's
   credentials. IPv4 only: on an IPv4 cluster the VPC CNI's policy agent
   can't hold an IPv6 block, and failing to, it enforced none of the
@@ -922,7 +922,7 @@ taken, and what would still hold.
   belongs to (`system:auth-delegator`). It holds the kernel's database: every run's
   inputs, outputs and logs, and the task rows the scheduler runs. On the
   bundled Postgres it signs in, as the scheduler and the sleeper do, as the
-  kernel's own role (`postgres.auth.kernelUsername`, `vertra_kernel`): no
+  kernel's own role (`postgres.auth.kernelUsername`, `vennir_kernel`): no
   superuser, owning only the kernel's database, refused the console's on
   the same instance (proven on kind 2026-11-03); the superuser is used only
   by Postgres itself, backups, and the step before each migration that
@@ -953,7 +953,7 @@ taken, and what would still hold.
 - **The sleeper** can change replica counts and stop the platform, not
   change it (above).
 
-## Vertra's own supply chain
+## Vennir's own supply chain
 
 On each version tag, the release workflow (`.github/workflows/release.yml`)
 refuses a tag whose commit isn't on `main` (which takes only reviewed pull
@@ -965,8 +965,8 @@ known-malicious package fails the release), signs each digest with cosign,
 keyless, as the workflow's own GitHub identity, and only once all three
 have passed tags them as the version. A version's tags are written once:
 a run refuses a version already published, and a re-run of its failed jobs
-keeps what an earlier attempt published. The charts and the `vertra` binaries are
-signed the same way, and a catalog's `./vertra` downloads its binary by
+keeps what an earlier attempt published. The charts and the `vennir` binaries are
+signed the same way, and a catalog's `./vennir` downloads its binary by
 SHA-256; the release checks it with govulncheck before pushing it. Every
 pull request also runs Semgrep (Go rules included), gitleaks, govulncheck
 over the CLI, the kernel and the gateway, and the same scan of the three
@@ -980,7 +980,7 @@ the `release.yml` in the commit it tags, so a branch commit whose
 update or delete `v*` tags; the check itself stops mistakes, such as
 tagging the wrong commit.
 
-Nothing verifies those signatures when installing: `vertra` checks the
+Nothing verifies those signatures when installing: `vennir` checks the
 charts against the SHA-256s each release records (each cosign-verified
 once), but the charts run their images by tag unless
 `image.digest` (and `gateway.image.digest`) pins them, and policy-controller doesn't cover the platform's
@@ -1032,7 +1032,7 @@ Not recorded:
 - **Anything done to the cluster directly**, outside the console: that's
   the cluster's audit log.
 
-## What Vertra stores
+## What Vennir stores
 
 | Where | What | Notes |
 | --- | --- | --- |
@@ -1065,7 +1065,7 @@ the metrics ports, the scanner's, Loki's, which NetworkPolicies limit.
 Proven on kind 2026-10-28 with the console's database on the kernel's
 Postgres: every connection there is TLS, a plain one is refused by
 `pg_hba`, kernel-api refuses a client that doesn't trust its CA, and a run
-goes through end to end. That's the layout of every install `vertra`
+goes through end to end. That's the layout of every install `vennir`
 makes (EKS and GKE too): one Postgres, in a Pod, for both databases. The
 console's own Postgres, which the hand-written GKE values use, is proven
 too (2026-10-29, those charts' layout on a kind cluster of its own): every
@@ -1075,7 +1075,7 @@ rotate, delete a chart's `-tls` and `-tls-ca` Secrets and upgrade
 
 ## Rules for product authors
 
-Products are written by catalog contributors, not by Vertra, so these are
+Products are written by catalog contributors, not by Vennir, so these are
 requirements on product code:
 
 - **Never print or return a secret.** Logs and `result.json` outputs are stored
@@ -1096,7 +1096,7 @@ requirements on product code:
 ## Not yet enforced
 
 Known gaps in 0.x, all tracked in [`TODO.md`](../TODO.md). They're the reason
-Vertra isn't production-ready yet.
+Vennir isn't production-ready yet.
 
 | Gap | Impact | Plan |
 | --- | --- | --- |

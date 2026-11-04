@@ -40,7 +40,7 @@ export async function lastImagePolicySave(): Promise<{ by: string; at: Date } | 
     .select({ email: users.email, at: auditLog.at })
     .from(auditLog)
     .leftJoin(users, eq(users.id, auditLog.actorId))
-    .where(and(eq(auditLog.route, "vertra.console.v1.ImageService/SetImagePolicy"), eq(auditLog.status, 200)))
+    .where(and(eq(auditLog.route, "vennir.console.v1.ImageService/SetImagePolicy"), eq(auditLog.status, 200)))
     .orderBy(desc(auditLog.id))
     .limit(1);
   return row ? { by: row.email ?? "a deleted account", at: row.at } : null;

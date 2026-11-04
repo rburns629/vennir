@@ -1,12 +1,12 @@
 # The base images this catalog approves. Catalog CI copies each into its
 # registry weekly (<registry>/bases/<name>, the same digest, scanned and
-# signed as products are: ./vertra catalog bases mirror), so a product can
+# signed as products are: ./vennir catalog bases mirror), so a product can
 # build FROM the catalog's own copy, which stays put if the source moves or
 # goes away. To use one, list it here, then (after the next weekly run, or
 # running ci.yml by hand) point Dockerfiles at it:
-#   ./vertra catalog bases --use-mirror
+#   ./vennir catalog bases --use-mirror
 # Products may use other bases too; their own checks scan them either way.
-apiVersion: vertra.dev/v2
+apiVersion: vennir.dev/v2
 kind: Bases
 bases: []
 #  - name: python

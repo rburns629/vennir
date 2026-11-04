@@ -1,0 +1,132 @@
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+
+package vennir.console.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Where task images may come from, and their security scans. The cluster
+// enforces both: the image policy refuses images from elsewhere, the scan
+// policy unpinned images and digests whose scan failed.
+service ImageService {
+  // The allowed image sources. Anyone signed in.
+  rpc GetImagePolicy(GetImagePolicyRequest) returns (GetImagePolicyResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Changes them. Send back the version read; a stale one is refused
+  // (aborted). Admins only.
+  rpc SetImagePolicy(SetImagePolicyRequest) returns (SetImagePolicyResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+  // One verdict per digest. Admins only.
+  rpc ListImageScans(ListImageScansRequest) returns (ListImageScansResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Accepts a failed scan, with a reason: the image may be registered and
+  // run again until a rescan finds something new. Admins only.
+  rpc AcceptImageScan(AcceptImageScanRequest) returns (AcceptImageScanResponse);
+  // Scans an image again now. Admins only.
+  rpc RescanImage(RescanImageRequest) returns (RescanImageResponse);
+}
+
+message ImagePolicy {
+  // False when the cluster has no image policy (the kernel chart isn't
+  // installed).
+  bool exists = 1;
+  // The registry path images are published to (catalog CI's target).
+  string source = 2;
+  repeated string additional = 3;
+  // Send back on SetImagePolicy, so concurrent edits can't clobber.
+  string version = 4;
+  // Every allowed prefix, as the cluster matches them.
+  repeated string allowed = 5;
+  // Admins only: who last saved them here, and when, from the audit log;
+  // empty when nobody has since it was installed (or for anyone else).
+  string last_saved_by = 6;
+  google.protobuf.Timestamp last_saved_at = 7;
+}
+
+enum ScanStatus {
+  SCAN_STATUS_UNSPECIFIED = 0;
+  SCAN_STATUS_PENDING = 1;
+  SCAN_STATUS_PASSED = 2;
+  // A HIGH or CRITICAL vulnerability with a fix, or a secret in the image.
+  SCAN_STATUS_FAILED = 3;
+  SCAN_STATUS_ERROR = 4;
+}
+
+message ImageScan {
+  string digest = 1;
+  string image = 2;
+  ScanStatus status = 3;
+  optional ScanFindings findings = 4;
+  google.protobuf.Timestamp requested_at = 5;
+  google.protobuf.Timestamp scanned_at = 6;
+  google.protobuf.Timestamp last_used_at = 7;
+  // Set when an admin accepted a failed verdict.
+  optional string accepted_by = 8;
+  optional string accepted_reason = 9;
+  google.protobuf.Timestamp accepted_at = 10;
+}
+
+message ScanFindings {
+  int32 fixable = 1;
+  int32 unfixable = 2;
+  int32 secrets = 3;
+  // At most 25.
+  repeated Finding findings = 4;
+  optional string error = 5;
+}
+
+message Finding {
+  // vulnerability or secret.
+  string kind = 1;
+  string id = 2;
+  string severity = 3;
+  optional string package = 4;
+  optional string installed = 5;
+  optional string fixed_in = 6;
+  optional string title = 7;
+}
+
+message GetImagePolicyRequest {}
+
+message GetImagePolicyResponse {
+  ImagePolicy policy = 1;
+}
+
+message SetImagePolicyRequest {
+  string source = 1;
+  repeated string additional = 2;
+  string version = 3;
+}
+
+message SetImagePolicyResponse {
+  ImagePolicy policy = 1;
+}
+
+message ListImageScansRequest {}
+
+message ListImageScansResponse {
+  repeated ImageScan scans = 1;
+}
+
+message AcceptImageScanRequest {
+  string digest = 1;
+  // 10 to 2000 characters.
+  string reason = 2;
+}
+
+message AcceptImageScanResponse {
+  ImageScan scan = 1;
+}
+
+message RescanImageRequest {
+  string digest = 1;
+}
+
+message RescanImageResponse {
+  // Unset when scanning is off.
+  optional ImageScan scan = 1;
+}

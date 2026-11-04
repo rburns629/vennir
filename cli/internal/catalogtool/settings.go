@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Settings say where products go: vertra.yaml, each overridable by an
+// Settings say where products go: vennir.yaml, each overridable by an
 // environment variable (CI sets them from the repository's variables).
 type Settings struct {
 	Registry    string
@@ -54,11 +54,7 @@ func (s Settings) BuildPlatform() string {
 	return "linux/amd64"
 }
 
-// FormerSettingsFile is vertra.yaml's name until the platform was renamed
-// Vertra (2026-10-20).
-const FormerSettingsFile = "acyclix.yaml"
-
-// Settings reads vertra.yaml (if any) and the environment.
+// Settings reads vennir.yaml (if any) and the environment.
 func (c *Catalog) Settings() (Settings, error) {
 	var file struct {
 		Registry string `yaml:"registry"`
@@ -69,16 +65,20 @@ func (c *Catalog) Settings() (Settings, error) {
 		Platform          string   `yaml:"platform"`
 		BuildEnvironments []string `yaml:"buildEnvironments"`
 	}
-	data, err := os.ReadFile(c.path("vertra.yaml"))
+	data, err := os.ReadFile(c.path("vennir.yaml"))
 	if err == nil {
 		if err := yaml.Unmarshal(data, &file); err != nil {
-			return Settings{}, fmt.Errorf("vertra.yaml: not valid YAML: %w", err)
+			return Settings{}, fmt.Errorf("vennir.yaml: not valid YAML: %w", err)
 		}
 	} else if !os.IsNotExist(err) {
 		return Settings{}, err
-	} else if _, err := os.Stat(c.path(FormerSettingsFile)); err == nil {
-		// Never read past silently: its registry would be lost.
-		return Settings{}, fmt.Errorf("%s: renamed vertra.yaml on 2026-10-20: ./vertra catalog migrate renames it", FormerSettingsFile)
+	} else {
+		for _, f := range formerNames {
+			// Never read past silently: its registry would be lost.
+			if _, err := os.Stat(c.path(f.settingsFile())); err == nil {
+				return Settings{}, fmt.Errorf("%s: renamed vennir.yaml on %s: ./vennir catalog migrate renames it", f.settingsFile(), f.until)
+			}
+		}
 	}
 	or := func(env, fallback string) string {
 		if v := c.Getenv(env); v != "" {
@@ -91,10 +91,10 @@ func (c *Catalog) Settings() (Settings, error) {
 		mode = "none"
 	}
 	return Settings{
-		Registry:    or("VERTRA_REGISTRY", file.Registry),
-		SigningMode: or("VERTRA_SIGNING_MODE", mode),
-		SigningKey:  or("VERTRA_SIGNING_KEY", file.Signing.Key),
-		Platform:    or("VERTRA_PLATFORM", file.Platform),
+		Registry:    or("VENNIR_REGISTRY", file.Registry),
+		SigningMode: or("VENNIR_SIGNING_MODE", mode),
+		SigningKey:  or("VENNIR_SIGNING_KEY", file.Signing.Key),
+		Platform:    or("VENNIR_PLATFORM", file.Platform),
 		// Never from the environment: which teams' values reach which
 		// builds is the catalog admins' file, reviewed like the workflow.
 		BuildEnvironments: file.BuildEnvironments,
@@ -106,7 +106,7 @@ func (s Settings) Problems() []string {
 	var found []string
 	switch {
 	case s.Registry == "":
-		found = append(found, "no registry: set registry in vertra.yaml or VERTRA_REGISTRY")
+		found = append(found, "no registry: set registry in vennir.yaml or VENNIR_REGISTRY")
 	case strings.Contains(s.Registry, "://") || strings.HasSuffix(s.Registry, "/"):
 		found = append(found, fmt.Sprintf("registry %s: a path like host[:port]/path, no scheme or trailing /", quote(s.Registry)))
 	}
@@ -117,7 +117,7 @@ func (s Settings) Problems() []string {
 		found = append(found, fmt.Sprintf("platform %s: os/arch, such as linux/amd64", quote(s.Platform)))
 	}
 	if s.SigningMode == "key" && s.SigningKey == "" {
-		found = append(found, "signing mode key needs a key: signing.key or VERTRA_SIGNING_KEY")
+		found = append(found, "signing mode key needs a key: signing.key or VENNIR_SIGNING_KEY")
 	}
 	return found
 }

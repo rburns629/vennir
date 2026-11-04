@@ -10,7 +10,7 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	kernelv1 "github.com/rburns629/vertra/kernel/internal/gen/vertra/kernel/v1"
+	kernelv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1"
 )
 
 func TestRefusalsAreTheAttemptsTheClusterRefused(t *testing.T) {

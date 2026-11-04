@@ -16,7 +16,7 @@ func typedProduct(team, name, needs, provides string) string {
 		}
 		return ", " + key + ": " + wiring
 	}
-	return `apiVersion: vertra.dev/v2
+	return `apiVersion: vennir.dev/v2
 kind: Product
 name: ` + name + `
 team: ` + team + `
@@ -28,15 +28,15 @@ actions:
     input:
       type: object
       properties:
-        project: {type: string` + hint("x-vertra-needs", needs) + `}
+        project: {type: string` + hint("x-vennir-needs", needs) + `}
     output:
       type: object
       properties:
-        id: {type: string` + hint("x-vertra-provides", provides) + `}
+        id: {type: string` + hint("x-vennir-provides", provides) + `}
 `
 }
 
-const cloudTypes = `apiVersion: vertra.dev/v2
+const cloudTypes = `apiVersion: vennir.dev/v2
 kind: WiringTypes
 types:
   - name: cloud.project
@@ -87,7 +87,7 @@ func TestWiringTypesAreDefinedOnceAndUsedAsDefined(t *testing.T) {
 	for _, want := range []string{
 		"teams/web/types.yaml: cloud.project is defined by team cloud already",
 		"teams/cloud/types.yaml: cloud.project's defaultProvider project.run isn't one of this team's actions with an output that provides it",
-		"teams/web/products/hosting/product.yaml: action run's input project: x-vertra-needs cloud.network isn't defined in any team's types.yaml",
+		"teams/web/products/hosting/product.yaml: action run's input project: x-vennir-needs cloud.network isn't defined in any team's types.yaml",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("no %q in:\n%s", want, out)
@@ -98,7 +98,7 @@ func TestWiringTypesAreDefinedOnceAndUsedAsDefined(t *testing.T) {
 	}
 
 	c = catalogWith(t, map[string]string{
-		"teams/cloud/types.yaml":                    "apiVersion: vertra.dev/v2\nkind: WiringTypes\ntypes:\n  - {name: Cloud, jsonType: text, description: x}\n",
+		"teams/cloud/types.yaml":                    "apiVersion: vennir.dev/v2\nkind: WiringTypes\ntypes:\n  - {name: Cloud, jsonType: text, description: x}\n",
 		"teams/cloud/products/project/product.yaml": typedProduct("cloud", "project", "", ""),
 	})
 	if out := errorsOf(t, (*Catalog).ValidateWiringTypes, c); !strings.Contains(out, "types.0") {

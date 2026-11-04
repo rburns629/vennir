@@ -3,8 +3,8 @@
 cleanup). Given {"resource": {"type": "gcp/project", "id": ...}} as the
 console recorded it.
 
-Only a project carrying create's vertra-made label, and the run's team
-(request.json's forTeam) as its vertra-team label, is deleted: a project made some other way,
+Only a project carrying create's vennir-made label, and the run's team
+(request.json's forTeam) as its vennir-team label, is deleted: a project made some other way,
 or made for another team, is refused, whoever asks. One already gone, or
 already shutting down, succeeds: a cleanup must, when there's nothing left to do.
 Google keeps a shut-down project for 30 days, when it can be restored.
@@ -23,8 +23,8 @@ from google.api_core.exceptions import GoogleAPIError, NotFound, PermissionDenie
 from google.auth import impersonated_credentials
 from google.cloud import resourcemanager_v3
 
-MADE_BY_LABEL = ("vertra-made", "true")
-TEAM_LABEL = "vertra-team"
+MADE_BY_LABEL = ("vennir-made", "true")
+TEAM_LABEL = "vennir-team"
 
 INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")
@@ -134,7 +134,7 @@ def _run() -> int:
     labels = dict(project.labels)
     if labels.get(MADE_BY_LABEL[0]) != MADE_BY_LABEL[1]:
         return _failure(
-            "NOT_MADE_BY_VERTRA",
+            "NOT_MADE_BY_VENNIR",
             f"project '{project_id}' wasn't made by this product (it has no {MADE_BY_LABEL[0]} label), so it isn't deleted",
         )
     if labels.get(TEAM_LABEL) != team:

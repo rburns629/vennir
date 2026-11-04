@@ -97,7 +97,7 @@ async function start(schedule: Schedule, team: string, due: Date, log: FastifyBa
   } catch (error) {
     // Refused (an ApiError says why), or the platform didn't answer: this
     // time is missed either way, and the schedule says so.
-    const why = error instanceof ApiError ? error.message : "Vertra couldn't start it: the platform didn't answer. The next time runs as usual.";
+    const why = error instanceof ApiError ? error.message : "Vennir couldn't start it: the platform didn't answer. The next time runs as usual.";
     await db.update(schedules).set({ lastRunAt: due, lastError: why.slice(0, 1000) }).where(eq(schedules.id, schedule.id));
     log.warn({ event: "schedule_refused", scheduleId: schedule.id, err: error }, "a scheduled run didn't start");
     await tellMaintainers(schedule, team, `schedule:${schedule.id}:${due.toISOString()}`, `Schedule ${schedule.name} couldn't start`, why);

@@ -7,7 +7,7 @@ import { ensureGatewayAccess } from "../src/db/gatewayAccess.js";
 // used, as the gateway would use it.
 const url = process.env["DATABASE_URL"] ?? "";
 const owner = new pg.Pool({ connectionString: url });
-const ROLE = "vertra_gateway_test";
+const ROLE = "vennir_gateway_test";
 const PASSWORD = "gateway-test-only";
 
 afterAll(async () => {
@@ -62,6 +62,6 @@ describe("the gateway's database role", () => {
   });
 
   it("refuses to go on without a role it can sign in as", async () => {
-    await expect(ensureGatewayAccess(owner, "vertra_gateway_missing", undefined)).rejects.toThrow("doesn't exist");
+    await expect(ensureGatewayAccess(owner, "vennir_gateway_missing", undefined)).rejects.toThrow("doesn't exist");
   });
 });

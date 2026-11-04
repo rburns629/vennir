@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-// Package cluster gets a cluster ready for Vertra: for kind (local), the
+// Package cluster gets a cluster ready for Vennir: for kind (local), the
 // local registry and the cluster itself; for an existing cluster, checks
-// that it can run Vertra. Both end with the platform namespace.
+// that it can run Vennir. Both end with the platform namespace.
 package cluster
 
 import (
@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vertra/cli/internal/config"
-	"github.com/rburns629/vertra/cli/internal/run"
+	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/run"
 )
 
 // MinKubernetesMinor is the oldest Kubernetes 1.x the charts support
@@ -31,7 +31,7 @@ func Context(c *config.Config) string {
 		// What `gcloud container clusters get-credentials` names it.
 		return fmt.Sprintf("gke_%s_%s_%s", c.GCP.Project, GKELocation(c), c.Cluster.Name)
 	case "aws":
-		// The alias vertra gives `aws eks update-kubeconfig`.
+		// The alias vennir gives `aws eks update-kubeconfig`.
 		return fmt.Sprintf("eks_%s_%s", c.AWS.Region, c.Cluster.Name)
 	}
 	return c.Cluster.Context
@@ -91,7 +91,7 @@ func Inspect(ctx context.Context, r *run.Runner, c *config.Config) State {
 	}
 	s.Reachable, s.ServerVersion = true, version
 	if minor := minorOf(version); minor < MinKubernetesMinor {
-		s.Problems = append(s.Problems, fmt.Sprintf("Kubernetes %s is too old: Vertra needs 1.%d or later", version, MinKubernetesMinor))
+		s.Problems = append(s.Problems, fmt.Sprintf("Kubernetes %s is too old: Vennir needs 1.%d or later", version, MinKubernetesMinor))
 	}
 	run.Together(
 		func() {
@@ -177,7 +177,7 @@ func EnsureKind(ctx context.Context, r *run.Runner, c *config.Config, s State) e
 		}
 	default:
 		// kind switches kubectl's current context to the new cluster; put
-		// back whatever the user had, since vertra names its context.
+		// back whatever the user had, since vennir names its context.
 		previous, _ := r.Output(ctx, "kubectl", "config", "current-context")
 		if err := r.RunInput(ctx, kindConfig, "kind", "create", "cluster", "--name", c.Cluster.Name, "--config", "-"); err != nil {
 			return err

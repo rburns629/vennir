@@ -79,7 +79,7 @@ def main() -> int:
         if target:
             try:
                 credentials = session.client("sts").assume_role(
-                    RoleArn=target, RoleSessionName="vertra-check"
+                    RoleArn=target, RoleSessionName="vennir-check"
                 )
             except ClientError as error:
                 if _code(error) not in DENIED:

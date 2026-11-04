@@ -23,7 +23,7 @@ spec:
         {{- include "execution-kernel.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: postgres
       annotations:
-        # kubectl logs and exec (and vertra's) reach this one, not the init container.
+        # kubectl logs and exec (and vennir's) reach this one, not the init container.
         kubectl.kubernetes.io/default-container: postgres
         {{- if .Values.tls.enabled }}
         # A rotated certificate (tls.yaml) or a changed pg_hba restarts it.
@@ -163,7 +163,7 @@ spec:
             - -c
             - ssl_key_file=/tls/tls.key
             - -c
-            - hba_file=/etc/vertra/pg/pg_hba.conf
+            - hba_file=/etc/vennir/pg/pg_hba.conf
             {{- end }}
           ports:
             - containerPort: 5432
@@ -199,7 +199,7 @@ spec:
             {{- end }}
             {{- if .Values.tls.enabled }}
             - {name: tls, mountPath: /tls, readOnly: true}
-            - {name: hba, mountPath: /etc/vertra/pg, readOnly: true}
+            - {name: hba, mountPath: /etc/vennir/pg, readOnly: true}
             {{- end }}
             # Parallel queries share memory through /dev/shm, which a
             # container otherwise gets only 64 MiB of.

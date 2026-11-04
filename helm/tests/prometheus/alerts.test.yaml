@@ -1,7 +1,7 @@
 # The charts' alerts as the bundled Prometheus evaluates them (both charts
 # rendered with monitoring.provider bundled into rules/; run by
 # helm/tests/prometheus-rules.sh). Release kernel and console, namespace
-# vertra-system.
+# vennir-system.
 rule_files:
   - rules/kernel.rules.yaml
   - rules/console.rules.yaml
@@ -11,16 +11,16 @@ tests:
   # A scheduler Pod that can't be scraped (crashing, hung) is down.
   - interval: 30s
     input_series:
-      - series: 'up{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-abc", component="scheduler"}'
+      - series: 'up{namespace="vennir-system", pod="kernel-execution-kernel-scheduler-abc", component="scheduler"}'
         values: '0x40'
-      - series: 'kernel_scheduler_tick_duration_seconds_count{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-abc"}'
+      - series: 'kernel_scheduler_tick_duration_seconds_count{namespace="vennir-system", pod="kernel-execution-kernel-scheduler-abc"}'
         values: '_x40'
     alert_rule_test:
       - eval_time: 5m
-        alertname: VertraSchedulerDown
+        alertname: VennirSchedulerDown
         exp_alerts: []
       - eval_time: 12m
-        alertname: VertraSchedulerDown
+        alertname: VennirSchedulerDown
         exp_alerts:
           - exp_labels: {severity: critical}
             exp_annotations:
@@ -31,15 +31,15 @@ tests:
   # (no Pod, so no series at all) is not.
   - interval: 30s
     input_series:
-      - series: 'up{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-abc", component="scheduler"}'
+      - series: 'up{namespace="vennir-system", pod="kernel-execution-kernel-scheduler-abc", component="scheduler"}'
         values: '1x40'
-      - series: 'kernel_scheduler_tick_duration_seconds_count{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-abc"}'
+      - series: 'kernel_scheduler_tick_duration_seconds_count{namespace="vennir-system", pod="kernel-execution-kernel-scheduler-abc"}'
         values: '100x40'
-      - series: 'up{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-def", component="scheduler"}'
+      - series: 'up{namespace="vennir-system", pod="kernel-execution-kernel-scheduler-def", component="scheduler"}'
         values: '1x40'
     alert_rule_test:
       - eval_time: 16m
-        alertname: VertraSchedulerDown
+        alertname: VennirSchedulerDown
         exp_alerts:
           - exp_labels: {severity: critical}
             exp_annotations:
@@ -47,34 +47,34 @@ tests:
               description: Nothing will start or finish. Check the scheduler's Pods and logs (docs/operations.md, Troubleshooting).
   - interval: 30s
     input_series:
-      - series: 'up{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-abc", component="scheduler"}'
+      - series: 'up{namespace="vennir-system", pod="kernel-execution-kernel-scheduler-abc", component="scheduler"}'
         values: '1x40'
-      - series: 'kernel_scheduler_tick_duration_seconds_count{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-abc"}'
+      - series: 'kernel_scheduler_tick_duration_seconds_count{namespace="vennir-system", pod="kernel-execution-kernel-scheduler-abc"}'
         values: '0+10x40'
     alert_rule_test:
       - eval_time: 16m
-        alertname: VertraSchedulerDown
+        alertname: VennirSchedulerDown
         exp_alerts: []
   - interval: 30s
     input_series:
-      - series: 'up{namespace="vertra-system", pod="console-execution-console-abc", component="app"}'
+      - series: 'up{namespace="vennir-system", pod="console-execution-console-abc", component="app"}'
         values: '1x40'
     alert_rule_test:
       - eval_time: 16m
-        alertname: VertraSchedulerDown
+        alertname: VennirSchedulerDown
         exp_alerts: []
 
   # Steps waiting past readyWaitSeconds (600).
   - interval: 30s
     input_series:
-      - series: 'kernel_oldest_ready_task_age_seconds{namespace="vertra-system"}'
+      - series: 'kernel_oldest_ready_task_age_seconds{namespace="vennir-system"}'
         values: '0+30x40'
     alert_rule_test:
       - eval_time: 8m
-        alertname: VertraStepsWaiting
+        alertname: VennirStepsWaiting
         exp_alerts: []
       - eval_time: 16m
-        alertname: VertraStepsWaiting
+        alertname: VennirStepsWaiting
         exp_alerts:
           - exp_labels: {severity: warning}
             exp_annotations:
@@ -85,16 +85,16 @@ tests:
   # replaced every 10 minutes with a gap between (a 0 for 2 minutes).
   - interval: 1m
     input_series:
-      - series: 'kernel_unschedulable_steps{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-a"}'
+      - series: 'kernel_unschedulable_steps{namespace="vennir-system", pod="kernel-execution-kernel-scheduler-a"}'
         values: '2x9 0x1 2x9 0x1 2x9 0x1'
-      - series: 'kernel_unschedulable_steps{namespace="vertra-system", pod="kernel-execution-kernel-api-a"}'
+      - series: 'kernel_unschedulable_steps{namespace="vennir-system", pod="kernel-execution-kernel-api-a"}'
         values: '0x35'
     alert_rule_test:
       - eval_time: 10m
-        alertname: VertraStepsUnschedulable
+        alertname: VennirStepsUnschedulable
         exp_alerts: []
       - eval_time: 20m
-        alertname: VertraStepsUnschedulable
+        alertname: VennirStepsUnschedulable
         exp_alerts:
           - exp_labels: {severity: warning}
             exp_annotations:
@@ -103,28 +103,28 @@ tests:
   - interval: 1m
     input_series:
       # A new node within a few minutes: nothing.
-      - series: 'kernel_unschedulable_steps{namespace="vertra-system", pod="kernel-execution-kernel-scheduler-a"}'
+      - series: 'kernel_unschedulable_steps{namespace="vennir-system", pod="kernel-execution-kernel-scheduler-a"}'
         values: '3x3 0x30'
     alert_rule_test:
       - eval_time: 25m
-        alertname: VertraStepsUnschedulable
+        alertname: VennirStepsUnschedulable
         exp_alerts: []
 
   # The console failing more than 5% of its calls.
   - interval: 30s
     input_series:
-      - series: 'console_rpc_requests_total{namespace="vertra-system", procedure="vertra.console.v1.ExecutionService/GetExecution", code="ok"}'
+      - series: 'console_rpc_requests_total{namespace="vennir-system", procedure="vennir.console.v1.ExecutionService/GetExecution", code="ok"}'
         values: '0+90x60'
-      - series: 'console_rpc_requests_total{namespace="vertra-system", procedure="vertra.console.v1.ExecutionService/GetExecution", code="internal"}'
+      - series: 'console_rpc_requests_total{namespace="vennir-system", procedure="vennir.console.v1.ExecutionService/GetExecution", code="internal"}'
         values: '0+10x60'
     alert_rule_test:
       - eval_time: 20m
-        alertname: VertraConsoleFailing
+        alertname: VennirConsoleFailing
         exp_alerts:
           - exp_labels: {severity: warning}
             exp_annotations:
               summary: More than 5% of the console's calls are failing.
               description: Each is logged in full by the console (maskErrors). Usually its database, kernel-api or the Kubernetes API.
       - eval_time: 20m
-        alertname: VertraSignInBurst
+        alertname: VennirSignInBurst
         exp_alerts: []

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vertra/cli/internal/config"
+	"github.com/rburns629/vennir/cli/internal/config"
 )
 
 // testdata/aws-eks-auto-fee.json: a real `aws pricing get-products`

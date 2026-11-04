@@ -25,7 +25,7 @@ func TestAssemble(t *testing.T) {
 	dst := filepath.Join(t.TempDir(), "catalog")
 	products, err := Assemble(Options{
 		Template: template, Team: "platform", Owners: "@octocat", Languages: []string{"python", "go"},
-		Registry: "us-central1-docker.pkg.dev/p/vertra-products",
+		Registry: "us-central1-docker.pkg.dev/p/vennir-products",
 	}, dst)
 	if err != nil {
 		t.Fatal(err)
@@ -56,12 +56,12 @@ func TestAssemble(t *testing.T) {
 	if strings.Contains(owners, "@your-org") || !strings.Contains(owners, "\n/teams/platform/ @octocat\n") || !strings.Contains(owners, "* @octocat") {
 		t.Errorf("CODEOWNERS:\n%s", owners)
 	}
-	settings := read(t, filepath.Join(dst, "vertra.yaml"))
-	if !strings.Contains(settings, "registry: us-central1-docker.pkg.dev/p/vertra-products\n") || strings.Contains(settings, "\nconsole:") {
-		t.Errorf("vertra.yaml:\n%s", settings)
+	settings := read(t, filepath.Join(dst, "vennir.yaml"))
+	if !strings.Contains(settings, "registry: us-central1-docker.pkg.dev/p/vennir-products\n") || strings.Contains(settings, "\nconsole:") {
+		t.Errorf("vennir.yaml:\n%s", settings)
 	}
-	if info, err := os.Stat(filepath.Join(dst, "vertra")); err != nil || info.Mode().Perm()&0o100 == 0 {
-		t.Error("./vertra should stay executable")
+	if info, err := os.Stat(filepath.Join(dst, "vennir")); err != nil || info.Mode().Perm()&0o100 == 0 {
+		t.Error("./vennir should stay executable")
 	}
 	// The samples stay, to copy from later; a second team's worth of them
 	// isn't added.
@@ -73,10 +73,10 @@ func TestAssemble(t *testing.T) {
 	}
 }
 
-// The template's own ./vertra takes the pin, every line of it.
+// The template's own ./vennir takes the pin, every line of it.
 func TestPin(t *testing.T) {
-	wrapper := filepath.Join(t.TempDir(), "vertra")
-	data, err := os.ReadFile("../../../catalog-template/vertra")
+	wrapper := filepath.Join(t.TempDir(), "vennir")
+	data, err := os.ReadFile("../../../catalog-template/vennir")
 	if err != nil {
 		t.Fatal(err)
 	}

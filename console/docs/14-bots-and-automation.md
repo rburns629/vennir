@@ -1,6 +1,6 @@
 # Bots and automation
 
-This page is for a team's maintainer who wants Vertra to work without a person at the console: a pipeline that submits DAGs or runs templates, a CI job that signs in with no stored token, another system that places orders and hears back, runs on a timetable, and notifications in chat, the console and email. It covers what to set up and where. The API calls themselves are in [Calling the API](05-calling-the-api.md).
+This page is for a team's maintainer who wants Vennir to work without a person at the console: a pipeline that submits DAGs or runs templates, a CI job that signs in with no stored token, another system that places orders and hears back, runs on a timetable, and notifications in chat, the console and email. It covers what to set up and where. The API calls themselves are in [Calling the API](05-calling-the-api.md).
 
 ## Which kind of bot do I need?
 
@@ -19,10 +19,10 @@ Give each pipeline or system its own bot, so revoking one doesn't break the othe
 
 Only a maintainer of the team sees the **Automation** tab.
 
-1. Open your team → **Automation**, and under **Add a bot**, say **What will use it?**, for example `release pipeline in our infra repo`. The bot is named after it: `team-a-release-pipeline-in-our-infra-repo@bots.vertra.local`. Its address is only a name; nothing is ever mailed to it.
+1. Open your team → **Automation**, and under **Add a bot**, say **What will use it?**, for example `release pipeline in our infra repo`. The bot is named after it: `team-a-release-pipeline-in-our-infra-repo@bots.vennir.local`. Its address is only a name; nothing is ever mailed to it.
 2. Pick **Expires after** ([how long](#how-long-does-a-token-last-and-how-do-i-rotate-it)).
 3. **Create bot and token.**
-4. **Copy it now**: the token is shown only this once. Store it as a secret where the pipeline runs, for example `gh secret set VERTRA_TOKEN --repo <your-org>/<your-repo>`. The card shows a first call to make with it.
+4. **Copy it now**: the token is shown only this once. Store it as a secret where the pipeline runs, for example `gh secret set VENNIR_TOKEN --repo <your-org>/<your-repo>`. The card shows a first call to make with it.
 5. **Done.**
 
 The bot's card then lists each of its tokens: its label, when it was made, when it was last used (to within five minutes), and when it expires. Its chip says **Active** (it has a working token), **Keyless** (it signs in from CI only) or **No token** (anything still using an old token fails to sign in).
@@ -45,12 +45,12 @@ The bot keeps its other tokens while you do this, so nothing breaks in between.
 
 ## How do I sign in from CI without a stored token?
 
-A GitHub Actions or GitLab CI job can sign in as a bot with its own identity, so the pipeline holds no Vertra secret at all.
+A GitHub Actions or GitLab CI job can sign in as a bot with its own identity, so the pipeline holds no Vennir secret at all.
 
 1. For a new bot: under **Add a bot**, say **What will use it?** and choose **Keyless, from CI** under **How it signs in**; the same fields follow, and **Create bot** makes the bot with no token at all, then shows the job's lines beside it. For a bot you already have: on its card, under **Signs in from CI, with no token**, choose **Sign in from CI…**.
 2. Pick the **CI**, then give **Repository (owner/name)** for GitHub or **Project (group/name)** for GitLab.
 3. Optionally, **Only from this branch**, such as `refs/heads/main`. Jobs on any other branch are refused.
-4. **Add.** The form shows the lines to put in the job: they ask the CI for an ID token for this install, exchange it, and keep the result as `VERTRA_TOKEN`.
+4. **Add.** The form shows the lines to put in the job: they ask the CI for an ID token for this install, exchange it, and keep the result as `VENNIR_TOKEN`.
 
 The exchanged token is good for an hour, as that bot. A token from any other repository or branch, or one minted for another service, is refused. The bot's card lists each CI identity with when it was last used, and **Remove** stops it.
 
@@ -89,7 +89,7 @@ From then on the card says `Posts to <host>, signed`, with when it last posted, 
 
 When an order finishes (succeeded, failed or cancelled), the console posts an `order.finished` message: which run and order it was, the template, which team it ran for, and how it ended. It carries no outputs; read them with `GetExecution`, as the bot.
 
-Every post carries a `Vertra-Signature: t=<unix seconds>,v1=<hex>` header, where `v1` is the HMAC-SHA256 of `<t>.<body>` with the secret. Before trusting a post, check the signature and that `t` is recent (within five minutes, say). Answer with any 2xx. Anything else, or no answer within 10 seconds, is tried again every 30 seconds, five times in all. A post can arrive twice, so act on each run's outcome once.
+Every post carries a `Vennir-Signature: t=<unix seconds>,v1=<hex>` header, where `v1` is the HMAC-SHA256 of `<t>.<body>` with the secret. Before trusting a post, check the signature and that `t` is recent (within five minutes, say). Answer with any 2xx. Anything else, or no answer within 10 seconds, is tried again every 30 seconds, five times in all. A post can arrive twice, so act on each run's outcome once.
 
 To change it:
 
