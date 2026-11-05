@@ -241,6 +241,10 @@ func TestWhatTheSpecDoesntDescribeIsBlockedAndNeverForwarded(t *testing.T) {
 		"a body it declares none for":   {"GET", "/payments/orders/orders/ord_abcdefgh", `{"admin": true}`, "INVALID_REQUEST", 400},
 		"an undeclared query parameter": {"GET", "/payments/orders/orders/ord_abcdefgh?debug=1", "", "INVALID_REQUEST", 400},
 		"a declared one, unfit":         {"GET", "/payments/orders/orders/ord_abcdefgh?expand=everything", "", "INVALID_REQUEST", 400},
+		// What Go's query parsing leaves out, the validator never sees.
+		"a query pair with a ;":     {"GET", "/payments/orders/orders/ord_abcdefgh?debug=1;x", "", "INVALID_REQUEST", 400},
+		"a query badly escaped":     {"GET", "/payments/orders/orders/ord_abcdefgh?debug=%zz", "", "INVALID_REQUEST", 400},
+		"too many query parameters": {"GET", "/payments/orders/orders/ord_abcdefgh?debug=1" + strings.Repeat("&", 10000), "", "INVALID_REQUEST", 400},
 	} {
 		w := f.do(tc.method, tc.path, "web-person", tc.body, map[string]string{"Content-Type": "application/json"})
 		if w.Code != tc.status || errorCode(t, w) != tc.code || w.Header().Get(AnsweredBy) != "gateway" {
