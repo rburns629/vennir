@@ -202,7 +202,11 @@ registered secrets, images, scans), and the cluster's policies hold as for
 any Job. Nothing runs for a retired or purged team, even in other teams'
 namespaces: a run on its behalf, a retry of one, and anything its bots run
 once every team they're in is retired are refused (`TEAM_RETIRED`,
-`TEAM_PURGED`), as a step in its own namespace is.
+`TEAM_PURGED`), as a step in its own namespace is. The one exception is
+an admin's cleanup of what a retired team's runs made (not a purged one's):
+it runs without un-retiring the team, which would let its people run anything
+again, and only where the product that made it is of a team that isn't
+retired, since nothing runs in a retired team's namespace.
 
 Where another team may aim a team's products is the owning team's: an
 input typed as a target (`x-vennir-needs: gcp.project`, `gcp.folder`,

@@ -259,12 +259,23 @@ async function runBlocker(teamNames: string[]): Promise<RunBlocker | null> {
  * onBehalfOf and each step's), wherever its steps run, other teams'
  * namespaces included; and anything a team's bot runs once every team it
  * belongs to is retired, since a bot acts only for its teams. A bot of no
- * team (an automation token's) isn't one of a team's.
+ * team (an automation token's) isn't one of a team's. With `adminCleanup`
+ * (an admin's cleanup run), a retired team it's for doesn't stop it: what
+ * the team's runs made can be deleted without un-retiring it, which would
+ * let its people run anything again. A purged team's still does, and the
+ * steps' own teams are checked as ever (authorizeTeams; the cluster runs
+ * nothing in a retired team's namespace).
  */
-async function refuseRetiredFor(caller: AuthUser | undefined, forTeams: (string | null | undefined)[]): Promise<void> {
+async function refuseRetiredFor(
+  caller: AuthUser | undefined,
+  forTeams: (string | null | undefined)[],
+  { adminCleanup = false }: { adminCleanup?: boolean } = {},
+): Promise<void> {
   const named = [...new Set(forTeams.filter((team): team is string => typeof team === "string" && team !== ""))];
-  const blocker = await runBlocker(named);
-  if (blocker) throw blocked(409, blocker);
+  for (const team of named) {
+    const blocker = await teamRunBlocker(team);
+    if (blocker && !(adminCleanup && blocker.error === "TEAM_RETIRED")) throw blocked(409, blocker);
+  }
   if (!caller?.isBot || caller.teamNames.length === 0) return;
   let first: RunBlocker | null = null;
   for (const team of caller.teamNames) {
@@ -986,6 +997,9 @@ export async function submit(caller: AuthUser | undefined, submitted: unknown, l
 }
 
 /** What a run of a template records (core/templates.ts). */
+/** What submitted_executions.template says for a cleanup run (core/resources.ts): never a template's <team>/<name>. */
+export const CLEANUP_RUN = "cleanup";
+
 export interface TemplateRun {
   /** <team>/<template>, or <team>/<product>.<action> for an action run alone. */
   template: string;
@@ -1050,7 +1064,9 @@ export async function submitChecked(
   const submittedInfo = extractTasksAuthInfo(submitted);
   if (submittedInfo === null) throw malformed();
   await authorizeTeams(submittedInfo, caller, { maintainers: run === undefined });
-  await refuseRetiredFor(caller, [run?.onBehalfOf, ...Object.values(run?.forTeams ?? {})]);
+  await refuseRetiredFor(caller, [run?.onBehalfOf, ...Object.values(run?.forTeams ?? {})], {
+    adminCleanup: caller?.isAdmin === true && run?.template === CLEANUP_RUN,
+  });
   const teams = [...new Set(submittedInfo.map((t) => t.team))];
   const context: RunContext = { action: "submit", teams, caller, log };
   await refuseBlockedImages(taskImages(submitted), context);
