@@ -752,8 +752,7 @@ It leaves:
   start: run the upgrade again. Delete what's left with
   `kubectl -n <namespace> delete job/<console>-execution-console-migrate configmap/<console>-execution-console-migrate-config secret/<kernel>-execution-kernel-db-migrate --ignore-not-found`
   (`<console>` and `<kernel>` are the release names, `console` and
-  `kernel`; `<namespace>` is the platform's, `vennir-system`, or `default`
-  on the GKE values' existing install).
+  `kernel`; `<namespace>` is the platform's, `vennir-system`).
 - Anything outside the charts: buckets, cloud identities, the registry, and
   the platform namespace itself.
 
@@ -848,6 +847,58 @@ the backup CronJob by hand (and the console's,
 `kubectl -n vennir-system create job --from=cronjob/kernel-execution-kernel-pg-backup pre-upgrade`.
 To go back: install the previous release's charts, then restore that backup
 ([Restoring](#backups)).
+
+### Moving the platform out of a team's namespace
+
+The platform's namespace is never a team's. An install made in one (the GKE
+reference install ran in `default`, an admins' team namespace, until
+2026-11) can't be moved in place: the releases' cluster-wide objects
+(admission policies, ClusterRoles) can't belong to two installs at once. So
+it's a reinstall into `vennir-system` that keeps the data. With `NS=default`
+(the old namespace) and the GKE values (`helm/values/gke/`, already
+`vennir-system`):
+
+1. **Workload Identity.** Grant each Google service account
+   `roles/iam.workloadIdentityUser` for its ServiceAccounts in the new
+   namespace, beside the old ones: on the GKE values,
+   `vennir-console-registry` for
+   `serviceAccount:<project>.svc.id.goog[vennir-system/console-execution-console]`
+   and `[vennir-system/console-execution-console-scanner]`
+   (`gcloud iam service-accounts add-iam-policy-binding <gsa> --role
+   roles/iam.workloadIdentityUser --member <member>`). policy-controller's,
+   in `cosign-system`, doesn't change.
+2. **Stop and dump.** Once nothing is running, scale `kernel-execution-kernel-api`,
+   `kernel-execution-kernel-scheduler` and `console-execution-console` in
+   `$NS` to 0, then
+   `kubectl -n $NS exec deploy/kernel-execution-kernel-postgres -- pg_dump -Fc -U postgres execution_kernel > kernel.pgdump`,
+   and `execution_console` the same from the Postgres that holds it
+   (`deploy/console-execution-console-postgres` on the GKE values).
+   Check both with `pg_restore --list`.
+3. **Uninstall** both releases from `$NS` ([Uninstalling](#uninstalling));
+   the volumes and the passwords' Secrets stay there until step 7.
+4. **Install** both charts into `vennir-system`, as on a first install
+   ([Installing](#installing-on-a-cluster-with-helm), step 5, without
+   `--wait`); `make gke-deploy` upgrades it from then on.
+5. **Restore** both dumps into it ([Restoring by hand](#backups), with
+   `NS=vennir-system`), and start everything again. At startup the console
+   rewrites what names the platform's namespace: the admission policies'
+   lists and each team's `vennir-scheduler-logs` RoleBinding.
+6. **What doesn't come over:** the image sources an admin added on the
+   Admin page (they live in the old install's policy: add them again),
+   every session (everyone signs in again), and the console's
+   LoadBalancer address (a new one; update DNS and any SSO redirect URI).
+   Upgrade policy-controller with its new selector, which now covers `$NS`
+   as the team namespace it is (the command in
+   `helm/values/gke/policy-controller.yaml`, with `--force-conflicts` once).
+7. **Clean up** once it runs: in `$NS`, the old volumes
+   (`kubectl -n $NS delete pvc -l 'app.kubernetes.io/instance in (kernel,console)'`),
+   the passwords' Secrets and the hooks' leftovers
+   ([Uninstalling](#uninstalling)); and the old Workload Identity members
+   (`[default/...]`, `remove-iam-policy-binding`).
+
+Team namespaces, their Secrets and their steps' Jobs aren't touched. Move
+with nothing running: a step's Job deleted before the new scheduler reads
+it fails as `JOB_NOT_FOUND` (retryable).
 
 ## Databases
 

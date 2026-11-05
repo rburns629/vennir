@@ -25,8 +25,6 @@ backup:
 postgres:
   consoleDatabase:
     enabled: true
-dispatchPolicy:
-  allowReleaseNamespace: false
 # Task images come from the local registry `make kind-registry` runs.
 imagePolicy:
   sourceRegistry: localhost:5001

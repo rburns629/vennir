@@ -11,24 +11,19 @@
 # Two things that bit when it was rolled out (2026-10-01):
 #  - In every namespace it covers, it refuses ANY image it can't resolve to a
 #    digest, not just the ones a policy matches. So it may only cover
-#    namespaces whose images its identity can read. `default` is excluded
-#    while the platform itself (platform-images) still runs there; covering
-#    it blocked the kernel's migration hook and every rollout.
+#    namespaces whose images its identity can read: team namespaces, never
+#    the platform's own (vennir-system, platform-images); covering that
+#    blocked the kernel's migration hook and every rollout (when the
+#    platform ran in `default`, 2026-10-01).
 #  - It owns its webhooks' namespaceSelector, so changing the selector with
 #    Helm needs --force-conflicts once.
 webhook:
   replicaCount: 2
-  # Team namespaces, minus `default`: on GKE the platform itself still runs
-  # there, and policy-controller requires every image in a namespace it
-  # covers to resolve to a digest, which it can't do for platform-images.
-  # Drop the NotIn once the platform has moved to its own namespace.
+  # Team namespaces only (the platform's own is never labelled one).
   namespaceSelector:
     matchExpressions:
       - key: vennir/team
         operator: Exists
-      - key: kubernetes.io/metadata.name
-        operator: NotIn
-        values: ["default"]
   # no-match-policy stays its default, deny: in team namespaces only images
   # a policy covers run (the kernel chart's: signed ones from the source
   # registry, on Pods; its workloads-pass policy lets Jobs and the like make

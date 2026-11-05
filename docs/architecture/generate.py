@@ -548,7 +548,7 @@ def system_page() -> Page:
     p.vertex(360, 120, 1150, 1120, "GKE Autopilot · vennir-gke (us-central1)", frame(BLUE))
     lb = p.titled(380, 230, 150, 80, "Service console", "LoadBalancer, public IP\nplain HTTP :80", BLUE)
 
-    p.vertex(560, 160, 500, 630, "namespace default  (the platform; vennir-system on kind)", frame(ORANGE))
+    p.vertex(560, 160, 500, 630, "namespace vennir-system  (the platform)", frame(ORANGE))
     console = p.titled(590, 210, 200, 90, "execution-console", "Fastify /api + React SPA\nconsole/", ORANGE)
     console_db = p.vertex(610, 360, 160, 90, "Postgres\nexecution_console", database(YELLOW))
     kernel_api = p.titled(830, 210, 200, 90, "kernel-api", "Go, Connect, ClusterIP only\naccepts only the console's token", ORANGE)

@@ -424,13 +424,12 @@ func KernelValues(c *config.Config, img Images, volume string, cloud *Cloud) map
 		scaleDown["consoleFullname"] = ConsoleRelease + "-execution-console"
 	}
 	v := map[string]any{
-		"api":            copies(c),
-		"postgres":       postgres,
-		"backup":         map[string]any{"enabled": false},
-		"imagePolicy":    map[string]any{"sourceRegistry": c.TaskImages.Registry},
-		"dispatchPolicy": map[string]any{"allowReleaseNamespace": false},
-		"scaleDown":      scaleDown,
-		"stepHeadroom":   map[string]any{"replicas": c.StepHeadroom},
+		"api":          copies(c),
+		"postgres":     postgres,
+		"backup":       map[string]any{"enabled": false},
+		"imagePolicy":  map[string]any{"sourceRegistry": c.TaskImages.Registry},
+		"scaleDown":    scaleDown,
+		"stepHeadroom": map[string]any{"replicas": c.StepHeadroom},
 	}
 	if img.Kernel != "" {
 		v["image"] = map[string]any{"repository": img.Kernel, "tag": img.Tag}
