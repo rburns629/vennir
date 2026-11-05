@@ -170,25 +170,22 @@ export function verifiedTlsProblem(databaseUrl: string): string {
   const host = parsed.host || process.env["PGHOST"] || "localhost";
   const loopback = (isIP(host) === 4 && host.startsWith("127.")) || (isIP(host) === 6 && host === "::1");
   if (host.startsWith("/") || host === "localhost" || loopback) return "";
-  const ssl: unknown = parsed.ssl === undefined ? sslFromEnvironment() : parsed.ssl;
-  const verified = ssl === true || ssl === "true" || (typeof ssl === "object" && ssl !== null && (ssl as { rejectUnauthorized?: unknown }).rejectUnauthorized !== false);
+  const ssl: unknown = parsed.ssl;
+  const verified =
+    ssl === undefined
+      ? environmentVerifies()
+      : ssl === true || ssl === "true" || (typeof ssl === "object" && ssl !== null && (ssl as { rejectUnauthorized?: unknown }).rejectUnauthorized !== false);
   if (verified) return "";
   return "with DATABASE_IAM_AUTH, its token is sent only over TLS that checks the server's certificate: sslmode=verify-full, or verify-ca with sslrootcert (the server's own CA), unless it connects to localhost (a Cloud SQL Auth Proxy)";
 }
 
-/** node-postgres's TLS where the URL says nothing: PGSSLMODE's (pg's connection-parameters.js). */
-function sslFromEnvironment(): unknown {
-  switch (process.env["PGSSLMODE"]) {
-    case "prefer":
-    case "require":
-    case "verify-ca":
-    case "verify-full":
-      return true;
-    case "no-verify":
-      return { rejectUnauthorized: false };
-    default:
-      return false;
-  }
+/**
+ * Whether node-postgres's TLS where the URL says nothing, PGSSLMODE's (pg's
+ * connection-parameters.js), checks the server's certificate: TLS with
+ * Node's defaults for these; none, or unchecked (no-verify), for the rest.
+ */
+function environmentVerifies(): boolean {
+  return ["prefer", "require", "verify-ca", "verify-full"].includes(process.env["PGSSLMODE"] ?? "");
 }
 
 export const CHAT_PROVIDERS = ["vertex", "bedrock", "anthropic", "openai-compatible"] as const;
