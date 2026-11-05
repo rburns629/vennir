@@ -127,6 +127,9 @@ type Settings struct {
 	// make that don't sign in, after which its requests are refused before
 	// sign-in (and any database work) until it's under again. 0: no limit.
 	UnauthenticatedPerMinute int
+	// PublicPeersShared: the public listener's peer, with no TrustedProxies,
+	// is a proxy every caller shares; no address is limited there.
+	PublicPeersShared bool
 	// BodyReadTimeout: the longest a request's body may take to arrive. 0:
 	// no deadline.
 	BodyReadTimeout time.Duration
@@ -247,10 +250,12 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	// First, whatever the API: a limited address hears nothing of which
 	// APIs there are, and costs no database work.
 	peer := peerKey(client)
-	// Only where the address is the caller's: on the public listener with
-	// no trustedProxies, the peer may be a load balancer every caller
-	// shares, and one caller's failures would shut out the rest.
-	limitPeers := g.Peers != nil && g.Settings.UnauthenticatedPerMinute > 0 && !(g.Public && len(trusted) == 0)
+	// Only where the address is the caller's: not on the public listener
+	// behind a proxy every caller shares that isn't trusted to say who they
+	// are (PublicPeersShared), where one caller's failures would shut out
+	// the rest.
+	limitPeers := g.Peers != nil && g.Settings.UnauthenticatedPerMinute > 0 &&
+		!(g.Public && len(trusted) == 0 && g.Settings.PublicPeersShared)
 	if limitPeers {
 		if spent, wait := g.Peers.Spent(peer, g.Settings.UnauthenticatedPerMinute, g.now()); spent {
 			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds()+0.999)))

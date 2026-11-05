@@ -146,7 +146,8 @@ func run(log *slog.Logger) error {
 			Minter:  &credentials.Minter{TokenRequest: tokenRequest, GCPAudience: s.GCPAudience, GCPTokenAudience: s.GCPTokenAudience},
 			Settings: gateway.Settings{BackendHosts: s.BackendHosts, InternetTeams: s.InternetTeams,
 				TrustedProxies: s.TrustedProxies, DefaultPerMinute: s.DefaultPerMinute, Closed: s.Closed,
-				UnauthenticatedPerMinute: s.UnauthenticatedPerMinute, BodyReadTimeout: s.BodyReadTimeout},
+				UnauthenticatedPerMinute: s.UnauthenticatedPerMinute, PublicPeersShared: s.PublicPeersShared,
+				BodyReadTimeout: s.BodyReadTimeout},
 			Log: log, Metrics: metrics, Traffic: recorder, Public: public,
 		}
 	}

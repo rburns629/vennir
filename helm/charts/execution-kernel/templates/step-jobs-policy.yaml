@@ -10,8 +10,8 @@ The executor starts a step's Job suspended, makes its request ConfigMap,
 then resumes it, and adopts a Job already there under the attempt's name
 (one an earlier pass of its own made). So nobody else's ConfigMap under
 that name may be mounted in its place, and nobody else's Job may be
-adopted as the step's. Nor may anyone else make a CronJob named ek-...:
-kube-system's CronJob controller makes its Jobs, named after it. Anything else that may write Jobs or ConfigMaps in
+adopted as the step's. Nor may anyone else make a CronJob named ek or ek-...:
+kube-system's CronJob controller makes its Jobs, named <cronjob>-<time>. Anything else that may write Jobs or ConfigMaps in
 a team namespace, such as a team's own deploys or an admin's tooling, is
 held to it. Deleting isn't covered: a delete alone can't put anything in
 the kernel's place, and an admin may still clean up.
@@ -54,7 +54,7 @@ spec:
         request.userInfo.username != "system:kube-controller-manager"
   validations:
     - expression: >-
-        !(object.metadata.name.startsWith("ek-") ||
+        !((object.metadata.name + (request.resource.resource == "cronjobs" ? "-" : "")).startsWith("ek-") ||
           (has(object.metadata.generateName) && object.metadata.generateName.startsWith("ek-")))
       messageExpression: >-
         "STEP_JOB_NOT_ALLOWED: only the kernel's scheduler makes or changes a step's " +

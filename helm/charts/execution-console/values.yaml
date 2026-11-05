@@ -351,10 +351,17 @@ gateway:
   # requests are refused with 429 before sign-in, so before any database
   # work, until it's under again. Callers who sign in aren't counted, but
   # share their address's limit: behind one NAT, one caller's bad token can
-  # hold up the rest for a minute. On the public listener, only with
-  # trustedProxies set: without them the peer may be a load balancer every
-  # caller shares, so no address is limited there. 0: no limit.
+  # hold up the rest for a minute. Not on the public listener behind a
+  # proxy every caller shares that trustedProxies doesn't list
+  # (publicPeersShared). 0: no limit.
   unauthenticatedPerMinute: 60
+  # -- The public listener's peer is a proxy every caller shares (an
+  # Ingress or load balancer that doesn't keep their address) and
+  # trustedProxies doesn't list it: then no address is limited there
+  # (unauthenticatedPerMinute), as one caller's failures would shut out the
+  # rest. On by itself with this chart's ingress and no trustedProxies;
+  # list the proxy in trustedProxies instead to keep the limit.
+  publicPeersShared: false
   # -- The longest a request's body may take to arrive, in seconds; then
   # 408 and nothing is forwarded. Answers aren't limited: they stream for as
   # long as the backend sends.

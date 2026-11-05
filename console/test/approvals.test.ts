@@ -202,6 +202,30 @@ describe("which steps wait for an approval", () => {
     expect(submitted.tasks[0]?.approvalRequired).toBe(true);
   });
 
+  it("so is one of a product with its own ServiceAccount, which such an image runs without", async () => {
+    const [ownerTeam] = await db.select({ id: teams.id }).from(teams).where(eq(teams.name, owner));
+    const guarded = `${owner}-guarded-run`;
+    await upsertProduct({
+      name: guarded,
+      image: `registry.example/${owner}/guarded:1@sha256:${"c".repeat(64)}`,
+      action: "run",
+      teamId: ownerTeam?.id ?? "",
+      serviceAccount: "guarded-sa",
+      inputSchema,
+      shareWith: ["*"],
+      approval: "always",
+    });
+    vi.mocked(submitExecution).mockClear();
+    const image = `registry.example/${owner}/guarded:2@sha256:${"e".repeat(64)}`;
+    const result = await call(tokens.maintainer, "ExecutionService/SubmitExecution", {
+      dag: { name: "unreleased", tasks: [{ id: "t", image, action: "run", team: owner, inputs: { projectId: `${apps}-dev` } }] },
+    });
+    expect(result.code).toBe("ok");
+    const submitted = vi.mocked(submitExecution).mock.lastCall?.[0] as { tasks: { approvalRequired?: boolean; serviceAccount?: string }[] };
+    expect(submitted.tasks[0]?.serviceAccount).toBe("default");
+    expect(submitted.tasks[0]?.approvalRequired).toBe(true);
+  });
+
   it("a target a rule lets through only with an approval waits; one another rule allows doesn't", async () => {
     expect((await run("apps", project, `${apps}-dev`)).waits).toBe(false);
     expect((await run("apps", project, "prod-eu")).waits).toBe(true);

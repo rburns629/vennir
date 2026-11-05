@@ -59,6 +59,11 @@ type Settings struct {
 	// address they saw; an IPv6 /64) may make before the gateway refuses its
 	// requests, before any database work, until it's under again. 0: no limit.
 	UnauthenticatedPerMinute int
+	// PublicPeersShared: on the public listener, with no TrustedProxies, a
+	// proxy every caller shares (an Ingress) is the peer, so no address is
+	// limited there (UnauthenticatedPerMinute): one caller's failures would
+	// shut out the rest.
+	PublicPeersShared bool
 	// BodyReadTimeout is the longest reading a request's body may take.
 	BodyReadTimeout time.Duration
 	// Minting Google ID tokens: the STS audience API ServiceAccounts'
@@ -124,6 +129,7 @@ func Load(getenv func(string) string) (*Settings, error) {
 		InternetTeams:            list(getenv("INTERNET_TEAMS")),
 		DefaultPerMinute:         positive("DEFAULT_PER_MINUTE", 600),
 		UnauthenticatedPerMinute: number("UNAUTHENTICATED_PER_MINUTE", 60),
+		PublicPeersShared:        getenv("PUBLIC_PEERS_SHARED") == "true",
 		BodyReadTimeout:          time.Duration(positive("BODY_READ_TIMEOUT_SECONDS", 30)) * time.Second,
 		GCPAudience:              getenv("GCP_STS_AUDIENCE"),
 		GCPTokenAudience:         getenv("GCP_TOKEN_AUDIENCE"),
