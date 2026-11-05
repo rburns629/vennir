@@ -585,7 +585,7 @@ func finishedJob(t *testing.T, result string, opts KubernetesOptions) (*cluster,
 	one := int32(1)
 	c := newCluster(opts,
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns}, Status: batchv1.JobStatus{Succeeded: 1, Ready: &one}},
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-abcde", Namespace: ns, Labels: map[string]string{"job-name": name}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-abcde", Namespace: ns, Labels: map[string]string{"job-name": name}, OwnerReferences: ownedBy(name)},
 			Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "product",
 				State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Message: result}}}}}})
 	return c, Handle{"namespace": ns, "jobName": name}
@@ -609,11 +609,47 @@ func TestAStepIsDoneWhenItsContainerIsNotWhenItsJobIsMarked(t *testing.T) {
 	ns, name := "demo-3", "ek-greet-1"
 	c := newCluster(options(),
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns}}, // not yet marked
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-abcde", Namespace: ns, Labels: map[string]string{"job-name": name}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-abcde", Namespace: ns, Labels: map[string]string{"job-name": name}, OwnerReferences: ownedBy(name)},
 			Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "product",
 				State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Message: `{"status": "succeeded", "outputs": {"greeting": "hello"}}`}}}}}})
 	s, err := c.k.Status(context.Background(), Handle{"namespace": ns, "jobName": name})
 	if err != nil {
+		t.Fatal(err)
+	}
+	check(t, "state", s.State, Succeeded)
+	check(t, "outputs", s.Outputs, map[string]any{"greeting": "hello"})
+}
+
+// A Pod anyone made with the Job's name on it isn't the step: its result is
+// never read, before the Job's own Pod or after.
+func TestOnlyTheJobsOwnPodIsRead(t *testing.T) {
+	ns, name := "demo-3", "ek-greet-1"
+	finished := func(pod string, owners []metav1.OwnerReference, result string) *corev1.Pod {
+		return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: pod, Namespace: ns, Labels: map[string]string{"job-name": name}, OwnerReferences: owners},
+			Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "product",
+				State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Message: result}}}}}}
+	}
+	controller := true
+	c := newCluster(options(),
+		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns, UID: "job-uid"}},
+		// Sorted first, as a list returns them: no owner, then another
+		// object's (same name, another UID).
+		finished("0-planted", nil, `{"status": "succeeded", "outputs": {"greeting": "forged"}}`),
+		finished("1-planted", []metav1.OwnerReference{{APIVersion: "batch/v1", Kind: "Job", Name: name, UID: "other", Controller: &controller}},
+			`{"status": "succeeded", "outputs": {"greeting": "forged"}}`))
+	handle := Handle{"namespace": ns, "jobName": name}
+	s, err := c.k.Status(context.Background(), handle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check(t, "state, with only planted Pods", s.State, Running)
+
+	own := finished("2-own", []metav1.OwnerReference{{APIVersion: "batch/v1", Kind: "Job", Name: name, UID: "job-uid", Controller: &controller}},
+		`{"status": "succeeded", "outputs": {"greeting": "hello"}}`)
+	if _, err := c.CoreV1().Pods(ns).Create(context.Background(), own, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if s, err = c.k.Status(context.Background(), handle); err != nil {
 		t.Fatal(err)
 	}
 	check(t, "state", s.State, Succeeded)
@@ -735,7 +771,7 @@ func TestAContainerTheClusterStoppedSaysWhy(t *testing.T) {
 	killed := []corev1.ContainerStatus{{Name: "product", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 137, Reason: "ContainerStatusUnknown"}}}}
 	running := []corev1.ContainerStatus{{Name: "product", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}}
 	pod := func(status corev1.PodStatus) *corev1.Pod {
-		return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-abcde", Namespace: ns, Labels: map[string]string{"job-name": name}}, Status: status}
+		return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-abcde", Namespace: ns, Labels: map[string]string{"job-name": name}, OwnerReferences: ownedBy(name)}, Status: status}
 	}
 	for what, c := range map[string]struct {
 		objects    []runtime.Object
@@ -816,7 +852,7 @@ func pullingJob(reason, message string) (*cluster, Handle) {
 	zero := int32(0)
 	return newCluster(options(),
 			&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns}, Status: batchv1.JobStatus{Ready: &zero}},
-			&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-x", Namespace: ns, Labels: map[string]string{"job-name": name},
+			&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-x", Namespace: ns, Labels: map[string]string{"job-name": name}, OwnerReferences: ownedBy(name),
 				CreationTimestamp: metav1.NewTime(time.Now().Add(-10 * time.Second))},
 				Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "product", Image: image,
 					State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: reason, Message: message}}}}}}),
@@ -938,7 +974,7 @@ func TestARunningStepSaysWhenItStarted(t *testing.T) {
 	started := metav1.NewTime(time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC))
 	c := newCluster(options(),
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns}, Status: batchv1.JobStatus{Ready: &one}},
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-x", Namespace: ns, Labels: map[string]string{"job-name": name}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name + "-x", Namespace: ns, Labels: map[string]string{"job-name": name}, OwnerReferences: ownedBy(name)},
 			Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "product", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: started}}}}}})
 	handle := Handle{"namespace": ns, "jobName": name}
 	podLists := func() int {
@@ -998,7 +1034,7 @@ func TestAStepWithNoPodIsAlwaysRead(t *testing.T) {
 }
 
 func unreadyPod(c *cluster, waiting string) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ek-step-1-x", Namespace: "team-a", Labels: map[string]string{"job-name": "ek-step-1"},
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ek-step-1-x", Namespace: "team-a", Labels: map[string]string{"job-name": "ek-step-1"}, OwnerReferences: ownedBy("ek-step-1"),
 		CreationTimestamp: metav1.Now()}}
 	if waiting != "" {
 		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "product", State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: waiting}}}}
@@ -1220,4 +1256,11 @@ func TestCountUnschedulableCountsPendingPodsWithNoNode(t *testing.T) {
 		pod(corev1.PodPending, corev1.ConditionFalse, corev1.PodReasonSchedulingGated),
 		pod(corev1.PodFailed, corev1.ConditionFalse, corev1.PodReasonUnschedulable),
 	}), 2)
+}
+
+// ownedBy is what the Job controller sets on a Pod it makes: the Job's
+// controller reference (a fake Job has no UID).
+func ownedBy(job string) []metav1.OwnerReference {
+	controller := true
+	return []metav1.OwnerReference{{APIVersion: "batch/v1", Kind: "Job", Name: job, Controller: &controller}}
 }

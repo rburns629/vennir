@@ -435,6 +435,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/configmap.yaml`, `secret.yaml`, `serviceaccount.yaml` | Settings, the database password, the kernel's identity. |
 | `templates/rbac.yaml` | What the scheduler may do: create and delete Jobs and ConfigMaps, read Pods; and its logs-only ClusterRole, bound per team namespace by the console (or cluster-wide, `rbac.schedulerLogs: cluster`). |
 | `templates/dispatch-policy.yaml` | Admission policy: the scheduler may only create Jobs (hardened, with `taskPodHardening`) in namespaces labelled `vennir/team=true`, and delete only its own Jobs and ConfigMaps there. |
+| `templates/step-pods-policy.yaml` | Admission policy: in a team namespace, only Kubernetes' own controllers may make or change a Pod with a task Job's labels or owner. |
 | `templates/image-policy.yaml` | Admission policy: task images only from allowed sources (the console edits the list). |
 | `templates/image-signature.yaml` | With Sigstore's policy-controller: only signed images from the source registry run in team namespaces, checked on Pods; a second policy passes the workloads that make them. |
 | `templates/purge-policy.yaml` | Admission policy: only the purge identity may delete a team's namespace. |

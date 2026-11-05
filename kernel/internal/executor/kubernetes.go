@@ -102,11 +102,13 @@ type Kubernetes struct {
 	quietSince map[string]time.Time
 	// When each running Job's container started, once read from its Pod.
 	startedAt map[string]time.Time
+	// uids are Jobs' UIDs, by name (jobUID).
+	uids map[string]types.UID
 }
 
 // NewKubernetes is an executor on client; call Watch to follow changes.
 func NewKubernetes(client kubernetes.Interface, opts KubernetesOptions, log *slog.Logger) *Kubernetes {
-	return &Kubernetes{client: client, opts: opts, log: log, terminal: map[string]terminalRecord{}, quietSince: map[string]time.Time{}, startedAt: map[string]time.Time{}}
+	return &Kubernetes{client: client, opts: opts, log: log, terminal: map[string]terminalRecord{}, quietSince: map[string]time.Time{}, startedAt: map[string]time.Time{}, uids: map[string]types.UID{}}
 }
 
 // call bounds one API request: the client's own default is to wait forever,
@@ -531,6 +533,7 @@ func (k *Kubernetes) remember(name string, record terminalRecord) {
 	defer k.mu.Unlock()
 	delete(k.quietSince, name)
 	delete(k.startedAt, name)
+	delete(k.uids, name)
 	record.recordedAt = time.Now()
 	k.terminal[name] = record
 	cutoff := time.Now().Add(-terminalRetention)
@@ -575,6 +578,9 @@ func (k *Kubernetes) Status(ctx context.Context, handle Handle) (Status, error) 
 	callCtx, cancel := k.call(ctx)
 	defer cancel()
 	job, err := k.client.BatchV1().Jobs(namespace).Get(callCtx, name, metav1.GetOptions{})
+	if err == nil {
+		k.noteUID(job)
+	}
 	if apierrors.IsNotFound(err) {
 		// The kernel deletes a Job only once it knows its outcome: after
 		// it's committed (Release), or when it can't start (its failure
@@ -700,14 +706,56 @@ func (k *Kubernetes) containerStarted(ctx context.Context, namespace, name strin
 	return nil, nil
 }
 
+// pods are the Job's own Pods: made by it, not merely labelled with its
+// name, which any Pod in the namespace may be (and its result would become
+// the step's outputs). None once the Job is gone.
 func (k *Kubernetes) pods(ctx context.Context, namespace, job string) ([]corev1.Pod, error) {
+	uid, err := k.jobUID(ctx, namespace, job)
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
 	callCtx, cancel := k.call(ctx)
 	defer cancel()
 	list, err := k.client.CoreV1().Pods(namespace).List(callCtx, metav1.ListOptions{LabelSelector: "job-name=" + job})
 	if err != nil {
 		return nil, err
 	}
-	return list.Items, nil
+	var own []corev1.Pod
+	for _, pod := range list.Items {
+		if owner := metav1.GetControllerOf(&pod); owner != nil && owner.Kind == "Job" && owner.Name == job && owner.UID == uid {
+			own = append(own, pod)
+		} else {
+			k.log.Warn("a Pod labelled with a task's Job isn't the Job's own; ignored", "namespace", namespace, "job", job, "pod", pod.Name)
+		}
+	}
+	return own, nil
+}
+
+// jobUID is the Job's UID, read once (a name is one attempt's alone).
+func (k *Kubernetes) jobUID(ctx context.Context, namespace, job string) (types.UID, error) {
+	k.mu.Lock()
+	uid, ok := k.uids[job]
+	k.mu.Unlock()
+	if ok {
+		return uid, nil
+	}
+	callCtx, cancel := k.call(ctx)
+	defer cancel()
+	got, err := k.client.BatchV1().Jobs(namespace).Get(callCtx, job, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	k.noteUID(got)
+	return got.UID, nil
+}
+
+func (k *Kubernetes) noteUID(job *batchv1.Job) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.uids[job.Name] = job.UID
 }
 
 // imagePullError is the failure of a Pod stuck on its image, if any, and
