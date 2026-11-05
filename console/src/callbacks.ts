@@ -8,10 +8,11 @@
  *     outputs are read with GetExecution, as the bot), so the system that
  *     placed it (a storefront, a Marketplace page) hears back without
  *     polling;
- *   - each owning team's outcome webhook, when it has one (`run.finished`:
- *     the run and each step's state, outputs and failure code, as the team
- *     sees them on its run's page), for its own systems, beside its chat
- *     webhook.
+ *   - the outcome webhook, when it has one, of the team a template run was
+ *     for, or of each team of a raw DAG (`run.finished`: the run and each
+ *     step's state, outputs and failure code, as the team sees them on its
+ *     run's page: a raw DAG's team only its own steps' outputs), for its
+ *     own systems, beside its chat webhook.
  *
  * Each post is signed with its callback's secret (shown once, when it's
  * set): `Vennir-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of
@@ -27,6 +28,8 @@ import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql, type SQL } from 
 import { ApiError } from "./apiError.js";
 import { config } from "./config.js";
 import { backendAllowed } from "./core/apis.js";
+import { taskTeams } from "./core/approvals.js";
+import { runOwnerTeams } from "./core/runView.js";
 import { db, whileHolding } from "./db/client.js";
 import { botCallbacks, callbackDeliveries, teamCallbacks, teams } from "./db/schema.js";
 import type { KernelTaskStatus } from "./kernel/client.js";
@@ -131,22 +134,26 @@ export async function runFinishedCallbacks(run: FinishedRun): Promise<void> {
       .onConflictDoNothing();
   }
 
-  // Its owning teams' outcome webhooks: those who see it in full (core/runView.ts).
-  const owners = run.template !== null ? (run.onBehalfOf ? [run.onBehalfOf] : []) : run.teams;
-  if (owners.length === 0) return;
+  // The teams it's for and their outcome webhooks, each seeing it as its
+  // members do (core/runView.ts): a template run's team every step's
+  // outputs; each team of a raw DAG its own steps' outputs only.
+  const owners = runOwnerTeams(run);
+  const told = run.template !== null ? owners : run.teams;
+  if (told.length === 0) return;
   const hooked = await db
     .select({ teamId: teamCallbacks.teamId, team: teams.name })
     .from(teamCallbacks)
     .innerJoin(teams, eq(teams.id, teamCallbacks.teamId))
-    .where(inArray(teams.name, owners));
+    .where(inArray(teams.name, told));
   if (hooked.length === 0) return;
-  const steps = run.tasks.map((t) => ({
-    taskId: t.taskId,
-    state: t.state,
-    outputs: t.outputs,
-    failureCode: typeof t.failure?.["code"] === "string" ? t.failure["code"] : null,
-  }));
+  const teamOf = taskTeams(run.payload);
   for (const { teamId, team } of hooked) {
+    const steps = run.tasks.map((t) => ({
+      taskId: t.taskId,
+      state: t.state,
+      outputs: owners.includes(team) || teamOf.get(t.taskId) === team ? t.outputs : null,
+      failureCode: typeof t.failure?.["code"] === "string" ? t.failure["code"] : null,
+    }));
     const full = { type: "run.finished", ...common, name: run.name, team, state: run.state, finishedAt: run.finishedAt, steps };
     let body = JSON.stringify(full);
     if (Buffer.byteLength(body) > MAX_BODY) {

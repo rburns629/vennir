@@ -5,8 +5,9 @@
  * console sends carries the caller's visibility:
  *
  * - a step's lines, every level, to its own team (its namespace);
- * - its INFO lines to the run's other owners (its submitter, the team it
- *   was run for; core/runView.ts), never to another provider's member;
+ * - its INFO lines to the run's other owners (its submitter, the team a
+ *   template run was for; core/runView.ts), never to another team's member
+ *   (a raw DAG's other teams included);
  * - an API backend's lines (a Pod a team labels vennir/api-backend), every
  *   level, to its own team only: they belong to no run. A team's backends
  *   run in its API backends' namespace, `<team>-apis` (k8s.ts apiNamespace),
@@ -19,7 +20,7 @@
  */
 import { Code } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
-import { and, arrayOverlaps, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, or } from "drizzle-orm";
 import { ApiError } from "../apiError.js";
 import { canActForTeam } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
@@ -81,8 +82,8 @@ function signedIn(caller: AuthUser | undefined): AuthUser {
 
 /**
  * The runs a caller owns (sees every step of, core/runView.ts) that started
- * since `since`, newest first: submitted, a template run for one of their
- * teams, or a raw DAG of their teams.
+ * since `since`, newest first: submitted, or a template run for one of
+ * their teams. A raw DAG of their teams isn't theirs unless they submitted it.
  */
 async function ownedRuns(who: AuthUser, since: Date): Promise<string[]> {
   const rows = await db
@@ -93,8 +94,7 @@ async function ownedRuns(who: AuthUser, since: Date): Promise<string[]> {
         gte(submittedExecutions.createdAt, new Date(since.getTime() - 24 * HOUR_MS)),
         or(
           eq(submittedExecutions.submittedBy, who.id),
-          and(isNull(submittedExecutions.template), arrayOverlaps(submittedExecutions.teams, who.teamNames)),
-          inArray(submittedExecutions.onBehalfOf, who.teamNames.length > 0 ? who.teamNames : [""]),
+          and(isNotNull(submittedExecutions.template), inArray(submittedExecutions.onBehalfOf, who.teamNames.length > 0 ? who.teamNames : [""])),
         ),
       ),
     )

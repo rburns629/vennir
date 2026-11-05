@@ -199,8 +199,10 @@ new secret** replaces the secret; **Remove** stops the posts.
 
 A team can also have an **outcome webhook** (its Settings tab, beside its chat
 notifications, set by its maintainers, under the same allowed hosts): every
-run the team owns posts `run.finished` there when it finishes, signed the
-same way, with each step's state, outputs and failure code:
+template run for the team, and every raw DAG with a step in it, posts
+`run.finished` there when it finishes, signed the same way, with each
+step's state, outputs and failure code (a raw DAG's other teams' steps
+with `"outputs": null`):
 
 ```json
 {"type": "run.finished", "executionId": "6b7a…", "requestId": "nightly-check-run-4812",

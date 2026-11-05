@@ -7,10 +7,11 @@
  * no Prometheus; perf/README.md's phase 3 measured it at about 50 ms over
  * 200,000 runs. How runs ended is the kernel's, on Metrics.
  *
- * A run counts for the teams it was run for, as runView.ts decides who owns
- * it: a template run's onBehalfOf ("" when for no team), a raw DAG's every
- * team. Readiness checks (the console's own) don't count. Steps are the
- * steps of the DAG as submitted, retries not counted. A step is a product's
+ * A run counts for the teams it was run for: a template run's onBehalfOf
+ * ("" when for no team), a raw DAG's every team (each of which sees its own
+ * steps of it in full, runView.ts; a count shows none of its outputs).
+ * Readiness checks (the console's own) don't count. Steps are the steps of
+ * the DAG as submitted, retries not counted. A step is a product's
  * only when it ran in the product's team's namespace, where that team sees
  * it (runView.ts); elsewhere it's an image, by its repository.
  *

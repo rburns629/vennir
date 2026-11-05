@@ -168,3 +168,5 @@ Click a step on the run's page, or call `ExecutionService/GetExecutionLogs`. A s
 The container and its Pod are deleted about 30 seconds after the step finishes, so the copy is the only one left; there's nothing to `kubectl logs` afterwards.
 
 On your own team's steps you see every line. On another team's step in your run (for example, a template that uses their products), you see only the lines it logs as JSON with `"level": "info"`; the page says how many lines were held back, and which team can see them.
+
+A raw DAG that spans teams is different: unless you submitted it (or are an admin), you see only your own teams' steps in full. Of another team's step you see its product, state, timing and failure code, but not its inputs, outputs, failure message or any of its log lines. Its submitter and admins see every step.

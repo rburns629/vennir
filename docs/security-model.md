@@ -296,9 +296,9 @@ the step's events; a declined or expired step fails (`APPROVAL_DECLINED`,
 `APPROVAL_EXPIRED`), and retrying it asks again. The check is the console's:
 kernel-api trusts its caller, as it does for everything else.
 
-A raw DAG needs a maintainer of every team it names. The run belongs to
-whoever ran it as well as to its steps' teams: they may see, cancel, retry
-and rerun it (a rerun runs the template again, as it is now; a retry is
+A raw DAG needs a maintainer of every team it names. Whoever ran it and
+its steps' teams may see, cancel, retry and rerun it (each team seeing its
+own steps in full, [below](#who-sees-a-run-that-spans-teams)) (a rerun runs the template again, as it is now; a retry is
 refused once it, or a step's action, is no longer shared).
 
 ## Who sees a run that spans teams
@@ -306,12 +306,20 @@ refused once it, or a step's action, is no longer shared).
 A template run can have steps in several teams' namespaces: the team it was
 run for (its consumer) and the teams whose products it uses (its
 providers). Its owners (admins, whoever submitted it, members of the team
-it was run for; for a raw DAG, every team in it) see every step, so a
-consumer sees what each provider's step returned. A provider's member sees
-their own team's steps in full and, of the rest, only each step's product,
-state, timing and failure code: never its inputs, outputs, failure message,
-the run's template parameters or its logs (`console/src/core/runView.ts`,
-in the run's details, its events and logs, and Observe's log search).
+it was run for) see every step, so a consumer sees what each provider's
+step returned. A provider's member sees their own team's steps in full and,
+of the rest, only each step's product, state, timing and failure code:
+never its inputs, outputs, failure message, the run's template parameters
+or its logs (`console/src/core/runView.ts`, in the run's details, its
+events and logs, Observe's log search, the chat agent's run tool and a
+team's outcome webhook).
+
+A raw DAG is run for no one team, so its owners are admins and whoever
+submitted it alone (decided 2026-11-05). A member of one of its teams sees
+that team's steps in full and the others' as a provider does: state,
+timing and failure code, and the run's own status. Being in a team that
+one step of a shared DAG runs in no longer shows every other team's
+outputs.
 
 ## What a run made, and deleting it
 
@@ -1237,7 +1245,6 @@ Vennir isn't production-ready yet.
 | Reads aren't audited ([Audit](#audit)) | Who looked at a run's outputs or logs isn't recorded | Not decided |
 | The audit log lives in the console's own database unless `audit.export` copies it to write-once storage (its entries are hash-chained, and with the copy compared with the database entry by entry; Observe shows the log as each caller may see it) | Without the copy, someone who can write that database could change it, rewriting the chain after it | Turn on `audit.export`, or ship the `event: "audit"` log lines to a SIEM |
 | Step Pod hardening is a chart setting: with `scheduler.taskPodHardening: false`, the dispatch policy no longer requires it, and only Pod Security, on namespaces the console created, holds a step to `restricted` | Steps run as root with an API token in an adopted namespace | Keep `taskPodHardening` on and let the console create team namespaces |
-| Every team named in a raw DAG sees all of its steps' outputs (a template run's providers see only their own steps in full; other teams see only a step's INFO log lines) | Cross-team visibility of outputs within a shared raw DAG | Decide: filter outputs by team, or require every team for reads |
 
 ## Out of scope
 

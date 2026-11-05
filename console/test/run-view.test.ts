@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 /**
  * Who sees what of a run that spans teams (core/runView.ts): its owners
- * (the submitter, the team it was run for) every step; a provider's member
- * their own steps in full and, of the rest, only state and failure codes.
- * A raw DAG belongs to all its teams.
+ * (admins, the submitter, the team a template run was for) every step; a
+ * provider's member their own steps in full and, of the rest, only state
+ * and failure codes. A raw DAG's owners are admins and its submitter alone
+ * (2026-11-05): each of its teams' members sees its own steps in full.
  */
 import { randomUUID } from "node:crypto";
 import { inArray, like } from "drizzle-orm";
@@ -60,6 +61,7 @@ const { rpc, makeUser, signIn, cleanUp } = rpcClient(() => app);
 let consumerMember: string;
 let providerMember: string;
 let submitter: string;
+let admin: string;
 
 const payload = {
   name: "run",
@@ -88,6 +90,7 @@ beforeAll(async () => {
   consumerMember = await signIn(c.email);
   providerMember = await signIn(p.email);
   submitter = await signIn(s.email);
+  admin = await signIn((await makeUser({ admin: true })).email);
   const consumerTeam = await createTeam(consumer);
   const providerTeam = await createTeam(provider);
   await addTeamMember(c.id, consumerTeam.id);
@@ -165,8 +168,50 @@ describe("a template run, seen by", () => {
   });
 });
 
-describe("a raw DAG", () => {
-  it("belongs to all its teams, as before", async () => {
-    expect(task((await detail(providerMember, rawRun)).tasks, "mine").outputs).toEqual({ secretish: "consumer data" });
+// Submitted by a member of the consumer team; consumerMember is in it too,
+// but didn't submit it.
+describe("a raw DAG, seen by", () => {
+  it("a member of one of its teams who didn't submit it: their team's steps in full, of the other's only state and failure code", async () => {
+    const seen = await detail(consumerMember, rawRun);
+    expect(task(seen.tasks, "mine").outputs).toEqual({ secretish: "consumer data" });
+    expect(task(seen.tasks, "mine").failure?.["message"]).toBe(failure.message);
+    expect(seen.dag?.tasks.find((t) => t.id === "mine")?.inputs).toEqual({ password: "consumer input" });
+    const theirs = task(seen.tasks, "theirs");
+    expect(theirs.outputs ?? null).toBeNull();
+    expect(seen.dag?.tasks.find((t) => t.id === "theirs")?.inputs ?? {}).toEqual({});
+    expect(JSON.stringify(seen)).not.toContain("p.example");
+
+    const theirsFromProvider = await detail(providerMember, rawRun);
+    expect(task(theirsFromProvider.tasks, "theirs").outputs).toEqual({ url: "https://p.example" });
+    const mine = task(theirsFromProvider.tasks, "mine");
+    expect(mine.outputs ?? null).toBeNull();
+    expect(mine.failure?.["code"]).toBe("PRODUCT_FAILED");
+    expect(mine.failure?.["message"] ?? "").toBe("");
+    expect(theirsFromProvider.dag?.tasks.find((t) => t.id === "mine")?.inputs ?? {}).toEqual({});
+    expect(JSON.stringify(theirsFromProvider)).not.toContain("consumer data");
+    expect(JSON.stringify(theirsFromProvider)).not.toContain("password was rejected");
+  });
+
+  it("a member of one of its teams: events and logs likewise", async () => {
+    const seen = await events(consumerMember, rawRun);
+    expect(seen[0]?.payload).toEqual({ taskKey: "theirs", attempt: 1 });
+    expect(seen[1]?.payload?.["error"]).toEqual(failure);
+
+    const lines = await logs(consumerMember, rawRun);
+    expect(task(lines, "mine").lines).toHaveLength(2);
+    expect(task(lines, "theirs").lines ?? []).toEqual([]);
+    expect(task(lines, "theirs").hidden).toBe(2);
+    expect(task(await logs(providerMember, rawRun), "mine").lines ?? []).toEqual([]);
+  });
+
+  it("whoever submitted it, and an admin: every step", async () => {
+    for (const token of [submitter, admin]) {
+      const seen = await detail(token, rawRun);
+      expect(task(seen.tasks, "mine").outputs).toEqual({ secretish: "consumer data" });
+      expect(task(seen.tasks, "theirs").outputs).toEqual({ url: "https://p.example" });
+      expect(seen.dag?.tasks.find((t) => t.id === "theirs")?.inputs).toEqual({ size: "small" });
+      expect((await events(token, rawRun))[0]?.payload?.["outputs"]).toEqual({ url: "https://p.example" });
+      expect(task(await logs(token, rawRun), "theirs").lines?.length).toBeGreaterThan(0);
+    }
   });
 });

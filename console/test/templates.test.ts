@@ -613,8 +613,11 @@ describe("a team's outcome webhook (decision 23)", () => {
       const tasks = [
         { taskId: "make", state: "SUCCEEDED", outputs: { url: "https://app.example.com" }, failure: null },
         { taskId: "check", state: "FAILED", outputs: null, failure: { code: "CHECK_FAILED", message: "not ready" } },
+        { taskId: "theirs", state: "SUCCEEDED", outputs: { token: "another team's" }, failure: null },
       ] as never[];
-      const run = { executionId, name: "deploy", submittedBy: maintainer.id, teams: [team], template: null, onBehalfOf: null, payload: { requestId: "r-1" }, state: "FAILED", finishedAt: new Date().toISOString(), tasks };
+      // A raw DAG with another team's step: that step's outputs aren't this team's (core/runView.ts).
+      const dag = { requestId: "r-1", tasks: [{ id: "make", team }, { id: "check", team }, { id: "theirs", team: `${prefix}-elsewhere` }] };
+      const run = { executionId, name: "deploy", submittedBy: maintainer.id, teams: [team, `${prefix}-elsewhere`], template: null, onBehalfOf: null, payload: dag, state: "FAILED", finishedAt: new Date().toISOString(), tasks };
       await runFinishedCallbacks(run);
       // Another team's run isn't posted to it.
       await runFinishedCallbacks({ ...run, executionId: randomUUID(), teams: [`${prefix}-elsewhere`] });
@@ -626,6 +629,7 @@ describe("a team's outcome webhook (decision 23)", () => {
         steps: [
           { taskId: "make", state: "SUCCEEDED", outputs: { url: "https://app.example.com" }, failureCode: null },
           { taskId: "check", state: "FAILED", outputs: null, failureCode: "CHECK_FAILED" },
+          { taskId: "theirs", state: "SUCCEEDED", outputs: null, failureCode: null },
         ],
       });
       const [, t, v1] = /^t=(\d+),v1=([0-9a-f]+)$/.exec(mine[0]!.signature) ?? [];
