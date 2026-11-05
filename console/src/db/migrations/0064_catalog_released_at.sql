@@ -1,0 +1,1 @@
+ALTER TABLE "catalog_sync" ADD COLUMN "released_at" timestamp with time zone;

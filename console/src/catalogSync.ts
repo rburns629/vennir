@@ -36,6 +36,7 @@
  */
 import { fromJson } from "@bufbuild/protobuf";
 import type { JsonValue } from "@bufbuild/protobuf";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { ApiError } from "./apiError.js";
@@ -526,8 +527,29 @@ export async function syncCatalog(log: FastifyBaseLogger, force = false): Promis
         throw new Error(`no trusted signer signed the catalog release ${repository}@${digest}; nothing was applied`);
       }
       const release = fromJson(ReleaseSchema, JSON.parse(json) as JsonValue, { ignoreUnknownFields: true });
+      // Never an older release than the one applied, though it was signed
+      // too: its createdAt is part of what's signed. Going back is releasing
+      // the older commit again.
+      const releasedAt = release.createdAt ? timestampDate(release.createdAt) : null;
+      if (current?.releasedAt && (!releasedAt || releasedAt < current.releasedAt)) {
+        throw new Error(
+          `the catalog release ${digest} was made ${releasedAt?.toISOString() ?? "at no stated time"}, before the one applied ` +
+            `(${current.releasedAt.toISOString()}); nothing was applied. To go back to it, release that commit again`,
+        );
+      }
       const problems = await apply(release, log);
-      await record({ digest, version, commit: release.commit, repository: release.repository, appliedAt: now, problems, checkedAt: now, error: null, applied: countsOf(release) });
+      await record({
+        digest,
+        version,
+        commit: release.commit,
+        repository: release.repository,
+        appliedAt: now,
+        releasedAt,
+        problems,
+        checkedAt: now,
+        error: null,
+        applied: countsOf(release),
+      });
       await writeAuditEntry(log, {
         actorId: null,
         method: "CATALOG",
