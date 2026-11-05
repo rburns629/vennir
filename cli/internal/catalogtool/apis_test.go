@@ -150,3 +150,20 @@ func TestAPIsInTheCluster(t *testing.T) {
 		t.Errorf("refused:\n%s", out)
 	}
 }
+
+func TestHTTPOnlyToAServiceInAnyClusterDomain(t *testing.T) {
+	for host, want := range map[string]bool{
+		"orders.payments.svc.cluster.local":  true,
+		"orders.payments.svc.corp.internal":  true,
+		"orders.payments.svc":                true,
+		"ORDERS.Payments.SVC.cluster.local.": true,
+		"orders.svc.cluster.local":           false,
+		"pod.orders.payments.svc":            false,
+		"api.example.com":                    false,
+		"svc.example.com":                    false,
+	} {
+		if got := inClusterService(host); got != want {
+			t.Errorf("inClusterService(%s) = %v, want %v", host, got, want)
+		}
+	}
+}

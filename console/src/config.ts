@@ -137,7 +137,40 @@ function databaseIamAuth(): "" | "gcp" | "aws" {
   const value = process.env["DATABASE_IAM_AUTH"] ?? "";
   if (value !== "" && value !== "gcp" && value !== "aws") throw new Error(`Invalid DATABASE_IAM_AUTH "${value}": expected "gcp", "aws", or nothing for a password.`);
   if (value === "aws" && !process.env["DATABASE_IAM_REGION"]) throw new Error("DATABASE_IAM_REGION is needed with DATABASE_IAM_AUTH=aws.");
+  if (value !== "") {
+    const problem = verifiedTlsProblem(process.env["DATABASE_URL"] ?? "");
+    if (problem) throw new Error(`DATABASE_URL: ${problem}`);
+  }
   return value;
+}
+
+/**
+ * Why a sign-in token from the cloud mustn't be sent over DATABASE_URL, or
+ * "": its TLS must check the server, so only the server gets it:
+ * sslmode=verify-full, or verify-ca with sslrootcert (the server's own CA,
+ * not the system's, which any publicly trusted certificate would pass).
+ * A loopback host or a Unix socket (a Cloud SQL Auth Proxy beside the
+ * process, which encrypts and checks on its own) needs neither. The rule of
+ * the kernel's verifiedTLSProblem and the gateway's verifiedTLS; never
+ * quotes the URL, which may hold a password.
+ */
+export function verifiedTlsProblem(databaseUrl: string): string {
+  // Read by hand, as node-postgres's own parser reads a URL: an empty host
+  // with ?host= (a Unix socket) isn't a URL to `new URL`.
+  const scheme = /^postgres(?:ql)?:\/\//.exec(databaseUrl);
+  if (!scheme) return "isn't a postgres:// URL";
+  const rest = databaseUrl.slice(scheme[0].length);
+  const queryAt = rest.indexOf("?");
+  const query = new URLSearchParams(queryAt >= 0 ? rest.slice(queryAt + 1) : "");
+  const authority = (queryAt >= 0 ? rest.slice(0, queryAt) : rest).split("/")[0] ?? "";
+  const hostPort = authority.slice(authority.lastIndexOf("@") + 1);
+  const hostname = hostPort.startsWith("[") ? hostPort.slice(1, hostPort.indexOf("]")) : (hostPort.split(":")[0] ?? "");
+  const host = decodeURIComponent(query.get("host") ?? (hostname || (process.env["PGHOST"] ?? "")));
+  if (host === "" || host.startsWith("/") || host === "localhost" || host === "::1" || /^127\./.test(host)) return "";
+  const mode = query.get("sslmode") ?? process.env["PGSSLMODE"] ?? "";
+  const rootCert = query.get("sslrootcert") ?? process.env["PGSSLROOTCERT"] ?? "";
+  if (mode === "verify-full" || (mode === "verify-ca" && rootCert !== "" && rootCert !== "system")) return "";
+  return `with DATABASE_IAM_AUTH, its token is sent only over TLS that checks the server: sslmode=verify-full, or verify-ca with sslrootcert (the server's own CA), unless it connects to localhost (a Cloud SQL Auth Proxy); its sslmode is ${mode || "unset"}`;
 }
 
 export const CHAT_PROVIDERS = ["vertex", "bedrock", "anthropic", "openai-compatible"] as const;

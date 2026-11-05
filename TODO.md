@@ -151,23 +151,6 @@ it was seen.
 
 ## Security
 
-- [ ] **From the security review of 2026-11-04** (six read-only reviewers,
-  each finding checked against the code; the fixes so far are #213 to #237).
-  Still open:
-  - Kernel (found fixing the kernel's): a cancel racing a retry can leave
-    the retried step READY in the cancelled execution (never claimed, but
-    shown as waiting).
-  - Console (found fixing the kernel's and the gateway's): refuse IAM-token
-    database sign-in without a verified TLS connection, as the kernel and
-    gateway do (`verifiedTLSProblem`, `kernel/internal/config`; the
-    gateway's `verifiedTLS`); the console's failure help explains
-    `PRODUCT_CODE_RESERVED`.
-  - Cluster domain (found fixing the gateway's): the console chart's own
-    URLs (the gateway's `CONSOLE_URL`, `GATEWAY_ISSUER`'s default,
-    `LOKI_URL`, `PROMETHEUS_URL`, NOTES) and the catalog tool's "http only
-    in the cluster" check (`cli/internal/catalogtool/apis.go`) still assume
-    `cluster.local`, not `clusterDomain`.
-
 - [ ] **Next release: drop API backends in their team's namespace** (API
   backends moved to `<team>-apis` on 2026-11-05): for one release the
   gateway still serves an in-cluster backend in the team's own namespace,

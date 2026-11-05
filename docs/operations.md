@@ -1029,15 +1029,14 @@ only `kernel database-setup`'s role may read it, to make the two databases
 and the services' users (members of `rds_iam`) and open each database to
 its own service alone.
 
-A sign-in token is the password, so the kernel won't send one over a
-connection that doesn't check the server: with `database.iamAuth` (or
-`kernel database-setup`'s administrator password on RDS) it refuses to
+A sign-in token is the password, so neither the kernel, the console nor
+the gateway sends one over a connection that doesn't check the server: with `database.iamAuth` (or
+`kernel database-setup`'s administrator password on RDS) each refuses to
 start unless the database URL says `sslmode=verify-full`, or
 `sslmode=verify-ca` with `sslrootcert` naming the server's own CA (what
 `vennir` writes on gcp, where Cloud SQL's certificate names the instance,
 not its address; `verify-full` on aws). A URL to a loopback address or a
-Unix socket, a Cloud SQL Auth Proxy beside it, needs neither. The console
-and the gateway don't check this yet (`TODO.md`).
+Unix socket, a Cloud SQL Auth Proxy beside it, needs neither.
 
 Cloud SQL and RDS back it up daily, with point-in-time recovery, keeping
 `database.backups.retentionDays` backups (at most 35 on RDS); the

@@ -197,11 +197,11 @@ spec:
             # Sessions are checked with the console's public key (its JWKS,
             # GET /api/auth/jwks): the gateway never holds JWT_SECRET.
             - name: CONSOLE_URL
-              value: "http://{{ include "execution-console.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}"
+              value: "http://{{ include "execution-console.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain | default "cluster.local" }}:{{ .Values.service.port }}"
             - name: SIGNING_KEY_FILE
               value: /var/run/secrets/vennir/signing/seed
             - name: GATEWAY_ISSUER
-              value: {{ .Values.gateway.publicUrl | default .Values.gateway.url | default (printf "http://%s.%s.svc.cluster.local:8080" $name .Release.Namespace) | quote }}
+              value: {{ .Values.gateway.publicUrl | default .Values.gateway.url | default (printf "http://%s.%s.svc.%s:8080" $name .Release.Namespace (.Values.clusterDomain | default "cluster.local")) | quote }}
             - name: BACKEND_HOSTS
               value: {{ join "," .Values.gateway.backendHosts | quote }}
             - name: CLUSTER_DOMAIN

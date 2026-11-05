@@ -654,7 +654,32 @@ func (s *Service) CancelExecution(ctx context.Context, req *connect.Request[kern
 			if err == nil && tag.RowsAffected() == 0 {
 				return errFinishedMeanwhile
 			}
-			return err
+			if err != nil {
+				return err
+			}
+			// Again, now that the execution is held: a retry (or an approval)
+			// that held it while the tasks above were cancelled may have made
+			// a task READY since, which nothing would claim in a cancelled
+			// execution. SKIP LOCKED, so this never waits on the scheduler
+			// (whose lock order is the tasks' first): one it holds becomes
+			// RUNNING, and its next pass stops it, as above.
+			rows, err = sp.Query(ctx, `UPDATE execution_tasks SET state = 'CANCELLED', updated_at = now()
+				WHERE id IN (SELECT id FROM execution_tasks WHERE execution_id = $1
+					AND state IN ('READY', 'BLOCKED', 'AWAITING_APPROVAL') FOR UPDATE SKIP LOCKED)
+				RETURNING id::text, task_key`, id)
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var c cancelled
+				if err := rows.Scan(&c.id, &c.key); err != nil {
+					rows.Close()
+					return err
+				}
+				tasks = append(tasks, c)
+			}
+			rows.Close()
+			return rows.Err()
 		})
 		if errors.Is(err, errFinishedMeanwhile) {
 			st, err := s.exists(ctx, t, id)
