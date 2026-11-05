@@ -69,7 +69,7 @@ Images are checked twice: by the console when you submit, retry or run again, an
 | `IMAGE_NOT_PINNED` | The image reached the cluster without a digest | Submit through the console or its API, which pins every image to a digest |
 | `IMAGE_SCAN_PENDING` | The image is being scanned for the first time | Try again in a minute |
 | `IMAGE_SCAN_ERROR` | The scan couldn't run, and is being retried | Try again in a minute. If it persists, tell an admin |
-| `IMAGE_SCAN_FAILED` | The scan found a HIGH or CRITICAL vulnerability with a fix available, or a secret in the image | Ask the product's team to rebuild it with the fixes. An admin can accept a failed scan with a reason ([image scans](16-admin-settings.md#image-scans)) |
+| `IMAGE_SCAN_FAILED` | Its image hasn't passed a scan on this install: the scan found a HIGH or CRITICAL vulnerability with a fix available, or a secret in the image, or the image was never scanned here (its Job didn't come through the console) | Retry it from the console, which scans it first. If the scan fails, ask the product's team to rebuild it with the fixes. An admin can accept a failed scan with a reason ([image scans](16-admin-settings.md#image-scans)) |
 | `IMAGE_NOT_SIGNED` | The install requires catalog images to be signed, and this one wasn't signed by catalog CI | Publish it through a catalog pull request, not by pushing it yourself |
 | `IMAGE_USER_NOT_ALLOWED` | The image runs as root, or as a named user | Ask the product's team to end the Dockerfile with a numeric `USER`, such as `USER 65532:65532` |
 

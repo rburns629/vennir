@@ -25,7 +25,7 @@ export const PLATFORM_ERRORS: Record<string, ErrorHelp> = {
   RESOURCES_NOT_ALLOWED: { means: "The step asks for more memory or CPU than its team may ever use.", do: "Ask an admin to raise the team's resource limits (its Settings tab), or ask the product's team for a smaller size." },
   IMAGE_NOT_ALLOWED: { means: "Its image isn't from a source this install allows.", do: "An admin can allow the source on the Admin page." },
   IMAGE_NOT_PINNED: { means: "Its image wasn't pinned to a digest, so the cluster refused it." },
-  IMAGE_SCAN_FAILED: { means: "Its image failed the security scan.", do: "Ask the product's team to rebuild it with the fixes." },
+  IMAGE_SCAN_FAILED: { means: "Its image hasn't passed the security scan on this install: it failed, or wasn't scanned here.", do: "Retry it from the console, which scans it first; if its scan fails, ask the product's team to rebuild it with the fixes." },
   IMAGE_NOT_SIGNED: { means: "Its image isn't signed by the catalog's CI.", do: "Ask the product's team to publish it through their catalog's CI." },
   IDENTITY_NOT_ALLOWED: { means: "It asked for an identity or secrets its product isn't registered for." },
   DISPATCH_REJECTED: { means: "The cluster refused to run it in that team's namespace." },

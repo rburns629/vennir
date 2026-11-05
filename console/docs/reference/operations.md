@@ -1474,7 +1474,7 @@ in sooner, delete their row from `sign_in_failures` (and
 | `DISPATCH_REJECTED` | Its namespace isn't labelled `vennir/team=true` |
 | `TEAM_RETIRED` | Its team's namespace is labelled `vennir/team=retired` (retired while the run was going) |
 | `IMAGE_NOT_ALLOWED` | Its image isn't under an allowed source (Admin page) |
-| `IMAGE_NOT_PINNED`, `IMAGE_SCAN_FAILED` | Not pinned by digest; a failed scan |
+| `IMAGE_NOT_PINNED`, `IMAGE_SCAN_FAILED` | Not pinned by digest; its digest hasn't passed a scan on this install (failed, or never scanned: a Job that didn't come through the console's submission, or the console's `scanning` is off while the kernel chart's `scanPolicy` is on). Retrying it from the console scans it and admits it |
 | `IMAGE_NOT_SIGNED` | Not signed by the catalog's key (with policy-controller) |
 | `INPUT_INVALID`, `OUTPUT_INVALID` | Not refused by the cluster but by the kernel: its resolved inputs, or its outputs, don't fit its product's schema (`product.yaml`'s `input` and `output`) |
 | `IDENTITY_NOT_ALLOWED` | A ServiceAccount or secret its product isn't allowed. If the console allowed it, the policy may be behind: the Admin's policy sync (`AdminService/GetPolicySync`) shows the last sync's outcome |

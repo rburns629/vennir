@@ -1550,11 +1550,30 @@ export async function deleteScanJob(namespace: string, name: string): Promise<vo
 }
 
 /**
- * Rewrites the kernel chart's scan policy's `blockedDigests` literal (a JSON
- * list) with what `build` returns, the same way as updateIdentityPolicy.
- * Returns false when the policy doesn't exist.
+ * How long the API servers may take to load a changed admission policy:
+ * each watches policies and recompiles a changed one about once a second.
  */
-export async function updateScanPolicy(name: string, build: () => Promise<string>): Promise<boolean> {
+const POLICY_SETTLE_MS = 3000;
+
+/** The scan policy's variables the console writes (the kernel chart's scan-policy.yaml). */
+const SCAN_POLICY_VARIABLES = new Set([
+  "unlistedAdmitted",
+  ...["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"].map((digit) => `allowedDigests${digit}`),
+]);
+
+/**
+ * Rewrites the kernel chart's scan policy's literals (unlistedAdmitted and
+ * the allowedDigests maps, by name) with what `build` returns, given what
+ * they say now, the same way as updateIdentityPolicy (`build` may return
+ * them unchanged). With `settle`, a write that changed any waits
+ * POLICY_SETTLE_MS, so the cluster admits what it added by the time this
+ * returns. Returns false when the policy doesn't exist.
+ */
+export async function updateScanPolicy(
+  name: string,
+  build: (current: Record<string, string>) => Promise<Record<string, string>>,
+  { settle = false } = {},
+): Promise<boolean> {
   const { admission } = getApis();
   for (let attempt = 1; ; attempt++) {
     let policy: k8s.V1ValidatingAdmissionPolicy;
@@ -1564,18 +1583,28 @@ export async function updateScanPolicy(name: string, build: () => Promise<string
       if (isNotFound(error)) return false;
       throw error;
     }
-    const variable = (policy.spec?.variables ?? []).find((v) => v.name === "blockedDigests");
-    if (!variable) throw new Error(`Scan policy "${name}" has no "blockedDigests" variable.`);
-    const literal = await build();
-    if (variable.expression === literal) return true;
-    variable.expression = literal;
+    const variables = (policy.spec?.variables ?? []).filter((v) => SCAN_POLICY_VARIABLES.has(v.name));
+    if (variables.length !== SCAN_POLICY_VARIABLES.size) {
+      throw new Error(`Scan policy "${name}" doesn't have the allow list's variables: upgrade the kernel chart before the console.`);
+    }
+    const wanted = await build(Object.fromEntries(variables.map((v) => [v.name, v.expression])));
+    let changed = false;
+    for (const variable of variables) {
+      const literal = wanted[variable.name];
+      if (literal === undefined || literal === variable.expression) continue;
+      variable.expression = literal;
+      changed = true;
+    }
+    if (!changed) return true;
     try {
       await admission.replaceValidatingAdmissionPolicy({ name, body: policy });
-      return true;
     } catch (error) {
       const conflict = typeof error === "object" && error !== null && "code" in error && error.code === 409;
       if (!conflict || attempt >= 5) throw error;
+      continue;
     }
+    if (settle) await new Promise((resolve) => setTimeout(resolve, POLICY_SETTLE_MS));
+    return true;
   }
 }
 

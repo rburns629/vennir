@@ -188,7 +188,7 @@ Admins are alerted when the image sources change.
 
 ### Image scans
 
-`/admin/scans`. Every image is scanned before it's registered or run, and again daily while it's in use. A scan fails on a HIGH or CRITICAL vulnerability with a fix available, or a secret in the image. A failed image can't run: the console refuses it, and so does the cluster (`IMAGE_SCAN_FAILED`). Steps already running aren't stopped.
+`/admin/scans`. Every image is scanned before it's registered or run, and again daily while it's in use. A scan fails on a HIGH or CRITICAL vulnerability with a fix available, or a secret in the image. A failed image can't run: the console refuses it, and so does the cluster (`IMAGE_SCAN_FAILED`), which runs only the digests the console has seen pass (or an admin accepted) and that are still in use. Steps already running aren't stopped.
 
 Filter the list by verdict: **Failed**, **Couldn't scan**, **Scanning**, **Accepted** or **Passed**. You can also filter by image or digest. Click a scan to see its findings: severity, finding, package, and the version that fixes it. In the scan you can:
 

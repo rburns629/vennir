@@ -147,8 +147,8 @@ retention:
 # or a secret in the image, fails it: new registrations and runs of it are
 # refused (never steps already running) until it's rescanned clean or an
 # admin accepts it. Images in use are rescanned every rescanHours. The
-# kernel chart's scan policy (scanPolicy) holds the failed digests, so the
-# cluster refuses them too. The server downloads its database from the
+# kernel chart's scan policy (scanPolicy) holds the digests that passed (or
+# were accepted), so the cluster refuses any other: keep this on while it is. The server downloads its database from the
 # internet (mirror.gcr.io / ghcr.io) when it starts and every few hours.
 scanning:
   enabled: true

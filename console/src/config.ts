@@ -658,7 +658,7 @@ export const config = {
     waitSeconds: wholeNumber("SCAN_WAIT_SECONDS", 60),
     // Images in use are scanned again once their verdict is this old.
     rescanHours: positiveInt("SCAN_RESCAN_HOURS", 24),
-    // The kernel chart's scan admission policy, which holds the failed digests.
+    // The kernel chart's scan admission policy, which holds the admitted digests.
     policyName: process.env["SCAN_POLICY_NAME"] ?? "",
     // The Trivy server's Deployment, which the console scales to zero after
     // idleMinutes with no scans and back up when one is wanted. Empty: it's

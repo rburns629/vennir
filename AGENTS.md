@@ -156,8 +156,10 @@ its own directory.
   registered or run (`console/src/scanning.ts`: a Trivy client Job against
   the console chart's Trivy server; a fixable HIGH/CRITICAL or a secret
   fails it). The kernel chart's `scan-policy.yaml` refuses unpinned images
-  and failed digests (`IMAGE_NOT_PINNED`, `IMAGE_SCAN_FAILED`), from a list
-  the console keeps current.
+  and any digest that hasn't passed (`IMAGE_NOT_PINNED`, `IMAGE_SCAN_FAILED`),
+  from an allow list the console keeps current: what passed (or an admin
+  accepted) and is still in use, written before a submission reaches
+  kernel-api.
 - **Catalog images can be required to be signed** (`imageSignature` in the
   kernel chart, `templates/image-signature.yaml`; on in the GKE values).
   Catalog CI signs them after they pass its security scans, with a generated

@@ -158,12 +158,8 @@ it was seen.
 ## Security
 
 - [ ] **From the security review of 2026-11-04** (six read-only reviewers,
-  each finding checked against the code; the fixes so far are #213 to #222).
-  Decided, still to build:
-  - **The scan policy admits only digests that passed** (or were accepted),
-    not every digest but those that failed.
-
-  Smaller, still open:
+  each finding checked against the code; the fixes so far are #213 to #226).
+  Still open:
   - Gateway: record a request's endpoint only once it's matched or signed
     in, limit by peer before sign-in, and set a body-read deadline; reserve
     the cloud federation audiences (`sts.amazonaws.com`, the GKE pool's) for

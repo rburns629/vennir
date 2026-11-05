@@ -108,7 +108,7 @@ A failed step shows a code, a message, what the code means and what to do. When 
 | `RESOURCES_NOT_ALLOWED` | The step asks for more memory or CPU than its team may ever use | No | Ask an admin to raise the team's resource limits, or ask the product's team for a smaller size |
 | `IMAGE_NOT_ALLOWED` | Its image isn't from a source this install allows | No | Use the catalog's image; an admin can allow another source on the Admin page |
 | `IMAGE_NOT_PINNED` | Its image wasn't pinned to a digest, so the cluster refused it | No | Submit it through the console, which pins every image |
-| `IMAGE_SCAN_FAILED` | Its image failed the security scan | No | Ask the product's team to rebuild it with the fixes |
+| `IMAGE_SCAN_FAILED` | Its image hasn't passed the security scan on this install: it failed, or wasn't scanned here | No | Retry it from the console, which scans it first; if the scan fails, ask the product's team to rebuild it with the fixes |
 | `IMAGE_NOT_SIGNED` | Its image isn't signed by the catalog's CI | No | Ask the product's team to publish it through their catalog's CI |
 | `IDENTITY_NOT_ALLOWED` | It asked for an identity or secrets its product isn't registered for | No | Check the product's ServiceAccount on its page and the secret on the Secrets tab; if they look right, tell an admin |
 | `TEAM_RETIRED` | Its team was retired while the run was going, so it never started (its steps already running finished) | No | An admin can un-retire the team on the Teams page, then retry it |
