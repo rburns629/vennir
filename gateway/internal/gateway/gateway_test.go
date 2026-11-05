@@ -64,6 +64,13 @@ const spec = `{
         "requestBody": {"content": {"application/vnd.example.notes": {"schema": {"type": "object"}}}},
         "responses": {"201": {"description": "created"}}
       }
+    },
+    "/refunds": {
+      "post": {
+        "parameters": [{"name": "X-Tenant", "in": "header", "required": true, "schema": {"type": "string", "enum": ["acme"]}}],
+        "requestBody": {"content": {"application/x-www-form-urlencoded": {"schema": {"type": "object", "properties": {"amount": {"type": "integer"}}}}}},
+        "responses": {"201": {"description": "created"}}
+      }
     }
   }
 }`
@@ -170,7 +177,8 @@ func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 	w := f.do("POST", "/payments/orders/orders?dry=true", "web-person", `{"amount": 1200}`, map[string]string{
 		"Content-Type": "application/json", "Idempotency-Key": "k1", "Vennir-Caller": "forged", "Connection": "close, X-Hop",
 		"X-Hop": "for the next hop only", "Proxy-Authorization": "Basic cHJveHk=", "X-Forwarded-For": "10.0.0.66", "X-Forwarded-Host": "evil.example",
-		"Forwarded": "for=10.0.0.66", "X-Real-Ip": "10.0.0.66"})
+		"Forwarded": "for=10.0.0.66", "X-Real-Ip": "10.0.0.66", "X-HTTP-Method-Override": "DELETE", "X-Original-URL": "/admin",
+		"X-Amz-Target": "DynamoDB_20120810.DeleteTable"})
 	if w.Code != http.StatusCreated || w.Header().Get(AnsweredBy) != "backend" || w.Header().Get("X-Backend") != "yes" || w.Body.String() != `{"ok":true}` {
 		t.Fatalf("answer = %d %v %s", w.Code, w.Header(), w.Body)
 	}
@@ -186,10 +194,15 @@ func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 	}
 	// Nothing for one hop only, and nothing the caller says about where
 	// it's from: X-Forwarded-For is the gateway's peer (httptest's).
-	for _, h := range []string{"X-Hop", "Proxy-Authorization", "X-Forwarded-Host", "Forwarded", "X-Real-Ip"} {
+	// Nor anything a backend's framework would read as another method or
+	// path than the one checked.
+	for _, h := range []string{"X-Hop", "Proxy-Authorization", "X-Forwarded-Host", "Forwarded", "X-Real-Ip", "X-Http-Method-Override", "X-Original-Url"} {
 		if v := got.Header.Get(h); v != "" {
 			t.Errorf("%s reached the backend: %q", h, v)
 		}
+	}
+	if got.Header.Get("X-Amz-Target") == "" {
+		t.Error("X-Amz-* is kept for a backend not signed with SigV4")
 	}
 	if v := got.Header.Values("X-Forwarded-For"); len(v) != 1 || v[0] != "192.0.2.1" {
 		t.Errorf("X-Forwarded-For = %q", v)
@@ -219,6 +232,59 @@ func verify(t *testing.T, token string, pub ed25519.PublicKey) caller.Claims {
 	var c caller.Claims
 	_ = json.Unmarshal(payload, &c)
 	return c
+}
+
+// What's validated is what the backend gets.
+func TestTheBackendGetsTheRequestThatWasChecked(t *testing.T) {
+	f := setup(t, "")
+	form := map[string]string{"Content-Type": "application/x-www-form-urlencoded", "X-Tenant": "acme"}
+	if w := f.do("POST", "/payments/orders/refunds", "web-person", "amount=5", form); w.Code != http.StatusCreated {
+		t.Fatalf("a form as described: %d %s", w.Code, w.Body)
+	}
+	with := func(extra map[string]string) map[string]string {
+		h := map[string]string{}
+		for k, v := range form {
+			h[k] = v
+		}
+		for k, v := range extra {
+			h[k] = v
+		}
+		return h
+	}
+	for name, tc := range map[string]struct {
+		path, body string
+		headers    map[string]string
+	}{
+		// Connection drops X-Tenant on the way: it's checked as missing.
+		"a header Connection names": {"/payments/orders/refunds", "amount=5", with(map[string]string{"Connection": "X-Tenant"})},
+		"_method in a form":         {"/payments/orders/refunds", "amount=5&_method=DELETE", form},
+		"_method in the query":      {"/payments/orders/refunds?_method=DELETE", "amount=5", form},
+		"a multipart _method": {"/payments/orders/refunds", "--b\r\nContent-Disposition: form-data; name=\"_method\"\r\n\r\nDELETE\r\n--b--\r\n",
+			with(map[string]string{"Content-Type": "multipart/form-data; boundary=b"})},
+	} {
+		if w := f.do("POST", tc.path, "web-person", tc.body, tc.headers); w.Code != http.StatusBadRequest || errorCode(t, w) != "INVALID_REQUEST" {
+			t.Errorf("%s: %d %s", name, w.Code, w.Body)
+		}
+	}
+	// Two Content-Types: the validator reads the first, a backend may read the last.
+	r := httptest.NewRequest("POST", "/payments/orders/orders", strings.NewReader(`{"amount": 1}`))
+	r.Header.Set("Authorization", "Bearer web-person")
+	r.Header["Content-Type"] = []string{"application/json", "application/x-www-form-urlencoded"}
+	w := httptest.NewRecorder()
+	f.gw.ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest || errorCode(t, w) != "INVALID_REQUEST" {
+		t.Errorf("two Content-Types: %d %s", w.Code, w.Body)
+	}
+	if len(f.backend.got) != 1 {
+		t.Errorf("the backend got %d requests, want only the first", len(f.backend.got))
+	}
+}
+
+func TestASigV4BackendGetsNoCallersAmzHeaders(t *testing.T) {
+	out := forwardHeaders(http.Header{"X-Amz-Target": {"DynamoDB_20120810.DeleteTable"}, "X-Amz-Security-Token": {"t"}, "Idempotency-Key": {"k"}}, "", true)
+	if out.Get("X-Amz-Target") != "" || out.Get("X-Amz-Security-Token") != "" || out.Get("Idempotency-Key") != "k" {
+		t.Errorf("forwarded %v", out)
+	}
 }
 
 func TestWhatTheSpecDoesntDescribeIsBlockedAndNeverForwarded(t *testing.T) {

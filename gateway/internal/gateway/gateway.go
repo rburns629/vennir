@@ -43,6 +43,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/netip"
@@ -131,6 +133,10 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 }
 
 // hopByHop are headers for one connection, never forwarded.
+// methodOverrides let a backend's framework run another method or path than
+// the one the OpenAPI document was checked for: never forwarded.
+var methodOverrides = []string{"X-Http-Method-Override", "X-Http-Method", "X-Method-Override", "X-Original-Url", "X-Rewrite-Url"}
+
 var hopByHop = []string{"Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailer", "Transfer-Encoding", "Upgrade"}
 
 // outcome is how a request ended, for logs and metrics.
@@ -280,9 +286,15 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	// can't read (a pair with a ";", a bad escape, and all of it past 10,000
 	// parameters), and the backend gets the query as sent: only one that
 	// reads in full is checked and forwarded.
-	if _, err := url.ParseQuery(r.URL.RawQuery); err != nil {
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
 		result.name = "invalid"
 		return g.refuse(w, result, http.StatusBadRequest, "INVALID_REQUEST", "The query can't be read (a \";\", a bad %-escape, or too many parameters): nothing was forwarded.")
+	}
+	// The validator reads the first, and a backend may read the last.
+	if len(r.Header.Values("Content-Type")) > 1 {
+		result.name = "invalid"
+		return g.refuse(w, result, http.StatusBadRequest, "INVALID_REQUEST", "A request has one Content-Type: nothing was forwarded.")
 	}
 
 	if r.ContentLength > api.MaxRequest {
@@ -301,6 +313,11 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		result.name = "invalid"
 		return g.refuse(w, result, http.StatusBadRequest, "INVALID_REQUEST", "A body needs a Content-Type: nothing was forwarded.")
 	}
+	// Frameworks read a _method field as the method to run instead.
+	if query.Has("_method") || formHas(r.Header.Get("Content-Type"), body, "_method") {
+		result.name = "invalid"
+		return g.refuse(w, result, http.StatusBadRequest, "INVALID_REQUEST", "A _method field asks the backend for another method than the request's: nothing was forwarded.")
+	}
 
 	target := *api.BackendURL
 	target.Path = strings.TrimSuffix(api.BackendURL.Path, "/") + rest
@@ -312,7 +329,8 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		result.name = "invalid"
 		return g.refuse(w, result, http.StatusBadRequest, "BAD_REQUEST", "The request can't be read.")
 	}
-	check.Header = r.Header.Clone()
+	// Its headers as the backend gets them: none for this hop only.
+	check.Header = beyondThisHop(r.Header)
 	if valid, problems := api.Validator.ValidateHttpRequest(check); !valid && !onlyStyledKeys(api, o.endpoint, problems) {
 		if notInSpec(problems) {
 			result.name = "blocked"
@@ -353,7 +371,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	if g.Public {
 		trusted = g.Settings.TrustedProxies
 	}
-	out.Header = forwardHeaders(r.Header, clientAddress(r.Header, r.RemoteAddr, trusted))
+	out.Header = forwardHeaders(r.Header, clientAddress(r.Header, r.RemoteAddr, trusted), api.BackendAuth["awsSigV4"] != nil)
 	out.Header.Set(caller.Header, signed)
 	out.Header.Set(RequestIDHeader, requestID)
 	out.ContentLength = int64(len(body))
@@ -433,21 +451,20 @@ func notInSpec(problems []*verrors.ValidationError) bool {
 // what a caller could claim about where it's from (Forwarded,
 // X-Forwarded-*, X-Real-Ip): X-Forwarded-For is set to client, the caller's
 // address as clientAddress worked it out.
-func forwardHeaders(in http.Header, client string) http.Header {
-	out := in.Clone()
-	for _, h := range hopByHop {
+func forwardHeaders(in http.Header, client string, sigV4 bool) http.Header {
+	out := beyondThisHop(in)
+	for _, h := range methodOverrides {
 		out.Del(h)
-	}
-	for _, h := range strings.Split(in.Get("Connection"), ",") {
-		if h = strings.TrimSpace(h); h != "" {
-			out.Del(h)
-		}
 	}
 	out.Del("Authorization")
 	out.Del("Forwarded")
 	out.Del("X-Real-Ip")
 	for k := range out {
-		if lower := strings.ToLower(k); strings.HasPrefix(lower, "vennir-") || strings.HasPrefix(lower, "x-forwarded-") {
+		lower := strings.ToLower(k)
+		// A SigV4 backend's operation can be chosen by its headers
+		// (X-Amz-Target), which would be signed as the API's role: only
+		// the signing's own are sent.
+		if strings.HasPrefix(lower, "vennir-") || strings.HasPrefix(lower, "x-forwarded-") || (sigV4 && strings.HasPrefix(lower, "x-amz-")) {
 			out.Del(k)
 		}
 	}
@@ -455,6 +472,48 @@ func forwardHeaders(in http.Header, client string) http.Header {
 		out.Set("X-Forwarded-For", client)
 	}
 	return out
+}
+
+// beyondThisHop is in without its hop-by-hop headers, those every Connection
+// header names included: what the backend gets, and so what's validated.
+func beyondThisHop(in http.Header) http.Header {
+	out := in.Clone()
+	for _, h := range hopByHop {
+		out.Del(h)
+	}
+	for _, value := range in.Values("Connection") {
+		for _, h := range strings.Split(value, ",") {
+			if h = strings.TrimSpace(h); h != "" {
+				out.Del(h)
+			}
+		}
+	}
+	return out
+}
+
+// formHas says whether a form body (urlencoded or multipart) has a field.
+func formHas(contentType string, body []byte, field string) bool {
+	media, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	switch media {
+	case "application/x-www-form-urlencoded":
+		values, _ := url.ParseQuery(string(body))
+		return values.Has(field)
+	case "multipart/form-data":
+		reader := multipart.NewReader(bytes.NewReader(body), params["boundary"])
+		for {
+			part, err := reader.NextPart()
+			if err != nil {
+				return false
+			}
+			if part.FormName() == field {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // clientAddress is the caller's address: the request's peer, unless the
