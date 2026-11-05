@@ -419,13 +419,18 @@ describe("a consumer's run", () => {
     }
   });
 
-  it("is rerun as the template, with the same parameters", async () => {
+  it("is rerun as the template, with the same parameters, by its owners only", async () => {
     const run = await call<{ executionId: string }>(outsiderToken, "TemplateService/RunTemplate", {
       team: own,
       name: "chain",
       parameters: { text: "again" },
     });
     vi.mocked(submitExecution).mockClear();
+    // A member of the team that provides its steps sees the run, not its
+    // parameters, and doesn't rerun it as their own.
+    const byProvider = await call<RpcError>(ownMemberToken, "ExecutionService/RerunExecution", { executionId: run.body.executionId });
+    expect(byProvider.code).toBe("permission_denied");
+    expect(submitExecution).not.toHaveBeenCalled();
     const rerun = await call<{ executionId: string }>(outsiderToken, "ExecutionService/RerunExecution", { executionId: run.body.executionId });
     expect(rerun.code).toBe("ok");
     expect(forwarded().tasks[0]).toMatchObject({ team: own, inputs: { text: "again", fixed: 1 } });

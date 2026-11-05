@@ -1128,8 +1128,16 @@ export async function rerun(caller: AuthUser | undefined, executionId: string, l
       "This execution was submitted before rerun support existed, so there's no stored submission to replay.",
     );
   }
-  // A template's run is rerun as the template, against its current products.
-  if (submitted.template !== null) return rerunTemplate(caller, submitted, log);
+  // A template's run is rerun as the template, against its current products,
+  // with its parameters: only by its owners (runView), who see them. A
+  // provider of one of its steps sees the run, not them, and rerunning it
+  // would make a run of their own with them.
+  if (submitted.template !== null) {
+    if (!runView(caller, submitted).full) {
+      throw new ApiError(403, "FORBIDDEN", "Only this run's owners rerun it: whoever ran it, the team it was run for, or an admin.");
+    }
+    return rerunTemplate(caller, submitted, log);
+  }
   // Stored DAGs from before the rename get the current field names first,
   // and a task with no serviceAccount the one it runs as now.
   const replayed = isRecord(submitted.payload)
