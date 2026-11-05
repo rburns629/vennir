@@ -632,21 +632,22 @@ func (s *Service) CancelExecution(ctx context.Context, req *connect.Request[kern
 		type cancelled struct{ id, key string }
 		var tasks []cancelled
 		err = pgx.BeginFunc(ctx, t.Tx, func(sp pgx.Tx) error {
-			rows, err := sp.Query(ctx, `UPDATE execution_tasks SET state = 'CANCELLED', updated_at = now()
-				WHERE execution_id = $1 AND state IN ('READY', 'BLOCKED', 'AWAITING_APPROVAL') RETURNING id::text, task_key`, id)
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var c cancelled
-				if err := rows.Scan(&c.id, &c.key); err != nil {
-					rows.Close()
+			// Each cancelled task, for its event.
+			cancelTasks := func(sql string) error {
+				rows, err := sp.Query(ctx, sql, id)
+				if err != nil {
 					return err
 				}
-				tasks = append(tasks, c)
+				found, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (cancelled, error) {
+					var c cancelled
+					err := row.Scan(&c.id, &c.key)
+					return c, err
+				})
+				tasks = append(tasks, found...)
+				return err
 			}
-			rows.Close()
-			if err := rows.Err(); err != nil {
+			if err := cancelTasks(`UPDATE execution_tasks SET state = 'CANCELLED', updated_at = now()
+				WHERE execution_id = $1 AND state IN ('READY', 'BLOCKED', 'AWAITING_APPROVAL') RETURNING id::text, task_key`); err != nil {
 				return err
 			}
 			tag, err := sp.Exec(ctx, `UPDATE executions SET state = 'CANCELLED', updated_at = now()
@@ -657,29 +658,16 @@ func (s *Service) CancelExecution(ctx context.Context, req *connect.Request[kern
 			if err != nil {
 				return err
 			}
-			// Again, now that the execution is held: a retry (or an approval)
-			// that held it while the tasks above were cancelled may have made
-			// a task READY since, which nothing would claim in a cancelled
-			// execution. SKIP LOCKED, so this never waits on the scheduler
-			// (whose lock order is the tasks' first): one it holds becomes
-			// RUNNING, and its next pass stops it, as above.
-			rows, err = sp.Query(ctx, `UPDATE execution_tasks SET state = 'CANCELLED', updated_at = now()
+			// Again, now that the execution is held: a retry that held it
+			// while the tasks above were cancelled may have made a task READY
+			// since, which nothing would claim in a cancelled execution. SKIP
+			// LOCKED, so this never waits on the scheduler (whose lock order
+			// is the tasks' first): what it skips, the scheduler's sweep of
+			// stranded tasks cancels (scheduler.CancelStranded).
+			return cancelTasks(`UPDATE execution_tasks SET state = 'CANCELLED', updated_at = now()
 				WHERE id IN (SELECT id FROM execution_tasks WHERE execution_id = $1
 					AND state IN ('READY', 'BLOCKED', 'AWAITING_APPROVAL') FOR UPDATE SKIP LOCKED)
-				RETURNING id::text, task_key`, id)
-			if err != nil {
-				return err
-			}
-			for rows.Next() {
-				var c cancelled
-				if err := rows.Scan(&c.id, &c.key); err != nil {
-					rows.Close()
-					return err
-				}
-				tasks = append(tasks, c)
-			}
-			rows.Close()
-			return rows.Err()
+				RETURNING id::text, task_key`)
 		})
 		if errors.Is(err, errFinishedMeanwhile) {
 			st, err := s.exists(ctx, t, id)

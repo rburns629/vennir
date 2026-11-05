@@ -92,7 +92,7 @@ func (c *Catalog) apiProblems(a *API) []string {
 	backend, _ := a.Spec["backend"].(map[string]any)
 	backendURL := text(backend, "url")
 	if u, err := url.Parse(backendURL); err == nil && u.Scheme == "http" && !inClusterService(u.Hostname()) {
-		problems = append(problems, fmt.Sprintf("backend.url %s: https, or http only to a Service in the cluster (<service>.<namespace>.svc, with its cluster's domain or not)", backendURL))
+		problems = append(problems, fmt.Sprintf("backend.url %s: https, or http only to a Service in the cluster (<service>.<namespace>.svc, alone or with .cluster.local; on a cluster with another domain, the short form)", backendURL))
 	}
 	auth, _ := backend["auth"].(map[string]any)
 	if sat, ok := auth["serviceAccountToken"].(map[string]any); ok {
@@ -388,15 +388,17 @@ func bytesOf(size string) int64 {
 	return 0
 }
 
-// inClusterService is a Service's name: <service>.<namespace>.svc, alone or
-// followed by its cluster's domain, whichever it is (a catalog serves every
-// install, each with its own: cluster.local or another).
+// inClusterService is a Service's name: <service>.<namespace>.svc, alone
+// (the gateway looks it up with its install's cluster domain, whichever it
+// is: a catalog serves every install) or with cluster.local. Not with any
+// other domain: a catalog can't tell a cluster's from a name on the internet.
 func inClusterService(host string) bool {
 	labels := strings.Split(strings.TrimSuffix(strings.ToLower(host), "."), ".")
-	for i, label := range labels {
-		if label == "svc" {
-			return i == 2 && labels[0] != "" && labels[1] != ""
-		}
+	if len(labels) != 3 && len(labels) != 5 {
+		return false
 	}
-	return false
+	if labels[0] == "" || labels[1] == "" || labels[2] != "svc" {
+		return false
+	}
+	return len(labels) == 3 || labels[3] == "cluster" && labels[4] == "local"
 }

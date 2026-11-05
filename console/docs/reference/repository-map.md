@@ -113,6 +113,7 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | `internal/scheduler/run.go` | The loop: each pass records what finished and commits it, then dispatches in a transaction of its own, finished Jobs released after the commit (held `ReleaseAfter` first, for the log collector), housekeeping, the queue gauges (`kernel_tasks`, the oldest ready task's age), the heartbeat, leases released on stop. |
 | `internal/scheduler/retention.go` | Deletes finished executions past their retention (with everything of theirs). |
 | `internal/scheduler/orphans.go` | Every few minutes, removes attempts' Jobs no task can use any more (a pass that rolled back, a release that failed, a deleted execution). |
+| `internal/scheduler/stranded.go` | Every few minutes too, cancels tasks left waiting in a cancelled execution (by a writer that raced the cancel), which nothing would claim. |
 | **`internal/migrate/`** | **The schema.** |
 | `internal/migrate/sql/` | One SQL file per change, applied in order, each once: `0001_initial_schema.sql` (every table at the first public release), then one file per later change. A released file never changes. |
 | `internal/migrate/migrate.go` | Applies them under an advisory lock, recorded in `schema_migrations`; takes over an install Alembic migrated; what kernel-api and the scheduler wait for. |

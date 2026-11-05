@@ -549,20 +549,21 @@ func TestACancelRacingARetryLeavesNothingReady(t *testing.T) {
 		_, err := cancel(c, id)
 		done <- err
 	}()
-	// The cancel has cancelled what it could and waits for the execution.
-	for range 100 {
-		var n int
-		if err := testPool.QueryRow(ctx, `SELECT count(*) FROM execution_tasks WHERE execution_id = $1 AND state = 'CANCELLED'`, id).Scan(&n); err != nil {
-			t.Fatal(err)
-		}
-		var waiting bool
-		if err := testPool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_locks WHERE NOT granted AND locktype = 'transactionid')`).Scan(&waiting); err != nil {
+	// The cancel has cancelled what it could and waits for the execution:
+	// a backend of this test's own database waiting on a lock.
+	waiting := false
+	for range 250 {
+		if err := testPool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+			WHERE datname = current_database() AND wait_event_type = 'Lock')`).Scan(&waiting); err != nil {
 			t.Fatal(err)
 		}
 		if waiting {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+	if !waiting {
+		t.Fatal("the cancel never waited for the execution: the race wasn't run")
 	}
 	if _, err := retrying.Exec(ctx, `UPDATE execution_tasks SET state = 'READY' WHERE execution_id = $1 AND task_key = 'create-project'`, id); err != nil {
 		t.Fatal(err)

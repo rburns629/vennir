@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+import { isIP } from "node:net";
+import { parseIntoClientConfig } from "pg-connection-string";
 import { readFileSync } from "node:fs";
 
 /**
@@ -146,31 +148,47 @@ function databaseIamAuth(): "" | "gcp" | "aws" {
 
 /**
  * Why a sign-in token from the cloud mustn't be sent over DATABASE_URL, or
- * "": its TLS must check the server, so only the server gets it:
- * sslmode=verify-full, or verify-ca with sslrootcert (the server's own CA,
- * not the system's, which any publicly trusted certificate would pass).
- * A loopback host or a Unix socket (a Cloud SQL Auth Proxy beside the
- * process, which encrypts and checks on its own) needs neither. The rule of
+ * "": its TLS must check the server's certificate, so only the server gets
+ * it. Read as node-postgres reads it (pg-connection-string, then PGHOST and
+ * PGSSLMODE where the URL says nothing), so what's checked is what
+ * connects: TLS that rejects an unverified certificate (sslmode=verify-full,
+ * or verify-ca with sslrootcert; node-postgres 8 checks the certificate for
+ * require and prefer too, unless uselibpqcompat, which this then refuses).
+ * A loopback address or a Unix socket (a Cloud SQL Auth Proxy beside the
+ * process, which encrypts and checks on its own) needs none. The rule of
  * the kernel's verifiedTLSProblem and the gateway's verifiedTLS; never
  * quotes the URL, which may hold a password.
  */
 export function verifiedTlsProblem(databaseUrl: string): string {
-  // Read by hand, as node-postgres's own parser reads a URL: an empty host
-  // with ?host= (a Unix socket) isn't a URL to `new URL`.
-  const scheme = /^postgres(?:ql)?:\/\//.exec(databaseUrl);
-  if (!scheme) return "isn't a postgres:// URL";
-  const rest = databaseUrl.slice(scheme[0].length);
-  const queryAt = rest.indexOf("?");
-  const query = new URLSearchParams(queryAt >= 0 ? rest.slice(queryAt + 1) : "");
-  const authority = (queryAt >= 0 ? rest.slice(0, queryAt) : rest).split("/")[0] ?? "";
-  const hostPort = authority.slice(authority.lastIndexOf("@") + 1);
-  const hostname = hostPort.startsWith("[") ? hostPort.slice(1, hostPort.indexOf("]")) : (hostPort.split(":")[0] ?? "");
-  const host = decodeURIComponent(query.get("host") ?? (hostname || (process.env["PGHOST"] ?? "")));
-  if (host === "" || host.startsWith("/") || host === "localhost" || host === "::1" || /^127\./.test(host)) return "";
-  const mode = query.get("sslmode") ?? process.env["PGSSLMODE"] ?? "";
-  const rootCert = query.get("sslrootcert") ?? process.env["PGSSLROOTCERT"] ?? "";
-  if (mode === "verify-full" || (mode === "verify-ca" && rootCert !== "" && rootCert !== "system")) return "";
-  return `with DATABASE_IAM_AUTH, its token is sent only over TLS that checks the server: sslmode=verify-full, or verify-ca with sslrootcert (the server's own CA), unless it connects to localhost (a Cloud SQL Auth Proxy); its sslmode is ${mode || "unset"}`;
+  let parsed: ReturnType<typeof parseIntoClientConfig>;
+  try {
+    parsed = parseIntoClientConfig(databaseUrl);
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? ` (${String(error.code)})` : "";
+    return `can't be read as a Postgres URL${code}`;
+  }
+  const host = parsed.host || process.env["PGHOST"] || "localhost";
+  const loopback = (isIP(host) === 4 && host.startsWith("127.")) || (isIP(host) === 6 && host === "::1");
+  if (host.startsWith("/") || host === "localhost" || loopback) return "";
+  const ssl: unknown = parsed.ssl === undefined ? sslFromEnvironment() : parsed.ssl;
+  const verified = ssl === true || ssl === "true" || (typeof ssl === "object" && ssl !== null && (ssl as { rejectUnauthorized?: unknown }).rejectUnauthorized !== false);
+  if (verified) return "";
+  return "with DATABASE_IAM_AUTH, its token is sent only over TLS that checks the server's certificate: sslmode=verify-full, or verify-ca with sslrootcert (the server's own CA), unless it connects to localhost (a Cloud SQL Auth Proxy)";
+}
+
+/** node-postgres's TLS where the URL says nothing: PGSSLMODE's (pg's connection-parameters.js). */
+function sslFromEnvironment(): unknown {
+  switch (process.env["PGSSLMODE"]) {
+    case "prefer":
+    case "require":
+    case "verify-ca":
+    case "verify-full":
+      return true;
+    case "no-verify":
+      return { rejectUnauthorized: false };
+    default:
+      return false;
+  }
 }
 
 export const CHAT_PROVIDERS = ["vertex", "bedrock", "anthropic", "openai-compatible"] as const;

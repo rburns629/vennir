@@ -317,9 +317,12 @@ public listener (the Ingress controller's namespace, a load balancer's
 ranges), and `gateway.trustedProxies` lists the proxies whose
 `X-Forwarded-For` names the caller; the chart refuses the second without
 the first. On a cluster set up with a DNS domain other than
-`cluster.local`, set the console chart's `clusterDomain` to it
-(`CLUSTER_DOMAIN` for the console and the gateway): it's how they tell
-which backend hosts are in the cluster, and in which namespace. With
+`cluster.local`, set `clusterDomain` to it in both charts: the console
+chart's is `CLUSTER_DOMAIN` for the console and the gateway (how they tell
+which backend hosts are in the cluster, and in which namespace) and its own
+in-cluster URLs; the kernel chart's puts it in kernel-api's certificate.
+Set the console chart's `kernelApiUrl` with it too. `vennir` assumes
+`cluster.local`, which every cluster it makes uses. With
 `database.iamAuth`, the gateway's `DATABASE_URL` must say
 `sslmode=verify-full` (or `verify-ca`) unless it connects to localhost (a
 Cloud SQL Auth Proxy beside it), or the gateway won't start; the URLs

@@ -10,6 +10,11 @@ image:
   digest: ""
   pullPolicy: IfNotPresent
 
+# -- The cluster's DNS domain (a Service is <name>.<namespace>.svc.<domain>):
+# kernel-api's certificate names it too when it isn't cluster.local. The
+# console chart's clusterDomain, the same.
+clusterDomain: cluster.local
+
 maxTasksPerExecution: 500
 
 serviceAccount:

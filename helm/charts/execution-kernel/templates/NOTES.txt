@@ -1,6 +1,6 @@
 execution-kernel is installed.
 
-kernel-api: {{ include "execution-kernel.fullname" . }}-api.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.api.service.port }}
+kernel-api: {{ include "execution-kernel.fullname" . }}-api.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain | default "cluster.local" }}:{{ .Values.api.service.port }}
 kernel-scheduler dispatches each task's Job into that task's own `team`
 namespace — there is no single fixed namespace
 to report here anymore.

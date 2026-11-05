@@ -151,16 +151,19 @@ func TestAPIsInTheCluster(t *testing.T) {
 	}
 }
 
-func TestHTTPOnlyToAServiceInAnyClusterDomain(t *testing.T) {
+func TestHTTPOnlyToAServiceInTheCluster(t *testing.T) {
 	for host, want := range map[string]bool{
-		"orders.payments.svc.cluster.local":  true,
-		"orders.payments.svc.corp.internal":  true,
-		"orders.payments.svc":                true,
-		"ORDERS.Payments.SVC.cluster.local.": true,
-		"orders.svc.cluster.local":           false,
-		"pod.orders.payments.svc":            false,
-		"api.example.com":                    false,
-		"svc.example.com":                    false,
+		"orders.payments.svc.cluster.local": true,
+		// Another domain can't be told from a name on the internet: the
+		// short form is looked up with the install's own.
+		"orders.payments.svc.corp.internal":    false,
+		"orders.payments.svc.attacker.example": false,
+		"orders.payments.svc":                  true,
+		"ORDERS.Payments.SVC.cluster.local.":   true,
+		"orders.svc.cluster.local":             false,
+		"pod.orders.payments.svc":              false,
+		"api.example.com":                      false,
+		"svc.example.com":                      false,
 	} {
 		if got := inClusterService(host); got != want {
 			t.Errorf("inClusterService(%s) = %v, want %v", host, got, want)
