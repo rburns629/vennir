@@ -149,5 +149,9 @@ describe("UserService", () => {
     await createApiToken(bot.id, "ci", hashApiToken(raw));
     const asBot = await rpc("UserService", "ListUsers", {}, { token: raw });
     expect(asBot.statusCode).toBe(403);
+    // And its flag can be cleared, never as "the last admin": it wasn't one.
+    expect((await rpc("UserService", "SetAdmin", { email, admin: false }, { token })).statusCode).toBe(200);
+    const [cleared] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, bot.id));
+    expect(cleared?.isAdmin).toBe(false);
   });
 });

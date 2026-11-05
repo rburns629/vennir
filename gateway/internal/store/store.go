@@ -384,10 +384,13 @@ const DefaultClusterDomain = "cluster.local"
 // BackendNamespace reads where a backend host is: whether it's in the
 // cluster, and the namespace it names, if it names one. These name one: a
 // Service (<service>.<namespace>.svc), a headless Service's Pod
-// (<pod>.<service>.<namespace>.svc) and a Pod (<a-b-c-d>.<namespace>.pod),
-// each with or without the cluster's domain (clusterDomain; cluster.local
-// is read as the cluster's too). These are in the cluster but name none
-// ("", true): any other name under that domain or ending in .svc or .pod;
+// (<pod>.<service>.<namespace>.svc), each with or without the cluster's
+// domain (clusterDomain; cluster.local is read as the cluster's too). These
+// are in the cluster but name none ("", true): a Pod's name
+// (<a-b-c-d>.<namespace>.pod), whose namespace cluster DNS doesn't check
+// (it answers the address in it, as with "pods insecure"), so it's an IP
+// address as any other; any other name under that domain or ending in .svc
+// or .pod;
 // an IP address (a Pod's or a Service's, whoever's they are), but the
 // loopback, which is the gateway's own Pod; and a single name, which the
 // Pod's DNS search path finds in the gateway's own namespace. Anything else
@@ -424,8 +427,6 @@ func BackendNamespace(u *url.URL, clusterDomain string) (namespace string, inClu
 	switch {
 	case labels[last] == "svc" && (last == 2 || last == 3):
 		return labels[last-1], true
-	case labels[last] == "pod" && last == 2:
-		return labels[1], true
 	case labels[last] == "svc" || labels[last] == "pod":
 		return "", true
 	}

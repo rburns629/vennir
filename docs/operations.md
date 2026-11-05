@@ -819,14 +819,13 @@ to know:
   from the `catalog-publish` Environment is refused.
 - **A catalog repository pinned by its id** (since 2026-11-05). Catalog
   CI's federation now trusts the repository's GitHub id and its owner's,
-  not its name, which a renamed or re-created repository could hold. On
-  AWS, `vennir apply` reads the ids before planning and, once approved,
-  has the repository's tokens carry them (subject claims `repo`, `context`,
-  `ref`, `repository_owner_id`, `repository_id`) before the role trusts
-  only subjects ending in them. On GCP, run `vennir catalog create` again
-  (its repository is left as it is): it reads the ids and re-applies the
-  provider's condition and the publish account's binding; until then the
-  provider trusts the name, as before.
+  not its name, which a renamed or re-created repository could hold.
+  `vennir apply` reads the ids before planning, with `gh` signed in, and
+  pins the federation to them: on GCP the provider's condition and the
+  publish account's binding; on AWS, once approved, it has the
+  repository's tokens carry them (subject claims `repo`, `context`, `ref`,
+  `repository_owner_id`, `repository_id`) before the role trusts only
+  subjects ending in them.
 - **A catalog's `ci.yml` and its `./vennir` pin** (after 0.9.0). Catalog CI
   on `main` now plans, builds teams' products in their own Environments
   (`buildEnvironments`), then publishes, with commands only `vennir` after

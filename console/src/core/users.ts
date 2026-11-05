@@ -114,7 +114,8 @@ export async function setAdmin(caller: AuthUser | undefined, email: string, admi
   // A bot acts unattended on a credential anyone holding it can use: it's
   // never an admin (auth/plugin.ts resolves one as no admin either).
   if (admin && user.isBot) throw new ApiError(400, "BAD_REQUEST", "A bot can't be an admin.");
-  if (!admin && user.isAdmin && (await countAdmins()) <= 1) {
+  // A bot's flag never made it an admin, so clearing one never leaves none.
+  if (!admin && user.isAdmin && !user.isBot && (await countAdmins()) <= 1) {
     throw new ApiError(409, "CONFLICT", "Cannot revoke the last remaining admin.");
   }
   await setUserAdmin(user.id, admin);

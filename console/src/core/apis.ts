@@ -51,11 +51,12 @@ export function backendAllowed(url: string, hosts: string[] = config.gateway.bac
  * Where a backend host is: whether it's in the cluster, and the namespace
  * it names, if it names one. These name one: a Service
  * (<service>.<namespace>.svc), a headless Service's Pod
- * (<pod>.<service>.<namespace>.svc) and a Pod (<a-b-c-d>.<namespace>.pod),
- * each with or without the cluster's domain (CLUSTER_DOMAIN; cluster.local
- * is read as the cluster's too). These are in the cluster but name none
- * (namespace null): any other name under that domain or ending in .svc or
- * .pod; an IP address (a Pod's or a Service's, whoever's they are), but the
+ * (<pod>.<service>.<namespace>.svc), each with or without the cluster's
+ * domain (CLUSTER_DOMAIN; cluster.local is read as the cluster's too).
+ * These are in the cluster but name none (namespace null): a Pod's name
+ * (<a-b-c-d>.<namespace>.pod), whose namespace cluster DNS doesn't check
+ * (it answers the address in it), so it's an IP address as any other; any
+ * other name under that domain or ending in .svc or .pod; an IP address (a Pod's or a Service's, whoever's they are), but the
  * loopback, which is the gateway's own Pod; and a single name, which the
  * gateway's DNS search path finds in its own namespace. Anything else is
  * outside (the gateway looks it up as the absolute name it is). The gateway
@@ -90,7 +91,6 @@ export function backendNamespace(url: string, clusterDomain = config.clusterDoma
   const labels = host.split(".");
   const last = labels.length - 1;
   if (labels[last] === "svc" && (last === 2 || last === 3)) return inCluster(labels[last - 1] || null);
-  if (labels[last] === "pod" && last === 2) return inCluster(labels[1] || null);
   if (labels[last] === "svc" || labels[last] === "pod") return inCluster();
   return within ? inCluster() : outside;
 }

@@ -61,7 +61,7 @@ func (p *Product) ReleaseActions(reference string) ([]*catalogv1.ProductAction, 
 			return nil, fmt.Errorf("action %s's output schema: %w", actionName, err)
 		}
 		a := &catalogv1.ProductAction{
-			Name:           fmt.Sprintf("%s-%s-%s", p.Team(), p.Name(), actionName),
+			Name:           registeredName(p, actionName),
 			Image:          reference,
 			Action:         actionName,
 			Team:           p.Team(),

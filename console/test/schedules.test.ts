@@ -214,6 +214,24 @@ describe("a due schedule", () => {
     }
   });
 
+  it("never wakes the sleeper for a retired team's, which would only be skipped", async () => {
+    Object.assign(config, { activityConfigMap: "console-activity", platformNamespace: "vennir-system" });
+    const [row] = await db.select().from(schedules).where(eq(schedules.teamId, ownTeamId));
+    // Due before any other test's: it would be the next.
+    const first = new Date(Date.now() + 5_000);
+    await db.update(schedules).set({ nextRunAt: first }).where(eq(schedules.id, row?.id ?? ""));
+    await setTeamRetired(ownTeamId, true, "admin@example.com");
+    try {
+      vi.mocked(recordNextSchedule).mockClear();
+      await startDueSchedules(silent);
+      const told = vi.mocked(recordNextSchedule).mock.calls.map((call) => (call[2] as Date | null)?.getTime());
+      expect(told).not.toContain(first.getTime());
+    } finally {
+      await setTeamRetired(ownTeamId, false);
+      Object.assign(config, { activityConfigMap: "", platformNamespace: "" });
+    }
+  });
+
   it("that can't run again (its time zone no longer reads) runs this once, and says why", async () => {
     await addTeamMember(bot.id, ownTeamId, "maintainer");
     const [row] = await db

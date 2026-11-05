@@ -1242,7 +1242,10 @@ export async function retry(caller: AuthUser | undefined, executionId: string, t
   // Theirs only while it's still shared with them, and its steps with its team.
   if (ownTemplateRun) await ensureStillRunnable(caller, submitted);
   await authorizeTasks(tasksInfo, caller, { maintainers: !ownTemplateRun });
-  await refuseRetiredFor(caller, [submitted.onBehalfOf, ...taskForTeams(submitted.payload)]);
+  // An admin's cleanup run may be retried as it may run (refuseRetiredFor).
+  await refuseRetiredFor(caller, [submitted.onBehalfOf, ...taskForTeams(submitted.payload)], {
+    adminCleanup: caller?.isAdmin === true && submitted.template === CLEANUP_RUN,
+  });
   // What runs again: the step, and every step kernel-api revives with it,
   // the ones its failure cancelled. Read before the retry, so every step not
   // yet finished is counted (a running one may be cancelled before the retry

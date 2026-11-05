@@ -224,6 +224,10 @@ export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: num
         .where(and(eq(apiTokens.userId, userId), isNull(apiTokens.revokedAt)))
         .returning();
       revokedBotTokens += revoked.length;
+      // A keyless bot signs in by its identities, not a token: gone too, or
+      // it would still sign in, a bot of no team.
+      const removed = await tx.delete(botIdentities).where(eq(botIdentities.botId, userId)).returning();
+      revokedBotTokens += removed.length;
     }
 
     await tx.update(teams).set({ deletedAt: new Date() }).where(eq(teams.id, teamId));

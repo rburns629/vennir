@@ -191,7 +191,7 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 			WHERE t.state = 'READY' AND t.available_at <= $1 AND e.state IN ('PENDING', 'RUNNING')
 			AND (t.available_at, t.id) > (COALESCE($3::timestamptz, '-infinity'), $4::uuid)
 			ORDER BY t.available_at, t.id LIMIT $2
-			FOR UPDATE OF t SKIP LOCKED FOR NO KEY UPDATE OF e SKIP LOCKED`, p.now, page, afterAt, afterID)
+			FOR UPDATE OF t SKIP LOCKED`, p.now, page, afterAt, afterID)
 		if err != nil {
 			return nil, err
 		}
@@ -251,6 +251,17 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 		}
 		after = ready[len(ready)-1]
 	}
+	// Each claimed task's execution is locked too, never waiting, and only
+	// theirs (not those of tasks passed over above, which would stay locked
+	// through the dispatch for nothing): one a cancel (or another
+	// scheduler) holds, or that's no longer active once locked (the state is
+	// read again on the locked row), keeps its task READY for a later pass.
+	// So a cancel can't land between the claim and the start, and waits for
+	// this pass to commit.
+	claimed, err := p.lockExecutions(claimed)
+	if err != nil {
+		return nil, err
+	}
 	for _, t := range claimed {
 		t.State = domain.TaskClaimed
 		t.LeaseOwner = &p.opts.Owner
@@ -281,6 +292,38 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 		}
 	}
 	return claimed, nil
+}
+
+// lockExecutions keeps the tasks whose execution it could lock, still
+// PENDING or RUNNING, without waiting.
+func (p *pass) lockExecutions(tasks []*Task) ([]*Task, error) {
+	if len(tasks) == 0 {
+		return tasks, nil
+	}
+	ids := make([]string, 0, len(tasks))
+	for _, t := range tasks {
+		ids = append(ids, t.ExecutionID)
+	}
+	rows, err := p.db.Query(p.ctx, `SELECT id::text FROM executions
+		WHERE id = ANY($1::uuid[]) AND state IN ('PENDING', 'RUNNING')
+		FOR NO KEY UPDATE SKIP LOCKED`, ids)
+	if err != nil {
+		return nil, err
+	}
+	locked := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		locked[id] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(tasks, func(t *Task) bool { return !locked[t.ExecutionID] }), nil
 }
 
 func ptr[T any](v T) *T { return &v }

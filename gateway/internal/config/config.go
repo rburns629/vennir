@@ -209,7 +209,7 @@ func verifiedTLS(databaseURL string, getenv func(string) string) string {
 	// As pgx reads them: a URL's hosts (several, comma-separated) or its
 	// host parameter, a keyword/value string's host, else PGHOST; none is
 	// a Unix socket, which is local.
-	var hosts, mode string
+	var hosts, mode, rootCert string
 	rest, ok := strings.CutPrefix(databaseURL, "postgres://")
 	if !ok {
 		rest, ok = strings.CutPrefix(databaseURL, "postgresql://")
@@ -225,12 +225,15 @@ func verifiedTLS(databaseURL string, getenv func(string) string) string {
 		if err != nil {
 			return "can't be read"
 		}
-		hosts, mode = authority, values.Get("sslmode")
+		hosts, mode, rootCert = authority, values.Get("sslmode"), values.Get("sslrootcert")
 		if h := values.Get("host"); h != "" {
 			hosts = h
 		}
 	} else {
-		mode, hosts = keyword(databaseURL, "sslmode"), keyword(databaseURL, "host")
+		mode, hosts, rootCert = keyword(databaseURL, "sslmode"), keyword(databaseURL, "host"), keyword(databaseURL, "sslrootcert")
+	}
+	if rootCert == "" {
+		rootCert = getenv("PGSSLROOTCERT")
 	}
 	if hosts == "" {
 		hosts = getenv("PGHOST")
@@ -255,7 +258,11 @@ func verifiedTLS(databaseURL string, getenv func(string) string) string {
 	if local {
 		return ""
 	}
-	if mode == "verify-full" || mode == "verify-ca" {
+	// verify-full checks the chain and the host name; verify-ca only the
+	// chain, so only against the server's own CA (sslrootcert): against the
+	// system's, any publicly trusted certificate would do (the kernel's
+	// verifiedTLSProblem, the same rule).
+	if mode == "verify-full" || mode == "verify-ca" && rootCert != "" && rootCert != "system" {
 		return ""
 	}
 	if mode == "" {
