@@ -13,7 +13,7 @@ import {
   recordSubmittedExecution,
   setUserAdmin,
 } from "../src/db/queries.js";
-import { secretGrants, submittedExecutions, teams, users } from "../src/db/schema.js";
+import { botIdentities, secretGrants, submittedExecutions, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { getExecutionStates, retryTask, submitExecution } from "../src/kernel/client.js";
 import { caller } from "./rpc.js";
@@ -197,10 +197,14 @@ describe("purge", () => {
 
   it("removes access, grants and bots, keeps history, and reserves the name forever", async () => {
     const t = await populatedTeam();
+    // Its bot signs in keyless too, by an identity: that goes with it.
+    const [bot] = await db.select({ id: users.id }).from(users).where(eq(users.email, `${t.name}-bot@bot.internal`));
+    await db.insert(botIdentities).values({ botId: bot?.id ?? "", issuer: "https://issuer.example", claims: { sub: `${t.name}-ci` } });
     await call(admin, "TeamService/RetireTeam", { name: t.name });
     const purged = await call<{ revokedBotTokens: number }>(admin, "TeamService/PurgeTeam", { name: t.name });
     expect(purged.code).toBe("ok");
-    expect(purged.body.revokedBotTokens).toBe(1);
+    expect(purged.body.revokedBotTokens).toBe(2);
+    expect(await db.select().from(botIdentities).where(eq(botIdentities.botId, bot?.id ?? ""))).toEqual([]);
 
     // Gone from membership, admin listing, and the team's own calls.
     expect((await call<{ teamNames: string[] }>(t.member.token, "AuthService/GetMe")).body.teamNames).toEqual([]);

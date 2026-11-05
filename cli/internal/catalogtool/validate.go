@@ -320,6 +320,12 @@ func (c *Catalog) ValidateServiceAccounts() bool {
 	return ok
 }
 
+// registeredName is the name an action is registered under: its team's,
+// its product's and its own (the release's ProductAction.Name).
+func registeredName(p *Product, action string) string {
+	return fmt.Sprintf("%s-%s-%s", p.Team(), p.Name(), action)
+}
+
 // ValidateProductNames refuses two actions registered under one name. Each
 // is registered as <team>-<product>-<action>, and names are one namespace
 // across every team: team a's product b-c and team a-b's product c both
@@ -348,7 +354,7 @@ func (c *Catalog) ValidateProductNames() bool {
 			if name == "" {
 				continue
 			}
-			registered := fmt.Sprintf("%s-%s-%s", p.Team(), p.Name(), name)
+			registered := registeredName(p, name)
 			whose := fmt.Sprintf("team %s's %s action %s", p.Team(), p.Label(), quote(name))
 			if other, taken := first[registered]; taken {
 				c.errorAt(path, fmt.Sprintf("%s is registered as %s, as %s is: product names are one across every team; rename the product or the action", whose, quote(registered), other))

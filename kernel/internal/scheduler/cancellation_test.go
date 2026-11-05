@@ -330,3 +330,45 @@ func TestAClaimHoldsItsExecutionUntilItCommits(t *testing.T) {
 		t.Fatalf("the execution's row was free while its task was being dispatched: %v", err)
 	}
 }
+
+// Only a claimed task's execution is locked for the pass: one whose task is
+// passed over (its team at its cap) stays free, so its cancel and its
+// settling aren't held up by a dispatch that started none of it.
+func TestAPassedOverTasksExecutionStaysUnlocked(t *testing.T) {
+	ctx := context.Background()
+	var first, second string
+	if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+		first = submit(t, tx, "idem-claim-passed-over-1", task("only"))
+		second = submit(t, tx, "idem-claim-passed-over-2", task("only"))
+		_, err := tx.Exec(ctx, `UPDATE executions SET state = 'RUNNING' WHERE id = ANY($1::uuid[])`, []string{first, second})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = testPool.Exec(ctx, `DELETE FROM executions WHERE id = ANY($1::uuid[])`, []string{first, second})
+	})
+	scheduler, err := testPool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = scheduler.Rollback(ctx) }()
+	exec := fake()
+	opts := DefaultOptions("scheduler-1")
+	opts.MaxRunningPerTeam = 1
+	if _, err := DispatchPass(ctx, scheduler, exec, opts, time.Now(), quietLog); err != nil {
+		t.Fatal(err)
+	}
+	equal(t, "started", len(exec.Started), 1)
+	locked := 0
+	for _, id := range []string{first, second} {
+		_, err := testPool.Exec(ctx, `SELECT id FROM executions WHERE id = $1 FOR NO KEY UPDATE NOWAIT`, id)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "55P03" {
+			locked++
+		} else if err != nil {
+			t.Fatal(err)
+		}
+	}
+	equal(t, "executions locked", locked, 1)
+}

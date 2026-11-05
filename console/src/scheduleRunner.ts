@@ -16,7 +16,7 @@
  * run again from their next time.
  */
 import type { FastifyBaseLogger } from "fastify";
-import { and, eq, isNotNull, lt, lte, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { ApiError } from "./apiError.js";
 import { callerForUser } from "./auth/plugin.js";
 import { nextFor } from "./core/schedules.js";
@@ -117,11 +117,11 @@ async function skip(schedule: Schedule, team: DueTeam, due: Date, log: FastifyBa
   await unclaim(schedule, due);
 }
 
-/** Starts one schedule's run, due at `due`, and clears that time's claim. */
-async function start(schedule: Schedule, dueTeam: DueTeam, due: Date, log: FastifyBaseLogger): Promise<void> {
+/** Starts one schedule's run, due at `due`, and clears that time's claim; false when it's skipped (a retired or purged team's). */
+async function start(schedule: Schedule, dueTeam: DueTeam, due: Date, log: FastifyBaseLogger): Promise<boolean> {
   if (dueTeam.retiredAt || dueTeam.deletedAt) {
     await skip(schedule, dueTeam, due, log);
-    return;
+    return false;
   }
   const team = dueTeam.name;
   const request = { parameters: schedule.parameters, onBehalfOf: team, requestId: `schedule:${schedule.id}:${due.toISOString()}` };
@@ -143,6 +143,7 @@ async function start(schedule: Schedule, dueTeam: DueTeam, due: Date, log: Fasti
     await tellMaintainers(schedule, team, `schedule:${schedule.id}:${due.toISOString()}`, `Schedule ${schedule.name} couldn't start`, why);
   }
   await unclaim(schedule, due);
+  return true;
 }
 
 let nextRecorded: string | undefined;
@@ -150,14 +151,16 @@ let nextRecorded: string | undefined;
 /**
  * The earliest enabled schedule's next run, kept in the activity ConfigMap
  * for the kernel's sleeper: it stays awake for one due soon, and wakes a
- * sleeping install a little before one. Written only when it changes.
+ * sleeping install a little before one. Written only when it changes. Not a
+ * retired or purged team's, which would only be skipped.
  */
 async function publishNextSchedule(): Promise<void> {
   if (!config.activityConfigMap || !config.platformNamespace) return;
   const [row] = await db
     .select({ next: sql<Date | null>`min(${schedules.nextRunAt})` })
     .from(schedules)
-    .where(and(eq(schedules.enabled, true), isNotNull(schedules.nextRunAt)));
+    .innerJoin(teams, eq(teams.id, schedules.teamId))
+    .where(and(eq(schedules.enabled, true), isNotNull(schedules.nextRunAt), isNull(teams.retiredAt), isNull(teams.deletedAt)));
   const next = row?.next ? new Date(row.next) : null;
   const key = next?.toISOString() ?? "";
   if (key === nextRecorded) return;
@@ -192,8 +195,7 @@ export async function startDueSchedules(log: FastifyBaseLogger): Promise<number>
     const at = await reclaim(schedule);
     if (!at) continue;
     log.warn({ event: "schedule_claim_resumed", scheduleId: schedule.id, due: at.toISOString() }, "starting a scheduled time another console claimed and didn't start");
-    await start(schedule, team, at, log);
-    started += 1;
+    if (await start(schedule, team, at, log)) started += 1;
   }
   const due = await db
     .select({ schedule: schedules, team: { name: teams.name, retiredAt: teams.retiredAt, deletedAt: teams.deletedAt } })
@@ -204,9 +206,9 @@ export async function startDueSchedules(log: FastifyBaseLogger): Promise<number>
   for (const { schedule, team } of due) {
     const claimed = await claim(schedule);
     if (!claimed) continue;
-    await start(schedule, team, claimed.due, log);
+    const ran = await start(schedule, team, claimed.due, log);
     if (claimed.stopped !== undefined) await stop(schedule, team.name, claimed.due, claimed.stopped, log);
-    started += 1;
+    if (ran) started += 1;
   }
   await publishNextSchedule();
   return started;

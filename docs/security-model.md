@@ -516,12 +516,14 @@ under its own spec and sharing (`<team>-apis` counts as the team's only
 while no team has that name: none can be named `*-apis` now, and one named
 so before keeps its namespace); a backend should still check the token's
 `api` as well as its `aud` (the sample does). The namespace is read from a
-Service's name, a headless Service's Pod's (`<pod>.<service>.<ns>.svc`) and
-a Pod's (`<a-b-c-d>.<ns>.pod`), with or without the cluster's domain (the
-console chart's `clusterDomain`; `cluster.local` is read as the cluster's
-too). A host inside the cluster that names no namespace is held, by the
-console and the gateway, whatever `backendHosts` allows: any IP address
-but the loopback (a Pod's or a Service's IP is anyone's), a single name
+Service's name and a headless Service's Pod's (`<pod>.<service>.<ns>.svc`),
+with or without the cluster's domain (the console chart's `clusterDomain`;
+`cluster.local` is read as the cluster's too). A host inside the cluster
+that names no namespace is held, by the console and the gateway, whatever
+`backendHosts` allows: any IP address but the loopback (a Pod's or a
+Service's IP is anyone's), a Pod's name (`<a-b-c-d>.<ns>.pod`, which
+cluster DNS answers with the address in it whatever namespace it says, so
+it's an IP address as any other), a single name
 (the Pod's DNS search path finds it in the platform's namespace), and any
 other name under the cluster's domain or ending in `.svc` or `.pod`. Every
 other host the gateway looks up as the absolute name it is, never through

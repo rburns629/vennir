@@ -235,8 +235,11 @@ describe("who sees what", () => {
     // A headless Service's Pods, and Pods.
     ["http://pod-1.orders.web.svc.cluster.local", "", "web", true, "other"],
     ["http://pod-1.orders.payments-apis.svc", "", "payments-apis", true, "apis"],
-    ["http://10-1-2-3.web.pod.cluster.local", "", "web", true, "other"],
-    ["http://10-1-2-3.payments-apis.pod", "", "payments-apis", true, "apis"],
+    // A Pod's name is its address: cluster DNS answers it whatever
+    // namespace it says, so it names none, and is held.
+    ["http://10-1-2-3.web.pod.cluster.local", "", null, true, "other"],
+    ["http://10-1-2-3.payments-apis.pod", "", null, true, "other"],
+    ["http://10-1-2-3.payments-apis.pod.cluster.local", "", null, true, "other"],
     // A cluster with a domain of its own, where cluster.local is still read
     // as the cluster's; on one without, that domain is a name outside.
     ["http://orders.web.svc.corp.internal", "corp.internal", "web", true, "other"],
