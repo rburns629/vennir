@@ -11,7 +11,9 @@
  * after CLAIM_MINUTES. A start that's refused (the bot lost access, a
  * parameter no longer fits), or a schedule that can't run again (its cron
  * or time zone no longer reads), is kept on the schedule and told to the
- * team's maintainers.
+ * team's maintainers. A retired team's schedules are skipped, each time
+ * logged and passed over, never deleted: un-retired, the team's schedules
+ * run again from their next time.
  */
 import type { FastifyBaseLogger } from "fastify";
 import { and, eq, isNotNull, lt, lte, sql } from "drizzle-orm";
@@ -82,8 +84,46 @@ async function tellMaintainers(schedule: Schedule, team: string, key: string, ti
   });
 }
 
+/** A due schedule's team: its name, and whether it's retired or purged. */
+interface DueTeam {
+  name: string;
+  retiredAt: Date | null;
+  deletedAt: Date | null;
+}
+
+/** Clears a time's claim, unless a later time has been claimed since. */
+async function unclaim(schedule: Schedule, due: Date): Promise<void> {
+  await db
+    .update(schedules)
+    .set({ claimedRunAt: null, claimedAt: null })
+    .where(and(eq(schedules.id, schedule.id), eq(schedules.claimedRunAt, due)));
+}
+
+/**
+ * Passes over a time of a retired (or purged) team's schedule: nothing runs
+ * for it, and the schedule stays as it is. Its maintainers aren't told:
+ * the team was retired on purpose, and it'd be every time.
+ */
+async function skip(schedule: Schedule, team: DueTeam, due: Date, log: FastifyBaseLogger): Promise<void> {
+  const why = team.deletedAt ? "its team was purged" : "its team is retired";
+  log.info(
+    { event: "schedule_skipped", scheduleId: schedule.id, team: team.name, due: due.toISOString(), reason: team.deletedAt ? "team_purged" : "team_retired" },
+    `skipped a scheduled run: ${why}`,
+  );
+  await db
+    .update(schedules)
+    .set({ lastError: `Skipped: ${why}, so nothing runs for it.${team.deletedAt ? "" : " It runs again once an admin un-retires the team."}` })
+    .where(eq(schedules.id, schedule.id));
+  await unclaim(schedule, due);
+}
+
 /** Starts one schedule's run, due at `due`, and clears that time's claim. */
-async function start(schedule: Schedule, team: string, due: Date, log: FastifyBaseLogger): Promise<void> {
+async function start(schedule: Schedule, dueTeam: DueTeam, due: Date, log: FastifyBaseLogger): Promise<void> {
+  if (dueTeam.retiredAt || dueTeam.deletedAt) {
+    await skip(schedule, dueTeam, due, log);
+    return;
+  }
+  const team = dueTeam.name;
   const request = { parameters: schedule.parameters, onBehalfOf: team, requestId: `schedule:${schedule.id}:${due.toISOString()}` };
   try {
     const bot = await callerForUser(schedule.botId);
@@ -102,11 +142,7 @@ async function start(schedule: Schedule, team: string, due: Date, log: FastifyBa
     log.warn({ event: "schedule_refused", scheduleId: schedule.id, err: error }, "a scheduled run didn't start");
     await tellMaintainers(schedule, team, `schedule:${schedule.id}:${due.toISOString()}`, `Schedule ${schedule.name} couldn't start`, why);
   }
-  // Unless a later time has been claimed since.
-  await db
-    .update(schedules)
-    .set({ claimedRunAt: null, claimedAt: null })
-    .where(and(eq(schedules.id, schedule.id), eq(schedules.claimedRunAt, due)));
+  await unclaim(schedule, due);
 }
 
 let nextRecorded: string | undefined;
@@ -140,7 +176,7 @@ async function stop(schedule: Schedule, team: string, due: Date, why: string, lo
 /** One pass: every enabled schedule that's due, and every time claimed but not started. */
 export async function startDueSchedules(log: FastifyBaseLogger): Promise<number> {
   const unstarted = await db
-    .select({ schedule: schedules, team: teams.name })
+    .select({ schedule: schedules, team: { name: teams.name, retiredAt: teams.retiredAt, deletedAt: teams.deletedAt } })
     .from(schedules)
     .innerJoin(teams, eq(teams.id, schedules.teamId))
     .where(
@@ -160,7 +196,7 @@ export async function startDueSchedules(log: FastifyBaseLogger): Promise<number>
     started += 1;
   }
   const due = await db
-    .select({ schedule: schedules, team: teams.name })
+    .select({ schedule: schedules, team: { name: teams.name, retiredAt: teams.retiredAt, deletedAt: teams.deletedAt } })
     .from(schedules)
     .innerJoin(teams, eq(teams.id, schedules.teamId))
     .where(and(eq(schedules.enabled, true), isNotNull(schedules.nextRunAt), lte(schedules.nextRunAt, sql`now()`)))
@@ -169,7 +205,7 @@ export async function startDueSchedules(log: FastifyBaseLogger): Promise<number>
     const claimed = await claim(schedule);
     if (!claimed) continue;
     await start(schedule, team, claimed.due, log);
-    if (claimed.stopped !== undefined) await stop(schedule, team, claimed.due, claimed.stopped, log);
+    if (claimed.stopped !== undefined) await stop(schedule, team.name, claimed.due, claimed.stopped, log);
     started += 1;
   }
   await publishNextSchedule();

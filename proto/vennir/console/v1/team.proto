@@ -62,7 +62,9 @@ service TeamService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // Adds someone with an account, as a member unless role says otherwise.
-  // A maintainer's (or an admin's). At most 30 an hour per caller.
+  // A maintainer's (or an admin's). At most 30 an hour per caller. An
+  // account that signed itself up, never verified by single sign-on, is
+  // refused unless an admin adds it (failed_precondition, EMAIL_NOT_VERIFIED).
   rpc AddMember(AddMemberRequest) returns (AddMemberResponse);
   // A maintainer's. Never the team's last maintainer (failed_precondition,
   // LAST_MAINTAINER).

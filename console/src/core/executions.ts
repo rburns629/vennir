@@ -254,6 +254,48 @@ async function runBlocker(teamNames: string[]): Promise<RunBlocker | null> {
 }
 
 /**
+ * Refuses (409, as for a task's own team) running anything for a team that
+ * can't run anything: a run for a retired or purged team (`forTeams`, its
+ * onBehalfOf and each step's), wherever its steps run, other teams'
+ * namespaces included; and anything a team's bot runs once every team it
+ * belongs to is retired, since a bot acts only for its teams. A bot of no
+ * team (an automation token's) isn't one of a team's. With `adminCleanup`
+ * (an admin's cleanup run), a retired team it's for doesn't stop it: what
+ * the team's runs made can be deleted without un-retiring it, which would
+ * let its people run anything again. A purged team's still does, and the
+ * steps' own teams are checked as ever (authorizeTeams; the cluster runs
+ * nothing in a retired team's namespace).
+ */
+async function refuseRetiredFor(
+  caller: AuthUser | undefined,
+  forTeams: (string | null | undefined)[],
+  { adminCleanup = false }: { adminCleanup?: boolean } = {},
+): Promise<void> {
+  const named = [...new Set(forTeams.filter((team): team is string => typeof team === "string" && team !== ""))];
+  for (const team of named) {
+    const blocker = await teamRunBlocker(team);
+    if (blocker && !(adminCleanup && blocker.error === "TEAM_RETIRED")) throw blocked(409, blocker);
+  }
+  if (!caller?.isBot || caller.teamNames.length === 0) return;
+  let first: RunBlocker | null = null;
+  for (const team of caller.teamNames) {
+    const why = await teamRunBlocker(team);
+    if (!why) return;
+    first ??= why;
+  }
+  if (first) throw blocked(409, first);
+}
+
+/** The team each stored task ran for (withForTeam's forTeam). */
+function taskForTeams(payload: unknown): string[] {
+  if (!isRecord(payload) || !Array.isArray(payload["tasks"])) return [];
+  return payload["tasks"].flatMap((task: unknown) => {
+    const forTeam = isRecord(task) ? optionalString(task["forTeam"]) : undefined;
+    return forTeam ? [forTeam] : [];
+  });
+}
+
+/**
  * The submission with every task's image pinned to the digest its tag names
  * right now (registry.ts's pinImages): a DAG may say `:latest`, and what
  * runs, what's retried and what's scanned is exactly the image resolved
@@ -955,6 +997,9 @@ export async function submit(caller: AuthUser | undefined, submitted: unknown, l
 }
 
 /** What a run of a template records (core/templates.ts). */
+/** What submitted_executions.template says for a cleanup run (core/resources.ts): never a template's <team>/<name>. */
+export const CLEANUP_RUN = "cleanup";
+
 export interface TemplateRun {
   /** <team>/<template>, or <team>/<product>.<action> for an action run alone. */
   template: string;
@@ -1019,6 +1064,9 @@ export async function submitChecked(
   const submittedInfo = extractTasksAuthInfo(submitted);
   if (submittedInfo === null) throw malformed();
   await authorizeTeams(submittedInfo, caller, { maintainers: run === undefined });
+  await refuseRetiredFor(caller, [run?.onBehalfOf, ...Object.values(run?.forTeams ?? {})], {
+    adminCleanup: caller?.isAdmin === true && run?.template === CLEANUP_RUN,
+  });
   const teams = [...new Set(submittedInfo.map((t) => t.team))];
   const context: RunContext = { action: "submit", teams, caller, log };
   await refuseBlockedImages(taskImages(submitted), context);
@@ -1078,7 +1126,9 @@ export async function executionDetail(caller: AuthUser | undefined, executionId:
   // No submitter id: that account has since been deleted (its executions
   // are kept, see db/schema.ts).
   const submitter = submitted.submittedBy ? await findUserById(submitted.submittedBy) : undefined;
-  const blocker = (await runBlocker(submitted.teams)) ?? (await detailImageBlocker(submitted.payload, log));
+  const blocker =
+    (await runBlocker([...submitted.teams, ...(submitted.onBehalfOf ? [submitted.onBehalfOf] : [])])) ??
+    (await detailImageBlocker(submitted.payload, log));
   // Who asked for each attempt, as the kernel recorded it: "user:<id>",
   // shown by email (an account since deleted says so).
   const emails = new Map<string, string>();
@@ -1192,6 +1242,7 @@ export async function retry(caller: AuthUser | undefined, executionId: string, t
   // Theirs only while it's still shared with them, and its steps with its team.
   if (ownTemplateRun) await ensureStillRunnable(caller, submitted);
   await authorizeTasks(tasksInfo, caller, { maintainers: !ownTemplateRun });
+  await refuseRetiredFor(caller, [submitted.onBehalfOf, ...taskForTeams(submitted.payload)]);
   // What runs again: the step, and every step kernel-api revives with it,
   // the ones its failure cancelled. Read before the retry, so every step not
   // yet finished is counted (a running one may be cancelled before the retry
@@ -1273,6 +1324,7 @@ export async function rerun(caller: AuthUser | undefined, executionId: string, l
   const storedInfo = extractTasksAuthInfo(submitted.payload);
   if (storedInfo === null) throw malformed();
   await authorizeTeams(storedInfo, caller);
+  await refuseRetiredFor(caller, []);
   const context: RunContext = { action: "rerun", teams: submitted.teams, executionId, caller, log };
   await refuseBlockedImages(taskImages(submitted.payload), context);
 

@@ -57,7 +57,8 @@ type UserServiceClient interface {
 	CreateUser(context.Context, *connect.Request[v1.CreateUserRequest]) (*connect.Response[v1.CreateUserResponse], error)
 	// Its executions stay in the history.
 	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error)
-	// Makes someone a Vennir admin, or takes it away.
+	// Makes someone a Vennir admin, or takes it away. Never a bot
+	// (invalid_argument).
 	SetAdmin(context.Context, *connect.Request[v1.SetAdminRequest]) (*connect.Response[v1.SetAdminResponse], error)
 	// Sets someone's password and ends their sessions; hand it over out of
 	// band. Not for a bot, which has no password.
@@ -154,7 +155,8 @@ type UserServiceHandler interface {
 	CreateUser(context.Context, *connect.Request[v1.CreateUserRequest]) (*connect.Response[v1.CreateUserResponse], error)
 	// Its executions stay in the history.
 	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error)
-	// Makes someone a Vennir admin, or takes it away.
+	// Makes someone a Vennir admin, or takes it away. Never a bot
+	// (invalid_argument).
 	SetAdmin(context.Context, *connect.Request[v1.SetAdminRequest]) (*connect.Response[v1.SetAdminResponse], error)
 	// Sets someone's password and ends their sessions; hand it over out of
 	// band. Not for a bot, which has no password.

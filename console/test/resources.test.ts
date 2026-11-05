@@ -331,6 +331,21 @@ describe("what runs made", () => {
     expect(lastSubmitted().dag.tasks[0]).toMatchObject({ team: prov, forTeam: cons });
   });
 
+  it("is deleted for a retired team by an admin only, without un-retiring it", async () => {
+    const executionId = await ranAndFinished(`${prov}-thing-create`, {}, { resources: [{ type: "demo/thing", id: `${prefix}-retired` }] });
+    const [made] = await list(consumerToken, { executionId });
+    const admin = await users.signIn((await users.makeUser({ admin: true })).email);
+    await db.update(teams).set({ retiredAt: new Date(), retiredBy: "an admin" }).where(eq(teams.name, cons));
+    try {
+      const refused = await call(consumerToken, "ResourceService/DeleteResources", { resourceIds: [made?.id] });
+      expect(refused.failure).toBe("TEAM_RETIRED");
+      expect((await call(admin, "ResourceService/DeleteResources", { resourceIds: [made?.id] })).code).toBe("ok");
+      expect(lastSubmitted().dag.tasks[0]).toMatchObject({ team: prov, forTeam: cons });
+    } finally {
+      await db.update(teams).set({ retiredAt: null, retiredBy: null }).where(eq(teams.name, cons));
+    }
+  });
+
   it("deletes each of a person's resources for its own product's team", async () => {
     // Made for the consumer alone (no team), by two teams' products: each
     // cleanup step for its own product's team, as its run's step was.

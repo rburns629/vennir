@@ -151,6 +151,12 @@ export const users = pgTable("users", {
   // email (notifier.ts): failures, approvals and readiness by default, not
   // every finished run.
   emailKinds: text("email_kinds").array().$type<NotificationKind[]>().notNull().default(sql`'{run_failed,approval_waiting,product_not_ready,catalog_failing,step_refused,platform_alert}'::text[]`),
+  // Made by its own sign-up (AuthService.Register, with self-registration
+  // on), which checks nothing about the email: anyone may register any
+  // address. Until single sign-on binds it (oidcSubject), nobody has
+  // verified it's the address's owner's, so a maintainer adding it to a
+  // team by email is told so (core/teams.ts addMember).
+  selfRegistered: boolean("self_registered").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

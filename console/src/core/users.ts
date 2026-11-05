@@ -106,11 +106,14 @@ export async function deleteAccount(
   log?.warn({ event: "account_deleted", userId: user.id, email: user.email, by: caller?.id }, "account deleted by admin");
 }
 
-/** Grants or revokes admin. Never revokes the last admin: nobody could grant it back. */
+/** Grants or revokes admin. Never to a bot, and never revokes the last admin: nobody could grant it back. */
 export async function setAdmin(caller: AuthUser | undefined, email: string, admin: boolean): Promise<void> {
   forbiddenUnlessAdmin(caller);
   const user = await findUserByEmail(email);
   if (!user) throw new ApiError(404, "NOT_FOUND", "No such user.");
+  // A bot acts unattended on a credential anyone holding it can use: it's
+  // never an admin (auth/plugin.ts resolves one as no admin either).
+  if (admin && user.isBot) throw new ApiError(400, "BAD_REQUEST", "A bot can't be an admin.");
   if (!admin && user.isAdmin && (await countAdmins()) <= 1) {
     throw new ApiError(409, "CONFLICT", "Cannot revoke the last remaining admin.");
   }

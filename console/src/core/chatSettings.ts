@@ -232,6 +232,8 @@ export async function testChatConfig(caller: AuthUser | undefined, input: ChatCo
     return { ok: true, problem: "", seconds: seconds(), model: answer.model, answer: answer.text.slice(0, 600), citations: answer.citations.length };
   } catch (error) {
     if (!(error instanceof ApiError) || error.code !== "MODEL_UNAVAILABLE") throw error;
+    // In full in the log (the agent's chat_model_unavailable); to the admin,
+    // only whether it answered.
     const problem = (failure as ModelUnavailable | null)?.summary ?? "The model didn't answer.";
     return { ok: false, problem, seconds: seconds(), model: settings.model, answer: "", citations: 0 };
   }

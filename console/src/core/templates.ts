@@ -47,7 +47,7 @@ import { UNREGISTERED_SERVICE_ACCOUNT } from "../productPolicy.js";
 import { allowedValues, targetInputs, targetProblems } from "../targets.js";
 import { readinessOf, type ReadinessView } from "../readiness.js";
 import { catalogLinks, githubBase } from "./catalogLinks.js";
-import { submitChecked } from "./executions.js";
+import { CLEANUP_RUN, submitChecked } from "./executions.js";
 import { ensureOrderRate } from "./orderRate.js";
 import { ensureRunsHere, runsHere } from "./clouds.js";
 
@@ -473,9 +473,6 @@ export async function ensureRunnable(who: AuthUser, kind: "template" | "action",
   if (kind === "template") await prepareTemplate(who, team, name, request);
   else await prepareAction(who, await findRunnableProduct(name), request, name);
 }
-
-/** What submitted_executions.template says for a cleanup run (core/resources.ts): never a template's <team>/<name>. */
-export const CLEANUP_RUN = "cleanup";
 
 /** What submitted_executions.template says for a preview run: never a template's <team>/<name>. */
 export const PREVIEW_RUN = "preview";

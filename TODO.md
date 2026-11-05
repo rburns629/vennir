@@ -167,17 +167,9 @@ it was seen.
     `LOKI_URL`, `PROMETHEUS_URL`, NOTES) and the catalog tool's "http only
     in the cluster" check (`cli/internal/catalogtool/apis.go`) still assume
     `cluster.local`, not `clusterDomain`.
-  - Console: a retired team's schedules don't run, and nothing runs for it
-    in other teams' namespaces; an admin can't be a bot; with
-    self-registration on, adding a member by email says when the account
-    was never verified.
-  - Catalog: a release doesn't un-retire a team an admin retired; release
-    refuses two teams' products whose names collide; GCP catalog CI's
-    federation pins the repository by its ID.
+  - Catalog: GCP catalog CI's federation pins the repository by its ID.
   - Cluster: the console replaces or registers only ExternalSecrets it
     labelled; an image's first part may not be uppercase.
-  - The chat agent's test of an admin's endpoint answers "didn't answer"
-    rather than the connection's error.
   - Identity (found reviewing #230): a running step keeps its digest's
     releases in use for every product that released that digest, not only
     the one it runs as (`releaseInUse` reads running digests alone), so

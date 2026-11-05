@@ -17,7 +17,7 @@
 import { Code } from "@connectrpc/connect";
 import { Type } from "@sinclair/typebox";
 import type { FastifyBaseLogger } from "fastify";
-import { groupSources, teamIsMapped } from "../sso.js";
+import { currentSso, groupSources, teamIsMapped } from "../sso.js";
 import { ApiError, externalSecretsMissing, forbiddenUnlessAdmin } from "../apiError.js";
 import { canActForTeam, ensureNotBot, ensureTeamMaintainer, ensureTeamMember } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
@@ -303,8 +303,30 @@ export async function addMember(
   if (user.isBot) {
     throw new ApiError(409, "CONFLICT", `${email} is a bot: make this team its own (Bots), rather than adding another team's.`, Code.AlreadyExists);
   }
+  ensureVerified(caller, user);
   await ensureNotFollowingGroups(team, { email: user.email, usesSso: user.oidcSubject !== null });
   await addTeamMember(user.id, team.id, role);
+}
+
+/**
+ * Refuses adding, by its email, an account that signed itself up and that
+ * nobody has verified is the address's owner's: self-registration checks
+ * nothing, so it may be anyone's. Single sign-on verifies it (binding the
+ * account to the provider's, whose email it checked); an admin, who can
+ * check it's theirs some other way, may add it anyway.
+ */
+function ensureVerified(caller: AuthUser | undefined, user: { email: string; selfRegistered: boolean; oidcSubject: string | null }): void {
+  if (!user.selfRegistered || user.oidcSubject !== null || caller?.isAdmin) return;
+  const how = currentSso()
+    ? "Once they sign in with single sign-on it's verified and they can be added; or an admin can add them."
+    : "If it's theirs, an admin can add them.";
+  throw new ApiError(
+    409,
+    "EMAIL_NOT_VERIFIED",
+    `${user.email}'s account signed itself up, and nobody has verified that address is theirs: anyone can sign up with any email. ${how}`,
+    undefined,
+    { email: user.email },
+  );
 }
 
 /** Whether groups decide this team's single sign-on members: groups are read and one is mapped to it. */
@@ -443,9 +465,16 @@ export async function retireTeam(caller: AuthUser | undefined, name: string, log
   return { name: team.name, retired: true, unregisteredProducts };
 }
 
+/**
+ * teams.retiredBy for a team a catalog release retired (it dropped the
+ * team's folder): the next release that names it again brings it back
+ * (catalogSync.ts). Any other retiring, an admin's, only an admin undoes.
+ */
+export const CATALOG_RETIRER = "the catalog";
+
 /** Who's retiring a team, as its page says it: an email, or the catalog's release. */
 async function whoRetires(caller: AuthUser | undefined): Promise<string | null> {
-  if (caller?.id === "catalog-sync") return "the catalog"; // catalogSync.ts's CATALOG
+  if (caller?.id === "catalog-sync") return CATALOG_RETIRER; // catalogSync.ts's CATALOG
   return caller ? ((await findUserById(caller.id))?.email ?? null) : null;
 }
 

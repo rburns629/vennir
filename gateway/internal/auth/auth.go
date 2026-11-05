@@ -155,6 +155,9 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	if ordering {
 		return nil, ErrOrdersOnly
 	}
+	// A bot is never an admin, whatever its row says: the console refuses
+	// making one an admin, and resolves a bot as no admin too.
+	c.IsAdmin = c.IsAdmin && !c.IsBot
 	// Ordered by name byte for byte, as the console's teamRolesForUser is,
 	// so both pick the same calling team. A retired team's require_sso
 	// still counts (as the console's does), but it calls as nobody.

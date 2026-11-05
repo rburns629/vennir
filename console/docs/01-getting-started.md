@@ -253,9 +253,9 @@ A task's own logs are on its execution's page; the team's **Running now** tab sh
 
 ## If your team is retired
 
-A team is retired when its folder is removed from the catalog, or by an admin. It can be undone: by an admin, or by restoring the folder.
+A team is retired when its folder is removed from the catalog, or by an admin. It can be undone: by an admin, or, when the catalog retired it, by restoring the folder. A team an admin retired stays retired whatever the catalog says, until an admin un-retires it.
 
-- The team is read-only: nothing new can be run, retried, added or changed for it (`TEAM_RETIRED`).
+- The team is read-only: nothing new can be run, retried, added or changed for it (`TEAM_RETIRED`), in its own namespace or another team's. Its bots can't run anything, and its schedules are skipped (kept, to run again once it's un-retired). An admin can still delete what the team's runs made (**Resources**), without un-retiring it, when the product that made it belongs to a team that isn't retired.
 - Its products are unregistered, so templates that use them stop working too.
 - Its history stays: you can still open its runs, outputs and logs.
 - Steps already running finish. Steps of its runs that hadn't started yet usually fail with `DISPATCH_REJECTED`: the cluster no longer starts anything in its namespace.

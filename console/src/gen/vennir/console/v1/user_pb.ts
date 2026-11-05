@@ -307,7 +307,8 @@ export const UserService: GenService<{
     output: typeof DeleteUserResponseSchema;
   },
   /**
-   * Makes someone a Vennir admin, or takes it away.
+   * Makes someone a Vennir admin, or takes it away. Never a bot
+   * (invalid_argument).
    *
    * @generated from rpc vennir.console.v1.UserService.SetAdmin
    */

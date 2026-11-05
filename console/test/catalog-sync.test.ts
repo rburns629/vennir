@@ -20,7 +20,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { newestVersion, syncCatalog } from "../src/catalogSync.js";
 import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
-import { createTeam } from "../src/db/queries.js";
+import { createTeam, setTeamRetired } from "../src/db/queries.js";
 import { auditLog, catalogSync, products, teams, templates, wiringTypes } from "../src/db/schema.js";
 import { ReleaseSchema, type Release } from "../src/gen/vennir/catalog/v1/release_pb.js";
 import { buildApp } from "../src/index.js";
@@ -232,6 +232,28 @@ describe("applying a release", () => {
     await syncCatalog(log);
     const [b] = await db.select().from(teams).where(eq(teams.name, teamB));
     expect(b?.retiredAt).toBeNull();
+    expect((await catalogProducts()).some((p) => p.name === `${teamB}-db-run`)).toBe(true);
+  });
+
+  it("leaves a team an admin retired retired, until an admin un-retires it", async () => {
+    const [b] = await db.select().from(teams).where(eq(teams.name, teamB));
+    await setTeamRetired(b?.id ?? "", true, "admin@example.com");
+    await db.delete(products).where(eq(products.teamId, b?.id ?? "")); // as retiring does
+    const both = (commit: string) =>
+      release({ commit, teams: [{ name: teamA }, { name: teamB, secretStoreDocuments: [JSON.stringify(store)] }], products: [product(teamA, "site"), product(teamB, "db")] });
+    publish(both("c4a"), digestOf(40));
+    await syncCatalog(log);
+    const [still] = await db.select().from(teams).where(eq(teams.name, teamB));
+    expect(still?.retiredAt).not.toBeNull();
+    expect(still?.retiredBy).toBe("admin@example.com");
+    expect((await catalogProducts()).some((p) => p.name === `${teamB}-db-run`)).toBe(false);
+    expect(vi.mocked(applySecretStoreObjects).mock.calls.some(([namespace]) => namespace === teamB)).toBe(false);
+    expect((await status())?.problems).toContainEqual(expect.objectContaining({ item: `team ${teamB}`, message: expect.stringContaining("admin@example.com") }));
+
+    // Un-retired by an admin, the next release applies it again.
+    await setTeamRetired(b?.id ?? "", false);
+    publish(both("c4"), digestOf(41)); // c4 again: what the tests after it start from
+    await syncCatalog(log);
     expect((await catalogProducts()).some((p) => p.name === `${teamB}-db-run`)).toBe(true);
   });
 
@@ -589,5 +611,30 @@ describe("an older release", () => {
     } finally {
       await db.update(catalogSync).set({ releasedAt: null }).where(eq(catalogSync.id, 1));
     }
+  });
+});
+
+describe("two teams' actions under one name", () => {
+  it("are refused, both named, and the rest still apply", async () => {
+    const short = `${prefix}-n`;
+    const long = `${prefix}-n-x`;
+    publish(
+      release({
+        commit: "c-names",
+        teams: [{ name: teamA }, { name: short }, { name: long }],
+        // Both are ${prefix}-n-x-y-run.
+        products: [product(teamA, "site"), product(short, "x-y"), product(long, "y")],
+      }),
+      digestOf(95),
+    );
+    await syncCatalog(log);
+    const name = `${prefix}-n-x-y-run`;
+    expect((await status())?.problems).toEqual([
+      { item: `product ${name}`, message: expect.stringContaining(`teams ${short} and ${long}`) as string },
+      { item: `product ${name}`, message: expect.stringContaining(`teams ${short} and ${long}`) as string },
+    ]);
+    const registered = (await catalogProducts()).map((p) => p.name);
+    expect(registered).not.toContain(name);
+    expect(registered).toContain(`${teamA}-site-run`);
   });
 });
