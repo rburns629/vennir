@@ -1527,7 +1527,8 @@ in sooner, delete their row from `sign_in_failures` (and
 
 | Code | Meaning |
 | --- | --- |
-| `DISPATCH_REJECTED` | Its namespace isn't labelled `vennir/team=true` |
+| `DISPATCH_REJECTED` | Its namespace isn't labelled `vennir/team=true`, or its Job isn't shaped as the executor makes it: a volume, pull Secret or placement the install doesn't give steps (after changing `scheduler.taskPlacement`, `capacityPlacements` or `taskImagePullSecret`, upgrade the kernel chart, which renders them into the dispatch policy, rather than only restarting the scheduler) |
+| `STEP_JOB_NOT_ALLOWED` | Not a task's: someone other than the scheduler (a team's deploy, an admin's tooling) made or changed a Job or ConfigMap named `ek-` in a team namespace. Name it something else |
 | `TEAM_RETIRED` | Its team's namespace is labelled `vennir/team=retired` (retired while the run was going) |
 | `IMAGE_NOT_ALLOWED` | Its image isn't under an allowed source (Admin page) |
 | `IMAGE_NOT_PINNED`, `IMAGE_SCAN_FAILED` | Not pinned by digest; its digest hasn't passed a scan on this install (failed, or never scanned: a Job that didn't come through the console's submission, or the console's `scanning` is off while the kernel chart's `scanPolicy` is on). Retrying it from the console scans it and admits it |

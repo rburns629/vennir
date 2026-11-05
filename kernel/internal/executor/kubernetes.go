@@ -186,8 +186,9 @@ func isRejection(err error) bool {
 // Start creates the attempt's Job, suspended, then its request ConfigMap
 // (owned by the Job, so Kubernetes removes it with the Job), then resumes
 // the Job: its Pod is made only once the ConfigMap under its name is the
-// kernel's, so it never mounts one planted ahead of it (an adopted Job
-// already resumed may have: TODO.md). Idempotent per
+// kernel's, so it never mounts one planted ahead of it (and the chart's
+// step-jobs policy lets nobody else make an ek- Job or ConfigMap in a team
+// namespace, so an adopted Job is one the scheduler made). Idempotent per
 // attempt: a Job already there under this attempt's name was made for this
 // same attempt (by a pass that rolled back, or a start that raised), and is
 // adopted, and resumed if it's still suspended.
@@ -263,8 +264,9 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 		}
 		if !sameAttempt(created, job) {
 			// The admission policies only check the Jobs the scheduler
-			// creates: one made any other way was never checked, and its
-			// result would become this step's outputs.
+			// creates: one made any other way (where the step-jobs policy
+			// is off) was never checked, and its result would become this
+			// step's outputs.
 			return nil, &DispatchRejected{Code: "DISPATCH_REJECTED", Message: fmt.Sprintf(
 				"A Job named %s already exists in %s that the kernel didn't make for this attempt (its labels, image, command, ServiceAccount or Secrets differ), so it wasn't adopted.", job.Name, namespace)}
 		}

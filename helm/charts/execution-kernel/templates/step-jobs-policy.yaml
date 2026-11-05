@@ -1,0 +1,73 @@
+{{/*
+Only the scheduler makes a step's Job and its request ConfigMap: in a team
+namespace, a Job or ConfigMap named ek-... (the executor's names,
+kernel/internal/executor/kubernetes.go) may be created or changed only by
+this release's scheduler, or by Kubernetes' own controllers (kube-system's:
+the Job controller, the garbage collector, the TTL and namespace
+controllers; or the controller manager under its own name).
+
+The executor starts a step's Job suspended, makes its request ConfigMap,
+then resumes it, and adopts a Job already there under the attempt's name
+(one an earlier pass of its own made). So nobody else's ConfigMap under
+that name may be mounted in its place, and nobody else's Job may be
+adopted as the step's. Anything else that may write Jobs or ConfigMaps in
+a team namespace, such as a team's own deploys or an admin's tooling, is
+held to it. Deleting isn't covered: a delete alone can't put anything in
+the kernel's place, and an admin may still clean up.
+
+Matches every namespace with the team label, so a second install on the
+same cluster needs a team label of its own (dispatchPolicy.teamNamespaceLabel),
+or each would refuse the other's scheduler.
+
+Off with dispatchPolicy.enabled, whose team namespace label it shares.
+*/}}
+{{- if .Values.dispatchPolicy.enabled }}
+{{- $scheduler := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-kernel.serviceAccountName" .) }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ include "execution-kernel.fullname" . }}-step-jobs
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs"]
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["configmaps"]
+    namespaceSelector:
+      matchExpressions:
+        - key: {{ .Values.dispatchPolicy.teamNamespaceLabel | quote }}
+          operator: Exists
+  matchConditions:
+    - name: not-the-scheduler-or-kubernetes
+      expression: >-
+        request.userInfo.username != {{ $scheduler | quote }} &&
+        !request.userInfo.username.startsWith("system:serviceaccount:kube-system:") &&
+        request.userInfo.username != "system:kube-controller-manager"
+  validations:
+    - expression: >-
+        !(object.metadata.name.startsWith("ek-") ||
+          (has(object.metadata.generateName) && object.metadata.generateName.startsWith("ek-")))
+      messageExpression: >-
+        "STEP_JOB_NOT_ALLOWED: only the kernel's scheduler makes or changes a step's " +
+        (request.resource.resource == "jobs" ? "Job" : "request ConfigMap") +
+        " (named ek-...); not " + request.userInfo.username + ", in " + request.namespace + "."
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ include "execution-kernel.fullname" . }}-step-jobs
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  policyName: {{ include "execution-kernel.fullname" . }}-step-jobs
+  validationActions: [Deny]
+{{- end }}

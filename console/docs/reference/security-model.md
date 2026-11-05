@@ -762,6 +762,8 @@ without going through the console:
 | Guardrail | What it refuses | Where |
 | --- | --- | --- |
 | Dispatch namespaces | Jobs in any namespace not labelled `vennir/team=true`, and in the platform's own namespace (`DISPATCH_REJECTED`) | `helm/charts/execution-kernel/templates/dispatch-policy.yaml` |
+| Step Pod shape | A Job of the scheduler's whose Pod mounts any volume but its own request ConfigMap (under its Job's name), scratch space (`emptyDir`), Secrets and projected tokens; names any pull Secret but `scheduler.taskImagePullSecret` (`vennir-pull` when set); names a node, or a node selector, tolerations or affinity the install doesn't place steps with (`scheduler.taskPlacement`, `capacityPlacements`) (`DISPATCH_REJECTED`). Exactly what the executor makes: a kernel test keeps `helm/tests/step-job.json` equal to its Job, and the admission tests admit that | `templates/dispatch-policy.yaml` |
+| Step Jobs | In a team namespace, anyone but the scheduler creating or changing a Job or ConfigMap named `ek-`, unless kube-system's controllers or the controller manager made or changed it (`STEP_JOB_NOT_ALLOWED`). So nobody else's ConfigMap is mounted as a step's request, and no Job made ahead of the scheduler is adopted as a step's. Deleting one isn't refused: a delete can't put anything in its place. A second install on the same cluster needs its own team label (`dispatchPolicy.teamNamespaceLabel`) | `templates/step-jobs-policy.yaml` |
 | Step Pods | In a team namespace, a Pod with a task Job's `job-name` or `controller-uid` label, or owned by an `ek-` Job, unless kube-system's controllers or the controller manager made or changed it (`STEP_POD_NOT_ALLOWED`). The kernel also reads a step's result only from a Pod its Job controls, by the Job's UID | `helm/charts/execution-kernel/templates/step-pods-policy.yaml` |
 | Image sources | Images outside the allowed registries (`IMAGE_NOT_ALLOWED`) | `templates/image-policy.yaml` |
 | Image signatures | Where policy-controller is installed, any Pod in a team namespace whose image isn't signed by catalog CI under the source registry, whoever makes it (`IMAGE_NOT_SIGNED`): images from sources an admin added don't run there either (`no-match-policy` stays `deny`, so a compromised console adding a source can't get past it). It checks Pods, not the Jobs and other workloads that make them, which a second policy passes without verifying them (the webhook still admits them): a step's Job is made, and its Pod refused (the Job's `FailedCreate` event, which the kernel reads) | `templates/image-signature.yaml` |
@@ -976,7 +978,8 @@ taken, and what would still hold.
 - **The scheduler** has the kernel's database too, and a ClusterRole
   (`helm/charts/execution-kernel/templates/rbac.yaml`): create Jobs and
   ConfigMaps (the dispatch policy keeps them to team namespaces, and the
-  Job policies check every Job); list and watch every Pod in the cluster
+  Job policies check every Job, down to its volumes, pull Secret and
+  placement); list and watch every Pod in the cluster
   read steps' logs only in team namespaces (a logs-only ClusterRole the
   console binds in each one; not the platform's or kube-system's, unless
   the kernel chart's `rbac.schedulerLogs: cluster`, for an install whose

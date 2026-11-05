@@ -30,6 +30,15 @@ it: the executor creates each suspended, makes its request ConfigMap, then
 resumes it, so its Pod never mounts a ConfigMap planted ahead of it. Only
 its own, suspended, in a live team namespace, and nothing else changed.
 
+A Job's Pod is held to the shape the executor gives it: its volumes only
+its request ConfigMap (under the Job's own name), emptyDirs, Secrets and
+projected tokens; no pull Secret but scheduler.taskImagePullSecret; placed
+only as scheduler.taskPlacement or a capacityPlacements entry places steps,
+on no node named. These come from this chart's values, so change them with
+a chart upgrade, not only the scheduler's ConfigMap.
+helm/tests/step-job.json is the executor's own Job (a kernel test keeps it
+so), which the admission tests admit.
+
 With scheduler.taskPodHardening on, a Job must also be hardened as the
 executor makes it (kernel/internal/executor/kubernetes.go): no Kubernetes
 token, non-root, no privilege escalation, a read-only root filesystem, no
@@ -49,6 +58,19 @@ false, as older vennir releases write it, is what the chart does anyway.
 {{- if .Values.dispatchPolicy.enabled }}
 {{- $scheduler := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-kernel.serviceAccountName" .) }}
 {{- $label := .Values.dispatchPolicy.teamNamespaceLabel }}
+{{- $pullSecret := .Values.scheduler.taskImagePullSecret | default "" }}
+{{- /* Where the executor places a step: the install's placement, or a
+       capacity's, each replacing the other (kernel/internal/executor). */}}
+{{- $selectors := list (.Values.scheduler.taskPlacement.nodeSelector | default dict) }}
+{{- $placed := .Values.scheduler.taskPlacement.tolerations | default list }}
+{{- range $kind, $p := .Values.scheduler.capacityPlacements }}
+{{- $selectors = append $selectors ($p.nodeSelector | default dict) }}
+{{- $placed = concat $placed ($p.tolerations | default list) }}
+{{- end }}
+{{- $tolerations := list }}
+{{- range $placed }}
+{{- $tolerations = append $tolerations (join "|" (list (toString (.key | default "")) (toString (.operator | default "")) (toString (.value | default "")) (toString (.effect | default "")) (ternary (toString .tolerationSeconds) "" (hasKey . "tolerationSeconds")))) }}
+{{- end }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
@@ -157,6 +179,41 @@ spec:
         a step's container runs its image's own entrypoint with its action as
         its one argument, no environment but the install's
         (scheduler.taskExtraEnvironment), and no token for the Kubernetes API
+      reason: Forbidden
+    # A step's Pod, shaped as the executor makes it: its volumes only its
+    # request ConfigMap (under its Job's name), scratch space, Secrets
+    # (which ones is the identity policy's) and its projected tokens; no
+    # pull Secret but the install's (scheduler.taskImagePullSecret); and
+    # placed only as the install places steps (scheduler.taskPlacement or a
+    # capacityPlacements entry), never on a node named.
+    - expression: >-
+        request.operation != "CREATE" || request.resource.resource != "jobs" || (
+        (!has(object.spec.template.spec.volumes) || object.spec.template.spec.volumes.all(v,
+          (has(v.configMap) && v.configMap.name == object.metadata.name) ||
+          has(v.emptyDir) || has(v.secret) ||
+          (has(v.projected) && (!has(v.projected.sources) || v.projected.sources.all(s, has(s.serviceAccountToken)))))) &&
+        {{- if $pullSecret }}
+        (!has(object.spec.template.spec.imagePullSecrets) || object.spec.template.spec.imagePullSecrets.all(p,
+          has(p.name) && p.name == {{ $pullSecret | quote }})) &&
+        {{- else }}
+        (!has(object.spec.template.spec.imagePullSecrets) || object.spec.template.spec.imagePullSecrets.size() == 0) &&
+        {{- end }}
+        (!has(object.spec.template.spec.nodeName) || object.spec.template.spec.nodeName == "") &&
+        (has(object.spec.template.spec.nodeSelector) ? object.spec.template.spec.nodeSelector : {}) in {{ $selectors | uniq | toJson }} &&
+        (!has(object.spec.template.spec.tolerations) || object.spec.template.spec.tolerations.all(t,
+          (has(t.key) ? t.key : "") + "|" + (has(t.operator) ? t.operator : "") + "|" +
+          (has(t.value) ? t.value : "") + "|" + (has(t.effect) ? t.effect : "") + "|" +
+          (has(t.tolerationSeconds) ? string(t.tolerationSeconds) : "") in {{ $tolerations | uniq | toJson }})) &&
+        {{- if not .Values.scheduler.taskPlacement.affinity }}
+        !has(object.spec.template.spec.affinity) &&
+        {{- end }}
+        true)
+      message: >-
+        a step's Pod mounts only its request, scratch space, Secrets and
+        projected tokens, pulls only with the install's pull Secret
+        (scheduler.taskImagePullSecret), and runs only where the install
+        places steps (scheduler.taskPlacement, capacityPlacements), on no
+        node named
       reason: Forbidden
     {{- if .Values.scheduler.taskPodHardening }}
     # A step's Job, hardened as the executor makes it (scheduler.taskPodHardening).

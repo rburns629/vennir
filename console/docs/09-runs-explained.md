@@ -112,7 +112,7 @@ A failed step shows a code, a message, what the code means and what to do. When 
 | `IMAGE_NOT_SIGNED` | Its image isn't signed by the catalog's CI | No | Ask the product's team to publish it through their catalog's CI |
 | `IDENTITY_NOT_ALLOWED` | It asked for an identity or secrets its product isn't registered for | No | Check the product's ServiceAccount on its page and the secret on the Secrets tab; if they look right, tell an admin |
 | `TEAM_RETIRED` | Its team was retired while the run was going, so it never started (its steps already running finished) | No | An admin can un-retire the team on the Teams page, then retry it |
-| `DISPATCH_REJECTED` | The cluster refused to run it in that team's namespace (not a team's) | No | Ask an admin to check the namespace |
+| `DISPATCH_REJECTED` | The cluster refused to run it in that team's namespace (not a team's), or refused its Job's volumes, pull Secret or placement | No | Ask an admin to check the namespace, and that the kernel chart was upgraded after its step placement or pull Secret changed |
 | `APPROVAL_DECLINED` | A maintainer of its team declined it, so it never ran | No | Ask them why, then run it again |
 | `APPROVAL_EXPIRED` | Nobody approved or declined it in time, so it never ran | No | Retry it to ask again, and tell its team |
 

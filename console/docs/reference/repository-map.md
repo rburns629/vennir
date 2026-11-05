@@ -103,6 +103,7 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | **`internal/executor/`** | **Running a task.** |
 | `internal/executor/executor.go` | The `Executor` interface and the types passed through it. |
 | `internal/executor/kubernetes.go` | The one executor: creates the Job and its `request.json` ConfigMap (adopting an attempt's Job, reporting a policy's refusal), reads status and the termination message, catches image-pull failures, removes a finished Job once released. |
+| `internal/executor/stepjob_test.go` | Keeps `helm/tests/step-job.json` equal to the Job the executor makes, for the admission tests to dry-run. |
 | `internal/executor/watch.go` | Informers on the kernel's Jobs and Pods: wake the loop on a change, and skip re-reading a step that hasn't changed. |
 | `internal/executor/executortest/` | `Fake`: an in-memory executor, to test the scheduler without a cluster. |
 | **`internal/scheduler/`** | **The scheduling pass and the loop.** |
@@ -435,6 +436,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/configmap.yaml`, `secret.yaml`, `serviceaccount.yaml` | Settings, the database password, the kernel's identity. |
 | `templates/rbac.yaml` | What the scheduler may do: create and delete Jobs and ConfigMaps, read Pods; and its logs-only ClusterRole, bound per team namespace by the console (or cluster-wide, `rbac.schedulerLogs: cluster`). |
 | `templates/dispatch-policy.yaml` | Admission policy: the scheduler may only create Jobs (hardened, with `taskPodHardening`) in namespaces labelled `vennir/team=true`, and delete only its own Jobs and ConfigMaps there. |
+| `templates/step-jobs-policy.yaml` | Admission policy: in a team namespace, only the scheduler (and Kubernetes' own controllers) may create or change a Job or ConfigMap named `ek-`. |
 | `templates/step-pods-policy.yaml` | Admission policy: in a team namespace, only Kubernetes' own controllers may make or change a Pod with a task Job's labels or owner. |
 | `templates/image-policy.yaml` | Admission policy: task images only from allowed sources (the console edits the list). |
 | `templates/image-signature.yaml` | With Sigstore's policy-controller: only signed images from the source registry run in team namespaces, checked on Pods; a second policy passes the workloads that make them. |
@@ -477,7 +479,8 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | --- | --- |
 | `secrets-e2e.sh` | A team's secret end to end on a kind install (`make kind-e2e-secrets`): a SecretStore (ESO's fake provider) syncs it, a registered product's step reads it (its SHA-256, never the value), and a step that isn't one, or another team's, is refused. |
 | `prometheus-rules.sh`, `prometheus/alerts.test.yaml` | Both charts' alerts rendered and evaluated by promtool (the bundled Prometheus's image) against made-up series: what fires and what doesn't. Run by CI's helm job. |
-| `admission-policies.sh` | Proves the charts' admission policies on a real cluster (dispatch, image sources, step identity, scans, purging, the console's write fence, namespaces and Jobs, the gateway's tokens), case by case with server-side dry runs. Run by CI's kubernetes job. |
+| `step-job.json` | A step's Job exactly as the kernel's executor makes it (a kernel test keeps it equal), which `admission-policies.sh` dry-runs as the scheduler and as anyone else. |
+| `admission-policies.sh` | Proves the charts' admission policies on a real cluster (dispatch and a step's Job shape, step Jobs, image sources, step identity, scans, purging, the console's write fence, namespaces and Jobs, the gateway's tokens), case by case with server-side dry runs. Run by CI's kubernetes job. |
 
 ### `helm/values/`: each cluster's settings
 
