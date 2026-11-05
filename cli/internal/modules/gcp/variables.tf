@@ -145,6 +145,26 @@ variable "catalog_repository" {
   default     = ""
 }
 
+variable "catalog_repository_id" {
+  description = "The catalog repository's GitHub id, and catalog_owner_id its owner's (`vennir catalog create` reads them): the federation trusts exactly them, so a repository renamed, or made again under the name by someone else, isn't trusted. Empty until the repository exists: the name alone."
+  type        = string
+  default     = ""
+  validation {
+    condition     = can(regex("^[0-9]*$", var.catalog_repository_id))
+    error_message = "catalog_repository_id is a number."
+  }
+}
+
+variable "catalog_owner_id" {
+  description = "The catalog repository's owner's GitHub id (see catalog_repository_id)."
+  type        = string
+  default     = ""
+  validation {
+    condition     = can(regex("^[0-9]*$", var.catalog_owner_id))
+    error_message = "catalog_owner_id is a number."
+  }
+}
+
 variable "google_groups" {
   description = "The console reads people's Google Workspace groups (Cloud Identity's API), as its own service account, for mapping groups to teams."
   type        = bool

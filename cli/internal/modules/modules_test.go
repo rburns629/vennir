@@ -25,8 +25,46 @@ func TestTheAWSPublishRoleTrustsOnlyMain(t *testing.T) {
 		t.Fatal("publish_trust names no subject")
 	}
 	for _, s := range subjects {
-		if !strings.HasSuffix(s[1], ":ref:refs/heads/main") {
+		if !strings.HasSuffix(strings.TrimSuffix(s[1], "${local.catalog_ids}"), ":ref:refs/heads/main") {
 			t.Errorf("publish_trust accepts %q, which doesn't name main", s[1])
+		}
+	}
+}
+
+// Once vennir knows the catalog repository's ids, the AWS publish role
+// trusts only subjects ending in them, in githost.SubjectClaimKeys' order,
+// and GCP's federation trusts the ids, not the name: a repository renamed,
+// or made again under its name by someone else, matches neither.
+func TestTheCatalogFederationPinsTheRepositoryByItsIDs(t *testing.T) {
+	aws, err := files.ReadFile("aws/main.tf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(aws), `catalog_ids     = ":repository_owner_id:${var.catalog_owner_id}:repository_id:${var.catalog_repository_id}"`) {
+		t.Error("aws/main.tf's catalog_ids isn't the owner's id then the repository's, as the subject template orders them")
+	}
+	pinned := regexp.MustCompile(`(?s)values = local\.catalog_pinned \? \[(.*?)\] : \[`).FindSubmatch(aws)
+	if pinned == nil {
+		t.Fatal("publish_trust's subjects don't depend on catalog_pinned")
+	}
+	for _, v := range regexp.MustCompile(`"([^"]*)"`).FindAllStringSubmatch(string(pinned[1]), -1) {
+		if !strings.HasSuffix(v[1], "${local.catalog_ids}") {
+			t.Errorf("pinned, publish_trust still accepts %q, which doesn't name the ids", v[1])
+		}
+	}
+
+	gcp, err := files.ReadFile("gcp/main.tf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`"assertion.repository_id == \"${var.catalog_repository_id}\" && assertion.repository_owner_id == \"${var.catalog_owner_id}\""`,
+		`"attribute.repository_id/${var.catalog_repository_id}"`,
+		`attribute_condition = "${local.catalog_repository_condition} && assertion.ref == \"refs/heads/main\""`,
+		`/${local.catalog_principal}"`,
+	} {
+		if !strings.Contains(string(gcp), want) {
+			t.Errorf("gcp/main.tf hasn't %s", want)
 		}
 	}
 }

@@ -60,6 +60,9 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 		versions <- list
 	}()
 	var cloud *cloudPlan
+	// The catalog repository exists already (on aws: `vennir catalog create`
+	// makes it after the first apply).
+	catalogExists := false
 	switch c.Target {
 	case "gcp":
 		var err error
@@ -67,6 +70,21 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 			return err
 		}
 	case "aws":
+		// The publish role trusts the catalog repository's ids, read (not
+		// changed) before planning; its tokens carry them once approved
+		// (ensureCatalogSubject, below).
+		if repo := c.Catalog.Repo(); repo != "" {
+			gh := githost.NewGitHub(a.runner)
+			var err error
+			if catalogExists, err = gh.Exists(ctx, repo); err != nil {
+				return err
+			}
+			if catalogExists {
+				if _, err := recordCatalogIDs(ctx, out, dir, c, gh, repo); err != nil {
+					return err
+				}
+			}
+		}
 		var err error
 		if cloud, err = a.planAWS(ctx, out, dir, c, false); err != nil {
 			return err
@@ -157,8 +175,9 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 		}
 	case "aws":
 		// Before the publish role's trust changes: a catalog made before it
-		// named only main needs its tokens to name their branch first.
-		if repo := c.Catalog.Repo(); repo != "" {
+		// named only main, and only this repository, needs its tokens to name
+		// their branch and its ids first.
+		if repo := c.Catalog.Repo(); repo != "" && catalogExists {
 			if err := ensureCatalogSubject(ctx, out, githost.NewGitHub(a.runner), repo); err != nil {
 				return err
 			}

@@ -32,21 +32,23 @@
  *
  * Which releases are in it (releaseInUse): each product's current one, and
  * an earlier one while it's in use: a step of an execution not yet seen
- * finished runs it (the kernel starts later steps and attempts by itself),
- * or it was registered or run in the last RELEASE_GRACE_MINUTES. The rest
- * are pruned: a step of one runs as an unregistered image would.
+ * finished runs it as that product (the kernel starts later steps and
+ * attempts by itself; a step of another product released at the same
+ * digest doesn't count), or it was registered or run in the last
+ * RELEASE_GRACE_MINUTES. The rest are pruned: a step of one runs as an
+ * unregistered image would.
  */
 import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { config } from "./config.js";
 import { db } from "./db/client.js";
 import { listTeamSecretNames } from "./db/queries.js";
-import { productReleases, products, teams } from "./db/schema.js";
+import { productReleases, products, submittedExecutions, teams } from "./db/schema.js";
 import { imageRepository } from "./imageRef.js";
 import { allowedPrefixes, readImagePolicy } from "./imagePolicy.js";
 import { updateIdentityPolicy } from "./k8s.js";
 import { pinImages } from "./registry.js";
-import { ADMIT_GRACE_MINUTES, digestOf, PINNED_DIGEST, runningDigests } from "./scanning.js";
+import { ADMIT_GRACE_MINUTES, digestOf, PINNED_DIGEST } from "./scanning.js";
 
 /** What a task that isn't a registered product runs as, with no Secrets. */
 export const UNREGISTERED_SERVICE_ACCOUNT = "default";
@@ -97,15 +99,63 @@ const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c",
 const releaseDigest = sql`substring(${productReleases.image} from ${PINNED_DIGEST})`;
 
 /**
+ * An image's repository, as imageRef.ts's imageRepository reads it (and the
+ * identity policy's CEL): normalized as the kubelet reads it, then its
+ * digest and its tag off. Never NULL for a non-NULL image.
+ */
+function repositoryOf(image: SQL): SQL {
+  return sql`regexp_replace(regexp_replace(
+    CASE
+      WHEN strpos(${image}, '/') > 0 AND (split_part(${image}, '/', 1) ~ '[.:A-Z]' OR split_part(${image}, '/', 1) = 'localhost') THEN ${image}
+      WHEN strpos(${image}, '/') > 0 THEN 'docker.io/' || ${image}
+      ELSE 'docker.io/library/' || ${image}
+    END, '@.*$', ''), ':[^/:]*$', '')`;
+}
+
+/**
+ * The steps of every execution the console hasn't seen finish (as
+ * scanning.ts's runningDigests), as the identity policy matches a step: its
+ * digest, namespace (team), image repository, action and ServiceAccount
+ * ("default" when it names none). No column is NULL.
+ */
+const runningSteps = sql`(
+  SELECT digest, team, repository, action, service_account FROM (
+    SELECT substring(step.task->>'image' from ${PINNED_DIGEST}) AS digest,
+      COALESCE(step.task->>'team', '') AS team,
+      ${repositoryOf(sql`COALESCE(step.task->>'image', '')`)} AS repository,
+      COALESCE(step.task->>'action', '') AS action,
+      COALESCE(NULLIF(step.task->>'serviceAccount', ''), ${UNREGISTERED_SERVICE_ACCOUNT}) AS service_account
+    FROM ${submittedExecutions},
+      jsonb_array_elements(CASE WHEN jsonb_typeof(${submittedExecutions.payload}->'tasks') = 'array'
+        THEN ${submittedExecutions.payload}->'tasks' ELSE '[]'::jsonb END) AS step(task)
+    WHERE ${submittedExecutions.resourcesRecordedAt} IS NULL
+  ) AS steps
+  WHERE digest IS NOT NULL
+)`;
+
+/** The release as a running step of its product would be: digest, repository, action, ServiceAccount. */
+const releaseAsStep = sql`${releaseDigest}, ${repositoryOf(sql`${productReleases.image}`)}, ${products.action},
+  COALESCE(${products.serviceAccount}, ${UNREGISTERED_SERVICE_ACCOUNT})`;
+
+/**
  * Whether a release (joined with its product) gives a step its product's
  * identity: it's pinned, and it's the product's current image, or an
- * earlier one still in use (this file's header). Never NULL.
+ * earlier one still in use (this file's header). A running step keeps it in
+ * use only when it runs as that product, matched as the identity policy
+ * matches it (its team, or any for a platform product; the release's
+ * repository, the product's action and ServiceAccount): another product
+ * released at the same digest doesn't. The running steps are read once per
+ * query (uncorrelated, so hashed), not per release. Never NULL.
  */
 export const releaseInUse: SQL = sql`(
   ${releaseDigest} IS NOT NULL AND (
     ${productReleases.image} = ${products.image}
     OR ${productReleases.lastUsedAt} > now() - make_interval(mins => ${RELEASE_GRACE_MINUTES})
-    OR ${releaseDigest} IN ${runningDigests}
+    OR COALESCE(CASE WHEN ${products.teamId} IS NULL
+      THEN (${releaseAsStep}) IN (SELECT digest, repository, action, service_account FROM ${runningSteps} AS running)
+      ELSE (${releaseAsStep}, COALESCE((SELECT owner_team.name FROM ${teams} AS owner_team WHERE owner_team.id = ${products.teamId}), ''))
+        IN (SELECT digest, repository, action, service_account, team FROM ${runningSteps} AS running)
+    END, false)
   )
 )`;
 

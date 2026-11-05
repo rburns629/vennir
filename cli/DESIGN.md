@@ -296,7 +296,7 @@ for teams that run OpenTofu or Terraform themselves.
 | Registries | Artifact Registry: platform images, task images | ECR repositories | ACR |
 | Identities | Service accounts and Workload Identity bindings for the console, the scanner (its own, read-only), backups, and ESO | IAM roles and Pod Identity associations | Managed identities and federated credentials |
 | Signing | Cloud KMS key (signing: kms) | KMS key | Key Vault key |
-| Catalog CI | Workload Identity Federation limited to the catalog repository | GitHub OIDC provider and a role limited to the repository | Federated credential for the repository |
+| Catalog CI | Workload Identity Federation limited to the catalog repository (by its id and its owner's) | GitHub OIDC provider and a role limited to the repository (by a subject naming its ids) | Federated credential for the repository |
 | Database (managed) | Cloud SQL for PostgreSQL (HA optional) | RDS PostgreSQL (Multi-AZ optional) | Azure Database for PostgreSQL Flexible Server (zone-redundant optional) |
 | Backups (in-cluster database) | Bucket with a lifecycle rule | S3 bucket with a lifecycle rule | Storage container with a lifecycle rule |
 | Observe's alerts on GKE's managed Prometheus | Cloud Monitoring's API, and `roles/monitoring.viewer` for the console (`monitoring.provider: google`) | (the chart's monitoring values) | (the chart's monitoring values) |

@@ -9,6 +9,7 @@ import { addTeamMember, createTeam, createUser, setUserAdmin } from "../src/db/q
 import { teams, users } from "../src/db/schema.js";
 import {
   allowedPrefixes,
+  hasUppercaseName,
   imageRefusal,
   invalidSourceReason,
   isBroadSource,
@@ -52,14 +53,38 @@ describe("the rules (the same ones image-policy.yaml's CEL applies)", () => {
     ["team/app:1", false],
     ["docker.io/evil/app", false],
     ["localhost:5001/app:1", false],
+    // Uppercase anywhere but the tag: a host matched as written isn't the
+    // registry's view of it, and an uppercase first part is a host to Docker.
+    [`${SOURCE.toUpperCase()}/app:1`, false],
+    [`${SOURCE}/App:1`, false],
+    [`${SOURCE}/app:Latest`, true],
+    [`${SOURCE}/app:Latest@sha256:${"a".repeat(64)}`, true],
+    ["Node:20", false],
+    ["Library/node:20", false],
+    ["docker.io/Library/node:20", false],
   ])("%s allowed: %s", (image, allowed) => {
     expect(isImageAllowed(image, prefixes)).toBe(allowed);
+  });
+
+  it("finds uppercase in a registry or repository, never in a tag", () => {
+    for (const image of ["Registry.Example/app", "registry.example:5000/a/B/c:1", "Team/app", "app:1/X", "App", "App:1", "App@sha256:x", "localhost:5001/A"]) {
+      expect(hasUppercaseName(image), image).toBe(true);
+    }
+    for (const image of ["registry.example/app:LATEST", "localhost:5001/app:V1@sha256:abc", "node:Twenty", "a/b/c"]) {
+      expect(hasUppercaseName(image), image).toBe(false);
+    }
+  });
+
+  it("explains an uppercase refusal", () => {
+    expect(imageRefusal([`${SOURCE}/App:1`], policy(SOURCE))?.message).toMatch(/uppercase letter in the registry or repository/);
   });
 
   it("reads short names the way the kubelet does", () => {
     expect(normalizeImage("node:20")).toBe("docker.io/library/node:20");
     expect(normalizeImage("team/app")).toBe("docker.io/team/app");
     expect(normalizeImage("localhost:5001/app")).toBe("localhost:5001/app");
+    // Docker reads an uppercase first part as a registry host.
+    expect(normalizeImage("Team/app")).toBe("Team/app");
   });
 
   it("only accepts registry paths as sources, and flags whole-registry ones", () => {

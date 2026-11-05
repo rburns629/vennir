@@ -29,8 +29,13 @@ Entries are path prefixes ending in "/", so ".../catalog-products/" allows
 ".../catalog-products/app:1" but not ".../catalog-products-evil/app:1".
 Images are read the way the kubelet reads them: "node:20" is
 "docker.io/library/node:20" and "team/app" is "docker.io/team/app", so a
-short name can't slip past an entry. console/src/imagePolicy.ts applies the
-same rules; keep them in step.
+short name can't slip past an entry. An image with an uppercase letter in
+its registry or repository is refused outright: a registry host is
+case-insensitive, so "Registry.Example/..." is "registry.example/..." to the
+registry but not to a prefix, and Docker reads an uppercase first part as a
+host ("Team/app" is host "Team", not "docker.io/Team/app"); repositories
+are lowercase, so nothing valid is lost (a tag may still have uppercase).
+console/src/imagePolicy.ts applies the same rules; keep them in step.
 */}}
 {{- if .Values.imagePolicy.enabled }}
 {{- $scheduler := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-kernel.serviceAccountName" .) }}
@@ -94,14 +99,25 @@ spec:
         object.spec.template.spec.containers.map(c, c.image) +
         (has(object.spec.template.spec.initContainers) ?
           object.spec.template.spec.initContainers.map(c, c.image) : [])
+    # An uppercase letter anywhere but the tag: in a path component, or in
+    # the first part (its host and port, or a short name's repository).
+    - name: uppercase
+      expression: >-
+        variables.images.filter(i, i.matches("^([^/@]*[A-Z][^@]*/|([^@]*/)?[^/@:]*[A-Z])"))
     - name: rejected
       expression: >-
         variables.images.filter(i, !variables.prefixes.exists(p,
           ((i.contains("/") && (i.split("/")[0].contains(".") || i.split("/")[0].contains(":") ||
-            i.split("/")[0] == "localhost")) ? i :
+            i.split("/")[0] == "localhost" || i.split("/")[0].matches("[A-Z]"))) ? i :
             (i.contains("/") ? "docker.io/" + i : "docker.io/library/" + i)
           ).startsWith(p)))
   validations:
+    - expression: size(variables.uppercase) == 0
+      messageExpression: >-
+        "IMAGE_NOT_ALLOWED: " + variables.uppercase.join(", ") +
+        " has an uppercase letter in its registry or repository. Image names are lowercase " +
+        "(only a tag may have uppercase letters)."
+      reason: Forbidden
     - expression: size(variables.rejected) == 0
       messageExpression: >-
         "IMAGE_NOT_ALLOWED: " + variables.rejected.join(", ") +

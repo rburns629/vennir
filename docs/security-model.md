@@ -61,7 +61,11 @@ only by the team's registered products.
 - The console labels what it creates (`app.kubernetes.io/managed-by:
   vennir-console`) and won't replace, or register, a Secret it didn't
   create, such as a SecretStore's own credentials: that's refused with a 409.
-  So a SecretStore's credentials can never be mounted by a step.
+  So a SecretStore's credentials can never be mounted by a step. Nor does
+  it replace or register an ExternalSecret it didn't label (one applied by
+  hand, syncing whatever it names): syncing a secret of that name is
+  refused the same way, and the write fence refuses the console creating
+  an unlabelled ExternalSecret or updating one that wasn't labelled.
 - No RBAC is involved: mounting doesn't consult it, and steps don't read
   Secrets through the API. The console creates no Roles (older versions made
   one per secret; the console removes them at startup).
@@ -173,9 +177,12 @@ pinned to the digest the tag names then (refused when the registry can't
 say). The console pins each step's image before it checks the identity, so
 a DAG saying `:latest` is its product only while `latest` is a release.
 Each product's current release counts, and an earlier one while it's still
-in use: an execution the console hasn't seen finish runs it (the kernel
-starts its later steps and attempts by itself), or it was registered or
-run in the last hour. The rest are pruned: a retry or rerun of a step of
+in use: a step of an execution the console hasn't seen finish runs it as
+that product (the kernel starts its later steps and attempts by itself),
+matched as the identity policy matches a step (its team, the release's
+repository, the product's action and ServiceAccount), so a step of another
+product released at the same digest doesn't keep it; or it was registered
+or run in the last hour. The rest are pruned: a retry or rerun of a step of
 one, once its execution has finished and the hour has passed, runs it as an
 unregistered image, so it's refused if it asks for the product's
 ServiceAccount or Secrets. A submission marks the releases it runs used
@@ -834,13 +841,13 @@ without going through the console:
 | Step Pod shape | A Job of the scheduler's whose Pod mounts any volume but its own request ConfigMap (under its Job's name), scratch space (`emptyDir`), Secrets and projected tokens; names any pull Secret but `scheduler.taskImagePullSecret` (`vennir-pull` when set); names a node, or a node selector, tolerations or affinity the install doesn't place steps with (`scheduler.taskPlacement`, `capacityPlacements`) (`DISPATCH_REJECTED`). Exactly what the executor makes: a kernel test keeps `helm/tests/step-job.json` equal to its Job, and the admission tests admit that | `templates/dispatch-policy.yaml` |
 | Step Jobs | In a team namespace, anyone but the scheduler creating or changing a Job or ConfigMap named `ek-`, or a CronJob named `ek` or `ek-…` (kube-system's CronJob controller makes its Jobs, named `<cronjob>-<time>`), unless kube-system's controllers or the controller manager made or changed it (`STEP_JOB_NOT_ALLOWED`). So nobody else's ConfigMap is mounted as a step's request, and no Job made ahead of the scheduler is adopted as a step's. Deleting one isn't refused: a delete can't put anything in its place. A second install on the same cluster needs its own team label (`dispatchPolicy.teamNamespaceLabel`) | `templates/step-jobs-policy.yaml` |
 | Step Pods | In a team namespace, a Pod with a task Job's `job-name` or `controller-uid` label, or owned by an `ek-` Job, unless kube-system's controllers or the controller manager made or changed it (`STEP_POD_NOT_ALLOWED`). The kernel also reads a step's result only from a Pod its Job controls, by the Job's UID | `helm/charts/execution-kernel/templates/step-pods-policy.yaml` |
-| Image sources | Images outside the allowed registries (`IMAGE_NOT_ALLOWED`) | `templates/image-policy.yaml` |
+| Image sources | Images outside the allowed registries, and any image with an uppercase letter in its registry or repository (`IMAGE_NOT_ALLOWED`): a registry host is case-insensitive, so it wouldn't match its source as written, and Docker reads an uppercase first part as a registry host; repositories are lowercase, so only a tag may have uppercase | `templates/image-policy.yaml` |
 | Image signatures | Where policy-controller is installed, any Pod in a team namespace whose image isn't signed by catalog CI under the source registry, whoever makes it (`IMAGE_NOT_SIGNED`): images from sources an admin added don't run there either (`no-match-policy` stays `deny`, so a compromised console adding a source can't get past it). It checks Pods, not the Jobs and other workloads that make them, which a second policy passes without verifying them (the webhook still admits them): a step's Job is made, and its Pod refused (the Job's `FailedCreate` event, which the kernel reads) | `templates/image-signature.yaml` |
 | Image scans | An image not pinned by digest (`IMAGE_NOT_PINNED`), or one whose digest hasn't passed its security scan on this install, failed or never scanned, unless an admin accepted a failed one (`IMAGE_SCAN_FAILED`). The policy is an allow list the console keeps: digests that passed (or were accepted) and are still in use (a registered product's, a step of an execution not yet finished, or used in the last hour); a submission, retry or rerun scans its images and writes their digests there before kernel-api has it. At most 5,000 digests: the API server compiles at most 100,000 characters per CEL expression (about 1,250 digests), so they're sixteen CEL maps by first hex digit, at most 1,200 each, about 400 KB in all. On an upgrade from the chart that refused only failed digests, the chart admits what isn't listed, refusing those it refused, until the new console has run ten minutes and writes the allow list alone, so steps of consoles still rolling out aren't refused. The console scans every image before it's registered or run, and daily while in use, for each platform the cluster runs (the console chart's `scanning.platforms`; a multi-arch cluster lists every one). The console chart's `scanning` must be on whenever this policy is, or every pinned step is refused | `templates/scan-policy.yaml` |
 | Step identity | A step running as any ServiceAccount but `default` unless it runs a registered product's release (one of the digests the product was registered at, from its repository, while in use) as the one its `product.yaml` declares; any step mounting a Secret unless it runs such a release and the Secret is registered for its team; Secrets reaching a step any way but a volume (`IDENTITY_NOT_ALLOWED`). The console keeps the policy's released digests (sixteen maps by first hex digit, up to about 2,600 digest-action pairs) and team secrets current. | `templates/identity-policy.yaml` |
 | Team deletion | A configured purger deleting a team namespace that isn't labelled retired (or a team's API backends' namespace, `<team>-apis`, not labelled `vennir/api-backends=retired`). None is configured by default: the console leaves a purged team's namespace, labelled retired, for a cluster administrator to delete, so the identity that retires a namespace can't also delete it (`teamNamespaces.purge` would let it) | `templates/purge-policy.yaml` |
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
-| Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own) | console chart, `templates/write-fence-policy.yaml` |
+| Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own); creating an ExternalSecret without its `app.kubernetes.io/managed-by: vennir-console` label, or updating one that didn't carry it | console chart, `templates/write-fence-policy.yaml` |
 
 The platform's namespace is never a team's (never labelled `vennir/team`).
 One that was would lose more than the dispatch guardrail there:
@@ -874,8 +881,10 @@ policy-controller's signature check apply to every Pod there.
 An install `vennir` makes sets up signing itself when its catalog is signed
 (`signing` in vennir.yaml, asked at `vennir init`): `kms`, a key in the
 cloud's KMS (a GCP key ring with a fresh suffix, or an AWS ECC P-256 key)
-that only the catalog repository's CI, through its main-only federation, may
-sign with, its public half read at apply; or `keyless`, the repository's
+that only the catalog repository's CI, through its main-only federation
+(which trusts the repository by its GitHub id and its owner's, not its
+name, so a repository renamed, or re-created under the name by someone
+else, isn't trusted), may sign with, its public half read at apply; or `keyless`, the repository's
 `ci.yml` on main by GitHub's OIDC issuer, through Sigstore's public log
 (which names the repository). Either way it installs policy-controller,
 scoped to team namespaces and bound to an identity that may only read the

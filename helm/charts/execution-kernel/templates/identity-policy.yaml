@@ -177,7 +177,8 @@ spec:
     - name: normalizedImage
       expression: >-
         (variables.image.contains("/") && (variables.image.split("/")[0].contains(".") ||
-          variables.image.split("/")[0].contains(":") || variables.image.split("/")[0] == "localhost")) ?
+          variables.image.split("/")[0].contains(":") || variables.image.split("/")[0] == "localhost" ||
+          variables.image.split("/")[0].matches("[A-Z]"))) ?
           variables.image :
           (variables.image.contains("/") ? "docker.io/" + variables.image : "docker.io/library/" + variables.image)
     # The digest, then the tag, come off: the console pins images as

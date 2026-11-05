@@ -327,7 +327,9 @@ export interface ExternalSecretGrant {
   keys: { secretKey: string; remoteKey: string; property?: string }[];
 }
 
-async function upsertExternalSecret(grant: ExternalSecretGrant): Promise<void> {
+/** Creates the ExternalSecret, or replaces `existing` (the console's own),
+ * with the resourceVersion read, so one swapped in since fails instead. */
+async function upsertExternalSecret(grant: ExternalSecretGrant, existing: ExternalSecretObject | undefined): Promise<void> {
   const { custom } = getApis();
   const plural = "externalsecrets";
   const body = {
@@ -343,58 +345,65 @@ async function upsertExternalSecret(grant: ExternalSecretGrant): Promise<void> {
       })),
     },
   };
-  try {
-    await custom.getNamespacedCustomObject({
-      group: ESO_GROUP,
-      version: ESO_VERSION,
-      namespace: grant.namespace,
-      plural,
-      name: grant.secretName,
-    });
-    await custom.replaceNamespacedCustomObject({
-      group: ESO_GROUP,
-      version: ESO_VERSION,
-      namespace: grant.namespace,
-      plural,
-      name: grant.secretName,
-      body,
-    });
-  } catch (error) {
-    if (!isNotFound(error)) throw error;
-    await createEsoObject({
-      group: ESO_GROUP,
-      version: ESO_VERSION,
-      namespace: grant.namespace,
-      plural,
-      body,
-    });
+  if (!existing) {
+    await createEsoObject({ group: ESO_GROUP, version: ESO_VERSION, namespace: grant.namespace, plural, body });
+    return;
   }
+  await custom.replaceNamespacedCustomObject({
+    group: ESO_GROUP,
+    version: ESO_VERSION,
+    namespace: grant.namespace,
+    plural,
+    name: grant.secretName,
+    body: { ...body, metadata: { ...body.metadata, resourceVersion: existing.metadata?.resourceVersion } },
+  });
 }
 
-async function externalSecretExists(namespace: string, name: string): Promise<boolean> {
+type ExternalSecretObject = { metadata?: k8s.V1ObjectMeta };
+
+/** The ExternalSecret of that name in the namespace, or undefined. */
+async function readExternalSecret(namespace: string, name: string): Promise<ExternalSecretObject | undefined> {
   const { custom } = getApis();
   try {
-    await custom.getNamespacedCustomObject({ group: ESO_GROUP, version: ESO_VERSION, namespace, plural: "externalsecrets", name });
-    return true;
+    return (await custom.getNamespacedCustomObject({
+      group: ESO_GROUP,
+      version: ESO_VERSION,
+      namespace,
+      plural: "externalsecrets",
+      name,
+    })) as ExternalSecretObject;
   } catch (error) {
-    if (isNotFound(error)) return false;
+    if (isNotFound(error)) return undefined;
     throw error;
   }
 }
 
+function externalSecretNotManaged(namespace: string, name: string): SecretNotManagedError {
+  return new SecretNotManagedError(
+    `An ExternalSecret named "${name}" already exists in "${namespace}" and wasn't created by the console, ` +
+      "so it can't be replaced or registered here. Choose another name.",
+  );
+}
+
+/**
+ * Only the console's own ExternalSecret (labelled MANAGED_LABELS, as every
+ * one it has made is) is ever replaced: one made elsewhere is refused, never
+ * adopted, registered or not, so registering a name can't take over what
+ * someone else syncs. The write fence refuses updating an unlabelled one too.
+ */
 export async function upsertExternalSecretGrant(grant: ExternalSecretGrant): Promise<void> {
   await ensureNamespaceExists(grant.namespace);
+  const existing = await readExternalSecret(grant.namespace, grant.secretName);
+  if (existing && !isManaged(existing.metadata)) throw externalSecretNotManaged(grant.namespace, grant.secretName);
   // An existing Secret of that name may be registered only when it's
-  // already the team's, or an ExternalSecret of that name syncs it (ESO's,
-  // made by the console or elsewhere); anything else is someone else's.
-  if (!grant.alreadyGranted && (await secretExists(grant.namespace, grant.secretName))) {
-    if (!(await externalSecretExists(grant.namespace, grant.secretName))) {
-      throw notManaged(grant.namespace, grant.secretName);
-    }
+  // already the team's, or the console's own ExternalSecret syncs it;
+  // anything else is someone else's.
+  if (!grant.alreadyGranted && !existing && (await secretExists(grant.namespace, grant.secretName))) {
+    throw notManaged(grant.namespace, grant.secretName);
   }
   // ESO's controller, not this process, creates the Secret asynchronously
   // once the ExternalSecret reconciles.
-  await upsertExternalSecret(grant);
+  await upsertExternalSecret(grant, existing);
   await deleteLegacySecretRole(grant.namespace, grant.secretName);
 }
 

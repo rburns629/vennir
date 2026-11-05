@@ -345,10 +345,16 @@ func (a *app) catalog(ctx context.Context, out io.Writer, dir string, c *config.
 		}
 	}
 
-	// AWS trusts the repository by the subject GitHub's tokens carry, which
-	// (immutable subjects) pins its id: known only now it exists.
-	if c.Target == "aws" {
+	// The federation trusts the repository by its id and its owner's,
+	// known only now it exists: AWS by the subject GitHub's tokens carry,
+	// GCP by the provider's condition.
+	switch c.Target {
+	case "aws":
 		if err := a.trustCatalogSubject(ctx, out, dir, c, gh, repo); err != nil {
+			return err
+		}
+	case "gcp":
+		if err := a.trustCatalogRepositoryGCP(ctx, out, dir, c, gh, repo); err != nil {
 			return err
 		}
 	}
@@ -723,20 +729,25 @@ func validateCatalog(ctx context.Context, dir string) error {
 	return nil
 }
 
-// trustCatalogSubject reads the repository's OIDC subject prefix and, if the
-// publish role doesn't trust it yet, records it and updates the role's trust.
+// trustCatalogSubject reads the repository's OIDC subject prefix and ids
+// and, if the publish role doesn't trust them yet, records them and updates
+// the role's trust.
 func (a *app) trustCatalogSubject(ctx context.Context, out io.Writer, dir string, c *config.Config, gh *githost.GitHub, repo string) error {
 	if err := ensureCatalogSubject(ctx, out, gh, repo); err != nil {
+		return err
+	}
+	pinned, err := recordCatalogIDs(ctx, out, dir, c, gh, repo)
+	if err != nil {
 		return err
 	}
 	prefix, err := gh.SubjectPrefix(ctx, repo)
 	if err != nil {
 		return err
 	}
-	if prefix == c.Catalog.SubjectPrefix || (c.Catalog.SubjectPrefix == "" && prefix == "repo:"+repo) {
+	if !pinned && (prefix == c.Catalog.SubjectPrefix || (c.Catalog.SubjectPrefix == "" && prefix == "repo:"+repo)) {
 		return nil
 	}
-	fmt.Fprintf(out, "GitHub names the repository %s in its tokens: updating the publish role to trust exactly that...\n", prefix)
+	fmt.Fprintf(out, "GitHub names the repository %s (id %s, owner id %s) in its tokens: updating the publish role to trust exactly that...\n", prefix, c.Catalog.RepositoryID, c.Catalog.OwnerID)
 	c.Catalog.SubjectPrefix = prefix
 	if err := c.Save(dir); err != nil {
 		return err
@@ -754,18 +765,63 @@ func (a *app) trustCatalogSubject(ctx context.Context, out io.Writer, dir string
 	return tf.ApplyOnly(ctx, "aws_iam_role.publish[0]")
 }
 
+// trustCatalogRepositoryGCP pins the GCP federation (its provider's
+// condition and the publish account's binding) to the repository's ids
+// once it exists, rather than its name, re-applying just those two when the
+// ids are new.
+func (a *app) trustCatalogRepositoryGCP(ctx context.Context, out io.Writer, dir string, c *config.Config, gh *githost.GitHub, repo string) error {
+	changed, err := recordCatalogIDs(ctx, out, dir, c, gh, repo)
+	if err != nil || !changed {
+		return err
+	}
+	fmt.Fprintf(out, "Pinning the catalog's federation to %s's id %s (owner id %s), not its name...\n", repo, c.Catalog.RepositoryID, c.Catalog.OwnerID)
+	tf := tofu.In(a.runner, dir)
+	if err := modules.Write("gcp", tf.Path); err != nil {
+		return err
+	}
+	if err := tf.WriteVars(keepBackupBucket(ctx, tf, c, gcp.Vars(c, false), "google_storage_bucket.backups[0]")); err != nil {
+		return err
+	}
+	if err := tf.Init(ctx); err != nil {
+		return err
+	}
+	return tf.ApplyOnly(ctx, "google_iam_workload_identity_pool_provider.github[0]", "google_service_account_iam_member.publish_federation[0]")
+}
+
+// recordCatalogIDs reads the catalog repository's id and its owner's, and
+// saves them when they're new; it says whether they were.
+func recordCatalogIDs(ctx context.Context, out io.Writer, dir string, c *config.Config, gh *githost.GitHub, repo string) (bool, error) {
+	ids, err := gh.RepositoryIDs(ctx, repo)
+	if err != nil {
+		return false, fmt.Errorf("reading %s's id, which its federation trusts: %w", repo, err)
+	}
+	if ids.Repository == c.Catalog.RepositoryID && ids.Owner == c.Catalog.OwnerID {
+		return false, nil
+	}
+	if c.Catalog.RepositoryID != "" {
+		fmt.Fprintf(out, "%s is now repository %s (owner %s), not %s (owner %s): trusting the new one.\n", repo, ids.Repository, ids.Owner, c.Catalog.RepositoryID, c.Catalog.OwnerID)
+	}
+	c.Catalog.RepositoryID, c.Catalog.OwnerID = ids.Repository, ids.Owner
+	return true, c.Save(dir)
+}
+
 // ensureCatalogSubject has the catalog repository's OIDC tokens name their
-// branch even in an Environment: the AWS publish role trusts a job of the
-// catalog-publish Environment only on main, so its tokens must say both
+// branch even in an Environment, and the repository's and its owner's ids:
+// the AWS publish role trusts a job of the catalog-publish Environment only
+// on main, and only of this repository, so its tokens must say all of it
 // (modules/aws publish_trust). A catalog made before that trust is fixed
 // by apply, before it changes the role (or its publishing would stop).
 func ensureCatalogSubject(ctx context.Context, out io.Writer, gh *githost.GitHub, repo string) error {
 	changed, err := gh.EnsureSubjectTemplate(ctx, repo)
 	if err != nil {
-		return fmt.Errorf("setting %s's OIDC subject to name its branch (the AWS publish role trusts main only): %w; with gh signed in as an admin of the repository, run this again, or set it yourself: gh api -X PUT repos/%s/actions/oidc/customization/sub -F use_default=false -f 'include_claim_keys[]=repo' -f 'include_claim_keys[]=context' -f 'include_claim_keys[]=ref'", repo, err, repo)
+		keys := ""
+		for _, k := range githost.SubjectClaimKeys {
+			keys += " -f 'include_claim_keys[]=" + k + "'"
+		}
+		return fmt.Errorf("setting %s's OIDC subject to name its branch and ids (the AWS publish role trusts main of this repository only): %w; with gh signed in as an admin of the repository, run this again, or set it yourself: gh api -X PUT repos/%s/actions/oidc/customization/sub -F use_default=false%s", repo, err, repo, keys)
 	}
 	if changed {
-		fmt.Fprintf(out, "%s's OIDC tokens now name their branch too (repo, context, ref), as the publish role requires.\n", repo)
+		fmt.Fprintf(out, "%s's OIDC tokens now name their branch and ids too (%s), as the publish role requires.\n", repo, strings.Join(githost.SubjectClaimKeys, ", "))
 	}
 	return nil
 }

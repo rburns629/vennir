@@ -9,7 +9,7 @@
  * written.
  */
 import { randomUUID } from "node:crypto";
-import { eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { hashPassword } from "../src/auth/password.js";
@@ -209,7 +209,8 @@ describe("syncing", () => {
       executionId,
       teams: [prefix],
       name: "earlier",
-      payload: { tasks: [{ id: "t", team: prefix, image: `example.com/${prefix}/db@${digest("1")}`, action: "create" }] },
+      // As the console submits it: the product's ServiceAccount filled in.
+      payload: { tasks: [{ id: "t", team: prefix, image: `example.com/${prefix}/db:1@${digest("1")}`, action: "create", serviceAccount: "db-v2" }] },
     });
     await syncIdentityPolicy();
     expect(ours().map((e) => e.digest)).toEqual([digest("1"), digest("2")]);
@@ -218,6 +219,59 @@ describe("syncing", () => {
     await db.update(submittedExecutions).set({ resourcesRecordedAt: new Date() }).where(eq(submittedExecutions.executionId, executionId));
     await syncIdentityPolicy();
     expect(ours().map((e) => e.digest)).toEqual([digest("2")]);
+  });
+
+  it("keeps an earlier release in use only for the product a running step runs as", async () => {
+    // Two products released at one digest (one image, two actions), and a
+    // platform product; each since released again, its earlier release
+    // last used two hours ago.
+    const shared = `example.com/${prefix}/shared`;
+    const platform = `example.com/${prefix}/platform`;
+    const a = { name: `${prefix}-a`, action: "run", team: prefix, serviceAccount: "a-sa" };
+    const b = { name: `${prefix}-b`, action: "check", team: prefix, serviceAccount: "b-sa" };
+    const p = { name: `${prefix}-p`, action: "run" };
+    for (const [product, image] of [[a, shared], [b, shared], [p, platform]] as const) {
+      expect((await register({ ...product, image: `${image}@${digest("3")}` })).code).toBe("ok");
+      expect((await register({ ...product, image: `${image}@${digest("4")}` })).code).toBe("ok");
+    }
+    const ids = (await db.select().from(products).where(inArray(products.name, [a.name, b.name, p.name]))).map((r) => r.id);
+    await db
+      .update(productReleases)
+      .set({ lastUsedAt: new Date(Date.now() - 2 * 3_600_000) })
+      .where(and(inArray(productReleases.productId, ids), like(productReleases.image, `%${digest("3")}`)));
+    const earlier = () =>
+      ours()
+        .filter((e) => e.digest === digest("3"))
+        .map((e) => `${e.repository.split("/").at(-1) ?? ""} ${e.action} ${e.serviceAccount}`)
+        .sort();
+
+    const executionId = randomUUID();
+    const running = async (...tasks: Record<string, unknown>[]) => {
+      await db.delete(submittedExecutions).where(eq(submittedExecutions.executionId, executionId));
+      await db.insert(submittedExecutions).values({ executionId, teams: [prefix], name: "earlier", payload: { tasks } });
+      await syncIdentityPolicy();
+      return earlier();
+    };
+    const step = (task: Record<string, unknown>) => ({ id: "t", team: prefix, image: `${shared}:1@${digest("3")}`, action: "run", serviceAccount: "a-sa", ...task });
+    try {
+      // A's step keeps A's release, not B's of the same digest.
+      expect(await running(step({}))).toEqual(["shared run a-sa"]);
+      // The same digest as neither: another action, ServiceAccount, team or repository.
+      expect(await running(step({ action: "other" }))).toEqual([]);
+      expect(await running(step({ serviceAccount: "b-sa" }))).toEqual([]);
+      expect(await running(step({ serviceAccount: undefined }))).toEqual([]);
+      expect(await running(step({ team: `${prefix}-other` }))).toEqual([]);
+      expect(await running(step({ image: `example.com/${prefix}/elsewhere@${digest("3")}` }))).toEqual([]);
+      // Both products' steps: both.
+      expect(await running(step({}), step({ id: "u", action: "check", serviceAccount: "b-sa" }))).toEqual(["shared check b-sa", "shared run a-sa"]);
+      // A platform product's, in any team's namespace, as "default".
+      expect(await running(step({ image: `${platform}@${digest("3")}`, team: `${prefix}-other`, serviceAccount: undefined }))).toEqual(["platform run default"]);
+      // Not a step at all: nothing, and no error.
+      expect(await running("not a step" as unknown as Record<string, unknown>, {})).toEqual([]);
+    } finally {
+      await db.delete(submittedExecutions).where(eq(submittedExecutions.executionId, executionId));
+      await db.delete(products).where(inArray(products.id, ids));
+    }
   });
 
   it("lists a release a submission is about to run, waiting for the cluster, and writes nothing when it's there", async () => {

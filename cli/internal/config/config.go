@@ -318,6 +318,12 @@ type Catalog struct {
 	// (repo:<owner>@<id>/<name>@<id> with immutable subjects), read once it
 	// exists; the AWS role trusts exactly it.
 	SubjectPrefix string `yaml:"subjectPrefix,omitempty"`
+	// RepositoryID and OwnerID are the repository's and its owner's GitHub
+	// ids, read once it exists: the cloud's federation trusts exactly them
+	// (GCP's condition, AWS's subject), so a repository renamed, or deleted
+	// and made again under its name by someone else, isn't trusted.
+	RepositoryID string `yaml:"repositoryId,omitempty"`
+	OwnerID      string `yaml:"ownerId,omitempty"`
 }
 
 // ExternalCatalog is a catalog published to another install's registry.
