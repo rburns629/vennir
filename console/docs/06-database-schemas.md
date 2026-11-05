@@ -554,6 +554,7 @@ The catalog release this console last applied (its teams, products and SecretSto
 | `commit` | text | yes | The catalog commit it describes. |
 | `repository` | text | yes | The catalog repository, for people. |
 | `applied_at` | timestamptz | yes | When it was applied. |
+| `released_at` | timestamptz | yes | When it was released (its signed `createdAt`). An older release isn't applied: going back is releasing that commit again. |
 | `problems` | jsonb | no | What applying it couldn't do, one item each (`item`, `message`); the rest was applied. |
 | `applied` | jsonb | yes | What it held: `teams`, `products` (by image), `actions`, `templates`, `apis` and `secretStores`, counted. Null before a release was applied. |
 | `checked_at` | timestamptz | yes | The last look. |

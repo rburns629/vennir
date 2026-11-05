@@ -449,6 +449,13 @@
       "when": 1793725899475,
       "tag": "0063_lowercase_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1793853795141,
+      "tag": "0064_catalog_released_at",
+      "breakpoints": true
     }
   ]
 }

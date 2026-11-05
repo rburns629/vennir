@@ -1201,6 +1201,8 @@ export const catalogSync = pgTable("catalog_sync", {
   commit: text("commit"),
   repository: text("repository"),
   appliedAt: timestamp("applied_at", { withTimezone: true }),
+  // When it was released (its signed createdAt): an older one isn't applied.
+  releasedAt: timestamp("released_at", { withTimezone: true }),
   // What applying it couldn't do, item by item: [{ item, message }].
   problems: jsonb("problems").$type<{ item: string; message: string; adoptableTeam?: string }[]>().notNull().default([]),
   // What it held (catalogSync.ts's counts); null before one was applied.

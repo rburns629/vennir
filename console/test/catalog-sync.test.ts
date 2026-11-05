@@ -12,6 +12,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { create, toJsonString, type MessageInitShape } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -548,5 +549,33 @@ describe("catalog versions", () => {
     publish(release({ commit: "c9", teams: [{ name: teamA }] }), digestOf(90));
     await syncCatalog(log);
     expect(await status()).toMatchObject({ digest: digestOf(90), version: null });
+  });
+});
+
+describe("an older release", () => {
+  it("isn't applied, though signed, and a newer one is", async () => {
+    const at = (iso: string) => timestampFromDate(new Date(iso));
+    const commitNow = async () => (await status())?.commit;
+    try {
+      publish(release({ commit: "c-new", createdAt: at("2026-11-02T00:00:00Z"), teams: [{ name: teamA }] }), digestOf(91));
+      await syncCatalog(log);
+      expect(await commitNow()).toBe("c-new");
+
+      // Served again by its tag, or as the newest version: an older digest.
+      publish(release({ commit: "c-old", createdAt: at("2026-11-01T00:00:00Z"), teams: [{ name: teamA }] }), digestOf(92));
+      await syncCatalog(log, true);
+      expect(await status()).toMatchObject({ commit: "c-new", digest: digestOf(91) });
+      expect((await status())?.error).toContain("before the one applied");
+      // One saying nothing of when it was made can't be newer.
+      publish(release({ commit: "c-none", teams: [{ name: teamA }] }), digestOf(93));
+      await syncCatalog(log, true);
+      expect(await commitNow()).toBe("c-new");
+
+      publish(release({ commit: "c-newer", createdAt: at("2026-11-03T00:00:00Z"), teams: [{ name: teamA }] }), digestOf(94));
+      await syncCatalog(log);
+      expect(await status()).toMatchObject({ commit: "c-newer", error: null });
+    } finally {
+      await db.update(catalogSync).set({ releasedAt: null }).where(eq(catalogSync.id, 1));
+    }
   });
 });

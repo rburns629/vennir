@@ -788,6 +788,11 @@ was refused (`IMAGE_NOT_SIGNED`). Proven on EKS too (2026-10-26), `kms`:
 an AWS KMS key, with policy-controller reading ECR through Pod Identity; the
 same four results.
 
+A console never applies a release older than the one it applied (by its
+signed `createdAt`), so a release signed long ago can't be served again in
+place of a newer one (`console/src/catalogSync.ts`); going back is
+releasing that commit again.
+
 An install reading another's catalog (`externalCatalog`) holds no signing
 right: it trusts the owner's signer (`catalogSignature`: its public key, or
 its repository's keyless identity) and, on gcp and aws, enforces it on
