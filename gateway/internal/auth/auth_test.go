@@ -316,3 +316,34 @@ func TestARetiredTeamCallsAsNobody(t *testing.T) {
 		t.Fatalf("the calling teams: %s", got)
 	}
 }
+
+// A bot never calls as an admin, even if its row says it is one: as the
+// console's resolveCaller has it.
+func TestABotIsNeverAnAdmin(t *testing.T) {
+	db := tx(t)
+	ctx := context.Background()
+	var botID string
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(db.QueryRow(ctx, `INSERT INTO users (email, is_bot, is_admin) VALUES ('gw-admin-bot@bots.vennir.local', true, true) RETURNING id::text`).Scan(&botID))
+	token := APITokenPrefix + "admin-bot-" + botID
+	sum := sha256.Sum256([]byte(token))
+	_, err := db.Exec(ctx, `INSERT INTO api_tokens (user_id, label, token_hash) VALUES ($1::uuid, 'ci', $2)`, botID, hex.EncodeToString(sum[:]))
+	must(err)
+	now := time.Now()
+	r := &Resolver{DB: db, Keys: keys, Now: func() time.Time { return now }}
+	who, err := r.Resolve(ctx, "Bearer "+token)
+	must(err)
+	if who.IsAdmin || !who.IsBot {
+		t.Errorf("its token: %+v", who)
+	}
+	who, err = r.Resolve(ctx, "Bearer "+jwt(t, secret, "EdDSA", map[string]any{"userId": botID, "iat": now.Unix(), "exp": now.Unix() + 60, "sso": true}))
+	must(err)
+	if who.IsAdmin || !who.IsBot {
+		t.Errorf("its keyless session: %+v", who)
+	}
+}

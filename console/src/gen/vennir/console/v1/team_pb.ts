@@ -1301,7 +1301,9 @@ export const TeamService: GenService<{
   },
   /**
    * Adds someone with an account, as a member unless role says otherwise.
-   * A maintainer's (or an admin's). At most 30 an hour per caller.
+   * A maintainer's (or an admin's). At most 30 an hour per caller. An
+   * account that signed itself up, never verified by single sign-on, is
+   * refused unless an admin adds it (failed_precondition, EMAIL_NOT_VERIFIED).
    *
    * @generated from rpc vennir.console.v1.TeamService.AddMember
    */

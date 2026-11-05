@@ -58,7 +58,7 @@ export function authService(app: FastifyInstance): ServiceImpl<typeof AuthServic
       if (await findUserByEmail(email)) {
         throw rpcError(Code.AlreadyExists, "CONFLICT", "Email already registered.");
       }
-      const user = await createUser(email, await hashPassword(password));
+      const user = await createUser(email, await hashPassword(password), false, true);
       return { userId: user.id, email: user.email };
     },
 

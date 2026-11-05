@@ -462,3 +462,24 @@ func TestAReleaseReadsNothingThroughALink(t *testing.T) {
 		t.Fatalf("release = %v, err = %v\n%s", release, err, out.String())
 	}
 }
+
+// Two teams' actions under one registered name: the release is refused,
+// naming both, rather than one install's console keeping either.
+func TestAReleaseRefusesTwoTeamsActionsUnderOneName(t *testing.T) {
+	server := httptest.NewServer(registry.New())
+	defer server.Close()
+	s := Settings{Registry: strings.TrimPrefix(server.URL, "http://") + "/catalog-products", SigningMode: "none"}
+	c := catalogWith(t, map[string]string{
+		"teams/a/products/b-c/product.yaml": productFile("b-c", "a", "[]"),
+		"teams/a-b/products/c/product.yaml": productFile("c", "a-b", "[]"),
+	})
+	var out strings.Builder
+	c.Stdout, c.Stderr = &out, &out
+	_, err := c.BuildRelease(context.Background(), s, "c1", "")
+	if err == nil || !strings.Contains(err.Error(), "two teams' actions are registered under one name") {
+		t.Fatalf("the release: %v", err)
+	}
+	if !strings.Contains(out.String(), "team a's teams/a/products/b-c") || !strings.Contains(out.String(), "team a-b's teams/a-b/products/c") {
+		t.Errorf("names both teams:\n%s", out.String())
+	}
+}

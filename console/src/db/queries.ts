@@ -50,6 +50,8 @@ export interface User {
   oidcSubject: string | null;
   // An ordering bot's templates (decision 23); null for anyone else.
   orderTemplates: string[] | null;
+  // Made by its own sign-up, its email unchecked (schema.ts).
+  selfRegistered: boolean;
 }
 
 /** The database, or a transaction on it: for the few queries one caller runs together. */
@@ -65,8 +67,13 @@ export async function findUserById(id: string): Promise<User | undefined> {
   return user;
 }
 
-export async function createUser(email: string, passwordHash: string | null, mustChangePassword = false): Promise<User> {
-  const [user] = await db.insert(users).values({ email: normalEmail(email), passwordHash, mustChangePassword }).returning();
+export async function createUser(
+  email: string,
+  passwordHash: string | null,
+  mustChangePassword = false,
+  selfRegistered = false,
+): Promise<User> {
+  const [user] = await db.insert(users).values({ email: normalEmail(email), passwordHash, mustChangePassword, selfRegistered }).returning();
   if (!user) throw new Error("Insert returned no row");
   return user;
 }
@@ -264,8 +271,12 @@ export async function recordSignIn(userId: string): Promise<void> {
   await db.update(users).set({ lastSignedInAt: new Date() }).where(eq(users.id, userId));
 }
 
+/** Never makes a bot an admin (core/users.ts says why). */
 export async function setUserAdmin(userId: string, isAdmin: boolean): Promise<void> {
-  await db.update(users).set({ isAdmin }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ isAdmin })
+    .where(and(eq(users.id, userId), ...(isAdmin ? [eq(users.isBot, false)] : [])));
 }
 
 /** How an account signs in: a password of its own, single sign-on, or both. */
@@ -330,7 +341,8 @@ export async function countAdmins(): Promise<number> {
   const [row] = await db
     .select({ count: count() })
     .from(users)
-    .where(eq(users.isAdmin, true));
+    // A bot is never an admin (auth/plugin.ts), whatever its row says.
+    .where(and(eq(users.isAdmin, true), eq(users.isBot, false)));
   return row?.count ?? 0;
 }
 

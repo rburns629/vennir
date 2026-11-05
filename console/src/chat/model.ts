@@ -81,8 +81,9 @@ export class ModelUnavailable extends Error {
   constructor(
     message: string,
     readonly summary: string = message,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
   }
 }
 
@@ -167,7 +168,13 @@ export class OpenAICompatible implements ChatModel {
           signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
         });
       } catch (error) {
-        throw new ModelUnavailable(`The model at ${this.options.endpoint} didn't answer: ${error instanceof Error ? error.message : String(error)}`);
+        // The connection's error, which can name hosts and say what they
+        // answered, is logged (chat_model_unavailable), never shown.
+        throw new ModelUnavailable(
+          `The model at ${this.options.endpoint} didn't answer: ${error instanceof Error ? error.message : String(error)}`,
+          `The model at ${this.options.endpoint} didn't answer.`,
+          { cause: error },
+        );
       }
       if ((response.status !== 429 && response.status !== 503) || attempt >= RETRIES.length || signal?.aborted) break;
       await response.body?.cancel();
@@ -308,7 +315,11 @@ export class AnthropicMessages implements ChatModel {
       );
     } catch (error) {
       if (error instanceof Anthropic.APIError) {
-        throw new ModelUnavailable(`Claude answered ${String(error.status ?? "no status")}: ${error.message.slice(0, 300)}`);
+        throw new ModelUnavailable(
+          `Claude answered ${String(error.status ?? "no status")}: ${error.message.slice(0, 300)}`,
+          error.status ? `Claude answered ${String(error.status)}.` : "Claude didn't answer.",
+          { cause: error },
+        );
       }
       throw error;
     }

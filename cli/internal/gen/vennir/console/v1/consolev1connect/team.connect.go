@@ -117,7 +117,9 @@ type TeamServiceClient interface {
 	// The team's members, bots included.
 	ListMembers(context.Context, *connect.Request[v1.ListMembersRequest]) (*connect.Response[v1.ListMembersResponse], error)
 	// Adds someone with an account, as a member unless role says otherwise.
-	// A maintainer's (or an admin's). At most 30 an hour per caller.
+	// A maintainer's (or an admin's). At most 30 an hour per caller. An
+	// account that signed itself up, never verified by single sign-on, is
+	// refused unless an admin adds it (failed_precondition, EMAIL_NOT_VERIFIED).
 	AddMember(context.Context, *connect.Request[v1.AddMemberRequest]) (*connect.Response[v1.AddMemberResponse], error)
 	// A maintainer's. Never the team's last maintainer (failed_precondition,
 	// LAST_MAINTAINER).
@@ -430,7 +432,9 @@ type TeamServiceHandler interface {
 	// The team's members, bots included.
 	ListMembers(context.Context, *connect.Request[v1.ListMembersRequest]) (*connect.Response[v1.ListMembersResponse], error)
 	// Adds someone with an account, as a member unless role says otherwise.
-	// A maintainer's (or an admin's). At most 30 an hour per caller.
+	// A maintainer's (or an admin's). At most 30 an hour per caller. An
+	// account that signed itself up, never verified by single sign-on, is
+	// refused unless an admin adds it (failed_precondition, EMAIL_NOT_VERIFIED).
 	AddMember(context.Context, *connect.Request[v1.AddMemberRequest]) (*connect.Response[v1.AddMemberResponse], error)
 	// A maintainer's. Never the team's last maintainer (failed_precondition,
 	// LAST_MAINTAINER).

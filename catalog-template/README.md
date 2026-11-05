@@ -751,7 +751,9 @@ with the product's commit (`:latest`, from a laptop). A product whose image
 for that commit is missing, or unsigned when the catalog signs (its publish
 failed), fails the release. In CI, `publish --changed` therefore also
 publishes every product whose image for its commit is missing or unsigned,
-so the next run on `main` (or rerunning the failed one) puts it right. It's complete, not a
+so the next run on `main` (or rerunning the failed one) puts it right. Two actions
+under one name fail it too (team `a`'s product `b-c` and team `a-b`'s `c` both
+make `a-b-c-run`; `check` says so first). It's complete, not a
 change: an install unregisters what a release no longer has, and retires a
 team whose folder is gone. Each console reads it every few minutes (an admin
 can press **Sync now**), verifies its signature, and applies it.
@@ -905,7 +907,9 @@ other providers are designed but not yet proven.
 - **Retire** (automatic, reversible): merge a pull request that deletes
   `teams/<team>/`. Each install retires the team when it reads the next
   release (read-only, products unregistered) and relabels its namespace so
-  nothing new runs there. Restoring the folder brings it back.
+  nothing new runs there. Restoring the folder brings it back, unless an
+  install's admin retired the team by hand: there it stays retired until
+  an admin un-retires it.
 - **Purge** (permanent): each install's admin, in its console (Team page →
   Purge), once nothing is running. History is kept, the name can never be
   reused, and the namespace stays, labelled retired, for a cluster

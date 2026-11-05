@@ -294,7 +294,7 @@ A team's name is also its Kubernetes namespace; there is no separate column for 
 | `name` | text | no, unique | The team, and its namespace. |
 | `created_at` | timestamptz | no | |
 | `retired_at` | timestamptz | yes | Set when the team is retired: read-only, products unregistered. Clearing it brings the team back. |
-| `retired_by` | text | yes | Who retired it, as it was then: their email, or `the catalog` for a release that dropped it. Null while it isn't retired. |
+| `retired_by` | text | yes | Who retired it, as it was then: their email, or `the catalog` for a release that dropped it. Null while it isn't retired. Only a team `the catalog` retired comes back when a release names it again; any other stays retired until an admin un-retires it. |
 | `deleted_at` | timestamptz | yes | Set when a retired team is purged: memberships, grants and products are gone and the team is hidden, but the row stays so the name stays reserved. |
 | `from_catalog` | boolean | no | Made by a catalog release: retired when a release no longer names it. A team an admin made isn't touched. |
 | `require_sso` | boolean | no | Its members sign in with single sign-on only: their passwords, and sessions a password made, are refused (admins' aren't). No effect while single sign-on is off. |
@@ -320,6 +320,7 @@ People and bots alike.
 | `must_change_password` | boolean | no | Its password was set by someone else (an admin's new account or reset, `vennir admin reset-password`): a session it signs in may only change it. |
 | `oidc_subject` | text, unique | yes | The single sign-on account bound at the first sign-in through it (`<issuer> <sub>`): from then on only that account signs in as this person. |
 | `last_signed_in_at` | timestamptz | yes | Its last sign-in, with a password or single sign-on; empty if it never has. Shown on the Admin page's list of people. |
+| `self_registered` | boolean | no | Made by its own sign-up (self-registration), which checks nothing about the email. Until single sign-on binds it (`oidc_subject`), nobody has verified the address is theirs, so a maintainer adding it to a team by email is refused, saying so (an admin may add it). |
 | `email_kinds` | text[] | no | Which of their notifications are emailed to them too, when the install sends email: `run_failed`, `approval_waiting`, `product_not_ready`, `catalog_failing`, `step_refused` and `platform_alert` by default. |
 | `created_at` | timestamptz | no | |
 

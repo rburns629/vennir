@@ -10,8 +10,10 @@ import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../src/db/client.js";
-import { createSsoUser } from "../src/db/queries.js";
-import { auditLog } from "../src/db/schema.js";
+import { generateApiToken, hashApiToken } from "../src/auth/apiToken.js";
+import { callerForUser } from "../src/auth/plugin.js";
+import { createApiToken, createSsoUser } from "../src/db/queries.js";
+import { auditLog, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { failureCode, rpcClient, type RpcError } from "./rpc.js";
 
@@ -127,5 +129,25 @@ describe("UserService", () => {
         .limit(1);
       expect(entry?.status).toBe(409);
     }
+  });
+  it("never makes a bot an admin, and never resolves one as an admin", async () => {
+    const admin = await makeUser({ admin: true });
+    const token = await signIn(admin.email);
+    const email = `rpc-bot-${randomUUID()}@bots.vennir.local`;
+    madeHere.push(email);
+    const [bot] = await db.insert(users).values({ email, isBot: true }).returning();
+    if (!bot) throw new Error("no bot");
+    const refused = await rpc("UserService", "SetAdmin", { email, admin: true }, { token });
+    expect(refused.json<RpcError>().code).toBe("invalid_argument");
+    const [after] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, bot.id));
+    expect(after?.isAdmin).toBe(false);
+
+    // Even if its row says it's one.
+    await db.update(users).set({ isAdmin: true }).where(eq(users.id, bot.id));
+    expect((await callerForUser(bot.id))?.isAdmin).toBe(false);
+    const raw = generateApiToken();
+    await createApiToken(bot.id, "ci", hashApiToken(raw));
+    const asBot = await rpc("UserService", "ListUsers", {}, { token: raw });
+    expect(asBot.statusCode).toBe(403);
   });
 });

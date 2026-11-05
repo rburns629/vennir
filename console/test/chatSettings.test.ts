@@ -198,5 +198,13 @@ describe("the chat agent's settings", () => {
     broken = false;
     expect(failed).toMatchObject({ ok: false, problem: "The model answered 500." });
     expect(JSON.stringify(failed)).not.toContain("hunter2");
+
+    // Nothing listening there: that it didn't answer, not the connection's error.
+    const closed = createServer();
+    await new Promise<void>((resolve) => closed.listen(0, "127.0.0.1", resolve));
+    const nowhere = `http://127.0.0.1:${String((closed.address() as AddressInfo).port)}/v1`;
+    await new Promise((resolve) => closed.close(resolve));
+    const unreachable = (await call<Record<string, unknown>>(admin, "ChatService/TestChatConfig", { config: input({ endpoint: nowhere }) })).body;
+    expect(unreachable).toMatchObject({ ok: false, problem: `The model at ${nowhere} didn't answer.` });
   });
 });

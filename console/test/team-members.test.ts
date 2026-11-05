@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 import { randomUUID } from "node:crypto";
-import { inArray, like } from "drizzle-orm";
+import { eq, inArray, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { hashPassword } from "../src/auth/password.js";
+import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createBotUser, createTeam, createUser, setTeamRetired, setUserAdmin } from "../src/db/queries.js";
 import { teams, users } from "../src/db/schema.js";
@@ -158,6 +159,33 @@ describe("adding a team member", () => {
     expect(added.code).toBe("already_exists");
     expect(added.failure).toBe("CONFLICT");
     expect(await memberIds(t.name)).not.toContain(bot.id);
+  });
+
+  it("says when the account signed itself up and its email was never verified", async () => {
+    const t = await teamOfTwo();
+    const email = `${prefix}-self-${randomUUID()}@example.com`;
+    emails.push(email);
+    const was = config.allowSelfRegistration;
+    config.allowSelfRegistration = true;
+    try {
+      expect((await call(undefined, "AuthService/Register", { email, password: "correct-horse-battery" })).code).toBe("ok");
+    } finally {
+      config.allowSelfRegistration = was;
+    }
+    const [registered] = await db.select().from(users).where(eq(users.email, email));
+    const added = await call(t.first.token, "TeamService/AddMember", { team: t.name, email });
+    expect(added.code).toBe("failed_precondition");
+    expect(added.failure).toBe("EMAIL_NOT_VERIFIED");
+    expect(added.message).toContain("nobody has verified");
+    expect(await memberIds(t.name)).not.toContain(registered?.id);
+    // Single sign-on verifies it.
+    await db.update(users).set({ oidcSubject: `https://idp.test|${randomUUID()}` }).where(eq(users.email, email));
+    expect((await call(t.first.token, "TeamService/AddMember", { team: t.name, email })).code).toBe("ok");
+    // An admin, who can check it's theirs some other way, may add one anyway.
+    const other = `${prefix}-self-${randomUUID()}@example.com`;
+    emails.push(other);
+    await createUser(other, await hashPassword("correct-horse-battery"), false, true);
+    expect((await call(admin, "TeamService/AddMember", { team: t.name, email: other })).code).toBe("ok");
   });
 
   it("is limited per caller, so emails can't be swept", async () => {

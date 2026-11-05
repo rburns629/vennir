@@ -19,7 +19,8 @@ service UserService {
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
     option idempotency_level = IDEMPOTENT;
   }
-  // Makes someone a Vennir admin, or takes it away.
+  // Makes someone a Vennir admin, or takes it away. Never a bot
+  // (invalid_argument).
   rpc SetAdmin(SetAdminRequest) returns (SetAdminResponse) {
     option idempotency_level = IDEMPOTENT;
   }

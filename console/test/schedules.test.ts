@@ -4,7 +4,9 @@
  * and what's refused; a due schedule starts once, as its bot, for its team,
  * even with two consoles at once; a refused start is kept and told to the
  * team's maintainers, as is one that can't run again; a time claimed and
- * not started is started by another console; pausing. kernel-api and the registry are stubbed; the
+ * not started is started by another console; pausing; a retired team's
+ * schedules are skipped, and nothing runs for it in another team's
+ * namespace. kernel-api and the registry are stubbed; the
  * rest is the real console on the real test database.
  */
 import { randomUUID } from "node:crypto";
@@ -13,7 +15,9 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../src/db/client.js";
-import { addTeamMember, createTeam, upsertProduct } from "../src/db/queries.js";
+import { callerForUser } from "../src/auth/plugin.js";
+import { runAction } from "../src/core/templates.js";
+import { addTeamMember, createTeam, setTeamRetired, upsertProduct } from "../src/db/queries.js";
 import { notificationEvents, products, schedules, submittedExecutions, teamMemberships, teams, users as usersTable } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { submitExecution } from "../src/kernel/client.js";
@@ -146,6 +150,38 @@ describe("a due schedule", () => {
     expect(listed.body.executions?.find((e) => e.executionId === run?.executionId)?.schedule).toBe("nightly");
     await startDueSchedules(silent);
     expect(ours()).toHaveLength(1);
+  });
+
+  it("of a retired team is skipped and kept, nothing runs for the team elsewhere, and it runs again once un-retired", async () => {
+    await setTeamRetired(ownTeamId, true, "admin@example.com");
+    try {
+      const [row] = await db.update(schedules).set({ nextRunAt: new Date(Date.now() - 60_000) }).where(eq(schedules.teamId, ownTeamId)).returning();
+      vi.mocked(silent.info).mockClear();
+      await startDueSchedules(silent);
+      expect(ours()).toEqual([]);
+      const [after] = await db.select().from(schedules).where(eq(schedules.id, row?.id ?? ""));
+      expect(after?.lastError).toMatch(/team is retired/);
+      expect(after?.nextRunAt?.getTime()).toBeGreaterThan(Date.now());
+      expect(after?.claimedRunAt).toBeNull();
+      expect(vi.mocked(silent.info).mock.calls.some(([fields]) => (fields as { event?: string }).event === "schedule_skipped")).toBe(true);
+
+      // Its bot, and its people, can't run anything for it in the
+      // provider's namespace; nor can its bot run anything at all.
+      const asBot = await callerForUser(bot.id);
+      const asMaintainer = await callerForUser(maintainer.id);
+      const request = { parameters: { text: "hi" }, onBehalfOf: own };
+      await expect(runAction(asBot, `${prov}-thing-run`, request, silent)).rejects.toMatchObject({ code: "TEAM_RETIRED" });
+      await expect(runAction(asMaintainer, `${prov}-thing-run`, request, silent)).rejects.toMatchObject({ code: "TEAM_RETIRED" });
+      await expect(runAction(asBot, `${prov}-thing-run`, { parameters: { text: "hi" } }, silent)).rejects.toMatchObject({ code: "TEAM_RETIRED" });
+      expect(ours()).toEqual([]);
+    } finally {
+      await setTeamRetired(ownTeamId, false);
+    }
+    await db.update(schedules).set({ nextRunAt: new Date(Date.now() - 60_000) }).where(eq(schedules.teamId, ownTeamId));
+    await startDueSchedules(silent);
+    expect(ours()).toHaveLength(1);
+    const [resumed] = await db.select().from(schedules).where(eq(schedules.teamId, ownTeamId));
+    expect(resumed?.lastError).toBeNull();
   });
 
   it("refused, is kept on the schedule and told to the team's maintainers", async () => {

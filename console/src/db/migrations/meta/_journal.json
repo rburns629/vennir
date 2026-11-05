@@ -463,6 +463,13 @@
       "when": 1793894007282,
       "tag": "0065_release_last_used",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1793903943396,
+      "tag": "0066_user_self_registered",
+      "breakpoints": true
     }
   ]
 }

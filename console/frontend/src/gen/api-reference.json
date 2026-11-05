@@ -1172,7 +1172,7 @@
     },
     {
      "name": "AddMember",
-     "comment": "Adds someone with an account, as a member unless role says otherwise.\nA maintainer's (or an admin's). At most 30 an hour per caller.",
+     "comment": "Adds someone with an account, as a member unless role says otherwise.\nA maintainer's (or an admin's). At most 30 an hour per caller. An\naccount that signed itself up, never verified by single sign-on, is\nrefused unless an admin adds it (failed_precondition, EMAIL_NOT_VERIFIED).",
      "input": "vennir.console.v1.AddMemberRequest",
      "output": "vennir.console.v1.AddMemberResponse",
      "streaming": false,
@@ -1436,7 +1436,7 @@
     },
     {
      "name": "SetAdmin",
-     "comment": "Makes someone a Vennir admin, or takes it away.",
+     "comment": "Makes someone a Vennir admin, or takes it away. Never a bot\n(invalid_argument).",
      "input": "vennir.console.v1.SetAdminRequest",
      "output": "vennir.console.v1.SetAdminResponse",
      "streaming": false,

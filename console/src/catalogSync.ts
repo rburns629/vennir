@@ -10,7 +10,10 @@
  * exactly its old token's rights (CATALOG):
  *   - each team it names exists and is active, with its namespace; a team
  *     made by an earlier release that this one doesn't name is retired
- *     (reversible). Purging stays an admin's action, never a release's. A
+ *     (reversible), and is active again once a release names it. One an
+ *     admin retired stays retired, its products and SecretStores not
+ *     applied, until an admin un-retires it. Purging stays an admin's
+ *     action, never a release's. A
  *     team that exists but no release made (by hand, or before this console
  *     read releases) is left alone, its products and SecretStores too, until
  *     an admin adopts it (adoptTeam): a new catalog folder never takes over
@@ -46,7 +49,7 @@ import { SCOPES } from "./auth/scopes.js";
 import type { AuthUser } from "./auth/plugin.js";
 import { CLOUDS, config } from "./config.js";
 import { deleteProduct, registerProduct } from "./core/products.js";
-import { applySecretStore, ensureTeam, retireTeam } from "./core/teams.js";
+import { applySecretStore, CATALOG_RETIRER, ensureTeam, retireTeam } from "./core/teams.js";
 import { parameterSchemaProblem, templateStepProblems } from "./core/templates.js";
 import { db } from "./db/client.js";
 import { deleteApisExcept, deleteTemplatesExcept, findTeamByName, replaceWiringTypes, upsertApi, upsertTemplate } from "./db/queries.js";
@@ -295,13 +298,24 @@ export async function apply(release: Release, log: FastifyBaseLogger): Promise<C
     }
   };
   const named = new Set(release.teams.map((t) => t.name));
-  // Teams this release may not touch: ones no release made.
+  // Teams this release may not touch: ones no release made, and ones an
+  // admin retired.
   const foreign = new Set<string>();
   for (const team of release.teams) {
     const [existing] = await db
-      .select({ fromCatalog: teams.fromCatalog, deletedAt: teams.deletedAt })
+      .select({ fromCatalog: teams.fromCatalog, deletedAt: teams.deletedAt, retiredAt: teams.retiredAt, retiredBy: teams.retiredBy })
       .from(teams)
       .where(eq(teams.name, team.name));
+    // Retired by an admin (or before teams recorded who): a release doesn't
+    // undo that, only an admin's un-retiring does.
+    if (existing?.retiredAt && !existing.deletedAt && existing.retiredBy !== CATALOG_RETIRER) {
+      foreign.add(team.name);
+      problems.push({
+        item: `team ${team.name}`,
+        message: `${team.name} was retired${existing.retiredBy ? ` by ${existing.retiredBy}` : ""}, not by a release, so this one didn't bring it back; its products and SecretStores weren't applied. An admin can un-retire it.`,
+      });
+      continue;
+    }
     if (existing && !existing.fromCatalog && !existing.deletedAt) {
       foreign.add(team.name);
       problems.push({
@@ -333,9 +347,23 @@ export async function apply(release: Release, log: FastifyBaseLogger): Promise<C
     });
   }
   const released = new Set<string>();
+  // A name is one product across every team: two of the release's under
+  // one (team a's b-c and team a-b's c both make a-b-c-run) would have the
+  // later replace the earlier. Neither is applied; what's stored stays.
+  const teamsByName = new Map<string, string[]>();
+  for (const p of release.products) teamsByName.set(p.name, [...(teamsByName.get(p.name) ?? []), p.team]);
   for (const p of release.products) {
     released.add(p.name);
     if (foreign.has(p.team)) continue;
+    const sharing = teamsByName.get(p.name) ?? [];
+    if (sharing.length > 1) {
+      problems.push({
+        item: `product ${p.name}`,
+        message: `${String(sharing.length)} of this release's actions are named ${p.name} (teams ${[...new Set(sharing)].join(" and ")}), so none was registered: rename one of the products or actions.`,
+      });
+      log.warn({ event: "catalog_apply_problem", item: `product ${p.name}`, teams: sharing }, `catalog release: product ${p.name} is named twice`);
+      continue;
+    }
     // Only into a team this release names (and so made, or will): never
     // into one it leaves out, which may be a team no release made.
     if (!named.has(p.team)) {

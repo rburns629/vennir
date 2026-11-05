@@ -320,6 +320,47 @@ func (c *Catalog) ValidateServiceAccounts() bool {
 	return ok
 }
 
+// ValidateProductNames refuses two actions registered under one name. Each
+// is registered as <team>-<product>-<action>, and names are one namespace
+// across every team: team a's product b-c and team a-b's product c both
+// make a-b-c-run, and the console registers only one of them.
+func (c *Catalog) ValidateProductNames() bool {
+	ok := true
+	first := map[string]string{} // registered name: whose action it is
+	for _, p := range c.AllProducts() {
+		if p.IsTemplate() {
+			continue
+		}
+		path := filepath.Join(p.Dir, "product.yaml")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue // ValidateProduct's to report
+		}
+		doc, problem := loadYAML(data)
+		spec, isMap := doc.(map[string]any)
+		if problem != "" || !isMap {
+			continue
+		}
+		actions, _ := spec["actions"].([]any)
+		for _, raw := range actions {
+			action, _ := raw.(map[string]any)
+			name := text(action, "name")
+			if name == "" {
+				continue
+			}
+			registered := fmt.Sprintf("%s-%s-%s", p.Team(), p.Name(), name)
+			whose := fmt.Sprintf("team %s's %s action %s", p.Team(), p.Label(), quote(name))
+			if other, taken := first[registered]; taken {
+				c.errorAt(path, fmt.Sprintf("%s is registered as %s, as %s is: product names are one across every team; rename the product or the action", whose, quote(registered), other))
+				ok = false
+				continue
+			}
+			first[registered] = whose
+		}
+	}
+	return ok
+}
+
 // linkProblem is why a team's files may not be symbolic links: CI reads,
 // builds and mounts them (a product's tests/*/secrets into its image), so a
 // link could hand a team's code whatever it points at, such as the publish

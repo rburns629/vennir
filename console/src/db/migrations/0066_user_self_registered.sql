@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "self_registered" boolean DEFAULT false NOT NULL;

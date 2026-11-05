@@ -658,6 +658,24 @@ func TestAProductRunsAsItsOwnServiceAccount(t *testing.T) {
 	}
 }
 
+func TestTwoTeamsActionsNeverShareARegisteredName(t *testing.T) {
+	c := catalogWith(t, map[string]string{
+		"teams/a/products/b-c/product.yaml": productFile("b-c", "a", "[]"),
+		"teams/a-b/products/c/product.yaml": productFile("c", "a-b", "[]"),
+		"teams/x/products/c/product.yaml":   productFile("c", "x", "[]"),
+	})
+	out := errorsOf(t, (*Catalog).ValidateProductNames, c)
+	if !strings.Contains(out, "'a-b-c-run'") || !strings.Contains(out, "team a's teams/a/products/b-c") || !strings.Contains(out, "team a-b's teams/a-b/products/c") {
+		t.Errorf("a-b-c-run, made by both teams, names both:\n%s", out)
+	}
+	if strings.Count(out, "registered as") != 1 {
+		t.Errorf("only that one is refused:\n%s", out)
+	}
+	if out := errorsOf(t, (*Catalog).ValidateProductNames, catalogWith(t, map[string]string{"teams/x/products/c/product.yaml": productFile("c", "x", "[]")})); out != "" {
+		t.Errorf("one team's product: %s", out)
+	}
+}
+
 func TestNoSymbolicLinksInATeamsFolder(t *testing.T) {
 	outside := t.TempDir() // such as the runner's ~/.docker
 	if err := os.WriteFile(filepath.Join(outside, "config.json"), []byte(`{"auths":{}}`), 0o644); err != nil {

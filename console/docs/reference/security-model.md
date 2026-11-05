@@ -17,7 +17,7 @@ gaps in [Not yet enforced](#not-yet-enforced) are why.
 | Who can read a secret? | Steps of its team's registered products that list it in `secretRefs`, and cluster administrators. Not the console: it writes Secrets but has no right to read them. See [Who can read a secret](#who-can-read-a-secret). |
 | Can one team's step reach another team's secret? | No. A step runs in its own team's namespace, and a Pod can only mount Secrets from its own namespace. |
 | Can one product reach another product's secret in the same team? | By design, yes: a team's secrets are the team's, and the team chooses per step which ones it gets (`secretRefs`). What a team can't do is give one to an image that isn't its registered product's release (it runs with no secrets), or mount a Secret it never registered. A product's release is a digest it was registered at, so another image pushed to the product's repository, at any tag or digest, isn't one. The console checks this at submit time, and an admission policy makes the cluster enforce it on every step's Job. A product's own cloud identity (its declared ServiceAccount) is still its own: another product can't run as it, since the console refuses a second image repository declaring it in the same namespace, and no product may declare `eso-gcp`, `eso-aws` or `eso-azure`, the ServiceAccounts ESO reads the team's vault as (the identity admission policy refuses a step running as those, too). |
-| Can a team register another team's product, or its image, as its own? | No. A team doesn't register products at all: the catalog's release does (`products:register`), or an admin, so what code runs, and as what, is decided by the catalog's review. A product name and an image repository belong to the first team that registers them, the repository even after its products are deleted (an admin can release an unused one). Catalog CI also derives each image's path from its team's folder, so one team can't publish under another's name. |
+| Can a team register another team's product, or its image, as its own? | No. A team doesn't register products at all: the catalog's release does (`products:register`), or an admin, so what code runs, and as what, is decided by the catalog's review. A product name and an image repository belong to the first team that registers them, the repository even after its products are deleted (an admin can release an unused one). Catalog CI also derives each image's path from its team's folder, so one team can't publish under another's name. A product's name is its team's, product's and action's (`<team>-<product>-<action>`), so two teams' folders could make the same one (team `a`'s `b-c`, team `a-b`'s `c`): `vennir catalog check` and the release refuse that, naming both, and a console applying a release that has it registers neither. |
 | Can anything but the console submit work? | No. kernel-api accepts only the console's ServiceAccount token, issued for kernel-api alone and checked with a TokenReview. See [How kernel-api knows its caller](#how-kernel-api-knows-its-caller). |
 | Is anything enforced if the console is bypassed? | Yes: which namespaces steps may run in, which image sources they may use, that images are pinned and passed their scan, which ServiceAccount and Secrets a step may have, image signatures (with Sigstore's policy-controller installed) and who may delete a team namespace. These are admission policies the Kubernetes API server applies to the scheduler's Jobs. They don't hold if the console itself is compromised: it can rewrite three of them. See [If a component is compromised](#if-a-component-is-compromised). |
 | Are secrets encrypted at rest? | That depends on the cluster. Enabling encryption of Secrets at rest in etcd, ideally with a KMS provider, is the cluster operator's responsibility and a prerequisite for production. |
@@ -199,7 +199,10 @@ the work consents through its `shareWith`, checked by catalog CI, when a
 release is applied (such a template isn't stored), on every run and on
 every retry. Then every check a submission gets applies (identity,
 registered secrets, images, scans), and the cluster's policies hold as for
-any Job.
+any Job. Nothing runs for a retired or purged team, even in other teams'
+namespaces: a run on its behalf, a retry of one, and anything its bots run
+once every team they're in is retired are refused (`TEAM_RETIRED`,
+`TEAM_PURGED`), as a step in its own namespace is.
 
 Where another team may aim a team's products is the owning team's: an
 input typed as a target (`x-vennir-needs: gcp.project`, `gcp.folder`,
@@ -238,7 +241,9 @@ project or region, so the console's own cloud identity can't be pointed
 elsewhere. Each change and test is audited with where it points. An
 address an admin gives is fetched by the
 console from inside the cluster, so testing one reports only whether it
-answered as a model, never what it replied. On GCP it's Gemini through Vertex AI in
+answered as a model (or its status code), never what it replied, nor the
+connection's error, which can name internal hosts; that's logged in full
+(`chat_model_unavailable`). On GCP it's Gemini through Vertex AI in
 the install's own project, as the console's Workload Identity; on AWS,
 Claude in Amazon Bedrock in the install's region, each request signed as
 the console's own role, which may call that one model and nothing else
@@ -359,6 +364,10 @@ an ordering bot's templates are cleared for its team to list again
 What a leaked token can
 do depends on its kind:
 
+A bot is never an admin: the console refuses making one an admin
+(`UserService/SetAdmin`), and the console and the gateway both resolve a
+bot as no admin even if its row says it is one.
+
 - **A team's bot** is a maintainer of its team (`console/src/core/tokens.ts`),
   so its token can do what a maintainer can there: register and replace
   the team's secrets, submit raw DAGs, retry and cancel the team's runs.
@@ -435,7 +444,10 @@ with the bot's teams and roles as they are then, through the same checks
 as the bot running it itself (sharing, the parameters' schema, targets,
 approvals). A bot that loses access stops the schedule at its next run,
 which is refused, kept on the schedule and told to the team's maintainers.
-Deleting the bot deletes its schedules.
+Deleting the bot deletes its schedules. A retired team's schedules don't
+run: each time is skipped and logged (`schedule_skipped`), and the schedule
+kept, so it runs again once an admin un-retires the team; purging the team
+deletes them.
 
 ## Who sees a step's logs
 
@@ -718,7 +730,12 @@ nothing else is checked (no character classes, no breached-password list).
 There's no second factor for password accounts; where that matters, use
 single sign-on and the provider's. Password accounts are made by admins: open
 registration (`ALLOW_SELF_REGISTRATION`) is off by default and, when on,
-doesn't verify the email.
+doesn't verify the email. So an account that signed itself up
+(`users.self_registered`) may be anyone's: a maintainer adding it to a team
+by its email is refused, saying nobody verified the address
+(`EMAIL_NOT_VERIFIED`), until single sign-on binds it to the provider's
+account (which checks the email); an admin, who can check it's theirs some
+other way, may add it.
 
 **Guessing** is limited twice (`console/src/rpc/services/auth.ts`): 10
 sign-ins per 15 minutes per client address and email, and, per email from
