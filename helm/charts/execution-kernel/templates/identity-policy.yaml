@@ -10,7 +10,10 @@ products', chosen per step; a Secret nobody registered, such as a
 SecretStore's credentials, can't be mounted at all). A product matches when
 the step is in the product's team namespace (or the product belongs to the
 platform, team ""), runs the same image repository (any tag or digest) and
-the same action (the container's first argument). Anything else is refused
+the same action (the container's first argument). No step runs as one of
+the ServiceAccounts ESO reads a team's vault as (eso-gcp, eso-aws,
+eso-azure), whatever is registered: the console refuses them as a product's
+too (console/src/core/products.ts). Anything else is refused
 when the scheduler creates the Job, which the kernel reports as a
 non-retryable IDENTITY_NOT_ALLOWED.
 
@@ -161,6 +164,12 @@ spec:
       message: >-
         IDENTITY_NOT_ALLOWED: a step's Job must have exactly one container and
         mount Secrets only as volumes.
+      reason: Forbidden
+    - expression: >-
+        !(variables.serviceAccount in ["eso-gcp", "eso-aws", "eso-azure"])
+      messageExpression: >-
+        "IDENTITY_NOT_ALLOWED: no step runs as " + variables.serviceAccount + ", the ServiceAccount " +
+        "ESO reads team " + request.namespace + "'s vault as."
       reason: Forbidden
     - expression: >-
         (variables.serviceAccount == "default" && size(variables.secrets) == 0) ||

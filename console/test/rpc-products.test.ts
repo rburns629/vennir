@@ -15,6 +15,8 @@ import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam } from "../src/db/queries.js";
 import { imageRepositories, products, teams } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
+import { SCOPES } from "../src/auth/scopes.js";
+import { registerProduct } from "../src/core/products.js";
 import { failureCode, rpcClient, type RpcError } from "./rpc.js";
 
 vi.mock("../src/k8s.js", async (importOriginal) => ({
@@ -127,6 +129,49 @@ describe("ProductService", () => {
     const response = await rpc("ProductService", "RegisterProduct", registration({ name: `${prefix}-sneaky`, serviceAccount: "orders-api" }), { token: adminToken });
     expect(response.json<RpcError>().code).toBe("invalid_argument");
     expect(response.json<RpcError>().message).toContain("-api");
+  });
+
+  it("refuses ESO's ServiceAccounts: the vault identity the catalog's admins approved", async () => {
+    for (const serviceAccount of ["eso-gcp", "eso-aws", "eso-azure"]) {
+      const response = await rpc("ProductService", "RegisterProduct", registration({ name: `${prefix}-vault`, serviceAccount }), { token: adminToken });
+      expect(response.json<RpcError>().code).toBe("invalid_argument");
+      expect(response.json<RpcError>().message).toContain("ESO");
+    }
+  });
+
+  it("a product's ServiceAccount is its own: no other repository's product may run as it", async () => {
+    const own = (name: string, image: string, overrides: object = {}) =>
+      registration({ name: `${prefix}-${name}`, image: `${registry}/${image}`, serviceAccount: "deployer", ...overrides });
+    expect((await rpc("ProductService", "RegisterProduct", own("deploy", "ours/deploy:1"), { token: adminToken })).statusCode).toBe(200);
+    // Its other actions may.
+    expect((await rpc("ProductService", "RegisterProduct", own("deploy-undo", "ours/deploy:1", { action: "undo" }), { token: adminToken })).statusCode).toBe(200);
+
+    const borrowed = await rpc("ProductService", "RegisterProduct", own("borrow", "ours/other:1"), { token: adminToken });
+    expect(borrowed.json<RpcError>().code).toBe("failed_precondition");
+    expect(borrowed.json<RpcError>().message).toContain(`team "${ours.name}"`);
+    // A platform product runs in every team's namespace: it can't either.
+    const platform = await rpc("ProductService", "RegisterProduct", own("plat", "platform/deploy:1", { team: undefined }), { token: adminToken });
+    expect(platform.json<RpcError>().code).toBe("failed_precondition");
+    // Another team's namespace has its own "deployer".
+    const elsewhere = await rpc("ProductService", "RegisterProduct", own("theirs-deploy", "theirs/deploy:1", { team: theirs.name }), { token: adminToken });
+    expect(elsewhere.statusCode).toBe(200);
+  });
+
+  it("a product moving to another repository keeps its ServiceAccount, action by action (as a catalog release registers)", async () => {
+    const catalog = { id: "catalog-sync", teamNames: [], maintainerOf: [], isAdmin: false, scopes: [SCOPES.PRODUCTS_REGISTER] };
+    const action = (name: string, image: string) =>
+      registerProduct(catalog, {
+        name: `${prefix}-${name}`,
+        image: `${registry}/${image}`,
+        action: name,
+        team: ours.name,
+        inputSchema: {},
+        serviceAccount: "mover",
+        sourcePath: "teams/ours/products/move/product.yaml",
+      });
+    await action("move-a", "ours/move-old:1");
+    await action("move-b", "ours/move-old:1");
+    await expect(action("move-a", "ours/move-new:1")).resolves.toMatchObject({ image: `${registry}/ours/move-new:1` });
   });
 
   it("checks a registration", async () => {

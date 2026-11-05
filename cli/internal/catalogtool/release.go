@@ -262,6 +262,9 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 		}
 		release.Products = append(release.Products, actions...)
 	}
+	if !c.ValidateServiceAccounts() {
+		problems = append(problems, "two products declare one serviceAccount (above)")
+	}
 	if !c.ValidateDags() {
 		problems = append(problems, "a dags/ file isn't valid (above)")
 	} else {

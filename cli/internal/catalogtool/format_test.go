@@ -628,3 +628,32 @@ func TestExamplesComeFromPassingTests(t *testing.T) {
 		t.Errorf("examples = %v", examples)
 	}
 }
+
+func TestAProductRunsAsItsOwnServiceAccount(t *testing.T) {
+	as := func(name, team, serviceAccount string) string {
+		return strings.Replace(productFile(name, team, "[]"), "owner: x\n", "owner: x\nserviceAccount: "+serviceAccount+"\n", 1)
+	}
+	c := catalogWith(t, map[string]string{
+		"teams/a/products/deploy/product.yaml": as("deploy", "a", "deployer"),
+		"teams/a/products/borrow/product.yaml": as("borrow", "a", "deployer"),
+		"teams/a/products/plain/product.yaml":  as("plain", "a", "default"),
+		"teams/a/products/other/product.yaml":  as("other", "a", "default"),
+		"teams/b/products/deploy/product.yaml": as("deploy", "b", "deployer"),
+	})
+	out := errorsOf(t, func(c *Catalog) bool { return c.ValidateServiceAccounts() }, c)
+	// Folders are read in order: borrow comes first, so deploy is the one refused.
+	if !strings.Contains(out, `teams/a/products/deploy/product.yaml`) || !strings.Contains(out, `'deployer' is teams/a/products/borrow's`) {
+		t.Errorf("a team's two products sharing a ServiceAccount:\n%s", out)
+	}
+	if strings.Count(out, "serviceAccount") != 1 {
+		t.Errorf("only that one is refused (default may be shared, and another team has its own):\n%s", out)
+	}
+
+	// ESO's are the vault's, never a product's.
+	for _, serviceAccount := range []string{"eso-gcp", "eso-aws", "eso-azure"} {
+		c := catalogWith(t, map[string]string{"teams/a/products/vault/product.yaml": as("vault", "a", serviceAccount)})
+		if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateProduct(c.AllProducts()[0]) }, c); !strings.Contains(out, "serviceAccount") {
+			t.Errorf("%s as a product's serviceAccount: %q", serviceAccount, out)
+		}
+	}
+}

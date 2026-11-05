@@ -267,6 +267,41 @@ func sameOwners(a, b []string) bool {
 	return strings.Join(a, " ") == strings.Join(b, " ")
 }
 
+// ValidateServiceAccounts refuses two products of one team running as one
+// ServiceAccount: each runs as its own, so a cloud identity bound to one is
+// that product's alone (the console refuses it too).
+func (c *Catalog) ValidateServiceAccounts() bool {
+	ok := true
+	first := map[string]string{} // team/serviceAccount: the product that declares it
+	for _, p := range c.AllProducts() {
+		if p.IsTemplate() {
+			continue
+		}
+		path := filepath.Join(p.Dir, "product.yaml")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue // ValidateProduct's to report
+		}
+		doc, problem := loadYAML(data)
+		spec, isMap := doc.(map[string]any)
+		if problem != "" || !isMap {
+			continue
+		}
+		serviceAccount := text(spec, "serviceAccount")
+		if serviceAccount == "" || serviceAccount == "default" {
+			continue
+		}
+		key := p.Team() + "/" + serviceAccount
+		if owner, taken := first[key]; taken {
+			c.errorAt(path, fmt.Sprintf("serviceAccount %s is %s's: each product runs as its own; choose another", quote(serviceAccount), owner))
+			ok = false
+			continue
+		}
+		first[key] = p.Label()
+	}
+	return ok
+}
+
 // ValidateCodeowners checks there's one .github/CODEOWNERS, every team is
 // owned, and the admin paths are the admins'.
 func (c *Catalog) ValidateCodeowners() bool {

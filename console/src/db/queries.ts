@@ -675,7 +675,7 @@ export interface ProductInput {
  */
 export class ProductOwnershipError extends Error {
   constructor(
-    readonly conflict: "name" | "repository",
+    readonly conflict: "name" | "repository" | "serviceAccount",
     readonly ownerTeamId: string | null,
   ) {
     super(`${conflict} is owned by ${ownerTeamId ?? "the platform"}`);
@@ -732,6 +732,33 @@ export async function upsertProduct(input: ProductInput): Promise<Product> {
       .where(eq(imageRepositories.repository, repository));
     if (!owner || owner.teamId !== input.teamId) {
       throw new ProductOwnershipError("repository", owner?.teamId ?? null);
+    }
+    // Its ServiceAccount is its own: no product of another repository runs
+    // in the same namespace as it, and so as whatever cloud identity was
+    // bound to it. A platform product's runs in every team's namespace, so it
+    // collides with any team's. The product's other actions (the same
+    // product.yaml) may still be on the image being moved off.
+    const serviceAccount = input.serviceAccount;
+    if (serviceAccount && serviceAccount !== "default") {
+      // Held to the end of the transaction: two first registrations of one
+      // name can't both see the other missing.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`product-service-account:${serviceAccount}`}))`);
+      const sharing = await tx
+        .select({ image: products.image, teamId: products.teamId, sourcePath: products.sourcePath })
+        .from(products)
+        .where(
+          and(
+            eq(products.serviceAccount, serviceAccount),
+            sql`${products.name} <> ${input.name}`,
+            input.teamId === null ? undefined : or(isNull(products.teamId), eq(products.teamId, input.teamId)),
+          ),
+        );
+      const taken = sharing.find(
+        (other) =>
+          imageRepository(other.image) !== repository &&
+          !(input.sourcePath && other.sourcePath === input.sourcePath && other.teamId === input.teamId),
+      );
+      if (taken) throw new ProductOwnershipError("serviceAccount", taken.teamId);
     }
     // An existing name is only updated when it's this team's product, in
     // the same statement, so two teams racing for one new name can't both
