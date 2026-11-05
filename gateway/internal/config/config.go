@@ -54,6 +54,13 @@ type Settings struct {
 	// peer is the caller.
 	TrustedProxies   []netip.Prefix
 	DefaultPerMinute int
+	// UnauthenticatedPerMinute is how many requests a minute that don't
+	// sign in one client address (the peer, or behind TrustedProxies the
+	// address they saw; an IPv6 /64) may make before the gateway refuses its
+	// requests, before any database work, until it's under again. 0: no limit.
+	UnauthenticatedPerMinute int
+	// BodyReadTimeout is the longest reading a request's body may take.
+	BodyReadTimeout time.Duration
 	// Minting Google ID tokens: the STS audience API ServiceAccounts'
 	// tokens are exchanged for (GKE: the cluster's Workload Identity
 	// pool; elsewhere a provider trusting its issuer), and the audience
@@ -100,26 +107,28 @@ func Load(getenv func(string) string) (*Settings, error) {
 		return n
 	}
 	s := &Settings{
-		DatabaseURL:            need("DATABASE_URL"),
-		DatabaseMaxConnections: number("DATABASE_MAX_CONNECTIONS", 10),
-		DatabaseConnectTimeout: time.Duration(number("DATABASE_CONNECT_TIMEOUT_SECONDS", 10)) * time.Second,
-		DatabaseIAMAuth:        getenv("DATABASE_IAM_AUTH"),
-		DatabaseIAMRegion:      getenv("DATABASE_IAM_REGION"),
-		DatabaseIAMAccount:     getenv("DATABASE_IAM_ACCOUNT"),
-		DatabaseIAMTokenFile:   getenv("DATABASE_IAM_TOKEN_FILE"),
-		ConsoleURL:             strings.TrimSuffix(need("CONSOLE_URL"), "/"),
-		SSO:                    getenv("SSO_ENABLED") == "true",
-		Issuer:                 need("GATEWAY_ISSUER"),
-		Listen:                 or("LISTEN", ":8080"),
-		PublicListen:           getenv("PUBLIC_LISTEN"),
-		MetricsListen:          or("METRICS_LISTEN", ":9090"),
-		BackendHosts:           list(getenv("BACKEND_HOSTS")),
-		InternetTeams:          list(getenv("INTERNET_TEAMS")),
-		DefaultPerMinute:       positive("DEFAULT_PER_MINUTE", 600),
-		GCPAudience:            getenv("GCP_STS_AUDIENCE"),
-		GCPTokenAudience:       getenv("GCP_TOKEN_AUDIENCE"),
-		Closed:                 getenv("CLOSED") == "true",
-		Refresh:                time.Duration(positive("REFRESH_SECONDS", 5)) * time.Second,
+		DatabaseURL:              need("DATABASE_URL"),
+		DatabaseMaxConnections:   number("DATABASE_MAX_CONNECTIONS", 10),
+		DatabaseConnectTimeout:   time.Duration(number("DATABASE_CONNECT_TIMEOUT_SECONDS", 10)) * time.Second,
+		DatabaseIAMAuth:          getenv("DATABASE_IAM_AUTH"),
+		DatabaseIAMRegion:        getenv("DATABASE_IAM_REGION"),
+		DatabaseIAMAccount:       getenv("DATABASE_IAM_ACCOUNT"),
+		DatabaseIAMTokenFile:     getenv("DATABASE_IAM_TOKEN_FILE"),
+		ConsoleURL:               strings.TrimSuffix(need("CONSOLE_URL"), "/"),
+		SSO:                      getenv("SSO_ENABLED") == "true",
+		Issuer:                   need("GATEWAY_ISSUER"),
+		Listen:                   or("LISTEN", ":8080"),
+		PublicListen:             getenv("PUBLIC_LISTEN"),
+		MetricsListen:            or("METRICS_LISTEN", ":9090"),
+		BackendHosts:             list(getenv("BACKEND_HOSTS")),
+		InternetTeams:            list(getenv("INTERNET_TEAMS")),
+		DefaultPerMinute:         positive("DEFAULT_PER_MINUTE", 600),
+		UnauthenticatedPerMinute: number("UNAUTHENTICATED_PER_MINUTE", 60),
+		BodyReadTimeout:          time.Duration(positive("BODY_READ_TIMEOUT_SECONDS", 30)) * time.Second,
+		GCPAudience:              getenv("GCP_STS_AUDIENCE"),
+		GCPTokenAudience:         getenv("GCP_TOKEN_AUDIENCE"),
+		Closed:                   getenv("CLOSED") == "true",
+		Refresh:                  time.Duration(positive("REFRESH_SECONDS", 5)) * time.Second,
 	}
 	for _, item := range list(getenv("TRUSTED_PROXIES")) {
 		prefix, err := netip.ParsePrefix(item)

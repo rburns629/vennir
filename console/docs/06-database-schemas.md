@@ -630,7 +630,7 @@ What the gateway did with each API's requests, a minute at a time; it adds to th
 | `api_id` | uuid | no | The API (`apis.id`). With `minute`, `team`, `endpoint` and `outcome`, the key. |
 | `minute` | timestamptz | no | The minute, in UTC. |
 | `team` | text | no | The calling team; empty for a caller who wasn't signed in. |
-| `endpoint` | text | no | The operation it matched (`GET /orders/{orderId}`), or for one it didn't, `METHOD /path` as sent, without the query (up to 160 characters). |
+| `endpoint` | text | no | The operation it matched (`GET /orders/{orderId}`), or for one it didn't from a caller who signed in, `METHOD /path` as sent, without the query (up to 160 characters); empty for one that matched none before sign-in. |
 | `outcome` | text | no | `forwarded_2xx` to `forwarded_5xx` (the backend's answer), or what the gateway answered itself: `blocked` (not in the spec), `invalid`, `limited`, `unauthenticated`, `forbidden`, `paused`, `held`, `closed`, `unavailable`, `backend_error`. |
 | `count` | integer | no | How many. |
 | `duration_ms` | bigint | no | Their total time, for averages. |

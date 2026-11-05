@@ -56,7 +56,7 @@ import { ReleaseSchema, type BackendAuth as ReleaseBackendAuth, type Release } f
 import { createVerifyJob, deleteScanJob, ensureServiceAccount, readScanJob } from "./k8s.js";
 import { catalogSyncs } from "./metrics.js";
 import { fetchRelease, listTags } from "./registry.js";
-import { reservedAudiences } from "./tokenAudiences.js";
+import { apiTokenAudienceProblem } from "./tokenAudiences.js";
 
 /** The rights a release is applied with: what catalog CI's token held. */
 const CATALOG: AuthUser = {
@@ -174,11 +174,12 @@ export async function applyApis(
       }
       if (typeof openapi !== "object" || openapi === null) throw new ReleaseProblem("its OpenAPI document isn't an object");
       // The gateway mints tokens only for an API's own ServiceAccount
-      // (*-api, its policy) and never for the cluster's own audiences.
+      // (*-api, its policy), never for the cluster's own audiences, and
+      // never for one a cloud would exchange for that ServiceAccount's
+      // cloud identity (the gateway refuses those too).
       if (!a.serviceAccount.endsWith("-api")) throw new ReleaseProblem(`its serviceAccount ${a.serviceAccount} must end in -api`);
-      if (a.backendAuth?.kind.case === "serviceAccountToken" && reservedAudiences().has(a.backendAuth.kind.value.audience)) {
-        throw new ReleaseProblem(`its backend's token audience ${a.backendAuth.kind.value.audience} is this cluster's own (the Kubernetes API's or kernel-api's)`);
-      }
+      const audienceProblem = a.backendAuth?.kind.case === "serviceAccountToken" ? apiTokenAudienceProblem(a.backendAuth.kind.value.audience) : "";
+      if (audienceProblem) throw new ReleaseProblem(audienceProblem);
       // The identity its backend credentials are minted for (phase 4).
       await ensureServiceAccount(a.team, a.serviceAccount);
       await upsertApi({

@@ -142,9 +142,11 @@ func run(log *slog.Logger) error {
 			Callers: &auth.Resolver{DB: pool, Keys: consoleKeys, SSO: s.SSO},
 			Signer:  &caller.Signer{Key: s.SigningKey, Issuer: s.Issuer},
 			Limiter: limits.New(),
+			Peers:   limits.New(),
 			Minter:  &credentials.Minter{TokenRequest: tokenRequest, GCPAudience: s.GCPAudience, GCPTokenAudience: s.GCPTokenAudience},
 			Settings: gateway.Settings{BackendHosts: s.BackendHosts, InternetTeams: s.InternetTeams,
-				TrustedProxies: s.TrustedProxies, DefaultPerMinute: s.DefaultPerMinute, Closed: s.Closed},
+				TrustedProxies: s.TrustedProxies, DefaultPerMinute: s.DefaultPerMinute, Closed: s.Closed,
+				UnauthenticatedPerMinute: s.UnauthenticatedPerMinute, BodyReadTimeout: s.BodyReadTimeout},
 			Log: log, Metrics: metrics, Traffic: recorder, Public: public,
 		}
 	}
@@ -178,6 +180,8 @@ func run(log *slog.Logger) error {
 }
 
 func server(addr string, h http.Handler) *http.Server {
-	// No write timeout: answers stream for as long as the backend sends.
+	// No write or read timeout: answers stream for as long as the backend
+	// sends. A request's body has its own deadline (BODY_READ_TIMEOUT_SECONDS,
+	// gateway.readBody), lifted once it's read.
 	return &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
 }

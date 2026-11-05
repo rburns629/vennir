@@ -213,7 +213,7 @@ async function gatewayRefusals(who: AuthUser, since: Date) {
     return {
       at: r.last,
       what: `${caller} \u2192 ${r.apiTeam}/${r.api}`,
-      detail: r.endpoint,
+      detail: r.endpoint || "(not signed in; a path not in its spec)",
       team: r.apiTeam,
       code: reason.code,
       why: reason.why,

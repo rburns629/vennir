@@ -16,15 +16,21 @@ func TestSettingsThatCantWorkAreRefusedAtStartup(t *testing.T) {
 	}
 	env := map[string]string{"DATABASE_URL": "postgres://x", "CONSOLE_URL": "http://console", "GATEWAY_ISSUER": "http://gw", "SIGNING_KEY_FILE": seed}
 	getenv := func(name string) string { return env[name] }
-	if s, err := Load(getenv); err != nil || s.Refresh.Seconds() != 5 || s.DefaultPerMinute != 600 {
+	if s, err := Load(getenv); err != nil || s.Refresh.Seconds() != 5 || s.DefaultPerMinute != 600 ||
+		s.UnauthenticatedPerMinute != 60 || s.BodyReadTimeout.Seconds() != 30 {
 		t.Fatalf("the defaults: %+v, %v", s, err)
 	}
-	for _, name := range []string{"REFRESH_SECONDS", "DEFAULT_PER_MINUTE"} {
+	for _, name := range []string{"REFRESH_SECONDS", "DEFAULT_PER_MINUTE", "BODY_READ_TIMEOUT_SECONDS"} {
 		env[name] = "0"
 		if _, err := Load(getenv); err == nil || !strings.Contains(err.Error(), name+": at least 1") {
 			t.Errorf("%s=0: %v", name, err)
 		}
 		delete(env, name)
+	}
+	// No limit before sign-in is a choice: 0 turns it off.
+	env["UNAUTHENTICATED_PER_MINUTE"] = "0"
+	if s, err := Load(getenv); err != nil || s.UnauthenticatedPerMinute != 0 {
+		t.Errorf("UNAUTHENTICATED_PER_MINUTE=0: %+v, %v", s, err)
 	}
 }
 

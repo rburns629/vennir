@@ -3,12 +3,15 @@
 package gateway
 
 import (
+	"bufio"
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -96,6 +99,8 @@ type backend struct {
 	*httptest.Server
 	got    []*http.Request
 	bodies []string
+	// pause: it sends half its answer, waits this long, then the rest.
+	pause time.Duration
 }
 
 func newBackend(t *testing.T) *backend {
@@ -108,7 +113,16 @@ func newBackend(t *testing.T) *backend {
 		w.Header().Set("X-Backend", "yes")
 		w.Header().Add("Set-Cookie", "sid=1; Path=/; Domain=example.com; HttpOnly")
 		w.Header().Add("Set-Cookie", "pref=dark")
+		// Its own copies of the gateway's headers, which callers never get.
+		w.Header().Set(RequestIDHeader, "from-the-backend")
+		w.Header().Set(AnsweredBy, "gateway")
+		w.Header().Set("Vennir-Caller", "from-the-backend")
 		w.WriteHeader(http.StatusCreated)
+		if b.pause > 0 {
+			_, _ = w.Write([]byte(`{"ok":`))
+			w.(http.Flusher).Flush()
+			time.Sleep(b.pause)
+		}
 		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	t.Cleanup(b.Close)
@@ -181,6 +195,11 @@ func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 		"X-Amz-Target": "DynamoDB_20120810.DeleteTable"})
 	if w.Code != http.StatusCreated || w.Header().Get(AnsweredBy) != "backend" || w.Header().Get("X-Backend") != "yes" || w.Body.String() != `{"ok":true}` {
 		t.Fatalf("answer = %d %v %s", w.Code, w.Header(), w.Body)
+	}
+	// Vennir-* on an answer are the gateway's alone: one of each, its own.
+	if ids := w.Header().Values(RequestIDHeader); len(ids) != 1 || ids[0] == "from-the-backend" ||
+		len(w.Header().Values(AnsweredBy)) != 1 || w.Header().Get("Vennir-Caller") != "" {
+		t.Errorf("Vennir-* on the answer: %v", w.Header())
 	}
 	if len(f.backend.got) != 1 {
 		t.Fatalf("backend got %d requests", len(f.backend.got))
@@ -632,5 +651,169 @@ func TestABackendSeesTheCallersAddressOnlyThroughTheTrustedPublicListener(t *tes
 		if v := f.backend.got[0].Header.Values("X-Forwarded-For"); len(v) != 1 || v[0] != want {
 			t.Errorf("public %v: X-Forwarded-For = %q, want %q", public, v, want)
 		}
+	}
+}
+
+// countingCallers counts sign-ins, each a database lookup in the real one.
+type countingCallers struct {
+	callers
+	n int
+}
+
+func (c *countingCallers) Resolve(ctx context.Context, authorization string) (*auth.Caller, error) {
+	c.n++
+	return c.callers.Resolve(ctx, authorization)
+}
+
+// An address that keeps failing to sign in is refused before sign-in, so
+// before any database work, whichever API it asks for; signing in costs
+// nothing of it, and another address has its own.
+func TestAddressesThatFailToSignInAreLimitedBeforeSignIn(t *testing.T) {
+	f := setup(t, "")
+	counting := &countingCallers{callers: f.gw.Callers.(callers)}
+	f.gw.Callers = counting
+	f.gw.Peers = limits.New()
+	f.gw.Settings.UnauthenticatedPerMinute = 3
+	now := time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
+	f.gw.Now = func() time.Time { return now }
+	from := func(peer, path, token string, headers map[string]string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", path, nil)
+		r.RemoteAddr = peer
+		if token != "" {
+			r.Header.Set("Authorization", "Bearer "+token)
+		}
+		for k, v := range headers {
+			r.Header.Set(k, v)
+		}
+		w := httptest.NewRecorder()
+		f.gw.ServeHTTP(w, r)
+		return w
+	}
+	path := "/payments/orders/orders/ord_abcdefgh"
+	for i := range 10 {
+		if w := from("203.0.113.5:4000", path, "web-person", nil); w.Code != 201 {
+			t.Fatalf("signed in, %d: %d", i, w.Code)
+		}
+	}
+	for i := range 3 {
+		if w := from("203.0.113.5:4000", path, "wrong", nil); w.Code != 401 {
+			t.Fatalf("failed sign-in %d: %d", i, w.Code)
+		}
+	}
+	signIns := counting.n
+	for _, p := range []string{path, "/payments/ledger/x", "/made-up/api/x"} {
+		if w := from("203.0.113.5:4001", p, "web-person", nil); w.Code != 429 || errorCode(t, w) != "RATE_LIMITED" || w.Header().Get("Retry-After") == "" {
+			t.Errorf("%s, past the limit: %d %v %s", p, w.Code, w.Header(), w.Body)
+		}
+	}
+	if counting.n != signIns {
+		t.Errorf("signed in %d more times past the limit", counting.n-signIns)
+	}
+	if w := from("203.0.113.6:4000", path, "web-person", nil); w.Code != 201 {
+		t.Errorf("another address: %d", w.Code)
+	}
+	// An IPv6 host may hold its whole /64: counted as one.
+	for range 3 {
+		from("[2001:db8:1:2::1]:4000", path, "", nil)
+	}
+	if w := from("[2001:db8:1:2::ffff]:4000", path, "web-person", nil); w.Code != 429 {
+		t.Errorf("the same /64: %d", w.Code)
+	}
+	now = now.Add(time.Minute)
+	if w := from("203.0.113.5:4000", path, "web-person", nil); w.Code != 201 {
+		t.Errorf("a minute later: %d", w.Code)
+	}
+
+	// Behind trusted proxies on the public listener, it's the address they
+	// saw, not the proxy's, that's counted.
+	f.api.Internet = true
+	f.gw.Public = true
+	f.gw.Settings.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
+	for range 3 {
+		from("10.0.0.2:4000", path, "", map[string]string{"X-Forwarded-For": "198.51.100.7"})
+	}
+	if w := from("10.0.0.2:4000", path, "web-person", map[string]string{"X-Forwarded-For": "198.51.100.7"}); w.Code != 429 {
+		t.Errorf("the same client, behind the proxy: %d", w.Code)
+	}
+	if w := from("10.0.0.2:4000", path, "web-person", map[string]string{"X-Forwarded-For": "198.51.100.8"}); w.Code != 201 {
+		t.Errorf("another client, behind the same proxy: %d", w.Code)
+	}
+}
+
+// A body that doesn't arrive in time is refused, and the connection with
+// it; one that does is forwarded, and the answer streams for as long as the
+// backend takes, past the body's deadline.
+func TestABodyHasADeadlineAndTheAnswerDoesnt(t *testing.T) {
+	f := setup(t, "")
+	f.gw.Settings.BodyReadTimeout = 300 * time.Millisecond
+	f.backend.pause = 600 * time.Millisecond
+	srv := httptest.NewServer(f.gw)
+	t.Cleanup(srv.Close)
+
+	conn, err := net.Dial("tcp", srv.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	_, _ = io.WriteString(conn, "POST /payments/orders/orders HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer web-person\r\n"+
+		"Content-Type: application/json\r\nContent-Length: 20\r\n\r\n{\"amount\"")
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	started := time.Now()
+	res, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusRequestTimeout || time.Since(started) > 3*time.Second {
+		t.Errorf("a body that stalled: %d after %v", res.StatusCode, time.Since(started))
+	}
+	if len(f.backend.got) != 0 {
+		t.Error("forwarded")
+	}
+
+	req, _ := http.NewRequest("POST", srv.URL+"/payments/orders/orders", strings.NewReader(`{"amount": 1}`))
+	req.Header.Set("Authorization", "Bearer web-person")
+	req.Header.Set("Content-Type", "application/json")
+	res, err = srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if err != nil || res.StatusCode != http.StatusCreated || string(body) != `{"ok":{"ok":true}` {
+		t.Errorf("a slow answer: %d %q %v", res.StatusCode, body, err)
+	}
+}
+
+type record struct{ team, endpoint, outcome string }
+
+type recorder []record
+
+func (r *recorder) Record(_, team, endpoint, outcome string, _ time.Time, _ time.Duration) {
+	*r = append(*r, record{team, endpoint, outcome})
+}
+
+// Traffic names an endpoint only once it's the spec's, or the caller has
+// signed in: before that, a made-up path is counted, but not as itself.
+func TestTrafficNamesAnEndpointOnlyOnceMatchedOrSignedIn(t *testing.T) {
+	f := setup(t, "")
+	f.api.ID = "api-1"
+	var got recorder
+	f.gw.Traffic = &got
+	f.do("GET", "/payments/orders/made-up-1", "", "", nil)
+	f.do("GET", "/payments/orders/made-up-2", "wrong", "", nil)
+	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "", "", nil)
+	f.do("DELETE", "/payments/orders/orders", "web-person", "", nil)
+	f.do("GET", "/payments/orders/orders/ord_abcdefgh", "web-person", "", nil)
+	f.do("GET", "/made-up/api/x", "", "", nil)
+	want := recorder{
+		{"", "", "unauthenticated"},
+		{"", "", "unauthenticated"},
+		{"", "GET /orders/{orderId}", "unauthenticated"},
+		{"web", "DELETE /orders", "blocked"},
+		{"web", "GET /orders/{orderId}", "forwarded_2xx"},
+	}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("recorded %v, want %v", got, want)
 	}
 }
