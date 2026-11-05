@@ -177,6 +177,26 @@ variable "catalog_subject_prefix" {
   default     = ""
 }
 
+variable "catalog_repository_id" {
+  description = "The catalog repository's GitHub id, and catalog_owner_id its owner's (`vennir catalog create` and `vennir apply` read them): the publish role trusts only subjects naming them, so a repository renamed, or made again under the name by someone else, isn't trusted. Empty: the subject prefix alone."
+  type        = string
+  default     = ""
+  validation {
+    condition     = can(regex("^[0-9]*$", var.catalog_repository_id))
+    error_message = "catalog_repository_id is a number."
+  }
+}
+
+variable "catalog_owner_id" {
+  description = "The catalog repository's owner's GitHub id (see catalog_repository_id)."
+  type        = string
+  default     = ""
+  validation {
+    condition     = can(regex("^[0-9]*$", var.catalog_owner_id))
+    error_message = "catalog_owner_id is a number."
+  }
+}
+
 variable "signing" {
   description = "How the catalog is signed: none, kms (a key here only its CI signs with) or keyless; or verify: another install signs it, and policy-controller only checks it here."
   type        = string

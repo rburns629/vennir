@@ -606,6 +606,19 @@ resource "google_compute_global_address" "console" {
 
 # --- the catalog's CI: pushes images from main, by GitHub's OIDC token -------
 
+# The repository by its id and its owner's once they're known (`vennir
+# catalog create` reads them), so one renamed, or deleted and made again
+# under its name by someone else, isn't trusted; by its name until then.
+locals {
+  catalog_pinned = var.catalog_repository_id != "" && var.catalog_owner_id != ""
+  catalog_repository_condition = (local.catalog_pinned ?
+    "assertion.repository_id == \"${var.catalog_repository_id}\" && assertion.repository_owner_id == \"${var.catalog_owner_id}\"" :
+  "assertion.repository == \"${var.catalog_repository}\"")
+  catalog_principal = (local.catalog_pinned ?
+    "attribute.repository_id/${var.catalog_repository_id}" :
+  "attribute.repository/${var.catalog_repository}")
+}
+
 # Deleted pools keep their id for 30 days, so each gets a fresh suffix.
 resource "random_id" "pool" {
   count       = var.catalog_repository != "" ? 1 : 0
@@ -625,13 +638,14 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   workload_identity_pool_provider_id = "github"
   display_name                       = "GitHub Actions"
   attribute_mapping = {
-    "google.subject"       = "assertion.sub"
-    "attribute.repository" = "assertion.repository"
-    "attribute.ref"        = "assertion.ref"
+    "google.subject"          = "assertion.sub"
+    "attribute.repository"    = "assertion.repository"
+    "attribute.repository_id" = "assertion.repository_id"
+    "attribute.ref"           = "assertion.ref"
   }
   # Only the catalog repository's main branch: pull requests (any fork's
   # code) never get a token.
-  attribute_condition = "assertion.repository == \"${var.catalog_repository}\" && assertion.ref == \"refs/heads/main\""
+  attribute_condition = "${local.catalog_repository_condition} && assertion.ref == \"refs/heads/main\""
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
   }
@@ -657,7 +671,7 @@ resource "google_service_account_iam_member" "publish_federation" {
   count              = var.catalog_repository != "" ? 1 : 0
   service_account_id = google_service_account.publish[0].name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github[0].name}/attribute.repository/${var.catalog_repository}"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github[0].name}/${local.catalog_principal}"
 }
 
 # --- catalog signing (signing): a KMS key only the catalog's CI signs with,

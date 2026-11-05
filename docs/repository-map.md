@@ -367,6 +367,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `docs.test.ts`, `schemaDoc.test.ts` | The guides load and link correctly; the database guide matches the schema. |
 | `jsonSchema.test.ts` | What a schema refuses, in its own words (a pattern's `x-vennir-pattern-message`) or ajv's. |
 | `secrets.test.ts` | Registering and revoking secrets: other teams refused, names Kubernetes would refuse, a Secret the console didn't create. |
+| `external-secrets.test.ts` | A synced secret's ExternalSecret: created labelled, only the console's own replaced, one made elsewhere never replaced or adopted. |
 | `apis.test.ts` | API products from releases (with their ServiceAccounts), who sees and may call them, held backends, pausing. |
 | `approvals.test.ts` | Which steps wait for an approval (`always`, `otherTeams`, a list of teams, a target rule), and who may decide. |
 | `registry-federation.test.ts` | The STS exchange, impersonation, caching and the Docker config handed out. |

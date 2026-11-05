@@ -51,15 +51,17 @@ func TestHasItems(t *testing.T) {
 	}
 }
 
-// Only exactly repo, context and ref, in that order, is the template the
-// AWS publish role's trust is written for.
+// Only exactly repo, context, ref and the two ids, in that order, is the
+// template the AWS publish role's trust is written for.
 func TestTheSubjectTemplateIsReadAsGitHubAnswers(t *testing.T) {
 	for body, want := range map[string]bool{
-		`{"use_default":false,"include_claim_keys":["repo","context","ref"]}`: true,
+		`{"use_default":false,"include_claim_keys":["repo","context","ref","repository_owner_id","repository_id"]}`: true,
 		`{"use_default":true}`: false,
-		`{"use_default":false,"include_claim_keys":["repo","context"]}`:       false,
-		`{"use_default":false,"include_claim_keys":["repo","ref","context"]}`: false,
-		`{"use_default":true,"include_claim_keys":["repo","context","ref"]}`:  false,
+		`{"use_default":false,"include_claim_keys":["repo","context","ref"]}`:                                       false,
+		`{"use_default":false,"include_claim_keys":["repo","context"]}`:                                             false,
+		`{"use_default":false,"include_claim_keys":["repo","ref","context","repository_owner_id","repository_id"]}`: false,
+		`{"use_default":false,"include_claim_keys":["repo","context","ref","repository_id","repository_owner_id"]}`: false,
+		`{"use_default":true,"include_claim_keys":["repo","context","ref","repository_owner_id","repository_id"]}`:  false,
 	} {
 		if got, err := subjectTemplateSet(body); err != nil || got != want {
 			t.Errorf("%s: %v, %v; want %v", body, got, err, want)
@@ -67,5 +69,19 @@ func TestTheSubjectTemplateIsReadAsGitHubAnswers(t *testing.T) {
 	}
 	if _, err := subjectTemplateSet("not json"); err == nil {
 		t.Error("an answer that isn't JSON should be an error")
+	}
+}
+
+// A repository's id and its owner's are read as GitHub answers them, and an
+// answer without both (or not numeric) is an error, never an empty pin.
+func TestTheRepositoryIDsAreReadAsGitHubAnswers(t *testing.T) {
+	ids, err := parseRepositoryIDs(`{"id":1296269,"name":"catalog","owner":{"login":"acme","id":1}}`)
+	if err != nil || ids != (IDs{Repository: "1296269", Owner: "1"}) {
+		t.Errorf("got %+v, %v", ids, err)
+	}
+	for _, body := range []string{`{"id":1296269}`, `{"owner":{"id":1}}`, `{"id":"x","owner":{"id":1}}`, `{"id":-1,"owner":{"id":1}}`, "not json"} {
+		if _, err := parseRepositoryIDs(body); err == nil {
+			t.Errorf("%s: should be an error", body)
+		}
 	}
 }

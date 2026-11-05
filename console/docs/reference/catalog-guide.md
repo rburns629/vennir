@@ -776,6 +776,19 @@ CI needs only the registry: no console token, no cluster credential. Each
 install points its console at the release (the console chart's
 `catalog.release`) and trusts the same signing key or identity as its images.
 
+The cloud's federation trusts this repository by its GitHub id and its
+owner's, not its name, since a name can pass to another repository (yours
+renamed, or deleted and made again by someone else). `vennir catalog
+create` reads the ids once the repository exists and pins them: on GCP the
+provider's condition is `assertion.repository_id == "<id>" &&
+assertion.repository_owner_id == "<owner id>"` (and `assertion.ref ==
+"refs/heads/main"`), and the publish account trusts `attribute.repository_id`;
+on AWS the repository's tokens carry the ids at the end of their subject
+(below) and the role trusts only subjects ending in them. Setting up
+federation by hand, do the same: a condition on `assertion.repository`
+alone, or a `repo:<owner>/<name>` subject, trusts whoever holds the name.
+Renaming or moving the repository, run `vennir catalog create` again.
+
 From a laptop: `./vennir catalog publish [teams/<team>/products/<product> ...]`,
 then `./vennir catalog release`, signed in to the registry with `docker login`.
 
@@ -959,8 +972,10 @@ through 0.10.0), in one pull request:
 The first run on `main` after the merge publishes a release Vennir installs
 read; a Vennir install doesn't read a Vertra release.
 
-On AWS, the publish role trusts only jobs whose OIDC subject names `main`,
-so the repository's tokens carry their branch even in an Environment
-(subject claims `repo`, `context`, `ref`). `vennir catalog create` sets
-that, and `vennir apply` sets it on a catalog made before it did (with `gh`
-signed in as an admin of the repository), before it changes the role.
+On AWS, the publish role trusts only jobs whose OIDC subject names `main`
+and this repository's ids, so the repository's tokens carry their branch
+even in an Environment, and its owner's id and its own (subject claims
+`repo`, `context`, `ref`, `repository_owner_id`, `repository_id`). `vennir
+catalog create` sets that, and `vennir apply` sets it on a catalog made
+before it did (with `gh` signed in as an admin of the repository), before
+it changes the role.

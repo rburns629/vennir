@@ -61,6 +61,8 @@ var Settings = []Setting{
 	{"catalog.languages", "The first team's starter languages: python, typescript, go, powershell, rust."},
 	{"catalog.useExisting", "The catalog repository already existed: its contents stay."},
 	{"catalog.subjectPrefix", "How GitHub names the repository in its OIDC tokens (vennir reads it)."},
+	{"catalog.repositoryId", "The repository's GitHub id, which its CI's federation trusts rather than its name (vennir reads it)."},
+	{"catalog.ownerId", "The repository's owner's GitHub id, trusted with repositoryId (vennir reads it)."},
 	{"externalCatalog.registry", "Read another install's catalog: the registry holding its images and releases."},
 	{"externalCatalog.gcpWorkloadIdentityProvider", "That catalog's Artifact Registry on another cloud: the provider this cluster federates through."},
 	{"externalCatalog.gcpServiceAccount", "That catalog: a service account to impersonate, if not granted directly."},

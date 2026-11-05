@@ -50,14 +50,14 @@ func TestTheCatalogsSubjectTemplateIsSetOnlyWhenItIsnt(t *testing.T) {
 	if !strings.Contains(string(calls), "-X PUT /repos/acme/catalog/actions/oidc/customization/sub") {
 		t.Errorf("no PUT of the template: %s", calls)
 	}
-	if !strings.Contains(string(calls), `"include_claim_keys":["repo","context","ref"]`) || !strings.Contains(string(calls), `"use_default":false`) {
+	if !strings.Contains(string(calls), `"include_claim_keys":["repo","context","ref","repository_owner_id","repository_id"]`) || !strings.Contains(string(calls), `"use_default":false`) {
 		t.Errorf("the template sent: %s", calls)
 	}
-	if !strings.Contains(out.String(), "now name their branch") {
+	if !strings.Contains(out.String(), "now name their branch and ids") {
 		t.Errorf("it should say it changed it: %q", out.String())
 	}
 
-	gh, log = fakeGH(t, `{"use_default":false,"include_claim_keys":["repo","context","ref"]}`)
+	gh, log = fakeGH(t, `{"use_default":false,"include_claim_keys":["repo","context","ref","repository_owner_id","repository_id"]}`)
 	out.Reset()
 	if err := ensureCatalogSubject(ctx, &out, gh, "acme/catalog"); err != nil {
 		t.Fatal(err)

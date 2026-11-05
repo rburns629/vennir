@@ -117,6 +117,7 @@ print("---".join(d for d in docs if re.search(r"^kind: ValidatingAdmissionPolicy
 cleanup() {
   render | k delete -f - --ignore-not-found > /dev/null 2>&1
   k delete clusterrolebinding,clusterrole $RELEASE-dry-run --ignore-not-found > /dev/null 2>&1
+  [ -n "${ESO_CRD_STUB:-}" ] && k delete crd externalsecrets.external-secrets.io --ignore-not-found > /dev/null 2>&1
   k delete namespace "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS" "$APIS_NS" "$RETIRED_APIS_NS" "$NOT_APIS_NS" --ignore-not-found --wait=false > /dev/null 2>&1
 }
 trap cleanup EXIT
@@ -155,6 +156,29 @@ k apply -f - > /dev/null <<EOF
  {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"name":"vennir-default-deny","namespace":"$TEAM_B"},
   "spec":{"podSelector":{},"policyTypes":["Ingress"],"ingress":[{"from":[{"podSelector":{}}]}]}}]}
 EOF
+# ExternalSecrets the console made (labelled) and one it didn't, for the
+# write fence's cases. Without External Secrets Operator (CI's cluster), a
+# stand-in for its CRD, removed again at the end.
+if ! k get crd externalsecrets.external-secrets.io > /dev/null 2>&1; then
+  ESO_CRD_STUB=1
+  k apply -f - > /dev/null <<EOF
+{"apiVersion":"apiextensions.k8s.io/v1","kind":"CustomResourceDefinition",
+ "metadata":{"name":"externalsecrets.external-secrets.io"},
+ "spec":{"group":"external-secrets.io","scope":"Namespaced",
+  "names":{"plural":"externalsecrets","singular":"externalsecret","kind":"ExternalSecret"},
+  "versions":[{"name":"v1","served":true,"storage":true,
+   "schema":{"openAPIV3Schema":{"type":"object","x-kubernetes-preserve-unknown-fields":true}}}]}}
+EOF
+  k wait --for=condition=Established crd/externalsecrets.external-secrets.io --timeout=60s > /dev/null
+fi
+external_secret() {  # name, labels as JSON
+  echo '{"apiVersion":"external-secrets.io/v1","kind":"ExternalSecret","metadata":{"name":"'"$1"'","labels":'"$2"'},
+ "spec":{"secretStoreRef":{"name":"store","kind":"SecretStore"},"target":{"name":"'"$1"'"},
+  "data":[{"secretKey":"a","remoteRef":{"key":"a"}}]}}'
+}
+CONSOLE_LABELS='{"app.kubernetes.io/managed-by":"vennir-console"}'
+external_secret es-console "$CONSOLE_LABELS" | k -n "$TEAM_A" apply -f - > /dev/null
+external_secret es-other '{}' | k -n "$TEAM_A" apply -f - > /dev/null
 # And Jobs for it to resume, or not: suspended as the executor makes them
 # (and one already resumed, with no Pods to make), none of them run.
 fixture_job() {  # namespace, name, labels as JSON, suspend, parallelism
@@ -186,6 +210,7 @@ rules:
   - {apiGroups: [networking.k8s.io], resources: [networkpolicies], verbs: [create, delete]}
   - {apiGroups: [rbac.authorization.k8s.io], resources: [rolebindings, roles], verbs: [create]}
   - {apiGroups: [rbac.authorization.k8s.io], resources: [clusterroles], verbs: [bind]}
+  - {apiGroups: [external-secrets.io], resources: [externalsecrets], verbs: [get, create, update, patch, delete]}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -461,6 +486,14 @@ expect "the executor's own Job"               allowed                "$(step_job
 
 echo "Image sources:"
 expect "an image from another registry"       IMAGE_NOT_ALLOWED              "$(job "$TEAM_A" busybox:1.36 run default "")"
+# Uppercase anywhere but the tag (a host is case-insensitive; Docker reads
+# an uppercase first part as a host).
+UPPER="has an uppercase letter"
+expect "the source's host in uppercase"       "$UPPER"                       "$(job "$TEAM_A" Registry.Example/app:1 run default "")"
+expect "uppercase in the repository"          "$UPPER"                       "$(job "$TEAM_A" $SOURCE/team/App:1 run default "")"
+expect "an uppercase short name"              "$UPPER"                       "$(job "$TEAM_A" Busybox:1.36 run default "")"
+expect "an uppercase first part, read as a host" "$UPPER"                    "$(job "$TEAM_A" Library/busybox:1.36 run default "")"
+expect "uppercase in the tag"                 allowed                        "$(job "$TEAM_A" $SOURCE/app:Latest run default "")"
 
 echo "Step Pods (anyone but Kubernetes' own controllers, such as a team's deploys):"
 pod() {  # namespace, metadata JSON, as (empty: this kubeconfig's user)
@@ -580,6 +613,16 @@ expect "a Secret in a team namespace"            allowed                     "$(
 expect "a Secret in kube-system"                 "may only write in team"    "$(secret kube-system)"
 expect "a Secret in the platform's namespace"    "may only write in team"    "$(secret "$PLATFORM_NS")"
 expect "a Secret in an API backends' namespace"  "may only write in team"    "$(secret "$APIS_NS")"
+
+echo "Console ExternalSecrets:"
+ES_UNLABELLED="carry app.kubernetes.io/managed-by"
+expect "create one, labelled the console's"      allowed            "$(external_secret es-new "$CONSOLE_LABELS" | as_console -n "$TEAM_A" create -f -)"
+expect "create one without the label"            "$ES_UNLABELLED"   "$(external_secret es-new '{}' | as_console -n "$TEAM_A" create -f -)"
+expect "replace the console's own"               allowed            "$(external_secret es-console "$CONSOLE_LABELS" | as_console -n "$TEAM_A" replace -f -)"
+expect "replace one it didn't make"              "$ES_UNLABELLED"   "$(external_secret es-other "$CONSOLE_LABELS" | as_console -n "$TEAM_A" replace -f -)"
+expect "label one it didn't make its own"        "$ES_UNLABELLED"   "$(as_console -n "$TEAM_A" label externalsecret es-other app.kubernetes.io/managed-by=vennir-console)"
+expect "drop its own label"                      "$ES_UNLABELLED"   "$(as_console -n "$TEAM_A" label externalsecret es-console app.kubernetes.io/managed-by-)"
+expect "delete one it didn't make"               allowed            "$(as_console -n "$TEAM_A" delete externalsecret es-other)"
 
 echo "Console NetworkPolicies:"
 NP_REFUSED="console's NetworkPolicies are"

@@ -382,8 +382,56 @@ func (g *GitHub) DeleteVariable(ctx context.Context, repo, name string) error {
 
 // SubjectClaimKeys is the subject template vennir sets on a catalog
 // repository: the job's context (its branch, or its Environment) and its
-// branch, so a job in an Environment says which branch it ran from too.
-var SubjectClaimKeys = []string{"repo", "context", "ref"}
+// branch, so a job in an Environment says which branch it ran from too,
+// then the repository's owner's id and its own, so a role trusting the
+// subject trusts this repository, not whichever later has its name (one
+// renamed, or deleted and made again by someone else).
+var SubjectClaimKeys = []string{"repo", "context", "ref", "repository_owner_id", "repository_id"}
+
+// IDs are a repository's and its owner's GitHub ids, which (unlike their
+// names) never pass to another repository or account.
+type IDs struct {
+	Repository string
+	Owner      string
+}
+
+// RepositoryIDs reads the repository's id, and its owner's.
+func (g *GitHub) RepositoryIDs(ctx context.Context, repo string) (IDs, error) {
+	body, err := g.api(ctx, "GET", "/repos/"+repo, "")
+	if err != nil {
+		return IDs{}, err
+	}
+	return parseRepositoryIDs(body)
+}
+
+func parseRepositoryIDs(body string) (IDs, error) {
+	var r struct {
+		ID    json.Number `json:"id"`
+		Owner struct {
+			ID json.Number `json:"id"`
+		} `json:"owner"`
+	}
+	if err := json.Unmarshal([]byte(body), &r); err != nil {
+		return IDs{}, fmt.Errorf("GitHub's repository answer: %w", err)
+	}
+	ids := IDs{Repository: r.ID.String(), Owner: r.Owner.ID.String()}
+	if !numeric(ids.Repository) || !numeric(ids.Owner) {
+		return IDs{}, fmt.Errorf("GitHub's repository answer has no id or owner id: %q, %q", ids.Repository, ids.Owner)
+	}
+	return ids, nil
+}
+
+func numeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
 
 // EnsureSubjectTemplate has the repository's Actions OIDC tokens carry
 // SubjectClaimKeys in their subject, unless they already do: a role

@@ -14,9 +14,9 @@
  */
 import { config } from "./config.js";
 import { readImagePolicyData, writeImagePolicyData } from "./k8s.js";
-import { normalizeImage } from "./imageRef.js";
+import { hasUppercaseName, normalizeImage } from "./imageRef.js";
 
-export { imageRepository, normalizeImage } from "./imageRef.js";
+export { hasUppercaseName, imageRepository, normalizeImage } from "./imageRef.js";
 
 export interface ImagePolicy {
   /** False when the policy doesn't exist (the kernel chart isn't installed). */
@@ -65,6 +65,7 @@ export function allowedPrefixes(policy: ImagePolicy): string[] {
 }
 
 export function isImageAllowed(image: string, prefixes: string[]): boolean {
+  if (hasUppercaseName(image)) return false;
   const normalized = normalizeImage(image);
   return prefixes.some((prefix) => normalized.startsWith(prefix));
 }
@@ -127,11 +128,16 @@ export function imageRefusal(images: string[], policy: ImagePolicy): ImageRefusa
   }
   const disallowed = unique.filter((image) => !isImageAllowed(image, prefixes));
   if (disallowed.length === 0) return null;
+  const uppercase = disallowed.filter(hasUppercaseName);
   return {
     error: "IMAGE_NOT_ALLOWED",
     message:
       `${disallowed.join(", ")} ${disallowed.length === 1 ? "is" : "are"} not from an allowed image source. ` +
-      `Allowed: ${prefixes.join(", ")}. An admin can allow more on the Admin page.`,
+      `Allowed: ${prefixes.join(", ")}. An admin can allow more on the Admin page.` +
+      (uppercase.length > 0
+        ? ` ${uppercase.join(", ")} ${uppercase.length === 1 ? "has" : "have"} an uppercase letter in the registry or repository; ` +
+          "image names are lowercase (only a tag may have uppercase letters)."
+        : ""),
     disallowedImages: disallowed,
     allowedSources: prefixes,
   };

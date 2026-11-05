@@ -207,6 +207,8 @@ func Vars(c *config.Config, deleteData bool, githubProvider string) map[string]a
 		"step_headroom":              c.StepHeadroom,
 		"github_oidc_provider_arn":   githubProvider,
 		"catalog_subject_prefix":     c.Catalog.SubjectPrefix,
+		"catalog_repository_id":      c.Catalog.RepositoryID,
+		"catalog_owner_id":           c.Catalog.OwnerID,
 		"chat_model":                 chatModel(c),
 		"amazon_prometheus":          c.Monitoring.Enabled && c.Monitoring.ProviderName() == "amazon",
 		"alert_email":                alertEmail(c),

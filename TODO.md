@@ -152,7 +152,7 @@ it was seen.
 ## Security
 
 - [ ] **From the security review of 2026-11-04** (six read-only reviewers,
-  each finding checked against the code; the fixes so far are #213 to #226).
+  each finding checked against the code; the fixes so far are #213 to #237).
   Still open:
   - Kernel (found fixing the kernel's): a cancel racing a retry can leave
     the retried step READY in the cancelled execution (never claimed, but
@@ -167,14 +167,6 @@ it was seen.
     `LOKI_URL`, `PROMETHEUS_URL`, NOTES) and the catalog tool's "http only
     in the cluster" check (`cli/internal/catalogtool/apis.go`) still assume
     `cluster.local`, not `clusterDomain`.
-  - Catalog: GCP catalog CI's federation pins the repository by its ID.
-  - Cluster: the console replaces or registers only ExternalSecrets it
-    labelled; an image's first part may not be uppercase.
-  - Identity (found reviewing #230): a running step keeps its digest's
-    releases in use for every product that released that digest, not only
-    the one it runs as (`releaseInUse` reads running digests alone), so
-    while one product runs a shared image, another product's earlier
-    release of it keeps that product's identity too.
 
 - [ ] **Next release: drop API backends in their team's namespace** (API
   backends moved to `<team>-apis` on 2026-11-05): for one release the

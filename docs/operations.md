@@ -261,7 +261,7 @@ of the values it writes):
 | policy-controller (`policy-controller-webhook`) | The same, read-only on the products' registry | The same, by Pod Identity |
 | A team's `eso-<cloud>` (its SecretStore) | Its Google service account, by the annotation in the store file | IRSA: the `eks.amazonaws.com/role-arn` annotation, a role trusting the cluster's OIDC issuer (registered in IAM once per cluster) for `system:serviceaccount:<team>:eso-aws` only. Pod Identity doesn't work for a store |
 | A product's own | Its Google service account, by the annotation an admin adds | A Pod Identity association for `<team>/<serviceAccount>`, which an admin adds |
-| Catalog CI (GitHub Actions) | Workload Identity Federation, main only | An IAM OIDC provider for GitHub's issuer (the account's one, shared by its installs: `vennir destroy` leaves it), a role trusting the repository's main only |
+| Catalog CI (GitHub Actions) | Workload Identity Federation, main only, the repository by its id and its owner's | An IAM OIDC provider for GitHub's issuer (the account's one, shared by its installs: `vennir destroy` leaves it), a role trusting the repository's main only, by a subject naming its id and its owner's |
 
 ### Signing in with Google
 
@@ -817,6 +817,16 @@ to know:
   role, with `gh` signed in as an admin of the repository; without `gh` it
   stops and gives the one command that sets it. Until it's set, publishing
   from the `catalog-publish` Environment is refused.
+- **A catalog repository pinned by its id** (since 2026-11-05). Catalog
+  CI's federation now trusts the repository's GitHub id and its owner's,
+  not its name, which a renamed or re-created repository could hold. On
+  AWS, `vennir apply` reads the ids before planning and, once approved,
+  has the repository's tokens carry them (subject claims `repo`, `context`,
+  `ref`, `repository_owner_id`, `repository_id`) before the role trusts
+  only subjects ending in them. On GCP, run `vennir catalog create` again
+  (its repository is left as it is): it reads the ids and re-applies the
+  provider's condition and the publish account's binding; until then the
+  provider trusts the name, as before.
 - **A catalog's `ci.yml` and its `./vennir` pin** (after 0.9.0). Catalog CI
   on `main` now plans, builds teams' products in their own Environments
   (`buildEnvironments`), then publishes, with commands only `vennir` after

@@ -807,6 +807,10 @@ resource "aws_iam_openid_connect_provider" "github" {
 
 locals {
   catalog_subject = var.catalog_subject_prefix != "" ? var.catalog_subject_prefix : "repo:${var.catalog_repository}"
+  # The subject's last claims, once vennir has read the repository's ids
+  # and set its template to carry them (githost.SubjectClaimKeys).
+  catalog_pinned  = var.catalog_repository_id != "" && var.catalog_owner_id != ""
+  catalog_ids     = ":repository_owner_id:${var.catalog_owner_id}:repository_id:${var.catalog_repository_id}"
   github_provider = var.github_oidc_provider_arn != "" ? var.github_oidc_provider_arn : try(aws_iam_openid_connect_provider.github[0].arn, "")
 }
 
@@ -829,13 +833,19 @@ data "aws_iam_policy_document" "publish_trust" {
     # Environment exists with its main-only rule, a branch's job can't match.
     # (The template-less form of a main job's subject is kept for a job
     # before the template takes effect: it names the branch.) Pull requests
-    # (any fork's code) never match. GitHub's subject names the repository,
-    # pinned by its id when it uses immutable subjects (a re-registered name
-    # can't match).
+    # (any fork's code) never match. GitHub's subject names the repository;
+    # once vennir has read its ids, the template adds them (repository_owner_id,
+    # repository_id) and only a subject ending in them is trusted, so a
+    # repository renamed, or deleted and made again under its name by
+    # someone else, can't match (nor can a template-less subject, which
+    # carries no ids).
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
+      values = local.catalog_pinned ? [
+        "${local.catalog_subject}:environment:catalog-publish:ref:refs/heads/main${local.catalog_ids}",
+        "${local.catalog_subject}:ref:refs/heads/main:ref:refs/heads/main${local.catalog_ids}",
+        ] : [
         "${local.catalog_subject}:environment:catalog-publish:ref:refs/heads/main",
         "${local.catalog_subject}:ref:refs/heads/main:ref:refs/heads/main",
         "${local.catalog_subject}:ref:refs/heads/main",

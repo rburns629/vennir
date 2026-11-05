@@ -11,7 +11,11 @@ labelled vennir/api-backends: console/src/teamNetwork.ts).
 
 Inside a team namespace, which objects are the console's is its own rule
 (console/src/k8s.ts: it labels what it creates, and replaces an existing
-Secret only when it's labelled or already granted).
+Secret only when it's labelled or already granted). For ExternalSecrets the
+label is enforced here as well: it updates only one labelled as its own.
+Secrets aren't held to the label here, because some the console rightly
+replaces predate it (a registered secret from before labels, a
+SecretStore's credential).
 */}}
 {{- if .Values.writeFence.enabled }}
 {{- $console := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-console.serviceAccountName" .) }}
@@ -78,6 +82,20 @@ spec:
       messageExpression: >-
         "The console may only update the ServiceAccounts ESO signs in as (eso-*), not " +
         object.metadata.name + "."
+      reason: Forbidden
+    # Its ExternalSecrets are its own: each it creates carries its label,
+    # and it updates only one that already did (k8s.ts,
+    # upsertExternalSecretGrant), so one made elsewhere is never taken over.
+    - expression: >-
+        request.resource.resource != "externalsecrets" || request.operation == "DELETE" || (
+          has(object.metadata.labels) &&
+          object.metadata.labels[?"app.kubernetes.io/managed-by"].orValue("") == "vennir-console" &&
+          (request.operation != "UPDATE" || (
+            has(oldObject.metadata.labels) &&
+            oldObject.metadata.labels[?"app.kubernetes.io/managed-by"].orValue("") == "vennir-console")))
+      message: >-
+        The console's ExternalSecrets carry app.kubernetes.io/managed-by=vennir-console, and it may
+        only update one that already did.
       reason: Forbidden
     # Its NetworkPolicies are each team's default deny (k8s.ts,
     # writeTeamNetworkPolicy), in its namespace and its API backends', never deleted, and only ever refusing more:
