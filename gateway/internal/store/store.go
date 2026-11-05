@@ -42,6 +42,10 @@ type API struct {
 	MaxRequest    int64
 	PausedMessage *string
 	UpdatedAt     time.Time
+	// APINamespaceTaken: a team is named APINamespace(Team) (one named
+	// before such names were refused), so that namespace is its, not this
+	// API's team's (BackendPlace).
+	APINamespaceTaken bool
 	// Validator checks a request against the spec; Problem says why there
 	// isn't one (the API then answers 503: it can't be checked, so it isn't
 	// forwarded).
@@ -174,7 +178,7 @@ func (s *Store) Refresh(ctx context.Context) error {
 	states.Close()
 	rows, err := s.DB.Query(ctx, `SELECT a.id::text, t.name, a.name, a.openapi::text, a.backend_url, coalesce(a.backend_auth::text, ''),
 			a.service_account, a.share_with, a.hidden, a.internet, a.per_minute::text, a.timeout_seconds, a.max_request_bytes,
-			a.paused_message, a.updated_at
+			a.paused_message, a.updated_at, EXISTS (SELECT 1 FROM teams o WHERE o.name = t.name || '-apis')
 		FROM apis a JOIN teams t ON t.id = a.team_id WHERE t.retired_at IS NULL AND t.deleted_at IS NULL`)
 	if err != nil {
 		return err
@@ -189,13 +193,14 @@ func (s *Store) Refresh(ctx context.Context) error {
 		var spec, backendURL, auth, perMinute string
 		var timeout int
 		if err := rows.Scan(&a.ID, &a.Team, &a.Name, &spec, &backendURL, &auth, &a.ServiceAccount, &a.ShareWith, &a.Hidden, &a.Internet,
-			&perMinute, &timeout, &a.MaxRequest, &a.PausedMessage, &a.UpdatedAt); err != nil {
+			&perMinute, &timeout, &a.MaxRequest, &a.PausedMessage, &a.UpdatedAt, &a.APINamespaceTaken); err != nil {
 			return err
 		}
-		if prev := old[a.Key()]; prev != nil && prev.UpdatedAt.Equal(a.UpdatedAt) {
+		if prev := old[a.Key()]; prev != nil && prev.UpdatedAt.Equal(a.UpdatedAt) && prev.APINamespaceTaken == a.APINamespaceTaken {
 			if !prev.recorded {
 				s.record(ctx, prev)
 			}
+			s.warnTeamNamespace(prev)
 			next[a.Key()] = prev
 			continue
 		}
@@ -218,6 +223,7 @@ func (s *Store) Refresh(ctx context.Context) error {
 		if a.Problem != "" {
 			s.Log.Warn("an API can't be served", "api", a.Key(), "problem", a.Problem)
 		}
+		s.warnTeamNamespace(&a)
 		s.record(ctx, &a)
 		next[a.Key()] = &a
 	}
@@ -229,6 +235,16 @@ func (s *Store) Refresh(ctx context.Context) error {
 	s.closed = closed
 	s.mu.Unlock()
 	return nil
+}
+
+// warnTeamNamespace logs, once a refresh, an API whose backend still runs
+// in its team's own namespace: served for one release, until it moves to
+// the team's API backends' namespace.
+func (s *Store) warnTeamNamespace(a *API) {
+	if a.BackendURL != nil && BackendPlace(a.BackendURL, a.Team, a.APINamespaceTaken) == BackendInTeam {
+		s.Log.Warn("an API's backend runs in its team's namespace: move it to the team's API backends' namespace",
+			"event", "api_backend_in_team_namespace", "api", a.Key(), "namespace", a.Team, "move_to", APINamespace(a.Team))
+	}
 }
 
 // maxProblem is the most of a problem the console is told: a parser's
@@ -351,8 +367,8 @@ func (s *Store) Run(ctx context.Context, interval time.Duration) {
 // BackendNamespace is the namespace an in-cluster backend host names
 // (<service>.<namespace>.svc, with or without .cluster.local), or "" for any
 // other host. The gateway may reach every team's API backends, so an API
-// may only use one in its own team's namespace (the console's
-// core/apis.ts backendNamespace, kept in step).
+// may only use one in its own team's API backends' namespace (BackendPlace;
+// the console's core/apis.ts backendNamespace, kept in step).
 func BackendNamespace(u *url.URL) string {
 	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
 	host = strings.TrimSuffix(host, ".cluster.local")
@@ -365,6 +381,41 @@ func BackendNamespace(u *url.URL) string {
 		return ""
 	}
 	return labels[len(labels)-1]
+}
+
+// APINamespace is the namespace a team's API backends run in, apart from
+// its steps and their Secrets (the console's k8s.ts apiNamespace, which
+// makes it).
+func APINamespace(team string) string { return team + "-apis" }
+
+// Where an API's backend runs, for its team (BackendPlace).
+const (
+	// BackendOutside: not in the cluster (any host BackendAllowed allows).
+	BackendOutside = "outside"
+	// BackendInAPIs: in the team's API backends' namespace.
+	BackendInAPIs = "apis"
+	// BackendInTeam: in the team's own namespace, where its steps run.
+	// Served for one release, until backends have moved, and logged.
+	BackendInTeam = "team"
+	// BackendElsewhere: in any other namespace: held.
+	BackendElsewhere = "other"
+)
+
+// BackendPlace says where an API's backend runs for the team it is.
+// APINamespace(team) is the team's only when no team has that name
+// (apiNamespaceTaken). The console's core/apis.ts backendPlace, kept in
+// step.
+func BackendPlace(u *url.URL, team string, apiNamespaceTaken bool) string {
+	switch ns := BackendNamespace(u); {
+	case ns == "":
+		return BackendOutside
+	case ns == APINamespace(team) && !apiNamespaceTaken:
+		return BackendInAPIs
+	case ns == team:
+		return BackendInTeam
+	default:
+		return BackendElsewhere
+	}
 }
 
 // BackendAllowed: the URL's host is one of hosts, exactly or below a "*."

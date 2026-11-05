@@ -103,11 +103,20 @@ func contains[T comparable](list []T, v T) bool {
 	return false
 }
 
+// apiNamespaceSuffix names a team's API backends' namespace, <team>-apis
+// (the console's k8s.ts apiNamespace).
+const apiNamespaceSuffix = "-apis"
+
 // reservedTeamName says why name can't be a team's, or "" when it can. A
 // team's images are <registry>/<team>/<product>, beside the catalog's own
-// repositories, and its name is a Kubernetes namespace's.
+// repositories, and its name is a Kubernetes namespace's, as is
+// <team>-apis, where its API backends run (the console refuses the same).
 func reservedTeamName(name string) string {
 	switch {
+	case strings.HasSuffix(name, apiNamespaceSuffix):
+		return "<team>" + apiNamespaceSuffix + " is a team's API backends' namespace"
+	case len(name)+len(apiNamespaceSuffix) > 63:
+		return "it can be at most 58 characters, so that <team>" + apiNamespaceSuffix + " fits a namespace's 63"
 	case name == "bases":
 		return "<registry>/bases/ holds the catalog's mirrored base images (bases.yaml)"
 	case name == ReleaseRepositoryName:

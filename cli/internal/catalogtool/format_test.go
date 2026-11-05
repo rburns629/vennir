@@ -347,7 +347,7 @@ func TestReservedTeamNames(t *testing.T) {
 	team := func(name string) string {
 		return "apiVersion: " + APIVersion + "\nkind: Team\nname: " + name + "\ndisplayName: X\ndescription: X\nowner: x\n"
 	}
-	for _, name := range []string{"bases", "catalog-release", "vennir-system", "kube-system", "kube-x"} {
+	for _, name := range []string{"bases", "catalog-release", "vennir-system", "kube-system", "kube-x", "payments-apis", strings.Repeat("a", 59)} {
 		c := catalogWith(t, map[string]string{"teams/" + name + "/team.yaml": team(name)})
 		if out := errorsOf(t, (*Catalog).ValidateTeams, c); !strings.Contains(out, "no team may be called '"+name+"'") {
 			t.Errorf("%s: %q", name, out)
@@ -357,7 +357,7 @@ func TestReservedTeamNames(t *testing.T) {
 			t.Errorf("the schema accepts %s", name)
 		}
 	}
-	for _, name := range []string{"base", "kube", "my-bases", "vennir"} {
+	for _, name := range []string{"base", "kube", "my-bases", "vennir", "apis", "my-apis-team", strings.Repeat("a", 58)} {
 		c := catalogWith(t, map[string]string{"teams/" + name + "/team.yaml": team(name)})
 		if out := errorsOf(t, (*Catalog).ValidateTeams, c); out != "" {
 			t.Errorf("%s was refused: %s", name, out)

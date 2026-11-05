@@ -25,12 +25,14 @@ import {
   gatewayIngressPolicy,
   NamespaceNotTeamsError,
   ProtectedNamespaceError,
+  setApiNamespace,
   setTeamNamespace,
   TEAM_GATEWAY_INGRESS,
   writeSchedulerLogsBinding,
   writeTeamNetworkPolicy,
   writeTeamPullSecret,
 } from "../src/k8s.js";
+import { syncApiNamespaces } from "../src/core/teams.js";
 import { syncSchedulerLogsBindings } from "../src/schedulerLogs.js";
 import { syncPullSecrets } from "../src/pullSecret.js";
 import { syncTeamNetworkPolicies } from "../src/teamNetwork.js";
@@ -40,6 +42,7 @@ import { caller, failureCode, problemMessages, type RpcError } from "./rpc.js";
 vi.mock("../src/k8s.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/k8s.js")>()),
   setTeamNamespace: vi.fn(() => Promise.resolve(true)),
+  setApiNamespace: vi.fn(() => Promise.resolve(true)),
   deleteTeamNamespace: vi.fn(() => Promise.resolve()),
   applySecretStoreObjects: vi.fn(() => Promise.resolve()),
   writeTeamPullSecret: vi.fn(() => Promise.resolve(true)),
@@ -94,6 +97,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.mocked(setTeamNamespace).mockClear();
+  vi.mocked(setApiNamespace).mockClear();
   vi.mocked(deleteTeamNamespace).mockClear();
   vi.mocked(applySecretStoreObjects).mockClear();
   vi.mocked(writeTeamPullSecret).mockClear();
@@ -104,6 +108,84 @@ describe("creating a team", () => {
   it("creates its namespace, labelled a team's", async () => {
     expect((await call(admin, "TeamService/CreateTeam", { name: name("new") })).code).toBe("ok");
     expect(setTeamNamespace).toHaveBeenCalledWith(name("new"), "true", expect.objectContaining({ createIfMissing: true, label: "vennir/team" }));
+  });
+
+  it("gives it an API backends' namespace, <team>-apis, apart from its own", async () => {
+    expect((await call(admin, "TeamService/CreateTeam", { name: name("new-apis-ns") })).code).toBe("ok");
+    expect(setApiNamespace).toHaveBeenCalledWith(name("new-apis-ns"), "true", expect.objectContaining({ createIfMissing: true, label: "vennir/team" }));
+  });
+
+  it("refuses a name that is, or can't have, an API backends' namespace", async () => {
+    const longest = name("l".repeat(58 - prefix.length - 1));
+    for (const bad of [name("x-apis"), `${longest}m`]) {
+      expect((await call(admin, "TeamService/CreateTeam", { name: bad })).code, bad).toBe("invalid_argument");
+      expect((await call(admin, "TeamService/EnsureTeam", { name: bad })).code, bad).toBe("invalid_argument");
+    }
+    expect(setTeamNamespace).not.toHaveBeenCalled();
+    expect(setApiNamespace).not.toHaveBeenCalled();
+    expect((await call(admin, "TeamService/CreateTeam", { name: longest })).code).toBe("ok");
+    expect(setApiNamespace).toHaveBeenCalledWith(longest, "true", expect.anything());
+  });
+
+  it("keeps a team named so before, without an API backends' namespace when it can't have one", async () => {
+    await createTeam(name("old-apis"));
+    const tooLong = name("o".repeat(60 - prefix.length - 1));
+    await createTeam(tooLong);
+    for (const team of [name("old-apis"), tooLong]) {
+      expect((await call(admin, "TeamService/EnsureTeam", { name: team })).code, team).toBe("ok");
+    }
+    expect(setApiNamespace).toHaveBeenCalledWith(name("old-apis"), "true", expect.anything());
+    expect(setApiNamespace).not.toHaveBeenCalledWith(tooLong, expect.anything(), expect.anything());
+  });
+
+  it("never takes an older team's namespace for a team's API backends'", async () => {
+    // A team named so before such names were refused.
+    await createTeam(name("shadow-apis"));
+    const refused = await call(admin, "TeamService/CreateTeam", { name: name("shadow") });
+    expect(refused.failure).toBe("NAMESPACE_EXISTS");
+    expect(setTeamNamespace).not.toHaveBeenCalled();
+    // One made before it: kept, with no API backends' namespace, so nothing
+    // of the other team's is labelled, written into or deleted as its own.
+    await createTeam(name("shadow"));
+    config.teamNamespaces.defaultDenyIngress = true;
+    try {
+      expect((await call(admin, "TeamService/EnsureTeam", { name: name("shadow") })).code).toBe("ok");
+      expect(await syncApiNamespaces()).toBe(true);
+      await syncTeamNetworkPolicies();
+      await retire(name("shadow"));
+      expect((await call(admin, "TeamService/PurgeTeam", { name: name("shadow") })).code).toBe("ok");
+    } finally {
+      config.teamNamespaces.defaultDenyIngress = false;
+    }
+    expect(setApiNamespace).not.toHaveBeenCalledWith(name("shadow"), expect.anything(), expect.anything());
+    expect(writeTeamNetworkPolicy).not.toHaveBeenCalledWith(name("shadow-apis"), expect.anything(), expect.anything());
+    expect(deleteTeamNamespace).toHaveBeenCalledWith(name("shadow"), expect.any(Array));
+    expect(deleteTeamNamespace).not.toHaveBeenCalledWith(name("shadow-apis"), expect.any(Array));
+  });
+
+  it("creates no team when its API backends' namespace can't be its", async () => {
+    vi.mocked(setApiNamespace).mockRejectedValueOnce(new NamespaceNotTeamsError("another team's"));
+    const taken = await call(admin, "TeamService/CreateTeam", { name: name("apis-taken") });
+    expect(taken.failure).toBe("NAMESPACE_EXISTS");
+    expect(await db.select().from(teams).where(inArray(teams.name, [name("apis-taken")]))).toEqual([]);
+    // Nor a namespace the kernel would dispatch into.
+    expect(setTeamNamespace).not.toHaveBeenCalled();
+  });
+
+  it("keeps an existing team going when its API backends' namespace can't be its", async () => {
+    await createTeam(name("apis-blocked"));
+    config.teamNamespaces.defaultDenyIngress = true;
+    try {
+      vi.mocked(setApiNamespace).mockRejectedValueOnce(new NamespaceNotTeamsError("someone else's"));
+      expect((await call(admin, "TeamService/EnsureTeam", { name: name("apis-blocked") })).code).toBe("ok");
+      vi.mocked(setApiNamespace).mockRejectedValueOnce(new ProtectedNamespaceError("protected"));
+      expect((await retire(name("apis-blocked"))).code).toBe("ok");
+    } finally {
+      config.teamNamespaces.defaultDenyIngress = false;
+    }
+    expect(setTeamNamespace).toHaveBeenCalledWith(name("apis-blocked"), "retired", expect.anything());
+    expect(writeTeamNetworkPolicy).toHaveBeenCalledWith(name("apis-blocked"), null, false);
+    expect(writeTeamNetworkPolicy).not.toHaveBeenCalledWith(`${name("apis-blocked")}-apis`, expect.anything(), expect.anything());
   });
 
   it("refuses a name that can't be a namespace", async () => {
@@ -174,6 +256,7 @@ describe("retiring and purging", () => {
     await createTeam(name("ret"));
     expect((await retire(name("ret"))).code).toBe("ok");
     expect(setTeamNamespace).toHaveBeenCalledWith(name("ret"), "retired", expect.objectContaining({ createIfMissing: false }));
+    expect(setApiNamespace).toHaveBeenCalledWith(name("ret"), "retired", expect.objectContaining({ createIfMissing: false }));
     await call(admin, "TeamService/UnretireTeam", { name: name("ret") });
     expect(setTeamNamespace).toHaveBeenLastCalledWith(name("ret"), "true", expect.objectContaining({ createIfMissing: true }));
   });
@@ -185,11 +268,12 @@ describe("retiring and purging", () => {
     expect(purged.code).toBe("ok");
     expect(purged.body.namespaceDeleted).toBe(true);
     expect(deleteTeamNamespace).toHaveBeenCalledWith(name("purge"), expect.any(Array));
+    expect(deleteTeamNamespace).toHaveBeenCalledWith(`${name("purge")}-apis`, expect.any(Array));
     // A namespace deletion that failed the first time can simply be retried.
     const again = await call<{ alreadyPurged: boolean }>(admin, "TeamService/PurgeTeam", { name: name("purge") });
     expect(again.code).toBe("ok");
     expect(again.body.alreadyPurged).toBe(true);
-    expect(deleteTeamNamespace).toHaveBeenCalledTimes(2);
+    expect(deleteTeamNamespace).toHaveBeenCalledTimes(4);
   });
 
   it("leaves the namespace when the console isn't allowed to purge", async () => {
@@ -203,6 +287,30 @@ describe("retiring and purging", () => {
       expect(deleteTeamNamespace).not.toHaveBeenCalled();
     } finally {
       config.teamNamespaces.purge = true;
+    }
+  });
+});
+
+describe("the API backends' namespaces resync", () => {
+  it("makes an active team's, relabels a retired team's, and reports a failure", async () => {
+    await createTeam(name("sync-on"));
+    await createTeam(name("sync-off"));
+    await retire(name("sync-off"));
+    vi.mocked(setApiNamespace).mockClear();
+    expect(await syncApiNamespaces()).toBe(true);
+    expect(setApiNamespace).toHaveBeenCalledWith(name("sync-on"), "true", expect.objectContaining({ createIfMissing: true }));
+    expect(setApiNamespace).toHaveBeenCalledWith(name("sync-off"), "retired", expect.objectContaining({ createIfMissing: false }));
+    vi.mocked(setApiNamespace).mockImplementationOnce(() => Promise.reject(new Error("boom")));
+    await expect(syncApiNamespaces()).rejects.toThrow("Couldn't make or label the API backends' namespaces");
+  });
+
+  it("does nothing when the console doesn't manage namespaces", async () => {
+    config.teamNamespaces.manage = false;
+    try {
+      expect(await syncApiNamespaces()).toBe(false);
+      expect(setApiNamespace).not.toHaveBeenCalled();
+    } finally {
+      config.teamNamespaces.manage = true;
     }
   });
 });
@@ -449,6 +557,7 @@ describe("the default-deny network policy", () => {
   it("is written into a new team's namespace", async () => {
     expect((await call(admin, "TeamService/CreateTeam", { name: name("net") })).code).toBe("ok");
     expect(writeTeamNetworkPolicy).toHaveBeenCalledWith(name("net"), null, false);
+    expect(writeTeamNetworkPolicy).toHaveBeenCalledWith(`${name("net")}-apis`, null, false);
   });
 
   it("isn't written when a team is retired, and is again when it comes back", async () => {
@@ -469,7 +578,9 @@ describe("the default-deny network policy", () => {
     config.teamNamespaces.gatewayIngress = gateway;
     await syncTeamNetworkPolicies();
     config.teamNamespaces.gatewayIngress = null;
+    // Into the team's namespace (for backends not yet moved) and its API backends'.
     expect(writeTeamNetworkPolicy).toHaveBeenCalledWith(name("net-sync"), gateway, false);
+    expect(writeTeamNetworkPolicy).toHaveBeenCalledWith(`${name("net-sync")}-apis`, gateway, false);
     // With blockMetadata (EKS), the no-metadata policy goes too.
     config.teamNamespaces.blockMetadata = true;
     await syncTeamNetworkPolicies();

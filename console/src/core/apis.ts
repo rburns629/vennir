@@ -15,7 +15,8 @@ import { config } from "../config.js";
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { catalogRepository, findApi, findUserById, listLiveTeamApis, setApiPaused, type ApiRow } from "../db/queries.js";
-import { apiProblems, apiTraffic, gatewayState, type BackendAuth } from "../db/schema.js";
+import { apiProblems, apiTraffic, gatewayState, teams, type BackendAuth } from "../db/schema.js";
+import { apiNamespace, hasApiNamespace } from "../k8s.js";
 import { catalogLinks, githubBase } from "./catalogLinks.js";
 
 type Api = ApiRow & { teamName: string };
@@ -49,8 +50,9 @@ export function backendAllowed(url: string, hosts: string[] = config.gateway.bac
  * The namespace an in-cluster backend host names (<service>.<namespace>.svc,
  * with or without .cluster.local), or null for any other host. The gateway
  * may reach every team's API backends, so an API may only use one in its
- * own team's namespace: another team's would be served under this API's
- * spec and sharing (the gateway's store.BackendNamespace, kept in step).
+ * own team's API backends' namespace (backendPlace): another team's would
+ * be served under this API's spec and sharing (the gateway's
+ * store.BackendNamespace, kept in step).
  */
 export function backendNamespace(url: string): string | null {
   let host: string;
@@ -63,6 +65,49 @@ export function backendNamespace(url: string): string | null {
   return match?.[1] ?? null;
 }
 
+/**
+ * Where an API's backend runs, for the team the API is: "outside" the
+ * cluster (any host backendHosts allows), in the team's API backends'
+ * namespace ("apis", `<team>-apis`, k8s.ts apiNamespace), in the team's own
+ * namespace ("team": accepted for one release, until backends have moved;
+ * the gateway logs it), or anywhere else ("other": held). `<team>-apis` is
+ * the team's only when no team has that name (`apiNamespaceTaken`: one
+ * named before such names were refused). The gateway's store.BackendPlace,
+ * kept in step.
+ */
+export function backendPlace(url: string, team: string, apiNamespaceTaken = false): "outside" | "apis" | "team" | "other" {
+  const namespace = backendNamespace(url);
+  if (namespace === null) return "outside";
+  if (namespace === apiNamespace(team) && !apiNamespaceTaken) return "apis";
+  if (namespace === team) return "team";
+  return "other";
+}
+
+/** Of these teams, the ones whose `<team>-apis` is a team's name (purged ones too: names stay reserved). */
+export async function apiNamespacesTaken(teamNames: string[]): Promise<Set<string>> {
+  const unique = [...new Set(teamNames)];
+  if (unique.length === 0) return new Set();
+  const rows = await db.select({ name: teams.name }).from(teams).where(inArray(teams.name, unique.map(apiNamespace)));
+  const taken = new Set(rows.map((r) => r.name));
+  return new Set(unique.filter((t) => taken.has(apiNamespace(t))));
+}
+
+/**
+ * These teams' API backends' namespaces, by team: none for a team whose
+ * `<team>-apis` is too long for a namespace, or is another team's name (both
+ * from before such names were refused), so the console never makes, labels,
+ * writes into or deletes another team's namespace as this one's.
+ */
+export async function ownApiNamespaces(teamNames: string[]): Promise<Map<string, string>> {
+  const taken = await apiNamespacesTaken(teamNames);
+  return new Map(teamNames.filter((t) => hasApiNamespace(t) && !taken.has(t)).map((t) => [t, apiNamespace(t)]));
+}
+
+/** One team's API backends' namespace (ownApiNamespaces), or null. */
+export async function ownApiNamespace(team: string): Promise<string | null> {
+  return (await ownApiNamespaces([team])).get(team) ?? null;
+}
+
 /** Why the gateway can't serve an API, as it recorded it (api_problems). */
 export interface Problem {
   problem: string;
@@ -73,6 +118,7 @@ export interface Problem {
 export function apiState(
   api: Pick<Api, "backendUrl" | "pausedMessage" | "teamName">,
   problem: Problem | null = null,
+  apiNamespaceTaken = false,
 ): { state: "live" | "held" | "paused" | "unavailable"; heldReason: string; problem: string; problemFoundAt: Date | null } {
   const none = { heldReason: "", problem: "", problemFoundAt: null };
   if (api.pausedMessage !== null) return { state: "paused", ...none };
@@ -83,12 +129,13 @@ export function apiState(
       heldReason: `Its backend's host, ${hostOf(api.backendUrl)}, isn't one this install's admins allow (the gateway's backendHosts).`,
     };
   }
-  const namespace = backendNamespace(api.backendUrl);
-  if (namespace !== null && namespace !== api.teamName) {
+  if (backendPlace(api.backendUrl, api.teamName, apiNamespaceTaken) === "other") {
     return {
       state: "held",
       ...none,
-      heldReason: `Its backend is in namespace ${namespace}, not its team's (${api.teamName}): an API may only use a backend of its own team.`,
+      heldReason:
+        `Its backend is in namespace ${backendNamespace(api.backendUrl) ?? ""}, not its team's API backends' namespace ` +
+        `(${apiNamespace(api.teamName)}): an API may only use a backend of its own team.`,
     };
   }
   if (problem) return { state: "unavailable", ...none, problem: problem.problem, problemFoundAt: problem.foundAt };
@@ -177,7 +224,7 @@ function joinUrl(base: string, api: Api): string {
 }
 
 /** One API as the caller sees it; `base` is the catalog repository's GitHub page, for its links. */
-function view(caller: AuthUser, api: Api, base: string | null, problem: Problem | null) {
+function view(caller: AuthUser, api: Api, base: string | null, problem: Problem | null, apiNamespaceTaken: boolean) {
   const own = caller.isAdmin || caller.teamNames.includes(api.teamName);
   const internet = api.internet && config.gateway.internetTeams.includes(api.teamName);
   const info = isRecord(api.openapi) && isRecord(api.openapi["info"]) ? api.openapi["info"] : {};
@@ -186,7 +233,7 @@ function view(caller: AuthUser, api: Api, base: string | null, problem: Problem 
     name: api.name,
     displayName: api.displayName,
     description: api.description,
-    ...apiState(api, problem),
+    ...apiState(api, problem, apiNamespaceTaken),
     pausedMessage: api.pausedMessage ?? "",
     mayCall: mayCall(caller, api),
     shareWith: api.shareWith,
@@ -217,7 +264,8 @@ export async function listApis(caller: AuthUser | undefined): Promise<ApiView[]>
   const base = githubBase(await catalogRepository());
   const seen = (await listLiveTeamApis()).filter((api) => sees(who, api));
   const problems = await problemsOf(seen.map((api) => api.id));
-  return seen.map((api) => view(who, api, base, problems.get(api.id) ?? null));
+  const taken = await apiNamespacesTaken(seen.map((api) => api.teamName));
+  return seen.map((api) => view(who, api, base, problems.get(api.id) ?? null, taken.has(api.teamName)));
 }
 
 async function visibleApi(who: AuthUser, team: string, name: string): Promise<Api> {
@@ -230,7 +278,8 @@ export async function getApi(caller: AuthUser | undefined, team: string, name: s
   const who = signedIn(caller);
   const api = await visibleApi(who, team, name);
   const problem = (await problemsOf([api.id])).get(api.id) ?? null;
-  return { api: view(who, api, githubBase(await catalogRepository()), problem), openapi: JSON.stringify(api.openapi) };
+  const taken = (await apiNamespacesTaken([api.teamName])).has(api.teamName);
+  return { api: view(who, api, githubBase(await catalogRepository()), problem, taken), openapi: JSON.stringify(api.openapi) };
 }
 
 /** Pauses (a message) or resumes (null) an API; a maintainer of its team or an admin. */

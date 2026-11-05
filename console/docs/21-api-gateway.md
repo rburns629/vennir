@@ -1,6 +1,6 @@
 # The API gateway, start to finish
 
-The API gateway publishes backends that teams already run (a Service in their namespace, a Cloud Run service, a Lambda function URL) as **API products**: reviewed in the catalog like any product, called at one address with a Vennir sign-in, checked request by request against the API's own OpenAPI file, and shared team by team. This guide takes it in order: turning it on, publishing an API (with each kind of backend), calling it, putting it on the internet, and running it day to day.
+The API gateway publishes backends that teams already run (a Service in their API backends' namespace, a Cloud Run service, a Lambda function URL) as **API products**: reviewed in the catalog like any product, called at one address with a Vennir sign-in, checked request by request against the API's own OpenAPI file, and shared team by team. This guide takes it in order: turning it on, publishing an API (with each kind of backend), calling it, putting it on the internet, and running it day to day.
 
 The console's side of it, every state, error code and page, is in [APIs and the gateway](11-apis.md). Every field of `api.yaml` is in the catalog guide's [API products](catalog-guide.md#api-products-apis).
 
@@ -30,7 +30,7 @@ vennir config set -e prod gateway.backendHosts "*.a.run.app,*.lambda-url.us-east
 vennir apply prod
 ```
 
-`gateway.backendHosts` lists the hosts backends may be under, exactly (`orders.example.com`) or a whole domain below a name (`*.a.run.app`). An in-cluster backend is a host too: `<service>.<team>.svc.cluster.local`, so allow `*.<team>.svc.cluster.local` per team that publishes in-cluster APIs. An API may only use an in-cluster backend in its own team's namespace, whatever this list says. An API whose backend isn't covered shows **Held**, and turns **Live** on its own once an admin adds its host.
+`gateway.backendHosts` lists the hosts backends may be under, exactly (`orders.example.com`) or a whole domain below a name (`*.a.run.app`). An in-cluster backend is a host too: `<service>.<team>-apis.svc.cluster.local`, in the team's API backends' namespace, so allow `*.<team>-apis.svc.cluster.local` per team that publishes in-cluster APIs. An API may only use an in-cluster backend in its own team's API backends' namespace, whatever this list says. (For one release, one still in the team's own namespace, `<service>.<team>.svc.cluster.local`, is served too, if this list allows it, and the gateway logs a warning until it moves.) An API whose backend isn't covered shows **Held**, and turns **Live** on its own once an admin adds its host.
 
 **Admin → API gateway** then shows the settings, the gateway's address inside the cluster, and the last day's traffic.
 
@@ -77,7 +77,7 @@ visibility: listed            # or hidden: only your team and admins know it exi
 
 ### A Service in your namespace (no `auth`, or `serviceAccountToken`)
 
-The backend runs in your team's namespace. The gateway may reach only Pods labelled `vennir/api-backend: "true"`; every other Pod there stays closed to everything outside the namespace. Label them `vennir/api: <api>` too, so the API's page can show their logs.
+The backend runs in your team's API backends' namespace, `<team>-apis`, which the console makes beside your team's namespace: your steps, their identities and your team's Secrets stay in the team's namespace, and reach the backend only through the gateway. Your cluster administrator gives whatever deploys it rights there alone. The gateway may reach only Pods labelled `vennir/api-backend: "true"`; every other Pod there stays closed to everything outside the namespace. Label them `vennir/api: <api>` too, so the API's page can show their logs. A backend still in the team's own namespace is served for one release; move it, and point `backend.url` at `<service>.<team>-apis.svc.cluster.local`.
 
 ```yaml
 backend:

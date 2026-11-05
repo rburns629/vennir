@@ -684,8 +684,8 @@ for a day; point `audit.export` at it in a values file under `_local/`.
 ### Logs
 
 Observe's Logs tab searches every step's output, the API backends teams
-run in their namespaces (Pods labelled `vennir/api-backend: "true"`, each
-team its own; also labelled `vennir/api: <name>`, searchable by API), and, for admins, the platform's own, when the console chart's `logs.enabled` is on (`vennir`:
+run in their API backends' namespaces (`<team>-apis`; Pods labelled
+`vennir/api-backend: "true"`, each team its own; also labelled `vennir/api: <name>`, searchable by API), and, for admins, the platform's own, when the console chart's `logs.enabled` is on (`vennir`:
 `logs.enabled` in vennir.yaml). Grafana Alloy collects through the
 Kubernetes API, redacting credentials, into one Loki; the console queries
 Loki with each caller's visibility added. Each step's Job is kept
@@ -738,7 +738,9 @@ It leaves:
   kernel's kept Secret behind too; delete it the same way.
 - **The team namespaces**, with their Secrets, ServiceAccounts and anything
   steps made there. The console created them, not Helm. Delete them with
-  `kubectl delete namespace -l vennir/team` (retired ones included).
+  `kubectl delete namespace -l vennir/team` (retired ones included), and
+  their API backends' namespaces with `kubectl delete namespace -l
+  vennir/api-backends`.
 - **The migration hooks' leftovers.** Helm doesn't delete hook resources
   on uninstall. The console's last migrate Job (kept for its log) and its
   `<console>-execution-console-migrate-config` ConfigMap stay. The kernel's
@@ -1257,16 +1259,58 @@ chart, `teamNamespaces.defaultDenyIngress`, on by default; only when the
 console manages team namespaces). Its Pods accept connections only from
 Pods in the same namespace, so teams can't reach each other. With the
 gateway on, a second one, `vennir-gateway-ingress`, lets the gateway's Pods
-(and nothing else) reach the Pods a team labels `vennir/api-backend: "true"`:
-an API product whose backend runs in the team's own namespace
-(`samples/local/apis/greetings`; on kind, `make kind-sample-api`). A
-namespace the console doesn't manage needs the same policies from whoever
-made it. Outbound traffic isn't restricted, except, with
+(and nothing else) reach the Pods a team labels `vennir/api-backend: "true"`. Outbound traffic isn't restricted, except, with
 `teamNamespaces.blockMetadata` (on EKS), a third policy,
 `vennir-no-metadata`, which lets a team's Pods out anywhere but the
 instance metadata server (`169.254.169.254`; IPv4 clusters, which are
 what `vennir` makes), so a step can't take its node's role. Never turn it on for GKE: Workload Identity is
 served at that address.
+
+### API backends' namespaces
+
+A team's in-cluster API backends run in a namespace of their own,
+`<team>-apis`, not in the team's namespace, where its steps run with its
+products' ServiceAccounts and its Secrets (`samples/local/apis/greetings`
+runs in `local-apis`; on kind, `make kind-sample-api`). The console makes it
+with the team (and, on its policy resync, for every team made before),
+labelled `vennir/api-backends=true` and never `vennir/team`, so the kernel
+dispatches nothing there; it writes only `vennir-default-deny` and
+`vennir-gateway-ingress` there (and `vennir-no-metadata` with
+`teamNamespaces.blockMetadata`), relabels it `retired` with the team, and
+deletes it with the team's when it may purge. No quota or limits: those
+are a ceiling on steps; set a ResourceQuota there yourself if a team's
+backends need one. A namespace the console doesn't manage needs the same
+policies from whoever made it. For one release, a backend still in the
+team's own namespace is served too (its namespace keeps
+`vennir-gateway-ingress`), and the gateway logs
+`api_backend_in_team_namespace` for each such API on every refresh: move
+it, and point its `backend.url` at `<service>.<team>-apis.svc.cluster.local`
+(with `gateway.backendHosts` allowing `*.<team>-apis.svc.cluster.local`).
+
+Whatever deploys a team's backend (its CD, or a person) needs rights in
+`<team>-apis` only, never in the team's namespace: a cluster administrator
+binds them there, for example the built-in `edit` ClusterRole, which can't
+change RBAC or the namespace itself:
+
+```
+kubectl -n payments-apis create rolebinding payments-deployer \
+  --clusterrole=edit --serviceaccount=ci:payments-deployer
+```
+
+The namespace enforces the Pod Security level team namespaces do
+(`teamNamespaces.podSecurity`, `restricted` by default), so the backend's
+Pods must meet it, as `examples/greetings-api/deploy.yaml` does.
+No team may be named `*-apis`, or longer than 58 characters (so
+`<team>-apis` fits a namespace's 63): the console and `vennir catalog
+validate` refuse such a name for a new team (and the console a new team
+whose `<team>-apis` is an older team's name); a team named so before keeps
+working, and one too long for it, or whose `<team>-apis` is another team's
+name, gets no API backends' namespace. Where a namespace named
+`<team>-apis` is already there and isn't the console's, a new team of that
+name is refused; an existing one goes on without it, the console logging
+`api_namespace_refused` and its policy resync reporting it (the Admin
+page's policies) until the namespace is renamed or handed over (label it
+`vennir/api-backends=true`).
 
 ## The chat agent
 

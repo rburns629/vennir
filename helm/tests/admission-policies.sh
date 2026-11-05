@@ -34,6 +34,11 @@ TEAM_B=$RELEASE-team-b
 OTHER_NS=$RELEASE-other
 RETIRED_NS=$RELEASE-retired
 PROTECTED_NS=$RELEASE-protected
+# Team A's API backends' namespace, a retired team's, and one labelled as
+# one though its name isn't <team>-apis.
+APIS_NS=$TEAM_A-apis
+RETIRED_APIS_NS=$RELEASE-retired-apis
+NOT_APIS_NS=$RELEASE-not-a-backends
 SCHEDULER=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-kernel
 CONSOLE=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-console
 GATEWAY=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-console-gateway
@@ -90,7 +95,7 @@ print("---".join(d for d in docs if re.search(r"^kind: ValidatingAdmissionPolicy
 cleanup() {
   render | k delete -f - --ignore-not-found > /dev/null 2>&1
   k delete clusterrolebinding,clusterrole $RELEASE-dry-run --ignore-not-found > /dev/null 2>&1
-  k delete namespace "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS" --ignore-not-found --wait=false > /dev/null 2>&1
+  k delete namespace "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS" "$APIS_NS" "$RETIRED_APIS_NS" "$NOT_APIS_NS" --ignore-not-found --wait=false > /dev/null 2>&1
 }
 trap cleanup EXIT
 
@@ -101,15 +106,17 @@ for _ in $(seq 1 90); do
   k get namespaces --field-selector status.phase=Terminating -o name | grep -q "namespace/$RELEASE-" || break
   sleep 2
 done
-for ns in "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS"; do
+for ns in "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS" "$APIS_NS" "$RETIRED_APIS_NS" "$NOT_APIS_NS"; do
   k create namespace "$ns" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
 k label namespace "$TEAM_A" "$TEAM_B" vennir/team=true --overwrite > /dev/null
 k label namespace "$RETIRED_NS" "$PROTECTED_NS" vennir/team=retired --overwrite > /dev/null
+k label namespace "$APIS_NS" vennir/api-backends=true --overwrite > /dev/null
+k label namespace "$RETIRED_APIS_NS" "$NOT_APIS_NS" vennir/api-backends=retired --overwrite > /dev/null
 for sa in eso-gcp db-sa orders-api; do
   k -n "$TEAM_A" create serviceaccount "$sa" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
-for ns in "$OTHER_NS" "$RETIRED_NS"; do
+for ns in "$OTHER_NS" "$RETIRED_NS" "$APIS_NS"; do
   k -n "$ns" create serviceaccount orders-api --dry-run=client -o yaml | k apply -f - > /dev/null
 done
 # What the scheduler may and may not delete: ConfigMaps as the executor
@@ -256,8 +263,8 @@ scheduler_delete() {  # namespace, name
 
 # A NetworkPolicy as the console writes it (console/src/k8s.ts), with one
 # change made by the python expression given (to spec).
-network_policy() {  # name, change
-  python3 - "$1" "$2" "$PLATFORM_NS" "$RELEASE" <<'PY' | as_console -n "$TEAM_A" create -f -
+network_policy() {  # name, change, namespace (team A's)
+  python3 - "$1" "$2" "$PLATFORM_NS" "$RELEASE" <<'PY' | as_console -n "${3:-$TEAM_A}" create -f -
 import json, sys
 name, change, platform, release = sys.argv[1:5]
 gateway = {"app.kubernetes.io/name": "execution-console", "app.kubernetes.io/instance": release,
@@ -397,6 +404,7 @@ echo "Console write fence:"
 expect "a Secret in a team namespace"            allowed                     "$(secret "$TEAM_A")"
 expect "a Secret in kube-system"                 "may only write in team"    "$(secret kube-system)"
 expect "a Secret in the platform's namespace"    "may only write in team"    "$(secret "$PLATFORM_NS")"
+expect "a Secret in an API backends' namespace"  "may only write in team"    "$(secret "$APIS_NS")"
 
 echo "Console NetworkPolicies:"
 NP_REFUSED="console's NetworkPolicies are"
@@ -415,6 +423,12 @@ expect "no-metadata excepting something else"    "$NP_REFUSED"    "$(network_pol
 expect "no-metadata letting out to Pods"         "$NP_REFUSED"    "$(network_policy vennir-no-metadata 'spec["egress"].append({"to": [{"podSelector": {}}]})')"
 expect "a policy of another name"                "$NP_REFUSED"    "$(network_policy allow-all 'spec["ingress"] = [{}]')"
 expect "deleting the default deny"               "$NP_REFUSED"    "$(as_console -n "$TEAM_B" delete networkpolicy vennir-default-deny)"
+expect "the default deny, API backends' namespace"   allowed      "$(network_policy vennir-default-deny pass "$APIS_NS")"
+expect "the gateway's ingress, API backends' namespace" allowed   "$(network_policy vennir-gateway-ingress pass "$APIS_NS")"
+expect "the no-metadata one, API backends' namespace" allowed     "$(network_policy vennir-no-metadata pass "$APIS_NS")"
+expect "a gateway ingress for every Pod there"   "$NP_REFUSED"    "$(network_policy vennir-gateway-ingress 'spec["podSelector"] = {}' "$APIS_NS")"
+expect "another name, API backends' namespace"   "$NP_REFUSED"    "$(network_policy allow-all 'spec["ingress"] = [{}]' "$APIS_NS")"
+expect "labelled API backends', not named <x>-apis" "may only write in team" "$(network_policy vennir-default-deny pass "$NOT_APIS_NS")"
 
 echo "Console quota and limits:"
 expect "the team's quota"                        allowed          "$(as_console -n "$TEAM_A" create quota vennir-team-quota --hard=pods=10)"
@@ -422,6 +436,7 @@ expect "a quota of another name"                 "only ResourceQuota" "$(as_cons
 LIMITS='{"apiVersion":"v1","kind":"LimitRange","metadata":{"name":"NAME"},"spec":{"limits":[{"type":"Container","default":{"cpu":"1"}}]}}'
 expect "the team's limits"                       allowed          "$(echo "${LIMITS/NAME/vennir-team-limits}" | as_console -n "$TEAM_A" create -f -)"
 expect "limits of another name"                  "only ResourceQuota" "$(echo "${LIMITS/NAME/other}" | as_console -n "$TEAM_A" create -f -)"
+expect "a quota in an API backends' namespace"   "may only write in team" "$(as_console -n "$APIS_NS" create quota vennir-team-quota --hard=pods=10)"
 
 echo "Console namespaces:"
 expect "create one labelled a team's"            allowed                      "$(new_namespace $RELEASE-new '{"vennir/team":"true"}')"
@@ -433,12 +448,24 @@ expect "label the platform's own"                "protected"                  "$
 expect "a label value other than true/retired"   "isn't a team's"             "$(as_console label namespace "$TEAM_A" vennir/team=yes --overwrite)"
 expect "change another label too"                "isn't a team's"             "$(as_console label namespace "$TEAM_A" other=1)"
 expect "change an annotation"                    "isn't a team's"             "$(as_console annotate namespace "$TEAM_A" note=1)"
+expect "create a team's API backends' one"       allowed                      "$(new_namespace $RELEASE-new-apis '{"vennir/api-backends":"true"}')"
+expect "an API backends' one not named <x>-apis" "only create a namespace"    "$(new_namespace $RELEASE-new-backends '{"vennir/api-backends":"true"}')"
+expect "an API backends' one, retired"           "only create a namespace"    "$(new_namespace $RELEASE-new-apis '{"vennir/api-backends":"retired"}')"
+expect "create one with both labels"             "never both"                 "$(new_namespace $RELEASE-both-apis '{"vennir/team":"true","vennir/api-backends":"true"}')"
+expect "retire an API backends' one"             allowed                      "$(as_console label namespace "$APIS_NS" vennir/api-backends=retired --overwrite)"
+expect "an API backends' one, a team's too"      "never both"                 "$(as_console label namespace "$APIS_NS" vennir/team=true)"
+expect "a team's, an API backends' too"          "never both"                 "$(as_console label namespace "$TEAM_A" vennir/api-backends=true)"
+expect "an API backends' one, another label"     "isn't a team's"             "$(as_console label namespace "$APIS_NS" other=1)"
+expect "relabel one not named <x>-apis"          "isn't a team's"             "$(as_console label namespace "$NOT_APIS_NS" vennir/api-backends=true --overwrite)"
 
 echo "Console purging:"
 expect "a retired team namespace"                allowed                      "$(as_console delete namespace "$RETIRED_NS")"
 expect "an active team namespace"                "can't be purged"            "$(as_console delete namespace "$TEAM_A")"
 expect "kube-system (Kubernetes itself refuses)" "forbidden"                  "$(as_console delete namespace kube-system)"
 expect "a protected one, though retired"         "can't be purged"            "$(as_console delete namespace "$PROTECTED_NS")"
+expect "a retired API backends' namespace"       allowed                      "$(as_console delete namespace "$RETIRED_APIS_NS")"
+expect "an active API backends' namespace"       "can't be purged"            "$(as_console delete namespace "$APIS_NS")"
+expect "retired API backends' not named <x>-apis" "can't be purged"           "$(as_console delete namespace "$NOT_APIS_NS")"
 expect "a User purger, a retired one"            allowed                      "$(k --as="$PURGER_USER" delete namespace "$RETIRED_NS" --dry-run=server 2>&1)"
 expect "a User purger, an active one"            "can't be purged"            "$(k --as="$PURGER_USER" delete namespace "$TEAM_A" --dry-run=server 2>&1)"
 expect "a Group purger's member, a retired one"  allowed                      "$(k --as=someone --as-group="$PURGER_GROUP" delete namespace "$RETIRED_NS" --dry-run=server 2>&1)"
@@ -456,6 +483,7 @@ expect "an API's, for its backend"               allowed                      "$
 expect "a ServiceAccount that isn't an API's"    "only mint tokens for API"   "$(token "$TEAM_A" db-sa https://orders.example)"
 expect "an API's outside team namespaces"        "only mint tokens for API"   "$(token "$OTHER_NS" orders-api https://orders.example)"
 expect "an API's in a retired team's namespace"  "only mint tokens for API"   "$(token "$RETIRED_NS" orders-api https://orders.example)"
+expect "an API's in an API backends' namespace"  "only mint tokens for API"   "$(token "$APIS_NS" orders-api https://orders.example)"
 expect "no audience (the Kubernetes API's)"      "never the Kubernetes API"   "$(token "$TEAM_A" orders-api "")"
 expect "for the Kubernetes API"                  "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://kubernetes.default.svc)"
 expect "for GKE's API"                           "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://container.googleapis.com/v1/projects/p)"

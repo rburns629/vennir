@@ -4,7 +4,7 @@ An API product is a backend a team already runs, published through this install'
 
 ## What is an API product?
 
-A team publishes a backend it already runs (a Service in its namespace, a Cloud Run service, a Lambda function URL) by adding an `api.yaml` and an OpenAPI file to its catalog folder. Once the catalog's release is applied, the gateway answers for it at `/<team>/<name>/` and forwards requests to the backend.
+A team publishes a backend it already runs (a Service in its API backends' namespace, `<team>-apis`, a Cloud Run service, a Lambda function URL) by adding an `api.yaml` and an OpenAPI file to its catalog folder. Once the catalog's release is applied, the gateway answers for it at `/<team>/<name>/` and forwards requests to the backend.
 
 The OpenAPI file is the allowlist. The gateway forwards a request only when its method and path are an operation in that file and the request fits that operation's schemas: a query parameter the operation doesn't declare is refused, and so is a body on an operation that declares none, a body without a `Content-Type`, or one whose media type has a schema the gateway can't check (it reads JSON, YAML, XML, forms, multipart, text, CSV and binary). Headers the operation doesn't mention are passed on. Anything else is answered by the gateway and never reaches the backend.
 
@@ -184,7 +184,7 @@ To release it, ask an admin to add the host (or a `*.` pattern above it) to the 
 
 ## Where are my API backend's logs?
 
-When the install keeps logs, a backend running in your team's namespace has its output on Observe: **Logs**, then **From: API backends**. The API's own page shows the newest of them, from all your team's API backends, under **Its backend’s logs**, with **Search them in Observe**. Only Pods labelled `vennir/api-backend: "true"` are collected. Label them `vennir/api: <the API's name>` too, and **Search them in Observe** finds this API's backend alone (else every API backend of your team's). Those lines, at every level, are seen by your team and admins only: they belong to no run, so no caller sees them ([Observe's logs](12-observe.md#whose-logs-can-i-see)).
+When the install keeps logs, a backend running in your team's API backends' namespace (`<team>-apis`) has its output on Observe: **Logs**, then **From: API backends**. The API's own page shows the newest of them, from all your team's API backends, under **Its backend’s logs**, with **Search them in Observe**. Only Pods labelled `vennir/api-backend: "true"` are collected. Label them `vennir/api: <the API's name>` too, and **Search them in Observe** finds this API's backend alone (else every API backend of your team's). Those lines, at every level, are seen by your team and admins only: they belong to no run, so no caller sees them ([Observe's logs](12-observe.md#whose-logs-can-i-see)).
 
 A backend outside the cluster (Cloud Run, Lambda) logs where it runs. Use `Vennir-Request-Id` to find a request on both sides.
 

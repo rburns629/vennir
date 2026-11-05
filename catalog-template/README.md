@@ -263,7 +263,7 @@ team when they're in it, and otherwise has no `forTeam`: refuse what needs
 one. A create that finds what it would make
 reports it in `resources` only when it carries both marks for this team.
 A team name is a Kubernetes namespace name (lowercase letters, digits and
-`-`, at most 63), so it's a valid GCP label value and Azure or AWS tag value
+`-`, at most 58, so that `<team>-apis` fits too), so it's a valid GCP label value and Azure or AWS tag value
 as it is.
 
 ```yaml
@@ -524,12 +524,18 @@ the gateway reads no secrets. Your backend learns who called from the
 `Vennir-Caller` header, which the gateway signs (its public key at
 `/.vennir/jwks.json` on the gateway).
 
-A backend in your team's own namespace is reachable by the gateway only
-when its Pods are labelled `vennir/api-backend: "true"` (every other Pod
-there stays closed to everything outside the namespace). What those Pods
+An in-cluster backend runs in your team's API backends' namespace,
+`<team>-apis`, which each install makes beside your team's namespace (your
+steps, their identities and your Secrets stay in the team's), and its
+`backend.url` is `http://<service>.<team>-apis.svc.cluster.local:<port>`.
+It's reachable by the gateway only when its Pods are labelled
+`vennir/api-backend: "true"` (every other Pod there stays closed to
+everything outside the namespace). For one release, a backend still in the
+team's own namespace is served too; move it. So no team may be called
+`*-apis`, or more than 58 characters long. What those Pods
 print is searchable by your team, and only your team, on Observe's Logs tab
 (From: API backends), when the install keeps logs. The samples show
-each way: `samples/local/apis/greetings` (a Service in the namespace, no
+each way: `samples/local/apis/greetings` (a Service in `local-apis`, no
 cloud, checking `Vennir-Caller`), `samples/gcp/apis/hello-world` (Cloud
 Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
 `awsSigV4`).

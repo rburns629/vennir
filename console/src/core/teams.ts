@@ -53,6 +53,10 @@ import {
   listTaskPods,
   NamespaceNotTeamsError,
   ProtectedNamespaceError,
+  apiNamespace,
+  hasApiNamespace,
+  NAMESPACE_MAX,
+  setApiNamespace,
   setTeamNamespace,
   type TeamNamespaceState,
   unfinishedPodsByNamespace,
@@ -64,6 +68,7 @@ import { ensureSchedulerLogsBinding } from "../schedulerLogs.js";
 import { ensureTeamNetworkPolicy } from "../teamNetwork.js";
 import { ensureTeamQuota } from "../teamQuota.js";
 import { ensureNotRetired } from "./retired.js";
+import { ownApiNamespace, ownApiNamespaces } from "./apis.js";
 import { checkSecretStoreObjects, cloudIdentities } from "../secretStores.js";
 import { isUniqueViolation } from "./products.js";
 import { platformAlert } from "../notifier.js";
@@ -80,15 +85,63 @@ const nameReserved = (name: string) =>
 const noSuchTeam = () => new ApiError(404, "NOT_FOUND", "No such team.");
 
 /**
- * Sets the team's namespace label when the console manages team namespaces
- * (config.teamNamespaces); refuses a namespace that can't be a team's.
+ * Refuses a new team's name that would be, or couldn't have, an API
+ * backends' namespace (k8s.ts apiNamespace): `<name>-apis` is the team's
+ * own, so no team may be called that (nor a new one whose `<name>-apis` is
+ * an older team's name), and it must fit a namespace's 63 characters. Teams
+ * named before stay. The catalog tool refuses the same
+ * names (cli/internal/catalogtool, team.schema.json).
  */
-async function setTeamNamespaceState(name: string, state: TeamNamespaceState, createIfMissing: boolean): Promise<void> {
+export async function refuseNewTeamName(name: string): Promise<void> {
+  if (name.endsWith("-apis")) {
+    throw new ApiError(422, "UNPROCESSABLE_ENTITY", `A team's name can't end in -apis: <team>-apis is where a team's API backends run.`);
+  }
+  if (!hasApiNamespace(name)) {
+    throw new ApiError(
+      422,
+      "UNPROCESSABLE_ENTITY",
+      `A team's name can be at most ${String(NAMESPACE_MAX - "-apis".length)} characters, so that ${apiNamespace(name)} fits a namespace's ${String(NAMESPACE_MAX)}.`,
+    );
+  }
+  if (await findTeamByNameIncludingDeleted(apiNamespace(name))) {
+    throw new ApiError(409, "NAMESPACE_EXISTS", `${apiNamespace(name)}, where this team's API backends would run, is another team's name.`);
+  }
+}
+
+/**
+ * Sets the team's namespace label, and its API backends' namespace's
+ * (k8s.ts setApiNamespace), when the console manages team namespaces
+ * (config.teamNamespaces); refuses a namespace that can't be a team's. A
+ * new team's API backends' namespace comes first, so a name whose
+ * `<name>-apis` can't be its never gets a namespace the kernel dispatches
+ * into. An existing team's that can't be its (a namespace of that name was
+ * there first) is logged and left, and the policy resync reports it
+ * (syncApiNamespaces): the team itself goes on.
+ */
+async function setTeamNamespaceState(
+  name: string,
+  state: TeamNamespaceState,
+  createIfMissing: boolean,
+  log: FastifyBaseLogger,
+  isNew = false,
+): Promise<void> {
   if (!config.teamNamespaces.manage) return;
   try {
-    await setTeamNamespace(name, state, { ...config.teamNamespaces, createIfMissing });
+    const options = { ...config.teamNamespaces, createIfMissing };
+    let apis = await ownApiNamespace(name);
+    if (apis && isNew) await setApiNamespace(name, state, options);
+    await setTeamNamespace(name, state, options);
+    if (apis && !isNew) {
+      try {
+        await setApiNamespace(name, state, options);
+      } catch (error) {
+        if (!(error instanceof NamespaceNotTeamsError || error instanceof ProtectedNamespaceError)) throw error;
+        log.warn({ event: "api_namespace_refused", team: name, namespace: apis, reason: error.message }, "the team's API backends' namespace can't be its");
+        apis = null;
+      }
+    }
     if (state === "true") {
-      await ensureTeamNetworkPolicy(name);
+      await ensureTeamNetworkPolicy(name, apis);
       await ensureSchedulerLogsBinding(name);
       await ensureTeamQuota(name);
       await copyPullSecret(name);
@@ -98,6 +151,32 @@ async function setTeamNamespaceState(name: string, state: TeamNamespaceState, cr
     if (error instanceof NamespaceNotTeamsError) throw new ApiError(409, "NAMESPACE_EXISTS", error.message);
     throw error;
   }
+}
+
+/**
+ * Gives every team its API backends' namespace (k8s.ts setApiNamespace),
+ * labelled as the team is: made for an active team that has none (teams
+ * made before there were any), relabelled for a retired one. In every
+ * policy resync (policySync.ts), before the network policies are written.
+ * Returns whether it applies; throws (after trying every team) if any
+ * failed.
+ */
+export async function syncApiNamespaces(): Promise<boolean> {
+  if (!config.teamNamespaces.manage) return false;
+  const failed: string[] = [];
+  const all = await listAllTeams();
+  const own = await ownApiNamespaces(all.map((t) => t.name));
+  for (const team of all) {
+    if (!own.has(team.name)) continue;
+    const active = team.retiredAt === null;
+    try {
+      await setApiNamespace(team.name, active ? "true" : "retired", { ...config.teamNamespaces, createIfMissing: active });
+    } catch {
+      failed.push(apiNamespace(team.name));
+    }
+  }
+  if (failed.length > 0) throw new Error(`Couldn't make or label the API backends' namespaces: ${failed.join(", ")}.`);
+  return true;
 }
 
 const TERMINAL_EXECUTION_STATES = new Set(["SUCCEEDED", "FAILED", "CANCELLED"]);
@@ -127,9 +206,10 @@ export async function newTeam(caller: AuthUser | undefined, name: string, log: F
   // teams.deletedAt), and that must fail.
   if (existing?.deletedAt) throw nameReserved(name);
   if (existing) throw new ApiError(409, "CONFLICT", "Team already exists.", Code.AlreadyExists);
+  await refuseNewTeamName(name);
   // The namespace first: a name that can't be a team's namespace never
   // becomes a team.
-  await setTeamNamespaceState(name, "true", true);
+  await setTeamNamespaceState(name, "true", true, log, true);
   const team = await createTeam(name);
   log.info({ team: team.name, createdBy: caller?.id }, "team created");
   return team;
@@ -150,7 +230,8 @@ export async function ensureTeam(caller: AuthUser | undefined, name: string, log
   if (existing?.retiredAt && !caller.isAdmin && !hasScope(caller, SCOPES.TEAMS_RETIRE)) {
     throw new ApiError(403, "FORBIDDEN", `"${name}" is retired; un-retiring it requires teams:retire.`);
   }
-  await setTeamNamespaceState(name, "true", true);
+  if (!existing) await refuseNewTeamName(name);
+  await setTeamNamespaceState(name, "true", true, log, !existing);
   if (!existing) {
     const team = await createTeam(name);
     log.info({ team: name, createdBy: caller.id }, "team created");
@@ -354,7 +435,7 @@ export async function retireTeam(caller: AuthUser | undefined, name: string, log
   if (!team) throw noSuchTeam();
   // The namespace first: once it's labelled retired, the kernel's dispatch
   // policy starts no new step there.
-  await setTeamNamespaceState(team.name, "retired", false);
+  await setTeamNamespaceState(team.name, "retired", false, log);
   if (!team.retiredAt) await setTeamRetired(team.id, true, await whoRetires(caller));
   const unregisteredProducts = await deleteProductsForTeam(team.id);
   await syncIdentityPolicy();
@@ -373,7 +454,7 @@ export async function unretireTeam(caller: AuthUser | undefined, name: string, l
   requireRetireRight(caller);
   const team = await findTeamByName(name);
   if (!team) throw noSuchTeam();
-  await setTeamNamespaceState(team.name, "true", true);
+  await setTeamNamespaceState(team.name, "true", true, log);
   if (team.retiredAt) await setTeamRetired(team.id, false);
   log.info({ team: team.name, by: caller?.id }, "team un-retired");
   return { name: team.name, retired: false };
@@ -398,7 +479,10 @@ export async function purgeTeam(caller: AuthUser | undefined, name: string, log:
   // for an operator to delete.
   const namespaceDeleted = config.teamNamespaces.manage && config.teamNamespaces.purge;
   const purgeNamespace = async () => {
-    if (namespaceDeleted) await deleteTeamNamespace(team.name, config.teamNamespaces.protected);
+    if (!namespaceDeleted) return;
+    await deleteTeamNamespace(team.name, config.teamNamespaces.protected);
+    const apis = await ownApiNamespace(team.name);
+    if (apis) await deleteTeamNamespace(apis, config.teamNamespaces.protected);
   };
   if (team.deletedAt) {
     await purgeNamespace();

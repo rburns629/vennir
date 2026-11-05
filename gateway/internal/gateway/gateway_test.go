@@ -402,14 +402,25 @@ func TestPausedHeldAndClosedForwardNothing(t *testing.T) {
 		t.Errorf("held: %d %s", w.Code, w.Body)
 	}
 	// Another team's in-cluster backend, though its host is allowed: held.
+	// So is one in a namespace named for the team's API backends that a
+	// team of that name has (named before such names were refused).
 	own := f.api.BackendURL
-	other, _ := url.Parse("http://orders.web.svc.cluster.local:8080")
-	f.api.BackendURL = other
 	f.gw.Settings.BackendHosts = []string{"*.svc.cluster.local"}
-	if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "API_HELD" || !strings.Contains(w.Body.String(), "another team's") {
-		t.Errorf("another team's backend: %d %s", w.Code, w.Body)
+	for _, c := range []struct {
+		backend string
+		taken   bool
+	}{
+		{"http://orders.web.svc.cluster.local:8080", false},
+		{"http://orders.web-apis.svc.cluster.local:8080", false},
+		{"http://orders.payments-apis.svc.cluster.local:8080", true},
+	} {
+		f.api.BackendURL, _ = url.Parse(c.backend)
+		f.api.APINamespaceTaken = c.taken
+		if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "API_HELD" || !strings.Contains(w.Body.String(), "API backends' namespace") {
+			t.Errorf("%s: %d %s", c.backend, w.Code, w.Body)
+		}
 	}
-	f.api.BackendURL = own
+	f.api.BackendURL, f.api.APINamespaceTaken = own, false
 	f.gw.Settings.BackendHosts = []string{"127.0.0.1"}
 	f.gw.Settings.Closed = true
 	if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "GATEWAY_CLOSED" {

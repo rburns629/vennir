@@ -10,6 +10,7 @@
  * /policy-sync) and a failure is logged at error level.
  */
 import type { FastifyBaseLogger } from "fastify";
+import { syncApiNamespaces } from "./core/teams.js";
 import { syncIdentityPolicy } from "./productPolicy.js";
 import { syncPullSecrets } from "./pullSecret.js";
 import { syncScanPolicy } from "./scanning.js";
@@ -32,6 +33,7 @@ const SYNCS: Record<string, () => Promise<boolean>> = {
   identityPolicy: syncIdentityPolicy,
   scanPolicy: syncScanPolicy,
   pullSecrets: syncPullSecrets,
+  apiNamespaces: syncApiNamespaces,
   teamNetworkPolicies: syncTeamNetworkPolicies,
   schedulerLogs: syncSchedulerLogsBindings,
   teamQuotas: syncTeamQuotas,

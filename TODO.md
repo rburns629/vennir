@@ -160,10 +160,6 @@ it was seen.
 - [ ] **From the security review of 2026-11-04** (six read-only reviewers,
   each finding checked against the code; the fixes so far are #213 to #222).
   Decided, still to build:
-  - **API backends in a namespace of their own**: a backend is its owning
-    team's, but not in the namespace its steps run in with product
-    identities and Secrets, where the step policies (which match only the
-    scheduler) don't hold anything else.
   - **The scan policy admits only digests that passed** (or were accepted),
     not every digest but those that failed.
 
@@ -203,6 +199,18 @@ it was seen.
   attempt's name, as the kernel would make it but already resumed, which it
   adopts. Check first that nothing else (an admin's tooling, the kernel's
   kind tests) makes such names there.
+
+- [ ] **Next release: drop API backends in their team's namespace** (API
+  backends moved to `<team>-apis` on 2026-11-05): for one release the
+  gateway still serves an in-cluster backend in the team's own namespace,
+  logging `api_backend_in_team_namespace`, and the console counts it live.
+  Then hold it like any other namespace (`gateway/internal/store`
+  `BackendPlace`, `console/src/core/apis.ts` `backendPlace`), stop writing
+  `vennir-gateway-ingress` into team namespaces and delete the copies there
+  (`console/src/teamNetwork.ts`; the write fence then needs to allow that
+  delete, or the chart's upgrade notes say to), and drop the team's own
+  namespace from API backends' log search (`console/src/core/logs.ts`).
+  Before, check the gateway's logs for the warning on each install.
 
 - [ ] **Every API shares the gateway's origin** (found 2026-11-03, in the
   review of the day's fixes): the gateway keeps a backend's cookies to its

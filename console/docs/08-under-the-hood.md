@@ -77,7 +77,7 @@ flowchart TB
   - **image-policy:** a task's image must come from an allowed source.
   - **identity-policy:** a task runs as `default` with no secrets, unless it's a registered product of its team, which runs as the ServiceAccount its product declares and may mount only secrets its team registered.
   - **scan-policy:** a task's image must be pinned to a digest, and that digest mustn't have failed its security scan.
-  - **purge-policy:** a configured purger may delete only a retired team namespace. None by default: a purged team's namespace is left, labelled retired, for a cluster administrator.
+  - **purge-policy:** a configured purger may delete only a retired team namespace, or a retired team's API backends' namespace. None by default: a purged team's namespace is left, labelled retired, for a cluster administrator.
 - **Errors:** a refusal fails the task with `DISPATCH_REJECTED`, `IMAGE_NOT_ALLOWED`, `IDENTITY_NOT_ALLOWED`, `IMAGE_NOT_PINNED` or `IMAGE_SCAN_FAILED`, and it isn't retried. [Runs, explained](09-runs-explained.md#what-does-each-failure-code-mean) says what to do about each.
 - **Code:** `helm/charts/execution-kernel/templates/*-policy.yaml`.
 

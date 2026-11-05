@@ -22,6 +22,7 @@ import { caller, rpcClient } from "./rpc.js";
 vi.mock("../src/k8s.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/k8s.js")>()),
   setTeamNamespace: vi.fn(() => Promise.resolve(true)),
+  setApiNamespace: vi.fn(() => Promise.resolve(true)),
   writeTeamPullSecret: vi.fn(() => Promise.resolve(true)),
   writeTeamNetworkPolicy: vi.fn(() => Promise.resolve(true)),
   writeTeamQuota: vi.fn(() => Promise.resolve(true)),

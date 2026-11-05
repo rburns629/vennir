@@ -648,7 +648,10 @@ rbac:
 
 # -- Team namespaces. With `manage`, the console creates each team's
 # namespace, labelled writeFence.teamNamespaceLabel=true, and relabels it
-# `retired` or back as the team is retired or un-retired. So catalog CI needs
+# `retired` or back as the team is retired or un-retired; and beside it the
+# team's API backends' namespace, <team>-apis, labelled
+# vennir/api-backends (never the team label: no step runs there, and the
+# console writes only its NetworkPolicies there). So catalog CI needs
 # no cluster credentials. templates/namespace-policy.yaml limits what it may
 # do to namespaces. `protected`: namespaces no team may ever have, beyond
 # kube-* and this release's own.
@@ -717,8 +720,9 @@ teamNamespaces:
   # team's steps can't reach another's. Written with each namespace and
   # rewritten on every policy resync. With gateway.enabled, a second one
   # (vennir-gateway-ingress) lets the gateway's Pods reach the Pods a team
-  # labels vennir/api-backend: "true", its APIs' in-cluster backends. The
-  # write fence accepts no other policy from the console. Needs a CNI that
+  # labels vennir/api-backend: "true", its APIs' in-cluster backends. Both
+  # (and vennir-no-metadata) go into each team's <team>-apis too, where its
+  # backends run. The write fence accepts no other policy from the console. Needs a CNI that
   # enforces NetworkPolicy.
   defaultDenyIngress: true
   # -- With defaultDenyIngress, a third NetworkPolicy (vennir-no-metadata)

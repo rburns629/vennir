@@ -8,7 +8,9 @@
  * - its INFO lines to the run's other owners (its submitter, the team it
  *   was run for; core/runView.ts), never to another provider's member;
  * - an API backend's lines (a Pod a team labels vennir/api-backend), every
- *   level, to its own team only: they belong to no run;
+ *   level, to its own team only: they belong to no run. A team's backends
+ *   run in its API backends' namespace, `<team>-apis` (k8s.ts apiNamespace),
+ *   and, for one release, in its own;
  * - the platform's own logs to admins only.
  *
  * Nothing the caller typed reaches a query unchecked: teams and levels are
@@ -23,7 +25,8 @@ import { canActForTeam } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { config } from "../config.js";
 import { db } from "../db/client.js";
-import { submittedExecutions } from "../db/schema.js";
+import { submittedExecutions, teams } from "../db/schema.js";
+import { apiNamespace } from "../k8s.js";
 import { runView } from "./runView.js";
 
 const LEVELS = ["debug", "info", "warn", "error"] as const;
@@ -108,8 +111,28 @@ async function runAccess(who: AuthUser, executionId: string): Promise<"none" | "
   return runView(who, run).full ? "full" : "own";
 }
 
+/** Every team's name, purged ones too (their names stay reserved). */
+async function allTeamNames(): Promise<Set<string>> {
+  return new Set((await db.select({ name: teams.name }).from(teams)).map((r) => r.name));
+}
+
+/**
+ * The namespaces these teams' API backends log from: each one's own, for one
+ * release, and its `<team>-apis`, unless that's a team's name (one named
+ * before such names were refused): then it's that team's, not this one's.
+ */
+function backendNamespaces(own: string[], names: Set<string>): string[] {
+  return own.flatMap((t) => (names.has(apiNamespace(t)) ? [t] : [t, apiNamespace(t)]));
+}
+
+/** The team an API backend's namespace is: itself when a team has its name, else `<team>` of `<team>-apis`. */
+export function teamOfBackendNamespace(namespace: string, names: Set<string>): string {
+  if (names.has(namespace) || !namespace.endsWith("-apis")) return namespace;
+  return namespace.slice(0, -"-apis".length);
+}
+
 /** The LogQL queries that together are what `who` may see of this search. */
-export async function visibleQueries(who: AuthUser, input: SearchLogsInput, since: Date): Promise<string[]> {
+export async function visibleQueries(who: AuthUser, input: SearchLogsInput, since: Date, names?: Set<string>): Promise<string[]> {
   const filters: string[] = [];
   if (input.executionId) filters.push(`| execution_id=${quoted(input.executionId)}`);
   if (input.text) filters.push(`|~ ${quoted(`(?i)${regexEscaped(input.text)}`)}`);
@@ -124,11 +147,14 @@ export async function visibleQueries(who: AuthUser, input: SearchLogsInput, sinc
     if (input.executionId) {
       throw new ApiError(400, "BAD_REQUEST", "An API backend's lines belong to no run: leave the run out.", Code.InvalidArgument);
     }
-    const team = input.team ? `, namespace=${quoted(input.team)}` : "";
+    names ??= await allTeamNames();
     const api = input.api ? `, api=${quoted(input.api)}` : "";
-    if (who.isAdmin) return [`{component="api"${team}${api}${level}}${pipeline}`];
+    if (who.isAdmin) {
+      const team = input.team ? `, namespace=~${oneOf(backendNamespaces([input.team], names))}` : "";
+      return [`{component="api"${team}${api}${level}}${pipeline}`];
+    }
     const own = who.teamNames.filter((t) => !input.team || t === input.team);
-    return own.length > 0 ? [`{component="api", namespace=~${oneOf(own)}${api}${level}}${pipeline}`] : [];
+    return own.length > 0 ? [`{component="api", namespace=~${oneOf(backendNamespaces(own, names))}${api}${level}}${pipeline}`] : [];
   }
   const access = input.executionId ? await runAccess(who, input.executionId) : "full";
   if (access === "none") {
@@ -188,7 +214,8 @@ export async function searchLogs(caller: AuthUser | undefined, input: SearchLogs
 
   const lines: LogLine[] = [];
   let truncated = false;
-  for (const query of await visibleQueries(who, input, since)) {
+  const names = input.source === "api" ? await allTeamNames() : new Set<string>();
+  for (const query of await visibleQueries(who, input, since, names)) {
     const { data } = await queryLoki(query, since, until, limit);
     let count = 0;
     for (const { stream, values } of data.result) {
@@ -196,7 +223,12 @@ export async function searchLogs(caller: AuthUser | undefined, input: SearchLogs
         count++;
         lines.push({
           at: new Date(Number(BigInt(ns) / 1_000_000n)),
-          team: stream["component"] === "platform" ? "" : (stream["namespace"] ?? ""),
+          team:
+            stream["component"] === "platform"
+              ? ""
+              : stream["component"] === "api"
+                ? teamOfBackendNamespace(stream["namespace"] ?? "", names)
+                : (stream["namespace"] ?? ""),
           executionId: stream["execution_id"] ?? "",
           task: stream["task"] ?? "",
           attempt: Number(stream["attempt"] ?? 0),
