@@ -173,6 +173,11 @@ it was seen.
     labelled; an image's first part may not be uppercase.
   - The chat agent's test of an admin's endpoint answers "didn't answer"
     rather than the connection's error.
+  - Identity (found reviewing #230): a running step keeps its digest's
+    releases in use for every product that released that digest, not only
+    the one it runs as (`releaseInUse` reads running digests alone), so
+    while one product runs a shared image, another product's earlier
+    release of it keeps that product's identity too.
 
 - [ ] **Next release: drop API backends in their team's namespace** (API
   backends moved to `<team>-apis` on 2026-11-05): for one release the

@@ -491,6 +491,8 @@ expect "another's in a retired team's"            "$STEP_JOB"  "$(k -n "$RETIRED
 expect "another relabelling a step's ConfigMap"   "$STEP_JOB"  "$(k -n "$TEAM_A" label configmap ek-mine app=other --overwrite --dry-run=server 2>&1)"
 expect "another deleting one (can't replace it)"  allowed      "$(k -n "$TEAM_A" delete configmap ek-unlabelled --dry-run=server 2>&1)"
 expect "another's Job, as the executor makes it"  "$STEP_JOB"  "$(step_job "$TEAM_A")"
+expect "another's CronJob named ek-"               "$STEP_JOB"  "$(k -n "$TEAM_A" create cronjob ek-new --image=busybox --schedule='* * * * *' --dry-run=server 2>&1)"
+expect "another's CronJob of another name"        allowed      "$(k -n "$TEAM_A" create cronjob not-a-step --image=busybox --schedule='* * * * *' --dry-run=server 2>&1)"
 expect "another's Job of another name"            allowed      "$(sed 's/"ek-db-[0-9a-f]*"/"not-a-step"/' helm/tests/step-job.json | k -n "$TEAM_A" create --dry-run=server -f - 2>&1)"
 expect "another resuming a step's Job"            "$STEP_JOB"  "$(k -n "$TEAM_A" patch job ek-suspended --type=merge -p '{"spec":{"suspend":false}}' --dry-run=server 2>&1)"
 expect "the Job controller changing one"          allowed      "$(k --as=system:serviceaccount:kube-system:job-controller -n "$TEAM_A" label job ek-suspended x=y --dry-run=server 2>&1)"

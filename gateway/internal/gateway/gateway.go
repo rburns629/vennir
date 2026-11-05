@@ -247,7 +247,11 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	// First, whatever the API: a limited address hears nothing of which
 	// APIs there are, and costs no database work.
 	peer := peerKey(client)
-	if g.Peers != nil && g.Settings.UnauthenticatedPerMinute > 0 {
+	// Only where the address is the caller's: on the public listener with
+	// no trustedProxies, the peer may be a load balancer every caller
+	// shares, and one caller's failures would shut out the rest.
+	limitPeers := g.Peers != nil && g.Settings.UnauthenticatedPerMinute > 0 && !(g.Public && len(trusted) == 0)
+	if limitPeers {
 		if spent, wait := g.Peers.Spent(peer, g.Settings.UnauthenticatedPerMinute, g.now()); spent {
 			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds()+0.999)))
 			return g.refuse(w, outcome{name: "peer_limited"}, http.StatusTooManyRequests, "RATE_LIMITED",
@@ -262,7 +266,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	// could make up paths, each a row of traffic.
 	o := outcome{apiID: api.ID, endpoint: api.Match(r.Method, rest), served: true}
 	who, err := g.Callers.Resolve(r.Context(), r.Header.Get("Authorization"))
-	if err != nil && errors.Is(err, auth.ErrUnauthenticated) && g.Peers != nil && g.Settings.UnauthenticatedPerMinute > 0 {
+	if err != nil && errors.Is(err, auth.ErrUnauthenticated) && limitPeers {
 		g.Peers.Allow(peer, g.Settings.UnauthenticatedPerMinute, g.now())
 	}
 	if err != nil {
@@ -479,8 +483,12 @@ func (g *Gateway) readBody(w http.ResponseWriter, r *http.Request, limit int64) 
 // the address, or an IPv6 one's /64 (one host may hold all of it).
 func peerKey(client string) string {
 	a, err := netip.ParseAddr(client)
-	if err != nil || a.Is4() {
+	if err != nil {
 		return client
+	}
+	// An IPv4 address written as IPv6 (::ffff:a.b.c.d) is its IPv4 one.
+	if a = a.Unmap(); a.Is4() {
+		return a.String()
 	}
 	return netip.PrefixFrom(a, 64).Masked().String()
 }

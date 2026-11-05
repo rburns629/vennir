@@ -224,15 +224,19 @@ describe("syncing", () => {
     // Pruned above; a submission marks it used first (core/executions.ts).
     const [row] = await db.select().from(products).where(eq(products.name, product.name));
     await db.update(productReleases).set({ lastUsedAt: new Date() }).where(eq(productReleases.productId, row?.id ?? ""));
-    expect(await admitReleases([digest("1")])).toEqual([]);
+    const use = (d: string, action = "create") => ({ digest: digest(d), repository: `example.com/${prefix}/db`, action, serviceAccount: "db-v2" });
+    expect(await admitReleases([use("1")])).toEqual([]);
     expect(writes).toBe(1);
     expect(vi.mocked(updateIdentityPolicy).mock.lastCall?.[2]).toEqual({ settle: true });
     expect(ours().map((e) => e.digest)).toEqual([digest("1"), digest("2")]);
     writes = 0;
-    expect(await admitReleases([digest("1"), digest("2")])).toEqual([]);
+    expect(await admitReleases([use("1"), use("2")])).toEqual([]);
     expect(writes).toBe(0);
     // One nothing released: still not listed.
-    expect(await admitReleases([digest("9")])).toEqual([digest("9")]);
+    expect(await admitReleases([use("9")])).toEqual([digest("9")]);
+    // A listed digest, but not as this product's entry (another action of
+    // the same image): not admitted, though the digest is listed.
+    expect(await admitReleases([use("1", "delete")])).toEqual([digest("1")]);
   });
 
   it("writes each team's registered secrets with the releases", async () => {
