@@ -103,7 +103,7 @@ by different people on purpose:
 
 | Object | Says | Who creates it |
 | --- | --- | --- |
-| **SecretStore** | This namespace may read this vault, as this identity: a scope grant | The team proposes it in the catalog (`teams/<team>/secret-stores/`); catalog admins approve; the console applies it after checking it only names a store in the team's namespace, ESO's own ServiceAccounts, and, for a store that needs a stored credential, the Secret `eso-auth` |
+| **SecretStore** | This namespace may read this vault, as this identity: a scope grant | The team proposes it in the catalog (`teams/<team>/secret-stores/`); catalog admins approve; the console applies it after checking it only names a store in the team's namespace, ESO's own ServiceAccounts, and, for a store that needs a stored credential, the Secret `eso-auth`: wherever its provider names a Secret (any `*SecretRef`, any `{name, key}`, a CA from a Secret) or a ServiceAccount, with nothing in another namespace (`namespace`, `remoteNamespace`) and no `kubernetes` provider (`console/src/secretStores.ts`, and `vennir catalog validate`) |
 | **ExternalSecret** | Sync this key from that store into this Secret: a reference | Team members, self-service, on the Secrets tab |
 
 So a team can sync as many secrets as it likes without ever widening what

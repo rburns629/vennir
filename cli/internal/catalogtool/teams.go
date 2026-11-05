@@ -25,36 +25,6 @@ var (
 
 const credentialSecret = "eso-auth"
 
-type found struct {
-	path  string
-	value any
-}
-
-// find is (path, value) for every key under node that wanted accepts.
-func find(node any, path string, wanted func(string) bool) []found {
-	var out []found
-	switch n := node.(type) {
-	case map[string]any:
-		keys := make([]string, 0, len(n))
-		for k := range n {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			child := path + "." + k
-			if wanted(k) {
-				out = append(out, found{child, n[k]})
-			}
-			out = append(out, find(n[k], child, wanted)...)
-		}
-	case []any:
-		for i, v := range n {
-			out = append(out, find(v, fmt.Sprintf("%s[%d]", path, i), wanted)...)
-		}
-	}
-	return out
-}
-
 func orQuestion(v any) string {
 	if s, ok := v.(string); ok && s != "" {
 		return s
@@ -71,6 +41,71 @@ func pyRepr(v any) string {
 	default:
 		return fmt.Sprint(x)
 	}
+}
+
+// specProblems is what a store's spec may not name, wherever it names it
+// (as the console's secretStores.ts): only the Secret the team stored its
+// credential in (eso-auth), any Secret selector included (a key ending in
+// secretRef, or any {name, key}: a bearer token, a client certificate, a CA
+// from a Secret), and only ESO's ServiceAccounts (a key ending in
+// serviceAccountRef, or serviceAccount). Nothing in another namespace
+// (namespace, remoteNamespace), and not the kubernetes provider, which reads
+// a cluster's Secrets. A CA from a ConfigMap names no Secret.
+func specProblems(node any, path string) []string {
+	var problems []string
+	switch n := node.(type) {
+	case []any:
+		for i, v := range n {
+			problems = append(problems, specProblems(v, fmt.Sprintf("%s[%d]", path, i))...)
+		}
+	case map[string]any:
+		named := func(v any) any {
+			if m, ok := v.(map[string]any); ok {
+				return m["name"]
+			}
+			return v
+		}
+		name, hasName := n["name"].(string)
+		if _, hasKey := n["key"].(string); hasName && hasKey && name != credentialSecret {
+			problems = append(problems, fmt.Sprintf("%s must name the Secret %s (where the team's BOOTSTRAP_CREDENTIAL is stored), not %s.",
+				path, quote(credentialSecret), pyRepr(name)))
+		}
+		keys := make([]string, 0, len(n))
+		for k := range n {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			value, child, lower := n[key], path+"."+key, strings.ToLower(key)
+			ref, isMap := value.(map[string]any)
+			// A CA from a ConfigMap names no Secret (only a caProvider says which).
+			if key == "caProvider" && isMap && ref["type"] == "ConfigMap" {
+				if _, present := ref["namespace"]; present {
+					problems = append(problems, fmt.Sprintf("%s.namespace points into another namespace; leave it out.", child))
+				}
+				continue
+			}
+			_, refHasKey := ref["key"].(string)
+			switch {
+			case key == "namespace" || lower == "remotenamespace":
+				problems = append(problems, fmt.Sprintf("%s points into another namespace; leave it out.", child))
+			case path == "spec.provider" && key == "kubernetes":
+				problems = append(problems, fmt.Sprintf("%s: the kubernetes provider reads a cluster's Secrets; use the team's own vault.", child))
+			case strings.HasSuffix(lower, "secretref") && !(isMap && refHasKey):
+				if named(value) != credentialSecret {
+					problems = append(problems, fmt.Sprintf("%s must name the Secret %s (where the team's BOOTSTRAP_CREDENTIAL is stored), not %s.",
+						child, quote(credentialSecret), pyRepr(named(value))))
+				}
+			case (strings.HasSuffix(lower, "serviceaccountref") || key == "serviceAccount") && isMap:
+				if sa, _ := ref["name"].(string); !contains(esoServiceAccounts, sa) {
+					problems = append(problems, fmt.Sprintf("%s must name one of ESO's ServiceAccounts (%s), not %s.",
+						child, strings.Join(esoServiceAccounts, ", "), pyRepr(ref["name"])))
+				}
+			}
+			problems = append(problems, specProblems(value, child)...)
+		}
+	}
+	return problems
 }
 
 // SecretStoreProblems checks a team's SecretStore documents.
@@ -103,19 +138,8 @@ func SecretStoreProblems(team string, documents []any) []string {
 			if spec == nil {
 				spec = map[string]any{}
 			}
-			for _, f := range find(spec, "spec", func(k string) bool { return k == "namespace" }) {
-				problems = append(problems, fmt.Sprintf("%s: %s points into another namespace; leave it out.", where, f.path))
-			}
-			for _, f := range find(spec, "spec", func(k string) bool { return strings.HasSuffix(strings.ToLower(k), "secretref") }) {
-				ref, isMap := f.value.(map[string]any)
-				if !isMap || ref["name"] != credentialSecret {
-					named := any(f.value)
-					if isMap {
-						named = ref["name"]
-					}
-					problems = append(problems, fmt.Sprintf("%s: %s must name the Secret %s (where the team's BOOTSTRAP_CREDENTIAL is stored), not %s.",
-						where, f.path, quote(credentialSecret), pyRepr(named)))
-				}
+			for _, problem := range specProblems(spec, "spec") {
+				problems = append(problems, where+": "+problem)
 			}
 		default:
 			problems = append(problems, fmt.Sprintf("%s: only SecretStore (%s) and ServiceAccount (v1) are allowed here.",

@@ -36,25 +36,47 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Every key ending in secretRef (any case), with its value, under `node`. */
-function secretRefs(node: unknown, path: string): [string, unknown][] {
-  if (Array.isArray(node)) return node.flatMap((value, index) => secretRefs(value, `${path}[${String(index)}]`));
+/**
+ * What a store's spec may name, wherever it names it: the one Secret the team
+ * stored its credential in (eso-auth), any Secret selector included (a key
+ * ending in secretRef, or any {name, key}: a bearer token, a client
+ * certificate, a CA from a Secret), and only ESO's ServiceAccounts (a key
+ * ending in serviceAccountRef, or serviceAccount). Nothing in another
+ * namespace (namespace, remoteNamespace), and not the kubernetes provider,
+ * which reads a cluster's Secrets. A CA from a ConfigMap names no Secret.
+ */
+function specProblems(node: unknown, path: string): string[] {
+  if (Array.isArray(node)) return node.flatMap((value, index) => specProblems(value, `${path}[${String(index)}]`));
   if (!isRecord(node)) return [];
-  return Object.entries(node).flatMap(([key, value]) => {
+  const problems: string[] = [];
+  const named = (value: unknown) => (isRecord(value) ? value["name"] : value);
+  if (typeof node["name"] === "string" && typeof node["key"] === "string" && node["name"] !== SECRET_STORE_CREDENTIAL) {
+    problems.push(`${path} must name the Secret "${SECRET_STORE_CREDENTIAL}" (the team's stored credential), not ${JSON.stringify(node["name"])}.`);
+  }
+  for (const [key, value] of Object.entries(node)) {
     const child = `${path}.${key}`;
-    const here: [string, unknown][] = key.toLowerCase().endsWith("secretref") ? [[child, value]] : [];
-    return [...here, ...secretRefs(value, child)];
-  });
-}
-
-/** Every `namespace` key under `node`: a reference into another namespace. */
-function namespaceKeys(node: unknown, path: string): string[] {
-  if (Array.isArray(node)) return node.flatMap((value, index) => namespaceKeys(value, `${path}[${String(index)}]`));
-  if (!isRecord(node)) return [];
-  return Object.entries(node).flatMap(([key, value]) => {
-    const child = `${path}.${key}`;
-    return [...(key === "namespace" ? [child] : []), ...namespaceKeys(value, child)];
-  });
+    const lower = key.toLowerCase();
+    // A CA from a ConfigMap names no Secret (only a caProvider says which).
+    if (key === "caProvider" && isRecord(value) && value["type"] === "ConfigMap") {
+      if ("namespace" in value) problems.push(`${child}.namespace points into another namespace; leave it out.`);
+      continue;
+    }
+    if (key === "namespace" || lower === "remotenamespace") {
+      problems.push(`${child} points into another namespace; leave it out.`);
+    } else if (path === "spec.provider" && key === "kubernetes") {
+      problems.push(`${child}: the kubernetes provider reads a cluster's Secrets; use the team's own vault.`);
+    } else if (lower.endsWith("secretref") && !(isRecord(value) && typeof value["key"] === "string")) {
+      if (named(value) !== SECRET_STORE_CREDENTIAL) {
+        problems.push(`${child} must name the Secret "${SECRET_STORE_CREDENTIAL}" (the team's stored credential), not ${JSON.stringify(named(value))}.`);
+      }
+    } else if ((lower.endsWith("serviceaccountref") || key === "serviceAccount") && isRecord(value)) {
+      if (typeof value["name"] !== "string" || !ESO_SERVICE_ACCOUNTS.includes(value["name"])) {
+        problems.push(`${child} must name one of ESO's ServiceAccounts (${ESO_SERVICE_ACCOUNTS.join(", ")}), not ${JSON.stringify(value["name"])}.`);
+      }
+    }
+    problems.push(...specProblems(value, child));
+  }
+  return problems;
 }
 
 function stringMap(value: unknown): value is Record<string, string> {
@@ -99,17 +121,7 @@ export function checkSecretStoreObjects(
       objects.push({ kind, apiVersion, metadata: { name, ...(stringMap(annotations) ? { annotations } : {}) } });
     } else if (kind === "SecretStore" && typeof apiVersion === "string" && SECRET_STORE_APIS.includes(apiVersion)) {
       const spec = doc["spec"];
-      for (const path of namespaceKeys(spec, "spec")) {
-        problems.push(`${where}: ${path} points into another namespace; leave it out.`);
-      }
-      for (const [path, ref] of secretRefs(spec, "spec")) {
-        if (!isRecord(ref) || ref["name"] !== SECRET_STORE_CREDENTIAL) {
-          problems.push(
-            `${where}: ${path} must name the Secret "${SECRET_STORE_CREDENTIAL}" (the team's stored credential), ` +
-              `not ${JSON.stringify(isRecord(ref) ? ref["name"] : ref)}.`,
-          );
-        }
-      }
+      for (const problem of specProblems(spec, "spec")) problems.push(`${where}: ${problem}`);
       objects.push({ kind, apiVersion, metadata: { name }, spec });
     } else {
       problems.push(

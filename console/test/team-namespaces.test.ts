@@ -233,6 +233,34 @@ describe("applying a team's SecretStore file", () => {
     expect(problems([{ apiVersion: "v1", kind: "ServiceAccount", metadata: { name: "eso-gcp" } }])).toContain("No SecretStore");
   });
 
+  it("names only the team's credential and ESO's ServiceAccounts, however a provider names them", () => {
+    const problems = (spec: object) => checkSecretStoreObjects("team-a", [store("team-a", spec)]).problems.join(" | ");
+    // A token or certificate from any Secret, under any key.
+    const k8s = problems({ provider: { kubernetes: { server: { url: "https://x" }, auth: { token: { bearerToken: { name: "vennir-pull", key: ".dockerconfigjson" } } } } } });
+    expect(k8s).toContain("the kubernetes provider");
+    expect(k8s).toContain('spec.provider.kubernetes.auth.token.bearerToken must name the Secret "eso-auth"');
+    expect(problems({ provider: { vault: { server: "https://v", caProvider: { type: "Secret", name: "vennir-pull", key: "ca" }, auth: { tokenSecretRef: { name: "eso-auth", key: "t" } } } } })).toContain(
+      'spec.provider.vault.caProvider must name the Secret "eso-auth"',
+    );
+    // Only a caProvider's "type" says it's a ConfigMap.
+    expect(problems({ provider: { kubernetes: { auth: { token: { bearerToken: { type: "ConfigMap", name: "vennir-pull", key: "x" } } } } } })).toContain(
+      "bearerToken must name the Secret",
+    );
+    // A CA from a ConfigMap names no Secret.
+    expect(problems({ provider: { vault: { server: "https://v", caProvider: { type: "ConfigMap", name: "ca", key: "ca.crt" }, auth: { tokenSecretRef: { name: "eso-auth", key: "t" } } } } })).toBe("");
+    // Only ESO's ServiceAccounts sign in.
+    expect(problems({ provider: { gcpsm: { projectID: "p", auth: { workloadIdentity: { serviceAccountRef: { name: "product-sa" } } } } } })).toContain(
+      "must name one of ESO's ServiceAccounts",
+    );
+    expect(problems({ provider: { gcpsm: { projectID: "p", auth: { workloadIdentity: { serviceAccountRef: { name: "eso-gcp" } } } } } })).toBe("");
+    expect(problems({ provider: { vault: { server: "https://v", auth: { kubernetes: { mountPath: "k", role: "r", serviceAccountRef: { name: "default" } } } } } })).toContain(
+      "must name one of ESO's ServiceAccounts",
+    );
+    expect(problems({ provider: { aws: { service: "SecretsManager", region: "r", auth: { jwt: { serviceAccountRef: { name: "eso-aws" } } } }, remoteNamespace: "x" } })).toContain(
+      "spec.provider.remoteNamespace points into another namespace",
+    );
+  });
+
   it("applies it with secret-stores:apply or as an admin, and nobody else", async () => {
     const team = name("stores");
     await createTeam(team);
