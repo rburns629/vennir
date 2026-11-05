@@ -1229,49 +1229,32 @@ export async function readImagePolicyData(
 /** Thrown when the policy changed since the caller read it. */
 export class ImagePolicyConflictError extends Error {}
 
+/** The identity policy's variables the console writes (the kernel chart's identity-policy.yaml). */
+const IDENTITY_POLICY_VARIABLES = new Set([
+  "products",
+  "teamSecrets",
+  ...["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"].map((digit) => `releases${digit}`),
+]);
+
 /**
- * Rewrites the identity policy's `products` and `teamSecrets` literals (the
- * execution-kernel chart's identity-policy.yaml) with what `build` returns,
- * JSON for each. `build` runs after the policy is read and the write is
- * conditional on that read's resourceVersion; on a conflict both happen
- * again. So when two syncs race, the later write always comes from a
- * database read made after the earlier write: the policy can't end up older
- * than the database. Returns false when the policy doesn't exist
- * (identityPolicy disabled).
+ * Rewrites the identity policy's literals (the execution-kernel chart's
+ * identity-policy.yaml: the legacy `products` list, `teamSecrets`, and the
+ * `releases` maps, by name) with what `build` returns, given what they say
+ * now, as updateScanPolicy does. Returns false when the policy doesn't
+ * exist (identityPolicy disabled).
  */
 export async function updateIdentityPolicy(
   name: string,
-  build: () => Promise<{ products: string; teamSecrets: string }>,
+  build: (current: Record<string, string>) => Promise<Record<string, string>>,
+  { settle = false } = {},
 ): Promise<boolean> {
-  const { admission } = getApis();
-  for (let attempt = 1; ; attempt++) {
-    let policy: k8s.V1ValidatingAdmissionPolicy;
-    try {
-      policy = await admission.readValidatingAdmissionPolicy({ name });
-    } catch (error) {
-      if (isNotFound(error)) return false;
-      throw error;
-    }
-    const variables = policy.spec?.variables ?? [];
-    const products = variables.find((v) => v.name === "products");
-    const teamSecrets = variables.find((v) => v.name === "teamSecrets");
-    if (!products || !teamSecrets) {
-      // An older kernel chart, whose policy checks per-product secret lists
-      // this console no longer writes.
-      throw new Error(`Identity policy "${name}" has no "products" or "teamSecrets" variable: upgrade the kernel chart.`);
-    }
-    const literals = await build();
-    if (products.expression === literals.products && teamSecrets.expression === literals.teamSecrets) return true;
-    products.expression = literals.products;
-    teamSecrets.expression = literals.teamSecrets;
-    try {
-      await admission.replaceValidatingAdmissionPolicy({ name, body: policy });
-      return true;
-    } catch (error) {
-      const conflict = typeof error === "object" && error !== null && "code" in error && error.code === 409;
-      if (!conflict || attempt >= 5) throw error;
-    }
-  }
+  return updatePolicyVariables(
+    name,
+    IDENTITY_POLICY_VARIABLES,
+    `Identity policy "${name}" doesn't have the released digests' variables: upgrade the kernel chart before the console.`,
+    build,
+    settle,
+  );
 }
 
 /** Rewrites only the policy's `source` and `additional` literals, and only
@@ -1564,15 +1547,41 @@ const SCAN_POLICY_VARIABLES = new Set([
 /**
  * Rewrites the kernel chart's scan policy's literals (unlistedAdmitted and
  * the allowedDigests maps, by name) with what `build` returns, given what
- * they say now, the same way as updateIdentityPolicy (`build` may return
- * them unchanged). With `settle`, a write that changed any waits
- * POLICY_SETTLE_MS, so the cluster admits what it added by the time this
- * returns. Returns false when the policy doesn't exist.
+ * they say now (`build` may return them unchanged). Returns false when the
+ * policy doesn't exist.
  */
 export async function updateScanPolicy(
   name: string,
   build: (current: Record<string, string>) => Promise<Record<string, string>>,
   { settle = false } = {},
+): Promise<boolean> {
+  return updatePolicyVariables(
+    name,
+    SCAN_POLICY_VARIABLES,
+    `Scan policy "${name}" doesn't have the allow list's variables: upgrade the kernel chart before the console.`,
+    build,
+    settle,
+  );
+}
+
+/**
+ * Rewrites the named variables of an admission policy the console keeps
+ * (`build` gets what they say now, and may return them unchanged). `build`
+ * runs after the policy is read and the write is conditional on that
+ * read's resourceVersion; on a conflict both happen again. So when two
+ * syncs race, the later write always comes from a database read made after
+ * the earlier write: the policy can't end up older than the database. With
+ * `settle`, a write that changed any waits POLICY_SETTLE_MS, so the cluster
+ * enforces what it added by the time this returns. Returns false when the
+ * policy doesn't exist; throws `missing` when it lacks one of `names` (an
+ * older kernel chart).
+ */
+async function updatePolicyVariables(
+  name: string,
+  names: Set<string>,
+  missing: string,
+  build: (current: Record<string, string>) => Promise<Record<string, string>>,
+  settle: boolean,
 ): Promise<boolean> {
   const { admission } = getApis();
   for (let attempt = 1; ; attempt++) {
@@ -1583,10 +1592,8 @@ export async function updateScanPolicy(
       if (isNotFound(error)) return false;
       throw error;
     }
-    const variables = (policy.spec?.variables ?? []).filter((v) => SCAN_POLICY_VARIABLES.has(v.name));
-    if (variables.length !== SCAN_POLICY_VARIABLES.size) {
-      throw new Error(`Scan policy "${name}" doesn't have the allow list's variables: upgrade the kernel chart before the console.`);
-    }
+    const variables = (policy.spec?.variables ?? []).filter((v) => names.has(v.name));
+    if (variables.length !== names.size) throw new Error(missing);
     const wanted = await build(Object.fromEntries(variables.map((v) => [v.name, v.expression])));
     let changed = false;
     for (const variable of variables) {

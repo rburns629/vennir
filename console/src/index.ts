@@ -14,6 +14,7 @@ import { startReadiness } from "./readiness.js";
 import { startScheduleRunner } from "./scheduleRunner.js";
 import { reconcileScans } from "./scanning.js";
 import { startPolicySync } from "./policySync.js";
+import { pinRegisteredTags } from "./productPolicy.js";
 import { startRetention } from "./retention.js";
 import { sql } from "drizzle-orm";
 import { config } from "./config.js";
@@ -135,6 +136,11 @@ async function main(): Promise<void> {
   const app = await buildApp();
   // Products registered before image repositories had owners get theirs.
   await claimRegisteredImageRepositories();
+  // Products registered by tag before identities were tied to digests get
+  // pinned (productPolicy.ts), before the identity policy is first written.
+  await pinRegisteredTags(app.log).catch((error: unknown) => {
+    app.log.error({ err: error, event: "product_pinning_failed" }, "couldn't pin the products registered by tag");
+  });
   // Single sign-on as admins set it (sso.ts): read before anyone signs in,
   // then every few seconds, so a change made on another console reaches this one.
   await refreshSso(app.log);

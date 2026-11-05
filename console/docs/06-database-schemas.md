@@ -239,6 +239,7 @@ erDiagram
     uuid id PK
     uuid product_id FK
     text image
+    timestamptz last_used_at
   }
   image_repositories {
     text repository PK
@@ -425,14 +426,15 @@ Catalog CI registers all of these from the product's `product.yaml` (the catalog
 
 ### product_releases
 
-Every image a product has been registered with, so the Products page can list its releases.
+Every image a product has been registered with, so the Products page can list its releases. A product's identity is tied to these: a step runs as the product's ServiceAccount, with its team's Secrets, only when its image is one of them by repository and digest, and only the current one or an earlier one still in use (run by an execution not yet finished, or registered or run in the last hour). The kernel chart's identity policy holds the same list.
 
 | Column | Type | Null | Meaning |
 | --- | --- | --- | --- |
 | `id` | uuid | no | |
 | `product_id` | uuid | no | |
-| `image` | text | no | Unique per product: registering the same image again isn't a new release. |
+| `image` | text | no | Unique per product: registering the same image again isn't a new release. Pinned (`…@sha256:…`), unless it was registered by tag with image pinning off, when it never gives a step the product's identity. |
 | `registered_at` | timestamptz | no | |
+| `last_used_at` | timestamptz | no | When it was last registered or run as its product: an earlier release keeps the product's identity for an hour after. |
 
 ### image_repositories
 

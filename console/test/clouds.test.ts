@@ -61,7 +61,7 @@ const call = caller(() => app);
 let token: string;
 
 const register = (product: string, action: string, clouds: string[], cloudsFrom: string) =>
-  upsertProduct({ name: `${team}-${product}-${action}`, image: `registry.example/${team}/${product}:1`, action, teamId: teamId, shareWith: ["*"],
+  upsertProduct({ name: `${team}-${product}-${action}`, image: `registry.example/${team}/${product}:1@sha256:${"c".repeat(64)}`, action, teamId: teamId, shareWith: ["*"],
     inputSchema: { type: "object" }, check: "ready", clouds, cloudsFrom });
 let teamId = "";
 
@@ -69,10 +69,13 @@ type Listed = { products?: { name: string; clouds?: string[]; cloudsFrom?: strin
 const listed = async () => ((await call<Listed>(token, "ProductService/ListProducts")).body.products ?? []).filter((p) => p.name.startsWith(team));
 const submit = (product: string) =>
   call<{ executionId?: string }>(token, "ExecutionService/SubmitExecution", {
-    dag: { name: "clouds", requestId: randomUUID(), tasks: [{ id: "one", image: `registry.example/${team}/${product}:1`, action: "create", team, inputs: {} }] },
+    dag: { name: "clouds", requestId: randomUUID(), tasks: [{ id: "one", image: `registry.example/${team}/${product}:1@sha256:${"c".repeat(64)}`, action: "create", team, inputs: {} }] },
   });
 
 beforeAll(async () => {
+  // A product's identity is its released digests', so its images are
+  // pinned (each tag, by the mock above, to one digest).
+  config.imagePinning = "required";
   app = await buildApp();
   teamId = (await createTeam(team)).id;
   await register("bucket", "create", ["aws"], "team");
@@ -96,6 +99,7 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
+  config.imagePinning = "off";
   config.installCloud = "";
   await db.delete(productReadiness).where(like(productReadiness.product, `${prefix}%`));
   await db.delete(products).where(like(products.name, `${prefix}%`));

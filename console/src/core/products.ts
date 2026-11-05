@@ -291,22 +291,39 @@ export async function registerProduct(caller: AuthUser | undefined, input: Regis
     }
   }
 
-  // Its image is scanned from registration on (scanning.ts): pinned already
-  // (a catalog release registers by digest), or resolved here. A digest whose scan
-  // failed isn't registered; one still being scanned is, and submissions
-  // wait for its verdict.
-  if (config.scanning.enabled) {
-    let pinned: string | undefined = digestOf(input.image) ? input.image : undefined;
-    if (!pinned) {
-      const policy = await readImagePolicy();
-      pinned = (await pinImages([input.image], allowedPrefixes(policy))).pinned.get(input.image);
+  // A product's identity is tied to the digests it's released as
+  // (productPolicy.ts), so its image is recorded pinned: as given when it
+  // names its digest (a catalog release always does), else resolved here,
+  // and refused when the registry can't say which image its tag is. With
+  // pinning off (config.imagePinning), a tag is recorded as given, and a
+  // step of it never gets the product's identity.
+  let image = input.image;
+  if (!digestOf(image) && (config.imagePinning !== "off" || config.scanning.enabled)) {
+    const policy = await readImagePolicy();
+    const resolved = (await pinImages([image], allowedPrefixes(policy))).pinned.get(image);
+    if (resolved) image = resolved;
+    else if (config.imagePinning !== "off") {
+      throw new ApiError(
+        422,
+        "IMAGE_NOT_RESOLVED",
+        `${input.name}: couldn't ask the registry which image ${image} is (or its source isn't allowed), so it isn't registered. ` +
+          "A product is registered at a digest, which its steps must run to get its identity; try again, or name the image by digest.",
+        undefined,
+        { unresolvedImages: [image] },
+      );
     }
-    const scan = pinned ? await requestScan(pinned) : null;
+  }
+
+  // Its image is scanned from registration on (scanning.ts). A digest whose
+  // scan failed isn't registered; one still being scanned is, and
+  // submissions wait for its verdict.
+  if (config.scanning.enabled) {
+    const scan = digestOf(image) ? await requestScan(image) : null;
     if (scan?.status === "failed" && scan.acceptedAt === null) {
       throw new ApiError(
         422,
         "IMAGE_SCAN_FAILED",
-        `${pinned ?? input.image} fails the security scan; it isn't registered. Rebuild it, or an admin can accept it with a reason.`,
+        `${image} fails the security scan; it isn't registered. Rebuild it, or an admin can accept it with a reason.`,
         undefined,
         { findings: scan.findings },
       );
@@ -316,7 +333,7 @@ export async function registerProduct(caller: AuthUser | undefined, input: Regis
   try {
     const product = await upsertProduct({
       name: input.name,
-      image: input.image,
+      image,
       action: input.action,
       teamId,
       inputSchema: input.inputSchema,
@@ -358,7 +375,7 @@ export async function registerProduct(caller: AuthUser | undefined, input: Regis
       throw new ApiError(
         409,
         "CONFLICT",
-        `"${input.image}" + "${input.action}" is already registered under a different name.`,
+        `"${image}" + "${input.action}" is already registered under a different name.`,
       );
     }
     throw error;

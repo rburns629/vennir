@@ -1,14 +1,34 @@
 // SPDX-License-Identifier: MIT
 import { randomUUID } from "node:crypto";
-import { inArray, like } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eq, inArray, like } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { hashPassword } from "../src/auth/password.js";
 import { db } from "../src/db/client.js";
-import { createTeam, createUser, setUserAdmin } from "../src/db/queries.js";
-import { products, teams, users } from "../src/db/schema.js";
+import { createTeam, createUser, findTeamByName, setUserAdmin, upsertProduct } from "../src/db/queries.js";
+import { productReleases, products, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
+import { config } from "../src/config.js";
+import { pinRegisteredTags } from "../src/productPolicy.js";
 import { caller } from "./rpc.js";
+
+// The registry, for registrations by tag with pinning on: example/app:pinned
+// names one digest; nothing else resolves.
+const PINNED_DIGEST = `sha256:${"7".repeat(64)}`;
+vi.mock("../src/registry.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/registry.js")>()),
+  pinImages: vi.fn((images: string[]) =>
+    Promise.resolve({
+      pinned: new Map(images.filter((i) => i.endsWith(":pinned")).map((i) => [i, `${i}@${PINNED_DIGEST}`])),
+      unresolved: images.filter((i) => !i.endsWith(":pinned")),
+    }),
+  ),
+}));
+
+vi.mock("../src/imagePolicy.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/imagePolicy.js")>()),
+  readImagePolicy: vi.fn(() => Promise.resolve({ exists: true, source: "docker.io/", additional: [], version: "1" })),
+}));
 
 const prefix = `rel-${randomUUID().slice(0, 6)}`;
 const emails: string[] = [];
@@ -77,5 +97,53 @@ describe("product release history", () => {
     // The current image is what `latest` means, not the newest date.
     expect(product.image).toBe("example/app:aaa");
     expect(product.releases.map((r) => r.image)).toEqual(["example/app:bbb", "example/app:aaa"]);
+  });
+});
+
+describe("registering by tag", () => {
+  it("records the digest the tag names, which a step's identity is tied to", async () => {
+    config.imagePinning = "required";
+    try {
+      expect((await register("example/app:pinned")).code).toBe("ok");
+      const product = await listed();
+      expect(product.image).toBe(`example/app:pinned@${PINNED_DIGEST}`);
+      expect(product.releases[0]?.image).toBe(`example/app:pinned@${PINNED_DIGEST}`);
+    } finally {
+      config.imagePinning = "off";
+    }
+  });
+
+  it("refuses a tag the registry can't resolve, and registers nothing", async () => {
+    config.imagePinning = "required";
+    try {
+      const before = await listed();
+      const refused = await register("example/app:moving");
+      expect(refused.code).toBe("invalid_argument");
+      expect(refused.message).toContain("couldn't ask the registry which image example/app:moving is");
+      expect((await listed()).releases).toEqual(before.releases);
+    } finally {
+      config.imagePinning = "off";
+    }
+  });
+});
+
+describe("products registered by tag before identities were tied to digests", () => {
+  it("are pinned at startup to the digest their tag names, as a release; one that won't resolve keeps its tag", async () => {
+    const team = await findTeamByName(prefix);
+    await upsertProduct({ name: `${prefix}-old`, image: "example/old:pinned", action: "run", teamId: team?.id ?? null });
+    await upsertProduct({ name: `${prefix}-gone`, image: "example/gone:moving", action: "run", teamId: team?.id ?? null });
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as Parameters<typeof pinRegisteredTags>[0];
+    config.imagePinning = "required";
+    try {
+      expect(await pinRegisteredTags(log)).toBeGreaterThanOrEqual(1);
+    } finally {
+      config.imagePinning = "off";
+    }
+    const [old] = await db.select().from(products).where(eq(products.name, `${prefix}-old`));
+    expect(old?.image).toBe(`example/old:pinned@${PINNED_DIGEST}`);
+    const releases = await db.select().from(productReleases).where(eq(productReleases.productId, old?.id ?? ""));
+    expect(releases.map((r) => r.image).sort()).toEqual(["example/old:pinned", `example/old:pinned@${PINNED_DIGEST}`]);
+    const [gone] = await db.select().from(products).where(eq(products.name, `${prefix}-gone`));
+    expect(gone?.image).toBe("example/gone:moving");
   });
 });

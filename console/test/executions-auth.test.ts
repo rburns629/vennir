@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { hashPassword } from "../src/auth/password.js";
@@ -14,7 +14,7 @@ import {
   recordSubmittedExecution,
   upsertProduct,
 } from "../src/db/queries.js";
-import { submittedExecutions, teams, users } from "../src/db/schema.js";
+import { productReleases, products, submittedExecutions, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { loadExecution } from "../src/auth/access.js";
 import { KernelApiError, cancelExecution, retryTask, submitExecution } from "../src/kernel/client.js";
@@ -35,7 +35,7 @@ vi.mock("../src/k8s.js", async (importOriginal) => ({
 vi.mock("../src/registry.js", () => ({
   missingImages: vi.fn(() => Promise.resolve([])),
   pinImages: vi.fn((images: string[]) =>
-    Promise.resolve({ pinned: new Map(images.map((i) => [i, `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
+    Promise.resolve({ pinned: new Map(images.map((i) => [i, i.includes("@") ? i : `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
   ),
 }));
 
@@ -93,6 +93,9 @@ function submit(task: Record<string, unknown>) {
 }
 
 beforeAll(async () => {
+  // A product's identity is its released digests', so its images are
+  // pinned (each tag, by the mock above, to one digest).
+  config.imagePinning = "required";
   app = await buildApp();
   await app.ready();
 
@@ -122,7 +125,7 @@ beforeAll(async () => {
   // team.)
   await upsertProduct({
     name: `${teamName}-product-a`,
-    image: "some-image:1",
+    image: `some-image:1@sha256:${"c".repeat(64)}`,
     action: "create",
     teamId,
     serviceAccount: GRANTEE,
@@ -133,7 +136,7 @@ beforeAll(async () => {
   // A product whose action declares its schemas (C1).
   await upsertProduct({
     name: `${teamName}-schema-check`,
-    image: "schema-image:1",
+    image: `schema-image:1@sha256:${"c".repeat(64)}`,
     action: "check",
     teamId,
     inputSchema: {
@@ -153,6 +156,7 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
+  config.imagePinning = "off";
   await app.close();
   await db.delete(submittedExecutions).where(inArray(submittedExecutions.teams, [[teamName]]));
   if (recordedExecutionIds.length > 0) {
@@ -195,9 +199,26 @@ describe("SubmitExecution: a product runs as its ServiceAccount, with its team's
     expect(ensureServiceAccount).not.toHaveBeenCalled();
   });
 
-  it("matches any release of the product's image", async () => {
-    const response = await submit({ image: "docker.io/library/some-image@sha256:abc", serviceAccount: GRANTEE });
+  it("matches the product's released digest, however the image is written", async () => {
+    const response = await submit({ image: `docker.io/library/some-image@sha256:${"c".repeat(64)}`, serviceAccount: GRANTEE });
     expect(response.code).toBe("ok");
+  });
+
+  it("refuses another digest of the product's repository its identity, as an unregistered image", async () => {
+    // Pushed to the product's repository, but never released as it.
+    const other = `some-image:1@sha256:${"e".repeat(64)}`;
+    const response = await submit({ image: other, serviceAccount: GRANTEE, secretRefs: ["product-a-secret"] });
+    expect(response.code).toBe("permission_denied");
+    expect(message(response)).toContain(`isn't a release of product "${teamName}-product-a"`);
+    expect(submitExecution).not.toHaveBeenCalled();
+  });
+
+  it("runs another digest of the product's repository as \"default\", with none of its own", async () => {
+    const response = await submit({ image: `some-image:1@sha256:${"e".repeat(64)}` });
+    expect(response.code).toBe("ok");
+    const forwarded = vi.mocked(submitExecution).mock.calls[0]?.[0] as { tasks: Record<string, unknown>[] };
+    expect(forwarded.tasks[0]?.["serviceAccount"]).toBe("default");
+    expect(forwarded.tasks[0]).not.toHaveProperty("tokenAudiences");
   });
 
   it("rejects a product's task that runs as another ServiceAccount", async () => {
@@ -260,12 +281,76 @@ describe("SubmitExecution: a product runs as its ServiceAccount, with its team's
   });
 });
 
+describe("SubmitExecution: an earlier release keeps its identity only while it's in use", () => {
+  const earlier = `moved-image@sha256:${"1".repeat(64)}`;
+  const current = `moved-image@sha256:${"2".repeat(64)}`;
+  const name = () => `${teamName}-moved`;
+  const message = (response: { message: string }) => response.message;
+  /** Its first release's last use, `hoursAgo` back. */
+  async function lastUsed(hoursAgo: number) {
+    const [product] = await db.select().from(products).where(eq(products.name, name()));
+    await db
+      .update(productReleases)
+      .set({ lastUsedAt: new Date(Date.now() - hoursAgo * 3_600_000) })
+      .where(and(eq(productReleases.productId, product?.id ?? ""), like(productReleases.image, `%${"1".repeat(64)}`)));
+  }
+  /** Every execution of the team seen finished: none keeps a release in use. */
+  async function finishAll() {
+    await db
+      .update(submittedExecutions)
+      .set({ resourcesRecordedAt: new Date() })
+      .where(and(sql`${teamName} = ANY(${submittedExecutions.teams})`, sql`${submittedExecutions.resourcesRecordedAt} IS NULL`));
+  }
+
+  beforeAll(async () => {
+    for (const image of [earlier, current]) {
+      await upsertProduct({ name: name(), image, action: "move", teamId, serviceAccount: "mover" });
+    }
+  });
+
+  it("runs the current release as its product", async () => {
+    expect((await submit({ image: current, action: "move", serviceAccount: "mover" })).code).toBe("ok");
+  });
+
+  it("runs an earlier release as its product for an hour after its last use", async () => {
+    await lastUsed(0.5);
+    expect((await submit({ image: earlier, action: "move", serviceAccount: "mover" })).code).toBe("ok");
+  });
+
+  it("refuses a pruned earlier release the product's identity, and gives it \"default\" when it names none", async () => {
+    await finishAll();
+    await lastUsed(2);
+    const refused = await submit({ image: earlier, action: "move", serviceAccount: "mover" });
+    expect(refused.code).toBe("permission_denied");
+    expect(message(refused)).toContain(`isn't a release of product "${name()}"`);
+    expect(submitExecution).not.toHaveBeenCalled();
+    expect((await submit({ image: earlier, action: "move" })).code).toBe("ok");
+    const forwarded = vi.mocked(submitExecution).mock.calls[0]?.[0] as { tasks: Record<string, unknown>[] };
+    expect(forwarded.tasks[0]?.["serviceAccount"]).toBe("default");
+  });
+
+  it("keeps it while an execution not yet finished runs it, for its retries", async () => {
+    await finishAll();
+    await lastUsed(2);
+    const executionId = randomUUID();
+    const payload = { name: "moving", tasks: [{ id: "t", image: earlier, action: "move", team: teamName, serviceAccount: "mover" }] };
+    await recordSubmittedExecution({ executionId, teams: [teamName], submittedBy: userId, name: "moving", payload });
+    expect((await call(token, "ExecutionService/RetryTask", { executionId, taskId: "t" })).code).toBe("ok");
+    // Finished, and its release unused since: a retry is refused.
+    await finishAll();
+    await lastUsed(2);
+    const refused = await call(token, "ExecutionService/RetryTask", { executionId, taskId: "t" });
+    expect(refused.code).toBe("permission_denied");
+    expect(message(refused)).toContain("isn't a release of product");
+  });
+});
+
 describe("SubmitExecution: token audiences are the product's, never the submitter's", () => {
   const forwarded = () =>
     (vi.mocked(submitExecution).mock.calls[0]?.[0] as { tasks: Record<string, unknown>[] }).tasks[0];
 
   it("gives a product's task the audiences its product declared", async () => {
-    expect((await submit({ image: "some-image:1" })).code).toBe("ok");
+    expect((await submit({ image: `some-image:1@sha256:${"c".repeat(64)}` })).code).toBe("ok");
     expect(forwarded()?.["tokenAudiences"]).toEqual(["sts.amazonaws.com"]);
   });
 
@@ -275,7 +360,7 @@ describe("SubmitExecution: token audiences are the product's, never the submitte
   });
 
   it("gives the product's image run as \"default\" none: that isn't the product", async () => {
-    expect((await submit({ image: "some-image:1", serviceAccount: "default" })).code).toBe("ok");
+    expect((await submit({ image: `some-image:1@sha256:${"c".repeat(64)}`, serviceAccount: "default" })).code).toBe("ok");
     expect(forwarded()).not.toHaveProperty("tokenAudiences");
   });
 
@@ -289,7 +374,7 @@ describe("SubmitExecution: inputs are checked against the product's schema", () 
   const sent = () => (vi.mocked(submitExecution).mock.calls[0]?.[0] as { tasks: Record<string, unknown>[] }).tasks;
   const check = (id: string, inputs: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
     id,
-    image: "schema-image:1",
+    image: `schema-image:1@sha256:${"c".repeat(64)}`,
     action: "check",
     team: teamName,
     inputs,
@@ -336,7 +421,7 @@ describe("SubmitExecution: every image is pinned to its digest", () => {
       expect(response.code).toBe("ok");
       expect(forwarded().tasks[0]?.image).toBe(`some-image:latest@sha256:${"c".repeat(64)}`);
     } finally {
-      config.imagePinning = "off";
+      config.imagePinning = "required";
     }
   });
 
@@ -349,7 +434,7 @@ describe("SubmitExecution: every image is pinned to its digest", () => {
       expect(response.failure).toBe("IMAGE_NOT_RESOLVED");
       expect(submitExecution).not.toHaveBeenCalled();
     } finally {
-      config.imagePinning = "off";
+      config.imagePinning = "required";
     }
   });
 });
@@ -426,7 +511,8 @@ describe("SubmitExecution: name and requestId", () => {
 describe("retry and cancel check access again, over every team", () => {
   const task =(id: string, team: string, extra: Record<string, unknown> = {}) => ({
     id,
-    image: "some-image:latest",
+    // As stored: pinned at submission.
+    image: `some-image:latest@sha256:${"c".repeat(64)}`,
     action: "create",
     team,
     serviceAccount: GRANTEE,
@@ -570,7 +656,7 @@ describe("SubmitExecution: a product's own retry policy (R3)", () => {
   beforeAll(async () => {
     await upsertProduct({
       name: `${teamName}-retrying`,
-      image: "retry-image:1",
+      image: `retry-image:1@sha256:${"c".repeat(64)}`,
       action: "ensure",
       teamId,
       idempotent: true,

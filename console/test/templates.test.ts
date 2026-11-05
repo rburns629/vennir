@@ -30,7 +30,7 @@ vi.mock("../src/registry.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/registry.js")>()),
   missingImages: vi.fn(() => Promise.resolve([])),
   pinImages: vi.fn((images: string[]) =>
-    Promise.resolve({ pinned: new Map(images.map((i) => [i, `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
+    Promise.resolve({ pinned: new Map(images.map((i) => [i, i.includes("@") ? i : `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
   ),
 }));
 vi.mock("../src/kernel/client.js", async (importOriginal) => {
@@ -83,12 +83,15 @@ const parameters = {
 const forwarded = () => vi.mocked(submitExecution).mock.calls.at(-1)?.[0] as { tasks: Record<string, unknown>[] };
 
 beforeAll(async () => {
+  // A product's identity is its released digests', so its images are
+  // pinned (each tag, by the mock above, to one digest).
+  config.imagePinning = "required";
   app = await buildApp();
   const [ownTeam, dbTeam, privTeam, consTeam] = [await createTeam(own), await createTeam(db_), await createTeam(priv), await createTeam(cons)];
   await recordSecretGrant({ teamId: ownTeam.id, secretName: "hello-key", keys: ["value"], source: "literal" });
   await upsertProduct({
     name: `${own}-hello-run`,
-    image: `registry.example/${own}/hello:1`,
+    image: `registry.example/${own}/hello:1@sha256:${"c".repeat(64)}`,
     action: "run",
     teamId: ownTeam.id,
     serviceAccount: "hello",
@@ -99,7 +102,7 @@ beforeAll(async () => {
   });
   await upsertProduct({
     name: `${db_}-store-put`,
-    image: `registry.example/${db_}/store:1`,
+    image: `registry.example/${db_}/store:1@sha256:${"c".repeat(64)}`,
     action: "put",
     teamId: dbTeam.id,
     serviceAccount: "store",
@@ -107,7 +110,7 @@ beforeAll(async () => {
   });
   await upsertProduct({
     name: `${priv}-secret-get`,
-    image: `registry.example/${priv}/secret:1`,
+    image: `registry.example/${priv}/secret:1@sha256:${"c".repeat(64)}`,
     action: "get",
     teamId: privTeam.id,
     sourcePath: `teams/${priv}/products/secret/product.yaml`,
@@ -115,7 +118,7 @@ beforeAll(async () => {
   // Only its own team sees this one.
   await upsertProduct({
     name: `${priv}-internal-run`,
-    image: `registry.example/${priv}/internal:1`,
+    image: `registry.example/${priv}/internal:1@sha256:${"c".repeat(64)}`,
     action: "run",
     teamId: privTeam.id,
     hidden: true,
@@ -176,6 +179,7 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
+  config.imagePinning = "off";
   const ours = await db.select({ id: teams.id }).from(teams).where(like(teams.name, `${prefix}%`));
   await db.delete(submittedExecutions).where(like(submittedExecutions.template, `${prefix}%`));
   await db.delete(products).where(like(products.name, `${prefix}%`));
@@ -330,7 +334,7 @@ describe("running a template", () => {
 
   it("runs a team's own DAG for that team, whatever forTeam it says", async () => {
     const submitted = await call(ownMemberToken, "ExecutionService/SubmitExecution", {
-      dag: { name: "own", tasks: [{ id: "one", image: `registry.example/${own}/hello:1`, action: "run", team: own, forTeam: cons, inputs: { text: "hi" } }] },
+      dag: { name: "own", tasks: [{ id: "one", image: `registry.example/${own}/hello:1@sha256:${"c".repeat(64)}`, action: "run", team: own, forTeam: cons, inputs: { text: "hi" } }] },
     });
     expect(submitted.code).toBe("ok");
     expect(forwarded().tasks[0]).toMatchObject({ team: own, forTeam: own });
@@ -338,7 +342,7 @@ describe("running a template", () => {
 
   it("is still refused as a DAG submitted by someone not in its teams", async () => {
     const submitted = await call(outsiderToken, "ExecutionService/SubmitExecution", {
-      dag: { name: "copy", tasks: [{ id: "one", image: `registry.example/${own}/hello:1`, action: "run", team: own, inputs: {} }] },
+      dag: { name: "copy", tasks: [{ id: "one", image: `registry.example/${own}/hello:1@sha256:${"c".repeat(64)}`, action: "run", team: own, inputs: {} }] },
     });
     expect(submitted.code).toBe("permission_denied");
   });
@@ -462,7 +466,7 @@ describe("an ordering bot (decision 23)", () => {
     expect((await order("chain")).code).toBe("ok");
     expect((await order("second")).failure).toBe("TEMPLATE_NOT_ORDERABLE");
     expect((await call(bot, "TemplateService/RunAction", { product: `${own}-hello-run`, inputs: { text: "hi" } })).failure).toBe("ORDERS_ONLY");
-    expect((await call(bot, "ExecutionService/SubmitExecution", { dag: { name: "raw", tasks: [{ id: "a", image: "registry.example/x:1", action: "run", team: shop }] } })).failure).toBe("ORDERS_ONLY");
+    expect((await call(bot, "ExecutionService/SubmitExecution", { dag: { name: "raw", tasks: [{ id: "a", image: `registry.example/x:1@sha256:${"c".repeat(64)}`, action: "run", team: shop }] } })).failure).toBe("ORDERS_ONLY");
 
     // Its team's maintainers list what it may order; a member may not.
     expect((await call(memberToken, "TokenService/SetBotOrders", { team: shop, email: botEmail, templates: [`${own}/second`] })).code).toBe("permission_denied");

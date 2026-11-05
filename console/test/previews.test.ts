@@ -7,6 +7,7 @@
  * step, which whoever ran it can't. kernel-api and the registry are
  * stubbed; the rest is the real console on the real test database.
  */
+import { config } from "../src/config.js";
 import { randomUUID } from "node:crypto";
 import { eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -28,7 +29,7 @@ vi.mock("../src/registry.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/registry.js")>()),
   missingImages: vi.fn(() => Promise.resolve([])),
   pinImages: vi.fn((images: string[]) =>
-    Promise.resolve({ pinned: new Map(images.map((i) => [i, `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
+    Promise.resolve({ pinned: new Map(images.map((i) => [i, i.includes("@") ? i : `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
   ),
 }));
 vi.mock("../src/kernel/client.js", async (importOriginal) => {
@@ -58,13 +59,16 @@ let maintainerToken: string;
 const lastDag = () => vi.mocked(submitExecution).mock.calls.at(-1)?.[0] as { tasks: Record<string, unknown>[] };
 
 beforeAll(async () => {
+  // A product's identity is its released digests', so its images are
+  // pinned (each tag, by the mock above, to one digest).
+  config.imagePinning = "required";
   app = await buildApp();
   const provTeam = await createTeam(prov);
   const consTeam = await createTeam(cons);
   const register = (name: string, action: string, extra: Partial<Parameters<typeof upsertProduct>[0]> = {}) =>
     upsertProduct({
       name: `${prov}-${name}-${action}`,
-      image: `registry.example/${prov}/${name}:1`,
+      image: `registry.example/${prov}/${name}:1@sha256:${"c".repeat(64)}`,
       action,
       teamId: provTeam.id,
       shareWith: ["*"],
@@ -102,6 +106,7 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
+  config.imagePinning = "off";
   await db.delete(submittedExecutions).where(inArray(submittedExecutions.onBehalfOf, [cons]));
   await db.delete(submittedExecutions).where(like(submittedExecutions.name, `Preview:%`));
   await db.delete(products).where(like(products.name, `${prefix}%`));

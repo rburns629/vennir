@@ -25,6 +25,7 @@ import { auditLog, catalogSync, products, teams, templates, wiringTypes } from "
 import { ReleaseSchema, type Release } from "../src/gen/vennir/catalog/v1/release_pb.js";
 import { buildApp } from "../src/index.js";
 import { applySecretStoreObjects, createVerifyJob, ExternalSecretsMissingError, readScanJob } from "../src/k8s.js";
+import { listReleaseIdentities } from "../src/productPolicy.js";
 import { fetchRelease, listTags } from "../src/registry.js";
 import { caller, rpcClient } from "./rpc.js";
 import { lockWiringTypes } from "./wiringTypesLock.js";
@@ -122,6 +123,17 @@ describe("applying a release", () => {
       [`${teamA}-site-remove`, `${teamA}-site-run`, `${teamB}-db-run`].sort(),
     );
     expect(registered.every((p) => p.fromCatalog && p.image.endsWith(digestOf(1)))).toBe(true);
+    // Each action's release, at the digest the release pins: what a step's
+    // identity is tied to (productPolicy.ts), and what the cluster's
+    // identity policy lists.
+    const released = (await listReleaseIdentities()).filter((r) => r.image.includes(prefix));
+    expect(released.map((r) => [r.image, r.action]).sort()).toEqual(
+      [
+        [`${registry}/${teamA}/site@${digestOf(1)}`, "remove"],
+        [`${registry}/${teamA}/site@${digestOf(1)}`, "run"],
+        [`${registry}/${teamB}/db@${digestOf(1)}`, "run"],
+      ].sort(),
+    );
     // The stores, never a credential: each install sets its own.
     expect(applySecretStoreObjects).toHaveBeenCalledTimes(1);
     expect(vi.mocked(applySecretStoreObjects).mock.calls[0]?.[0]).toBe(teamA);

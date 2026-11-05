@@ -476,6 +476,11 @@ export const wiringTypes = pgTable("wiring_types", {
  * re-run of the same commit) is not a new release, and keeps its original
  * registeredAt. Rows go with their product (unregistering or retiring a
  * team's products removes the history too).
+ *
+ * A release's digest is what a step's identity is tied to (productPolicy.ts):
+ * a step runs as its product's ServiceAccount, with its team's Secrets, only
+ * when its image is one of these, by digest; the current one, or an earlier
+ * one still in use (lastUsedAt, or an execution not yet finished).
  */
 export const productReleases = pgTable(
   "product_releases",
@@ -486,6 +491,9 @@ export const productReleases = pgTable(
       .references(() => products.id, { onDelete: "cascade" }),
     image: text("image").notNull(),
     registeredAt: timestamp("registered_at", { withTimezone: true }).notNull().defaultNow(),
+    // When it was last registered or run: an earlier release keeps its
+    // identity for an hour after (productPolicy.ts's releaseInUse).
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique().on(table.productId, table.image)],
 );

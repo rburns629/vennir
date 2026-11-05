@@ -4,6 +4,7 @@
  * that team's allowedTargets let it. Checked before anything runs, from the
  * input's x-vennir-needs type; the owning team's own people aren't limited.
  */
+import { config } from "../src/config.js";
 import { randomUUID } from "node:crypto";
 import { eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -25,7 +26,7 @@ vi.mock("../src/registry.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/registry.js")>()),
   missingImages: vi.fn(() => Promise.resolve([])),
   pinImages: vi.fn((images: string[]) =>
-    Promise.resolve({ pinned: new Map(images.map((i) => [i, `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
+    Promise.resolve({ pinned: new Map(images.map((i) => [i, i.includes("@") ? i : `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
   ),
 }));
 vi.mock("../src/kernel/client.js", async (importOriginal) => {
@@ -63,6 +64,9 @@ const inputSchema = {
 };
 
 beforeAll(async () => {
+  // A product's identity is its released digests', so its images are
+  // pinned (each tag, by the mock above, to one digest).
+  config.imagePinning = "required";
   app = await buildApp();
   const [ownerTeam, appsTeam, otherTeam] = [await createTeam(owner), await createTeam(allowed), await createTeam(other)];
   await db
@@ -71,7 +75,7 @@ beforeAll(async () => {
     .where(eq(teams.id, ownerTeam.id));
   await upsertProduct({
     name: product,
-    image: `registry.example/${owner}/project:1`,
+    image: `registry.example/${owner}/project:1@sha256:${"c".repeat(64)}`,
     action: "create",
     teamId: ownerTeam.id,
     inputSchema,
@@ -93,7 +97,7 @@ beforeAll(async () => {
   for (const [team, teamId] of [[allowed, appsTeam.id], [other, otherTeam.id]] as const) {
     await upsertProduct({
       name: `${team}-source-make`,
-      image: `registry.example/${team}/source:1`,
+      image: `registry.example/${team}/source:1@sha256:${"c".repeat(64)}`,
       action: "make",
       teamId,
       outputSchema: { type: "object", properties: { projectId: { type: "string", "x-vennir-provides": "gcp.project" } } },
@@ -120,6 +124,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  config.imagePinning = "off";
   await db.delete(submittedExecutions).where(like(submittedExecutions.template, `${prefix}%`));
   await db.delete(products).where(like(products.name, `${prefix}%`));
   const ours = await db.select({ id: teams.id }).from(teams).where(like(teams.name, `${prefix}%`));

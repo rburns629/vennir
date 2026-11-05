@@ -137,15 +137,21 @@ its own directory.
   not `kind load`.
 - **Step identity is enforced in the cluster too**
   (`helm/charts/execution-kernel/templates/identity-policy.yaml`). A step runs
-  as `default` with no Secrets unless it's a registered product, which runs
-  as the ServiceAccount its `product.yaml` declares (or `default`) and may
-  mount any Secret its team registered: the same rule as the console's
-  `identityRefusal`. Secrets are per team, chosen per step (`secretRefs`);
+  as `default` with no Secrets unless it runs a registered product's
+  release, which runs as the ServiceAccount its `product.yaml` declares (or
+  `default`) and may mount any Secret its team registered: the same rule as
+  the console's `identityRefusal`. A release is a digest the product was
+  registered at (`product_releases`; a catalog release names each by digest,
+  and one registered by tag is pinned then): its current one, or an earlier
+  one still in use (an unfinished execution runs it, or it was registered or
+  run in the last hour). Any other image in the product's repository, at any
+  tag or digest, runs as an unregistered image. Secrets are per team, chosen per step (`secretRefs`);
   a product.yaml's `actions[].secretRefs` (catalog format v2) are recorded
-  as its bindings, not yet enforced (that comes with consumers). The products and
+  as its bindings, not yet enforced (that comes with consumers). The released
+  digests (sixteen maps by first hex digit, like the scan policy's) and
   each team's secret names live as CEL literals in the policy, which the
-  console rewrites whenever products or secrets change and at startup
-  (`console/src/productPolicy.ts`). A refusal
+  console rewrites whenever products or secrets change, every few minutes
+  and at startup (`console/src/productPolicy.ts`). A refusal
   is a non-retryable `IDENTITY_NOT_ALLOWED`. Because the console edits this
   policy and the image policy, Helm 4's server-side apply sees it as their
   owner: upgrade the kernel chart with `--force-conflicts` (the Makefile

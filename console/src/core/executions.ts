@@ -53,7 +53,7 @@ import {
   submitExecution,
   type ExecutionStateEntry,
 } from "../kernel/client.js";
-import { UNREGISTERED_SERVICE_ACCOUNT } from "../productPolicy.js";
+import { admitReleases, markReleasesUsed, releasedImageKey, releasedImages, UNREGISTERED_SERVICE_ACCOUNT } from "../productPolicy.js";
 import { ensureStillRunnable, rerunTemplate } from "./templates.js";
 import { mayDecide, notDeciders, notDecidersOf, taskTeams } from "./approvals.js";
 import { visibleLines } from "../logLevels.js";
@@ -61,7 +61,7 @@ import { failureCodeOnly, runView, visibleEvent, visiblePayload } from "./runVie
 import { errorMessage, errorPath, schemaErrors } from "../jsonSchema.js";
 import { missingImages, pinImages } from "../registry.js";
 import { platformAlert } from "../notifier.js";
-import { scanBlocker } from "../scanning.js";
+import { digestOf, scanBlocker } from "../scanning.js";
 import { narrowWiredTargets, targetProblems, targetsNeedApproval } from "../targets.js";
 import { CHECK_RUN } from "../readiness.js";
 import { ensureRunsHere } from "./clouds.js";
@@ -341,21 +341,33 @@ const runsAs = (product: Product) => product.serviceAccount ?? UNREGISTERED_SERV
 /**
  * Why this task may not run as the ServiceAccount it names, or mount secrets
  * at all; null when it may. `matching` are the registered products (usable
- * in its team) with its image's repository and its action. Which secrets it
- * may mount is checked after (each must be its team's).
+ * in its team) its image and action are a release of: its action, and its
+ * image by repository and digest (productLookup). `unreleased` are those of
+ * its image's repository and action whose releases its digest isn't one of,
+ * for the message. Which secrets it may mount is checked after (each must be
+ * its team's).
  *
  * A ServiceAccount can carry a cloud identity (a product's GCP service
  * account through Workload Identity, say), so which one a task runs as
- * follows from what it runs: a product runs as the ServiceAccount its
- * reviewed product.yaml declares, and only a product may mount its team's
- * secrets; anything else runs as "default" with none. Running as "default"
+ * follows from what it runs: a product's release runs as the ServiceAccount
+ * its reviewed product.yaml declares, and only a product's release may
+ * mount its team's secrets; anything else, another image of the same
+ * repository included, runs as "default" with none. Running as "default"
  * with no secrets is always allowed, products too: it grants nothing.
  */
-function identityRefusal(task: TaskAuthInfo, matching: Product[]): string | null {
+function identityRefusal(task: TaskAuthInfo, matching: Product[], unreleased: Product[] = []): string | null {
   const label = task.id === undefined ? "A task" : `Task "${task.id}"`;
   const serviceAccount = task.serviceAccount ?? UNREGISTERED_SERVICE_ACCOUNT;
   if (serviceAccount === UNREGISTERED_SERVICE_ACCOUNT && task.secretRefs.length === 0) return null;
   if (matching.length === 0) {
+    if (unreleased.length > 0) {
+      return (
+        `${label} runs "${task.image ?? ""}", which isn't a release of product "${unreleased[0]?.name ?? ""}" ` +
+        `in use: a product's identity is its released images' alone (by digest), so this one can only run as ` +
+        `ServiceAccount "${UNREGISTERED_SERVICE_ACCOUNT}" and mount no secrets. Run the image the product is ` +
+        "registered at, or release this one through the catalog."
+      );
+    }
     return (
       `${label} runs "${task.image ?? ""}" (action "${task.action ?? ""}"), which isn't a registered ` +
       `product of team "${task.team}", so it can only run as ServiceAccount ` +
@@ -373,32 +385,58 @@ function identityRefusal(task: TaskAuthInfo, matching: Product[]): string | null
 }
 
 /**
- * Finds the registered products a task runs: its image's repository (any
- * tag) and its action, among its team's products and the platform's. Caches
- * each team's lookups for the length of one request.
+ * Finds the registered products a task runs, among its team's products and
+ * the platform's: `matching`, those its action and image are a release of
+ * (its image's repository and digest one of the product's releases in use,
+ * productPolicy.ts's releasedImages: what gives it the product's identity);
+ * `sameRepository`, those of its action and image repository, whatever the
+ * digest (for describing a step, never for what it may do). Caches each
+ * team's lookups for the length of one request.
  */
 export function productLookup() {
   const teamIds = new Map<string, string | null>();
   const usableByTeamId = new Map<string | null, Product[]>();
+  const released = new Map<string, Set<string>>();
 
   async function teamId(team: string): Promise<string | null> {
     if (!teamIds.has(team)) teamIds.set(team, (await findTeamByName(team))?.id ?? null);
     return teamIds.get(team) ?? null;
   }
 
-  async function matching(team: string, image: string | undefined, action: string | undefined): Promise<Product[]> {
+  async function usable(team: string): Promise<Product[]> {
     const id = await teamId(team);
-    let usable = usableByTeamId.get(id);
-    if (usable === undefined) {
-      usable = await listProductsUsableBy(id);
-      usableByTeamId.set(id, usable);
+    let found = usableByTeamId.get(id);
+    if (found === undefined) {
+      found = await listProductsUsableBy(id);
+      usableByTeamId.set(id, found);
     }
-    if (image === undefined) return [];
-    const repository = imageRepository(image);
-    return usable.filter((product) => product.action === action && imageRepository(product.image) === repository);
+    return found;
   }
 
-  return { teamId, matching };
+  async function sameRepository(team: string, image: string | undefined, action: string | undefined): Promise<Product[]> {
+    const products = await usable(team);
+    if (image === undefined) return [];
+    const repository = imageRepository(image);
+    return products.filter((product) => product.action === action && imageRepository(product.image) === repository);
+  }
+
+  // By the release's own repository, as the cluster's policy matches: an
+  // earlier release still in use may be from a repository the product has
+  // since moved off.
+  async function matching(team: string, image: string | undefined, action: string | undefined): Promise<Product[]> {
+    const key = image === undefined ? null : releasedImageKey(image);
+    if (key === null) return [];
+    const candidates = (await usable(team)).filter((product) => product.action === action);
+    if (candidates.length === 0) return [];
+    const unknown = candidates.filter((product) => !released.has(product.id));
+    if (unknown.length > 0) {
+      const found = await releasedImages(unknown.map((product) => product.id));
+      for (const product of unknown) released.set(product.id, found.get(product.id) ?? new Set());
+    }
+    return candidates.filter((product) => released.get(product.id)?.has(key));
+  }
+
+  return { teamId, matching, sameRepository };
 }
 
 /** A task as submitted, by its id. */
@@ -409,12 +447,19 @@ function payloadTask(payload: unknown, taskId: string): Record<string, unknown> 
 
 /**
  * The registered product a task as submitted ran, if it ran one: by its
- * team, image repository, action and identity.
+ * team, released image, action and identity. With `anyDigest`, by its image
+ * repository alone, for describing a step whose release may since have been
+ * pruned (its failure's help), never for deciding what it may do.
  */
-export async function productOfTask(products: ReturnType<typeof productLookup>, task: Record<string, unknown> | undefined): Promise<Product | undefined> {
+export async function productOfTask(
+  products: ReturnType<typeof productLookup>,
+  task: Record<string, unknown> | undefined,
+  { anyDigest = false }: { anyDigest?: boolean } = {},
+): Promise<Product | undefined> {
   const teamName = optionalString(task?.["team"]);
   if (!teamName) return undefined;
-  const matching = await products.matching(teamName, optionalString(task?.["image"]), optionalString(task?.["action"]));
+  const find = anyDigest ? products.sameRepository : products.matching;
+  const matching = await find(teamName, optionalString(task?.["image"]), optionalString(task?.["action"]));
   const serviceAccount = optionalString(task?.["serviceAccount"]) ?? UNREGISTERED_SERVICE_ACCOUNT;
   return matching.find((p) => runsAs(p) === serviceAccount);
 }
@@ -667,7 +712,7 @@ async function failuresExplained(
     const code = typeof t.failure?.["code"] === "string" ? t.failure["code"] : undefined;
     if (!code) continue;
     const task = submitted.get(t.taskId);
-    const product = await productOfTask(products, task);
+    const product = await productOfTask(products, task, { anyDigest: true });
     const teamName = optionalString(task?.["team"]);
     const team = teamName ? await findTeamByName(teamName) : undefined;
     out.set(t.taskId, failureHelp(code, product, team));
@@ -682,13 +727,24 @@ function requester(caller: AuthUser | undefined): string {
 
 /**
  * The checks every submission gets: a maintainer of each task's team (except
- * for a template's run, authorized as a whole by core/templates.ts), the identity
- * each task runs as, then secretRefs against each team's current secrets.
- * Rerun and retry apply them afresh against current membership and grants,
- * rather than trusting what was true at the first submission (a team can
- * lose a secret, or a caller leave a team, in between).
+ * for a template's run, authorized as a whole by core/templates.ts), then
+ * authorizeIdentities. Rerun and retry apply them afresh against current
+ * membership and grants, rather than trusting what was true at the first
+ * submission (a team can lose a secret, or a caller leave a team, in
+ * between). The images must be pinned by now: a product's identity is its
+ * released digests'.
  */
 async function authorizeTasks(
+  tasksInfo: TaskAuthInfo[],
+  caller: AuthUser | undefined,
+  { maintainers = true }: { maintainers?: boolean } = {},
+): Promise<void> {
+  await authorizeTeams(tasksInfo, caller, { maintainers });
+  await authorizeIdentities(tasksInfo);
+}
+
+/** A maintainer of each task's team (unless `maintainers` is false), and each team able to run anything. */
+async function authorizeTeams(
   tasksInfo: TaskAuthInfo[],
   caller: AuthUser | undefined,
   { maintainers = true }: { maintainers?: boolean } = {},
@@ -701,7 +757,13 @@ async function authorizeTasks(
     const blocker = await teamRunBlocker(team);
     if (blocker) throw blocked(409, blocker);
   }
+}
 
+/**
+ * The identity each task runs as (identityRefusal), then secretRefs against
+ * each team's current secrets. Run on pinned images.
+ */
+async function authorizeIdentities(tasksInfo: TaskAuthInfo[]): Promise<void> {
   // kernel runs a task as whatever ServiceAccount, and mounts whatever
   // Secret names, it asks for, with no notion of "team" or "product" to
   // check them against (kernel/internal/executor/kubernetes.go): this is the one
@@ -709,11 +771,12 @@ async function authorizeTasks(
   // cluster's identity policy checks again).
   const products = productLookup();
 
-  // Which ServiceAccount, and which secrets, follow from the product the
-  // task runs (identityRefusal).
+  // Which ServiceAccount, and which secrets, follow from the product release
+  // the task runs (identityRefusal).
   for (const task of tasksInfo) {
     const matching = await products.matching(task.team, task.image, task.action);
-    const refusal = identityRefusal(task, matching);
+    const unreleased = matching.length === 0 ? await products.sameRepository(task.team, task.image, task.action) : [];
+    const refusal = identityRefusal(task, matching, unreleased);
     if (refusal) throw new ApiError(403, "FORBIDDEN", refusal);
   }
 
@@ -733,6 +796,35 @@ async function authorizeTasks(
         );
       }
     }
+  }
+}
+
+/**
+ * Makes sure the cluster's identity policy lists the release each task runs
+ * as its product (productPolicy.ts), before kernel-api has the steps: each
+ * is marked used, so it stays listed until the execution is recorded (and
+ * in use), and written into the policy if it isn't yet. Run after
+ * authorizeIdentities.
+ */
+async function admitIdentities(tasksInfo: TaskAuthInfo[]): Promise<void> {
+  const products = productLookup();
+  const uses: { productId: string; digest: string }[] = [];
+  for (const task of tasksInfo) {
+    const digest = task.image === undefined ? null : digestOf(task.image);
+    if (!digest) continue;
+    const serviceAccount = task.serviceAccount ?? UNREGISTERED_SERVICE_ACCOUNT;
+    const product = (await products.matching(task.team, task.image, task.action)).find((p) => runsAs(p) === serviceAccount);
+    if (product) uses.push({ productId: product.id, digest });
+  }
+  if (uses.length === 0) return;
+  await markReleasesUsed(uses);
+  const unlisted = await admitReleases(uses.map((use) => use.digest));
+  if (unlisted.length > 0) {
+    throw new ApiError(
+      409,
+      "IDENTITY_PENDING",
+      `The product released as ${unlisted.join(", ")} changed while this was being submitted; try again.`,
+    );
   }
 }
 
@@ -895,24 +987,30 @@ export async function submitChecked(
   log: FastifyBaseLogger,
   run?: TemplateRun,
 ) {
-  const body = isRecord(submitted) ? await withProductIdentities(submitted) : submitted;
-  const tasksInfo = extractTasksAuthInfo(body);
-  if (tasksInfo === null) {
-    throw new ApiError(
+  const malformed = () =>
+    new ApiError(
       400,
       "BAD_REQUEST",
       'Malformed submission: every task must declare a non-empty "team", and ' +
         '"secretRefs" if present must be an array of non-empty strings.',
     );
-  }
-  await authorizeTasks(tasksInfo, caller, { maintainers: run === undefined });
-  const teams = [...new Set(tasksInfo.map((t) => t.team))];
+  const submittedInfo = extractTasksAuthInfo(submitted);
+  if (submittedInfo === null) throw malformed();
+  await authorizeTeams(submittedInfo, caller, { maintainers: run === undefined });
+  const teams = [...new Set(submittedInfo.map((t) => t.team))];
   const context: RunContext = { action: "submit", teams, caller, log };
-  await refuseBlockedImages(taskImages(body), context);
-  await ensureServiceAccounts(tasksInfo);
+  await refuseBlockedImages(taskImages(submitted), context);
 
-  const pinnedBody = await pinned(body as Record<string, unknown>, context);
+  // Pinned before the identity checks: a product's identity is its
+  // released digests' (productPolicy.ts), so it follows from the image that
+  // will run, not from a tag.
+  const pinnedBody = await withProductIdentities(await pinned(submitted as Record<string, unknown>, context));
+  const tasksInfo = extractTasksAuthInfo(pinnedBody);
+  if (tasksInfo === null) throw malformed();
+  await authorizeIdentities(tasksInfo);
+  await ensureServiceAccounts(tasksInfo);
   await refuseUnscanned(taskImages(pinnedBody), context);
+  await admitIdentities(tasksInfo);
   const submission = withForTeam(
     await withProductContract(await withProductResources(pinnedBody), {
       teamNames: caller?.teamNames ?? [],
@@ -1081,6 +1179,7 @@ export async function retry(caller: AuthUser | undefined, executionId: string, t
   await refuseBlockedImages(images, context);
   await refuseUnscanned(images, context);
   await ensureServiceAccounts(tasksInfo);
+  await admitIdentities(tasksInfo.filter((task) => task.id === taskId));
   const retried = await retryTask(executionId, taskId, requester(caller));
   // Live again: what it makes, or deletes, is recorded once it finishes again.
   await markResourcesUnrecorded(executionId);
@@ -1138,26 +1237,26 @@ export async function rerun(caller: AuthUser | undefined, executionId: string, l
     }
     return rerunTemplate(caller, submitted, log);
   }
-  // Stored DAGs from before the rename get the current field names first,
-  // and a task with no serviceAccount the one it runs as now.
-  const replayed = isRecord(submitted.payload)
-    ? await withProductIdentities(submitted.payload)
-    : submitted.payload;
-  const tasksInfo = extractTasksAuthInfo(replayed);
-  if (tasksInfo === null) {
-    throw new ApiError(422, "UNPROCESSABLE_ENTITY", "The stored submission for this execution is malformed and can't be replayed.");
-  }
-  await authorizeTasks(tasksInfo, caller);
+  const malformed = () => new ApiError(422, "UNPROCESSABLE_ENTITY", "The stored submission for this execution is malformed and can't be replayed.");
+  const storedInfo = extractTasksAuthInfo(submitted.payload);
+  if (storedInfo === null) throw malformed();
+  await authorizeTeams(storedInfo, caller);
   const context: RunContext = { action: "rerun", teams: submitted.teams, executionId, caller, log };
-  await refuseBlockedImages(taskImages(replayed), context);
-  await ensureServiceAccounts(tasksInfo);
+  await refuseBlockedImages(taskImages(submitted.payload), context);
 
   // Every field carries over except requestId: kernel-api treats it as
   // identifying this specific submission (proto/vennir/kernel/v1),
   // so reusing the original would return the same execution. A stored DAG
-  // from before pinning has tags; they're pinned now.
-  const pinnedReplay = await pinned(replayed as Record<string, unknown>, context);
+  // from before pinning has tags; they're pinned now, before the identity
+  // checks (a product's identity is its released digests'). A task with no
+  // serviceAccount gets the one it runs as now.
+  const pinnedReplay = await withProductIdentities(await pinned(submitted.payload as Record<string, unknown>, context));
+  const tasksInfo = extractTasksAuthInfo(pinnedReplay);
+  if (tasksInfo === null) throw malformed();
+  await authorizeIdentities(tasksInfo);
+  await ensureServiceAccounts(tasksInfo);
   await refuseUnscanned(taskImages(pinnedReplay), context);
+  await admitIdentities(tasksInfo);
   // A team's own DAG again: each step for its team, whatever the stored one says.
   const rerunPayload = withForTeam(
     await withProductContract(await withProductResources({ ...pinnedReplay, requestId: randomUUID() }), {

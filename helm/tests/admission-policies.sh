@@ -46,7 +46,9 @@ GATEWAY=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-console-gateway
 PURGER_USER=$RELEASE-purger
 PURGER_GROUP=$RELEASE-purgers
 SOURCE=registry.example
-PRODUCTS='[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"},{"team":"","repository":"registry.example/platform","action":"run","serviceAccount":"plat-sa","audiences":""},{"team":"'$TEAM_A'","repository":"registry.example/vault","action":"run","serviceAccount":"eso-gcp","audiences":""}]'
+# An upgraded install's legacy products list (by repository, any digest),
+# which the console empties once its rollout is over.
+LEGACY_PRODUCTS='[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}]'
 TEAM_SECRETS='{"'$TEAM_A'":"api-token,db-key","'$TEAM_B'":"b-key"}'
 FAILURES=0
 
@@ -204,18 +206,6 @@ subjects:
 EOF
 
 render | k apply -f - > /dev/null
-# The console keeps the identity policy's products and team secrets
-# current; here, fixed ones.
-k get validatingadmissionpolicy $RELEASE-execution-kernel-identity -o json \
-  | python3 -c '
-import json, sys
-policy = json.load(sys.stdin)
-literals = {"products": sys.argv[1], "teamSecrets": sys.argv[2]}
-for variable in policy["spec"]["variables"]:
-    if variable["name"] in literals:
-        variable["expression"] = literals[variable["name"]]
-print(json.dumps(policy))' "$PRODUCTS" "$TEAM_SECRETS" \
-  | k replace -f - > /dev/null
 # And the scan policy's admitted digests (digest to true, in sixteen maps
 # by first hex digit): the step identity cases' (0…), one that passed (c…),
 # one an admin accepted (a…; the console lists it the same way). One never
@@ -225,6 +215,11 @@ print(json.dumps(policy))' "$PRODUCTS" "$TEAM_SECRETS" \
 digest() { echo "sha256:$(printf "$1%.0s" $(seq 64))"; }
 ZERO_DIGEST=$(digest 0) PASSED_DIGEST=$(digest c) ACCEPTED_DIGEST=$(digest a)
 UNSCANNED_DIGEST=$(digest d) FAILED_DIGEST=$(digest b)
+# Products' released digests, for the step identity cases (all passed
+# their scans): db's and vault's (0…), the platform product's (1…), the
+# "big" product's in a map filled to the most the console writes in one
+# (c…), and a digest pushed to db's repository but never released (2…).
+PLATFORM_DIGEST=$(digest 1) UNRELEASED_DIGEST=$(digest 2)
 scan_literal() {  # digests as a JSON map of digest to true or false, unlistedAdmitted, how many to fill it to, and with what first digit (any)
   k get validatingadmissionpolicy $RELEASE-execution-kernel-scan -o json \
     | python3 -c '
@@ -246,7 +241,55 @@ for variable in policy["spec"]["variables"]:
 print(json.dumps(policy))' "$1" "$2" "${3:-0}" "${4:-}" \
     | k replace -f - > /dev/null || { echo "  FAIL  writing the scan policy's digests"; FAILURES=$((FAILURES + 1)); }
 }
-scan_literal '{"'$ZERO_DIGEST'":true,"'$PASSED_DIGEST'":true,"'$ACCEPTED_DIGEST'":true}' false 5000
+scan_literal '{"'$ZERO_DIGEST'":true,"'$PASSED_DIGEST'":true,"'$ACCEPTED_DIGEST'":true,"'$PLATFORM_DIGEST'":true,"'$UNRELEASED_DIGEST'":true}' false 5000
+
+# The console keeps the identity policy's literals current (console/src/
+# productPolicy.ts); here, fixed ones: the legacy products list, each team's
+# secrets, and the released digests, in sixteen maps by first hex digit.
+# With "full", the c… map is filled to the most the console writes in one
+# map (MAX_MAP_CHARS) and the rest to the most it writes in all
+# (MAX_RELEASE_CHARS), so the policy is proven at its size limit.
+RELEASES='{"'$ZERO_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"},{"team":"'$TEAM_A'","repository":"registry.example/vault","action":"run","serviceAccount":"eso-gcp","audiences":""}],"'$PLATFORM_DIGEST'":[{"team":"","repository":"registry.example/platform","action":"run","serviceAccount":"plat-sa","audiences":""}],"'$PASSED_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/big","action":"run","serviceAccount":"db-sa","audiences":""}]}'
+identity_literal() {  # legacy products, team secrets, releases (digest to products), "full" or ""
+  k get validatingadmissionpolicy $RELEASE-execution-kernel-identity -o json \
+    | python3 -c '
+import hashlib, json, sys
+policy = json.load(sys.stdin)
+policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+MAX_MAP_CHARS, MAX_RELEASE_CHARS = 95000, 600000
+maps = {digit: {} for digit in "0123456789abcdef"}
+for digest, entries in json.loads(sys.argv[3]).items():
+    maps[digest[7]][digest] = entries
+dump = lambda m: json.dumps(m, separators=(",", ":"))
+def fill(digit, limit, n):
+    while True:
+        h = hashlib.sha256(b"fill-%d" % n).hexdigest()
+        digest = "sha256:" + digit + h[1:]
+        entry = [{"team": "fill", "repository": "registry.example/fill/p%d" % n, "action": "run", "serviceAccount": "fill-%d" % n, "audiences": ""}]
+        maps[digit][digest] = entry
+        if len(dump(maps[digit])) > limit:
+            del maps[digit][digest]
+            return n
+        n += 1
+if sys.argv[4] == "full":
+    n = fill("c", MAX_MAP_CHARS, 0)
+    rest = (MAX_RELEASE_CHARS - len(dump(maps["c"]))) // 15
+    for digit in "0123456789abdef":
+        n = fill(digit, rest, n)
+    total = sum(len(dump(m)) for m in maps.values())
+    print("  (releases: %d characters, %d in the c map)" % (total, len(dump(maps["c"]))), file=sys.stderr)
+for variable in policy["spec"]["variables"]:
+    name = variable["name"]
+    if name == "products":
+        variable["expression"] = sys.argv[1]
+    elif name == "teamSecrets":
+        variable["expression"] = sys.argv[2]
+    elif name.startswith("releases") and name[len("releases"):] in maps:
+        variable["expression"] = dump(maps[name[len("releases"):]])
+print(json.dumps(policy))' "$1" "$2" "$3" "${4:-}" \
+    | k replace -f - > /dev/null || { echo "  FAIL  writing the identity policy's literals"; FAILURES=$((FAILURES + 1)); }
+}
+identity_literal '[]' "$TEAM_SECRETS" "$RELEASES" full
 
 # A Job as the console makes an image scan (console/src/k8s.ts), with one
 # change made by the python expression given (to s, the Pod spec).
@@ -462,29 +505,53 @@ expect "the Job controller changing one"          allowed      "$(k --as=system:
 expect "the garbage collector changing a ConfigMap" allowed    "$(k --as=system:serviceaccount:kube-system:generic-garbage-collector -n "$TEAM_A" label configmap ek-mine x=y --dry-run=server 2>&1)"
 
 echo "Step identity:"
-expect "a product, as its SA, with its secret"   allowed               "$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)"
-expect "the same, pinned by digest"              allowed               "$(job "$TEAM_A" $SOURCE/db@sha256:$(printf '0%.0s' $(seq 64)) create db-sa db-key)"
-expect "the same, tagged and pinned (as submitted)" allowed            "$(job "$TEAM_A" $SOURCE/db:1@sha256:$(printf '0%.0s' $(seq 64)) create db-sa db-key)"
-expect "any other secret of its team"           allowed               "$(job "$TEAM_A" $SOURCE/db:1 create db-sa api-token)"
-expect "a Secret its team never registered"      IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa eso-auth)"
-expect "a platform product, its team's secret"   allowed               "$(job "$TEAM_B" $SOURCE/platform:2 run plat-sa b-key)"
-expect "a platform product, another team's"      IDENTITY_NOT_ALLOWED  "$(job "$TEAM_B" $SOURCE/platform:2 run plat-sa db-key)"
-expect "the product's image, another action"     IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1 delete db-sa "")"
-expect "a team's product in another team"        IDENTITY_NOT_ALLOWED  "$(job "$TEAM_B" $SOURCE/db:1 create db-sa "")"
-expect "a platform product in any team"          allowed               "$(job "$TEAM_B" $SOURCE/platform:2 run plat-sa "")"
+DB=$SOURCE/db:1@$ZERO_DIGEST
+expect "a product's release, as its SA, with its secret" allowed       "$(job "$TEAM_A" $DB create db-sa db-key)"
+expect "the same, pinned by digest alone"        allowed               "$(job "$TEAM_A" $SOURCE/db@$ZERO_DIGEST create db-sa db-key)"
+expect "a release in a full releases map"        allowed               "$(job "$TEAM_A" $SOURCE/big:1@$PASSED_DIGEST run db-sa db-key)"
+expect "any other secret of its team"           allowed               "$(job "$TEAM_A" $DB create db-sa api-token)"
+expect "a Secret its team never registered"      IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $DB create db-sa eso-auth)"
+expect "another digest in its repository"        IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa db-key)"
+expect "another digest, as its SA, no secrets"   IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "")"
+expect "another digest, as default"              allowed               "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create default "")"
+expect "its tag, not pinned"                     IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "")"
+expect "its digest from another repository"      IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1@$ZERO_DIGEST create db-sa "")"
+expect "a platform product, its team's secret"   allowed               "$(job "$TEAM_B" $SOURCE/platform:2@$PLATFORM_DIGEST run plat-sa b-key)"
+expect "a platform product, another team's"      IDENTITY_NOT_ALLOWED  "$(job "$TEAM_B" $SOURCE/platform:2@$PLATFORM_DIGEST run plat-sa db-key)"
+expect "the product's release, another action"   IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $DB delete db-sa "")"
+expect "a team's product in another team"        IDENTITY_NOT_ALLOWED  "$(job "$TEAM_B" $DB create db-sa "")"
+expect "a platform product in any team"          allowed               "$(job "$TEAM_B" $SOURCE/platform:2@$PLATFORM_DIGEST run plat-sa "")"
 expect "an unregistered image as a product's SA" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run db-sa "")"
-expect "ESO's SA, even registered as a product's" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/vault:1 run eso-gcp "")"
+expect "ESO's SA, even registered as a product's" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/vault:1@$ZERO_DIGEST run eso-gcp "")"
 expect "default with a secret"                   IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run default db-key)"
 # The dispatch policy refuses any valueFrom too; either refusal will do.
 expect "a secret through env, not a volume"      "IDENTITY_NOT_ALLOWED\|own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"env":[{"name":"K","valueFrom":{"secretKeyRef":{"name":"db-key","key":"k"}}}]')"
-expect "a secret through envFrom"                "IDENTITY_NOT_ALLOWED\|own entrypoint"  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" ',"envFrom":[{"secretRef":{"name":"db-key"}}]')"
+expect "a secret through envFrom"                "IDENTITY_NOT_ALLOWED\|own entrypoint"  "$(job "$TEAM_A" $DB create db-sa "" ',"envFrom":[{"secretRef":{"name":"db-key"}}]')"
 # The dispatch policy refuses a projected volume of anything but tokens too.
-expect "a secret in a projected volume"          "IDENTITY_NOT_ALLOWED\|mounts only"  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" "" "" ',{"name":"p","projected":{"sources":[{"secret":{"name":"db-key"}}]}}')"
+expect "a secret in a projected volume"          "IDENTITY_NOT_ALLOWED\|mounts only"  "$(job "$TEAM_A" $DB create db-sa "" "" "" ',{"name":"p","projected":{"sources":[{"secret":{"name":"db-key"}}]}}')"
 AUDIENCE='{"name":"t","projected":{"sources":[{"serviceAccountToken":{"path":"t","audience":"'
-expect "a token for its product's audience"      allowed                "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
-expect "a token for another audience"            IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" "" "" ",$AUDIENCE"'https://example.com","expirationSeconds":3600}}]}}')"
-expect "a token lasting over an hour"            IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":7200}}]}}')"
+expect "a token for its product's audience"      allowed                "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
+expect "a token for another audience"            IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'https://example.com","expirationSeconds":3600}}]}}')"
+expect "a token lasting over an hour"            IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":7200}}]}}')"
 expect "a token for a step that isn't a product" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
+expect "a token for another digest in its repository" IDENTITY_NOT_ALLOWED "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
+# An upgraded install: the chart keeps the legacy list (by repository, any
+# digest) until the console, its rollout over, empties it.
+identity_literal "$LEGACY_PRODUCTS" "$TEAM_SECRETS" "$RELEASES"
+for _ in $(seq 1 30); do
+  job "$TEAM_A" $SOURCE/db:1 create db-sa db-key | grep -q "(server dry run)" && break
+  sleep 1
+done
+expect "upgraded: the legacy list, by repository" allowed              "$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)"
+expect "upgraded: and another digest of it"      allowed               "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa db-key)"
+expect "upgraded: still not another repository" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run db-sa "")"
+identity_literal '[]' "$TEAM_SECRETS" "$RELEASES"
+for _ in $(seq 1 30); do
+  job "$TEAM_A" $SOURCE/db:1 create db-sa db-key | grep -q "IDENTITY_NOT_ALLOWED" && break
+  sleep 1
+done
+expect "emptied: its tag again refused"          IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)"
+expect "emptied: its release still allowed"      allowed               "$(job "$TEAM_A" $DB create db-sa db-key)"
 
 echo "Image scans:"
 expect "a digest that passed"                    allowed               "$(job "$TEAM_A" $SOURCE/app:1@$PASSED_DIGEST run default "")"
