@@ -56,9 +56,10 @@ export function backendAllowed(url: string, hosts: string[] = config.gateway.bac
  * These are in the cluster but name none (namespace null): a Pod's name
  * (<a-b-c-d>.<namespace>.pod), whose namespace cluster DNS doesn't check
  * (it answers the address in it), so it's an IP address as any other; any
- * other name under that domain or ending in .svc or .pod; an IP address (a Pod's or a Service's, whoever's they are), but the
- * loopback, which is the gateway's own Pod; and a single name, which the
- * gateway's DNS search path finds in its own namespace. Anything else is
+ * other name under that domain or ending in .svc or .pod; an IP address
+ * (a Pod's or a Service's, whoever's they are), but the loopback, which is
+ * the gateway's own Pod; and a single name, which the gateway's DNS search
+ * path finds in its own namespace. Anything else is
  * outside (the gateway looks it up as the absolute name it is). The gateway
  * may reach every team's API backends, so an API may only use one in its
  * own team's API backends' namespace (backendPlace): another team's would

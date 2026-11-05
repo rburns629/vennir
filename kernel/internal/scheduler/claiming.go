@@ -5,6 +5,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"maps"
 	"slices"
 	"time"
 
@@ -124,14 +125,17 @@ func capTeams(t *Task) []string {
 
 // claimReadyTasks claims up to ClaimLimit READY tasks whose available_at
 // has passed and whose execution is still active, after recovering expired
-// leases. Each task read is locked with its execution's row (FOR NO KEY
-// UPDATE, an UPDATE's own lock, as marking the execution RUNNING takes),
-// held until the pass commits, task then execution as kernel-api's cancel
-// takes them, both SKIP LOCKED so a claim never waits: an execution being
-// cancelled, or settled by another scheduler, is passed over this pass,
-// and one cancelled since the query's snapshot is re-read locked and
-// dropped. A cancel arriving after the claim waits for the pass to commit,
-// then finds the task RUNNING and leaves it to the next pass to stop.
+// leases. Pages of READY tasks are read without locking; a task is locked
+// only once it's to be claimed (past its team's cap), with its execution's
+// row (FOR NO KEY UPDATE, an UPDATE's own lock, as marking the execution
+// RUNNING takes), held until the pass commits, task then execution as
+// kernel-api's cancel takes them, both SKIP LOCKED so a claim never waits
+// (lockForClaim): a task another scheduler has, or an execution being
+// cancelled or settled, is passed over this pass, and one changed since the
+// page was read is read again locked. What's passed over before that is
+// never locked, so its cancel doesn't wait for this pass. A cancel arriving
+// after the claim waits for the pass to commit, then finds the task RUNNING
+// and leaves it to the next pass to stop.
 // MaxRunning caps how many tasks are claimed or running across the
 // platform, MaxRunningPerTeam per team (capTeams); a task over a cap stays
 // READY. The caps are exact with one scheduler; with several, each counts
@@ -190,8 +194,7 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 			JOIN executions e ON e.id = t.execution_id
 			WHERE t.state = 'READY' AND t.available_at <= $1 AND e.state IN ('PENDING', 'RUNNING')
 			AND (t.available_at, t.id) > (COALESCE($3::timestamptz, '-infinity'), $4::uuid)
-			ORDER BY t.available_at, t.id LIMIT $2
-			FOR UPDATE OF t SKIP LOCKED`, p.now, page, afterAt, afterID)
+			ORDER BY t.available_at, t.id LIMIT $2`, p.now, page, afterAt, afterID)
 		if err != nil {
 			return nil, err
 		}
@@ -200,67 +203,90 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 			return nil, err
 		}
 		scanned += len(ready)
-		for _, t := range ready {
-			if len(claimed) == limit {
-				break
-			}
-			if p.opts.MaxRunningPerTeam > 0 && slices.ContainsFunc(capTeams(t), func(team string) bool {
+		overCap := func(t *Task) bool {
+			return p.opts.MaxRunningPerTeam > 0 && slices.ContainsFunc(capTeams(t), func(team string) bool {
 				return perTeam[team] >= p.opts.MaxRunningPerTeam
-			}) {
-				continue
+			})
+		}
+		for next := 0; next < len(ready) && len(claimed) < limit; {
+			// The next tasks that could be claimed (past their team's cap,
+			// counting each chosen; not of a cap scope found held), up to the
+			// slots left: only these are locked, together, in one query
+			// (lockForClaim), so nothing passed over is.
+			var batch []*Task
+			tentative := maps.Clone(perTeam)
+			for ; next < len(ready) && len(claimed)+len(batch) < limit; next++ {
+				t := ready[next]
+				if p.opts.MaxRunningPerTeam > 0 && slices.ContainsFunc(capTeams(t), func(team string) bool {
+					return tentative[team] >= p.opts.MaxRunningPerTeam
+				}) {
+					continue
+				}
+				if t.CapScope != nil && heldScopes[*t.CapScope] {
+					continue
+				}
+				if p.opts.MaxRunningPerTeam > 0 {
+					for _, team := range capTeams(t) {
+						tentative[team]++
+					}
+				}
+				batch = append(batch, t)
 			}
-			if t.CapScope != nil && heldScopes[*t.CapScope] {
-				continue
-			}
-			if held, err := p.capHold(t, capped); err != nil {
-				return nil, err
-			} else if held {
-				heldScopes[*t.CapScope] = true
-				continue // stays READY; GetExecution says it waits for its product's cap
-			}
-			key, held, err := p.concurrencyHold(t, keys, heldKeys)
+			locked, err := p.lockForClaim(batch)
 			if err != nil {
 				return nil, err
 			}
-			if held {
-				// Stays READY; the next pass looks again. Its key says what
-				// it's waiting for (kernel-api's TaskStatus.waiting_for).
-				if _, err := p.db.Exec(p.ctx, `UPDATE execution_tasks SET concurrency_key = $1
-					WHERE id = $2::uuid AND concurrency_key IS DISTINCT FROM $1`, key, t.ID); err != nil {
+			for _, candidate := range batch {
+				// One another scheduler has (or claimed since the page was
+				// read), or whose execution a cancel holds or that's no
+				// longer active, is passed over without a slot or a key
+				// taken for it; the rest are as read again, locked.
+				t := locked[candidate.ID]
+				if t == nil || overCap(t) {
+					continue
+				}
+				if t.CapScope != nil && heldScopes[*t.CapScope] {
+					continue
+				}
+				if held, err := p.capHold(t, capped); err != nil {
+					return nil, err
+				} else if held {
+					heldScopes[*t.CapScope] = true
+					continue // stays READY; GetExecution says it waits for its product's cap
+				}
+				key, held, err := p.concurrencyHold(t, keys, heldKeys)
+				if err != nil {
 					return nil, err
 				}
-				continue
-			}
-			if key != "" {
-				keys[key] = true
-				t.ConcurrencyKey = &key
-			}
-			if t.CapScope != nil {
-				capped[*t.CapScope]++
-			}
-			if p.opts.MaxRunningPerTeam > 0 {
-				for _, team := range capTeams(t) {
-					perTeam[team]++
+				if held {
+					// Stays READY; the next pass looks again. Its key says what
+					// it's waiting for (kernel-api's TaskStatus.waiting_for).
+					if _, err := p.db.Exec(p.ctx, `UPDATE execution_tasks SET concurrency_key = $1
+						WHERE id = $2::uuid AND concurrency_key IS DISTINCT FROM $1`, key, t.ID); err != nil {
+						return nil, err
+					}
+					continue
 				}
+				if key != "" {
+					keys[key] = true
+					t.ConcurrencyKey = &key
+				}
+				if t.CapScope != nil {
+					capped[*t.CapScope]++
+				}
+				if p.opts.MaxRunningPerTeam > 0 {
+					for _, team := range capTeams(t) {
+						perTeam[team]++
+					}
+				}
+				claimed = append(claimed, t)
 			}
-			claimed = append(claimed, t)
 		}
 
 		if len(ready) < page {
 			break
 		}
 		after = ready[len(ready)-1]
-	}
-	// Each claimed task's execution is locked too, never waiting, and only
-	// theirs (not those of tasks passed over above, which would stay locked
-	// through the dispatch for nothing): one a cancel (or another
-	// scheduler) holds, or that's no longer active once locked (the state is
-	// read again on the locked row), keeps its task READY for a later pass.
-	// So a cancel can't land between the claim and the start, and waits for
-	// this pass to commit.
-	claimed, err := p.lockExecutions(claimed)
-	if err != nil {
-		return nil, err
 	}
 	for _, t := range claimed {
 		t.State = domain.TaskClaimed
@@ -294,36 +320,34 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 	return claimed, nil
 }
 
-// lockExecutions keeps the tasks whose execution it could lock, still
-// PENDING or RUNNING, without waiting.
-func (p *pass) lockExecutions(tasks []*Task) ([]*Task, error) {
+// lockForClaim locks these READY tasks, each with its execution still
+// PENDING or RUNNING, without waiting for either (task then execution, as
+// kernel-api's cancel takes them), in one query, and reads them again as
+// locked, by id: one that can't be had now is missing.
+func (p *pass) lockForClaim(tasks []*Task) (map[string]*Task, error) {
 	if len(tasks) == 0 {
-		return tasks, nil
+		return nil, nil
 	}
 	ids := make([]string, 0, len(tasks))
 	for _, t := range tasks {
-		ids = append(ids, t.ExecutionID)
+		ids = append(ids, t.ID)
 	}
-	rows, err := p.db.Query(p.ctx, `SELECT id::text FROM executions
-		WHERE id = ANY($1::uuid[]) AND state IN ('PENDING', 'RUNNING')
-		FOR NO KEY UPDATE SKIP LOCKED`, ids)
+	rows, err := p.db.Query(p.ctx, `SELECT `+taskColumnsOf("t")+` FROM execution_tasks t
+		JOIN executions e ON e.id = t.execution_id
+		WHERE t.id = ANY($1::uuid[]) AND t.state = 'READY' AND e.state IN ('PENDING', 'RUNNING')
+		FOR UPDATE OF t SKIP LOCKED FOR NO KEY UPDATE OF e SKIP LOCKED`, ids)
 	if err != nil {
 		return nil, err
 	}
-	locked := map[string]bool{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		locked[id] = true
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
+	locked, err := scanTasks(rows)
+	if err != nil {
 		return nil, err
 	}
-	return slices.DeleteFunc(tasks, func(t *Task) bool { return !locked[t.ExecutionID] }), nil
+	byID := make(map[string]*Task, len(locked))
+	for _, t := range locked {
+		byID[t.ID] = t
+	}
+	return byID, nil
 }
 
 func ptr[T any](v T) *T { return &v }

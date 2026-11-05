@@ -70,14 +70,22 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 	// (ensureCatalogSubject, below).
 	if repo := c.Catalog.Repo(); repo != "" && (c.Target == "gcp" || c.Target == "aws") {
 		gh := githost.NewGitHub(a.runner)
-		var err error
-		if catalogExists, err = gh.Exists(ctx, repo); err != nil {
-			return err
-		}
-		if catalogExists {
-			if _, err := recordCatalogIDs(ctx, out, dir, c, gh, repo); err != nil {
+		err := func() error {
+			var err error
+			if catalogExists, err = gh.Exists(ctx, repo); err != nil || !catalogExists {
 				return err
 			}
+			_, err = recordCatalogIDs(ctx, out, dir, c, gh, repo)
+			return err
+		}()
+		switch {
+		case err == nil:
+		case c.Target == "aws":
+			// Its publish role trusts only tokens that carry the ids.
+			return err
+		default:
+			// On gcp the ids only narrow a trust that holds by name meanwhile.
+			fmt.Fprintf(out, "Warning: couldn't read %s's ids with gh (%v), so catalog CI's federation still trusts it by name; sign gh in and apply again to pin it by id.\n", repo, err)
 		}
 	}
 	switch c.Target {

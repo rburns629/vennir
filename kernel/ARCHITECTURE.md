@@ -170,18 +170,19 @@ write is in order, in its transaction.
 → [SCHEDULER_MAX_RUNNING_TASKS(_PER_TEAM)?] runningPerTeam() caps how many
     [per team, a task counts against the team it runs in and, when another,
      the team it runs for (for_team: a shared product's run); once in all]
-→ SELECT ... FOR UPDATE OF t SKIP LOCKED,
-    a page at a time by (available_at, id)
+→ SELECT ... a page at a time by (available_at, id), unlocked
     WHERE state = READY AND available_at <= now
       AND execution.state IN (PENDING, RUNNING)     [a dead execution gets no more claims]
-→ lockExecutions(): SELECT executions of the tasks claimed (only theirs)
-    WHERE state IN (PENDING, RUNNING) FOR NO KEY UPDATE SKIP LOCKED
-    [never waited for: one a cancel (or another scheduler's settling) holds,
-     or cancelled since the snapshot (the state is re-read on the locked
-     row), keeps its task READY for a later pass; a cancel arriving later
-     waits for this pass to commit, then leaves the RUNNING task for the
-     next pass to stop. A task passed over (a cap, a key) leaves its
-     execution unlocked]
+→ lockForClaim(): of each page, the next tasks past their team's cap, up to
+    the slots left, locked together with their executions in one query:
+    FOR UPDATE OF t SKIP LOCKED FOR NO KEY UPDATE OF e SKIP LOCKED,
+    read again locked
+    [never waited for: one another scheduler has, or whose execution a
+     cancel (or another scheduler's settling) holds, or that's no longer
+     active, takes no slot and no key; what's passed over before it is never
+     locked, so its cancel doesn't wait for this pass; a cancel arriving
+     after the claim waits for the pass to commit, then leaves the RUNNING
+     task for the next pass to stop]
     [held tasks (a cap, a key) stay READY in place: the next page (at least
      100) is read until ClaimLimit are claimed, none are left, or 2000 have
      been read; a cap scope or key found held is passed over for the rest of

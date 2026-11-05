@@ -371,4 +371,60 @@ func TestAPassedOverTasksExecutionStaysUnlocked(t *testing.T) {
 		}
 	}
 	equal(t, "executions locked", locked, 1)
+	// Nor is the passed-over task's row (only the claimed one's is): a
+	// cancel updates the execution's READY tasks first, and would wait for
+	// this pass.
+	lockedTasks := 0
+	for _, id := range []string{first, second} {
+		_, err := testPool.Exec(ctx, `SELECT id FROM execution_tasks WHERE execution_id = $1 FOR UPDATE NOWAIT`, id)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "55P03" {
+			lockedTasks++
+		} else if err != nil {
+			t.Fatal(err)
+		}
+	}
+	equal(t, "task rows locked", lockedTasks, 1)
+}
+
+// An execution held elsewhere (a cancel, another scheduler) takes no claim
+// slot: its older READY tasks are passed over and the pass fills its limit
+// from the rest, rather than claiming them and dropping them after.
+func TestAHeldExecutionTakesNoClaimSlot(t *testing.T) {
+	ctx := context.Background()
+	var held, other string
+	if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+		held = submit(t, tx, "idem-claim-held-slot-1", task("a"), task("b"))
+		other = submit(t, tx, "idem-claim-held-slot-2", task("only"))
+		if _, err := tx.Exec(ctx, `UPDATE executions SET state = 'RUNNING' WHERE id = ANY($1::uuid[])`, []string{held, other}); err != nil {
+			return err
+		}
+		// The held execution's tasks come first.
+		_, err := tx.Exec(ctx, `UPDATE execution_tasks SET available_at = now() - interval '1 hour' WHERE execution_id = $1`, held)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = testPool.Exec(ctx, `DELETE FROM executions WHERE id = ANY($1::uuid[])`, []string{held, other})
+	})
+	holder, err := testPool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = holder.Rollback(ctx) }()
+	if _, err := holder.Exec(ctx, `SELECT id FROM executions WHERE id = $1 FOR NO KEY UPDATE`, held); err != nil {
+		t.Fatal(err)
+	}
+	exec := fake()
+	opts := DefaultOptions("scheduler-1")
+	opts.ClaimLimit = 1
+	if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+		_, err := DispatchPass(ctx, tx, exec, opts, time.Now(), quietLog)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	equal(t, "started", len(exec.Started), 1)
+	equal(t, "the other execution's", tasksByKey(t, testPool, other)["only"].State, domain.TaskRunning)
 }

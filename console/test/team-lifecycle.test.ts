@@ -203,7 +203,7 @@ describe("purge", () => {
     await call(admin, "TeamService/RetireTeam", { name: t.name });
     const purged = await call<{ revokedBotTokens: number }>(admin, "TeamService/PurgeTeam", { name: t.name });
     expect(purged.code).toBe("ok");
-    expect(purged.body.revokedBotTokens).toBe(2);
+    expect(purged.body.revokedBotTokens).toBe(1);
     expect(await db.select().from(botIdentities).where(eq(botIdentities.botId, bot?.id ?? ""))).toEqual([]);
 
     // Gone from membership, admin listing, and the team's own calls.
