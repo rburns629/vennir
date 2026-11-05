@@ -317,9 +317,12 @@ public listener (the Ingress controller's namespace, a load balancer's
 ranges), and `gateway.trustedProxies` lists the proxies whose
 `X-Forwarded-For` names the caller; the chart refuses the second without
 the first. On a cluster set up with a DNS domain other than
-`cluster.local`, set the console chart's `clusterDomain` to it
-(`CLUSTER_DOMAIN` for the console and the gateway): it's how they tell
-which backend hosts are in the cluster, and in which namespace. With
+`cluster.local`, set `clusterDomain` to it in both charts: the console
+chart's is `CLUSTER_DOMAIN` for the console and the gateway (how they tell
+which backend hosts are in the cluster, and in which namespace) and its own
+in-cluster URLs; the kernel chart's puts it in kernel-api's certificate.
+Set the console chart's `kernelApiUrl` with it too. `vennir` assumes
+`cluster.local`, which every cluster it makes uses. With
 `database.iamAuth`, the gateway's `DATABASE_URL` must say
 `sslmode=verify-full` (or `verify-ca`) unless it connects to localhost (a
 Cloud SQL Auth Proxy beside it), or the gateway won't start; the URLs
@@ -1029,15 +1032,14 @@ only `kernel database-setup`'s role may read it, to make the two databases
 and the services' users (members of `rds_iam`) and open each database to
 its own service alone.
 
-A sign-in token is the password, so the kernel won't send one over a
-connection that doesn't check the server: with `database.iamAuth` (or
-`kernel database-setup`'s administrator password on RDS) it refuses to
+A sign-in token is the password, so neither the kernel, the console nor
+the gateway sends one over a connection that doesn't check the server: with `database.iamAuth` (or
+`kernel database-setup`'s administrator password on RDS) each refuses to
 start unless the database URL says `sslmode=verify-full`, or
 `sslmode=verify-ca` with `sslrootcert` naming the server's own CA (what
 `vennir` writes on gcp, where Cloud SQL's certificate names the instance,
 not its address; `verify-full` on aws). A URL to a loopback address or a
-Unix socket, a Cloud SQL Auth Proxy beside it, needs neither. The console
-and the gateway don't check this yet (`TODO.md`).
+Unix socket, a Cloud SQL Auth Proxy beside it, needs neither.
 
 Cloud SQL and RDS back it up daily, with point-in-time recovery, keeping
 `database.backups.retentionDays` backups (at most 35 on RDS); the

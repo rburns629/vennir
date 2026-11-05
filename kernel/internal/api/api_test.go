@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -523,6 +524,58 @@ func TestCancellingLeavesARunningTaskForTheScheduler(t *testing.T) {
 	tasks := tasksByID(get(t, c, id))
 	if tasks["create-project"].State != kernelv1.TaskState_TASK_STATE_RUNNING || tasks["deploy-application"].State != kernelv1.TaskState_TASK_STATE_CANCELLED {
 		t.Errorf("tasks = %v", tasks)
+	}
+}
+
+// A retry that held the execution while a cancel cancelled its tasks, and
+// made its task READY before it committed, leaves no READY task in the
+// cancelled execution: the cancel looks again once it holds the execution.
+func TestACancelRacingARetryLeavesNothingReady(t *testing.T) {
+	c := client(t)
+	ctx := context.Background()
+	id := submit(t, c, chain(unique("cancel-retry-race"))).ExecutionId
+	exec(t, `UPDATE execution_tasks SET state = 'FAILED' WHERE execution_id = $1 AND task_key = 'create-project'`, id)
+	exec(t, `UPDATE executions SET state = 'RUNNING' WHERE id = $1`, id)
+	retrying, err := testPool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = retrying.Rollback(ctx) }()
+	if _, err := retrying.Exec(ctx, `SELECT id FROM executions WHERE id = $1 FOR UPDATE`, id); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := cancel(c, id)
+		done <- err
+	}()
+	// The cancel has cancelled what it could and waits for the execution:
+	// a backend of this test's own database waiting on a lock.
+	waiting := false
+	for range 250 {
+		if err := testPool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+			WHERE datname = current_database() AND wait_event_type = 'Lock')`).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !waiting {
+		t.Fatal("the cancel never waited for the execution: the race wasn't run")
+	}
+	if _, err := retrying.Exec(ctx, `UPDATE execution_tasks SET state = 'READY' WHERE execution_id = $1 AND task_key = 'create-project'`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := retrying.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if tasks := tasksByID(get(t, c, id)); tasks["create-project"].State != kernelv1.TaskState_TASK_STATE_CANCELLED {
+		t.Errorf("the retried task in a cancelled execution: %v", tasks["create-project"].State)
 	}
 }
 

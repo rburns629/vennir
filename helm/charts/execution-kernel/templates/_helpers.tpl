@@ -182,6 +182,11 @@ really changes.
 {{- $certs := dict }}
 {{- range $item, $service := $servers }}
   {{- $hosts := list $service (printf "%s.%s" $service $ns) (printf "%s.%s.svc" $service $ns) (printf "%s.%s.svc.cluster.local" $service $ns) }}
+  {{- /* A cluster of another domain's name too (only then: the names, and so the certificates, of every other install stay as they were). */}}
+  {{- $domain := $.Values.clusterDomain | default "cluster.local" }}
+  {{- if ne $domain "cluster.local" }}
+    {{- $hosts = append $hosts (printf "%s.%s.svc.%s" $service $ns $domain) }}
+  {{- end }}
   {{- $crt := index $existing (printf "%s.crt" $item) | default "" }}
   {{- $key := index $existing (printf "%s.key" $item) | default "" }}
   {{- $hostsKey := printf "%s.hosts" $item }}

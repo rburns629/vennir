@@ -19,7 +19,16 @@ export const PLATFORM_ERRORS: Record<string, ErrorHelp> = {
   POD_TERMINATED_UNEXPECTEDLY: { means: "Its container stopped before reporting a result: its Pod was evicted (its node short of memory or disk), preempted, or lost with its node. The message says which." },
   EXECUTOR_START_FAILED: { means: "The cluster couldn't start it." },
   JOB_NOT_FOUND: { means: "Its Job disappeared from the cluster before it reported a result." },
+  IMAGE_INVALID: { means: "Its image's name isn't one the cluster can read.", do: "Ask the product's team to fix its image's name." },
   IMAGE_NOT_FOUND: { means: "Its image isn't in the registry.", do: "Ask the product's team to publish it." },
+  STEP_JOB_NOT_ALLOWED: {
+    means: "The cluster refused a step's Job or request ConfigMap made by something other than the platform's scheduler, in the team's namespace.",
+    do: "An admin can check what else in the team's namespace makes Jobs or ConfigMaps named ek-.",
+  },
+  STEP_POD_NOT_ALLOWED: {
+    means: "The cluster refused a Pod for the step made by something other than Kubernetes' Job controller, in the team's namespace.",
+    do: "An admin can check what else in the team's namespace makes Pods for its steps.",
+  },
   IMAGE_PULL_FAILED: { means: "The cluster couldn't download its image." },
   IMAGE_USER_NOT_ALLOWED: { means: "Its image runs as a user the cluster can't confirm isn't root (a named USER, or root).", do: "Ask the product's team to end its Dockerfile with a numeric USER, such as USER 65532:65532." },
   RESOURCES_NOT_ALLOWED: { means: "The step asks for more memory or CPU than its team may ever use.", do: "Ask an admin to raise the team's resource limits (its Settings tab), or ask the product's team for a smaller size." },
@@ -33,6 +42,10 @@ export const PLATFORM_ERRORS: Record<string, ErrorHelp> = {
   OUTPUT_CONTAINS_CREDENTIAL: { means: "Its outputs held something that looked like a credential, so they were discarded.", do: "Ask the product's team: outputs must never echo a secret." },
   PRODUCT_RESULT_MISSING: { means: "It ended without writing its result." },
   PRODUCT_RESULT_INVALID: { means: "It wrote a result the platform couldn't read." },
+  PRODUCT_CODE_RESERVED: {
+    means: "It failed, and reported its failure under a code only the platform sets. The message is the product's own, and says which code it used.",
+    do: "Ask the product's team to report its failures under codes of its own.",
+  },
   UNSUPPORTED_ACTION: { means: "The product doesn't have that action." },
   APPROVAL_DECLINED: { means: "A maintainer of its team declined it, so it never ran.", do: "Ask them why, then run it again." },
   APPROVAL_EXPIRED: { means: "Nobody approved or declined it in time, so it never ran.", do: "Retry it to ask again, and tell its team." },

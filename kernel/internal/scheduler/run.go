@@ -214,6 +214,12 @@ func (l *Loop) housekeeping(ctx context.Context, nextRetention, nextOrphanSweep 
 		if _, err := ReleaseOrphanedAttempts(ctx, l.Pool, l.Executor, time.Now().Add(-OrphanMinAge), l.Log); err != nil {
 			l.Log.Error("couldn't sweep orphaned attempts", "error", err.Error())
 		}
+		if err := pgx.BeginFunc(ctx, l.Pool, func(tx pgx.Tx) error {
+			_, err := CancelStranded(ctx, tx, l.Log)
+			return err
+		}); err != nil {
+			l.Log.Error("couldn't cancel tasks left waiting in cancelled executions", "error", err.Error())
+		}
 	}
 }
 

@@ -248,7 +248,7 @@ spec:
             - --disable-reporting
           env:
             - name: LOKI_URL
-              value: "http://{{ $loki }}.{{ .Release.Namespace }}.svc.cluster.local:3100"
+              value: "http://{{ $loki }}.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain | default "cluster.local" }}:3100"
             - name: PLATFORM_NAMESPACE
               value: {{ .Release.Namespace | quote }}
           ports:

@@ -1,6 +1,6 @@
 execution-console is installed.
 
-execution-console: {{ include "execution-console.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+execution-console: {{ include "execution-console.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain | default "cluster.local" }}:{{ .Values.service.port }}
 
 Check the migration Job finished before logging in -- it also creates the
 bootstrap admin account on first install:

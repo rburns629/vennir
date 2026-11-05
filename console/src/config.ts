@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+import { isIP } from "node:net";
+import { parseIntoClientConfig } from "pg-connection-string";
 import { readFileSync } from "node:fs";
 
 /**
@@ -137,7 +139,53 @@ function databaseIamAuth(): "" | "gcp" | "aws" {
   const value = process.env["DATABASE_IAM_AUTH"] ?? "";
   if (value !== "" && value !== "gcp" && value !== "aws") throw new Error(`Invalid DATABASE_IAM_AUTH "${value}": expected "gcp", "aws", or nothing for a password.`);
   if (value === "aws" && !process.env["DATABASE_IAM_REGION"]) throw new Error("DATABASE_IAM_REGION is needed with DATABASE_IAM_AUTH=aws.");
+  if (value !== "") {
+    const problem = verifiedTlsProblem(process.env["DATABASE_URL"] ?? "");
+    if (problem) throw new Error(`DATABASE_URL: ${problem}`);
+  }
   return value;
+}
+
+/**
+ * Why a sign-in token from the cloud mustn't be sent over DATABASE_URL, or
+ * "": its TLS must check the server's certificate, so only the server gets
+ * it. Read as node-postgres reads it (pg-connection-string, then PGHOST and
+ * PGSSLMODE where the URL says nothing), so what's checked is what
+ * connects: TLS that rejects an unverified certificate (sslmode=verify-full,
+ * or verify-ca with sslrootcert; node-postgres 8 checks the certificate for
+ * require and prefer too, unless uselibpqcompat, which this then refuses).
+ * A loopback address or a Unix socket (a Cloud SQL Auth Proxy beside the
+ * process, which encrypts and checks on its own) needs none. The rule of
+ * the kernel's verifiedTLSProblem and the gateway's verifiedTLS; never
+ * quotes the URL, which may hold a password.
+ */
+export function verifiedTlsProblem(databaseUrl: string): string {
+  let parsed: ReturnType<typeof parseIntoClientConfig>;
+  try {
+    parsed = parseIntoClientConfig(databaseUrl);
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? ` (${String(error.code)})` : "";
+    return `can't be read as a Postgres URL${code}`;
+  }
+  const host = parsed.host || process.env["PGHOST"] || "localhost";
+  const loopback = (isIP(host) === 4 && host.startsWith("127.")) || (isIP(host) === 6 && host === "::1");
+  if (host.startsWith("/") || host === "localhost" || loopback) return "";
+  const ssl: unknown = parsed.ssl;
+  const verified =
+    ssl === undefined
+      ? environmentVerifies()
+      : ssl === true || ssl === "true" || (typeof ssl === "object" && ssl !== null && (ssl as { rejectUnauthorized?: unknown }).rejectUnauthorized !== false);
+  if (verified) return "";
+  return "with DATABASE_IAM_AUTH, its token is sent only over TLS that checks the server's certificate: sslmode=verify-full, or verify-ca with sslrootcert (the server's own CA), unless it connects to localhost (a Cloud SQL Auth Proxy)";
+}
+
+/**
+ * Whether node-postgres's TLS where the URL says nothing, PGSSLMODE's (pg's
+ * connection-parameters.js), checks the server's certificate: TLS with
+ * Node's defaults for these; none, or unchecked (no-verify), for the rest.
+ */
+function environmentVerifies(): boolean {
+  return ["prefer", "require", "verify-ca", "verify-full"].includes(process.env["PGSSLMODE"] ?? "");
 }
 
 export const CHAT_PROVIDERS = ["vertex", "bedrock", "anthropic", "openai-compatible"] as const;

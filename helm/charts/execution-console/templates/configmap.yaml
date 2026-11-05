@@ -58,7 +58,7 @@ data:
   WRITE_FENCE_POLICY: {{ printf "%s-write-fence" (include "execution-console.fullname" .) | quote }}
   {{- end }}
   {{- if .Values.logs.enabled }}
-  LOKI_URL: "http://{{ include "execution-console.fullname" . }}-loki.{{ .Release.Namespace }}.svc.cluster.local:3100"
+  LOKI_URL: "http://{{ include "execution-console.fullname" . }}-loki.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain | default "cluster.local" }}:3100"
   {{- end }}
   LOG_SEARCH_DAYS: {{ .Values.logs.searchDays | quote }}
   {{- with .Values.audit.export }}
@@ -85,7 +85,7 @@ data:
   # The Prometheus whose alerts Observe shows: monitoring.prometheusUrl, else
   # the bundled one.
   {{- $bundled := and (eq .Values.monitoring.provider "bundled") .Values.monitoring.prometheus.enabled }}
-  PROMETHEUS_URL: {{ .Values.monitoring.prometheusUrl | default (ternary (printf "http://%s-prometheus.%s.svc.cluster.local:9090" (include "execution-console.fullname" .) .Release.Namespace) "" $bundled) | quote }}
+  PROMETHEUS_URL: {{ .Values.monitoring.prometheusUrl | default (ternary (printf "http://%s-prometheus.%s.svc.%s:9090" (include "execution-console.fullname" .) .Release.Namespace (.Values.clusterDomain | default "cluster.local")) "" $bundled) | quote }}
   IMAGE_SIGNATURE_POLICY_NAME: {{ .Values.imageSignature.policyName | quote }}
   KERNEL_API_URL: {{ .Values.kernelApiUrl | quote }}
   ENVIRONMENT_LABEL: {{ .Values.environmentLabel | quote }}

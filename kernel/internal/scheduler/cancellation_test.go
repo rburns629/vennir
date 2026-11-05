@@ -428,3 +428,55 @@ func TestAHeldExecutionTakesNoClaimSlot(t *testing.T) {
 	equal(t, "started", len(exec.Started), 1)
 	equal(t, "the other execution's", tasksByKey(t, testPool, other)["only"].State, domain.TaskRunning)
 }
+
+// A task left waiting in a cancelled execution (by a writer that raced the
+// cancel) is cancelled by the scheduler's sweep, with its event; one whose
+// row someone holds is left for the next sweep, never waited for.
+func TestStrandedTasksAreCancelled(t *testing.T) {
+	ctx := context.Background()
+	var id string
+	if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+		id = submit(t, tx, "idem-stranded", task("a"), task("b"))
+		_, err := tx.Exec(ctx, `UPDATE executions SET state = 'CANCELLED' WHERE id = $1`, id)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = testPool.Exec(ctx, `DELETE FROM executions WHERE id = $1`, id) })
+	holder, err := testPool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = holder.Rollback(ctx) }()
+	if _, err := holder.Exec(ctx, `SELECT id FROM execution_tasks WHERE execution_id = $1 AND task_key = 'b' FOR UPDATE`, id); err != nil {
+		t.Fatal(err)
+	}
+	sweep := func() int {
+		t.Helper()
+		var n int
+		if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+			var err error
+			n, err = CancelStranded(ctx, tx, quietLog)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if n := sweep(); n < 1 {
+		t.Fatalf("swept %d", n)
+	}
+	tasks := tasksByKey(t, testPool, id)
+	equal(t, "a", tasks["a"].State, domain.TaskCancelled)
+	equal(t, "b, held", tasks["b"].State, domain.TaskReady)
+	var events int
+	if err := testPool.QueryRow(ctx, `SELECT count(*) FROM execution_events WHERE execution_id = $1 AND event_type = $2`, id, string(domain.EventTaskCancelled)).Scan(&events); err != nil {
+		t.Fatal(err)
+	}
+	equal(t, "events", events, 1)
+	if err := holder.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	sweep()
+	equal(t, "b, once free", tasksByKey(t, testPool, id)["b"].State, domain.TaskCancelled)
+}
