@@ -1,0 +1,66 @@
+{{/*
+Only Kubernetes' own controllers may make a Pod that claims to be a step's:
+in a team namespace, a Pod labelled with a task Job's name (job-name or
+batch.kubernetes.io/job-name, ek-...), with a Job's controller-uid label,
+or owned by an ek- Job is refused unless kube-system's controllers (the Job
+controller, the garbage collector) or the controller manager made or
+changed it.
+
+The kernel reads a step's result from its Job's Pod (its termination
+message). It takes only Pods its Job controls, by the Job's UID
+(kernel/internal/executor/kubernetes.go), so a Pod made ahead of the Job is
+never read; this also refuses one made once the Job is there, when its UID
+can be read. Anything else that may make Pods in a team namespace, such as a
+team's own deploys, is held to it.
+
+Off with dispatchPolicy.enabled, whose team namespace label it shares.
+*/}}
+{{- if .Values.dispatchPolicy.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ include "execution-kernel.fullname" . }}-step-pods
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+    namespaceSelector:
+      matchExpressions:
+        - key: {{ .Values.dispatchPolicy.teamNamespaceLabel | quote }}
+          operator: Exists
+  matchConditions:
+    - name: not-kubernetes-own-controllers
+      expression: >-
+        !request.userInfo.username.startsWith("system:serviceaccount:kube-system:") &&
+        request.userInfo.username != "system:kube-controller-manager"
+  variables:
+    - name: labels
+      expression: >-
+        has(object.metadata.labels) ? object.metadata.labels : {}
+  validations:
+    - expression: >-
+        !(["job-name", "batch.kubernetes.io/job-name"].exists(k, k in variables.labels && variables.labels[k].startsWith("ek-")) ||
+          ["controller-uid", "batch.kubernetes.io/controller-uid"].exists(k, k in variables.labels) ||
+          (has(object.metadata.ownerReferences) &&
+            object.metadata.ownerReferences.exists(o, o.kind == "Job" && o.name.startsWith("ek-"))))
+      messageExpression: >-
+        "STEP_POD_NOT_ALLOWED: only Kubernetes' Job controller makes a step's Pods; " +
+        "this one in " + request.namespace + " has a task Job's labels or owner."
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ include "execution-kernel.fullname" . }}-step-pods
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  policyName: {{ include "execution-kernel.fullname" . }}-step-pods
+  validationActions: [Deny]
+{{- end }}

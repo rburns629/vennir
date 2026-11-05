@@ -51,6 +51,7 @@ render() {
       --show-only templates/dispatch-policy.yaml \
       --show-only templates/image-policy.yaml \
       --show-only templates/identity-policy.yaml \
+      --show-only templates/step-pods-policy.yaml \
       --set scanPolicy.requireDigest=false --show-only templates/scan-policy.yaml
     echo "---"
     # The console as the purger, as on kind and GKE, and a User and a Group.
@@ -345,6 +346,24 @@ expect "resume outside team namespaces"        "may only resume its own"     "$(
 
 echo "Image sources:"
 expect "an image from another registry"       IMAGE_NOT_ALLOWED              "$(job "$TEAM_A" busybox:1.36 run default "")"
+
+echo "Step Pods (anyone but Kubernetes' own controllers, such as a team's deploys):"
+pod() {  # namespace, metadata JSON, as (empty: this kubeconfig's user)
+  local as=()
+  [ -n "${3:-}" ] && as=(--as="$3")
+  k ${as[@]+"${as[@]}"} -n "$1" create --dry-run=server -f - 2>&1 <<EOF
+{"apiVersion":"v1","kind":"Pod","metadata":{"name":"policy-check"$2},
+ "spec":{"containers":[{"name":"product","image":"$SOURCE/app:1"}]}}
+EOF
+}
+OWNED_BY_STEP=',"ownerReferences":[{"apiVersion":"batch/v1","kind":"Job","name":"ek-0123","uid":"00000000-0000-0000-0000-000000000000","controller":true}]'
+expect "a Pod of its own"                         allowed               "$(pod "$TEAM_A" ',"labels":{"app":"orders"}')"
+expect "a Pod with a step's job-name"             STEP_POD_NOT_ALLOWED  "$(pod "$TEAM_A" ',"labels":{"job-name":"ek-0123"}')"
+expect "the newer job-name label"                 STEP_POD_NOT_ALLOWED  "$(pod "$TEAM_A" ',"labels":{"batch.kubernetes.io/job-name":"ek-0123"}')"
+expect "a Job's controller-uid"                   STEP_POD_NOT_ALLOWED  "$(pod "$TEAM_A" ',"labels":{"batch.kubernetes.io/controller-uid":"00000000-0000-0000-0000-000000000000"}')"
+expect "owned by a step's Job"                    STEP_POD_NOT_ALLOWED  "$(pod "$TEAM_A" "$OWNED_BY_STEP")"
+expect "the Job controller's"                     allowed               "$(pod "$TEAM_A" ',"labels":{"job-name":"ek-0123"}'"$OWNED_BY_STEP" system:serviceaccount:kube-system:job-controller)"
+expect "outside a team namespace"                 allowed               "$(pod "$OTHER_NS" ',"labels":{"job-name":"ek-0123"}')"
 
 echo "Step identity:"
 expect "a product, as its SA, with its secret"   allowed               "$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)"
