@@ -36,7 +36,7 @@ gaps in [Not yet enforced](#not-yet-enforced) are why.
 | Team maintainers | Manage their team: its people and their roles, register its secrets and choose which step gets which, its bots, raw DAGs, cancelling its runs | Console authorization (`auth/access.ts`): the maintainer role, per-product identity, registered team secrets |
 | Team members | See their team's runs, logs, Pods and secrets' names; run its actions and what's shared with it | The member role: nothing they can change |
 | Product images | Do their one job with the inputs and secrets they're given | Their namespace, ServiceAccount and mounted secrets; admission policies |
-| Pipelines (bots) | A team's bot: what a maintainer of its team may do; an ordering bot, only its listed templates; an automation token, only its scopes, in no team | Hashed API tokens that expire (90 days unless their maker chose otherwise) or are revoked; `auth/access.ts`'s `ensureMayOrder`. See [Bot tokens](#bot-tokens) |
+| Pipelines (bots) | A team's bot: what a maintainer of its team may do, except make tokens, bots or identities or change its people; an ordering bot, only its listed templates; an automation token, only its scopes, in no team | Hashed API tokens that expire (90 days unless their maker chose otherwise) or are revoked; `auth/access.ts`'s `ensureMayOrder`. See [Bot tokens](#bot-tokens) |
 
 ## Where secret values live
 
@@ -341,8 +341,11 @@ do depends on its kind:
 
 - **A team's bot** is a maintainer of its team (`console/src/core/tokens.ts`),
   so its token can do what a maintainer can there: register and replace
-  the team's secrets, submit raw DAGs, retry and cancel the team's runs,
-  and manage its people and bots.
+  the team's secrets, submit raw DAGs, retry and cancel the team's runs.
+  No bot makes credentials or changes who's in the team: bots, their tokens
+  and keyless identities, members, roles and the team's sign-in rule are
+  people's to change (`auth/access.ts`'s `ensureNotBot`), so a keyless
+  session's hour is all it ever has.
 - **An ordering bot** is a member, and may only order the templates its
   maintainers list for it ([Ordering bots](#ordering-bots)); it calls no API
   through the gateway.

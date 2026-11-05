@@ -8,7 +8,7 @@ In the examples, the console is `https://vennir.example.com` and the team is `te
 
 ## 1. Get a token
 
-In the console, open your team → **Automation → Add a bot**, say what will use it, and copy the token: it's shown only once. Only a maintainer of the team can add a bot. The bot acts as a maintainer of your team, and of nothing else: it can submit and retry your team's DAGs. Its address is your team's alone: another team's bot's address is refused, so choose a new one. Store the token as a secret in your pipeline, for example:
+In the console, open your team → **Automation → Add a bot**, say what will use it, and copy the token: it's shown only once. Only a maintainer of the team can add a bot. The bot acts as a maintainer of your team, and of nothing else: it can submit and retry your team's DAGs. It can't make tokens or bots, or change the team's people: those are a person's to do. Its address is your team's alone: another team's bot's address is refused, so choose a new one. Store the token as a secret in your pipeline, for example:
 
 ```console
 $ gh secret set VENNIR_TOKEN --repo <your-org>/<your-repo>

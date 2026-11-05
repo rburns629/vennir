@@ -34,6 +34,18 @@ export function ensureMayOrder(authUser: { orderTemplates?: string[] } | undefin
   }
 }
 
+/**
+ * A bot (a pipeline's, an ordering one, a keyless CI job's) acts with what
+ * its team gave it and gives nothing on: it makes no tokens, identities or
+ * bots, and changes no one's membership or the team's sign-in. A keyless
+ * session lasts an hour, and a token it made would outlast it.
+ */
+export function ensureNotBot(authUser: { isBot?: boolean } | undefined, what: string): void {
+  if (authUser?.isBot) {
+    throw new ApiError(403, "FORBIDDEN", `A bot can't ${what}: a person who maintains the team does.`);
+  }
+}
+
 /** A member of the team, or a platform admin. */
 export function canActForTeam(authUser: AuthUser, team: string): boolean {
   return authUser !== undefined && (authUser.isAdmin || authUser.teamNames.includes(team));

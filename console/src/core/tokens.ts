@@ -17,7 +17,7 @@ import { Type } from "@sinclair/typebox";
 import { eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { ApiError, forbiddenUnlessAdmin } from "../apiError.js";
-import { canMaintainTeam, ensureTeamMaintainer } from "../auth/access.js";
+import { canMaintainTeam, ensureNotBot, ensureTeamMaintainer } from "../auth/access.js";
 import { generateApiToken, hashApiToken } from "../auth/apiToken.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { ScopeSchema } from "../auth/scopes.js";
@@ -78,6 +78,7 @@ export async function createBotToken(
   teamName: string,
   input: { email: string; label: string; ordering?: boolean; orderTemplates?: string[]; expiresInDays?: number },
 ) {
+  ensureNotBot(caller, "make a bot or its token");
   const team = await teamForMaintainer(caller, teamName);
   ensureNotRetired(team);
   const bot = await teamBot(team, input);
@@ -133,6 +134,7 @@ export async function ensureTeamsBot(teamName: string, email: string, botId: str
 
 /** Sets what an ordering bot of the team may order (its maintainers). */
 export async function setBotOrders(caller: AuthUser | undefined, teamName: string, email: string, templates: string[]) {
+  ensureNotBot(caller, "change what a bot may order");
   const team = await teamForMaintainer(caller, teamName);
   ensureNotRetired(team);
   const bot = (await listBotsForTeam(team.id)).find((b) => b.email === normalEmail(email));
@@ -155,6 +157,7 @@ export async function setBotCallback(
   email: string,
   input: { url: string; rotateSecret: boolean },
 ): Promise<{ host: string; signingSecret: string }> {
+  ensureNotBot(caller, "change a bot's order callback");
   const team = await teamForMaintainer(caller, teamName);
   ensureNotRetired(team);
   const bot = (await listBotsForTeam(team.id)).find((b) => b.email === normalEmail(email));

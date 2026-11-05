@@ -19,7 +19,7 @@ import { Type } from "@sinclair/typebox";
 import type { FastifyBaseLogger } from "fastify";
 import { groupSources, teamIsMapped } from "../sso.js";
 import { ApiError, externalSecretsMissing, forbiddenUnlessAdmin } from "../apiError.js";
-import { canActForTeam, ensureTeamMaintainer, ensureTeamMember } from "../auth/access.js";
+import { canActForTeam, ensureNotBot, ensureTeamMaintainer, ensureTeamMember } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { hasScope, SCOPES } from "../auth/scopes.js";
 import { config, QUANTITY } from "../config.js";
@@ -212,6 +212,7 @@ export async function addMember(
   email: string,
   role: TeamRole = "member",
 ): Promise<void> {
+  ensureNotBot(caller, "add a team member");
   const team = await maintainedTeam(caller, teamName);
   ensureNotRetired(team);
   const user = await findUserByEmail(email);
@@ -263,6 +264,7 @@ export async function removeMember(
   userId: string,
   log: FastifyBaseLogger,
 ): Promise<void> {
+  ensureNotBot(caller, "remove a team member");
   const team = await maintainedTeam(caller, teamName);
   ensureNotRetired(team);
   const all = await listMembersForTeam(team.id);
@@ -283,6 +285,7 @@ export async function setMemberRole(
   role: TeamRole,
   log: FastifyBaseLogger,
 ): Promise<void> {
+  ensureNotBot(caller, "change a member's role");
   const team = await maintainedTeam(caller, teamName);
   ensureNotRetired(team);
   const all = await listMembersForTeam(team.id);
@@ -302,6 +305,7 @@ export async function setMemberRole(
  * but without effect, so nobody is locked out.
  */
 export async function setTeamSignIn(caller: AuthUser | undefined, teamName: string, requireSso: boolean, log: FastifyBaseLogger) {
+  ensureNotBot(caller, "change how the team signs in");
   forbiddenUnlessAdmin(caller, "Only an admin decides how a team signs in.");
   const team = await findTeamByName(teamName);
   if (!team) throw new ApiError(404, "NOT_FOUND", `No team named "${teamName}".`, Code.NotFound);
