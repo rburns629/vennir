@@ -124,9 +124,10 @@ imageSignature:
 # start a new one.
 executionRetentionDays: 90
 
-# -- Images that failed their security scan don't run (templates/
-# scan-policy.yaml): the console keeps the failed digests here (the console
-# chart's scanning). requireDigest: every step's image must be pinned
+# -- Only images that passed their security scan run (templates/
+# scan-policy.yaml): the console keeps the digests that passed, or that an
+# admin accepted, here (the console chart's scanning, which must be on
+# whenever this is). requireDigest: every step's image must be pinned
 # (`…@sha256:…`), as the console does at submission, so the digest checked
 # is the image that runs.
 scanPolicy:

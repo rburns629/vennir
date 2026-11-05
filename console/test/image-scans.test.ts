@@ -14,18 +14,36 @@ import { hashPassword } from "../src/auth/password.js";
 import { config } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { createUser, setUserAdmin } from "../src/db/queries.js";
-import { imageScans, products, users } from "../src/db/schema.js";
+import { imageScans, products, submittedExecutions, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { caller } from "./rpc.js";
 
 const call = caller(() => app);
 import { createScanJob, readScanJob, scaleScanner, updateScanPolicy } from "../src/k8s.js";
-import { combineScanOutputs, parseScanOutput, reconcileScans, requestScan, RETRY_ERRORED_MINUTES, scanBlocker, scanTarget, syncScanPolicy, verdictOf } from "../src/scanning.js";
+import {
+  ADMIT_GRACE_MINUTES,
+  admittedDigests,
+  combineScanOutputs,
+  parseScanOutput,
+  reconcileScans,
+  requestScan,
+  RETRY_ERRORED_MINUTES,
+  scanBlocker,
+  scanTarget,
+  syncScanPolicy,
+  UPGRADE_OVERLAP_MS,
+  verdictOf,
+} from "../src/scanning.js";
 
 /** What each scan Job (by target) prints when it finishes. */
 const outputs = new Map<string, string>();
 const jobs = new Map<string, string>(); // job name -> target
-let policyWritten: string | undefined;
+/** The scan policy's variables the console writes, as the chart seeds them. */
+const seeded = (): Record<string, string> => ({
+  unlistedAdmitted: "false",
+  ...Object.fromEntries([..."0123456789abcdef"].map((digit) => [`allowedDigests${digit}`, "{}"])),
+});
+let policyWritten: Record<string, string> | undefined;
 /** The Trivy server's Deployment, for the idling tests. */
 const scanner = { replicas: 1, ready: 1 };
 
@@ -46,8 +64,10 @@ vi.mock("../src/k8s.js", async (importOriginal) => ({
     if (replicas === 0) scanner.ready = 0;
     return Promise.resolve();
   }),
-  updateScanPolicy: vi.fn(async (_name: string, build: () => Promise<string>) => {
-    policyWritten = await build();
+  // The policy's literal is kept between calls, as the cluster would.
+  updateScanPolicy: vi.fn(async (_name: string, build: (current: Record<string, string>) => Promise<Record<string, string>>) => {
+    const current = policyWritten ?? seeded();
+    policyWritten = { ...current, ...(await build(current)) };
     return true;
   }),
 }));
@@ -83,6 +103,7 @@ afterAll(async () => {
   Object.assign(config.scanning, original);
   await db.delete(imageScans).where(like(imageScans.image, `%${prefix}%`));
   await db.delete(products).where(like(products.name, `${prefix}%`));
+  await db.delete(submittedExecutions).where(like(submittedExecutions.name, `${prefix}%`));
   await db.delete(users).where(inArray(users.email, emails));
   await app.close();
 });
@@ -93,6 +114,10 @@ beforeEach(() => {
   vi.mocked(updateScanPolicy).mockClear();
   policyWritten = undefined;
 });
+
+/** What the cluster's scan policy says of a digest: true admits it. */
+const listed = (digest: string): unknown =>
+  (JSON.parse(policyWritten?.[`allowedDigests${digest.charAt(7)}`] ?? "{}") as Record<string, unknown>)[digest];
 
 /** Starts the image's scan, lets its Job finish with `output`, and records it. */
 async function scanned(img: string, output: string): Promise<void> {
@@ -158,13 +183,27 @@ describe("what a verdict allows", () => {
     expect(createScanJob).toHaveBeenCalledOnce(); // no second scan while the verdict is fresh
   });
 
+  it("has the cluster admit a clean image before saying it may run, and waits for that write", async () => {
+    const img = image();
+    const digest = img.split("@")[1] ?? "";
+    expect((await scanBlocker([img]))?.error).toBe("IMAGE_SCAN_PENDING");
+    expect(listed(digest)).toBeUndefined(); // not while it's being scanned
+    outputs.set(scanTarget(img).target, CLEAN);
+    await reconcileScans();
+    vi.mocked(updateScanPolicy).mockClear();
+    expect(await scanBlocker([img])).toBeNull();
+    expect(listed(digest)).toBe(true);
+    expect(vi.mocked(updateScanPolicy).mock.calls[0]?.[2]).toEqual({ settle: true });
+  });
+
   it("blocks a failed image, and tells the cluster", async () => {
     const img = image();
     await scanned(img, VULNERABLE);
     const blocker = await scanBlocker([img]);
     expect(blocker?.error).toBe("IMAGE_SCAN_FAILED");
     expect(blocker?.images[0]?.findings?.fixable).toBe(1);
-    expect(JSON.parse(policyWritten ?? "[]")).toContain(img.split("@")[1]);
+    await syncScanPolicy();
+    expect(listed(img.split("@")[1] ?? "")).toBeUndefined();
   });
 
   it("refuses to register a failed image", async () => {
@@ -184,9 +223,12 @@ describe("what a verdict allows", () => {
     const accept = (token: string, reason: string) => call(token, "ImageService/AcceptImageScan", { digest, reason });
     expect((await accept(app.jwt.sign({ userId: member }), "No fix applies to how we use it.")).code).toBe("permission_denied");
     expect((await accept(admin, "ok")).code).toBe("invalid_argument"); // a real reason
+    await syncScanPolicy();
+    expect(listed(digest)).toBeUndefined();
     expect((await accept(admin, "Not reachable: the binary never parses untrusted input.")).code).toBe("ok");
+    expect(listed(digest)).toBe(true); // written as it's accepted
     expect(await scanBlocker([img])).toBeNull();
-    expect(JSON.parse(policyWritten ?? "[]")).not.toContain(digest);
+    expect(listed(digest)).toBe(true);
   });
 
   it("waits before trying again a rescan that couldn't scan, keeping the last verdict meanwhile", async () => {
@@ -258,7 +300,7 @@ describe("what a verdict allows", () => {
       expect(row).toMatchObject({ status: "failed", jobName: null });
       expect((row?.findings as { fixable?: number } | null)?.fixable).toBe(1);
       await syncScanPolicy();
-      expect(JSON.parse(policyWritten ?? "[]")).toContain(digest);
+      expect(listed(digest)).toBeUndefined();
     } finally {
       vi.mocked(readScanJob).mockImplementation((_namespace: string, name: string) => {
         const output = outputs.get(jobs.get(name) ?? "");
@@ -361,6 +403,90 @@ describe("what a verdict allows", () => {
     expect(again.code).toBe("ok");
     const listed = await call<{ scans?: { digest: string; scannedAt?: string }[] }>(admin, "ImageService/ListImageScans");
     expect(listed.body.scans?.find((x) => x.digest === digest)?.scannedAt).toBeUndefined();
+  });
+});
+
+describe("the cluster's allow list", () => {
+  /** A clean image, scanned, last used `minutesAgo`. */
+  async function clean(minutesAgo: number): Promise<{ img: string; digest: string }> {
+    const img = image();
+    await scanned(img, CLEAN);
+    const digest = img.split("@")[1] ?? "";
+    await db.update(imageScans).set({ lastUsedAt: new Date(Date.now() - minutesAgo * 60_000) }).where(eq(imageScans.digest, digest));
+    return { img, digest };
+  }
+
+  async function execution(img: string, finished: boolean): Promise<void> {
+    await db.insert(submittedExecutions).values({
+      executionId: randomUUID(),
+      teams: ["team-a"],
+      name: `${prefix}-run`,
+      payload: { tasks: [{ id: "a", team: "team-a", image: img, action: "run" }] },
+      resourcesRecordedAt: finished ? new Date() : null,
+    });
+  }
+
+  it("keeps what's in use and prunes the rest", async () => {
+    const recent = await clean(5);
+    const unused = await clean(ADMIT_GRACE_MINUTES + 30);
+    const running = await clean(ADMIT_GRACE_MINUTES + 30);
+    const finished = await clean(ADMIT_GRACE_MINUTES + 30);
+    const registered = await clean(ADMIT_GRACE_MINUTES + 30);
+    const failed = image();
+    await scanned(failed, VULNERABLE);
+    const failedDigest = failed.split("@")[1] ?? "";
+    await execution(running.img, false);
+    await execution(finished.img, true);
+    await execution(failed, false); // in use, but it never passed
+    await db.insert(products).values({ name: `${prefix}-registered`, image: registered.img, action: "run" });
+
+    await syncScanPolicy();
+    expect(listed(recent.digest)).toBe(true);
+    expect(listed(running.digest)).toBe(true);
+    expect(listed(registered.digest)).toBe(true);
+    expect(listed(unused.digest)).toBeUndefined();
+    expect(listed(finished.digest)).toBeUndefined();
+    expect(listed(failedDigest)).toBeUndefined();
+    expect(await admittedDigests()).not.toContain(unused.digest);
+  });
+
+  it("admits a pruned digest again when it's submitted again", async () => {
+    const { img, digest } = await clean(ADMIT_GRACE_MINUTES + 30);
+    await syncScanPolicy();
+    expect(listed(digest)).toBeUndefined();
+    expect(await scanBlocker([img])).toBeNull();
+    expect(listed(digest)).toBe(true);
+  });
+
+  it("doesn't write when every digest is admitted already", async () => {
+    const { img } = await clean(1);
+    expect(await scanBlocker([img])).toBeNull();
+    const before = JSON.stringify(policyWritten);
+    expect(await scanBlocker([img])).toBeNull();
+    expect(JSON.stringify(policyWritten)).toBe(before);
+  });
+
+  it("keeps the chart's upgrade seed for a while, refusing failed digests, then writes the allow list alone", async () => {
+    const passed = await clean(1);
+    const failed = image();
+    await scanned(failed, VULNERABLE);
+    const failedDigest = failed.split("@")[1] ?? "";
+    policyWritten = { ...seeded(), unlistedAdmitted: "true" };
+    await syncScanPolicy();
+    expect(policyWritten["unlistedAdmitted"]).toBe("true");
+    expect(listed(failedDigest)).toBe(false);
+    expect(listed(passed.digest)).toBe(true);
+
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now + UPGRADE_OVERLAP_MS + 1000);
+    try {
+      expect(await scanBlocker([passed.img])).toBeNull(); // the seed is past its time: rewritten
+      expect(policyWritten["unlistedAdmitted"]).toBe("false");
+      expect(listed(failedDigest)).toBeUndefined();
+      expect(listed(passed.digest)).toBe(true);
+    } finally {
+      clock.mockRestore();
+    }
   });
 });
 

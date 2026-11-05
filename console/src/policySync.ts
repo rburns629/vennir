@@ -2,7 +2,7 @@
 /**
  * Keeps the cluster's copies of the console's lists from drifting: the
  * identity policy (products and team secrets, productPolicy.ts), the scan
- * policy (failed digests, scanning.ts) and each team's copy of the pull
+ * policy (admitted digests, scanning.ts) and each team's copy of the pull
  * Secret (pullSecret.ts). Each is rewritten whenever its data changes; this
  * also rewrites them every few minutes, so a write that
  * failed, or a hand edit to a policy, is put right without waiting for the

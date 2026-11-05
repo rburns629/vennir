@@ -15,13 +15,15 @@
  * executions.ts), never steps already running, until a rescan finds it
  * clean or an admin accepts it with a reason. Images in use are rescanned
  * daily, since new vulnerabilities are published against old images. The
- * kernel chart's scan policy holds the failed digests (syncScanPolicy), so
- * the cluster refuses them however a Job reaches it.
+ * kernel chart's scan policy admits only the digests that passed (or were
+ * accepted) and are still in use (syncScanPolicy, digestInUse), so the
+ * cluster refuses anything else however a Job reaches it. A submission
+ * writes its digests there before kernel-api has it (scanBlocker).
  */
-import { and, eq, gt, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { config } from "./config.js";
 import { db } from "./db/client.js";
-import { imageScans } from "./db/schema.js";
+import { imageScans, products, submittedExecutions } from "./db/schema.js";
 import { normalizeImage } from "./imageRef.js";
 import { createScanJob, deleteScanJob, NO_PLATFORM_MARKER, readScanJob, readScanner, scaleScanner, updateScanPolicy } from "./k8s.js";
 import { scansFinished } from "./metrics.js";
@@ -138,6 +140,172 @@ export function scanTarget(image: string): { target: string; insecure: boolean }
 
 function blocks(row: ScanRow): boolean {
   return row.status === "failed" && row.acceptedAt === null;
+}
+
+/** How long a digest stays admitted after it was last used (digestInUse). */
+export const ADMIT_GRACE_MINUTES = 60;
+
+/**
+ * The most digests the scan policy may hold (scan-policy.yaml's header):
+ * about 80 bytes each, so about 400 KB, well under etcd's 1.5 MiB object
+ * limit (and Helm's release Secrets, which keep it, hold 1 MiB). It holds
+ * them in sixteen maps by their first hex digit, since the API server
+ * compiles at most 100,000 characters per CEL expression: at most
+ * MAX_PER_MAP in each.
+ */
+export const MAX_ADMITTED_DIGESTS = 5_000;
+export const MAX_PER_MAP = 1_200;
+const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"];
+
+const PINNED_DIGEST = "@(sha256:[a-f0-9]{64})$";
+
+/**
+ * Whether a scan's digest is still in use, so the cluster must keep
+ * admitting it (scan-policy.yaml's header): a registered product's image
+ * (by digest), a step of an execution not yet seen finished (the kernel
+ * starts its later steps and attempts by itself), or used in the last
+ * ADMIT_GRACE_MINUTES (a submission whose execution isn't recorded yet).
+ * Whatever else runs again goes through a submission or retry, which
+ * scans it and admits it again first. The subqueries never yield NULL (an
+ * image that isn't pinned), so neither does this, and NOT digestInUse
+ * (retention.ts) means what it says.
+ */
+export const digestInUse: SQL = sql`(
+  ${imageScans.lastUsedAt} > now() - make_interval(mins => ${ADMIT_GRACE_MINUTES})
+  OR ${imageScans.digest} IN (
+    SELECT digest FROM (SELECT substring(${products.image} from ${PINNED_DIGEST}) AS digest FROM ${products}) AS registered
+    WHERE digest IS NOT NULL
+  )
+  OR ${imageScans.digest} IN (
+    SELECT digest FROM (
+      SELECT substring(step.task->>'image' from ${PINNED_DIGEST}) AS digest
+      FROM ${submittedExecutions},
+        jsonb_array_elements(CASE WHEN jsonb_typeof(${submittedExecutions.payload}->'tasks') = 'array'
+          THEN ${submittedExecutions.payload}->'tasks' ELSE '[]'::jsonb END) AS step(task)
+      WHERE ${submittedExecutions.resourcesRecordedAt} IS NULL
+    ) AS running
+    WHERE digest IS NOT NULL
+  )
+)`;
+
+/** The digests the cluster admits: passed, or failed and accepted, and in use. */
+export async function admittedDigests(): Promise<string[]> {
+  const rows = await db
+    .select({ digest: imageScans.digest })
+    .from(imageScans)
+    .where(
+      and(
+        or(eq(imageScans.status, "passed"), and(eq(imageScans.status, "failed"), isNotNull(imageScans.acceptedAt))),
+        digestInUse,
+      ),
+    )
+    .orderBy(imageScans.digest);
+  return rows.map((row) => row.digest);
+}
+
+/**
+ * How long after this console starts it keeps the kernel chart's upgrade
+ * seed (unlistedAdmitted true, scan-policy.yaml): consoles from before the
+ * allow list, which don't write it, may still be taking submissions during
+ * this one's rollout. Only kept when it's there; never set.
+ */
+export const UPGRADE_OVERLAP_MS = 10 * 60_000;
+const startedAt = Date.now();
+
+/** What the scan policy says: each listed digest admitted (true) or not, and whether one not listed is. */
+interface ScanPolicyState {
+  digests: Map<string, boolean>;
+  unlistedAdmitted: boolean;
+}
+
+/** The state the policy's variables (k8s.ts's updateScanPolicy) hold; a literal that can't be read counts as empty. */
+function readState(variables: Record<string, string>): ScanPolicyState {
+  const digests = new Map<string, boolean>();
+  for (const digit of DIGITS) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(variables[`allowedDigests${digit}`] ?? "{}");
+    } catch {
+      continue;
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) continue;
+    for (const [digest, admitted] of Object.entries(parsed)) {
+      if (typeof admitted === "boolean") digests.set(digest, admitted);
+    }
+  }
+  return { digests, unlistedAdmitted: variables["unlistedAdmitted"] === "true" };
+}
+
+/** The policy's variables for a state: each digest in its first hex digit's map. */
+function writeState(state: ScanPolicyState): Record<string, string> {
+  if (state.digests.size > MAX_ADMITTED_DIGESTS) {
+    throw new Error(`${String(state.digests.size)} image digests are in use, more than the scan policy holds (${String(MAX_ADMITTED_DIGESTS)}).`);
+  }
+  const maps = new Map<string, Record<string, boolean>>(DIGITS.map((digit) => [digit, {}]));
+  for (const digest of [...state.digests.keys()].sort()) {
+    const map = maps.get(digest.charAt(7));
+    if (map) map[digest] = state.digests.get(digest) ?? false;
+  }
+  const variables: Record<string, string> = { unlistedAdmitted: String(state.unlistedAdmitted) };
+  for (const [digit, map] of maps) {
+    if (Object.keys(map).length > MAX_PER_MAP) {
+      throw new Error(`More than ${String(MAX_PER_MAP)} image digests in use start ${digit}, more than the scan policy holds in one map.`);
+    }
+    variables[`allowedDigests${digit}`] = JSON.stringify(map);
+  }
+  return variables;
+}
+
+/** Whether the policy admits a digest, as its CEL does. */
+function stateAdmits(state: ScanPolicyState, digest: string): boolean {
+  const listed = state.digests.get(digest);
+  return listed === true || (listed === undefined && state.unlistedAdmitted);
+}
+
+/**
+ * What the scan policy should say, given what it says now: each admitted
+ * digest, true. While the chart's upgrade seed is there and this console
+ * started less than UPGRADE_OVERLAP_MS ago, unlistedAdmitted stays true,
+ * with each digest that fails (and isn't accepted) listed false, as the
+ * deny list before it.
+ */
+async function wantedState(current: ScanPolicyState): Promise<ScanPolicyState> {
+  const wanted: ScanPolicyState = { digests: new Map(), unlistedAdmitted: false };
+  if (current.unlistedAdmitted && Date.now() - startedAt < UPGRADE_OVERLAP_MS) {
+    wanted.unlistedAdmitted = true;
+    const refused = await db
+      .select({ digest: imageScans.digest })
+      .from(imageScans)
+      .where(and(eq(imageScans.status, "failed"), isNull(imageScans.acceptedAt)));
+    for (const { digest } of refused) wanted.digests.set(digest, false);
+  }
+  for (const digest of await admittedDigests()) wanted.digests.set(digest, true);
+  return wanted;
+}
+
+/**
+ * Makes sure the cluster admits these digests, which have just passed (or
+ * been accepted), before a step of them is handed to kernel-api: when one
+ * isn't admitted yet (or the chart's upgrade seed is there past
+ * UPGRADE_OVERLAP_MS), the whole list is rewritten and the write waited
+ * for. Returns the digests it still doesn't admit: their verdict changed
+ * meanwhile.
+ */
+async function admit(digests: string[]): Promise<string[]> {
+  if (digests.length === 0 || !config.scanning.policyName) return [];
+  let state: ScanPolicyState = { digests: new Map(), unlistedAdmitted: false };
+  const exists = await updateScanPolicy(
+    config.scanning.policyName,
+    async (variables) => {
+      state = readState(variables);
+      const seedExpired = state.unlistedAdmitted && Date.now() - startedAt >= UPGRADE_OVERLAP_MS;
+      if (!seedExpired && digests.every((digest) => stateAdmits(state, digest))) return variables;
+      state = await wantedState(state);
+      return writeState(state);
+    },
+    { settle: true },
+  );
+  return exists ? digests.filter((digest) => !stateAdmits(state, digest)) : [];
 }
 
 /**
@@ -265,7 +433,7 @@ export async function reconcileScans(): Promise<boolean> {
       // The registry no longer has it: scanning again can never work. It
       // can't run either; if it's ever pushed again, its next use scans it.
       // A failed verdict is kept (below, as a rescan that couldn't run), so
-      // the digest stays on the cluster's deny list.
+      // the console keeps refusing it.
       const gone = await db.delete(imageScans).where(thisJob).returning({ digest: imageScans.digest });
       await deleteScanJob(namespace, row.jobName);
       if (gone.length === 0) continue;
@@ -333,13 +501,13 @@ export async function reconcileScans(): Promise<boolean> {
   return changed;
 }
 
-/** Writes every blocking digest into the kernel chart's scan policy. */
+/**
+ * Writes the digests the cluster admits (admittedDigests) into the kernel
+ * chart's scan policy, pruning those no longer in use.
+ */
 export async function syncScanPolicy(): Promise<boolean> {
   if (!config.scanning.enabled || !config.scanning.policyName) return false;
-  return updateScanPolicy(config.scanning.policyName, async () => {
-    const rows = await db.select().from(imageScans).where(eq(imageScans.status, "failed"));
-    return JSON.stringify(rows.filter(blocks).map((row) => row.digest).sort());
-  });
+  return updateScanPolicy(config.scanning.policyName, async (variables) => writeState(await wantedState(readState(variables))));
 }
 
 export interface ScanBlocker {
@@ -352,7 +520,8 @@ export interface ScanBlocker {
  * Why these (pinned) images may not run, or null when they may: each must
  * have passed its scan, or been accepted. A first scan is waited for, up to
  * config.scanning.waitSeconds; one still running then asks the caller to
- * try again.
+ * try again. Null also means the cluster's scan policy admits them now
+ * (admit), so call it before handing kernel-api what runs them.
  */
 export async function scanBlocker(images: string[]): Promise<ScanBlocker | null> {
   if (!config.scanning.enabled) return null;
@@ -380,7 +549,16 @@ export async function scanBlocker(images: string[]): Promise<ScanBlocker | null>
     }
     const waiting = pinned.filter((image) => rows.get(image)?.status === "pending");
     const errored = pinned.filter((image) => rows.get(image)?.status === "error");
-    if (waiting.length === 0 && errored.length === 0) return null;
+    if (waiting.length === 0 && errored.length === 0) {
+      const unadmitted = await admit([...new Set(pinned.map((image) => digestOf(image) ?? ""))]);
+      if (unadmitted.length === 0) return null;
+      const changed = pinned.filter((image) => unadmitted.includes(digestOf(image) ?? ""));
+      return {
+        error: "IMAGE_SCAN_PENDING",
+        message: `The scan verdict of ${changed.join(", ")} changed while it was being submitted; try again.`,
+        images: changed.map((image) => ({ image, digest: digestOf(image) ?? "" })),
+      };
+    }
     if (Date.now() >= deadline) {
       return waiting.length > 0
         ? {

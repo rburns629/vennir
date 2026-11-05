@@ -1,31 +1,93 @@
 {{/*
-Images that failed their security scan don't run, however the Job reaches
-the cluster: the cluster's copy of the console's scan verdicts
-(console/src/scanning.ts). The console scans every image before a step may
-run it and keeps `blockedDigests` here current: the digests that failed,
-unless an admin accepted one. With requireDigest, every step's image must
-also be pinned (`…@sha256:…`), which the console does at submission, so a
-digest is what's checked, never a tag that could move.
+Only images that passed their security scan on this install run, however
+the Job reaches the cluster: the cluster's copy of the console's scan
+verdicts (console/src/scanning.ts). With requireDigest, every step's image
+must also be pinned (`…@sha256:…`), which the console does at submission,
+so a digest is what's checked, never a tag that could move.
 
-A refusal is a non-retryable IMAGE_SCAN_FAILED (or IMAGE_NOT_PINNED). The
-literal is seeded empty on install and kept on upgrade (lookup), re-encoded
-as JSON, as for identity-policy.yaml.
+The allow list is CEL map literals, digest to true, that the console keeps
+current: the digests whose newest scan passed, or that an admin accepted,
+and that are still in use. In use means any of
+  - a registered product's image, when it's registered by digest;
+  - a step of an execution the console hasn't seen finish (its
+    submitted_executions row not yet recorded), since the kernel starts
+    later steps and further attempts of a running execution by itself;
+  - used (registered, submitted, retried or rerun) in the last hour, which
+    covers a submission between its digest being written here and its
+    execution being recorded.
+Everything else is pruned at the console's next sync (every few minutes).
+A schedule, template run, readiness check, rerun or retry goes through the
+console's submission again, which scans the digest and writes it here
+before kernel-api has the execution, so a pruned digest comes back before
+it's needed. The console waits a few seconds after a write that added a
+digest, for the API servers to load the new policy.
+
+A step's digest that isn't admitted is refused with a non-retryable
+IMAGE_SCAN_FAILED (or IMAGE_NOT_PINNED when it isn't pinned at all).
+Without requireDigest, an unpinned image isn't checked here.
+
+Size: the Kubernetes API server compiles at most 100,000 characters per CEL
+expression, about 1,250 digests (each entry is about 80). So the list is
+sixteen maps, `allowedDigests0` to `allowedDigestsf`, by the digest's first
+hex digit, and `allowedDigests` maps each digit to its map: a lookup costs
+the same however many it holds. The console writes at most 5,000 digests
+(scanning.ts's MAX_ADMITTED_DIGESTS: about 400 KB, well under etcd's
+1.5 MiB object limit, and kept in Helm's release Secrets too, which hold
+1 MiB) and at most 1,200 in any one map.
+
+The literals are seeded on install as {} and kept on upgrade (lookup),
+re-encoded as JSON, as for identity-policy.yaml. `unlistedAdmitted` is
+false, except on an install upgraded from the chart that kept a deny list
+(`blockedDigests`): there it's seeded true (admit what isn't listed), with
+each digest that list refused listed false, so steps keep running as they
+did. The new console, which rewrites the list at startup and every few
+minutes, keeps that for its first ten minutes, while consoles from before,
+which don't write the list, may still take submissions during its rollout;
+then it writes the allow list alone, digests mapped to true, and
+unlistedAdmitted false. It never sets it true. The console chart's
+scanning must be on whenever this policy is: otherwise nothing ever writes
+the list, and every pinned step is refused.
 */}}
 {{- if .Values.scanPolicy.enabled }}
 {{- $scheduler := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-kernel.serviceAccountName" .) }}
 {{- $name := printf "%s-scan" (include "execution-kernel.fullname" .) }}
-{{- $blocked := "[]" }}
+{{- $digits := splitList "" "0123456789abcdef" }}
+{{- $shards := dict }}
+{{- range $digits }}
+{{- $_ := set $shards . dict }}
+{{- end }}
+{{- $unlisted := false }}
 {{- $existing := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $name }}
 {{- if $existing }}
+{{- $found := false }}
+{{- range $existing.spec.variables }}
+{{- $digit := trimPrefix "allowedDigests" .name }}
+{{- if and (ne $digit .name) (hasKey $shards $digit) }}
+{{- $found = true }}
+{{- range $digest, $admitted := fromJson .expression }}
+{{- if not (and (regexMatch "^sha256:[a-f0-9]{64}$" $digest) (eq (substr 7 8 $digest) $digit) (kindIs "bool" $admitted)) }}
+{{- fail (printf "%s's allowedDigests%s isn't a JSON map of sha256 digests starting %s to true or false; delete the policy and let the console resync it." $name $digit $digit) }}
+{{- end }}
+{{- $_ := set (index $shards $digit) $digest $admitted }}
+{{- end }}
+{{- else if eq .name "unlistedAdmitted" }}
+{{- if not (has .expression (list "true" "false")) }}
+{{- fail (printf "%s's unlistedAdmitted isn't true or false; delete the policy and let the console resync it." $name) }}
+{{- end }}
+{{- $unlisted = eq .expression "true" }}
+{{- end }}
+{{- end }}
+{{- if not $found }}
 {{- range $existing.spec.variables }}
 {{- if eq .name "blockedDigests" }}
-{{- $stored := fromJsonArray .expression }}
-{{- range $stored }}
+{{- $unlisted = true }}
+{{- range fromJsonArray .expression }}
 {{- if not (and (kindIs "string" .) (regexMatch "^sha256:[a-f0-9]{64}$" .)) }}
 {{- fail (printf "%s's blockedDigests isn't a JSON list of sha256 digests; delete the policy and let the console resync it." $name) }}
 {{- end }}
+{{- $_ := set (index $shards (substr 7 8 .)) . false }}
 {{- end }}
-{{- $blocked = toJson $stored }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
@@ -47,14 +109,30 @@ spec:
     - name: from-kernel-scheduler
       expression: request.userInfo.username == {{ $scheduler | quote }}
   variables:
-    # The one the console edits.
-    - name: blockedDigests
-      expression: {{ $blocked | toJson }}
+    # The ones the console edits: unlistedAdmitted and the sixteen maps.
+    - name: unlistedAdmitted
+      expression: {{ ternary "true" "false" $unlisted | quote }}
+    {{- range $digits }}
+    - name: allowedDigests{{ . }}
+      expression: {{ toJson (index $shards .) | toJson }}
+    {{- end }}
+    - name: allowedDigests
+      expression: >-
+        { {{- range $i, $digit := $digits }}{{ if $i }}, {{ end }}{{ $digit | quote }}: dyn(variables.allowedDigests{{ $digit }}){{ end -}} }
     - name: images
       expression: >-
         object.spec.template.spec.containers.map(c, c.image) +
           (has(object.spec.template.spec.initContainers) ?
             object.spec.template.spec.initContainers.map(c, c.image) : [])
+    # Pinned images whose digest isn't admitted: not a sha256 digest, listed
+    # false, or not listed while unlistedAdmitted is false.
+    - name: unadmitted
+      expression: >-
+        variables.images.filter(i, i.contains("@") &&
+          !(i.split("@")[1].matches("^sha256:[a-f0-9]{64}$") &&
+            (i.split("@")[1] in variables.allowedDigests[i.split("@")[1].substring(7, 8)] ?
+              variables.allowedDigests[i.split("@")[1].substring(7, 8)][i.split("@")[1]] == true :
+              variables.unlistedAdmitted)))
   validations:
     {{- if .Values.scanPolicy.requireDigest }}
     - expression: variables.images.all(i, i.contains("@sha256:"))
@@ -64,13 +142,13 @@ spec:
         "pins every image when a DAG is submitted."
       reason: Forbidden
     {{- end }}
-    - expression: >-
-        !variables.images.exists(i, i.contains("@") && i.split("@")[1] in variables.blockedDigests)
+    - expression: size(variables.unadmitted) == 0
       messageExpression: >-
-        "IMAGE_SCAN_FAILED: " + variables.images.filter(i, i.contains("@") &&
-          i.split("@")[1] in variables.blockedDigests).join(", ") +
-        " failed its security scan (a HIGH or CRITICAL vulnerability with a fix, or a secret in " +
-        "the image). Rebuild it, or an admin can accept it in the console."
+        "IMAGE_SCAN_FAILED: " + variables.unadmitted.join(", ") +
+        " hasn't passed a security scan on this install: its scan failed (a HIGH or CRITICAL " +
+        "vulnerability with a fix, or a secret in the image), or it was never scanned here. The " +
+        "console scans every image when a step is submitted or retried; rebuild it, or an admin " +
+        "can accept a failed scan in the console."
       reason: Forbidden
 ---
 apiVersion: admissionregistration.k8s.io/v1

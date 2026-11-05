@@ -160,7 +160,7 @@ async function main(): Promise<void> {
   startReadiness(app.log);
   // Teams' schedules that are due (scheduleRunner.ts): now, then every 30 seconds.
   startScheduleRunner(app.log);
-  // Image scans (scanning.ts): the cluster's list of failed digests now,
+  // Image scans (scanning.ts): the cluster's list of admitted digests now,
   // then finished scans read, and due rescans started, every 15 seconds.
   // A failure is logged and tried again on the next round.
   if (config.scanning.enabled) {

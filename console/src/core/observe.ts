@@ -40,7 +40,7 @@ const WHY: Record<string, string> = {
   TEAM_RETIRED: "Its team was retired while the run was going.",
   IMAGE_NOT_ALLOWED: "Its image isn't from a source this install allows.",
   IMAGE_NOT_PINNED: "Its image wasn't pinned to a digest.",
-  IMAGE_SCAN_FAILED: "Its image failed the security scan.",
+  IMAGE_SCAN_FAILED: "Its image hasn't passed the security scan on this install.",
   IMAGE_NOT_SIGNED: "Its image isn't signed by the catalog's CI.",
   IDENTITY_NOT_ALLOWED: "It asked for an identity or secrets its product isn't registered for.",
   RESOURCES_NOT_ALLOWED: "It asks for more memory or CPU than its team may ever use.",

@@ -13,6 +13,7 @@ const prefix = `ret-${randomUUID().slice(0, 6)}`;
 const longAgo = new Date("2000-01-01T00:00:00Z");
 const oldId = randomUUID();
 const newId = randomUUID();
+const runningId = randomUUID();
 // Its own digests: another file's scans (a digest is image_scans' key) would
 // collide with fixed ones when the files run at the same time.
 const digest = (name: string) => `sha256:${createHash("sha256").update(prefix + name).digest("hex")}`;
@@ -21,7 +22,7 @@ const email = `${prefix}@example.com`;
 
 afterAll(async () => {
   await db.delete(users).where(inArray(users.email, [email]));
-  await db.delete(submittedExecutions).where(inArray(submittedExecutions.executionId, [oldId, newId]));
+  await db.delete(submittedExecutions).where(inArray(submittedExecutions.executionId, [oldId, newId, runningId]));
   await db.delete(auditLog).where(like(auditLog.route, `/api/${prefix}%`));
   await db.delete(imageScans).where(like(imageScans.image, `${prefix}%`));
 });
@@ -53,6 +54,19 @@ describe("retention", () => {
     expect(audit.map((a) => a.route)).toEqual([`/api/${prefix}/new`]);
     const scans = await db.select().from(imageScans).where(like(imageScans.image, `${prefix}%`));
     expect(scans.map((s) => s.image).sort()).toEqual([`${prefix}/failed`, `${prefix}/new`]);
+  });
+
+  it("keeps an unused scan whose digest a running execution still has, so the cluster keeps admitting it", async () => {
+    await db.insert(imageScans).values({ digest: digest("running"), image: `${prefix}/running`, status: "passed", lastUsedAt: longAgo });
+    await db.insert(submittedExecutions).values({
+      executionId: runningId,
+      teams: [prefix],
+      name: "running",
+      payload: { tasks: [{ id: "a", team: prefix, image: `registry.example/app@${digest("running")}`, action: "run" }] },
+    });
+    await deleteExpired();
+    const scans = await db.select().from(imageScans).where(like(imageScans.image, `${prefix}/running`));
+    expect(scans).toHaveLength(1);
   });
 
 });

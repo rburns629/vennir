@@ -156,7 +156,7 @@ TypeScript, Fastify 5, Drizzle (Postgres), `@kubernetes/client-node`. One proces
 | `imagePolicy.ts` | The allowed image sources: the same matching rules as the cluster's image policy, and reading and saving it. |
 | `imageRef.ts` | Reading an image reference the way the kubelet does (`normalizeImage`, `imageRepository`); pure, used by the image policy and repository ownership. |
 | `secretStores.ts` | What a team's SecretStore file may hold, checked before the console applies it (`PUT /teams/:team/secret-store`): the same rules as the catalog's own check. |
-| `scanning.ts` | Scanning every image before it's registered or run: a Trivy client Job per digest, verdicts in `image_scans`, daily rescans, the failed digests written into the kernel's scan policy; idling the Trivy server when no scan is wanted. |
+| `scanning.ts` | Scanning every image before it's registered or run: a Trivy client Job per digest, verdicts in `image_scans`, daily rescans, the digests that passed and are in use written into the kernel's scan policy; idling the Trivy server when no scan is wanted. |
 | `activity.ts` | Records when the console was last used (any signed-in request, once a minute at most) for the kernel's sleeper. |
 | `audit.ts` | Who changed what: every changing `/api` request, allowed or refused, recorded in `audit_log`, hash-chained, and logged (never a secret value, password or token). |
 | `metrics.ts` | The console's Prometheus metrics (Connect calls by procedure and code, catalog syncs, image scans, the process), on a port of their own. |
@@ -441,7 +441,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/purge-policy.yaml` | Admission policy: only the purge identity may delete a team's namespace, or its API backends' namespace, and only a retired one. |
 | `templates/networkpolicy.yaml` | Only the release's Pods (and the console) may reach Postgres; only the console may reach kernel-api. |
 | `templates/identity-policy.yaml` | Admission policy: a step runs as `default` with no Secrets, or as its registered product's ServiceAccount with only its Secrets. The console keeps its product list current. |
-| `templates/scan-policy.yaml` | Admission policy: a step's image must be pinned by digest, and not one whose security scan failed (the console keeps that list). |
+| `templates/scan-policy.yaml` | Admission policy: a step's image must be pinned by digest, and a digest that passed its security scan (the console keeps that list, pruned to the digests in use). |
 | `templates/console-database.yaml` | With `postgres.consoleDatabase` on: the console's database and login role on the kernel's Postgres, the gateway's own role, their connection Secrets, and the Job that creates them, so one instance serves both. |
 | `templates/_helpers.tpl`, `NOTES.txt` | Shared template snippets; the message shown after install. |
 

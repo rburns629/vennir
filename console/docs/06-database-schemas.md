@@ -480,7 +480,7 @@ The audit log's write-once copy (`src/auditExport.ts`), one row: how far the cop
 
 ### image_scans
 
-One security scan verdict per image digest (`src/scanning.ts`). Every image is scanned before it's registered or run, whoever built it, and again daily while it's in use; a failed one (a HIGH or CRITICAL vulnerability with a fix, or a secret in the image) blocks new registrations and runs until a rescan finds it clean or an admin accepts it. The kernel chart's scan policy holds the failed digests, so the cluster refuses them too.
+One security scan verdict per image digest (`src/scanning.ts`). Every image is scanned before it's registered or run, whoever built it, and again daily while it's in use; a failed one (a HIGH or CRITICAL vulnerability with a fix, or a secret in the image) blocks new registrations and runs until a rescan finds it clean or an admin accepts it. The kernel chart's scan policy holds the digests that passed (or were accepted) and are in use, so the cluster refuses any other.
 
 | Column | Type | Null | Meaning |
 | --- | --- | --- | --- |

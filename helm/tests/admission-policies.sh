@@ -188,17 +188,37 @@ for variable in policy["spec"]["variables"]:
         variable["expression"] = literals[variable["name"]]
 print(json.dumps(policy))' "$PRODUCTS" "$TEAM_SECRETS" \
   | k replace -f - > /dev/null
-# And the scan policy's failed digests.
-BLOCKED_DIGEST=sha256:$(printf 'b%.0s' $(seq 64))
-k get validatingadmissionpolicy $RELEASE-execution-kernel-scan -o json \
-  | python3 -c '
-import json, sys
+# And the scan policy's admitted digests (digest to true, in sixteen maps
+# by first hex digit): the step identity cases' (0…), one that passed (c…),
+# one an admin accepted (a…; the console lists it the same way). One never
+# scanned (d…) and one that failed (b…) aren't listed. The rest is filled to
+# the most the console writes (scanning.ts's MAX_ADMITTED_DIGESTS), so the
+# policy is proven at its size limit.
+digest() { echo "sha256:$(printf "$1%.0s" $(seq 64))"; }
+ZERO_DIGEST=$(digest 0) PASSED_DIGEST=$(digest c) ACCEPTED_DIGEST=$(digest a)
+UNSCANNED_DIGEST=$(digest d) FAILED_DIGEST=$(digest b)
+scan_literal() {  # digests as a JSON map of digest to true or false, unlistedAdmitted, how many to fill it to, and with what first digit (any)
+  k get validatingadmissionpolicy $RELEASE-execution-kernel-scan -o json \
+    | python3 -c '
+import hashlib, json, sys
 policy = json.load(sys.stdin)
+# The copy kubectl apply keeps of what it applied: replace would update it, past an annotation size limit.
+policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+digests = json.loads(sys.argv[1])
+for i in range(int(sys.argv[3]) - len(digests)):
+    digests["sha256:" + sys.argv[4] + hashlib.sha256(b"fill-%d" % i).hexdigest()[len(sys.argv[4]):]] = True
+maps = {digit: {} for digit in "0123456789abcdef"}
+for digest, admitted in digests.items():
+    maps[digest[7]][digest] = admitted
 for variable in policy["spec"]["variables"]:
-    if variable["name"] == "blockedDigests":
-        variable["expression"] = json.dumps([sys.argv[1]])
-print(json.dumps(policy))' "$BLOCKED_DIGEST" \
-  | k replace -f - > /dev/null
+    if variable["name"] == "unlistedAdmitted":
+        variable["expression"] = sys.argv[2]
+    elif variable["name"][len("allowedDigests"):] in maps and variable["name"].startswith("allowedDigests"):
+        variable["expression"] = json.dumps(maps[variable["name"][len("allowedDigests"):]], separators=(",", ":"))
+print(json.dumps(policy))' "$1" "$2" "${3:-0}" "${4:-}" \
+    | k replace -f - > /dev/null || { echo "  FAIL  writing the scan policy's digests"; FAILURES=$((FAILURES + 1)); }
+}
+scan_literal '{"'$ZERO_DIGEST'":true,"'$PASSED_DIGEST'":true,"'$ACCEPTED_DIGEST'":true}' false 5000
 
 # A Job as the console makes an image scan (console/src/k8s.ts), with one
 # change made by the python expression given (to s, the Pod spec).
@@ -397,8 +417,30 @@ expect "a token lasting over an hour"            IDENTITY_NOT_ALLOWED  "$(job "$
 expect "a token for a step that isn't a product" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
 
 echo "Image scans:"
-expect "an image whose scan failed"              IMAGE_SCAN_FAILED     "$(job "$TEAM_A" $SOURCE/app:1@$BLOCKED_DIGEST run default "")"
-expect "the same repository, another digest"     allowed               "$(job "$TEAM_A" $SOURCE/app:1@sha256:$(printf 'c%.0s' $(seq 64)) run default "")"
+expect "a digest that passed"                    allowed               "$(job "$TEAM_A" $SOURCE/app:1@$PASSED_DIGEST run default "")"
+expect "a digest an admin accepted"              allowed               "$(job "$TEAM_A" $SOURCE/app:1@$ACCEPTED_DIGEST run default "")"
+expect "a digest that failed (not listed)"       IMAGE_SCAN_FAILED     "$(job "$TEAM_A" $SOURCE/app:1@$FAILED_DIGEST run default "")"
+expect "a digest never scanned"                  IMAGE_SCAN_FAILED     "$(job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "")"
+expect "unpinned, with requireDigest off"        allowed               "$(job "$TEAM_A" $SOURCE/app:1 run default "")"
+expect "a digest that isn't sha256"              IMAGE_SCAN_FAILED     "$(job "$TEAM_A" $SOURCE/app:1@sha512:$(printf 'c%.0s' $(seq 128)) run default "")"
+# One of the sixteen maps at the most the console writes in one
+# (scanning.ts's MAX_PER_MAP), near the API server's limit on an expression.
+scan_literal '{"'$PASSED_DIGEST'":true}' false 1200 c
+for _ in $(seq 1 30); do
+  job "$TEAM_A" $SOURCE/app:1@$ACCEPTED_DIGEST run default "" | grep -q IMAGE_SCAN_FAILED && break
+  sleep 1
+done
+expect "a full map: a digest in it"              allowed               "$(job "$TEAM_A" $SOURCE/app:1@$PASSED_DIGEST run default "")"
+expect "a full map: one that isn't"              IMAGE_SCAN_FAILED     "$(job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "")"
+# The chart's seed when upgrading from the deny list: what isn't listed is
+# admitted, what's listed false isn't (until the console writes its list).
+scan_literal '{"'$FAILED_DIGEST'":false}' true
+for _ in $(seq 1 30); do
+  job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "" | grep -q "(server dry run)" && break
+  sleep 1
+done
+expect "upgrade seed: a digest not listed"       allowed               "$(job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "")"
+expect "upgrade seed: one the deny list had"     IMAGE_SCAN_FAILED     "$(job "$TEAM_A" $SOURCE/app:1@$FAILED_DIGEST run default "")"
 
 echo "Console write fence:"
 expect "a Secret in a team namespace"            allowed                     "$(secret "$TEAM_A")"

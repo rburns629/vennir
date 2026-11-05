@@ -366,8 +366,8 @@ export const imageRepositories = pgTable("image_repositories", {
  * before it's registered or run, whoever built it, and again daily while
  * it's in use. A failed one blocks new registrations and runs (never steps
  * already running) until it's rescanned clean or an admin accepts it, with
- * a reason. The kernel chart's scan policy holds the failed digests, so the
- * cluster refuses them too.
+ * a reason. The kernel chart's scan policy holds the digests that passed (or
+ * were accepted) and are in use, so the cluster refuses any other.
  */
 export const imageScans = pgTable("image_scans", {
   digest: text("digest").primaryKey(),
