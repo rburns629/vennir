@@ -744,7 +744,7 @@ without going through the console:
 
 | Guardrail | What it refuses | Where |
 | --- | --- | --- |
-| Dispatch namespaces | Jobs in any namespace not labelled `vennir/team=true`, and in the platform's own namespace (`DISPATCH_REJECTED`), unless `dispatchPolicy.allowReleaseNamespace` is on: only for an install whose platform namespace is also a team's, as the GKE reference install's `default` is (`helm/values/gke/kernel.yaml`) | `helm/charts/execution-kernel/templates/dispatch-policy.yaml` |
+| Dispatch namespaces | Jobs in any namespace not labelled `vennir/team=true`, and in the platform's own namespace (`DISPATCH_REJECTED`) | `helm/charts/execution-kernel/templates/dispatch-policy.yaml` |
 | Step Pods | In a team namespace, a Pod with a task Job's `job-name` or `controller-uid` label, or owned by an `ek-` Job, unless kube-system's controllers or the controller manager made or changed it (`STEP_POD_NOT_ALLOWED`). The kernel also reads a step's result only from a Pod its Job controls, by the Job's UID | `helm/charts/execution-kernel/templates/step-pods-policy.yaml` |
 | Image sources | Images outside the allowed registries (`IMAGE_NOT_ALLOWED`) | `templates/image-policy.yaml` |
 | Image signatures | Where policy-controller is installed, any Pod in a team namespace whose image isn't signed by catalog CI under the source registry, whoever makes it (`IMAGE_NOT_SIGNED`): images from sources an admin added don't run there either (`no-match-policy` stays `deny`, so a compromised console adding a source can't get past it). It checks Pods, not the Jobs and other workloads that make them, which a second policy passes without verifying them (the webhook still admits them): a step's Job is made, and its Pod refused (the Job's `FailedCreate` event, which the kernel reads) | `templates/image-signature.yaml` |
@@ -754,9 +754,8 @@ without going through the console:
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
 | Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own) | console chart, `templates/write-fence-policy.yaml` |
 
-An install whose platform namespace is also a team's (`allowReleaseNamespace`,
-as the GKE reference values' `default` is) loses more than the dispatch
-guardrail there:
+The platform's namespace is never a team's (never labelled `vennir/team`).
+One that was would lose more than the dispatch guardrail there:
 - the team's `vennir-default-deny` admits every Pod in the namespace to
   every other, so that team's steps can reach the platform's Postgres and
   kernel-api (passwords and TokenReview still hold; the network layer
@@ -771,9 +770,11 @@ guardrail there:
 - the gateway's token fence matches kernel-api's ServiceAccount there;
 - the team's quota counts the platform's own Pods.
 
-`vennir` installs into `vennir-system` by default and always turns
-`allowReleaseNamespace` off; the GKE reference install moves on its next
-run (`TODO.md`).
+So the kernel chart has no setting that runs steps there (it had
+`dispatchPolicy.allowReleaseNamespace` while the GKE reference install ran in
+`default`, an admins' team namespace). `vennir` and the GKE reference values
+install into `vennir-system`; moving an install out of a team's namespace is
+in `docs/operations.md`.
 
 The dispatch, image, scan and identity policies check the scheduler's own
 requests and nobody else's (their `matchConditions`). Anyone else the

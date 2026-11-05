@@ -76,19 +76,13 @@ last one was.
 Released 0.6.0 on GKE Autopilot and EKS standard. Each item names where
 it was seen.
 
-- [ ] **The GKE reference install runs the platform in `default`**, also an
-  admins' team namespace (`allowReleaseNamespace`): there that team's steps
-  can reach the platform's Postgres and kernel-api, its products can run as
-  the platform's ServiceAccounts, the console's write fence admits the
-  platform's own Secrets, policy-controller excludes the namespace, and the
-  gateway's token fence matches kernel-api's ServiceAccount
-  (`docs/security-model.md`, "Guardrails the cluster enforces"). The next
-  billed GKE run installs fresh into `vennir-system`: `GKE_NAMESPACE` in the
-  Makefile, the values files' comments and `kernelApiUrl`
-  (`helm/values/gke/console.yaml`), `allowReleaseNamespace` dropped,
-  policy-controller's `NotIn default` dropped, and the Google service
-  accounts' Workload Identity bindings to the new namespace's Kubernetes
-  ServiceAccounts.
+- [ ] **Move the GKE reference install out of `default`** (an admins' team
+  namespace) into `vennir-system`, on the next billed GKE run. The repo is
+  ready (the values, the Makefile, the chart's `allowReleaseNamespace`
+  removed); the move, the console's and scanner's Workload Identity
+  bindings to the new namespace, and policy-controller now covering
+  `default` are proven only there (`docs/operations.md`, "Moving the
+  platform out of a team's namespace").
 - [ ] **Completion lag on GKE is policy-controller's webhook** (the r7 run,
   `perf/README.md`, "On GKE again"): with 40 at once, Job creations waited
   out its 10 s and were retried, and a pass that dispatches records nothing

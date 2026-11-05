@@ -1,7 +1,7 @@
 # execution-kernel on GKE `vennir-gke` (release `kernel`, namespace
-# default; a new install uses its own, vennir-system):
+# vennir-system, the platform's own; never a team's):
 #   make gke-deploy VERSION=v<x.y.z>   (the release's signed chart and images)
-#   or: helm upgrade --install kernel oci://ghcr.io/rburns629/vennir/charts/execution-kernel --version <x.y.z> -n default \
+#   or: helm upgrade --install kernel oci://ghcr.io/rburns629/vennir/charts/execution-kernel --version <x.y.z> -n vennir-system \
 #     --reset-values --force-conflicts --kube-context gke_my-gcp-project_us-central1_vennir-gke \
 #     -f helm/values/gke/kernel.yaml
 # A release's image, signed by its workflow (make gke-deploy VERSION=v...):
@@ -12,10 +12,6 @@ image:
   pullPolicy: IfNotPresent
 backup:
   enabled: false
-# Only because this install runs the platform in `default`, which is also
-# an admins' team namespace. A new install in vennir-system drops this.
-dispatchPolicy:
-  allowReleaseNamespace: true
 # Where catalog CI publishes product images. The image policy seeds from
 # this on first install; afterwards the Admin page owns the list.
 imagePolicy:

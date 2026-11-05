@@ -544,9 +544,10 @@ GKE_PROJECT ?= my-gcp-project
 GKE_CLUSTER ?= vennir-gke
 GKE_CONTEXT ?= gke_$(GKE_PROJECT)_us-central1_$(GKE_CLUSTER)
 GKE_REGISTRY ?= us-central1-docker.pkg.dev/$(GKE_PROJECT)/platform-images
-# Still `default` on GKE until the platform is moved to its own namespace
-# there (it's vennir-system on kind).
-GKE_NAMESPACE ?= default
+# The platform's own namespace, never a team's, as on kind. An install still
+# in `default` moves first (docs/operations.md, "Moving the platform out of
+# a team's namespace").
+GKE_NAMESPACE ?= vennir-system
 GKE_KUBECTL := kubectl --context $(GKE_CONTEXT) -n $(GKE_NAMESPACE)
 # --force-conflicts: see KIND_HELM_UPGRADE.
 GKE_HELM_UPGRADE := --kube-context $(GKE_CONTEXT) -n $(GKE_NAMESPACE) \

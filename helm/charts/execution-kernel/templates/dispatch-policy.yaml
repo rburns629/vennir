@@ -36,7 +36,16 @@ token, non-root, no privilege escalation, a read-only root filesystem, no
 capabilities, nothing of the host's. The cluster then holds this even in a
 team namespace without Pod Security's restricted label (one the console
 didn't create), and for a Job the scheduler was tricked into making.
+
+The platform's namespace is never a team's, so there's no setting that lets
+steps run in it (dispatchPolicy.allowReleaseNamespace, removed: install the
+platform into a namespace of its own, docs/operations.md, "Moving the
+platform out of a team's namespace"). Set true, it stops the install;
+false, as older vennir releases write it, is what the chart does anyway.
 */}}
+{{- if .Values.dispatchPolicy.allowReleaseNamespace }}
+{{- fail "dispatchPolicy.allowReleaseNamespace was removed: the platform's namespace is never a team's. Install into a namespace of its own (docs/operations.md, \"Moving the platform out of a team's namespace\") and drop the setting." }}
+{{- end }}
 {{- if .Values.dispatchPolicy.enabled }}
 {{- $scheduler := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-kernel.serviceAccountName" .) }}
 {{- $label := .Values.dispatchPolicy.teamNamespaceLabel }}
@@ -70,9 +79,7 @@ spec:
     # Creating: only into a team namespace that isn't retired.
     - expression: >-
         request.operation != "CREATE" || (
-        {{- if not .Values.dispatchPolicy.allowReleaseNamespace }}
         namespaceObject.metadata.name != {{ .Release.Namespace | quote }} &&
-        {{- end }}
         variables.labelled &&
         namespaceObject.metadata.labels[{{ $label | quote }}] == "true")
       # A retired team's says so, with its code (the kernel reads it).
@@ -87,9 +94,7 @@ spec:
     # Deleting: only what the executor made, in a team namespace, live or retired.
     - expression: >-
         request.operation != "DELETE" || (
-        {{- if not .Values.dispatchPolicy.allowReleaseNamespace }}
         namespaceObject.metadata.name != {{ .Release.Namespace | quote }} &&
-        {{- end }}
         variables.labelled &&
         namespaceObject.metadata.labels[{{ $label | quote }}] in ["true", "retired"] &&
         oldObject.metadata.name.startsWith("ek-") &&
@@ -104,9 +109,7 @@ spec:
     # whom, with what, was checked when the Job was created).
     - expression: >-
         request.operation != "UPDATE" || (
-        {{- if not .Values.dispatchPolicy.allowReleaseNamespace }}
         namespaceObject.metadata.name != {{ .Release.Namespace | quote }} &&
-        {{- end }}
         variables.labelled &&
         namespaceObject.metadata.labels[{{ $label | quote }}] == "true" &&
         oldObject.metadata.name.startsWith("ek-") &&

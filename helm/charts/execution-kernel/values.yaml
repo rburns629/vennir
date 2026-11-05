@@ -57,16 +57,6 @@ rbac:
 dispatchPolicy:
   enabled: true
   teamNamespaceLabel: vennir/team
-  # -- Transitional escape hatch for an install that still shares its
-  # namespace with a team: the platform installed into `default`, which is
-  # also the admins' own team namespace (admins manage everyone's
-  # integrations and test from there). true lets tasks dispatch into the
-  # release namespace *if* it also carries the team label; every other
-  # rule still applies. It knowingly leaves one gap: tasks in that
-  # namespace run alongside the platform's own ServiceAccounts and
-  # Postgres. Leave false for any install in its own namespace (e.g.
-  # vennir-system); set true only until such an install is migrated.
-  allowReleaseNamespace: false
 
 # -- Purging a retired platform's namespace (see templates/purge-policy.yaml).
 # Only images under an allowed source may run (templates/image-policy.yaml).

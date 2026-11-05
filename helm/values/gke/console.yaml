@@ -1,6 +1,6 @@
-# execution-console on GKE (release `console`, namespace default):
+# execution-console on GKE (release `console`, namespace vennir-system):
 #   make gke-deploy VERSION=v<x.y.z>   (the release's signed chart and images)
-#   or: helm upgrade --install console oci://ghcr.io/rburns629/vennir/charts/execution-console --version <x.y.z> -n default \
+#   or: helm upgrade --install console oci://ghcr.io/rburns629/vennir/charts/execution-console --version <x.y.z> -n vennir-system \
 #     --reset-values --kube-context gke_my-gcp-project_us-central1_vennir-gke \
 #     -f helm/values/gke/console.yaml
 # No bootstrapAdmin.password here on purpose: a fresh install's first admin
@@ -14,7 +14,7 @@ image:
   pullPolicy: IfNotPresent
 backup:
   enabled: false
-kernelApiUrl: https://kernel-execution-kernel-api.default.svc.cluster.local:8000
+kernelApiUrl: https://kernel-execution-kernel-api.vennir-system.svc.cluster.local:8000
 # The cloud this install is on: products whose catalog clouds leave it out
 # are listed but not checked or run here.
 installCloud: gcp
@@ -39,8 +39,10 @@ serviceAccount:
   annotations:
     iam.gke.io/gcp-service-account: vennir-console-registry@my-gcp-project.iam.gserviceaccount.com
 # Scan Jobs pull the images they scan as the same read-only registry
-# identity (its Workload Identity binding must also name the scanner
-# ServiceAccount, console-execution-console-scanner).
+# identity. Its roles/iam.workloadIdentityUser binding names both
+# ServiceAccounts, in the platform's namespace:
+#   serviceAccount:my-gcp-project.svc.id.goog[vennir-system/console-execution-console]
+#   serviceAccount:my-gcp-project.svc.id.goog[vennir-system/console-execution-console-scanner]
 scanning:
   serviceAccountAnnotations:
     iam.gke.io/gcp-service-account: vennir-console-registry@my-gcp-project.iam.gserviceaccount.com
