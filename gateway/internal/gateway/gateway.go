@@ -276,6 +276,15 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	}
 	result.team = callingTeam
 
+	// The validator reads the query as Go parses it, which leaves out what it
+	// can't read (a pair with a ";", a bad escape, and all of it past 10,000
+	// parameters), and the backend gets the query as sent: only one that
+	// reads in full is checked and forwarded.
+	if _, err := url.ParseQuery(r.URL.RawQuery); err != nil {
+		result.name = "invalid"
+		return g.refuse(w, result, http.StatusBadRequest, "INVALID_REQUEST", "The query can't be read (a \";\", a bad %-escape, or too many parameters): nothing was forwarded.")
+	}
+
 	if r.ContentLength > api.MaxRequest {
 		result.name = "invalid"
 		return g.refuse(w, result, http.StatusRequestEntityTooLarge, "TOO_LARGE", "The body is larger than this API takes: "+strconv.FormatInt(api.MaxRequest, 10)+" bytes.")
