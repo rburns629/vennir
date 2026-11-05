@@ -24,6 +24,12 @@ databasePoolSize: 10
 # minutes), and the requests needing it with it.
 databaseConnectTimeoutSeconds: 10
 
+# -- The cluster's DNS domain (the kubelet's clusterDomain): cluster.local
+# unless the cluster was set up with another. The console and the gateway
+# read an API backend's host by it: which hosts are in the cluster, and in
+# which namespace (an API may only use its own team's).
+clusterDomain: cluster.local
+
 # -- Copies on CPU load instead of replicaCount: a HorizontalPodAutoscaler
 # (the `auto` size, sizes/auto.yaml). Needs the cluster's metrics API
 # (metrics-server; built into GKE, EKS Auto Mode and AKS Automatic).

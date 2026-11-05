@@ -50,6 +50,7 @@ data:
 
 {{- define "execution-console.configData" }}
   PORT: {{ .Values.service.port | quote }}
+  CLUSTER_DOMAIN: {{ .Values.clusterDomain | quote }}
   DATABASE_IAM_AUTH: {{ .Values.database.iamAuth | quote }}
   DATABASE_IAM_REGION: {{ .Values.database.region | quote }}
   METRICS_PORT: {{ .Values.monitoring.port | quote }}

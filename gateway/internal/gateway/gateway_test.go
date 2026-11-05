@@ -381,6 +381,43 @@ func TestWhatTheSpecDoesntDescribeIsBlockedAndNeverForwarded(t *testing.T) {
 	}
 }
 
+// A ";" in a path reaches a backend only through an API whose document has
+// matrix parameters: elsewhere frameworks may read it as one where the
+// validator reads it as part of the segment.
+func TestASemicolonInAPathOnlyWithMatrixParameters(t *testing.T) {
+	f := setup(t, "")
+	files := func(name, param string) *store.API {
+		a := &store.API{Team: "payments", Name: name, BackendURL: f.api.BackendURL, ShareWith: []string{"web"},
+			PerMinute: map[string]int{"default": 100}, Timeout: 5 * time.Second, MaxRequest: 1024}
+		f.gw.Store.Put(a, []byte(`{"openapi": "3.1.0", "info": {"title": "Files", "version": "1"},
+			"paths": {"/files/{name}": {"get": {"parameters": [`+param+`], "responses": {"200": {"description": "ok"}}}}}}`))
+		if a.Problem != "" {
+			t.Fatal(a.Problem)
+		}
+		return a
+	}
+	if files("files", `{"name": "name", "in": "path", "required": true, "schema": {"type": "string"}}`).MatrixParameters {
+		t.Fatal("a simple path parameter isn't a matrix one")
+	}
+	for _, path := range []string{"/payments/files/files/a;jsessionid=x", "/payments/files/files/a%3Bb", "/payments/files/files/a%3bb"} {
+		if w := f.do("GET", path, "web-person", "", nil); w.Code != 400 || errorCode(t, w) != "INVALID_REQUEST" || !strings.Contains(w.Body.String(), "matrix") {
+			t.Errorf("%s: %d %s", path, w.Code, w.Body)
+		}
+	}
+	if len(f.backend.got) != 0 {
+		t.Fatalf("forwarded %d", len(f.backend.got))
+	}
+	if w := f.do("GET", "/payments/files/files/a", "web-person", "", nil); w.Code != 201 {
+		t.Errorf("no ;: %d %s", w.Code, w.Body)
+	}
+	if !files("cars", `{"name": "name", "in": "path", "required": true, "style": "matrix", "schema": {"type": "string"}}`).MatrixParameters {
+		t.Fatal("a matrix path parameter")
+	}
+	if w := f.do("GET", "/payments/cars/files/;name=blue", "web-person", "", nil); w.Code != 201 {
+		t.Errorf("a matrix parameter: %d %s", w.Code, w.Body)
+	}
+}
+
 func TestWhoMayCall(t *testing.T) {
 	f := setup(t, "")
 	path := "/payments/orders/orders/ord_abcdefgh"
@@ -422,9 +459,12 @@ func TestPausedHeldAndClosedForwardNothing(t *testing.T) {
 	}
 	// Another team's in-cluster backend, though its host is allowed: held.
 	// So is one in a namespace named for the team's API backends that a
-	// team of that name has (named before such names were refused).
+	// team of that name has (named before such names were refused). And
+	// any host in the cluster that names no namespace, though an admin
+	// allowed it: an IP address, a short name.
 	own := f.api.BackendURL
-	f.gw.Settings.BackendHosts = []string{"*.svc.cluster.local"}
+	f.gw.Settings.BackendHosts = []string{"*.svc.cluster.local", "*.pod.cluster.local", "*.svc.corp.internal", "10.96.0.10", "fd00::1", "orders"}
+	f.gw.Settings.ClusterDomain = "corp.internal"
 	for _, c := range []struct {
 		backend string
 		taken   bool
@@ -432,6 +472,12 @@ func TestPausedHeldAndClosedForwardNothing(t *testing.T) {
 		{"http://orders.web.svc.cluster.local:8080", false},
 		{"http://orders.web-apis.svc.cluster.local:8080", false},
 		{"http://orders.payments-apis.svc.cluster.local:8080", true},
+		{"http://pod-1.orders.web.svc.cluster.local:8080", false},
+		{"http://10-1-2-3.web.pod.cluster.local:8080", false},
+		{"http://orders.web.svc.corp.internal:8080", false},
+		{"http://10.96.0.10:8080", false},
+		{"http://[fd00::1]:8080", false},
+		{"http://orders:8080", false},
 	} {
 		f.api.BackendURL, _ = url.Parse(c.backend)
 		f.api.APINamespaceTaken = c.taken
@@ -439,7 +485,18 @@ func TestPausedHeldAndClosedForwardNothing(t *testing.T) {
 			t.Errorf("%s: %d %s", c.backend, w.Code, w.Body)
 		}
 	}
-	f.api.BackendURL, f.api.APINamespaceTaken = own, false
+	if len(f.backend.got) != 0 {
+		t.Fatalf("forwarded %d", len(f.backend.got))
+	}
+	// The gateway's own Pod is no namespace's: served, by name too.
+	f.api.BackendURL, _ = url.Parse(strings.Replace(own.String(), "127.0.0.1", "localhost", 1))
+	f.api.APINamespaceTaken = false
+	f.gw.Settings.BackendHosts = []string{"localhost"}
+	if w := f.do("GET", path, "web-person", "", nil); w.Code != 201 {
+		t.Errorf("localhost: %d %s", w.Code, w.Body)
+	}
+	f.backend.got = nil
+	f.api.BackendURL = own
 	f.gw.Settings.BackendHosts = []string{"127.0.0.1"}
 	f.gw.Settings.Closed = true
 	if w := f.do("GET", path, "web-person", "", nil); w.Code != 503 || errorCode(t, w) != "GATEWAY_CLOSED" {

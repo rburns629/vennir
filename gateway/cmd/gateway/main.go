@@ -95,7 +95,7 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	defer pool.Close()
-	apis := &store.Store{DB: pool, Log: log}
+	apis := &store.Store{DB: pool, Log: log, ClusterDomain: s.ClusterDomain}
 	// The database may not let it in yet: on a fresh install the console's
 	// migration makes its role (console/src/db/gatewayAccess.ts) after the
 	// gateway has started. It waits, rather than crash-looping meanwhile.
@@ -144,7 +144,7 @@ func run(log *slog.Logger) error {
 			Limiter: limits.New(),
 			Peers:   limits.New(),
 			Minter:  &credentials.Minter{TokenRequest: tokenRequest, GCPAudience: s.GCPAudience, GCPTokenAudience: s.GCPTokenAudience},
-			Settings: gateway.Settings{BackendHosts: s.BackendHosts, InternetTeams: s.InternetTeams,
+			Settings: gateway.Settings{BackendHosts: s.BackendHosts, InternetTeams: s.InternetTeams, ClusterDomain: s.ClusterDomain,
 				TrustedProxies: s.TrustedProxies, DefaultPerMinute: s.DefaultPerMinute, Closed: s.Closed,
 				UnauthenticatedPerMinute: s.UnauthenticatedPerMinute, PublicPeersShared: s.PublicPeersShared,
 				BodyReadTimeout: s.BodyReadTimeout},

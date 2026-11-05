@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"slices"
@@ -54,6 +55,11 @@ type API struct {
 	// recorded: Problem is in the console's api_problems table (or, with
 	// none, the API's row isn't), for the API's page.
 	recorded bool
+	// MatrixParameters: its spec has a path parameter of style matrix
+	// (;name=value), so a path may have a ";" in it (the gateway refuses
+	// one otherwise: backends' frameworks read it as a parameter, or not,
+	// where the validator reads it as part of the segment).
+	MatrixParameters bool
 	// Endpoints are its spec's operations, to name what a request matched.
 	Endpoints []Endpoint
 	// queryKeys are the query keys each operation ("METHOD /path") takes
@@ -134,6 +140,8 @@ type Store struct {
 		Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 	}
 	Log *slog.Logger
+	// ClusterDomain is the cluster's DNS domain (BackendPlace).
+	ClusterDomain string
 
 	mu   sync.RWMutex
 	apis map[string]*API
@@ -214,10 +222,10 @@ func (s *Store) Refresh(ctx context.Context) error {
 			a.Problem = "its rate limits can't be read"
 		} else if auth != "" && json.Unmarshal([]byte(auth), &a.BackendAuth) != nil {
 			a.Problem = "its backend credential settings can't be read"
-		} else if v, keys, problem := build([]byte(spec)); problem != "" {
+		} else if v, keys, matrix, problem := build([]byte(spec)); problem != "" {
 			a.Problem = problem
 		} else {
-			a.Validator, a.queryKeys = v, keys
+			a.Validator, a.queryKeys, a.MatrixParameters = v, keys, matrix
 			a.Endpoints = endpoints([]byte(spec))
 		}
 		if a.Problem != "" {
@@ -241,7 +249,7 @@ func (s *Store) Refresh(ctx context.Context) error {
 // in its team's own namespace: served for one release, until it moves to
 // the team's API backends' namespace.
 func (s *Store) warnTeamNamespace(a *API) {
-	if a.BackendURL != nil && BackendPlace(a.BackendURL, a.Team, a.APINamespaceTaken) == BackendInTeam {
+	if a.BackendURL != nil && BackendPlace(a.BackendURL, a.Team, a.APINamespaceTaken, s.ClusterDomain) == BackendInTeam {
 		s.Log.Warn("an API's backend runs in its team's namespace: move it to the team's API backends' namespace",
 			"event", "api_backend_in_team_namespace", "api", a.Key(), "namespace", a.Team, "move_to", APINamespace(a.Team))
 	}
@@ -279,7 +287,7 @@ func (s *Store) record(ctx context.Context, a *API) {
 // Put adds an API whose spec is given, for tests.
 func (s *Store) Put(a *API, spec []byte) {
 	if a.Validator == nil {
-		a.Validator, a.queryKeys, a.Problem = build(spec)
+		a.Validator, a.queryKeys, a.MatrixParameters, a.Problem = build(spec)
 		a.Endpoints = endpoints(spec)
 	}
 	s.mu.Lock()
@@ -290,10 +298,10 @@ func (s *Store) Put(a *API, spec []byte) {
 	s.apis[a.Key()] = a
 }
 
-func build(spec []byte) (validator.Validator, map[string]queryKeys, string) {
+func build(spec []byte) (validator.Validator, map[string]queryKeys, bool, string) {
 	doc, err := libopenapi.NewDocument(spec)
 	if err != nil {
-		return nil, nil, "its OpenAPI document can't be read: " + err.Error()
+		return nil, nil, false, "its OpenAPI document can't be read: " + err.Error()
 	}
 	// Strict: what the document doesn't describe isn't forwarded. A body
 	// on an operation that declares none, or of a media type with a schema
@@ -309,18 +317,23 @@ func build(spec []byte) (validator.Validator, map[string]queryKeys, string) {
 		config.WithStrictMode(),
 		config.WithStrictIgnorePaths("$.headers**", "$.cookies**", "$.body**"))
 	if len(errs) > 0 {
-		return nil, nil, fmt.Sprintf("its OpenAPI document can't be used: %v", errs[0])
+		return nil, nil, false, fmt.Sprintf("its OpenAPI document can't be used: %v", errs[0])
 	}
 	model, err := doc.BuildV3Model()
 	if err != nil {
-		return nil, nil, "its OpenAPI document can't be used: " + err.Error()
+		return nil, nil, false, "its OpenAPI document can't be used: " + err.Error()
 	}
 	keys := map[string]queryKeys{}
+	matrix := false
 	if model.Model.Paths != nil {
 		for path, item := range model.Model.Paths.PathItems.FromOldest() {
+			for _, p := range item.Parameters {
+				matrix = matrix || p.In == "path" && p.Style == "matrix"
+			}
 			for method, op := range item.GetOperations().FromOldest() {
 				var k queryKeys
 				for _, p := range slices.Concat(item.Parameters, op.Parameters) {
+					matrix = matrix || p.In == "path" && p.Style == "matrix"
 					if p.In != "query" {
 						continue
 					}
@@ -344,7 +357,7 @@ func build(spec []byte) (validator.Validator, map[string]queryKeys, string) {
 			}
 		}
 	}
-	return v, keys, ""
+	return v, keys, matrix, ""
 }
 
 // Run refreshes every interval until ctx ends; a failed refresh keeps
@@ -364,23 +377,78 @@ func (s *Store) Run(ctx context.Context, interval time.Duration) {
 	}
 }
 
-// BackendNamespace is the namespace an in-cluster backend host names
-// (<service>.<namespace>.svc, with or without .cluster.local), or "" for any
-// other host. The gateway may reach every team's API backends, so an API
-// may only use one in its own team's API backends' namespace (BackendPlace;
-// the console's core/apis.ts backendNamespace, kept in step).
-func BackendNamespace(u *url.URL) string {
+// DefaultClusterDomain is a cluster's DNS domain unless it's set up with
+// another (CLUSTER_DOMAIN).
+const DefaultClusterDomain = "cluster.local"
+
+// BackendNamespace reads where a backend host is: whether it's in the
+// cluster, and the namespace it names, if it names one. These name one: a
+// Service (<service>.<namespace>.svc), a headless Service's Pod
+// (<pod>.<service>.<namespace>.svc) and a Pod (<a-b-c-d>.<namespace>.pod),
+// each with or without the cluster's domain (clusterDomain; cluster.local
+// is read as the cluster's too). These are in the cluster but name none
+// ("", true): any other name under that domain or ending in .svc or .pod;
+// an IP address (a Pod's or a Service's, whoever's they are), but the
+// loopback, which is the gateway's own Pod; and a single name, which the
+// Pod's DNS search path finds in the gateway's own namespace. Anything else
+// is outside, and is looked up as the absolute name it is (DialHost), never
+// through the search path. The gateway may reach every team's API
+// backends, so an API may only use one in its own team's API backends'
+// namespace (BackendPlace; the console's core/apis.ts backendNamespace,
+// kept in step).
+func BackendNamespace(u *url.URL, clusterDomain string) (namespace string, inCluster bool) {
 	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
-	host = strings.TrimSuffix(host, ".cluster.local")
-	rest, ok := strings.CutSuffix(host, ".svc")
-	if !ok {
-		return ""
+	if host == "localhost" {
+		return "", false
 	}
-	labels := strings.Split(rest, ".")
-	if len(labels) < 2 {
-		return ""
+	if a, err := netip.ParseAddr(host); err == nil {
+		return "", !(a.Is4() && a.IsLoopback() || a == netip.IPv6Loopback())
 	}
-	return labels[len(labels)-1]
+	if !strings.Contains(host, ".") {
+		return "", true
+	}
+	for _, domain := range []string{strings.ToLower(clusterDomain), DefaultClusterDomain} {
+		if domain == "" {
+			continue
+		}
+		if host == domain {
+			return "", true
+		}
+		if rest, ok := strings.CutSuffix(host, "."+domain); ok {
+			host, inCluster = rest, true
+			break
+		}
+	}
+	labels := strings.Split(host, ".")
+	last := len(labels) - 1
+	switch {
+	case labels[last] == "svc" && (last == 2 || last == 3):
+		return labels[last-1], true
+	case labels[last] == "pod" && last == 2:
+		return labels[1], true
+	case labels[last] == "svc" || labels[last] == "pod":
+		return "", true
+	}
+	return "", inCluster
+}
+
+// DialHost is the name the gateway looks a backend's host up as: a
+// Service's or Pod's short form (.svc, .pod) with the cluster's domain,
+// and every name absolute, so the Pod's DNS search path never finds a host
+// BackendNamespace reads as outside (orders.team-b) inside the cluster
+// (orders.team-b.svc).
+func DialHost(host, clusterDomain string) string {
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if _, err := netip.ParseAddr(host); err == nil || host == "localhost" {
+		return host
+	}
+	if strings.HasSuffix(host, ".svc") || strings.HasSuffix(host, ".pod") {
+		if clusterDomain == "" {
+			clusterDomain = DefaultClusterDomain
+		}
+		return host + "." + strings.ToLower(clusterDomain) + "."
+	}
+	return host + "."
 }
 
 // APINamespace is the namespace a team's API backends run in, apart from
@@ -397,18 +465,21 @@ const (
 	// BackendInTeam: in the team's own namespace, where its steps run.
 	// Served for one release, until backends have moved, and logged.
 	BackendInTeam = "team"
-	// BackendElsewhere: in any other namespace: held.
+	// BackendElsewhere: in any other namespace, or in the cluster where
+	// no namespace is named (an IP address, a short name): held.
 	BackendElsewhere = "other"
 )
 
-// BackendPlace says where an API's backend runs for the team it is.
-// APINamespace(team) is the team's only when no team has that name
-// (apiNamespaceTaken). The console's core/apis.ts backendPlace, kept in
-// step.
-func BackendPlace(u *url.URL, team string, apiNamespaceTaken bool) string {
-	switch ns := BackendNamespace(u); {
-	case ns == "":
+// BackendPlace says where an API's backend runs for the team it is, on a
+// cluster whose DNS domain is clusterDomain. APINamespace(team) is the
+// team's only when no team has that name (apiNamespaceTaken). The
+// console's core/apis.ts backendPlace, kept in step.
+func BackendPlace(u *url.URL, team string, apiNamespaceTaken bool, clusterDomain string) string {
+	switch ns, inCluster := BackendNamespace(u, clusterDomain); {
+	case !inCluster:
 		return BackendOutside
+	case ns == "":
+		return BackendElsewhere
 	case ns == APINamespace(team) && !apiNamespaceTaken:
 		return BackendInAPIs
 	case ns == team:

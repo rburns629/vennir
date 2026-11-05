@@ -8,8 +8,11 @@ package config
 import (
 	"crypto/ed25519"
 	"fmt"
+	"net"
 	"net/netip"
+	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +51,9 @@ type Settings struct {
 	// public listener), and for metrics.
 	Listen, PublicListen, MetricsListen string
 	BackendHosts, InternetTeams         []string
+	// ClusterDomain is the cluster's DNS domain (cluster.local unless it
+	// was set up with another): which backend hosts are in the cluster.
+	ClusterDomain string
 	// TrustedProxies are the peers (an ingress, a load balancer) whose
 	// X-Forwarded-For says who the caller is, on the public listener; from
 	// anyone else, and on the in-cluster listener, it's dropped, and the
@@ -126,6 +132,7 @@ func Load(getenv func(string) string) (*Settings, error) {
 		PublicListen:             getenv("PUBLIC_LISTEN"),
 		MetricsListen:            or("METRICS_LISTEN", ":9090"),
 		BackendHosts:             list(getenv("BACKEND_HOSTS")),
+		ClusterDomain:            strings.TrimSuffix(or("CLUSTER_DOMAIN", "cluster.local"), "."),
 		InternetTeams:            list(getenv("INTERNET_TEAMS")),
 		DefaultPerMinute:         positive("DEFAULT_PER_MINUTE", 600),
 		UnauthenticatedPerMinute: number("UNAUTHENTICATED_PER_MINUTE", 60),
@@ -163,6 +170,14 @@ func Load(getenv func(string) string) (*Settings, error) {
 	default:
 		problems = append(problems, fmt.Sprintf("DATABASE_IAM_AUTH: gcp, aws, or empty for a password, got %q", s.DatabaseIAMAuth))
 	}
+	if s.DatabaseIAMAuth != "" && s.DatabaseURL != "" {
+		if problem := verifiedTLS(s.DatabaseURL, getenv); problem != "" {
+			problems = append(problems, "DATABASE_URL: "+problem)
+		}
+	}
+	if !dnsName.MatchString(s.ClusterDomain) {
+		problems = append(problems, fmt.Sprintf("CLUSTER_DOMAIN: a DNS name such as cluster.local, got %q", s.ClusterDomain))
+	}
 	if path := need("SIGNING_KEY_FILE"); path != "" {
 		seed, err := os.ReadFile(path)
 		seed = []byte(strings.TrimSpace(string(seed)))
@@ -176,6 +191,86 @@ func Load(getenv func(string) string) (*Settings, error) {
 		return nil, fmt.Errorf("the gateway's settings: %s", strings.Join(problems, "; "))
 	}
 	return s, nil
+}
+
+// dnsName is a DNS name of lowercase labels, without a trailing dot.
+var dnsName = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
+
+// verifiedTLS is why a database URL may not be signed in to with an IAM
+// token, or "": the token is the password, a bearer credential for the
+// database (and, on AWS, for nothing else; on Google Cloud, an access token
+// for the gateway's service account), so it's only sent where the server's
+// certificate is checked (sslmode verify-full, or verify-ca: Cloud SQL's
+// names the instance, not its address), or to localhost (a Cloud SQL Auth
+// Proxy or other connector beside it, which makes its own verified TLS
+// connection), a Unix socket included. The kernel's rule too
+// (kernel/internal/config).
+func verifiedTLS(databaseURL string, getenv func(string) string) string {
+	// As pgx reads them: a URL's hosts (several, comma-separated) or its
+	// host parameter, a keyword/value string's host, else PGHOST; none is
+	// a Unix socket, which is local.
+	var hosts, mode string
+	rest, ok := strings.CutPrefix(databaseURL, "postgres://")
+	if !ok {
+		rest, ok = strings.CutPrefix(databaseURL, "postgresql://")
+	}
+	if ok {
+		// Not url.Parse, which can't read several hosts.
+		authority, query, _ := strings.Cut(rest, "?")
+		authority, _, _ = strings.Cut(authority, "/")
+		if at := strings.LastIndex(authority, "@"); at >= 0 {
+			authority = authority[at+1:]
+		}
+		values, err := url.ParseQuery(query)
+		if err != nil {
+			return "can't be read"
+		}
+		hosts, mode = authority, values.Get("sslmode")
+		if h := values.Get("host"); h != "" {
+			hosts = h
+		}
+	} else {
+		mode, hosts = keyword(databaseURL, "sslmode"), keyword(databaseURL, "host")
+	}
+	if hosts == "" {
+		hosts = getenv("PGHOST")
+	}
+	if mode == "" {
+		mode = getenv("PGSSLMODE")
+	}
+	local := true
+	for _, host := range strings.Split(hosts, ",") {
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		host = strings.Trim(host, "[]")
+		if h, err := url.PathUnescape(host); err == nil {
+			host = h
+		}
+		a, err := netip.ParseAddr(host)
+		if !(host == "" || host == "localhost" || strings.HasPrefix(host, "/") || err == nil && a.IsLoopback()) {
+			local = false
+		}
+	}
+	if local {
+		return ""
+	}
+	if mode == "verify-full" || mode == "verify-ca" {
+		return ""
+	}
+	if mode == "" {
+		mode = "prefer, the default"
+	}
+	return "with DATABASE_IAM_AUTH, its token is sent only over TLS that checks the server's certificate: sslmode=verify-full (or verify-ca) and sslrootcert, unless it connects to localhost (a Cloud SQL Auth Proxy); its sslmode is " + mode
+}
+
+// keyword is a keyword/value connection string's value for key, or "".
+func keyword(dsn, key string) string {
+	m := regexp.MustCompile(`(?:^|\s)` + key + `\s*=\s*('(?:[^'\\]|\\.)*'|\S*)`).FindStringSubmatch(dsn)
+	if m == nil {
+		return ""
+	}
+	return strings.Trim(m[1], "'")
 }
 
 func list(v string) []string {

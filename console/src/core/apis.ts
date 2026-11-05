@@ -8,6 +8,7 @@
  * pausing one for an incident.
  */
 import { Code } from "@connectrpc/connect";
+import { isIP, isIPv4 } from "node:net";
 import { ApiError } from "../apiError.js";
 import { canMaintainTeam } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
@@ -47,22 +48,51 @@ export function backendAllowed(url: string, hosts: string[] = config.gateway.bac
 }
 
 /**
- * The namespace an in-cluster backend host names (<service>.<namespace>.svc,
- * with or without .cluster.local), or null for any other host. The gateway
+ * Where a backend host is: whether it's in the cluster, and the namespace
+ * it names, if it names one. These name one: a Service
+ * (<service>.<namespace>.svc), a headless Service's Pod
+ * (<pod>.<service>.<namespace>.svc) and a Pod (<a-b-c-d>.<namespace>.pod),
+ * each with or without the cluster's domain (CLUSTER_DOMAIN; cluster.local
+ * is read as the cluster's too). These are in the cluster but name none
+ * (namespace null): any other name under that domain or ending in .svc or
+ * .pod; an IP address (a Pod's or a Service's, whoever's they are), but the
+ * loopback, which is the gateway's own Pod; and a single name, which the
+ * gateway's DNS search path finds in its own namespace. Anything else is
+ * outside (the gateway looks it up as the absolute name it is). The gateway
  * may reach every team's API backends, so an API may only use one in its
  * own team's API backends' namespace (backendPlace): another team's would
  * be served under this API's spec and sharing (the gateway's
  * store.BackendNamespace, kept in step).
  */
-export function backendNamespace(url: string): string | null {
+export function backendNamespace(url: string, clusterDomain = config.clusterDomain): { inCluster: boolean; namespace: string | null } {
+  const outside = { inCluster: false, namespace: null };
+  const inCluster = (namespace: string | null = null) => ({ inCluster: true, namespace });
   let host: string;
   try {
     host = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
   } catch {
-    return null;
+    return outside;
   }
-  const match = /^(?:[^.]+\.)+?([^.]+)\.svc(?:\.cluster\.local)?$/.exec(host);
-  return match?.[1] ?? null;
+  if (host === "localhost") return outside;
+  const address = host.replace(/^\[(.*)\]$/, "$1");
+  if (isIP(address)) return isIPv4(address) && address.startsWith("127.") || address === "::1" ? outside : inCluster();
+  if (!host.includes(".")) return inCluster();
+  let within = false;
+  for (const domain of [clusterDomain.toLowerCase(), "cluster.local"]) {
+    if (!domain) continue;
+    if (host === domain) return inCluster();
+    if (host.endsWith(`.${domain}`)) {
+      host = host.slice(0, -domain.length - 1);
+      within = true;
+      break;
+    }
+  }
+  const labels = host.split(".");
+  const last = labels.length - 1;
+  if (labels[last] === "svc" && (last === 2 || last === 3)) return inCluster(labels[last - 1] || null);
+  if (labels[last] === "pod" && last === 2) return inCluster(labels[1] || null);
+  if (labels[last] === "svc" || labels[last] === "pod") return inCluster();
+  return within ? inCluster() : outside;
 }
 
 /**
@@ -72,12 +102,18 @@ export function backendNamespace(url: string): string | null {
  * namespace ("team": accepted for one release, until backends have moved;
  * the gateway logs it), or anywhere else ("other": held). `<team>-apis` is
  * the team's only when no team has that name (`apiNamespaceTaken`: one
- * named before such names were refused). The gateway's store.BackendPlace,
- * kept in step.
+ * named before such names were refused). In the cluster, naming no
+ * namespace, is "other" too. The gateway's store.BackendPlace, kept in step.
  */
-export function backendPlace(url: string, team: string, apiNamespaceTaken = false): "outside" | "apis" | "team" | "other" {
-  const namespace = backendNamespace(url);
-  if (namespace === null) return "outside";
+export function backendPlace(
+  url: string,
+  team: string,
+  apiNamespaceTaken = false,
+  clusterDomain = config.clusterDomain,
+): "outside" | "apis" | "team" | "other" {
+  const { inCluster, namespace } = backendNamespace(url, clusterDomain);
+  if (!inCluster) return "outside";
+  if (namespace === null) return "other";
   if (namespace === apiNamespace(team) && !apiNamespaceTaken) return "apis";
   if (namespace === team) return "team";
   return "other";
@@ -130,11 +166,14 @@ export function apiState(
     };
   }
   if (backendPlace(api.backendUrl, api.teamName, apiNamespaceTaken) === "other") {
+    const { namespace } = backendNamespace(api.backendUrl);
     return {
       state: "held",
       ...none,
       heldReason:
-        `Its backend is in namespace ${backendNamespace(api.backendUrl) ?? ""}, not its team's API backends' namespace ` +
+        (namespace === null
+          ? `Its backend's host, ${hostOf(api.backendUrl)}, is inside the cluster but names no namespace (an IP address, a short name), not its team's API backends' namespace `
+          : `Its backend is in namespace ${namespace}, not its team's API backends' namespace `) +
         `(${apiNamespace(api.teamName)}): an API may only use a backend of its own team.`,
     };
   }

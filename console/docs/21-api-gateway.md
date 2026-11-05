@@ -32,6 +32,8 @@ vennir apply prod
 
 `gateway.backendHosts` lists the hosts backends may be under, exactly (`orders.example.com`) or a whole domain below a name (`*.a.run.app`). An in-cluster backend is a host too: `<service>.<team>-apis.svc.cluster.local`, in the team's API backends' namespace, so allow `*.<team>-apis.svc.cluster.local` per team that publishes in-cluster APIs. An API may only use an in-cluster backend in its own team's API backends' namespace, whatever this list says. (For one release, one still in the team's own namespace, `<service>.<team>.svc.cluster.local`, is served too, if this list allows it, and the gateway logs a warning until it moves.) An API whose backend isn't covered shows **Held**, and turns **Live** on its own once an admin adds its host.
 
+The gateway reads the namespace from a Service's name (`<service>.<namespace>.svc`), a headless Service's Pod's (`<pod>.<service>.<namespace>.svc`) and a Pod's (`<a-b-c-d>.<namespace>.pod`), with or without the cluster's domain. A cluster set up with a domain other than `cluster.local` needs the console chart's `clusterDomain` set to it. A host that's inside the cluster but names no namespace is always held, whatever this list says: an IP address (a Pod's or a Service's could be any team's), a single name such as `orders` (it would be found in the platform's own namespace), or any other name under the cluster's domain. Every other host is looked up exactly as written, never through the cluster's DNS search path, so `orders.web` is never `orders.web.svc.cluster.local`. Only the loopback (`localhost`, `127.0.0.1`, `::1`), the gateway's own Pod, is exempt.
+
 **Admin → API gateway** then shows the settings, the gateway's address inside the cluster, and the last day's traffic.
 
 **Where it's reached.** Inside the cluster, every Pod (steps, services, other APIs' backends) reaches it at `http://console-execution-console-gateway.vennir-system.svc.cluster.local:8080`. From your laptop, for trying it:
@@ -133,6 +135,8 @@ curl -H "Authorization: Bearer $VENNIR_TOKEN" \
 - **Calling for a team.** If you're in several teams the API is shared with, send `Vennir-Team: <team>` to choose which one's limit you use.
 - **Asking for access.** An API that isn't shared with your team answers 403. **Ask for access ↗** on its page opens an issue on the catalog repository asking its team to add yours.
 - **Reporting a problem.** Every answer carries `Vennir-Request-Id`, and the backend gets the same id; `Vennir-Answered-By` says whether the gateway or the backend answered.
+- **Paths are taken as the OpenAPI file reads them.** A path with an encoded slash, a backslash or a dot segment is refused (404). So is one with a `;`, written as is or as `%3B` (400 `INVALID_REQUEST`), unless the API's OpenAPI file has a path parameter with `style: matrix`: some backends' frameworks read what follows a `;` as a parameter, or drop it, where the gateway would check it as part of the path.
+- **After the console's `jwtSecret` changes**, sessions signed with the old one stop working at the gateway within a minute, the time it keeps the console's keys before reading them again. While it can't read them (the console restarting), it keeps using the last ones for up to 10 minutes. Bot tokens are checked against the database on every request.
 
 Every error code, and what to do about it: [What does each gateway error mean?](11-apis.md#what-does-each-gateway-error-mean)
 

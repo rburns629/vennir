@@ -222,16 +222,66 @@ describe("who sees what", () => {
     expect(backendAllowed("https://xexample.run.app", ["*.example.run.app"])).toBe(false);
   });
 
-  it("holds an API whose in-cluster backend is another team's, whatever backendHosts allows", () => {
-    for (const [url, ns] of [
-      ["http://orders.team-b.svc.cluster.local:8080", "team-b"],
-      ["http://orders.team-b.svc:8080", "team-b"],
-      ["http://pod-1.orders.team-b.svc.cluster.local", "team-b"],
-      ["http://orders:8080", null],
-      ["https://api.example.com", null],
-    ] as const) {
-      expect(backendNamespace(url), url).toBe(ns);
+  // The hosts a backend may have, for the team payments: the namespace each
+  // names, whether it's in the cluster, and so where it runs. The gateway's
+  // store_test.go has the same table (backendHostTable), kept in step.
+  const backendHosts: [backend: string, domain: string, namespace: string | null, inCluster: boolean, place: string][] = [
+    // Services, with and without the cluster's domain.
+    ["http://orders.payments-apis.svc.cluster.local:8080", "", "payments-apis", true, "apis"],
+    ["http://orders.payments-apis.svc", "", "payments-apis", true, "apis"],
+    ["http://ORDERS.Payments-Apis.svc.cluster.local.", "", "payments-apis", true, "apis"],
+    ["http://orders.payments.svc.cluster.local", "", "payments", true, "team"],
+    ["http://orders.web.svc.cluster.local", "", "web", true, "other"],
+    // A headless Service's Pods, and Pods.
+    ["http://pod-1.orders.web.svc.cluster.local", "", "web", true, "other"],
+    ["http://pod-1.orders.payments-apis.svc", "", "payments-apis", true, "apis"],
+    ["http://10-1-2-3.web.pod.cluster.local", "", "web", true, "other"],
+    ["http://10-1-2-3.payments-apis.pod", "", "payments-apis", true, "apis"],
+    // A cluster with a domain of its own, where cluster.local is still read
+    // as the cluster's; on one without, that domain is a name outside.
+    ["http://orders.web.svc.corp.internal", "corp.internal", "web", true, "other"],
+    ["http://orders.payments-apis.svc.corp.internal", "corp.internal", "payments-apis", true, "apis"],
+    ["http://orders.web.svc.cluster.local", "corp.internal", "web", true, "other"],
+    ["http://foo.corp.internal", "corp.internal", null, true, "other"],
+    ["http://orders.web.svc.corp.internal", "", null, false, "outside"],
+    // In the cluster, naming no namespace: held.
+    ["http://orders.svc.cluster.local", "", null, true, "other"],
+    ["http://cluster.local", "", null, true, "other"],
+    ["http://a.b.orders.web.svc.cluster.local", "", null, true, "other"],
+    ["http://orders.pod", "", null, true, "other"],
+    ["http://10.96.0.10:8080", "", null, true, "other"],
+    ["http://[fd00::1]:8080", "", null, true, "other"],
+    ["http://[::ffff:10.96.0.10]", "", null, true, "other"],
+    ["http://[::ffff:127.0.0.1]", "", null, true, "other"],
+    ["http://orders:8080", "", null, true, "other"],
+    // The gateway's own Pod, and names outside (looked up as absolute
+    // names, so orders.web is never orders.web.svc).
+    ["http://127.0.0.1:8080", "", null, false, "outside"],
+    ["http://[::1]:8080", "", null, false, "outside"],
+    ["http://localhost:8080", "", null, false, "outside"],
+    ["http://orders.web", "", null, false, "outside"],
+    ["https://api.example.com", "", null, false, "outside"],
+    ["https://svc.example.com", "", null, false, "outside"],
+  ];
+
+  it("reads a backend host's namespace, and holds one in the cluster that names none", () => {
+    for (const [url, domain, namespace, inCluster, place] of backendHosts) {
+      expect(backendNamespace(url, domain || "cluster.local"), `${url} ${domain}`).toEqual({ inCluster, namespace });
+      expect(backendPlace(url, "payments", false, domain || "cluster.local"), `${url} ${domain}`).toBe(place);
     }
+    const before = [...config.gateway.backendHosts];
+    config.gateway.backendHosts.splice(0, Infinity, "10.96.0.10", "orders");
+    try {
+      for (const url of ["http://10.96.0.10:8080", "http://orders:8080"]) {
+        const held = apiState({ backendUrl: url, pausedMessage: null, teamName: "payments" });
+        expect(held, url).toMatchObject({ state: "held", heldReason: expect.stringContaining("names no namespace") as string });
+      }
+    } finally {
+      config.gateway.backendHosts.splice(0, Infinity, ...before);
+    }
+  });
+
+  it("holds an API whose in-cluster backend is another team's, whatever backendHosts allows", () => {
     const before = [...config.gateway.backendHosts];
     config.gateway.backendHosts.splice(0, Infinity, "*.svc.cluster.local");
     try {

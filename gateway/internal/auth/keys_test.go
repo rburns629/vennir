@@ -154,3 +154,52 @@ func TestConsoleKeysUnderConcurrentRequests(t *testing.T) {
 		}
 	}
 }
+
+// How long a key the console no longer publishes still verifies here, as
+// docs/security-model.md says: until keysFor has passed since the set was
+// last read, while the console answers; until keptFor has, while it can't
+// be read (and so can't say the key is gone).
+func TestARemovedKeyVerifiesForAtMostTheRefresh(t *testing.T) {
+	if keysFor > time.Minute || keptFor > 10*time.Minute {
+		t.Fatalf("keysFor %v, keptFor %v: longer than docs/security-model.md says", keysFor, keptFor)
+	}
+	current := atomic.Value{}
+	current.Store("one")
+	var down atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if down.Load() {
+			http.Error(w, "down", http.StatusServiceUnavailable)
+			return
+		}
+		x := base64.RawURLEncoding.EncodeToString(secret.Public().(ed25519.PublicKey))
+		_ = json.NewEncoder(w).Encode(map[string]any{"keys": []map[string]string{
+			{"kty": "OKP", "crv": "Ed25519", "x": x, "kid": current.Load().(string), "alg": "EdDSA"},
+		}})
+	}))
+	defer server.Close()
+	ctx := context.Background()
+	for _, consoleDown := range []bool{false, true} {
+		down.Store(false)
+		current.Store("one")
+		k := &ConsoleKeys{URL: server.URL}
+		if _, err := k.Key(ctx, "one"); err != nil {
+			t.Fatal(err)
+		}
+		// The console stops publishing it (JWT_SECRET rotated).
+		current.Store("two")
+		down.Store(consoleDown)
+		bound := keysFor
+		if consoleDown {
+			bound = keptFor
+		}
+		read := time.Now()
+		k.good, k.fetched = read.Add(-bound+5*time.Second), read.Add(-bound+5*time.Second)
+		if _, err := k.Key(ctx, "one"); err != nil {
+			t.Errorf("console down %v: within %v of the last read: %v", consoleDown, bound, err)
+		}
+		k.good, k.fetched = read.Add(-bound), read.Add(-bound)
+		if _, err := k.Key(ctx, "one"); err == nil {
+			t.Errorf("console down %v: %v after the last read, the removed key still verifies", consoleDown, bound)
+		}
+	}
+}

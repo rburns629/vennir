@@ -492,10 +492,21 @@ whatever `backendHosts` allows, so no team can serve another's backend
 under its own spec and sharing (`<team>-apis` counts as the team's only
 while no team has that name: none can be named `*-apis` now, and one named
 so before keeps its namespace); a backend should still check the token's
-`api` as well as its `aud` (the sample does). Only the cluster's default domain is read
-(`.svc.cluster.local`): on a cluster with another, and for short names,
-pod IPs or anything else that reaches inside the cluster, `backendHosts`
-alone decides, so list exactly the hosts each API may use. A caller's own `Vennir-*` headers are dropped, as are a backend's on its answer (they're the gateway's alone),
+`api` as well as its `aud` (the sample does). The namespace is read from a
+Service's name, a headless Service's Pod's (`<pod>.<service>.<ns>.svc`) and
+a Pod's (`<a-b-c-d>.<ns>.pod`), with or without the cluster's domain (the
+console chart's `clusterDomain`; `cluster.local` is read as the cluster's
+too). A host inside the cluster that names no namespace is held, by the
+console and the gateway, whatever `backendHosts` allows: any IP address
+but the loopback (a Pod's or a Service's IP is anyone's), a single name
+(the Pod's DNS search path finds it in the platform's namespace), and any
+other name under the cluster's domain or ending in `.svc` or `.pod`. Every
+other host the gateway looks up as the absolute name it is, never through
+the search path, so `orders.web` can't turn out to be
+`orders.web.svc.cluster.local`, and a `.svc` or `.pod` short form with the
+cluster's domain added: what it dials is what was read
+(`gateway/internal/store`, the console's `core/apis.ts`, kept in step and
+tested with one table of hosts). A caller's own `Vennir-*` headers are dropped, as are a backend's on its answer (they're the gateway's alone),
 and so is what it says of where it's from (`Forwarded`, `X-Forwarded-*`,
 `X-Real-Ip`): `X-Forwarded-For` is the gateway's own peer, or, on the
 public listener behind a proxy listed in `gateway.trustedProxies`, the last
@@ -515,7 +526,11 @@ cookies HttpOnly and doesn't take a cookie alone as sign-in (the gateway
 itself signs callers in by a bearer header only); a host for each API is in
 `TODO.md`.
 Paths with encoded slashes, backslashes or dot segments (`..;` too) are
-refused, so what's checked is what's forwarded. Before sign-in, an API
+refused, so what's checked is what's forwarded, and so is a `;` in a path,
+as is or `%3B` (400 `INVALID_REQUEST`), unless the API's document has a
+path parameter of `style: matrix`: the validator reads it as part of the
+segment, where a backend's framework may read a matrix parameter or drop
+what follows. Before sign-in, an API
 that's hidden or paused is answered as one that isn't there (404), so its
 state and pause message reach only signed-in callers who can see it; a
 hidden one is 404 to anyone but its own team and admins, as in the console.
@@ -558,7 +573,19 @@ A retired team's members and bots don't call as it. It checks sessions with the 
 JWKS, `/api/auth/jwks`), so it can verify a session but never make one,
 and never holds `JWT_SECRET` (proven on kind 2026-10-28: the gateway
 connects as `vennir_gateway`, accepts a console session, refuses one signed
-any other way). Requests are logged and counted by
+any other way). The console publishes only the key of its current
+`JWT_SECRET`, and the gateway reads the set again a minute after it last
+did, so once `JWT_SECRET` changes, a session signed with the old key stops
+verifying at the gateway within that minute (and at the console at once).
+While the console's JWKS can't be read (the console restarting), the
+gateway can't know a key is gone, and keeps the last set for at most 10
+minutes before refusing every session with 503 (`gateway/internal/auth/
+keys.go`, `keysFor` and `keptFor`, tested). Bot tokens are checked against
+the database on every request. When it signs in to the database with a
+cloud IAM token (`database.iamAuth`), the token is the password, so it
+refuses at startup a `DATABASE_URL` whose `sslmode` isn't `verify-full` or
+`verify-ca`, unless it connects to localhost (a Cloud SQL Auth Proxy beside
+it), as the kernel does. Requests are logged and counted by
 API, team, caller and outcome, never with bodies, header values or
 credentials; the counts kept for each API's page (`api_traffic`, a week)
 hold only the calling team, never who. What it refused there is also in

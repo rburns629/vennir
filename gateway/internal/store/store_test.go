@@ -213,7 +213,7 @@ func TestABackendInItsTeamsNamespaceIsLoggedEachRefresh(t *testing.T) {
 	if err := s.Refresh(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.Get(team, "moved"); got == nil || !got.APINamespaceTaken || BackendPlace(got.BackendURL, team, got.APINamespaceTaken) != BackendElsewhere {
+	if got := s.Get(team, "moved"); got == nil || !got.APINamespaceTaken || BackendPlace(got.BackendURL, team, got.APINamespaceTaken, "") != BackendElsewhere {
 		t.Errorf("a team named %s: %+v", APINamespace(team), got)
 	}
 }
@@ -240,30 +240,93 @@ func TestBackendPlace(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := BackendPlace(u, "payments", c.taken); got != c.want {
+		if got := BackendPlace(u, "payments", c.taken, ""); got != c.want {
 			t.Errorf("BackendPlace(%s, taken %v) = %q, want %q", c.backend, c.taken, got, c.want)
 		}
 	}
 }
 
-// An in-cluster backend host names its namespace; any other host names none.
+// The hosts a backend may have, for the team payments: the namespace each
+// names, whether it's in the cluster, and so where it runs. The console's
+// test/apis.test.ts has the same table (backendHosts), kept in step.
+var backendHostTable = []struct {
+	backend, domain string
+	namespace       string
+	inCluster       bool
+	place           string
+}{
+	// Services, with and without the cluster's domain.
+	{"http://orders.payments-apis.svc.cluster.local:8080", "", "payments-apis", true, BackendInAPIs},
+	{"http://orders.payments-apis.svc", "", "payments-apis", true, BackendInAPIs},
+	{"http://ORDERS.Payments-Apis.svc.cluster.local.", "", "payments-apis", true, BackendInAPIs},
+	{"http://orders.payments.svc.cluster.local", "", "payments", true, BackendInTeam},
+	{"http://orders.web.svc.cluster.local", "", "web", true, BackendElsewhere},
+	// A headless Service's Pods, and Pods.
+	{"http://pod-1.orders.web.svc.cluster.local", "", "web", true, BackendElsewhere},
+	{"http://pod-1.orders.payments-apis.svc", "", "payments-apis", true, BackendInAPIs},
+	{"http://10-1-2-3.web.pod.cluster.local", "", "web", true, BackendElsewhere},
+	{"http://10-1-2-3.payments-apis.pod", "", "payments-apis", true, BackendInAPIs},
+	// A cluster with a domain of its own, where cluster.local is still read
+	// as the cluster's; on one without, that domain is a name outside.
+	{"http://orders.web.svc.corp.internal", "corp.internal", "web", true, BackendElsewhere},
+	{"http://orders.payments-apis.svc.corp.internal", "corp.internal", "payments-apis", true, BackendInAPIs},
+	{"http://orders.web.svc.cluster.local", "corp.internal", "web", true, BackendElsewhere},
+	{"http://foo.corp.internal", "corp.internal", "", true, BackendElsewhere},
+	{"http://orders.web.svc.corp.internal", "", "", false, BackendOutside},
+	// In the cluster, naming no namespace: held.
+	{"http://orders.svc.cluster.local", "", "", true, BackendElsewhere},
+	{"http://cluster.local", "", "", true, BackendElsewhere},
+	{"http://a.b.orders.web.svc.cluster.local", "", "", true, BackendElsewhere},
+	{"http://orders.pod", "", "", true, BackendElsewhere},
+	{"http://10.96.0.10:8080", "", "", true, BackendElsewhere},
+	{"http://[fd00::1]:8080", "", "", true, BackendElsewhere},
+	{"http://[::ffff:10.96.0.10]", "", "", true, BackendElsewhere},
+	{"http://[::ffff:127.0.0.1]", "", "", true, BackendElsewhere},
+	{"http://orders:8080", "", "", true, BackendElsewhere},
+	// The gateway's own Pod, and names outside (looked up as absolute
+	// names, so orders.web is never orders.web.svc).
+	{"http://127.0.0.1:8080", "", "", false, BackendOutside},
+	{"http://[::1]:8080", "", "", false, BackendOutside},
+	{"http://localhost:8080", "", "", false, BackendOutside},
+	{"http://orders.web", "", "", false, BackendOutside},
+	{"https://api.example.com", "", "", false, BackendOutside},
+	{"https://svc.example.com", "", "", false, BackendOutside},
+}
+
+// A host that names a namespace yields it; one in the cluster that names
+// none is held, never outside.
 func TestBackendNamespace(t *testing.T) {
-	for raw, want := range map[string]string{
-		"http://orders.team-b.svc.cluster.local:8080":  "team-b",
-		"http://orders.team-b.svc:8080":                "team-b",
-		"http://ORDERS.Team-B.svc.cluster.local.":      "team-b",
-		"http://pod-1.orders.team-b.svc.cluster.local": "team-b",
-		"http://orders:8080":                           "",
-		"http://orders.svc.cluster.local":              "",
-		"https://api.example.com":                      "",
-		"https://svc.example.com":                      "",
-	} {
-		u, err := url.Parse(raw)
+	for _, c := range backendHostTable {
+		u, err := url.Parse(c.backend)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := BackendNamespace(u); got != want {
-			t.Errorf("BackendNamespace(%s) = %q, want %q", raw, got, want)
+		if ns, in := BackendNamespace(u, c.domain); ns != c.namespace || in != c.inCluster {
+			t.Errorf("BackendNamespace(%s, %q) = %q, %v; want %q, %v", c.backend, c.domain, ns, in, c.namespace, c.inCluster)
+		}
+		if got := BackendPlace(u, "payments", false, c.domain); got != c.place {
+			t.Errorf("BackendPlace(%s, %q) = %q, want %q", c.backend, c.domain, got, c.place)
+		}
+	}
+}
+
+// What's looked up is what was read: a Service's or Pod's short form with
+// the cluster's domain, and every name absolute.
+func TestDialHost(t *testing.T) {
+	for _, c := range []struct{ host, domain, want string }{
+		{"orders.payments-apis.svc", "", "orders.payments-apis.svc.cluster.local."},
+		{"orders.payments-apis.svc", "corp.internal", "orders.payments-apis.svc.corp.internal."},
+		{"10-1-2-3.payments-apis.pod.", "", "10-1-2-3.payments-apis.pod.cluster.local."},
+		{"orders.payments-apis.svc.cluster.local", "", "orders.payments-apis.svc.cluster.local."},
+		{"orders.web", "", "orders.web."},
+		{"API.example.com", "", "api.example.com."},
+		{"orders", "", "orders."},
+		{"localhost", "", "localhost"},
+		{"127.0.0.1", "", "127.0.0.1"},
+		{"::1", "", "::1"},
+	} {
+		if got := DialHost(c.host, c.domain); got != c.want {
+			t.Errorf("DialHost(%s, %q) = %q, want %q", c.host, c.domain, got, c.want)
 		}
 	}
 }
