@@ -530,10 +530,10 @@ export async function purgeTeam(caller: AuthUser | undefined, name: string, log:
       { executionIds: unfinished },
     );
   }
-  const { revokedBotTokens } = await purgeTeamRecords(team.id);
+  const { revokedBotTokens, removedBotIdentities } = await purgeTeamRecords(team.id);
   await syncIdentityPolicy();
   await purgeNamespace();
-  log.info({ team: team.name, by: caller?.id, revokedBotTokens }, "team purged");
+  log.info({ team: team.name, by: caller?.id, revokedBotTokens, removedBotIdentities }, "team purged");
   await platformAlert(
     `purge:${team.id}`,
     `Team ${team.name} was purged`,

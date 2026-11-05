@@ -192,7 +192,7 @@ export async function deleteProductsForTeam(teamId: string): Promise<number> {
  * products go, bots left belonging to no live team have their tokens
  * revoked, and the row is soft-deleted so its name stays reserved.
  * Execution history (submittedExecutions) is deliberately kept. */
-export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: number }> {
+export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: number; removedBotIdentities: number }> {
   return db.transaction(async (tx) => {
     const members = await tx
       .delete(teamMemberships)
@@ -209,6 +209,7 @@ export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: num
     await tx.delete(teamCallbacks).where(eq(teamCallbacks.teamId, teamId));
 
     let revokedBotTokens = 0;
+    let removedBotIdentities = 0;
     for (const { userId } of members) {
       const [user] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
       if (!user?.isBot) continue;
@@ -227,11 +228,11 @@ export async function purgeTeam(teamId: string): Promise<{ revokedBotTokens: num
       // A keyless bot signs in by its identities, not a token: gone too, or
       // it would still sign in, a bot of no team.
       const removed = await tx.delete(botIdentities).where(eq(botIdentities.botId, userId)).returning();
-      revokedBotTokens += removed.length;
+      removedBotIdentities += removed.length;
     }
 
     await tx.update(teams).set({ deletedAt: new Date() }).where(eq(teams.id, teamId));
-    return { revokedBotTokens };
+    return { revokedBotTokens, removedBotIdentities };
   });
 }
 

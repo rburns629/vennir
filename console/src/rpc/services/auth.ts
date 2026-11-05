@@ -59,6 +59,8 @@ export function authService(app: FastifyInstance): ServiceImpl<typeof AuthServic
         throw rpcError(Code.AlreadyExists, "CONFLICT", "Email already registered.");
       }
       const user = await createUser(email, await hashPassword(password), false, true);
+      // Its audit entry's actor: the account it made.
+      ctx.values.set(kSignedIn, user.id);
       return { userId: user.id, email: user.email };
     },
 

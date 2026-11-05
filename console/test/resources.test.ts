@@ -54,6 +54,7 @@ vi.mock("../src/kernel/client.js", async (importOriginal) => {
       ),
     ),
     getExecution: vi.fn((id: string) => Promise.resolve(kernelRuns.get(id) ?? { executionId: id, name: "x", state: "RUNNING", tasks: [] })),
+    retryTask: vi.fn((executionId: string) => Promise.resolve({ executionId, state: "RUNNING" })),
   };
 });
 vi.mock("../src/imagePolicy.js", async (importOriginal) => ({
@@ -339,8 +340,15 @@ describe("what runs made", () => {
     try {
       const refused = await call(consumerToken, "ResourceService/DeleteResources", { resourceIds: [made?.id] });
       expect(refused.failure).toBe("TEAM_RETIRED");
-      expect((await call(admin, "ResourceService/DeleteResources", { resourceIds: [made?.id] })).code).toBe("ok");
+      const cleanup = await call<{ executionId: string }>(admin, "ResourceService/DeleteResources", { resourceIds: [made?.id] });
+      expect(cleanup.code).toBe("ok");
       expect(lastSubmitted().dag.tasks[0]).toMatchObject({ team: prov, forTeam: cons });
+      // Its step failed: the admin may retry it as they ran it; the team's people may not.
+      const executionId = cleanup.body.executionId;
+      kernelRuns.set(executionId, { executionId, name: "x", state: "FAILED", tasks: [step("delete-1", "FAILED")] });
+      const retry = { executionId, taskId: "delete-1" };
+      expect((await call(consumerToken, "ExecutionService/RetryTask", retry)).code).not.toBe("ok");
+      expect((await call(admin, "ExecutionService/RetryTask", retry)).code).toBe("ok");
     } finally {
       await db.update(teams).set({ retiredAt: null, retiredBy: null }).where(eq(teams.name, cons));
     }
