@@ -94,11 +94,27 @@ func TestAPIs(t *testing.T) {
 		"hidden and shared":              {apiYAML + "visibility: hidden\n", openapiYAML, "api.yaml"},
 		"a limit it can't read":          {strings.Replace(apiYAML, "600/min", "lots", 1), openapiYAML, "api.yaml"},
 		"too long a timeout":             {strings.Replace(apiYAML, "timeout: 20s", "timeout: 900s", 1), openapiYAML, "api.yaml"},
+		"AWS's audience":                 {tokenFor("sts.amazonaws.com"), openapiYAML, "one a cloud federates"},
+		"Azure's audience":               {tokenFor("api://AzureADTokenExchange"), openapiYAML, "one a cloud federates"},
+		"a GKE pool":                     {tokenFor("acme.svc.id.goog"), openapiYAML, "one a cloud federates"},
+		"a GKE pool's STS audience":      {tokenFor("identitynamespace:acme.svc.id.goog:https://container.googleapis.com/x"), openapiYAML, "one a cloud federates"},
+		"a GCP provider":                 {tokenFor("//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/k"), openapiYAML, "one a cloud federates"},
+		"the Kubernetes API's":           {tokenFor("https://kubernetes.default.svc"), openapiYAML, "one a cloud federates"},
 	} {
 		if out := errorsOf(t, (*Catalog).ValidateAPIs, apiCatalog(t, tc.api, tc.spec)); !strings.Contains(out, tc.want) {
 			t.Errorf("%s: want %q in:\n%s", name, tc.want, out)
 		}
 	}
+	if out := errorsOf(t, (*Catalog).ValidateAPIs, apiCatalog(t, tokenFor("https://orders.example.com"), openapiYAML)); out != "" {
+		t.Errorf("a backend's own audience was refused:\n%s", out)
+	}
+}
+
+// tokenFor is apiYAML with a serviceAccountToken for audience.
+func tokenFor(audience string) string {
+	return strings.Replace(apiYAML, `    googleIdToken:
+      serviceAccount: orders-gateway@payments-prod.iam.gserviceaccount.com`, `    serviceAccountToken:
+      audience: "`+audience+`"`, 1)
 }
 
 // An AWS backend that takes IAM: signed as a role, carried in the

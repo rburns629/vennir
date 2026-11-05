@@ -58,6 +58,38 @@ export function reservedAudiences(): Set<string> {
   ]);
 }
 
+/**
+ * Whether a token for `audience` could be exchanged for a cloud identity:
+ * AWS's and Azure's federation audiences, a GKE Workload Identity pool
+ * (<project>.svc.id.goog) or its STS audience (identitynamespace:...), a GCP
+ * workload identity provider. A product's steps may ask for these (that's
+ * what tokenAudiences are for); an API's backend token may not, or its
+ * backend could become the API ServiceAccount's cloud identity. As the
+ * gateway's credentials.CloudAudience and the catalog tool's, kept in step.
+ */
+export function cloudFederationAudience(audience: string): boolean {
+  const a = audience.toLowerCase();
+  return (
+    a === "sts.amazonaws.com" ||
+    a === "api://azureadtokenexchange" ||
+    a.endsWith(".svc.id.goog") ||
+    a.startsWith("identitynamespace:") ||
+    a.startsWith("//iam.googleapis.com/") ||
+    a.startsWith("https://iam.googleapis.com/")
+  );
+}
+
+/** What's wrong with an API's backend token audience (backend.auth.serviceAccountToken), or "". */
+export function apiTokenAudienceProblem(audience: string): string {
+  if (reservedAudiences().has(audience)) {
+    return `its backend's token audience ${audience} is this cluster's own (the Kubernetes API's or kernel-api's)`;
+  }
+  if (cloudFederationAudience(audience)) {
+    return `its backend's token audience ${audience} is one a cloud federates (AWS, Azure or Google): a backend's token may never carry it`;
+  }
+  return "";
+}
+
 /** What's wrong with a product's audiences, one problem per entry. */
 export function tokenAudienceProblems(audiences: string[]): string[] {
   const problems: string[] = [];

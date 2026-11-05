@@ -519,7 +519,9 @@ request signed as a role trusting the cluster's OIDC issuer for
 a function URL the role needs both `lambda:InvokeFunctionUrl` and
 `lambda:InvokeFunction`), or
 `serviceAccountToken` (the Kubernetes token itself, for a backend that
-checks those). A backend that takes only a static key can't be published:
+checks those, for the backend's own audience: never one a cloud exchanges
+for an identity, such as `sts.amazonaws.com` or a Workload Identity
+pool's, which `vennir catalog validate` refuses). A backend that takes only a static key can't be published:
 the gateway reads no secrets. Your backend learns who called from the
 `Vennir-Caller` header, which the gateway signs (its public key at
 `/.vennir/jwks.json` on the gateway).

@@ -7,6 +7,9 @@
 // signed Vennir-Caller header, and the answer streamed back unchanged; but
 // only if the API's OpenAPI document describes it. In order:
 //
+//  0. the client's address (clientAddress) hasn't failed to sign in more
+//     than UnauthenticatedPerMinute times in the last minute; else 429,
+//     before any database work
 //  1. the API exists, and here (an internet-reachable one, on the public
 //     listener); else 404
 //  2. the caller signs in, as the console's callers do; else 401, or 404
@@ -16,7 +19,8 @@
 //     they're an admin; else 404, as the console's sees()
 //  4. it isn't closed, paused or held, and its spec could be read; else 503
 //  5. it's shared with one of the caller's teams; else 403
-//  6. its body is within the API's size; else 413
+//  6. its body is within the API's size, and arrives within
+//     BodyReadTimeout; else 413, or 408
 //  7. its method and path are an operation in the spec; else 404, blocked:
 //     never forwarded
 //  8. its parameters, headers and body fit that operation's schemas, with
@@ -28,7 +32,10 @@
 //     behind a trusted proxy the address it saw (never what the caller said);
 //     a cookie the backend sets is kept to the API's own path
 //
-// Every answer says who gave it: Vennir-Answered-By: gateway or backend.
+// Every answer says who gave it: Vennir-Answered-By: gateway or backend;
+// a backend's own Vennir-* headers aren't passed on. A request's traffic is
+// counted against its API's endpoint only once it matched one of the spec's
+// operations or the caller signed in: before that, against no endpoint.
 // Logs and metrics name the API, team, caller and outcome; never a body, a
 // header's value or a credential.
 package gateway
@@ -62,7 +69,6 @@ import (
 	"github.com/rburns629/vennir/gateway/internal/caller"
 	"github.com/rburns629/vennir/gateway/internal/limits"
 	"github.com/rburns629/vennir/gateway/internal/store"
-	"github.com/rburns629/vennir/gateway/internal/traffic"
 )
 
 // AnsweredBy says who answered: gateway or backend.
@@ -82,14 +88,20 @@ type Gateway struct {
 	}
 	Signer  *caller.Signer
 	Limiter *limits.Limiter
-	Minter  interface {
+	// Peers counts each client address's failed sign-ins
+	// (Settings.UnauthenticatedPerMinute).
+	Peers  *limits.Limiter
+	Minter interface {
 		Authorize(ctx context.Context, out *http.Request, body []byte, team, serviceAccount string, auth map[string]map[string]string) error
 	}
 	Settings Settings
 	Log      *slog.Logger
 	Metrics  *Metrics
-	// Traffic counts what each API's requests came to (its page shows it).
-	Traffic *traffic.Recorder
+	// Traffic counts what each API's requests came to (its page shows it):
+	// a traffic.Recorder.
+	Traffic interface {
+		Record(apiID, team, endpoint, outcome string, at time.Time, took time.Duration)
+	}
 	// Public: this listener is the internet's, which serves only APIs that
 	// are reachable from the internet and allowed to be.
 	Public bool
@@ -111,6 +123,13 @@ type Settings struct {
 	DefaultPerMinute int
 	// Closed: every API answers 503, and nothing is forwarded.
 	Closed bool
+	// UnauthenticatedPerMinute: requests a minute one client address may
+	// make that don't sign in, after which its requests are refused before
+	// sign-in (and any database work) until it's under again. 0: no limit.
+	UnauthenticatedPerMinute int
+	// BodyReadTimeout: the longest a request's body may take to arrive. 0:
+	// no deadline.
+	BodyReadTimeout time.Duration
 }
 
 // Metrics count what the gateway did.
@@ -123,7 +142,7 @@ type Metrics struct {
 func NewMetrics(reg prometheus.Registerer) *Metrics {
 	m := &Metrics{
 		Requests: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "vennir_gateway_requests_total",
-			Help: "Requests, by API and outcome (forwarded, blocked, invalid, unauthenticated, forbidden, limited, paused, held, unavailable, backend_error)."},
+			Help: "Requests, by API and outcome (forwarded, blocked, invalid, unauthenticated, forbidden, limited, peer_limited, paused, held, unavailable, backend_error)."},
 			[]string{"api", "outcome"}),
 		Duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "vennir_gateway_request_duration_seconds",
 			Help: "How long requests took, by API and who answered.", Buckets: prometheus.DefBuckets}, []string{"api", "answered_by"}),
@@ -218,15 +237,34 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest, requestID string) outcome {
+	// Only the public listener is behind a proxy: on the in-cluster one,
+	// the peer is the caller (a Pod's X-Forwarded-For says nothing).
+	var trusted []netip.Prefix
+	if g.Public {
+		trusted = g.Settings.TrustedProxies
+	}
+	client := clientAddress(r.Header, r.RemoteAddr, trusted)
+	// First, whatever the API: a limited address hears nothing of which
+	// APIs there are, and costs no database work.
+	peer := peerKey(client)
+	if g.Peers != nil && g.Settings.UnauthenticatedPerMinute > 0 {
+		if spent, wait := g.Peers.Spent(peer, g.Settings.UnauthenticatedPerMinute, g.now()); spent {
+			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds()+0.999)))
+			return g.refuse(w, outcome{name: "peer_limited"}, http.StatusTooManyRequests, "RATE_LIMITED",
+				"Too many requests from your address failed to sign in: nothing more is taken from it until Retry-After.")
+		}
+	}
 	api := g.Store.Get(team, name)
 	if api == nil || (g.Public && !(api.Internet && slices.Contains(g.Settings.InternetTeams, api.Team))) {
 		return g.refuse(w, outcome{name: "not_found"}, http.StatusNotFound, "NOT_FOUND", "No such API here.")
 	}
+	// Before sign-in, an endpoint only if it's one of the spec's: anyone
+	// could make up paths, each a row of traffic.
 	o := outcome{apiID: api.ID, endpoint: api.Match(r.Method, rest), served: true}
-	if o.endpoint == "" {
-		o.endpoint = r.Method + " " + rest
-	}
 	who, err := g.Callers.Resolve(r.Context(), r.Header.Get("Authorization"))
+	if err != nil && errors.Is(err, auth.ErrUnauthenticated) && g.Peers != nil && g.Settings.UnauthenticatedPerMinute > 0 {
+		g.Peers.Allow(peer, g.Settings.UnauthenticatedPerMinute, g.now())
+	}
 	if err != nil {
 		// Before sign-in, a hidden or paused API is as one that isn't
 		// there: its state and pause message are for callers who see it.
@@ -249,6 +287,9 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, o.as("unavailable"), http.StatusServiceUnavailable, "UNAVAILABLE", "The gateway can't check who you are right now.")
 	}
 	o.subject = "user:" + who.UserID
+	if o.endpoint == "" {
+		o.endpoint = r.Method + " " + rest
+	}
 	if api.Hidden && !who.IsAdmin && !slices.Contains(who.Teams, api.Team) {
 		// As the console's sees(): a hidden API is its own team's (and
 		// admins'), whatever it's shared with, and no one else hears of it.
@@ -301,10 +342,20 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		result.name = "invalid"
 		return g.refuse(w, result, http.StatusRequestEntityTooLarge, "TOO_LARGE", "The body is larger than this API takes: "+strconv.FormatInt(api.MaxRequest, 10)+" bytes.")
 	}
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, api.MaxRequest))
+	body, err := g.readBody(w, r, api.MaxRequest)
 	if err != nil {
 		result.name = "invalid"
-		return g.refuse(w, result, http.StatusRequestEntityTooLarge, "TOO_LARGE", "The body is larger than this API takes: "+strconv.FormatInt(api.MaxRequest, 10)+" bytes.")
+		var tooLarge *http.MaxBytesError
+		var netErr net.Error
+		switch {
+		case errors.As(err, &tooLarge):
+			return g.refuse(w, result, http.StatusRequestEntityTooLarge, "TOO_LARGE", "The body is larger than this API takes: "+strconv.FormatInt(api.MaxRequest, 10)+" bytes.")
+		case errors.As(err, &netErr) && netErr.Timeout():
+			// The connection's read deadline has passed: it can't be reused.
+			w.Header().Set("Connection", "close")
+			return g.refuse(w, result, http.StatusRequestTimeout, "REQUEST_TIMEOUT", "The body didn't arrive in time: nothing was forwarded.")
+		}
+		return g.refuse(w, result, http.StatusBadRequest, "BAD_REQUEST", "The body couldn't be read: nothing was forwarded.")
 	}
 
 	// The validator checks a body only by its Content-Type, and would let
@@ -365,13 +416,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		result.name = "invalid"
 		return g.refuse(w, result, http.StatusBadRequest, "BAD_REQUEST", "The request can't be read.")
 	}
-	// Only the public listener is behind a proxy: on the in-cluster one,
-	// the peer is the caller (a Pod's X-Forwarded-For says nothing).
-	var trusted []netip.Prefix
-	if g.Public {
-		trusted = g.Settings.TrustedProxies
-	}
-	out.Header = forwardHeaders(r.Header, clientAddress(r.Header, r.RemoteAddr, trusted), api.BackendAuth["awsSigV4"] != nil)
+	out.Header = forwardHeaders(r.Header, client, api.BackendAuth["awsSigV4"] != nil)
 	out.Header.Set(caller.Header, signed)
 	out.Header.Set(RequestIDHeader, requestID)
 	out.ContentLength = int64(len(body))
@@ -394,7 +439,9 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	defer res.Body.Close()
 	for k, values := range res.Header {
 		k = http.CanonicalHeaderKey(k)
-		if slices.Contains(hopByHop, k) {
+		// Vennir-* are the gateway's (its request id, who answered): a
+		// backend's own never sit beside them.
+		if slices.Contains(hopByHop, k) || strings.HasPrefix(strings.ToLower(k), "vennir-") {
 			continue
 		}
 		for _, v := range values {
@@ -411,6 +458,31 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	flushCopy(w, res.Body)
 	result.name, result.status = "forwarded", res.StatusCode
 	return result
+}
+
+// readBody reads a request's body, at most limit bytes, within the
+// gateway's BodyReadTimeout: a body sent slowly holds no connection open.
+// The deadline is lifted once it's read, so the answer may stream for as
+// long as the backend sends.
+func (g *Gateway) readBody(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, error) {
+	rc := http.NewResponseController(w)
+	if g.Settings.BodyReadTimeout > 0 {
+		// Not every ResponseWriter has a connection (a test's recorder).
+		if err := rc.SetReadDeadline(time.Now().Add(g.Settings.BodyReadTimeout)); err == nil {
+			defer func() { _ = rc.SetReadDeadline(time.Time{}) }()
+		}
+	}
+	return io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
+}
+
+// peerKey is the key a client address's failed sign-ins are counted under:
+// the address, or an IPv6 one's /64 (one host may hold all of it).
+func peerKey(client string) string {
+	a, err := netip.ParseAddr(client)
+	if err != nil || a.Is4() {
+		return client
+	}
+	return netip.PrefixFrom(a, 64).Masked().String()
 }
 
 // callingTeam is the team the caller calls as: the one in Vennir-Team if

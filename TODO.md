@@ -154,13 +154,10 @@ it was seen.
 - [ ] **From the security review of 2026-11-04** (six read-only reviewers,
   each finding checked against the code; the fixes so far are #213 to #226).
   Still open:
-  - Gateway: record a request's endpoint only once it's matched or signed
-    in, limit by peer before sign-in, and set a body-read deadline; reserve
-    the cloud federation audiences (`sts.amazonaws.com`, the GKE pool's) for
-    `serviceAccountToken`; read a backend's namespace from Pod DNS names and
-    a custom cluster domain too; `Set` (not add) `Vennir-*` on answers;
-    refuse a `;` in a path unless the document uses matrix parameters;
-    shorten or document how long a rotated session key still verifies.
+  - Gateway: read a backend's namespace from Pod DNS names and a custom
+    cluster domain too; refuse a `;` in a path unless the document uses
+    matrix parameters; shorten or document how long a rotated session key
+    still verifies.
   - Kernel: count a shared product's runs against the team they're for as
     well as its own; refuse IAM-token database sign-in without a verified
     TLS connection; reserve every failure code the kernel itself sets; a

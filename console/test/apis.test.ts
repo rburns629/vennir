@@ -310,6 +310,8 @@ describe("traffic", () => {
       { apiId: orders?.id ?? "", minute: minute(3), team: consumer, endpoint: "GET /orders/{id}", outcome: "forwarded_5xx", count: 2, durationMs: 100 },
       { apiId: orders?.id ?? "", minute: minute(2), team: consumer, endpoint: "DELETE /admin/users", outcome: "blocked", count: 5, durationMs: 0 },
       { apiId: orders?.id ?? "", minute: minute(2), team: "", endpoint: "POST /orders", outcome: "unauthenticated", count: 1, durationMs: 0 },
+      // Before sign-in, a path not in the spec: counted under no endpoint.
+      { apiId: orders?.id ?? "", minute: minute(2), team: "", endpoint: "", outcome: "unauthenticated", count: 6, durationMs: 0 },
       // A hidden API asked for by a caller not of its team: stopped too.
       { apiId: orders?.id ?? "", minute: minute(2), team: "", endpoint: "GET /orders/{id}", outcome: "not_found", count: 4, durationMs: 0 },
       // A team with no limit of its own in api.yaml: held to the API's default.
@@ -320,7 +322,8 @@ describe("traffic", () => {
     const got = await call<Traffic>(tokens.member, "ApiService/GetApiTraffic", { team: owner, name: "orders", hours: 24 });
     expect(got.code).toBe("ok");
     const t = got.body;
-    expect([t.requests, t.forwarded, t.stopped, t.backendErrors]).toEqual(["126", "113", "13", "2"]);
+    expect([t.requests, t.forwarded, t.stopped, t.backendErrors]).toEqual(["132", "113", "19", "2"]);
+    expect(t.endpoints.map((e) => e.endpoint)).not.toContain("");
     expect(t.endpoints.find((e) => e.endpoint === "POST /orders")).toMatchObject({ requests: "114", invalid: "3", averageMs: "100" });
     expect(t.blocked).toEqual([expect.objectContaining({ request: "DELETE /admin/users", count: "5", teams: [consumer] })]);
     expect(t.teams.find((x) => x.team === consumer)).toMatchObject({ peakPerMinute: "73", limitPerMinute: 600 });
@@ -360,5 +363,18 @@ describe("an API's identity, which the gateway mints tokens for", () => {
       expect.stringContaining("must end in -api"),
       expect.stringContaining("is this cluster's own"),
     ]);
+  });
+
+  it("may not be for an audience a cloud federates", async () => {
+    const audiences = [
+      "sts.amazonaws.com",
+      "api://AzureADTokenExchange",
+      "acme.svc.id.goog",
+      "identitynamespace:acme.svc.id.goog:https://container.googleapis.com/v1/projects/acme/locations/l/clusters/c",
+      "//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/k",
+    ];
+    problems.length = 0;
+    await apply(audiences.map((audience, i) => api(`cloud-audience-${String(i)}`, { backendAuth: { kind: { case: "serviceAccountToken" as const, value: { audience } } } })));
+    expect(problems).toEqual(audiences.map(() => expect.stringContaining("one a cloud federates")));
   });
 });

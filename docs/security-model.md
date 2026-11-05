@@ -477,7 +477,7 @@ so before keeps its namespace); a backend should still check the token's
 `api` as well as its `aud` (the sample does). Only the cluster's default domain is read
 (`.svc.cluster.local`): on a cluster with another, and for short names,
 pod IPs or anything else that reaches inside the cluster, `backendHosts`
-alone decides, so list exactly the hosts each API may use. A caller's own `Vennir-*` headers are dropped,
+alone decides, so list exactly the hosts each API may use. A caller's own `Vennir-*` headers are dropped, as are a backend's on its answer (they're the gateway's alone),
 and so is what it says of where it's from (`Forwarded`, `X-Forwarded-*`,
 `X-Real-Ip`): `X-Forwarded-For` is the gateway's own peer, or, on the
 public listener behind a proxy listed in `gateway.trustedProxies`, the last
@@ -501,6 +501,13 @@ refused, so what's checked is what's forwarded. Before sign-in, an API
 that's hidden or paused is answered as one that isn't there (404), so its
 state and pause message reach only signed-in callers who can see it; a
 hidden one is 404 to anyone but its own team and admins, as in the console.
+A client address (the peer, or the address trusted proxies saw; an IPv6
+/64) that fails to sign in more than `gateway.unauthenticatedPerMinute`
+times a minute (60) is refused with 429 before sign-in, so before any
+database work, until it's under again; and a request's body must arrive
+within `gateway.bodyReadTimeoutSeconds` (30), so slow senders can't hold
+connections open (answers aren't limited: they stream). Both are counted
+per replica.
 
 Backends must be under hosts the admins allow (`gateway.backendHosts`), or
 the API is held: the gateway can't be pointed anywhere a catalog says. Its
@@ -508,7 +515,17 @@ only Kubernetes right is minting ServiceAccount tokens, and an admission
 policy limits that to API ServiceAccounts (`*-api`) in active (not retired) team namespaces, for
 a named audience that isn't the Kubernetes API's or kernel-api's, lasting an
 hour at most, so it can't mint the platform's or a team's other identities,
-or a token for the cluster itself. `-api` is reserved: no product may run as
+or a token for the cluster itself. A backend's token (`serviceAccountToken`)
+may not carry an audience a cloud exchanges for an identity either
+(`sts.amazonaws.com`, `api://AzureADTokenExchange`, a GKE pool
+`<project>.svc.id.goog` or its `identitynamespace:` audience, a GCP
+workload identity provider), or the backend could sign in to that cloud as
+the API's ServiceAccount: the catalog tool, the console's catalog sync and
+the gateway refuse them. The admission policy refuses Azure's and the
+`identitynamespace:` ones too, but not AWS's or the Google pool's: the
+gateway asks for those itself, for the same ServiceAccounts, for its own
+`awsSigV4` and `googleIdToken` exchanges, and a request doesn't say which
+it's for, so there the gateway's own check is what holds. `-api` is reserved: no product may run as
 such a ServiceAccount, and an API's must end in it. It reads the
 console's database as a role of its own (`vennir_gateway`,
 `console/src/db/gatewayAccess.ts`): it may read the columns it needs to

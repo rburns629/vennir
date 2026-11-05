@@ -90,16 +90,19 @@ Every answer carries two headers worth keeping:
 - `Vennir-Answered-By`: `gateway` when the gateway refused or answered itself, `backend` when the backend did;
 - `Vennir-Request-Id`: the gateway's id for this request. The backend gets the same id, so give it to the owning team when you report a problem.
 
+These are always the gateway's: a backend's own `Vennir-*` headers aren't passed on.
+
 ## What does the gateway check, in order?
 
 For each request to `/<team>/<name>/<path>`:
 
+0. **Your address hasn't kept failing to sign in.** After 60 requests in a minute from one address that didn't sign in (an admin may change the number), every request from that address is refused with 429 and `Retry-After` until it's under again, whichever API it's for, signed in or not. Behind one shared address (an office's, a NAT's), one caller's bad token can hold up the rest: fix the token, and wait out `Retry-After`.
 1. **The API exists here.** On the public address, only APIs reachable from the internet are served. Else 404.
 2. **You're signed in.** Else 401; but 404 for a hidden or paused API, which before you sign in is answered as one that isn't there.
 3. **You may see it.** A hidden API is only for its own team and admins, whatever it's shared with. Else 404, as in the console.
 4. **It's open.** Not closed by an admin, not paused, not held, and its spec could be read. Else 503.
 5. **It's shared with your team.** Else 403.
-6. **The body isn't too large** for this API (`maxRequest`, 1 MiB unless it says otherwise). Else 413.
+6. **The body isn't too large** for this API (`maxRequest`, 1 MiB unless it says otherwise), and arrives within 30 seconds. Else 413, or 408 for a body that took too long. The answer has no such limit: it streams for as long as the backend sends.
 7. **The method and path are an operation in the spec.** Else 404, and the request is counted as blocked.
 8. **Parameters, headers and body fit that operation's schemas**, with no query parameter it doesn't declare, a body only where it declares one, and that body with a `Content-Type`. Else 400, with what didn't fit.
 9. **Your team is within its requests a minute.** Else 429, with `Retry-After`.
@@ -120,8 +123,9 @@ The gateway's own answers are JSON, `{"error": "<code>", "message": "…"}`, and
 | 404 | `NOT_IN_SPEC` | The spec has no such method and path. Nothing was forwarded | Check the endpoint list on its **Overview** |
 | 404 | `NOT_FOUND` | No such API here (or not on the public address, or one hidden from you, or one that's hidden or paused while you aren't signed in), or the path has an encoded slash, a backslash or a dot segment | Check the address on its **Overview**, and your token |
 | 400 | `INVALID_REQUEST` | The request doesn't fit the spec's schemas | Read `problems`; compare with the downloaded spec |
+| 408 | `REQUEST_TIMEOUT` | The body didn't arrive in time. Nothing was forwarded | Send it at once, not slowly; send less over a slow link |
 | 413 | `TOO_LARGE` | The body is larger than this API takes | Send less; the limit is on its **Overview** |
-| 429 | `RATE_LIMITED` | Your team used this API's requests for the minute | Wait for `Retry-After` seconds |
+| 429 | `RATE_LIMITED` | Your team used this API's requests for the minute, or your address failed to sign in too often | Wait for `Retry-After` seconds; if you weren't signed in, fix your token first |
 | 503 | `API_PAUSED` | Its team paused it; the message says why | Wait, or ask its team |
 | 503 | `API_HELD` | Its backend isn't one this install allows yet | Its team asks an admin ([held](#why-is-my-api-held)) |
 | 503 | `GATEWAY_CLOSED` | An admin closed the gateway; the message says why | Wait, or ask an admin |
@@ -158,7 +162,7 @@ On your API's page, **Endpoints and traffic** shows what callers sent, what the 
 | **Forwarded to the backend** | Requests that reached your backend |
 | **Stopped at the gateway** | Not in the spec, didn't fit, over the rate, not signed in or not shared, paused, held or closed |
 | **Backend errors** | Your backend answered 5xx, or couldn't be reached |
-| **Endpoints, from its OpenAPI file** | Per operation: **Requests**, **Didn’t fit**, **Backend 4xx**, **Backend 5xx**, **Backend, avg** |
+| **Endpoints, from its OpenAPI file** | Per operation: **Requests**, **Didn’t fit**, **Backend 4xx**, **Backend 5xx**, **Backend, avg**. A request from a caller who didn't sign in, to a path that isn't in the spec, is counted in **Requests** and **Stopped at the gateway** but under no endpoint, so made-up paths can't fill the table |
 | **Blocked: not in the spec** | Methods and paths your spec doesn't describe, how often, from which teams, and when last |
 | **By calling team** | Each team's requests, and a bar of its busiest minute against its limit |
 

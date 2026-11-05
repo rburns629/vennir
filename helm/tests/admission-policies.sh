@@ -530,6 +530,11 @@ expect "no audience (the Kubernetes API's)"      "never the Kubernetes API"   "$
 expect "for the Kubernetes API"                  "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://kubernetes.default.svc)"
 expect "for GKE's API"                           "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://container.googleapis.com/v1/projects/p)"
 expect "for kernel-api"                          "never the Kubernetes API"   "$(token "$TEAM_A" orders-api vennir-kernel-api)"
+expect "for Azure's federation"                  "never the Kubernetes API"   "$(token "$TEAM_A" orders-api api://AzureADTokenExchange)"
+expect "for a GKE pool's STS audience"           "never the Kubernetes API"   "$(token "$TEAM_A" orders-api identitynamespace:p.svc.id.goog:https://container.googleapis.com/v1/projects/p)"
+# The gateway's own exchanges (awsSigV4, googleIdToken) ask for these: it
+# refuses them for serviceAccountToken itself.
+expect "for AWS's STS, the gateway's own"        allowed                      "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
 expect "lasting over an hour"                    "an hour at most"            "$(token "$TEAM_A" orders-api https://orders.example 7200)"
 
 echo "Console Jobs (image scans and catalog verifications):"

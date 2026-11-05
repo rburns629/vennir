@@ -84,7 +84,7 @@ backend:
   url: http://orders.web.svc.cluster.local:8080
 ```
 
-With no `auth`, the backend trusts what the gateway signs instead: it checks `Vennir-Caller` against `/.vennir/jwks.json`, its `aud` and its `api`. `samples/local/apis/greetings` does exactly that, with no cloud. With `auth: {serviceAccountToken: {audience: <aud>}}` the gateway sends a Kubernetes token for the API's ServiceAccount, for a backend that checks those.
+With no `auth`, the backend trusts what the gateway signs instead: it checks `Vennir-Caller` against `/.vennir/jwks.json`, its `aud` and its `api`. `samples/local/apis/greetings` does exactly that, with no cloud. With `auth: {serviceAccountToken: {audience: <aud>}}` the gateway sends a Kubernetes token for the API's ServiceAccount, for a backend that checks those. The audience is the backend's own, never the Kubernetes API's, kernel-api's, or one a cloud exchanges for an identity (`sts.amazonaws.com`, `api://AzureADTokenExchange`, a GKE Workload Identity pool `<project>.svc.id.goog` or its `identitynamespace:` audience, a GCP workload identity provider `//iam.googleapis.com/…`): with one of those, the backend could sign in to that cloud as the API's ServiceAccount. `vennir catalog validate`, the console's catalog sync and the gateway each refuse them.
 
 ### A Cloud Run service (`googleIdToken`)
 
@@ -191,6 +191,17 @@ Leave `trustedProxies` empty if you can't narrow `publicListenerFrom` to the pro
 | Change an API's backend, spec, sharing or limits | Its team | A catalog pull request: the console never changes an API itself |
 | See refusals across APIs | Teams, for their own APIs and calls; admins, all | **Observe → Refused**, filtered by **Gateway** |
 | Find a backend's logs | Its team | Its page → **Its backend's logs** (in-cluster backends with `vennir/api-backend` and `vennir/api` labels); Cloud Run or Lambda log where they run |
+
+## Limits on callers
+
+Two settings in the console chart's `gateway` values, besides each API's own rate, `maxRequest` and `timeout`:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `gateway.unauthenticatedPerMinute` | `60` | Requests a minute one client address may make that fail to sign in. Past it, that address's requests are refused with 429 before sign-in, so before the gateway does any database work for them, until it's under again. The address is the peer, or on the public listener behind `trustedProxies` the address they saw; an IPv6 address counts as its /64. `0`: no limit |
+| `gateway.bodyReadTimeoutSeconds` | `30` | The longest a request's body may take to arrive; then 408 and nothing is forwarded. Answers have no such limit |
+
+Each replica counts on its own, as with API rates.
 
 ## Addresses and firewalls
 

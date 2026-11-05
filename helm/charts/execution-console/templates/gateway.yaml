@@ -106,12 +106,19 @@ spec:
       reason: Forbidden
     # For a backend's audience: named (none means the Kubernetes API's own),
     # never the cluster's or kernel-api's, and short-lived (it asks for ten
-    # minutes, gateway/internal/credentials).
+    # minutes, gateway/internal/credentials). Nor Azure's federation audience
+    # or a GKE pool's STS audience, which the gateway never asks for. AWS's
+    # (sts.amazonaws.com) and the Google pool's or provider's
+    # (gateway.gcp.tokenAudience) it does ask for, for its own exchanges
+    # (awsSigV4, googleIdToken), for the same ServiceAccounts as a backend's
+    # token: those the gateway itself refuses for serviceAccountToken, as
+    # the console and the catalog tool refuse them in an API.
     - expression: >-
         has(object.spec.audiences) && object.spec.audiences.size() > 0 &&
         object.spec.audiences.all(a, !(a in {{ concat (list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" .Values.kernelApiToken.audience) .Values.gateway.reservedAudiences | toJson }}) &&
-          !a.startsWith("https://container.googleapis.com/"))
-      message: "The gateway mints tokens only for a backend's own audience: never the Kubernetes API's or kernel-api's."
+          !a.startsWith("https://container.googleapis.com/") &&
+          a.lowerAscii() != "api://azureadtokenexchange" && !a.lowerAscii().startsWith("identitynamespace:"))
+      message: "The gateway mints tokens only for a backend's own audience: never the Kubernetes API's or kernel-api's, nor one a cloud federates that it doesn't use itself."
       reason: Forbidden
     - expression: has(object.spec.expirationSeconds) && object.spec.expirationSeconds <= 3600
       message: "The gateway mints tokens lasting an hour at most."
@@ -203,6 +210,10 @@ spec:
               value: {{ join "," .Values.gateway.trustedProxies | quote }}
             - name: DEFAULT_PER_MINUTE
               value: {{ .Values.gateway.defaultPerMinute | quote }}
+            - name: UNAUTHENTICATED_PER_MINUTE
+              value: {{ .Values.gateway.unauthenticatedPerMinute | quote }}
+            - name: BODY_READ_TIMEOUT_SECONDS
+              value: {{ .Values.gateway.bodyReadTimeoutSeconds | quote }}
             - name: CLOSED
               value: {{ .Values.gateway.closed | quote }}
             # A team may require single sign-on: then it refuses password

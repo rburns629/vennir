@@ -346,6 +346,17 @@ gateway:
   egress: []
   # -- Requests a minute for a calling team an API's limits don't name.
   defaultPerMinute: 600
+  # -- Failed sign-ins a minute from one client address (the peer, or behind
+  # trustedProxies the address they saw; an IPv6 /64), after which its
+  # requests are refused with 429 before sign-in, so before any database
+  # work, until it's under again. Callers who sign in aren't counted, but
+  # share their address's limit: behind one NAT, one caller's bad token can
+  # hold up the rest for a minute. 0: no limit.
+  unauthenticatedPerMinute: 60
+  # -- The longest a request's body may take to arrive, in seconds; then
+  # 408 and nothing is forwarded. Answers aren't limited: they stream for as
+  # long as the backend sends.
+  bodyReadTimeoutSeconds: 30
   # -- Close the gateway: every API answers 503 and nothing is forwarded.
   closed: false
   resources:

@@ -79,7 +79,7 @@
           "maxProperties": 1,
           "properties": {
             "serviceAccountToken": {
-              "description": "A token for the API's own Kubernetes ServiceAccount, for this audience: for a backend in a cluster that checks Kubernetes tokens.",
+              "description": "A token for the API's own Kubernetes ServiceAccount, for this audience: for a backend in a cluster that checks Kubernetes tokens. Never the Kubernetes API's, nor one a cloud federates (sts.amazonaws.com, api://AzureADTokenExchange, a GKE Workload Identity pool or a GCP workload identity provider): the catalog tool, the console and the gateway refuse those.",
               "type": "object",
               "additionalProperties": false,
               "required": [

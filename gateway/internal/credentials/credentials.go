@@ -44,11 +44,32 @@ var ErrUnsupported = errors.New("this kind of backend credential isn't supported
 // federation settings).
 var ErrNotConfigured = errors.New("this install's gateway isn't set up to mint this cloud's credentials")
 
+// ErrReservedAudience is a serviceAccountToken audience a cloud takes for
+// federation (or the gateway's own for it): a backend given that token
+// could trade it for the API ServiceAccount's cloud identity.
+var ErrReservedAudience = errors.New("this audience is a cloud's federation audience: a backend's token may never carry it")
+
 // TokenLifetime is how long a minted ServiceAccount token lasts.
 const TokenLifetime = 10 * time.Minute
 
 // AWSAudience is the audience a token AWS STS accepts carries.
 const AWSAudience = "sts.amazonaws.com"
+
+// AzureAudience is the audience Entra's workload identity federation takes.
+const AzureAudience = "api://AzureADTokenExchange"
+
+// CloudAudience says whether a ServiceAccount token for audience could be
+// exchanged for a cloud identity: AWS's and Azure's federation audiences, a
+// GKE Workload Identity pool (<project>.svc.id.goog) or its STS audience
+// (identitynamespace:...), and a GCP workload identity provider. As the
+// console's apiTokenAudienceProblem (console/src/tokenAudiences.ts) and the
+// catalog tool's (cli/internal/catalogtool/apis.go), kept in step.
+func CloudAudience(audience string) bool {
+	a := strings.ToLower(audience)
+	return a == AWSAudience || a == strings.ToLower(AzureAudience) ||
+		strings.HasSuffix(a, ".svc.id.goog") || strings.HasPrefix(a, "identitynamespace:") ||
+		strings.HasPrefix(a, "//iam.googleapis.com/") || strings.HasPrefix(a, "https://iam.googleapis.com/")
+}
 
 // Minter mints and keeps backend credentials.
 type Minter struct {
@@ -112,7 +133,13 @@ func (m *Minter) Authorize(ctx context.Context, out *http.Request, body []byte, 
 	case len(auth) == 0:
 		return nil
 	case auth["serviceAccountToken"] != nil:
-		token, err := m.serviceAccountToken(ctx, team, serviceAccount, auth["serviceAccountToken"]["audience"])
+		// The cloud audiences are for the gateway's own exchanges below,
+		// never a token handed to a backend.
+		audience := auth["serviceAccountToken"]["audience"]
+		if CloudAudience(audience) || audience == m.GCPAudience || audience == m.GCPTokenAudience {
+			return ErrReservedAudience
+		}
+		token, err := m.serviceAccountToken(ctx, team, serviceAccount, audience)
 		if err != nil {
 			return err
 		}

@@ -58,6 +58,27 @@ func TestServiceAccountTokensAreMintedAndKeptMostOfTheirLife(t *testing.T) {
 	}
 }
 
+// A backend's token never carries an audience a cloud federates: it could
+// be traded for the API ServiceAccount's cloud identity. The gateway's own
+// exchanges still get them.
+func TestServiceAccountTokensRefuseCloudAudiences(t *testing.T) {
+	var asked []string
+	m := minter(&asked)
+	m.GCPAudience, m.GCPTokenAudience = "//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/k", "custom-pool-audience"
+	for _, aud := range []string{"sts.amazonaws.com", "api://AzureADTokenExchange", "API://AzureADTokenExchange", "acme.svc.id.goog",
+		"identitynamespace:acme.svc.id.goog:https://container.googleapis.com/v1/projects/acme/locations/l/clusters/c",
+		"//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/other",
+		"https://iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/other", "custom-pool-audience"} {
+		auth := map[string]map[string]string{"serviceAccountToken": {"audience": aud}}
+		if err := m.Authorize(context.Background(), request(t), nil, "payments", "orders-api", auth); err != ErrReservedAudience {
+			t.Errorf("%s: %v", aud, err)
+		}
+	}
+	if len(asked) != 0 {
+		t.Errorf("minted %v", asked)
+	}
+}
+
 func TestGoogleIDTokensComeFromTheAPIsServiceAccountByFederation(t *testing.T) {
 	var asked []string
 	var exchange, mint map[string]any

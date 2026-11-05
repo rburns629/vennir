@@ -94,12 +94,35 @@ func (c *Catalog) apiProblems(a *API) []string {
 	if u, err := url.Parse(backendURL); err == nil && u.Scheme == "http" && !strings.HasSuffix(u.Hostname(), ".svc.cluster.local") {
 		problems = append(problems, fmt.Sprintf("backend.url %s: https, or http only to a Service in the cluster (<service>.<namespace>.svc.cluster.local)", backendURL))
 	}
+	auth, _ := backend["auth"].(map[string]any)
+	if sat, ok := auth["serviceAccountToken"].(map[string]any); ok {
+		if aud := text(sat, "audience"); reservedAPIAudience(aud) {
+			problems = append(problems, fmt.Sprintf("backend.auth.serviceAccountToken.audience %s: the Kubernetes API's, or one a cloud federates (AWS, Azure, Google): a backend's token may never carry it", quote(aud)))
+		}
+	}
 	specFile := filepath.Join(a.Dir, text(a.Spec, "spec"))
 	specData, err := os.ReadFile(specFile)
 	if err != nil {
 		return append(problems, fmt.Sprintf("spec %s: no such file beside api.yaml", text(a.Spec, "spec")))
 	}
 	return append(problems, openapiProblems(specData, backendURL)...)
+}
+
+// reservedAPIAudience: a token for this audience would be good to the
+// Kubernetes API, or could be exchanged for the API ServiceAccount's cloud
+// identity (AWS's and Azure's federation audiences, a GKE Workload Identity
+// pool or its STS audience, a GCP workload identity provider). As the
+// gateway's credentials.CloudAudience and the console's
+// apiTokenAudienceProblem, which also know the cluster's own.
+func reservedAPIAudience(audience string) bool {
+	a := strings.ToLower(audience)
+	switch a {
+	case "https://kubernetes.default.svc", "https://kubernetes.default.svc.cluster.local", "kubernetes.default.svc",
+		"kubernetes.default.svc.cluster.local", "sts.amazonaws.com", "api://azureadtokenexchange":
+		return true
+	}
+	return strings.HasSuffix(a, ".svc.id.goog") || strings.HasPrefix(a, "identitynamespace:") ||
+		strings.HasPrefix(a, "//iam.googleapis.com/") || strings.HasPrefix(a, "https://iam.googleapis.com/")
 }
 
 // openapiProblems is what makes an OpenAPI file unusable as an allowlist:

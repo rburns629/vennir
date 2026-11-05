@@ -335,6 +335,9 @@ export async function getApiTraffic(caller: AuthUser | undefined, team: string, 
       blocked.set(r.endpoint, b);
       continue;
     }
+    // Before sign-in, a path that isn't the spec's is counted under no
+    // endpoint (the gateway keeps no made-up path): in the totals only.
+    if (r.endpoint === "") continue;
     const e = endpoints.get(r.endpoint) ?? { requests: 0, invalid: 0, backend4xx: 0, backend5xx: 0, ms: 0, answered: 0 };
     e.requests += r.count;
     if (r.outcome === "invalid") e.invalid += r.count;
