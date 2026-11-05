@@ -4,6 +4,7 @@
  * allowedTargets lets through only with one), and who may decide: a
  * maintainer of the step's team, never whoever submitted the run.
  */
+import { config } from "../src/config.js";
 import { randomUUID } from "node:crypto";
 import { arrayOverlaps, eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -27,7 +28,7 @@ vi.mock("../src/registry.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/registry.js")>()),
   missingImages: vi.fn(() => Promise.resolve([])),
   pinImages: vi.fn((images: string[]) =>
-    Promise.resolve({ pinned: new Map(images.map((i) => [i, `${i}@sha256:${"d".repeat(64)}`])), unresolved: [] }),
+    Promise.resolve({ pinned: new Map(images.map((i) => [i, i.includes("@") ? i : `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
   ),
 }));
 vi.mock("../src/kernel/client.js", async (importOriginal) => {
@@ -66,6 +67,9 @@ const inputSchema = {
 };
 
 beforeAll(async () => {
+  // A product's identity is its released digests', so its images are
+  // pinned (each tag, by the mock above, to one digest).
+  config.imagePinning = "required";
   app = await buildApp();
   const [ownerTeam, appsTeam] = [await createTeam(owner), await createTeam(apps)];
   await db
@@ -84,7 +88,7 @@ beforeAll(async () => {
   ] as const) {
     await upsertProduct({
       name,
-      image: `registry.example/${owner}/${name}:1`,
+      image: `registry.example/${owner}/${name}:1@sha256:${"c".repeat(64)}`,
       action,
       teamId: ownerTeam.id,
       inputSchema,
@@ -104,6 +108,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  config.imagePinning = "off";
   await db.delete(submittedExecutions).where(arrayOverlaps(submittedExecutions.teams, [owner, apps]));
   await db.delete(products).where(like(products.name, `${prefix}%`));
   const ours = await db.select({ id: teams.id }).from(teams).where(like(teams.name, `${prefix}%`));
@@ -162,7 +167,7 @@ describe("which steps wait for an approval", () => {
     const audit = `${owner}-audit-run`;
     await upsertProduct({
       name: audit,
-      image: `registry.example/${owner}/${audit}:1`,
+      image: `registry.example/${owner}/${audit}:1@sha256:${"c".repeat(64)}`,
       action: "run",
       teamId: ownerTeam!.id,
       // No target in it: only the approval decides.

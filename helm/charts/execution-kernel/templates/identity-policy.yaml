@@ -3,14 +3,15 @@ Which ServiceAccount a step may run as, and which Secrets it may mount: the
 cluster's copy of the console's rule (identityRefusal in console/src/core/
 executions.ts), so it holds even for a Job the console never checked.
 
-A step runs as "default" with no Secrets, unless it's a registered product:
-then it may run as the ServiceAccount its product.yaml declares and mount
-any Secret its team registered in the console (a team's secrets are its
-products', chosen per step; a Secret nobody registered, such as a
-SecretStore's credentials, can't be mounted at all). A product matches when
-the step is in the product's team namespace (or the product belongs to the
-platform, team ""), runs the same image repository (any tag or digest) and
-the same action (the container's first argument). No step runs as one of
+A step runs as "default" with no Secrets, unless it runs a registered
+product's release: then it may run as the ServiceAccount its product.yaml
+declares and mount any Secret its team registered in the console (a team's
+secrets are its products', chosen per step; a Secret nobody registered, such
+as a SecretStore's credentials, can't be mounted at all). A product matches
+when the step is in the product's team namespace (or the product belongs to
+the platform, team ""), runs one of the product's released digests (from the
+same image repository: never another image pushed there, at any tag or
+digest) and the same action (the container's first argument). No step runs as one of
 the ServiceAccounts ESO reads a team's vault as (eso-gcp, eso-aws,
 eso-azure), whatever is registered: the console refuses them as a product's
 too (console/src/core/products.ts). Anything else is refused
@@ -29,17 +30,39 @@ hour at most. A projected token with no audience is the Kubernetes API's
 own, which the kernel never asks for (it turns automounting off, unless
 scheduler.taskPodHardening is off).
 
-What's registered lives in this policy itself, as two CEL literals:
-`products`, a JSON list of {team, repository, action, serviceAccount,
-audiences} (audiences comma-separated, "" for none), and
-`teamSecrets`, a JSON map of team to its registered Secret names,
-comma-separated (CEL wants every value in a literal to have one type;
-Secret names can't contain commas). The console rewrites both whenever
-products or secrets change and at startup (console/src/productPolicy.ts;
-its RBAC allows updating this one policy by name). This chart seeds them
-empty on install and keeps whatever is there on upgrade (lookup),
-re-encoded as JSON so they can only ever be literals. Same reasoning as
-image-policy.yaml for a literal rather than a ConfigMap.
+What's registered lives in this policy itself, as CEL literals the console
+rewrites whenever products or secrets change, every few minutes and at
+startup (console/src/productPolicy.ts; its RBAC allows updating this one
+policy by name):
+  - `releases0` to `releasesf`: JSON maps of a released digest
+    (sha256:<64 hex>) to the products it's a release of, each {team,
+    repository, action, serviceAccount, audiences} (audiences
+    comma-separated, "" for none), by the digest's first hex digit; and
+    `releases`, each digit to its map, so a lookup is a map index however
+    many it holds. Which releases: each product's current one, and an
+    earlier one while it's in use (run by an execution the console hasn't
+    seen finish, or registered or run in the last hour). The rest are
+    pruned: a step of one runs as an unregistered image would.
+  - `teamSecrets`, a JSON map of team to its registered Secret names,
+    comma-separated (CEL wants every value in a literal to have one type;
+    Secret names can't contain commas).
+  - `products`, the list charts before released digests held: {team,
+    repository, action, serviceAccount, audiences}, matched by repository,
+    any digest. Seeded [] on install. On an upgrade from such a chart it's
+    kept, so steps keep running while consoles from before (which write
+    only it) may still be taking submissions; the new console keeps it for
+    its first ten minutes, then writes it [], and never fills it.
+
+Size: the API server compiles at most 100,000 characters per CEL
+expression. An entry is about 75 characters for its digest and about 150
+for each product (action) it's a release of; the console writes at most
+95,000 in any one map and 600,000 in all (about 2,600 digest-action pairs;
+productPolicy.ts's MAX_MAP_CHARS, MAX_RELEASE_CHARS), keeping the object
+well under etcd's 1.5 MiB and Helm's release Secret under its 1 MiB.
+
+This chart seeds the literals empty on install and keeps whatever is there
+on upgrade (lookup), re-encoded as JSON so they can only ever be literals.
+Same reasoning as image-policy.yaml for a literal rather than a ConfigMap.
 
 The kernel's Jobs have exactly one container and mount Secrets only as
 volumes; anything else is refused too, so a Secret can't arrive some other
@@ -51,6 +74,11 @@ imageRepository) read them.
 {{- $name := printf "%s-identity" (include "execution-kernel.fullname" .) }}
 {{- $productsExpr := "[]" }}
 {{- $teamSecretsExpr := "{}" }}
+{{- $digits := splitList "" "0123456789abcdef" }}
+{{- $shards := dict }}
+{{- range $digits }}
+{{- $_ := set $shards . dict }}
+{{- end }}
 {{- $existing := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $name }}
 {{- if $existing }}
 {{- range $existing.spec.variables }}
@@ -76,6 +104,23 @@ imageRepository) read them.
 {{- end }}
 {{- $teamSecretsExpr = toJson $stored }}
 {{- end }}
+{{- $digit := trimPrefix "releases" .name }}
+{{- if and (ne $digit .name) (hasKey $shards $digit) }}
+{{- range $digest, $entries := fromJson .expression }}
+{{- if not (and (regexMatch "^sha256:[a-f0-9]{64}$" $digest) (eq (substr 7 8 $digest) $digit) (kindIs "slice" $entries)) }}
+{{- fail (printf "%s's releases%s isn't a JSON map of sha256 digests starting %s to lists of products; delete the policy and let the console resync it." $name $digit $digit) }}
+{{- end }}
+{{- $kept := list }}
+{{- range $entries }}
+{{- $entry := . }}
+{{- if or (not (kindIs "map" $entry)) (not (and (kindIs "string" (get $entry "team")) (kindIs "string" (get $entry "repository")) (kindIs "string" (get $entry "action")) (kindIs "string" (get $entry "serviceAccount")) (kindIs "string" (get $entry "audiences")))) }}
+{{- fail (printf "%s's releases%s has a product that isn't {team, repository, action, serviceAccount, audiences} strings; delete the policy and let the console resync it." $name $digit) }}
+{{- end }}
+{{- $kept = append $kept (dict "team" $entry.team "repository" $entry.repository "action" $entry.action "serviceAccount" $entry.serviceAccount "audiences" $entry.audiences) }}
+{{- end }}
+{{- $_ := set (index $shards $digit) $digest $kept }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
 apiVersion: admissionregistration.k8s.io/v1
@@ -96,11 +141,19 @@ spec:
     - name: from-kernel-scheduler
       expression: request.userInfo.username == {{ $scheduler | quote }}
   variables:
-    # The two the console edits.
+    # The ones the console edits: the legacy products list, teamSecrets
+    # and the sixteen releases maps.
     - name: products
       expression: {{ $productsExpr | toJson }}
     - name: teamSecrets
       expression: {{ $teamSecretsExpr | toJson }}
+    {{- range $digits }}
+    - name: releases{{ . }}
+      expression: {{ toJson (index $shards .) | toJson }}
+    {{- end }}
+    - name: releases
+      expression: >-
+        { {{- range $i, $digit := $digits }}{{ if $i }}, {{ end }}{{ $digit | quote }}: dyn(variables.releases{{ $digit }}){{ end -}} }
     - name: pod
       expression: object.spec.template.spec
     - name: serviceAccount
@@ -142,10 +195,23 @@ spec:
       expression: >-
         has(variables.pod.containers[0].args) && size(variables.pod.containers[0].args) > 0 ?
           variables.pod.containers[0].args[0] : ""
-    # The registered products this step is.
+    # The image's digest, "" when it isn't pinned to one.
+    - name: digest
+      expression: >-
+        variables.normalizedImage.contains("@") &&
+          variables.normalizedImage.split("@")[1].matches("^sha256:[a-f0-9]{64}$") ?
+          variables.normalizedImage.split("@")[1] : ""
+    # The products the digest is a release of, and (an upgraded install's,
+    # until the console empties it) the legacy list's.
+    - name: candidates
+      expression: >-
+        (variables.digest != "" && variables.digest in variables.releases[variables.digest.substring(7, 8)] ?
+          variables.releases[variables.digest.substring(7, 8)][variables.digest] : []) +
+        variables.products
+    # The registered products' releases this step is.
     - name: matched
       expression: >-
-        variables.products.filter(p,
+        variables.candidates.filter(p,
           (p.team == "" || p.team == request.namespace) &&
           p.repository == variables.repository && p.action == variables.action &&
           p.serviceAccount == variables.serviceAccount)
@@ -175,11 +241,13 @@ spec:
         (variables.serviceAccount == "default" && size(variables.secrets) == 0) ||
         size(variables.matched) > 0
       messageExpression: >-
-        "IDENTITY_NOT_ALLOWED: " + variables.repository + " (action \"" + variables.action +
+        "IDENTITY_NOT_ALLOWED: " + variables.image + " (action \"" + variables.action +
         "\") may not run as ServiceAccount \"" + variables.serviceAccount + "\"" +
         (size(variables.secrets) > 0 ? " with Secrets" : "") +
-        " in " + request.namespace + ". Only a registered product may, as the ServiceAccount " +
-        "its product.yaml declares; anything else runs as \"default\" with no Secrets."
+        " in " + request.namespace + ". Only a registered product's release may (one of the " +
+        "digests it's registered at, while in use), as the ServiceAccount its product.yaml " +
+        "declares; anything else, another image of the same repository included, runs as " +
+        "\"default\" with no Secrets."
       reason: Forbidden
     - expression: >-
         size(variables.secrets) == 0 ||

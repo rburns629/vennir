@@ -577,7 +577,7 @@ def system_page() -> Page:
         [
             ("dispatch-policy", "scheduler may create Jobs only\nin vennir/team=true namespaces"),
             ("image-policy", "task images only from allowed\nsources (the Admin page edits it)"),
-            ("identity-policy", "a step runs as its product's\nServiceAccount, or default"),
+            ("identity-policy", "a product release runs as its\nServiceAccount; else default"),
             ("image-signature", "GKE: catalog images must be\nsigned (ClusterImagePolicy)"),
             ("purge-policy", "only the purge identity may\ndelete a team's namespace"),
         ]

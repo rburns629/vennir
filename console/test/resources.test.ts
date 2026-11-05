@@ -9,6 +9,7 @@
  * kernel-api and the registry are stubbed; the rest is the real console on
  * the real test database.
  */
+import { config } from "../src/config.js";
 import { randomUUID } from "node:crypto";
 import { eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -35,7 +36,7 @@ vi.mock("../src/registry.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/registry.js")>()),
   missingImages: vi.fn(() => Promise.resolve([])),
   pinImages: vi.fn((images: string[]) =>
-    Promise.resolve({ pinned: new Map(images.map((i) => [i, `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
+    Promise.resolve({ pinned: new Map(images.map((i) => [i, i.includes("@") ? i : `${i}@sha256:${"c".repeat(64)}`])), unresolved: [] }),
   ),
 }));
 vi.mock("../src/kernel/client.js", async (importOriginal) => {
@@ -127,13 +128,16 @@ type Listed = { resources?: { id: string; externalId: string; link: string; stat
 const list = async (token: string, body: object) => (await call<Listed>(token, "ResourceService/ListResources", body)).body.resources ?? [];
 
 beforeAll(async () => {
+  // A product's identity is its released digests', so its images are
+  // pinned (each tag, by the mock above, to one digest).
+  config.imagePinning = "required";
   app = await buildApp();
   const provTeam = await createTeam(prov);
   await createTeam(cons);
   const register = (name: string, action: string, extra: Partial<Parameters<typeof upsertProduct>[0]> = {}) =>
     upsertProduct({
       name: `${prov}-${name}-${action}`,
-      image: `registry.example/${prov}/${name}:1`,
+      image: `registry.example/${prov}/${name}:1@sha256:${"c".repeat(64)}`,
       action,
       teamId: provTeam.id,
       shareWith: ["*"],
@@ -146,7 +150,7 @@ beforeAll(async () => {
   for (const action of ["create", "delete"]) {
     await upsertProduct({
       name: `${prov2}-thing-${action}`,
-      image: `registry.example/${prov2}/thing:1`,
+      image: `registry.example/${prov2}/thing:1@sha256:${"c".repeat(64)}`,
       action,
       teamId: prov2Team.id,
       shareWith: ["*"],
@@ -185,6 +189,7 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
+  config.imagePinning = "off";
   await db.delete(resourceDeleteRequests).where(inArray(resourceDeleteRequests.ownerTeam, [cons, prov]));
   await db.delete(resources).where(like(resources.productTeam, `${prefix}%`));
   await db.delete(submittedExecutions).where(inArray(submittedExecutions.onBehalfOf, [cons]));
@@ -481,7 +486,7 @@ describe("what depends on what (decision 25)", () => {
 
   it("links a step to the one its input was wired from in the same run", async () => {
     const executionId = randomUUID();
-    const task = (id: string, name: string, inputs: Record<string, unknown> = {}) => ({ id, team: prov, image: `registry.example/${prov}/${name}:1`, action: "create", inputs });
+    const task = (id: string, name: string, inputs: Record<string, unknown> = {}) => ({ id, team: prov, image: `registry.example/${prov}/${name}:1@sha256:${"c".repeat(64)}`, action: "create", inputs });
     await recordRun(
       {
         executionId,

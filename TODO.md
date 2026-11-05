@@ -170,9 +170,7 @@ it was seen.
     refuses two teams' products whose names collide; GCP catalog CI's
     federation pins the repository by its ID.
   - Cluster: the console replaces or registers only ExternalSecrets it
-    labelled; a step's identity is tied to its product's released digests,
-    not every image in its repository; an image's first part may not be
-    uppercase.
+    labelled; an image's first part may not be uppercase.
   - The chat agent's test of an admin's endpoint answers "didn't answer"
     rather than the connection's error.
 

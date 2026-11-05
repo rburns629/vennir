@@ -67,7 +67,7 @@ flowchart TB
 
 ### Who may mount a Secret is an admission policy, not RBAC
 - **Normally:** access to a Secret is RBAC: a Role and a RoleBinding.
-- **Here:** RBAC doesn't apply to mounts (the kubelet mounts whatever a Pod names), so no Role is involved. A team's secrets are the ones it registered in the console; the identity policy lets a step mount them only if it's one of the team's registered products, running as the ServiceAccount its product declares. The console keeps the policy's products and each team's secret names current, and creates no RBAC at all (it may only delete the per-secret Roles older versions made).
+- **Here:** RBAC doesn't apply to mounts (the kubelet mounts whatever a Pod names), so no Role is involved. A team's secrets are the ones it registered in the console; the identity policy lets a step mount them only if it runs one of the team's registered products' releases (a digest the product was registered at, not any image in its repository), running as the ServiceAccount its product declares. The console keeps the policy's released digests and each team's secret names current, and creates no RBAC at all (it may only delete the per-secret Roles older versions made).
 - **Code:** `console/src/productPolicy.ts`, `helm/charts/execution-kernel/templates/identity-policy.yaml`.
 
 ### Admission policies as the last line of defence
@@ -76,7 +76,7 @@ flowchart TB
   - **dispatch-policy:** the scheduler may create Jobs and ConfigMaps only in namespaces labelled `vennir/team=true`, never in its own (the platform's namespace is never a team's), and only Jobs shaped as its executor makes them: its own volumes, pull Secret and placement, never a node named. `matchConditions` limits the rule to the scheduler's own identity.
   - **step-jobs-policy:** in a team namespace, only the scheduler (and Kubernetes' own controllers) may create or change a Job or ConfigMap named `ek-`, so a step's request and Job are always the kernel's.
   - **image-policy:** a task's image must come from an allowed source.
-  - **identity-policy:** a task runs as `default` with no secrets, unless it's a registered product of its team, which runs as the ServiceAccount its product declares and may mount only secrets its team registered.
+  - **identity-policy:** a task runs as `default` with no secrets, unless it runs a release of a registered product of its team (one of the digests the product was registered at: its current one, or an earlier one still in use), which runs as the ServiceAccount its product declares and may mount only secrets its team registered.
   - **scan-policy:** a task's image must be pinned to a digest, and that digest must have passed its security scan on this install (or an admin accepted it).
   - **purge-policy:** a configured purger may delete only a retired team namespace, or a retired team's API backends' namespace. None by default: a purged team's namespace is left, labelled retired, for a cluster administrator.
 - **Errors:** a refusal fails the task with `DISPATCH_REJECTED`, `IMAGE_NOT_ALLOWED`, `IDENTITY_NOT_ALLOWED`, `IMAGE_NOT_PINNED` or `IMAGE_SCAN_FAILED`, and it isn't retried. [Runs, explained](09-runs-explained.md#what-does-each-failure-code-mean) says what to do about each.

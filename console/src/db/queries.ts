@@ -780,11 +780,12 @@ export async function upsertProduct(input: ProductInput): Promise<Product> {
       throw new ProductOwnershipError("name", existing?.teamId ?? null);
     }
     // Record this image as a release. Re-registering an image already
-    // recorded is a no-op, so a CI re-run doesn't duplicate or re-date it.
+    // recorded isn't a new one, so a CI re-run doesn't duplicate or re-date
+    // it; it counts as a use (productPolicy.ts's releaseInUse).
     await tx
       .insert(productReleases)
       .values({ productId: product.id, image: product.image })
-      .onConflictDoNothing({ target: [productReleases.productId, productReleases.image] });
+      .onConflictDoUpdate({ target: [productReleases.productId, productReleases.image], set: { lastUsedAt: sql`now()` } });
     return product;
   });
 }
@@ -868,32 +869,6 @@ export function listProductsUsableBy(teamId: string | null): Promise<Product[]> 
     .select()
     .from(products)
     .where(teamId === null ? platform : or(eq(products.teamId, teamId), platform));
-}
-
-export interface ProductIdentity {
-  image: string;
-  action: string;
-  serviceAccount: string | null;
-  tokenAudiences: string[];
-  /** The owning team's name (its namespace); null for a platform product. */
-  teamName: string | null;
-}
-
-/** What the cluster's identity policy needs about every product that can
- * run (productPolicy.ts): a purged team's products never match a task. */
-export function listProductIdentities(): Promise<ProductIdentity[]> {
-  return db
-    .select({
-      image: products.image,
-      action: products.action,
-      serviceAccount: products.serviceAccount,
-      tokenAudiences: products.tokenAudiences,
-      teamName: teams.name,
-    })
-    .from(products)
-    .leftJoin(teams, eq(teams.id, products.teamId))
-    .where(or(isNull(products.teamId), isNull(teams.deletedAt)))
-    .orderBy(products.name);
 }
 
 export async function findProductByName(name: string): Promise<Product | undefined> {

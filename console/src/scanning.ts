@@ -157,7 +157,24 @@ export const MAX_ADMITTED_DIGESTS = 5_000;
 export const MAX_PER_MAP = 1_200;
 const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"];
 
-const PINNED_DIGEST = "@(sha256:[a-f0-9]{64})$";
+/** A pinned image's digest, for SQL's substring(... from ...). */
+export const PINNED_DIGEST = "@(sha256:[a-f0-9]{64})$";
+
+/**
+ * The digests the steps of every execution the console hasn't seen finish
+ * run (its submitted_executions row not yet recorded): the kernel starts
+ * their later steps and further attempts by itself. Never NULL.
+ */
+export const runningDigests: SQL = sql`(
+  SELECT digest FROM (
+    SELECT substring(step.task->>'image' from ${PINNED_DIGEST}) AS digest
+    FROM ${submittedExecutions},
+      jsonb_array_elements(CASE WHEN jsonb_typeof(${submittedExecutions.payload}->'tasks') = 'array'
+        THEN ${submittedExecutions.payload}->'tasks' ELSE '[]'::jsonb END) AS step(task)
+    WHERE ${submittedExecutions.resourcesRecordedAt} IS NULL
+  ) AS running
+  WHERE digest IS NOT NULL
+)`;
 
 /**
  * Whether a scan's digest is still in use, so the cluster must keep
@@ -176,16 +193,7 @@ export const digestInUse: SQL = sql`(
     SELECT digest FROM (SELECT substring(${products.image} from ${PINNED_DIGEST}) AS digest FROM ${products}) AS registered
     WHERE digest IS NOT NULL
   )
-  OR ${imageScans.digest} IN (
-    SELECT digest FROM (
-      SELECT substring(step.task->>'image' from ${PINNED_DIGEST}) AS digest
-      FROM ${submittedExecutions},
-        jsonb_array_elements(CASE WHEN jsonb_typeof(${submittedExecutions.payload}->'tasks') = 'array'
-          THEN ${submittedExecutions.payload}->'tasks' ELSE '[]'::jsonb END) AS step(task)
-      WHERE ${submittedExecutions.resourcesRecordedAt} IS NULL
-    ) AS running
-    WHERE digest IS NOT NULL
-  )
+  OR ${imageScans.digest} IN ${runningDigests}
 )`;
 
 /** The digests the cluster admits: passed, or failed and accepted, and in use. */

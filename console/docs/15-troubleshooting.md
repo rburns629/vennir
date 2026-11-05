@@ -86,7 +86,7 @@ Images are scanned again daily while they're in use. So an image that ran yester
 - The secret's name differs from the one the product expects. The product's actions name theirs under `secretRefs` in `product.yaml`, shown on the **Products** page.
 - The secret syncs from a vault and isn't there yet. On the team's **Secrets** tab, a synced secret shows **Synced**, **Syncing**, **Sync error** or **Missing**. A change in your vault can take up to an hour to arrive.
 
-**What to do:** check the secret's status on the team's **Secrets** tab, and that the task lists the exact name. If you submitted with a secret name the team doesn't have, the console refuses the submission instead, with `Secret "…" is not registered for team "…"`. If a step fails with `IDENTITY_NOT_ALLOWED`, the console and the cluster disagree about the product or secret, often because one changed after you submitted. Run it again. If it persists, tell an admin. See [Secrets, explained](04-secrets-explained.md) for how a secret reaches a step.
+**What to do:** check the secret's status on the team's **Secrets** tab, and that the task lists the exact name. If you submitted with a secret name the team doesn't have, the console refuses the submission instead, with `Secret "…" is not registered for team "…"`. If a step fails with `IDENTITY_NOT_ALLOWED`, the console and the cluster disagree about the product, its released digests or the secret, often because one changed after you submitted. Run it again. If it persists, tell an admin. See [Secrets, explained](04-secrets-explained.md) for how a secret reaches a step.
 
 ## "Not run: it's for aws installs" (NOT_FOR_THIS_INSTALL)
 
