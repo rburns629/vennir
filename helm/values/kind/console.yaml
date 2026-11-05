@@ -44,7 +44,8 @@ bootstrapAdmin:
 secretSources:
   catalogRepo: my-org/vennir-catalog
 # The API gateway: forwards to backends in the vennir-samples namespace and
-# the local sample team's (its greetings API: make kind-sample-api)
+# the local sample team's API backends' namespace, local-apis (its greetings
+# API: make kind-sample-api)
 # (kubectl port-forward svc/console-execution-console-gateway 18090:8080).
 gateway:
   enabled: true
@@ -54,7 +55,7 @@ gateway:
   image:
     repository: execution-gateway
     tag: latest
-  backendHosts: ["*.vennir-samples.svc.cluster.local", "*.local.svc.cluster.local"]
+  backendHosts: ["*.vennir-samples.svc.cluster.local", "*.local-apis.svc.cluster.local"]
   url: http://localhost:18090
 
 # A Prometheus in the monitoring namespace may scrape /metrics (none is

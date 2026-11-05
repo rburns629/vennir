@@ -1,14 +1,16 @@
-# The greetings backend in the local team's namespace, as the team itself
-# would run it (kubectl, or its own CD): `make kind-sample-api` builds it and
-# applies this. vennir/api-backend: "true" is what lets the gateway reach it
-# (the console's vennir-gateway-ingress NetworkPolicy); every other Pod in
-# the namespace stays closed to it. vennir/api names the API product it
-# serves, so Observe can search its lines by API.
+# The greetings backend in the local team's API backends' namespace,
+# local-apis (the console makes <team>-apis beside each team's namespace,
+# apart from its steps and their Secrets), as the team itself would run it
+# (kubectl, or its own CD): `make kind-sample-api` builds it and applies
+# this. vennir/api-backend: "true" is what lets the gateway reach it (the
+# console's vennir-gateway-ingress NetworkPolicy); every other Pod stays
+# closed to it. vennir/api names the API product it serves, so Observe can
+# search its lines by API.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: greetings
-  namespace: local
+  namespace: local-apis
 spec:
   replicas: 1
   selector:
@@ -35,7 +37,7 @@ spec:
             # This backend's origin, as the API's backend.url names it: the
             # Vennir-Caller token's audience.
             - name: AUDIENCE
-              value: http://greetings.local.svc.cluster.local:8080
+              value: http://greetings.local-apis.svc.cluster.local:8080
             # The API it serves, <team>/<name>: a token for another API, even
             # one at this origin, is refused.
             - name: API
@@ -55,7 +57,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: greetings
-  namespace: local
+  namespace: local-apis
 spec:
   selector: {app: greetings}
   ports: [{port: 8080, targetPort: 8080}]

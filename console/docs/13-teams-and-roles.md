@@ -4,7 +4,7 @@ This page is for anyone working in a team on Vennir: what the **Teams** page and
 
 ## What is a team?
 
-A team is a group of people, its products, and its secrets. It is also a Kubernetes namespace with the same name: every step a team's products run starts in that namespace. A team's name uses lowercase letters, digits and dashes. Once a team is purged, its name can never be used again.
+A team is a group of people, its products, and its secrets. It is also a Kubernetes namespace with the same name: every step a team's products run starts in that namespace. A team's name uses lowercase letters, digits and dashes, at most 58 of them, and never ends in `-apis`: beside its namespace each team has `<team>-apis`, where its API backends run. Once a team is purged, its name can never be used again.
 
 A team is made in one of two ways:
 
@@ -170,7 +170,7 @@ Purging removes a team for good. It can't be undone.
 - **What it keeps:**
   - The run history.
   - The name. It stays reserved forever, so a new team can't reuse it (`NAME_RESERVED`).
-  - The namespace, labelled retired, for a cluster administrator to delete. The console deletes it only if the install allows that (`teamNamespaces.purge` in the console chart), which is off by default.
+  - The namespace, and its API backends' namespace (`<team>-apis`), labelled retired, for a cluster administrator to delete. The console deletes them only if the install allows that (`teamNamespaces.purge` in the console chart), which is off by default.
 
 Admins get an alert when a team is purged.
 

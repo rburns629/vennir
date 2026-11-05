@@ -196,16 +196,18 @@ console-docs:
 	@bash .github/scripts/console-docs.sh
 
 # The backend of the local sample's API product (samples/local/apis/greetings),
-# run in the local team's namespace as the team itself would run it: the
-# gateway reaches it through the console's vennir-gateway-ingress policy.
-# Publish the local sample first (make catalog-publish), so the namespace
-# and the API exist.
+# run in the local team's API backends' namespace (local-apis) as the team
+# itself would run it: the gateway reaches it through the console's
+# vennir-gateway-ingress policy. Publish the local sample first (make
+# catalog-publish), so the namespaces and the API exist. Removes the copy
+# older versions ran in the team's own namespace.
 kind-sample-api: kind-registry
 	$(DOCKER) build -t $(KIND_REGISTRY)/local/greetings-api:demo examples/greetings-api
 	$(DOCKER) push $(KIND_REGISTRY)/local/greetings-api:demo
 	$(KUBECTL) apply -f examples/greetings-api/deploy.yaml
-	$(KUBECTL) -n local rollout restart deployment greetings
-	$(KUBECTL) -n local rollout status deployment greetings --timeout=2m
+	$(KUBECTL) -n local delete deployment,service greetings --ignore-not-found
+	$(KUBECTL) -n local-apis rollout restart deployment greetings
+	$(KUBECTL) -n local-apis rollout status deployment greetings --timeout=2m
 
 # Local mode: publish a catalog repository's products to kind without any Git
 # hosting or CI, with ./vennir (built from this checkout), the tool its CI runs:

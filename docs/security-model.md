@@ -438,8 +438,9 @@ logs in the cluster (a read-only ClusterRole on `pods` and `pods/log`:
 steps run in every team's namespace); it keeps only steps' Pods, the
 API backends teams run (Pods labelled `vennir/api-backend: "true"`) and the
 platform's own. An API backend's lines, every level, are for its own team
-only (they belong to no run, so no one else owns them); the platform's own
-logs are for admins only.
+only (they belong to no run, so no one else owns them; a backend in
+`<team>-apis` is that team's, unless a team has that very name); the
+platform's own logs are for admins only.
 
 ## The API gateway
 
@@ -460,11 +461,20 @@ The caller's `Authorization` stops at the gateway; the backend gets its own
 credential instead, minted per request, and `Vennir-Caller`, an EdDSA JWT
 the gateway signs (its key at `/.vennir/jwks.json`) naming the caller,
 their team and the API. An API may only use an in-cluster backend in its
-own team's namespace (`<service>.<team>.svc`): one pointed at another
-team's is held, by the console and the gateway, whatever `backendHosts`
-allows, so no team can serve another's backend under its own spec and
-sharing; a backend should still check the token's `api` as well as its
-`aud` (the sample does). Only the cluster's default domain is read
+own team's API backends' namespace (`<service>.<team>-apis.svc`), which the
+console makes beside each team's namespace, labelled `vennir/api-backends`
+and never `vennir/team`: no step is dispatched there, no product identity
+or team Secret is written there, so whatever a team deploys its backend
+with holds none of them, and its steps reach the backend only through the
+gateway. For one release a backend still in the team's own namespace
+(`<service>.<team>.svc`) is served too, and the gateway logs it
+(`api_backend_in_team_namespace`) on every refresh until it moves. One
+pointed at any other namespace is held, by the console and the gateway,
+whatever `backendHosts` allows, so no team can serve another's backend
+under its own spec and sharing (`<team>-apis` counts as the team's only
+while no team has that name: none can be named `*-apis` now, and one named
+so before keeps its namespace); a backend should still check the token's
+`api` as well as its `aud` (the sample does). Only the cluster's default domain is read
 (`.svc.cluster.local`): on a cluster with another, and for short names,
 pod IPs or anything else that reaches inside the cluster, `backendHosts`
 alone decides, so list exactly the hosts each API may use. A caller's own `Vennir-*` headers are dropped,
@@ -740,7 +750,7 @@ without going through the console:
 | Image signatures | Where policy-controller is installed, any Pod in a team namespace whose image isn't signed by catalog CI under the source registry, whoever makes it (`IMAGE_NOT_SIGNED`): images from sources an admin added don't run there either (`no-match-policy` stays `deny`, so a compromised console adding a source can't get past it). It checks Pods, not the Jobs and other workloads that make them, which a second policy passes without verifying them (the webhook still admits them): a step's Job is made, and its Pod refused (the Job's `FailedCreate` event, which the kernel reads) | `templates/image-signature.yaml` |
 | Image scans | An image not pinned by digest (`IMAGE_NOT_PINNED`), or one whose digest failed its security scan unless an admin accepted it (`IMAGE_SCAN_FAILED`). The console scans every image before it's registered or run, and daily while in use, for each platform the cluster runs (the console chart's `scanning.platforms`; a multi-arch cluster lists every one) | `templates/scan-policy.yaml` |
 | Step identity | A step running as any ServiceAccount but `default` unless it's a registered product running as the one its `product.yaml` declares; any step mounting a Secret unless it's a registered product and the Secret is registered for its team; Secrets reaching a step any way but a volume (`IDENTITY_NOT_ALLOWED`). The console keeps the policy's products and team secrets current. | `templates/identity-policy.yaml` |
-| Team deletion | A configured purger deleting a team namespace that isn't labelled retired. None is configured by default: the console leaves a purged team's namespace, labelled retired, for a cluster administrator to delete, so the identity that retires a namespace can't also delete it (`teamNamespaces.purge` would let it) | `templates/purge-policy.yaml` |
+| Team deletion | A configured purger deleting a team namespace that isn't labelled retired (or a team's API backends' namespace, `<team>-apis`, not labelled `vennir/api-backends=retired`). None is configured by default: the console leaves a purged team's namespace, labelled retired, for a cluster administrator to delete, so the identity that retires a namespace can't also delete it (`teamNamespaces.purge` would let it) | `templates/purge-policy.yaml` |
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
 | Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own) | console chart, `templates/write-fence-policy.yaml` |
 
@@ -818,7 +828,7 @@ CronJobs, its own and the wake one, and an admission policy in
 `timeZone`, never the Job they run. A stolen token of either can stop the
 platform, not change it.
 
-And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api (not the gateway, which forwards where catalogs say): a step's Pod can reach neither. Every team namespace also holds `vennir-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vennir-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vennir/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vennir-Caller`, the sample backend's 401). The console's write fence accepts no other NetworkPolicy from it, and only those two shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and its RBAC can't delete one, so a compromised console can't open a team namespace up. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vennir-team-quota`) and LimitRange (`vennir-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators (and it mustn't also be a team's: see [Guardrails the cluster enforces](#guardrails-the-cluster-enforces)). The bundled databases' passwords are generated on install.
+And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in both charts) let only the platform's own Pods connect to its Postgres, and only the console connect to kernel-api (not the gateway, which forwards where catalogs say): a step's Pod can reach neither. Every team namespace also holds `vennir-default-deny`, which the console writes with the namespace and rewrites on every policy resync (`console/src/teamNetwork.ts`): its Pods accept connections only from Pods in the same namespace, so one team's steps can't reach another team's Pods or Services. With the gateway on, it also writes `vennir-gateway-ingress`: the gateway's Pods (this release's namespace and the gateway's own labels) may reach the Pods the team labels `vennir/api-backend: "true"`, its API products' in-cluster backends, and nothing else of the team's (proven on kind 2026-10-28: through the gateway, 200; from another team's namespace, no connection; from its own namespace without the gateway's signed `Vennir-Caller`, the sample backend's 401). Those backends run in the team's API backends' namespace, `<team>-apis` (labelled `vennir/api-backends`, never `vennir/team`), which holds the same `vennir-default-deny` and `vennir-gateway-ingress` (and `vennir-no-metadata` with `teamNamespaces.blockMetadata`) and nothing else of the console's: no Secrets, ServiceAccounts, RoleBindings, quota or limits, so its steps, in the team's namespace, can't reach the backend but through the gateway. For one release the team's namespace keeps its `vennir-gateway-ingress` too, for backends not yet moved. The console's write fence accepts no other NetworkPolicy from it, and only those shapes (a broader selector, any namespace, any Pod of the platform's, or an extra peer is refused), and nothing but those NetworkPolicies in an API backends' namespace; its RBAC can't delete one, so a compromised console can't open a team namespace up. The console creates `<team>-apis` with the team (and, on its policy resync, for teams made before), retires it with the team and, with `teamNamespaces.purge`, deletes it with the team's; the namespace policy lets it create only a namespace named `*-apis` with that label, and never one with both labels. Outgoing traffic isn't restricted: steps call their clouds. Every team namespace also holds a ResourceQuota (`vennir-team-quota`) and LimitRange (`vennir-team-limits`) when limits are set (`console/src/teamQuota.ts`: the chart's `teamNamespaces.quota`, or a team's own set by an admin), so one team's steps can't take the cluster's capacity from the others; the cluster refuses a Pod over them, and the write fence accepts no other quota or limits from the console. They need a CNI that enforces NetworkPolicy, and they select Pods by label, so creating Pods in the platform namespace must stay limited to administrators (and it mustn't also be a team's: see [Guardrails the cluster enforces](#guardrails-the-cluster-enforces)). The bundled databases' passwords are generated on install.
 
 ## What a step can reach
 

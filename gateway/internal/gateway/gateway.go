@@ -270,8 +270,8 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, o.as("unavailable"), http.StatusServiceUnavailable, "API_UNAVAILABLE", "This API can't be served as it's set up (its team sees why on its page), so nothing is forwarded.")
 	case !store.BackendAllowed(api.BackendURL, g.Settings.BackendHosts):
 		return g.refuse(w, o.as("held"), http.StatusServiceUnavailable, "API_HELD", "This API's backend isn't one this install allows yet.")
-	case store.BackendNamespace(api.BackendURL) != "" && store.BackendNamespace(api.BackendURL) != api.Team:
-		return g.refuse(w, o.as("held"), http.StatusServiceUnavailable, "API_HELD", "This API's backend is another team's: an API may only use its own team's.")
+	case store.BackendPlace(api.BackendURL, api.Team, api.APINamespaceTaken) == store.BackendElsewhere:
+		return g.refuse(w, o.as("held"), http.StatusServiceUnavailable, "API_HELD", "This API's backend isn't in its team's API backends' namespace: an API may only use its own team's.")
 	}
 
 	result := o

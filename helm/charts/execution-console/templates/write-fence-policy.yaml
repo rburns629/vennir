@@ -5,7 +5,9 @@ it would let the console create, change or delete Secrets, ServiceAccounts,
 Roles, RoleBindings and ExternalSecrets in any namespace: kube-system, the
 platform's own. This policy, applied by the Kubernetes API server to every
 such request from the console's ServiceAccount, refuses anything outside a
-namespace labelled as a team's (the label the kernel's dispatch policy uses).
+namespace labelled as a team's (the label the kernel's dispatch policy uses),
+but its NetworkPolicies in a team's API backends' namespace (<team>-apis,
+labelled vennir/api-backends: console/src/teamNetwork.ts).
 
 Inside a team namespace, which objects are the console's is its own rule
 (console/src/k8s.ts: it labels what it creates, and replaces an existing
@@ -48,18 +50,24 @@ spec:
     - name: from-the-console
       expression: request.userInfo.username == {{ $console | quote }}
   validations:
-    # Outside team namespaces, only the federated registry token's Secret
-    # in this one (registryFederation.ts), when that's configured.
+    # Outside team namespaces, only the NetworkPolicies of a team's API
+    # backends' namespace (held to the shapes below), and the federated
+    # registry token's Secret in this one (registryFederation.ts), when
+    # that's configured.
     - expression: >-
         (has(namespaceObject.metadata.labels) &&
-        {{ .Values.writeFence.teamNamespaceLabel | quote }} in namespaceObject.metadata.labels)
+        {{ .Values.writeFence.teamNamespaceLabel | quote }} in namespaceObject.metadata.labels) || (
+        namespaceObject.metadata.name.endsWith("-apis") && has(namespaceObject.metadata.labels) &&
+        "vennir/api-backends" in namespaceObject.metadata.labels &&
+        request.resource.group == "networking.k8s.io" && request.resource.resource == "networkpolicies")
         {{- if include "execution-console.registryFederationAudience" . }} || (
         request.namespace == {{ .Release.Namespace | quote }} && request.resource.resource == "secrets" &&
         request.operation != "DELETE" && object.metadata.name == "vennir-registry-token")
         {{- end }}
       messageExpression: >-
         "The console may only write in team namespaces (labelled " +
-        {{ .Values.writeFence.teamNamespaceLabel | quote }} + "), not in " + request.namespace + "."
+        {{ .Values.writeFence.teamNamespaceLabel | quote }} + "), and only NetworkPolicies in a team's API " +
+        "backends' namespace, not this in " + request.namespace + "."
       reason: Forbidden
     # It creates product ServiceAccounts and never changes them afterwards
     # (a cloud identity bound to one is the platform team's); the only
@@ -72,7 +80,7 @@ spec:
         object.metadata.name + "."
       reason: Forbidden
     # Its NetworkPolicies are each team's default deny (k8s.ts,
-    # writeTeamNetworkPolicy), never deleted, and only ever refusing more:
+    # writeTeamNetworkPolicy), in its namespace and its API backends', never deleted, and only ever refusing more:
     # every Pod selected, and connections let in from this namespace's own
     # Pods alone, with no egress rule (NetworkPolicy allows add up, so one
     # would undo vennir-no-metadata). So the console can't open a team

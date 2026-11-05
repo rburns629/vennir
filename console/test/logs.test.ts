@@ -24,6 +24,9 @@ const teamA = `${prefix}-a`;
 const teamB = `${prefix}-b`;
 const sharedRun = randomUUID(); // steps in A and B
 const runInA = randomUUID(); // A's alone
+// A team named before names ending in -apis were refused: its namespace is
+// its own, never team B's API backends' namespace.
+const legacyApisTeam = `${teamB}-apis`;
 let app: FastifyInstance;
 let loki: Server;
 const queries: string[] = [];
@@ -40,7 +43,13 @@ beforeAll(async () => {
     const query = new URL(req.url ?? "", "http://x").searchParams.get("query") ?? "";
     queries.push(query);
     const ns = (offset: number) => `${String(Date.now() - offset)}000000`;
-    const result = query.includes('level="info"')
+    const result = query.startsWith('{component="api"')
+      ? [
+          { stream: { component: "api", namespace: `${teamA}-apis`, level: "info", app: "orders" }, values: [[ns(100), "moved backend"]] },
+          { stream: { component: "api", namespace: teamA, level: "info", app: "legacy" }, values: [[ns(200), "unmoved backend"]] },
+          { stream: { component: "api", namespace: legacyApisTeam, level: "info", app: "own" }, values: [[ns(300), "an -apis team's own"]] },
+        ]
+      : query.includes('level="info"')
       ? [{ stream: { component: "step", namespace: teamB, level: "info", execution_id: sharedRun, task: "b", attempt: "1" }, values: [[ns(1000), "B's info"]] }]
       : [{ stream: { component: "step", namespace: teamA, level: "debug", execution_id: runInA, task: "a", attempt: "2" }, values: [[ns(500), "A's debug"]] }];
     res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ status: "success", data: { resultType: "streams", result } }));
@@ -58,6 +67,7 @@ beforeAll(async () => {
   memberOfB = await signIn(b.email);
   await addTeamMember(a.id, (await createTeam(teamA)).id);
   await addTeamMember(b.id, (await createTeam(teamB)).id);
+  await createTeam(legacyApisTeam);
   await recordSubmittedExecution({ executionId: sharedRun, teams: [teamA, teamB], submittedBy: b.id, name: "shared", payload: {} });
   await recordSubmittedExecution({ executionId: runInA, teams: [teamA], submittedBy: a.id, name: "a's", payload: {} });
 });
@@ -142,7 +152,7 @@ describe("log search", () => {
 describe("API backends' log search", () => {
   it("gives a member every level of their own team's backends, and nothing of another team's", async () => {
     expect((await search(memberOfA, { source: "api" })).code).toBe("ok");
-    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA})$"}`]);
+    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA}|${teamA}-apis)$"}`]);
     queries.length = 0;
     const elsewhere = await search(memberOfA, { source: "api", team: teamB });
     expect(elsewhere.code).toBe("ok");
@@ -150,15 +160,32 @@ describe("API backends' log search", () => {
     expect(queries).toHaveLength(0);
   });
 
+  it("finds a team's backends in its API backends' namespace and, for now, its own, and names the team", async () => {
+    const found = await search(admin, { source: "api" });
+    expect(found.body.lines?.map((l) => [l.line, l.team])).toEqual([
+      ["moved backend", teamA],
+      ["unmoved backend", teamA],
+      ["an -apis team's own", legacyApisTeam],
+    ]);
+  });
+
   it("gives an admin every team's", async () => {
-    await search(admin, { source: "api", team: teamB, level: "error" });
-    expect(queries).toEqual([`{component="api", namespace="${teamB}", level="error"}`]);
+    await search(admin, { source: "api", team: teamA, level: "error" });
+    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA}|${teamA}-apis)$", level="error"}`]);
+  });
+
+  it("never takes another team's namespace for a team's API backends' namespace", async () => {
+    await search(admin, { source: "api", team: teamB });
+    expect(queries).toEqual([`{component="api", namespace=~"^(${teamB})$"}`]);
+    queries.length = 0;
+    await search(memberOfB, { source: "api" });
+    expect(queries).toEqual([`{component="api", namespace=~"^(${teamB})$"}`]);
   });
 
   it("narrows to one API product's backend, its Pods' vennir/api label", async () => {
     queries.length = 0;
     await search(memberOfA, { source: "api", api: "orders" });
-    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA})$", api="orders"}`]);
+    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA}|${teamA}-apis)$", api="orders"}`]);
     queries.length = 0;
     expect((await search(memberOfA, { source: "api", api: "Not An API" })).code).toBe("invalid_argument");
     expect(queries).toHaveLength(0);

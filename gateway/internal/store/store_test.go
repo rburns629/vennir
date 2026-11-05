@@ -3,11 +3,15 @@
 package store
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/url"
 	"os"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -142,6 +146,102 @@ func TestSettingsThatDontDecodeAreAProblem(t *testing.T) {
 		}
 		if got := s.Get(team, name); got == nil || got.Problem != c.want || got.Validator != nil {
 			t.Errorf("%s: %+v, want the problem %q and no validator", name, got, c.want)
+		}
+	}
+}
+
+// A backend still in its team's own namespace is logged once a refresh,
+// changed or not, never per request; a team named for another's API
+// backends' namespace makes it that team's.
+func TestABackendInItsTeamsNamespaceIsLoggedEachRefresh(t *testing.T) {
+	dbURL := os.Getenv("TEST_DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "postgresql://postgres@localhost/execution_console_test"
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	var teamID, team string
+	if err := pool.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-ns-' || substr(md5(random()::text), 1, 6)) RETURNING id::text, name`).Scan(&teamID, &team); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid OR name = $2`, teamID, APINamespace(team)); err != nil {
+			t.Errorf("removing the test's teams: %v", err)
+		}
+	})
+	spec := `{"openapi": "3.1.0", "info": {"title": "Orders", "version": "1"}, "paths": {}}`
+	for name, backend := range map[string]string{
+		"unmoved": "http://orders." + team + ".svc.cluster.local",
+		"moved":   "http://orders." + APINamespace(team) + ".svc.cluster.local",
+	} {
+		if _, err := pool.Exec(ctx, `INSERT INTO apis (team_id, name, display_name, openapi, backend_url, service_account)
+			VALUES ($1::uuid, $2, $2, $3::jsonb, $4, 'orders-api')`, teamID, name, spec, backend); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var logged bytes.Buffer
+	s := &Store{DB: pool, Log: slog.New(slog.NewJSONHandler(&logged, nil))}
+	warnings := func() []string {
+		var apis []string
+		for _, line := range strings.Split(strings.TrimSpace(logged.String()), "\n") {
+			var entry struct{ Event, API string }
+			if json.Unmarshal([]byte(line), &entry) == nil && entry.Event == "api_backend_in_team_namespace" {
+				apis = append(apis, entry.API)
+			}
+		}
+		logged.Reset()
+		return apis
+	}
+	for range 2 {
+		if err := s.Refresh(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if got := warnings(); !slices.Equal(got, []string{team + "/unmoved"}) {
+			t.Errorf("warned of %v, want only %s/unmoved", got, team)
+		}
+	}
+	if got := s.Get(team, "moved"); got == nil || got.APINamespaceTaken {
+		t.Fatalf("moved: %+v", got)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO teams (name) VALUES ($1)`, APINamespace(team)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Get(team, "moved"); got == nil || !got.APINamespaceTaken || BackendPlace(got.BackendURL, team, got.APINamespaceTaken) != BackendElsewhere {
+		t.Errorf("a team named %s: %+v", APINamespace(team), got)
+	}
+}
+
+// A team's backend runs in its API backends' namespace, or for one release
+// its own; anywhere else in the cluster is another team's.
+func TestBackendPlace(t *testing.T) {
+	for _, c := range []struct {
+		backend string
+		taken   bool
+		want    string
+	}{
+		{"http://orders.payments-apis.svc.cluster.local:8080", false, BackendInAPIs},
+		{"http://orders.payments-apis.svc", false, BackendInAPIs},
+		{"http://orders.payments.svc.cluster.local", false, BackendInTeam},
+		{"http://orders.payments.svc.cluster.local", true, BackendInTeam},
+		{"http://orders.payments-apis.svc.cluster.local", true, BackendElsewhere},
+		{"http://orders.web.svc.cluster.local", false, BackendElsewhere},
+		{"http://orders.web-apis.svc.cluster.local", false, BackendElsewhere},
+		{"http://orders.payments-apis-apis.svc.cluster.local", false, BackendElsewhere},
+		{"https://orders.example.run.app", false, BackendOutside},
+	} {
+		u, err := url.Parse(c.backend)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := BackendPlace(u, "payments", c.taken); got != c.want {
+			t.Errorf("BackendPlace(%s, taken %v) = %q, want %q", c.backend, c.taken, got, c.want)
 		}
 	}
 }

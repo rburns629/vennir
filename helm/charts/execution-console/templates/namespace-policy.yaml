@@ -7,18 +7,23 @@ namespace. This policy, applied by the Kubernetes API server to every such
 request from the console's ServiceAccount, allows only:
 
   - creating a namespace labelled <teamNamespaceLabel>=true;
+  - creating a team's API backends' namespace, named <team>-apis and
+    labelled vennir/api-backends=true (never the team label too);
   - changing that one label, to "true" or "retired", on a namespace that
-    already has it (a team's): nothing else about it, no other label or
-    annotation;
+    already has it (a team's, or a team's API backends'): nothing else
+    about it, no other label or annotation;
 
 never on kube-*, this release's namespace or teamNamespaces.protected.
 Deleting one is the kernel chart's purge policy's (retired namespaces only).
-console/src/k8s.ts's setTeamNamespace keeps to the same rules.
+console/src/k8s.ts's setTeamNamespace and setApiNamespace keep to the same
+rules.
 */}}
 {{- if .Values.teamNamespaces.manage }}
 {{- $console := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-console.serviceAccountName" .) }}
 {{- $name := printf "%s-namespaces" (include "execution-console.fullname" .) }}
 {{- $label := .Values.writeFence.teamNamespaceLabel }}
+{{- /* console/src/k8s.ts's API_NAMESPACE_LABEL. */}}
+{{- $apis := "vennir/api-backends" }}
 {{- $protected := concat (list "kube-system" "kube-public" "kube-node-lease" .Release.Namespace) .Values.teamNamespaces.protected | uniq }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
@@ -48,24 +53,36 @@ spec:
       messageExpression: >-
         "The console may not create or change namespace " + object.metadata.name + ": it's protected."
       reason: Forbidden
+    # Never both labels: a team's API backends' namespace is no team's, so
+    # the kernel never dispatches there.
     - expression: >-
-        request.operation != "CREATE" ||
-        ({{ $label | quote }} in variables.labels && variables.labels[{{ $label | quote }}] == "true")
-      message: "The console may only create a namespace labelled {{ $label }}=true."
+        !({{ $label | quote }} in variables.labels && {{ $apis | quote }} in variables.labels)
+      message: "A namespace is a team's ({{ $label }}) or a team's API backends' ({{ $apis }}), never both."
       reason: Forbidden
     - expression: >-
-        request.operation != "UPDATE" || (
-          {{ $label | quote }} in variables.oldLabels &&
-          {{ $label | quote }} in variables.labels &&
-          variables.labels[{{ $label | quote }}] in ["true", "retired"] &&
-          variables.oldLabels.all(k, k == {{ $label | quote }} ||
+        request.operation != "CREATE" ||
+        ({{ $label | quote }} in variables.labels && variables.labels[{{ $label | quote }}] == "true") ||
+        ({{ $apis | quote }} in variables.labels && variables.labels[{{ $apis | quote }}] == "true" &&
+          object.metadata.name.endsWith("-apis"))
+      message: >-
+        The console may only create a namespace labelled {{ $label }}=true, or one named <team>-apis
+        labelled {{ $apis }}=true.
+      reason: Forbidden
+    - expression: >-
+        request.operation != "UPDATE" || [{{ $label | quote }}, {{ $apis | quote }}].exists(l,
+          (l == {{ $label | quote }} || object.metadata.name.endsWith("-apis")) &&
+          l in variables.oldLabels &&
+          l in variables.labels &&
+          variables.labels[l] in ["true", "retired"] &&
+          variables.oldLabels.all(k, k == l ||
             (k in variables.labels && variables.labels[k] == variables.oldLabels[k])) &&
-          variables.labels.all(k, k == {{ $label | quote }} || k in variables.oldLabels) &&
+          variables.labels.all(k, k == l || k in variables.oldLabels) &&
           (has(object.metadata.annotations) ? object.metadata.annotations : {}) ==
             (has(oldObject.metadata.annotations) ? oldObject.metadata.annotations : {}))
       messageExpression: >-
-        "The console may only set the {{ $label }} label (to true or retired) on a team's namespace, and change
-        nothing else about it; " + object.metadata.name + " isn't a team's, or more changed."
+        "The console may only set the {{ $label }} label (to true or retired) on a team's namespace, or the
+        {{ $apis }} label on a team's API backends' namespace, and change nothing else about it; " +
+        object.metadata.name + " isn't a team's (or a team's API backends'), or more changed."
       reason: Forbidden
 ---
 apiVersion: admissionregistration.k8s.io/v1

@@ -35,9 +35,10 @@ const POLICY: Record<string, { label: string; about: ReactNode; code?: string }>
     code: "IMAGE_SCAN_FAILED",
   },
   pullSecrets: { label: "Registry sign-in for each team", about: "The pull secret each team namespace uses to fetch images from private registries." },
+  apiNamespaces: { label: "Each team's API backends' namespace", about: "<team>-apis, where a team runs its API backends, apart from its steps and their Secrets." },
   teamNetworkPolicies: {
     label: "What each team's steps may reach",
-    about: "Each team namespace's network policies: no other team's Pods, and only the gateway into its API backends.",
+    about: "Each team namespace's network policies, and its API backends' namespace's: no other team's Pods, and only the gateway into its API backends.",
   },
   schedulerLogs: { label: "The scheduler's log reading", about: "Lets the kernel's scheduler read its steps' logs in team namespaces, and nothing else." },
   teamQuotas: { label: "What each team may use together", about: "Each team namespace's quota and per-step memory ceiling: its own, or the install's." },
@@ -49,7 +50,7 @@ const KERNEL_POLICIES: { label: string; about: ReactNode; code?: string }[] = [
   { label: "Where images may come from", about: <>The sources in <Link component={RouterLink} to="/admin/images">Image sources</Link>, which the console edits in place.</>, code: "IMAGE_NOT_ALLOWED" },
   { label: "Images are pinned", about: "Every image must name its digest.", code: "IMAGE_NOT_PINNED" },
   { label: "Catalog images are signed", about: <>When the install turns on <Mono>imageSignature</Mono>: checked by Sigstore&apos;s policy-controller.</>, code: "IMAGE_NOT_SIGNED" },
-  { label: "Who may delete a team's namespace", about: "Only a retired team's, and only by the purger the install names." },
+  { label: "Who may delete a team's namespace", about: "Only a retired team's (or its API backends' namespace), and only by the purger the install names." },
 ];
 
 /** Steps the cluster refused in the last day, from Observe's Security view. */

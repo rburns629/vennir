@@ -7,8 +7,10 @@ Deleting a namespace can't be scoped by RBAC alone: `delete` on
 So the ClusterRole below grants exactly that verb, and the admission policy
 narrows it: a purger may only delete a namespace labelled
 `<teamNamespaceLabel>=retired` (set when a platform is retired, see the
-catalog's retire workflow) that isn't a system namespace, `default`, this
-release's own namespace, or in `purgePolicy.protectedNamespaces`.
+catalog's retire workflow), or a retired team's API backends' namespace
+(`<team>-apis`, labelled `vennir/api-backends=retired`), that isn't a
+system namespace, `default`, this release's own namespace, or in
+`purgePolicy.protectedNamespaces`.
 
 Enforced by the Kubernetes API server (ValidatingAdmissionPolicy, 1.30+),
 so it holds however the purge is run. Off until purgers are configured.
@@ -89,13 +91,17 @@ spec:
     - expression: >-
         !(oldObject.metadata.name in {{ $protected | toJson }}) &&
         !oldObject.metadata.name.startsWith("kube-") &&
-        has(oldObject.metadata.labels) &&
+        has(oldObject.metadata.labels) && ((
         {{ $label | quote }} in oldObject.metadata.labels &&
-        oldObject.metadata.labels[{{ $label | quote }}] == "retired"
+        oldObject.metadata.labels[{{ $label | quote }}] == "retired") || (
+        oldObject.metadata.name.endsWith("-apis") &&
+        "vennir/api-backends" in oldObject.metadata.labels &&
+        oldObject.metadata.labels["vennir/api-backends"] == "retired"))
       messageExpression: >-
         "namespace " + oldObject.metadata.name + " can't be purged: only a
-        retired Vennir team namespace ({{ $label }}=retired) that isn't a
-        protected namespace may be deleted by this identity"
+        retired Vennir team namespace ({{ $label }}=retired), or a retired
+        team's API backends' namespace (vennir/api-backends=retired), that
+        isn't a protected namespace may be deleted by this identity"
       reason: Forbidden
 ---
 apiVersion: admissionregistration.k8s.io/v1

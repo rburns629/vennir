@@ -11,7 +11,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { applyApis } from "../src/catalogSync.js";
 import { config } from "../src/config.js";
-import { apiState, backendAllowed, backendNamespace } from "../src/core/apis.js";
+import { apiState, backendAllowed, backendNamespace, backendPlace } from "../src/core/apis.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, findTeamByName } from "../src/db/queries.js";
 import { apiProblems, apiTraffic, apis, gatewayState, teams } from "../src/db/schema.js";
@@ -235,12 +235,40 @@ describe("who sees what", () => {
     const before = [...config.gateway.backendHosts];
     config.gateway.backendHosts.splice(0, Infinity, "*.svc.cluster.local");
     try {
-      const own = apiState({ backendUrl: "http://orders.team-a.svc.cluster.local:8080", pausedMessage: null, teamName: "team-a" });
-      expect(own.state).toBe("live");
-      const theirs = apiState({ backendUrl: "http://orders.team-b.svc.cluster.local:8080", pausedMessage: null, teamName: "team-a" });
+      const state = (url: string, taken = false) => apiState({ backendUrl: url, pausedMessage: null, teamName: "team-a" }, null, taken);
+      // Its API backends' namespace; for one release, its own too.
+      expect(state("http://orders.team-a-apis.svc.cluster.local:8080").state).toBe("live");
+      expect(state("http://orders.team-a.svc.cluster.local:8080").state).toBe("live");
+      const theirs = state("http://orders.team-b.svc.cluster.local:8080");
       expect(theirs).toMatchObject({ state: "held", heldReason: expect.stringContaining("team-b") as string });
+      expect(theirs.heldReason).toContain("team-a-apis");
+      expect(state("http://orders.team-b-apis.svc.cluster.local:8080").state).toBe("held");
+      // A team named team-a-apis (from before such names were refused): its namespace isn't team-a's.
+      expect(state("http://orders.team-a-apis.svc.cluster.local:8080", true).state).toBe("held");
     } finally {
       config.gateway.backendHosts.splice(0, Infinity, ...before);
+    }
+    expect(backendPlace("http://orders.team-a-apis.svc", "team-a")).toBe("apis");
+    expect(backendPlace("http://orders.team-a.svc", "team-a")).toBe("team");
+    expect(backendPlace("http://orders.team-a-apis-apis.svc", "team-a")).toBe("other");
+    expect(backendPlace("https://orders.example.run.app", "team-a")).toBe("outside");
+  });
+
+  it("holds an API whose backend is in a namespace named for it that's another team's", async () => {
+    const taken = `${owner}-apis`;
+    await createTeam(taken);
+    const before = [...config.gateway.backendHosts];
+    config.gateway.backendHosts.splice(0, Infinity, "*.svc.cluster.local");
+    try {
+      await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: `http://legacy.${taken}.svc.cluster.local` })]);
+      const got = await call<{ api: { state: string } }>(tokens.member, "ApiService/GetApi", { team: owner, name: "legacy" });
+      expect(got.body.api.state).toBe("API_STATE_HELD");
+      const listed = await call<Listed>(tokens.member, "ApiService/ListApis", {});
+      expect(listed.body.apis?.find((a) => a.name === "legacy")?.state).toBe("API_STATE_HELD");
+    } finally {
+      config.gateway.backendHosts.splice(0, Infinity, ...before);
+      await db.delete(teams).where(eq(teams.name, taken));
+      await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
     }
   });
 

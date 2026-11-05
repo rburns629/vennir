@@ -436,7 +436,51 @@ async function readNamespace(name: string): Promise<k8s.V1Namespace | undefined>
 export async function setTeamNamespace(
   name: string,
   state: TeamNamespaceState,
-  options: { label: string; protected: string[]; createIfMissing: boolean; podSecurity?: string },
+  options: NamespaceOptions,
+): Promise<boolean> {
+  return setLabelledNamespace(name, state, options.label, API_NAMESPACE_LABEL, options);
+}
+
+/** The label on each team's API backends' namespace (apiNamespace), "true"
+ * or "retired" as the team's own is. Never the team label: the kernel
+ * dispatches nothing there, and the console writes only its NetworkPolicies
+ * there. The console chart's namespace and write-fence policies and the
+ * kernel chart's purge policy name it too. */
+export const API_NAMESPACE_LABEL = "vennir/api-backends";
+
+/** The namespace a team's API backends run in. The gateway forwards to an
+ * in-cluster backend only there (core/apis.ts backendPlace, the gateway's
+ * store.APINamespace). */
+export function apiNamespace(team: string): string {
+  return `${team}-apis`;
+}
+
+/** The longest a namespace's name may be: a DNS label. */
+export const NAMESPACE_MAX = 63;
+
+/** Whether a team can have an API backends' namespace: one named before
+ * names were held to fit it may be too long for one. */
+export function hasApiNamespace(team: string): boolean {
+  return apiNamespace(team).length <= NAMESPACE_MAX;
+}
+
+/**
+ * Gives a team its API backends' namespace, apiNamespace(team), labelled
+ * API_NAMESPACE_LABEL=<state>, as setTeamNamespace does the team's own; one
+ * carrying the team label (`options.label`) is a team's, never adopted.
+ */
+export async function setApiNamespace(team: string, state: TeamNamespaceState, options: NamespaceOptions): Promise<boolean> {
+  return setLabelledNamespace(apiNamespace(team), state, API_NAMESPACE_LABEL, options.label, options);
+}
+
+type NamespaceOptions = { label: string; protected: string[]; createIfMissing: boolean; podSecurity?: string };
+
+async function setLabelledNamespace(
+  name: string,
+  state: TeamNamespaceState,
+  label: string,
+  otherLabel: string,
+  options: NamespaceOptions,
 ): Promise<boolean> {
   const { core } = getApis();
   refuseProtected(name, options.protected);
@@ -448,26 +492,29 @@ export async function setTeamNamespace(
       // can be less restricted than the kernel's own step Pods.
       const podSecurity = options.podSecurity ? { "pod-security.kubernetes.io/enforce": options.podSecurity } : {};
       await core.createNamespace({
-        body: { metadata: { name, labels: { ...MANAGED_LABELS, ...podSecurity, [options.label]: state } } },
+        body: { metadata: { name, labels: { ...MANAGED_LABELS, ...podSecurity, [label]: state } } },
       });
       return true;
     } catch (error) {
       // Created in between by a concurrent call: relabel it below.
       const exists = typeof error === "object" && error !== null && "code" in error && error.code === 409;
       if (!exists) throw error;
-      return setTeamNamespace(name, state, options);
+      return setLabelledNamespace(name, state, label, otherLabel, options);
     }
   }
   const labels = existing.metadata?.labels ?? {};
-  if (!(options.label in labels) && !isManaged(existing.metadata)) {
+  if (otherLabel in labels) {
+    throw new NamespaceNotTeamsError(`A namespace named "${name}" already exists, labelled ${otherLabel}: it can't also be this one.`);
+  }
+  if (!(label in labels) && !isManaged(existing.metadata)) {
     throw new NamespaceNotTeamsError(
       `A namespace named "${name}" already exists and isn't a team's. Rename the team, or label the namespace ` +
-        `${options.label}=true yourself to hand it over.`,
+        `${label}=true yourself to hand it over.`,
     );
   }
-  if (labels[options.label] === state) return true;
+  if (labels[label] === state) return true;
   existing.metadata ??= {};
-  existing.metadata.labels = { ...labels, [options.label]: state };
+  existing.metadata.labels = { ...labels, [label]: state };
   await core.replaceNamespace({ name, body: existing });
   return true;
 }

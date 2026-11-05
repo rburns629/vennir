@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 // The backend of the local sample's API product (catalog-template/samples/
-// local/apis/greetings): an HTTP service a team runs in its own namespace,
-// published through the install's gateway. The gateway forwards only what
+// local/apis/greetings): an HTTP service a team runs in its API backends'
+// namespace (<team>-apis), published through the install's gateway. The
+// gateway forwards only what
 // the API's openapi.yaml describes, and adds a Vennir-Caller header: a JWT,
 // signed by the gateway (EdDSA), naming who called and as which team. This
 // checks it against the gateway's public keys before answering, so a
