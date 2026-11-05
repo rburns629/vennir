@@ -198,7 +198,7 @@ Two settings in the console chart's `gateway` values, besides each API's own rat
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `gateway.unauthenticatedPerMinute` | `60` | Requests a minute one client address may make that fail to sign in. Past it, that address's requests are refused with 429 before sign-in, so before the gateway does any database work for them, until it's under again. The address is the peer, or on the public listener behind `trustedProxies` the address they saw; an IPv6 address counts as its /64. `0`: no limit |
+| `gateway.unauthenticatedPerMinute` | `60` | Requests a minute one client address may make that fail to sign in. Past it, that address's requests are refused with 429 before sign-in, so before the gateway does any database work for them, until it's under again. The address is the peer, or on the public listener behind `trustedProxies` the address they saw; an IPv6 address counts as its /64. On the public listener, only with `trustedProxies` set: without them the peer may be a load balancer every caller shares, so no address is limited there. `0`: no limit |
 | `gateway.bodyReadTimeoutSeconds` | `30` | The longest a request's body may take to arrive; then 408 and nothing is forwarded. Answers have no such limit |
 
 Each replica counts on its own, as with API rates.

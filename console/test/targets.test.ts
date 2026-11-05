@@ -35,6 +35,8 @@ vi.mock("../src/kernel/client.js", async (importOriginal) => {
   return {
     ...actual,
     submitExecution: vi.fn(() => Promise.resolve({ executionId: uuid(), state: "PENDING", created: true })),
+    // Retry asks which steps it will revive (the ones the failure cancelled).
+    getExecution: vi.fn((executionId: string) => Promise.resolve({ executionId, name: "", state: "FAILED", tasks: [] })),
     retryTask: vi.fn(() => Promise.resolve({ executionId: "retried", taskId: "run", state: "READY" })),
   };
 });

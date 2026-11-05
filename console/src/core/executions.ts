@@ -436,7 +436,16 @@ export function productLookup() {
     return candidates.filter((product) => released.get(product.id)?.has(key));
   }
 
-  return { teamId, matching, sameRepository };
+  // Whose contract a step is held to (approval, inputs, targets, where it
+  // runs): its release's product, or, for another image of the same
+  // repository, which runs with no identity, still that product's, so
+  // an unreleased digest is never a way around them.
+  async function forContract(team: string, image: string | undefined, action: string | undefined): Promise<Product[]> {
+    const released = await matching(team, image, action);
+    return released.length > 0 ? released : sameRepository(team, image, action);
+  }
+
+  return { teamId, matching, sameRepository, forContract };
 }
 
 /** A task as submitted, by its id. */
@@ -446,10 +455,12 @@ function payloadTask(payload: unknown, taskId: string): Record<string, unknown> 
 }
 
 /**
- * The registered product a task as submitted ran, if it ran one: by its
- * team, released image, action and identity. With `anyDigest`, by its image
- * repository alone, for describing a step whose release may since have been
- * pruned (its failure's help), never for deciding what it may do.
+ * The registered product whose contract a task as submitted is held to
+ * (approval, targets, where it runs): by its team, action and identity, and
+ * its released image, or else another image of that repository
+ * (productLookup's forContract). With `anyDigest`, by its image repository
+ * alone, whatever its identity, for describing a step whose release may
+ * since have been pruned (its failure's help).
  */
 export async function productOfTask(
   products: ReturnType<typeof productLookup>,
@@ -458,7 +469,7 @@ export async function productOfTask(
 ): Promise<Product | undefined> {
   const teamName = optionalString(task?.["team"]);
   if (!teamName) return undefined;
-  const find = anyDigest ? products.sameRepository : products.matching;
+  const find = anyDigest ? products.sameRepository : products.forContract;
   const matching = await find(teamName, optionalString(task?.["image"]), optionalString(task?.["action"]));
   const serviceAccount = optionalString(task?.["serviceAccount"]) ?? UNREGISTERED_SERVICE_ACCOUNT;
   return matching.find((p) => runsAs(p) === serviceAccount);
@@ -615,7 +626,7 @@ async function withProductContract(submission: Record<string, unknown>, runner: 
     }
     const rest = Object.fromEntries(Object.entries(task).filter(([key]) => !(PRODUCT_FIELDS as readonly string[]).includes(key)));
     const team = optionalString(task["team"]);
-    const matching = team === undefined ? [] : await products.matching(team, optionalString(task["image"]), optionalString(task["action"]));
+    const matching = team === undefined ? [] : await products.forContract(team, optionalString(task["image"]), optionalString(task["action"]));
     const serviceAccount = optionalString(task["serviceAccount"]) ?? UNREGISTERED_SERVICE_ACCOUNT;
     const product = matching.find((p) => runsAs(p) === serviceAccount);
     if (!product) {
@@ -808,17 +819,17 @@ async function authorizeIdentities(tasksInfo: TaskAuthInfo[]): Promise<void> {
  */
 async function admitIdentities(tasksInfo: TaskAuthInfo[]): Promise<void> {
   const products = productLookup();
-  const uses: { productId: string; digest: string }[] = [];
+  const uses: { productId: string; digest: string; repository: string; action: string; serviceAccount: string }[] = [];
   for (const task of tasksInfo) {
     const digest = task.image === undefined ? null : digestOf(task.image);
-    if (!digest) continue;
+    if (!digest || task.image === undefined) continue;
     const serviceAccount = task.serviceAccount ?? UNREGISTERED_SERVICE_ACCOUNT;
     const product = (await products.matching(task.team, task.image, task.action)).find((p) => runsAs(p) === serviceAccount);
-    if (product) uses.push({ productId: product.id, digest });
+    if (product) uses.push({ productId: product.id, digest, repository: imageRepository(task.image), action: product.action, serviceAccount });
   }
   if (uses.length === 0) return;
   await markReleasesUsed(uses);
-  const unlisted = await admitReleases(uses.map((use) => use.digest));
+  const unlisted = await admitReleases(uses);
   if (unlisted.length > 0) {
     throw new ApiError(
       409,
@@ -1174,12 +1185,16 @@ export async function retry(caller: AuthUser | undefined, executionId: string, t
   // Its product may since have been made for other clouds' installs.
   const retriedProduct = await productOfTask(productLookup(), payloadTask(submitted.payload, taskId));
   if (retriedProduct) ensureRunsHere(retriedProduct);
-  const images = taskImages(submitted.payload, taskId);
+  // What runs again: the step, and every step its failure cancelled, which
+  // kernel-api revives; each must be scanned and admitted as a new one is.
+  const cancelled = (await getExecution(executionId)).tasks.filter((t) => t.state === "CANCELLED").map((t) => t.taskId);
+  const runAgain = new Set([taskId, ...cancelled]);
+  const images = [...runAgain].flatMap((id) => taskImages(submitted.payload, id));
   const context: RunContext = { action: "retry", teams: submitted.teams, executionId, caller, log };
   await refuseBlockedImages(images, context);
   await refuseUnscanned(images, context);
   await ensureServiceAccounts(tasksInfo);
-  await admitIdentities(tasksInfo.filter((task) => task.id === taskId));
+  await admitIdentities(tasksInfo.filter((task) => task.id !== undefined && runAgain.has(task.id)));
   const retried = await retryTask(executionId, taskId, requester(caller));
   // Live again: what it makes, or deletes, is recorded once it finishes again.
   await markResourcesUnrecorded(executionId);

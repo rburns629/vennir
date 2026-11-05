@@ -17,7 +17,8 @@ import {
 import { productReleases, products, submittedExecutions, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { loadExecution } from "../src/auth/access.js";
-import { KernelApiError, cancelExecution, retryTask, submitExecution } from "../src/kernel/client.js";
+import { KernelApiError, cancelExecution, getExecution, retryTask, submitExecution } from "../src/kernel/client.js";
+import { scanBlocker } from "../src/scanning.js";
 import { ensureServiceAccount } from "../src/k8s.js";
 import { missingImages, pinImages } from "../src/registry.js";
 import { config } from "../src/config.js";
@@ -52,9 +53,17 @@ vi.mock("../src/kernel/client.js", async (importOriginal) => {
   return {
     ...actual,
     submitExecution: vi.fn(() => Promise.resolve({ executionId: uuid(), state: "PENDING", created: true })),
+    // Retry asks which steps it will revive (the ones the failure cancelled).
+    getExecution: vi.fn((executionId: string) => Promise.resolve({ executionId, name: "", state: "FAILED", tasks: [] })),
     retryTask: vi.fn((executionId: string) => Promise.resolve({ executionId, state: "RUNNING" })),
     cancelExecution: vi.fn((executionId: string) => Promise.resolve({ executionId, state: "CANCELLED" })),
   };
+});
+
+// Scanning as it is (off here), seen: which images a retry has checked.
+vi.mock("../src/scanning.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/scanning.js")>();
+  return { ...actual, scanBlocker: vi.fn(actual.scanBlocker) };
 });
 
 // The image policy lives in a ConfigMap on a real cluster; here it allows
@@ -537,6 +546,24 @@ describe("retry and cancel check access again, over every team", () => {
     expect(retryTask).toHaveBeenCalledOnce();
     // Who retried it, for the kernel to record on the next attempt.
     expect(retryTask).toHaveBeenCalledWith(id, "t", `user:${userId}`);
+  });
+
+  it("scans and admits the steps a retry revives, not only the retried one", async () => {
+    const revived = `other-image:1@sha256:${"d".repeat(64)}`;
+    const id = await recorded([teamName], { tasks: [task("t", teamName), task("after", teamName, { image: revived, serviceAccount: "default", dependsOn: ["t"] })] });
+    // The failure cancelled "after": kernel-api revives it with the retry.
+    vi.mocked(getExecution).mockResolvedValueOnce({
+      executionId: id,
+      name: "",
+      state: "FAILED",
+      tasks: [
+        { taskId: "t", state: "FAILED", attemptCount: 1, outputs: null, failure: null, dependsOn: [] },
+        { taskId: "after", state: "CANCELLED", attemptCount: 0, outputs: null, failure: null, dependsOn: ["t"] },
+      ],
+    } as unknown as Awaited<ReturnType<typeof getExecution>>);
+    vi.mocked(scanBlocker).mockClear();
+    expect((await retry(id, "t")).code).toBe("ok");
+    expect(vi.mocked(scanBlocker).mock.calls.flatMap(([images]) => images)).toEqual(expect.arrayContaining([revived]));
   });
 
   it("refuses a retry that would mount a secret no longer registered", async () => {

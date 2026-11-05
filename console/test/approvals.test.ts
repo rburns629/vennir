@@ -191,6 +191,17 @@ describe("which steps wait for an approval", () => {
     expect((await run("member", wipe)).waits).toBe(true);
   });
 
+  it("another image of a product's repository, not a release, is still held to its approval", async () => {
+    vi.mocked(submitExecution).mockClear();
+    const image = `registry.example/${owner}/${wipe}:2@sha256:${"e".repeat(64)}`;
+    const result = await call(tokens.maintainer, "ExecutionService/SubmitExecution", {
+      dag: { name: "unreleased", tasks: [{ id: "t", image, action: "run", team: owner, inputs: { projectId: `${apps}-dev` } }] },
+    });
+    expect(result.code).toBe("ok");
+    const submitted = vi.mocked(submitExecution).mock.lastCall?.[0] as { tasks: { approvalRequired?: boolean; serviceAccount?: string }[] };
+    expect(submitted.tasks[0]?.approvalRequired).toBe(true);
+  });
+
   it("a target a rule lets through only with an approval waits; one another rule allows doesn't", async () => {
     expect((await run("apps", project, `${apps}-dev`)).waits).toBe(false);
     expect((await run("apps", project, "prod-eu")).waits).toBe(true);

@@ -320,7 +320,9 @@ the first. The whole walk-through, per cloud:
 [the API gateway](../console/docs/21-api-gateway.md#putting-it-on-the-internet).
 `gateway.unauthenticatedPerMinute` (60; 0 turns it off) is how many
 failed sign-ins a minute one client address gets before its requests are
-refused with 429 ahead of sign-in, and `gateway.bodyReadTimeoutSeconds`
+refused with 429 ahead of sign-in (on the public listener only with
+`gateway.trustedProxies` set, as otherwise every caller may share a load
+balancer's address), and `gateway.bodyReadTimeoutSeconds`
 (30) how long a request's body may take to arrive (then 408); see
 [limits on callers](../console/docs/21-api-gateway.md#limits-on-callers).
 An admin closes it from the Admin page (every API answers 503 with their

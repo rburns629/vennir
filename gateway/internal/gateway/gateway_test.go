@@ -738,6 +738,23 @@ func TestAddressesThatFailToSignInAreLimitedBeforeSignIn(t *testing.T) {
 	if w := from("10.0.0.2:4000", path, "web-person", map[string]string{"X-Forwarded-For": "198.51.100.8"}); w.Code != 201 {
 		t.Errorf("another client, behind the same proxy: %d", w.Code)
 	}
+	// An IPv4 client a proxy writes as IPv6 is its own, not every IPv4 one's.
+	for range 3 {
+		from("10.0.0.2:4000", path, "", map[string]string{"X-Forwarded-For": "::ffff:198.51.100.9"})
+	}
+	if w := from("10.0.0.2:4000", path, "web-person", map[string]string{"X-Forwarded-For": "::ffff:198.51.100.10"}); w.Code != 201 {
+		t.Errorf("another IPv4 client, written as IPv6: %d", w.Code)
+	}
+
+	// On the public listener with no trusted proxies, the peer may be a load
+	// balancer every caller shares: no address is limited there.
+	f.gw.Settings.TrustedProxies = nil
+	for range 5 {
+		from("10.0.0.3:4000", path, "", nil)
+	}
+	if w := from("10.0.0.3:4000", path, "web-person", nil); w.Code != 201 {
+		t.Errorf("public, no trusted proxies: %d", w.Code)
+	}
 }
 
 // A body that doesn't arrive in time is refused, and the connection with

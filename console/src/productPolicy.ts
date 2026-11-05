@@ -159,12 +159,12 @@ export function releasedImageKey(image: string): string | null {
  * in use, only once kernel-api has it).
  */
 export async function markReleasesUsed(uses: { productId: string; digest: string }[]): Promise<void> {
-  for (const { productId, digest } of uses) {
-    await db
-      .update(productReleases)
-      .set({ lastUsedAt: new Date() })
-      .where(and(eq(productReleases.productId, productId), sql`${releaseDigest} = ${digest}`));
-  }
+  const pairs = [...new Map(uses.map((use) => [`${use.productId} ${use.digest}`, use])).values()];
+  if (pairs.length === 0) return;
+  await db
+    .update(productReleases)
+    .set({ lastUsedAt: new Date() })
+    .where(or(...pairs.map(({ productId, digest }) => and(eq(productReleases.productId, productId), sql`${releaseDigest} = ${digest}`))));
 }
 
 /**
@@ -256,7 +256,20 @@ export function releaseVariables(maps: Map<string, Map<string, PolicyProduct[]>>
 }
 
 /** The digests the policy's releases maps list now; a literal that can't be read counts as empty. */
-function listedDigests(variables: Record<string, string>): Set<string> {
+/** A listed release, as admitReleases asks for one: its digest, and the product entry it runs as. */
+export interface ReleaseUse {
+  digest: string;
+  repository: string;
+  action: string;
+  serviceAccount: string;
+}
+
+function useKey(use: ReleaseUse): string {
+  return JSON.stringify([use.digest, use.repository, use.action, use.serviceAccount]);
+}
+
+/** Every (digest, entry) the policy's releases maps list. */
+function listedUses(variables: Record<string, string>): Set<string> {
   const listed = new Set<string>();
   for (const digit of DIGITS) {
     let parsed: unknown;
@@ -265,7 +278,13 @@ function listedDigests(variables: Record<string, string>): Set<string> {
     } catch {
       continue;
     }
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) for (const digest of Object.keys(parsed)) listed.add(digest);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) continue;
+    for (const [digest, entries] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!Array.isArray(entries)) continue;
+      for (const e of entries as Partial<PolicyProduct>[]) {
+        listed.add(useKey({ digest, repository: e.repository ?? "", action: e.action ?? "", serviceAccount: e.serviceAccount ?? "" }));
+      }
+    }
   }
   return listed;
 }
@@ -305,26 +324,27 @@ export async function syncIdentityPolicy(): Promise<boolean> {
 }
 
 /**
- * Makes sure the cluster lists these released digests, which a submission
- * has just been allowed to run as their products (and marked used), before
- * kernel-api has it: when one isn't listed yet, the whole policy is
- * rewritten and the write waited for. Returns the digests it still doesn't
- * list: their product changed meanwhile.
+ * Makes sure the cluster lists these releases, each under the product entry
+ * a submission has just been allowed to run it as (and marked used), before
+ * kernel-api has it: when one isn't listed yet (its digest may be, as
+ * another product's), the whole policy is rewritten and the write waited
+ * for. Returns the digests it still doesn't list so: their product changed
+ * meanwhile.
  */
-export async function admitReleases(digests: string[]): Promise<string[]> {
-  const wanted = [...new Set(digests)];
+export async function admitReleases(uses: ReleaseUse[]): Promise<string[]> {
+  const wanted = [...new Map(uses.map((use) => [useKey(use), use])).values()];
   if (wanted.length === 0 || !config.identityPolicyName) return [];
   let listed = new Set<string>();
   const exists = await updateIdentityPolicy(
     config.identityPolicyName,
     async (current) => {
-      listed = listedDigests(current);
-      if (wanted.every((digest) => listed.has(digest))) return current;
+      listed = listedUses(current);
+      if (wanted.every((use) => listed.has(useKey(use)))) return current;
       const variables = await wantedVariables(current);
-      listed = listedDigests(variables);
+      listed = listedUses(variables);
       return variables;
     },
     { settle: true },
   );
-  return exists ? wanted.filter((digest) => !listed.has(digest)) : [];
+  return exists ? [...new Set(wanted.filter((use) => !listed.has(useKey(use))).map((use) => use.digest))] : [];
 }
