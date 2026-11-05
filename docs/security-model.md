@@ -203,7 +203,9 @@ asking: each tool calls the console's own code with their identity, so it
 sees what they may, and its only effect is a proposed cart, which they open
 and place themselves. Ordering bots can't use it. Its answers' citations
 are kept only when they name a section it retrieved, and links are the
-console's, not the model's. It answers only about Vennir: a question
+console's, not the model's: a link in an answer to anywhere but the
+console's own pages is shown as its text (`console/src/chat/citations.ts`,
+and the chat panel). It answers only about Vennir: a question
 judged not about it (by a separate, tool-less call that treats the
 question as data) gets a fixed sentence and never reaches the agent, and an
 answer resting on neither the docs it cites nor its tools' results is

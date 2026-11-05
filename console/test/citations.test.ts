@@ -31,6 +31,25 @@ describe("citations", () => {
     expect(checkCitations("You have two projects.", []).uncited).toBe(false);
   });
 
+  it("keeps only links to the console's own pages: any other is left as its text", () => {
+    const text = [
+      "See [the run](/runs/abc) and [Backups](/docs/reference-operations#backups) [S1].",
+      "[Sign in again](https://evil.example/login) or [here](//evil.example) or [there](/\\evil.example).",
+      "![pixel](https://evil.example/p.png?d=secret) <https://evil.example/x>",
+      "[ref][1]",
+      "[1]: https://evil.example/ref",
+    ].join("\n");
+    const checked = checkCitations(text, sources).text;
+    expect(checked).toContain("[the run](/runs/abc)");
+    expect(checked).toContain("[Backups](/docs/reference-operations#backups) [S1]");
+    expect(checked).not.toContain("](https://");
+    expect(checked).not.toContain("](//");
+    expect(checked).not.toContain("![");
+    expect(checked).not.toContain("<https://");
+    expect(checked).not.toMatch(/^\[1\]:/m);
+    expect(checked).toContain("Sign in again or here or there.");
+  });
+
   it("numbers each turn's sources after the last", () => {
     expect(asSources([hit("a", "x")], 2).map((s) => s.id)).toEqual(["S3"]);
   });

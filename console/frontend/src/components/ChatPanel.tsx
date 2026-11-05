@@ -73,8 +73,7 @@ function Answer({ turn, onOpenCart, onLeave }: { turn: Extract<Turn, { role: "as
       a: ({ href, children }) => {
         const cited = href?.startsWith("#source-") ? href.slice("#source-".length) : null;
         if (!cited) {
-          // The console's own pages open in it (a reload would lose the conversation);
-          // anything else in a new tab, never in place of the console.
+          // The console's own pages open in it (a reload would lose the conversation).
           // A path on this console: "/" then not another "/" or a "\\" (which browsers read as another host).
           if (href && /^\/(?![/\\])/.test(href)) {
             return (
@@ -83,11 +82,9 @@ function Answer({ turn, onOpenCart, onLeave }: { turn: Extract<Turn, { role: "as
               </Link>
             );
           }
-          return (
-            <Link href={href} target="_blank" rel="noopener noreferrer">
-              {children}
-            </Link>
-          );
+          // Anywhere else is text: an answer's links are the console's, never
+          // one the model was handed by what a product or run says.
+          return <>{children}</>;
         }
         const target = `${prefix}-${cited}`;
         return (
