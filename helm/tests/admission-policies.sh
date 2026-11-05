@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MIT
 #
 # Proves the charts' admission policies on a real cluster: dispatch (team
-# namespaces only), image sources, step identity, scans and purging (kernel
+# namespaces only, Jobs shaped as the executor makes them), step Jobs and
+# Pods, image sources, step identity, scans and purging (kernel
 # chart), and the console's write fence, its namespaces, its Jobs and the
 # gateway's tokens (console chart). Every case is a server-side dry run, so
 # nothing is created, made as the identity the policy guards (impersonated).
@@ -51,13 +52,40 @@ FAILURES=0
 
 render() {
   {
+    # Steps pull with vennir-pull, and a product asking for Spot runs on
+    # its pool (helm/tests/step-job.json is such a step's Job).
     helm template "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
       --set imagePolicy.sourceRegistry=$SOURCE \
+      --set scheduler.taskImagePullSecret=vennir-pull \
+      --set scheduler.capacityPlacements.spot.nodeSelector.pool=spot \
+      --set 'scheduler.capacityPlacements.spot.tolerations[0].key=pool' \
+      --set 'scheduler.capacityPlacements.spot.tolerations[0].operator=Equal' \
+      --set 'scheduler.capacityPlacements.spot.tolerations[0].value=spot' \
+      --set 'scheduler.capacityPlacements.spot.tolerations[0].effect=NoSchedule' \
       --show-only templates/dispatch-policy.yaml \
       --show-only templates/image-policy.yaml \
       --show-only templates/identity-policy.yaml \
       --show-only templates/step-pods-policy.yaml \
       --set scanPolicy.requireDigest=false --show-only templates/scan-policy.yaml
+    echo "---"
+    # Only the scheduler makes ek- Jobs and ConfigMaps, in any team-labelled
+    # namespace: narrowed here to this run's, so an install on the same
+    # cluster (and another run beside this one) keeps making its own.
+    helm template "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
+      --show-only templates/step-jobs-policy.yaml \
+      | k create --dry-run=client -o json -f - \
+      | python3 -c '
+import json, sys
+text, decoder, docs, at = sys.stdin.read(), json.JSONDecoder(), [], 0
+while text[at:].strip():
+    doc, end = decoder.raw_decode(text, at + len(text[at:]) - len(text[at:].lstrip()))
+    docs.append(doc)
+    at = end
+for d in docs:
+    if d["kind"] == "ValidatingAdmissionPolicy":
+        d["spec"]["matchConstraints"]["namespaceSelector"]["matchExpressions"].append(
+            {"key": "kubernetes.io/metadata.name", "operator": "In", "values": sys.argv[1:]})
+print(json.dumps({"apiVersion": "v1", "kind": "List", "items": docs}))' "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS"
     echo "---"
     # The console as the purger, as on kind and GKE, and a User and a Group.
     helm template "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
@@ -243,7 +271,7 @@ PY
 # Hardened as the executor makes a step's Job (scheduler.taskPodHardening),
 # unless the seventh argument is "unhardened" (neither), or "own" (the
 # container's securityContext is the sixth argument's).
-job() {  # namespace, image, action, serviceAccount, secret ("" for none), extra container JSON, hardening, extra volumes JSON
+job() {  # namespace, image, action, serviceAccount, secret ("" for none), extra container JSON, hardening, extra volumes JSON, extra Pod spec JSON
   local volumes='{"name":"x","emptyDir":{}}'"${8:-}" mounts=""
   local pod=',"automountServiceAccountToken":false,"securityContext":{"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}'
   local container=',"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"capabilities":{"drop":["ALL"]}}'
@@ -255,7 +283,7 @@ job() {  # namespace, image, action, serviceAccount, secret ("" for none), extra
   fi
   k --as="$SCHEDULER" -n "$1" create --dry-run=server -f - 2>&1 <<EOF
 {"apiVersion":"batch/v1","kind":"Job","metadata":{"name":"policy-check"},
- "spec":{"template":{"spec":{"restartPolicy":"Never","serviceAccountName":"$4"$pod,
+ "spec":{"template":{"spec":{"restartPolicy":"Never","serviceAccountName":"$4"$pod${9:-},
    "containers":[{"name":"product","image":"$2","args":["$3"]$mounts$container${6:-}}],
    "volumes":[$volumes]}}}}
 EOF
@@ -371,6 +399,31 @@ expect "resume one not labelled its own"       "may only resume its own"     "$(
 expect "resume in a retired team's"            "TEAM_RETIRED"                "$(scheduler_patch "$RETIRED_NS" ek-suspended "$RESUME")"
 expect "resume outside team namespaces"        "may only resume its own"     "$(scheduler_patch "$OTHER_NS" ek-suspended "$RESUME")"
 
+# The Pod's volumes, pull Secret and node, as the executor makes them.
+SHAPE="a step's Pod mounts only"
+expect "its request ConfigMap, under its Job's name" allowed         "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ',{"name":"input","configMap":{"name":"policy-check"}}')"
+expect "another ConfigMap"                    "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ',{"name":"input","configMap":{"name":"ek-another"}}')"
+expect "the node's filesystem"                "$SHAPE\|must run hardened" "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ',{"name":"root","hostPath":{"path":"/"}}')"
+expect "the node's filesystem, unhardened"    "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" unhardened ',{"name":"root","hostPath":{"path":"/"}}')"
+expect "a PersistentVolumeClaim"              "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ',{"name":"pvc","persistentVolumeClaim":{"claimName":"data"}}')"
+expect "the Pod's own details (downward API)" "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ',{"name":"d","downwardAPI":{"items":[{"path":"l","fieldRef":{"fieldPath":"metadata.labels"}}]}}')"
+expect "a ConfigMap in a projected volume"    "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" ',{"name":"p","projected":{"sources":[{"configMap":{"name":"kube-root-ca.crt"}}]}}')"
+expect "pulling with vennir-pull"             allowed                "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" "" ',"imagePullSecrets":[{"name":"vennir-pull"}]')"
+expect "pulling with another Secret"          "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" "" ',"imagePullSecrets":[{"name":"db-key"}]')"
+expect "a node named"                         "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" "" ',"nodeName":"some-node"')"
+expect "a capacity's placement"               allowed                "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" "" ',"nodeSelector":{"pool":"spot"},"tolerations":[{"key":"pool","operator":"Equal","value":"spot","effect":"NoSchedule"}]')"
+expect "a node selector of its own"           "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" "" ',"nodeSelector":{"kubernetes.io/hostname":"some-node"}')"
+expect "a toleration of its own"              "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" "" ',"tolerations":[{"operator":"Exists"}]')"
+expect "an affinity, with none configured"    "$SHAPE"               "$(job "$TEAM_A" $SOURCE/app:1 run default "" "" "" "" ',"affinity":{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchFields":[{"key":"metadata.name","operator":"In","values":["some-node"]}]}]}}}')"
+# The Job the executor makes (helm/tests/step-job.json, which a kernel test
+# keeps equal to it), as the scheduler makes it; and below, as anyone else.
+step_job() {  # namespace, as (empty: this kubeconfig's user)
+  local as=()
+  [ -n "${2:-}" ] && as=(--as="$2")
+  k ${as[@]+"${as[@]}"} -n "$1" create --dry-run=server -f helm/tests/step-job.json 2>&1
+}
+expect "the executor's own Job"               allowed                "$(step_job "$TEAM_A" "$SCHEDULER")"
+
 echo "Image sources:"
 expect "an image from another registry"       IMAGE_NOT_ALLOWED              "$(job "$TEAM_A" busybox:1.36 run default "")"
 
@@ -392,6 +445,22 @@ expect "owned by a step's Job"                    STEP_POD_NOT_ALLOWED  "$(pod "
 expect "the Job controller's"                     allowed               "$(pod "$TEAM_A" ',"labels":{"job-name":"ek-0123"}'"$OWNED_BY_STEP" system:serviceaccount:kube-system:job-controller)"
 expect "outside a team namespace"                 allowed               "$(pod "$OTHER_NS" ',"labels":{"job-name":"ek-0123"}')"
 
+echo "Step Jobs and ConfigMaps (anyone but the scheduler and Kubernetes' own controllers):"
+STEP_JOB=STEP_JOB_NOT_ALLOWED
+expect "the scheduler's request ConfigMap"        allowed      "$(k --as="$SCHEDULER" -n "$TEAM_A" create configmap ek-new --dry-run=server 2>&1)"
+expect "another's ConfigMap named ek-"            "$STEP_JOB"  "$(k -n "$TEAM_A" create configmap ek-new --dry-run=server 2>&1)"
+expect "another's, generated ek-..."              "$STEP_JOB"  "$(echo '{"apiVersion":"v1","kind":"ConfigMap","metadata":{"generateName":"ek-"}}' | k -n "$TEAM_A" create --dry-run=server -f - 2>&1)"
+expect "another's ConfigMap of another name"      allowed      "$(k -n "$TEAM_A" create configmap not-a-step --dry-run=server 2>&1)"
+expect "another's named ek-, not a team's"        allowed      "$(k -n "$OTHER_NS" create configmap ek-new --dry-run=server 2>&1)"
+expect "another's in a retired team's"            "$STEP_JOB"  "$(k -n "$RETIRED_NS" create configmap ek-new --dry-run=server 2>&1)"
+expect "another relabelling a step's ConfigMap"   "$STEP_JOB"  "$(k -n "$TEAM_A" label configmap ek-mine app=other --overwrite --dry-run=server 2>&1)"
+expect "another deleting one (can't replace it)"  allowed      "$(k -n "$TEAM_A" delete configmap ek-unlabelled --dry-run=server 2>&1)"
+expect "another's Job, as the executor makes it"  "$STEP_JOB"  "$(step_job "$TEAM_A")"
+expect "another's Job of another name"            allowed      "$(sed 's/"ek-db-[0-9a-f]*"/"not-a-step"/' helm/tests/step-job.json | k -n "$TEAM_A" create --dry-run=server -f - 2>&1)"
+expect "another resuming a step's Job"            "$STEP_JOB"  "$(k -n "$TEAM_A" patch job ek-suspended --type=merge -p '{"spec":{"suspend":false}}' --dry-run=server 2>&1)"
+expect "the Job controller changing one"          allowed      "$(k --as=system:serviceaccount:kube-system:job-controller -n "$TEAM_A" label job ek-suspended x=y --dry-run=server 2>&1)"
+expect "the garbage collector changing a ConfigMap" allowed    "$(k --as=system:serviceaccount:kube-system:generic-garbage-collector -n "$TEAM_A" label configmap ek-mine x=y --dry-run=server 2>&1)"
+
 echo "Step identity:"
 expect "a product, as its SA, with its secret"   allowed               "$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)"
 expect "the same, pinned by digest"              allowed               "$(job "$TEAM_A" $SOURCE/db@sha256:$(printf '0%.0s' $(seq 64)) create db-sa db-key)"
@@ -409,7 +478,8 @@ expect "default with a secret"                   IDENTITY_NOT_ALLOWED  "$(job "$
 # The dispatch policy refuses any valueFrom too; either refusal will do.
 expect "a secret through env, not a volume"      "IDENTITY_NOT_ALLOWED\|own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"env":[{"name":"K","valueFrom":{"secretKeyRef":{"name":"db-key","key":"k"}}}]')"
 expect "a secret through envFrom"                "IDENTITY_NOT_ALLOWED\|own entrypoint"  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" ',"envFrom":[{"secretRef":{"name":"db-key"}}]')"
-expect "a secret in a projected volume"          "IDENTITY_NOT_ALLOWED"  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" "" "" ',{"name":"p","projected":{"sources":[{"secret":{"name":"db-key"}}]}}')"
+# The dispatch policy refuses a projected volume of anything but tokens too.
+expect "a secret in a projected volume"          "IDENTITY_NOT_ALLOWED\|mounts only"  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" "" "" ',{"name":"p","projected":{"sources":[{"secret":{"name":"db-key"}}]}}')"
 AUDIENCE='{"name":"t","projected":{"sources":[{"serviceAccountToken":{"path":"t","audience":"'
 expect "a token for its product's audience"      allowed                "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
 expect "a token for another audience"            IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "" "" "" ",$AUDIENCE"'https://example.com","expirationSeconds":3600}}]}}')"

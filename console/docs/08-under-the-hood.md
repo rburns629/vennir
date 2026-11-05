@@ -72,8 +72,9 @@ flowchart TB
 
 ### Admission policies as the last line of defence
 - **Normally:** a ValidatingAdmissionPolicy enforces cluster-wide rules, written in CEL and run by the API server itself, with no webhook server to operate.
-- **Here:** five policies back up what the console already checks, so a bug in, or a way around, the console still can't cause harm:
-  - **dispatch-policy:** the scheduler may create Jobs and ConfigMaps only in namespaces labelled `vennir/team=true`, never in its own (the platform's namespace is never a team's). `matchConditions` limits the rule to the scheduler's own identity.
+- **Here:** six policies back up what the console already checks, so a bug in, or a way around, the console still can't cause harm:
+  - **dispatch-policy:** the scheduler may create Jobs and ConfigMaps only in namespaces labelled `vennir/team=true`, never in its own (the platform's namespace is never a team's), and only Jobs shaped as its executor makes them: its own volumes, pull Secret and placement, never a node named. `matchConditions` limits the rule to the scheduler's own identity.
+  - **step-jobs-policy:** in a team namespace, only the scheduler (and Kubernetes' own controllers) may create or change a Job or ConfigMap named `ek-`, so a step's request and Job are always the kernel's.
   - **image-policy:** a task's image must come from an allowed source.
   - **identity-policy:** a task runs as `default` with no secrets, unless it's a registered product of its team, which runs as the ServiceAccount its product declares and may mount only secrets its team registered.
   - **scan-policy:** a task's image must be pinned to a digest, and that digest must have passed its security scan on this install (or an admin accepted it).

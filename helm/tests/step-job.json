@@ -1,0 +1,150 @@
+{
+  "kind": "Job",
+  "apiVersion": "batch/v1",
+  "metadata": {
+    "name": "ek-db-129de6cd05c133c4",
+    "labels": {
+      "app": "execution-kernel",
+      "vennir.dev/attempt": "1",
+      "vennir.dev/execution-id": "00000000-0000-0000-0000-000000000001"
+    },
+    "annotations": {
+      "vennir.dev/task": "db"
+    }
+  },
+  "spec": {
+    "activeDeadlineSeconds": 1200,
+    "backoffLimit": 0,
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "execution-kernel",
+          "vennir.dev/attempt": "1",
+          "vennir.dev/execution-id": "00000000-0000-0000-0000-000000000001"
+        },
+        "annotations": {
+          "vennir.dev/task": "db"
+        }
+      },
+      "spec": {
+        "volumes": [
+          {
+            "name": "input",
+            "configMap": {
+              "name": "ek-db-129de6cd05c133c4"
+            }
+          },
+          {
+            "name": "output",
+            "emptyDir": {}
+          },
+          {
+            "name": "tmp",
+            "emptyDir": {}
+          },
+          {
+            "name": "secret-0",
+            "secret": {
+              "secretName": "db-key"
+            }
+          },
+          {
+            "name": "tokens",
+            "projected": {
+              "sources": [
+                {
+                  "serviceAccountToken": {
+                    "audience": "sts.amazonaws.com",
+                    "expirationSeconds": 3600,
+                    "path": "sts.amazonaws.com"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "containers": [
+          {
+            "name": "product",
+            "image": "registry.example/db:1@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "args": [
+              "create"
+            ],
+            "resources": {},
+            "volumeMounts": [
+              {
+                "name": "input",
+                "readOnly": true,
+                "mountPath": "/platform/input"
+              },
+              {
+                "name": "output",
+                "mountPath": "/platform/output"
+              },
+              {
+                "name": "secret-0",
+                "readOnly": true,
+                "mountPath": "/platform/secrets/db-key"
+              },
+              {
+                "name": "tokens",
+                "readOnly": true,
+                "mountPath": "/platform/tokens"
+              },
+              {
+                "name": "tmp",
+                "mountPath": "/tmp"
+              }
+            ],
+            "terminationMessagePath": "/platform/output/result.json",
+            "terminationMessagePolicy": "File",
+            "imagePullPolicy": "IfNotPresent",
+            "securityContext": {
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              },
+              "privileged": false,
+              "runAsNonRoot": true,
+              "readOnlyRootFilesystem": true,
+              "allowPrivilegeEscalation": false,
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            }
+          }
+        ],
+        "restartPolicy": "Never",
+        "terminationGracePeriodSeconds": 30,
+        "nodeSelector": {
+          "pool": "spot"
+        },
+        "serviceAccountName": "db-sa",
+        "automountServiceAccountToken": false,
+        "securityContext": {
+          "runAsNonRoot": true,
+          "seccompProfile": {
+            "type": "RuntimeDefault"
+          }
+        },
+        "imagePullSecrets": [
+          {
+            "name": "vennir-pull"
+          }
+        ],
+        "tolerations": [
+          {
+            "key": "pool",
+            "operator": "Equal",
+            "value": "spot",
+            "effect": "NoSchedule"
+          }
+        ]
+      }
+    },
+    "ttlSecondsAfterFinished": 3600,
+    "suspend": true
+  },
+  "status": {}
+}

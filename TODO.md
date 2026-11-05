@@ -171,21 +171,10 @@ it was seen.
     federation pins the repository by its ID.
   - Cluster: the console replaces or registers only ExternalSecrets it
     labelled; a step's identity is tied to its product's released digests,
-    not every image in its repository; the scheduler's Jobs may mount only
-    the volume kinds the executor uses, pull only with `vennir-pull`, and
-    name no node; an image's first part may not be uppercase.
+    not every image in its repository; an image's first part may not be
+    uppercase.
   - The chat agent's test of an admin's endpoint answers "didn't answer"
     rather than the connection's error.
-
-- [ ] **Only the scheduler makes `ek-` Jobs and ConfigMaps in team
-  namespaces** (found 2026-11-03, reviewing the suspended start): an
-  admission policy refusing anyone else's create of a Job or ConfigMap named
-  `ek-` in a namespace labelled `vennir/team`. The suspended start leaves
-  two ways in, both needing such rights: replacing the kernel's ConfigMap in
-  the moment before the kubelet mounts it, and a Job made first under the
-  attempt's name, as the kernel would make it but already resumed, which it
-  adopts. Check first that nothing else (an admin's tooling, the kernel's
-  kind tests) makes such names there.
 
 - [ ] **Next release: drop API backends in their team's namespace** (API
   backends moved to `<team>-apis` on 2026-11-05): for one release the
