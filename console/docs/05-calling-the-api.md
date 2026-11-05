@@ -135,7 +135,8 @@ $ call ExecutionService/ListExecutions '{"page":{"limit":20},"team":"team-a"}' |
 ## Placing orders from another system
 
 A storefront, a Marketplace page of your own, or an event consumer places
-orders: it runs a published template with its inputs, and nothing else. Give
+orders: it runs a published template with its inputs, and, like any member,
+can delete what your team's runs made. Give
 it an **ordering bot**: on **Automation → Add a bot**, tick *It places
 orders* and list the templates it may order (`<team>/<name>`). It's a member
 of your team, not a maintainer, so it can't submit raw DAGs, run single

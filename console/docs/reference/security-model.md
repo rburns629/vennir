@@ -34,9 +34,9 @@ gaps in [Not yet enforced](#not-yet-enforced) are why.
 | Vennir admins (console) | Manage teams, people, bots, allowed image sources; act in any team | Console authorization; every admin action is logged |
 | Catalog reviewers | Decide which product images exist, and which ServiceAccount and secrets each product declares | The catalog repository's review rules (CODEOWNERS, protected branches) |
 | Team maintainers | Manage their team: its people and their roles, register its secrets and choose which step gets which, its bots, raw DAGs, cancelling its runs | Console authorization (`auth/access.ts`): the maintainer role, per-product identity, registered team secrets |
-| Team members | See their team's runs, logs, Pods and secrets' names; run its actions and what's shared with it | The member role: nothing they can change |
+| Team members | See their team's runs, logs, Pods and secrets' names; run its actions and what's shared with it; delete what its runs made (its products' cleanup actions, decided 2026-11-04) | The member role: none of the team's settings, people, secrets or bots |
 | Product images | Do their one job with the inputs and secrets they're given | Their namespace, ServiceAccount and mounted secrets; admission policies |
-| Pipelines (bots) | A team's bot: what a maintainer of its team may do, except make tokens, bots or identities or change its people; an ordering bot, only its listed templates; an automation token, only its scopes, in no team | Hashed API tokens that expire (90 days unless their maker chose otherwise) or are revoked; `auth/access.ts`'s `ensureMayOrder`. See [Bot tokens](#bot-tokens) |
+| Pipelines (bots) | A team's bot: what a maintainer of its team may do, except make tokens, bots or identities or change its people; an ordering bot, only its listed templates, and deleting what its team's runs made; an automation token, only its scopes, in no team | Hashed API tokens that expire (90 days unless their maker chose otherwise) or are revoked; `auth/access.ts`'s `ensureMayOrder`. See [Bot tokens](#bot-tokens) |
 
 ## Where secret values live
 
@@ -388,9 +388,11 @@ orders) is a member of its team, not a maintainer, and may run only the
 templates its team's maintainers list for it: no raw DAG, no single action,
 no rerun (`ORDERS_ONLY`, `TEMPLATE_NOT_ORDERABLE`). A leaked ordering token
 can order those templates for that team, under its caps, quota and
-approvals, and nothing more, and at most the install's rate a minute
+approvals, and at most the install's rate a minute
 (`orders.ratePerMinute`, 60 by default; 429 past it, counted from the runs it
-made, so every console replica agrees). The runs a schedule makes as its bot
+made, so every console replica agrees). Like any member, it may also delete
+what its team's runs made (its products' cleanup actions): the system placing
+orders through it decides who may ask that of it (decided 2026-11-04). The runs a schedule makes as its bot
 aren't limited this way: the schedule is its team's, reviewed by its maintainers.
 
 An ordering bot may have a callback, where each of its orders' outcomes is
