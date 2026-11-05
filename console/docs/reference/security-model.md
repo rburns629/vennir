@@ -23,7 +23,7 @@ gaps in [Not yet enforced](#not-yet-enforced) are why.
 | Are secrets encrypted at rest? | That depends on the cluster. Enabling encryption of Secrets at rest in etcd, ideally with a KMS provider, is the cluster operator's responsibility and a prerequisite for production. |
 | Is Vennir's own data encrypted at rest? | Only the few credentials the console keeps itself. Step inputs, outputs and logs, and the audit log, are plain in Postgres; encrypting its disks and backups is the operator's. See [What Vennir stores](#what-vennir-stores). |
 | Is traffic inside the cluster encrypted? | Yes, with each chart's `tls` (on by default): kernel-api serves HTTPS and the bundled Postgres instances accept only TLS, each with a certificate from its chart's own CA, which every client checks (`verify-full`). Metrics ports and the scanner's are plain; NetworkPolicies limit who reaches them. See [What Vennir stores](#what-vennir-stores). |
-| Where are the database passwords? | With the bundled Postgres, generated on install and kept in the releases' Secrets. With a managed database (`database.type: managed`) there are none of Vennir's: each service signs in as its own cloud identity with a short-lived token (IAM database authentication; Cloud SQL: an hour's Google token; Amazon RDS: a 15-minute token its role signs), over TLS checked against the server's CA, from inside the install's network only. A separate administrator identity, used only by `kernel database-setup`, opens each database to its own service alone; on RDS, whose administrator must have a password, RDS keeps it in Secrets Manager, readable only by that identity. See [Databases](operations.md#databases). |
+| Where are the database passwords? | With the bundled Postgres, generated on install and kept in the releases' Secrets. With a managed database (`database.type: managed`) there are none of Vennir's: each service signs in as its own cloud identity with a short-lived token (IAM database authentication; Cloud SQL: an hour's Google token; Amazon RDS: a 15-minute token its role signs), over TLS checked against the server's CA, from inside the install's network only (the kernel refuses to start with a URL that wouldn't check it). A separate administrator identity, used only by `kernel database-setup`, opens each database to its own service alone; on RDS, whose administrator must have a password, RDS keeps it in Secrets Manager, readable only by that identity. See [Databases](operations.md#databases). |
 | What reaches logs and outputs? | Whatever a step prints or returns. Vennir stores step outputs and logs; a product must never print or return a secret. |
 
 ## Who is trusted
@@ -1153,8 +1153,16 @@ requirements on product code:
   (`INPUT_CONTAINS_CREDENTIAL`). It can only recognize shapes, not values
   (it never sees a secret's value), so a password or an opaque token is
   still stored if printed. Log what you did, not what you used.
+- **Use failure codes of your own.** The codes the platform sets (its
+  refusals, timeouts, schema and result checks: `domain.ReservedCodes`) are
+  trusted by callers and the console's failure help, and their
+  retryability is the kernel's. A step that reports one fails as
+  `PRODUCT_CODE_RESERVED` instead, its message kept with the code it
+  claimed, and isn't retried.
 - **Be idempotent.** Steps run at least once: a retried step must not create
-  something twice or charge twice.
+  something twice or charge twice. Cancelling a run stops a step already
+  started, but a step whose start was under way when the cancel came is
+  started, then stopped on the scheduler's next pass.
 - **Read secrets only from `/platform/secrets/`**, never from inputs, and never
   bake one into an image. Images are shared, cached and pulled by every team.
 
@@ -1170,6 +1178,7 @@ Vennir isn't production-ready yet.
 | Reads aren't audited ([Audit](#audit)) | Who looked at a run's outputs or logs isn't recorded | Not decided |
 | The audit log lives in the console's own database unless `audit.export` copies it to write-once storage (its entries are hash-chained, and with the copy compared with the database entry by entry; Observe shows the log as each caller may see it) | Without the copy, someone who can write that database could change it, rewriting the chain after it | Turn on `audit.export`, or ship the `event: "audit"` log lines to a SIEM |
 | Step Pod hardening is a chart setting: with `scheduler.taskPodHardening: false`, the dispatch policy no longer requires it, and only Pod Security, on namespaces the console created, holds a step to `restricted` | Steps run as root with an API token in an adopted namespace | Keep `taskPodHardening` on and let the console create team namespaces |
+| With IAM database sign-in, the console and the gateway don't refuse a database URL that doesn't check the server's certificate (the kernel does) | A URL without `verify-full` (or `verify-ca` with the server's CA) would send their sign-in token to whoever answers at the database's address | Apply the kernel's rule (`kernel/internal/config`) to both |
 | Every team named in a raw DAG sees all of its steps' outputs (a template run's providers see only their own steps in full; other teams see only a step's INFO log lines) | Cross-team visibility of outputs within a shared raw DAG | Decide: filter outputs by team, or require every team for reads |
 
 ## Out of scope

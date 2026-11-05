@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/rburns629/vennir/kernel/internal/domain"
@@ -432,10 +433,68 @@ func Load(getenv func(string) string) (Settings, error) {
 	}
 	// The Python kernel's URL names its driver (postgresql+asyncpg://).
 	s.DatabaseURL = strings.Replace(s.DatabaseURL, "postgresql+asyncpg://", "postgresql://", 1)
+	if s.DatabaseIAMAuth != "" || s.DatabaseAdminSecret != "" {
+		if problem := verifiedTLSProblem(s.DatabaseURL); problem != "" {
+			r.problems = append(r.problems, "DATABASE_URL: "+problem)
+		}
+	}
 	if len(r.problems) > 0 {
 		return Settings{}, errors.New("invalid settings:\n  " + strings.Join(r.problems, "\n  "))
 	}
 	return s, nil
+}
+
+// verifiedTLSProblem is why a database URL mustn't be sent a cloud
+// sign-in token (DATABASE_IAM_AUTH's, valid for every database the
+// identity may use) or the administrator's password (DATABASE_ADMIN_SECRET):
+// they go as the password, in the clear to whoever answers unless the
+// connection is TLS with the server's certificate checked. So the URL must
+// say sslmode=verify-full, or verify-ca with sslrootcert, the server's own
+// CA (Cloud SQL's certificate names its instance, not the address
+// connected to, so only the CA can be checked: an instance's CA is its
+// own). A loopback host or a Unix socket (a Cloud SQL Auth Proxy beside
+// the process, which encrypts and checks on its own) needs neither. Read
+// as pgx reads it (every host it may try, each with its own TLS), so what's
+// checked is what connects.
+func verifiedTLSProblem(databaseURL string) string {
+	const need = "with a sign-in token or password from the cloud, sslmode=verify-full, or verify-ca with sslrootcert (the server's own CA), so it's only sent to the server"
+	c, err := pgconn.ParseConfig(databaseURL)
+	if err != nil {
+		// Its own error quotes the URL, which may hold a password.
+		if inner := errors.Unwrap(err); inner != nil {
+			return "unreadable: " + inner.Error()
+		}
+		return "unreadable as a Postgres URL"
+	}
+	tries := []*pgconn.FallbackConfig{{Host: c.Host, Port: c.Port, TLSConfig: c.TLSConfig}}
+	tries = append(tries, c.Fallbacks...)
+	for _, try := range tries {
+		if localDatabaseHost(try.Host) {
+			continue
+		}
+		tlsConfig := try.TLSConfig
+		switch {
+		case tlsConfig == nil:
+			return need + fmt.Sprintf("; %s would be tried without TLS", try.Host)
+		case !tlsConfig.InsecureSkipVerify:
+			// verify-full: the chain and the host name.
+		case tlsConfig.VerifyPeerCertificate != nil && tlsConfig.RootCAs != nil:
+			// verify-ca (or require with a root certificate): the chain, to sslrootcert's CA.
+		default:
+			return need + fmt.Sprintf("; %s's certificate wouldn't be checked against its own CA", try.Host)
+		}
+	}
+	return ""
+}
+
+// localDatabaseHost is a host that never leaves the Pod: a Unix socket's
+// directory, localhost, or a loopback address.
+func localDatabaseHost(host string) bool {
+	if strings.HasPrefix(host, "/") || host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // podLabelProblem is why a TASK_POD_LABELS entry can't be used: not a

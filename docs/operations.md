@@ -460,7 +460,11 @@ and one that dies has its running steps adopted by another when its leases
 expire. The one thing that loosens is the step caps: `maxRunningTasks` and
 `maxRunningTasksPerTeam` are exact with one scheduler, and with several
 each counts on its own and can overshoot by up to one `claimLimit`. A
-product's own cap and concurrency key stay exact. Several console copies
+product's own cap and concurrency key stay exact. A step of a team's
+shared product, run for another team, counts against both teams'
+`maxRunningTasksPerTeam`. A claim also locks each step's execution
+(skipping, not waiting for, one that's being cancelled), so the steps of
+one execution are claimed by one scheduler at a time. Several console copies
 share everything through the database (the catalog sync and the audit copy
 run on one at a time), except the sign-in throttle, which each copy keeps
 in its own memory.
@@ -1008,6 +1012,16 @@ keeps it in Secrets Manager itself (it's in no state file of Vennir's), and
 only `kernel database-setup`'s role may read it, to make the two databases
 and the services' users (members of `rds_iam`) and open each database to
 its own service alone.
+
+A sign-in token is the password, so the kernel won't send one over a
+connection that doesn't check the server: with `database.iamAuth` (or
+`kernel database-setup`'s administrator password on RDS) it refuses to
+start unless the database URL says `sslmode=verify-full`, or
+`sslmode=verify-ca` with `sslrootcert` naming the server's own CA (what
+`vennir` writes on gcp, where Cloud SQL's certificate names the instance,
+not its address; `verify-full` on aws). A URL to a loopback address or a
+Unix socket, a Cloud SQL Auth Proxy beside it, needs neither. The console
+and the gateway don't check this yet (`TODO.md`).
 
 Cloud SQL and RDS back it up daily, with point-in-time recovery, keeping
 `database.backups.retentionDays` backups (at most 35 on RDS); the

@@ -742,13 +742,17 @@ func TestAResultCutShortIsntRetried(t *testing.T) {
 	check(t, "names the limit", strings.Contains(s.Error.Message, "4096 bytes"), true)
 }
 
-// Only the kernel sets the cluster's refusal codes; a step that uses one
-// would again.
-func TestAResultClaimingARefusalIsntRetried(t *testing.T) {
-	c, handle := finishedJob(t, `{"status": "failed", "error": {"code": "IMAGE_NOT_ALLOWED", "message": "no"}}`, options())
-	s, _ := c.k.Status(context.Background(), handle)
-	check(t, "code", s.Error.Code, "PRODUCT_RESULT_INVALID")
-	check(t, "retryable", s.Error.Retryable, false)
+// Only the platform sets its codes (domain.ReservedCodes): a step that
+// uses one fails under a code of its own, never retried (it would claim the
+// same again), its message kept and redacted.
+func TestAResultClaimingAPlatformCodeIsTheSteps(t *testing.T) {
+	for _, code := range []string{"IMAGE_NOT_ALLOWED", "TASK_TIMEOUT"} {
+		c, handle := finishedJob(t, `{"status": "failed", "error": {"code": "`+code+`", "message": "key `+aws+`", "retryable": true}}`, options())
+		s, _ := c.k.Status(context.Background(), handle)
+		check(t, "code", s.Error.Code, "PRODUCT_CODE_RESERVED")
+		check(t, "retryable", s.Error.Retryable, false)
+		check(t, "message", s.Error.Message, "key [redacted AWS access key] (The step reported its failure as "+code+", a code only the platform sets.)")
+	}
 }
 
 func TestAMissingOrInvalidResultIsARetryableFailure(t *testing.T) {

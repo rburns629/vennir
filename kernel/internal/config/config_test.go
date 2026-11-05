@@ -3,6 +3,15 @@
 package config
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -127,4 +136,87 @@ func TestTheProfilerListensOnLoopbackOnly(t *testing.T) {
 	if s, err := load(t, nil); err != nil || s.ProfilingAddress != "" {
 		t.Errorf("off by default: %q, %v", s.ProfilingAddress, err)
 	}
+}
+
+// A cloud sign-in token, or the administrator's password, is sent only over
+// TLS that checks the server: verify-full, or verify-ca against its own CA,
+// or to a proxy beside the process (loopback, a Unix socket).
+func TestACloudSignInNeedsAVerifiedConnection(t *testing.T) {
+	const host = "postgresql://vennir-kernel%40p.iam@10.40.0.3:5432/execution_kernel"
+	ca := "&sslrootcert=" + caFile(t)
+	for _, url := range []string{
+		host + "?sslmode=verify-full",
+		host + "?sslmode=verify-full" + ca,
+		host + "?sslrootcert=system",
+		host + "?sslmode=verify-ca" + ca,
+		host + "?sslmode=require" + ca, // libpq's verify-ca, with a root certificate
+		"host=10.40.0.3 sslmode=verify-full",
+		"postgresql://vennir-kernel%40p.iam@127.0.0.1:5432/execution_kernel?sslmode=disable",
+		"postgresql://vennir-kernel%40p.iam@[::1]:5432/execution_kernel",
+		"postgresql://vennir-kernel%40p.iam@localhost/execution_kernel",
+		"postgresql:///execution_kernel?host=/cloudsql/p:r:i",
+	} {
+		for _, env := range []map[string]string{
+			{"DATABASE_IAM_AUTH": "gcp"},
+			{"DATABASE_IAM_AUTH": "aws", "DATABASE_IAM_REGION": "us-east-2"},
+			{"DATABASE_ADMIN_SECRET": "arn:aws:secretsmanager:us-east-2:1:secret:x", "DATABASE_IAM_REGION": "us-east-2"},
+		} {
+			env["DATABASE_URL"] = url
+			if _, err := load(t, env); err != nil {
+				t.Errorf("%s: %v", url, err)
+			}
+		}
+	}
+	for _, url := range []string{
+		host,
+		host + "?sslmode=disable",
+		host + "?sslmode=prefer",
+		host + "?sslmode=require",
+		host + "?sslmode=verify-ca",
+		host + "?sslmode=verify-full&host=10.40.0.4&sslmode=disable",
+		host + "?sslmode=verify-ca&sslrootcert=/nowhere/ca.crt",
+		"postgresql://u@127.0.0.1/db?host=10.40.0.3",
+		"postgresql://u@127.0.0.1,10.40.0.3/db?sslmode=prefer",
+		"host=10.40.0.3 sslmode=require",
+		"not a URL at all ::",
+	} {
+		for _, env := range []map[string]string{
+			{"DATABASE_IAM_AUTH": "gcp"},
+			{"DATABASE_ADMIN_SECRET": "arn:aws:secretsmanager:us-east-2:1:secret:x", "DATABASE_IAM_REGION": "us-east-2"},
+		} {
+			env["DATABASE_URL"] = url
+			if _, err := load(t, env); err == nil || !strings.Contains(err.Error(), "DATABASE_URL") {
+				t.Errorf("%s: accepted (%v)", url, err)
+			}
+		}
+	}
+	// A password of the URL's own is the operator's choice, as before.
+	if _, err := load(t, map[string]string{"DATABASE_URL": host + "?sslmode=disable"}); err != nil {
+		t.Error(err)
+	}
+	// What's refused never quotes the URL (it may hold a password).
+	_, err := load(t, map[string]string{"DATABASE_IAM_AUTH": "gcp", "DATABASE_URL": "postgresql://u:hunter2@10.40.0.3/db?sslmode=bogus"})
+	if err == nil || strings.Contains(err.Error(), "hunter2") {
+		t.Errorf("refusal: %v", err)
+	}
+}
+
+// caFile is a CA certificate's PEM file, for sslrootcert.
+func caFile(t *testing.T) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "test CA"},
+		NotBefore: time.Now(), NotAfter: time.Now().Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "ca.crt")
+	if err := os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

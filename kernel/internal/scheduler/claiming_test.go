@@ -275,6 +275,34 @@ func TestATeamAtItsCapDoesntStarveTheOthers(t *testing.T) {
 	equal(t, "teams", teamsOf(claimed), []string{"a", "b"})
 }
 
+// A shared product runs in its own team's namespace for another team: its
+// run counts against both teams' caps (so a team can't run past its own
+// by running others' products), and once against the platform's.
+func TestASharedProductsRunCountsAgainstBothTeams(t *testing.T) {
+	tx := txFor(t)
+	submit(t, tx, "idem-cap-shared", task("shared", team("a"), forTeam("b")))
+	perTeam := func(o *Options) { o.MaxRunningPerTeam = 1 }
+	equal(t, "the shared run", len(claim(t, tx, "scheduler-1", time.Minute, time.Now(), perTeam)), 1)
+
+	submit(t, tx, "idem-cap-shared-after", numbered(3, "a", "b", "c")...)
+	claimed := claim(t, tx, "scheduler-1", time.Minute, time.Now(), perTeam)
+	equal(t, "teams", teamsOf(claimed), []string{"c"})
+
+	// The platform's cap counts the shared run once (and team c's).
+	all := func(o *Options) { o.MaxRunning = 3 }
+	equal(t, "under the platform's cap", len(claim(t, tx, "scheduler-1", time.Minute, time.Now(), all, limit(1))), 1)
+}
+
+// A product's cap counts its every run, whichever team each is for.
+func TestAProductsCapCountsItsRunsForEveryTeam(t *testing.T) {
+	tx := txFor(t)
+	product := capped("teams/a/products/shared", 1)
+	submit(t, tx, "idem-cap-product-b", task("for-b", team("a"), forTeam("b"), product))
+	submit(t, tx, "idem-cap-product-c", task("for-c", team("a"), forTeam("c"), product))
+	equal(t, "claimed", len(claim(t, tx, "scheduler-1", time.Minute, time.Now())), 1)
+	equal(t, "then", len(claim(t, tx, "scheduler-1", time.Minute, time.Now())), 0)
+}
+
 // keyed is a task that changes project p, keyed on it under scope.
 func keyed(id, scope, p string) TaskDef {
 	return task(id, inputs(map[string]any{"projectId": p}), concurrency(scope, "projectId"))

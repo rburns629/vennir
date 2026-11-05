@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/rburns629/vennir/kernel/internal/domain"
 	"github.com/rburns629/vennir/kernel/internal/executor"
@@ -230,4 +231,102 @@ func TestARetryableFailureInAFailedExecutionRunsOnceItsResumed(t *testing.T) {
 	equal(t, "a", tasks["a"].State, domain.TaskRunning)
 	equal(t, "b", tasks["b"].State, domain.TaskRunning)
 	equal(t, "b's attempts", tasks["b"].AttemptCount, 2)
+}
+
+// A claim locks each claimed task's execution too, never waiting for it.
+// While a cancel holds the execution's row, a READY task it didn't lock
+// (one a retry made READY after the cancel's own update read the tasks) is
+// passed over rather than started; once the cancel commits, it never is.
+// Before, the claim locked the task alone, and so started a step of an
+// execution being cancelled. Committed rows across two connections.
+func TestAClaimSkipsAnExecutionBeingCancelled(t *testing.T) {
+	for _, state := range []string{"PENDING", "RUNNING"} {
+		t.Run(state, func(t *testing.T) { claimWhileCancelling(t, state) })
+	}
+}
+
+func claimWhileCancelling(t *testing.T, state string) {
+	ctx := context.Background()
+	var id string
+	if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+		id = submit(t, tx, "idem-claim-cancel-race-"+state, task("only"))
+		_, err := tx.Exec(ctx, `UPDATE executions SET state = $2 WHERE id = $1`, id, state)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = testPool.Exec(ctx, `DELETE FROM executions WHERE id = $1`, id) })
+	exec := fake()
+	opts := DefaultOptions("scheduler-1")
+	committedPass := func() {
+		t.Helper()
+		done := make(chan error, 1)
+		go func() {
+			done <- pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+				_, err := DispatchPass(ctx, tx, exec, opts, time.Now(), quietLog)
+				return err
+			})
+		}()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("the claim waited for the cancel's lock")
+		}
+	}
+
+	cancel, err := testPool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = cancel.Rollback(ctx) }()
+	if moved, err := transitionExecution(ctx, cancel, id, domain.ExecutionCancelled, domain.ActiveExecutionStates...); err != nil || !moved {
+		t.Fatalf("cancel: moved=%v err=%v", moved, err)
+	}
+	committedPass()
+	equal(t, "starts while being cancelled", len(exec.StartCalls), 0)
+	equal(t, "task", tasksByKey(t, testPool, id)["only"].State, domain.TaskReady)
+
+	if err := cancel.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	committedPass()
+	equal(t, "starts once cancelled", len(exec.StartCalls), 0)
+	equal(t, "task", tasksByKey(t, testPool, id)["only"].State, domain.TaskReady)
+}
+
+// A pass that claimed a task holds its execution's row until it commits, so
+// a cancel waits for the dispatch rather than landing between the claim and
+// the start.
+func TestAClaimHoldsItsExecutionUntilItCommits(t *testing.T) {
+	ctx := context.Background()
+	var id string
+	if err := pgx.BeginFunc(ctx, testPool, func(tx pgx.Tx) error {
+		id = submit(t, tx, "idem-claim-holds-execution", task("a"), task("b", dependsOn("a")))
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = testPool.Exec(ctx, `DELETE FROM executions WHERE id = $1`, id) })
+	// Already RUNNING, so marking it started doesn't take the lock instead.
+	if _, err := testPool.Exec(ctx, `UPDATE executions SET state = 'RUNNING' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	scheduler, err := testPool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = scheduler.Rollback(ctx) }()
+	exec := fake()
+	if _, err := DispatchPass(ctx, scheduler, exec, DefaultOptions("scheduler-1"), time.Now(), quietLog); err != nil {
+		t.Fatal(err)
+	}
+	equal(t, "started", len(exec.Started), 1)
+	_, err = testPool.Exec(ctx, `SELECT id FROM executions WHERE id = $1 FOR NO KEY UPDATE NOWAIT`, id)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "55P03" {
+		t.Fatalf("the execution's row was free while its task was being dispatched: %v", err)
+	}
 }
