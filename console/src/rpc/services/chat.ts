@@ -11,6 +11,7 @@ import { currentChat } from "../../chat/settings.js";
 import type { AskRequest, AskStreamRequest, ChatConfigInput as ChatConfigMessage, ChatService } from "../../gen/vennir/console/v1/chat_pb.js";
 import { callerOf, logOf } from "../context.js";
 import { timestamp } from "../convert.js";
+import { FixedWindowLimit } from "../rateLimit.js";
 import { check } from "../validate.js";
 
 const Turn = Type.Object({ role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]), content: Type.String({ minLength: 1, maxLength: 4000 }) });
@@ -86,6 +87,10 @@ function response(answer: Answer) {
   };
 }
 
+
+// A rating is kept 90 days, for admins to read: bounded per person.
+const ratingLimit = new FixedWindowLimit(60, 60 * 60 * 1000, "ratings");
+
 export function chatService(): ServiceImpl<typeof ChatService> {
   return {
     getChatSettings() {
@@ -103,15 +108,33 @@ export function chatService(): ServiceImpl<typeof ChatService> {
           model: Type.String({ maxLength: 200 }),
           comment: Type.String({ maxLength: 2000 }),
           steps: Type.Array(Type.String({ maxLength: 100 }), { maxItems: 40 }),
+          // What an answer cites is a Docs page (citations.ts's linkOf): the
+          // ratings are the caller's word, and admins follow these links.
+          citations: Type.Array(
+            Type.Object({
+              id: Type.String({ pattern: "^S[0-9]{1,4}$" }),
+              title: Type.String({ maxLength: 300 }),
+              heading: Type.String({ maxLength: 300 }),
+              kind: Type.String({ maxLength: 40 }),
+              link: Type.String({ pattern: "^/docs/[A-Za-z0-9_-]+(#[a-z0-9-]*)?$", maxLength: 400 }),
+            }),
+            { maxItems: 40 },
+          ),
         },
-        { rating: req.rating, team: req.team, question: req.question, answer: req.answer, model: req.model, comment: req.comment, steps: req.steps },
+        {
+          rating: req.rating,
+          team: req.team,
+          question: req.question,
+          answer: req.answer,
+          model: req.model,
+          comment: req.comment,
+          steps: req.steps,
+          citations: req.citations.map((c) => ({ id: c.id, title: c.title, heading: c.heading, kind: c.kind, link: c.link })),
+        },
       );
-      return rateAnswer(callerOf(ctx), {
-        ...valid,
-        team: valid.team || null,
-        comment: valid.comment || null,
-        citations: req.citations.slice(0, 40).map((c) => ({ id: c.id, title: c.title, heading: c.heading, kind: c.kind, link: c.link })),
-      });
+      const caller = callerOf(ctx);
+      await ratingLimit.take(`chat-ratings:${caller.id}`, ctx);
+      return rateAnswer(caller, { ...valid, team: valid.team || null, comment: valid.comment || null });
     },
 
     async listChatFeedback(req, ctx) {

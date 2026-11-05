@@ -742,16 +742,16 @@ describe("the docs", () => {
     await waitFor(() => { expect(question.value).toBe("And what should I do?"); });
   });
 
-  it("opens the console's own pages from an answer in the console, and others in a new tab", async () => {
+  it("opens the console's own pages from an answer in the console, and shows any other link as text", async () => {
     await renderAt("/", MEMBER, {
       "ChatService/GetChatSettings": { enabled: true, model: "qwen3.8-27b" },
       "ChatService/AskStream": () => [{ answer: { text: "See [your runs](/runs) or [the status page](https://status.example.com)." } }],
     });
     fireEvent.change(await screen.findByRole("textbox", { name: "Ask Vennir" }), { target: { value: "Where are my runs?" } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
-    const external = await screen.findByRole("link", { name: "the status page" });
-    expect(external.getAttribute("target")).toBe("_blank");
-    expect(external.getAttribute("rel")).toContain("noopener");
+    // An answer's links are the console's: one elsewhere is its text alone.
+    expect(await screen.findByText(/the status page/)).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "the status page" })).toBeNull();
     fireEvent.click(screen.getByRole("link", { name: "your runs" }));
     // The Runs page, in the console (no reload), with the panel closed for it.
     expect(await screen.findByRole("heading", { level: 1, name: "Runs" })).toBeTruthy();

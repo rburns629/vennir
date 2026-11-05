@@ -601,6 +601,12 @@ describe("rating answers", () => {
     expect((await rpc(token, "ChatService/RateAnswer", { ...rating, rating: "up", question: `${prefix} thanks` })).code).toBe("ok");
     expect((await rpc(token, "ChatService/RateAnswer", { ...rating, rating: "sideways" })).code).toBe("invalid_argument");
     expect((await rpc(token, "ChatService/RateAnswer", { ...rating, team: theirs })).failure).toBe("FORBIDDEN");
+    // What it cites is a Docs page, as an answer's citations are: never a
+    // link elsewhere, for an admin to follow.
+    for (const link of ["https://evil.example/admin", "//evil.example", "/docs/x/../../admin", "/runs/abc"]) {
+      const forged = await rpc(token, "ChatService/RateAnswer", { ...rating, citations: [{ ...rating.citations[0], link }] });
+      expect(forged.code, link).toBe("invalid_argument");
+    }
 
     expect((await rpc(token, "ChatService/ListChatFeedback", {})).failure).toBe("FORBIDDEN");
     const admin = await users.signIn((await users.makeUser({ admin: true })).email);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import Markdown from "react-markdown";
+import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -22,6 +22,21 @@ const FILTERS: [Shown, string][] = [
   ["down", "Wrong"],
   ["up", "Good"],
 ];
+
+// A rating is its rater's word: its answer's links, and what it cites, are
+// followed only to the console's own pages (Docs, for a citation).
+const CONSOLE_PATH = /^\/(?![/\\])/;
+const DOCS_LINK = /^\/docs\/[A-Za-z0-9_-]+(#[a-z0-9-]*)?$/;
+const ANSWER: Components = {
+  a: ({ href, children }) =>
+    href && CONSOLE_PATH.test(href) ? (
+      <Link component={RouterLink} to={href}>
+        {children}
+      </Link>
+    ) : (
+      <>{children}</>
+    ),
+};
 
 /** One rating: the question, what was wrong, and the answer with what it cited. */
 function Rating({ r }: { r: ChatRating }) {
@@ -47,15 +62,21 @@ function Rating({ r }: { r: ChatRating }) {
           The answer{r.steps.length > 0 ? ` (it used ${[...new Set(r.steps)].join(", ")})` : ""}
         </Box>
         <Box sx={{ "& p": { my: 0.75 }, "& pre": { overflowX: "auto" }, fontSize: 14, overflowWrap: "anywhere" }}>
-          <Markdown remarkPlugins={[remarkGfm]}>{r.answer}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]} components={ANSWER}>
+            {r.answer}
+          </Markdown>
         </Box>
         {r.citations.length > 0 && (
           <Box component="ol" sx={{ m: 0, pl: 2.5, fontSize: 13 }} aria-label="Sources">
             {r.citations.map((c) => (
               <li key={c.id}>
-                <Link component={RouterLink} to={c.link}>
-                  [{c.id}] {c.title} · {c.heading}
-                </Link>
+                {DOCS_LINK.test(c.link) ? (
+                  <Link component={RouterLink} to={c.link}>
+                    [{c.id}] {c.title} · {c.heading}
+                  </Link>
+                ) : (
+                  `[${c.id}] ${c.title} · ${c.heading}`
+                )}
               </li>
             ))}
           </Box>

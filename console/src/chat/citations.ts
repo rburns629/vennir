@@ -73,5 +73,30 @@ export function checkCitations(answer: string, retrieved: Source[]): Checked {
       });
     return kept.length > 0 ? `[${kept.join(", ")}]` : "";
   });
-  return { text: text.replace(/ +([.,;:])/g, "$1"), citations, invented: [...invented], uncited: retrieved.length > 0 && citations.length === 0 };
+  return {
+    text: consoleLinksOnly(text.replace(/ +([.,;:])/g, "$1")),
+    citations,
+    invented: [...invented],
+    uncited: retrieved.length > 0 && citations.length === 0,
+  };
+}
+
+/** A path on this console: "/" then not another "/" or a "\\" (which browsers read as another host). */
+export const CONSOLE_PATH = /^\/(?![/\\])/;
+
+/**
+ * The answer's markdown links and images, but only to the console's own
+ * pages: any other is left as its text. The model is handed what products
+ * and runs say, so a link elsewhere could be one it was told to show; an
+ * answer's links are the console's, never the model's. (The chat panel
+ * shows any other link it's given, a bare address included, as text too.)
+ */
+export function consoleLinksOnly(text: string): string {
+  return text
+    .replace(/(!?)\[([^\]]*)\]\(\s*<?([^)\s>]*)>?(?:\s+"[^"]*")?\s*\)/g, (whole, image: string, label: string, url: string) =>
+      !image && CONSOLE_PATH.test(url) ? whole : label,
+    )
+    .replace(/<((?:https?|mailto|ftp):[^>\s]*)>/gi, "$1")
+    // A reference's definition ([1]: https://...), which a [label][1] uses.
+    .replace(/^ {0,3}\[[^\]]+\]:[ \t]*<?(\S*?)>?(?:[ \t]+.*)?$/gm, (whole, url: string) => (CONSOLE_PATH.test(url) ? whole : ""));
 }
