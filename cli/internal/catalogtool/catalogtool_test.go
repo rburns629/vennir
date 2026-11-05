@@ -177,6 +177,43 @@ func TestSecretStoreProblems(t *testing.T) {
 	}
 }
 
+// The same rules as the console's secretStores.ts, however a provider names
+// a Secret or a ServiceAccount.
+func TestSecretStoreProblemsWhateverAProviderCallsThem(t *testing.T) {
+	store := func(provider map[string]any) []any {
+		return []any{map[string]any{"apiVersion": "external-secrets.io/v1", "kind": "SecretStore", "metadata": map[string]any{"name": "s"},
+			"spec": map[string]any{"provider": provider}}}
+	}
+	m := func(kv ...any) map[string]any {
+		out := map[string]any{}
+		for i := 0; i < len(kv); i += 2 {
+			out[kv[i].(string)] = kv[i+1]
+		}
+		return out
+	}
+	for name, c := range map[string]struct {
+		provider map[string]any
+		want     string // "" for none
+	}{
+		"a token from another Secret": {m("kubernetes", m("auth", m("token", m("bearerToken", m("name", "vennir-pull", "key", "x"))))),
+			"spec.provider.kubernetes.auth.token.bearerToken must name the Secret 'eso-auth'"},
+		"the kubernetes provider": {m("kubernetes", m("server", m("url", "https://x"))), "the kubernetes provider"},
+		"a CA from a Secret":      {m("vault", m("caProvider", m("type", "Secret", "name", "vennir-pull", "key", "ca"))), "spec.provider.vault.caProvider must name the Secret 'eso-auth'"},
+		"a selector saying it's a ConfigMap": {m("kubernetes", m("auth", m("token", m("bearerToken", m("type", "ConfigMap", "name", "vennir-pull", "key", "x"))))),
+			"bearerToken must name the Secret 'eso-auth'"},
+		"a CA from a ConfigMap": {m("vault", m("caProvider", m("type", "ConfigMap", "name", "ca", "key", "ca.crt"))), ""},
+		"a product's ServiceAccount": {m("gcpsm", m("auth", m("workloadIdentity", m("serviceAccountRef", m("name", "product-sa"))))),
+			"must name one of ESO's ServiceAccounts"},
+		"ESO's":              {m("aws", m("auth", m("jwt", m("serviceAccountRef", m("name", "eso-aws"))))), ""},
+		"a remote namespace": {m("x", m("remoteNamespace", "other")), "spec.provider.x.remoteNamespace points into another namespace"},
+	} {
+		got := strings.Join(SecretStoreProblems("team", store(c.provider)), "\n")
+		if (c.want == "" && got != "") || (c.want != "" && !strings.Contains(got, c.want)) {
+			t.Errorf("%s: %q, want %q", name, got, c.want)
+		}
+	}
+}
+
 func TestReleaseActions(t *testing.T) {
 	p := &Product{Dir: "/catalog/teams/web/products/site", Spec: map[string]any{
 		"displayName": "Site", "description": "A site.", "serviceAccount": "site-sa", "deprecated": "Use site2.",
