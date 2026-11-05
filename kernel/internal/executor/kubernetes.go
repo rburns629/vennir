@@ -1051,10 +1051,7 @@ func buildStatus(terminated *corev1.ContainerStateTerminated, logs []string) Sta
 			Message: fmt.Sprintf("Container's result.json was over the %d bytes Kubernetes keeps of it, so it was cut short. Output small values (IDs, names, URIs), and put large data in storage, outputting where it is.", resultLimit)}}
 	}
 	if err != nil {
-		// Claiming the cluster's own refusal is the step's code, not chance:
-		// it would write the same again.
-		var reserved *domain.ReservedCodeError
-		return Status{State: Failed, Error: &domain.StructuredError{Code: "PRODUCT_RESULT_INVALID", Retryable: !errors.As(err, &reserved),
+		return Status{State: Failed, Error: &domain.StructuredError{Code: "PRODUCT_RESULT_INVALID", Retryable: true,
 			Message: domain.RedactText("Container's result.json was invalid: " + err.Error())}}
 	}
 	if result.Status == "succeeded" {

@@ -158,10 +158,13 @@ it was seen.
     cluster domain too; refuse a `;` in a path unless the document uses
     matrix parameters; shorten or document how long a rotated session key
     still verifies.
-  - Kernel: count a shared product's runs against the team they're for as
-    well as its own; refuse IAM-token database sign-in without a verified
-    TLS connection; reserve every failure code the kernel itself sets; a
-    claim takes the execution's lock too, so a cancel can't race a start.
+  - Kernel (found fixing the kernel's): a cancel racing a retry can leave
+    the retried step READY in the cancelled execution (never claimed, but
+    shown as waiting).
+  - Gateway and console (found fixing the kernel's): refuse IAM-token
+    database sign-in without a verified TLS connection, as the kernel does
+    (`verifiedTLSProblem`, `kernel/internal/config`); the console's failure
+    help explains `PRODUCT_CODE_RESERVED`.
   - Console: a retired team's schedules don't run, and nothing runs for it
     in other teams' namespaces; an admin can't be a bot; with
     self-registration on, adding a member by email says when the account

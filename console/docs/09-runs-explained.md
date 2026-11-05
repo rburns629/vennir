@@ -77,7 +77,7 @@ Something is holding it. In order of how often you'll see them:
 
 - **Its product's limits.** A product can run at most so many steps at once (`maxRunning`), or only one at a time for the same inputs (`concurrencyKey`), for example one deploy per service. The step starts when the earlier one finishes.
 - **A retry's backoff.** A step being retried waits 5 seconds, doubling, up to 5 minutes.
-- **The install's limits.** An admin can cap how many steps run at once, across the install or per team.
+- **The install's limits.** An admin can cap how many steps run at once, across the install or per team. A step of another team's shared product counts against both teams: the product's, whose namespace it runs in, and yours, the team it runs for.
 - **No room in the cluster.** The Job exists, but no node has room, or the team's resource quota is used up. The step is Running but its container hasn't started. After 10 minutes it fails with `TASK_NOT_STARTED`.
 
 The team's **Running now** tab shows its steps' Pods as Kubernetes sees them, including one that can't start and why.
@@ -101,6 +101,7 @@ A failed step shows a code, a message, what the code means and what to do. When 
 | `IMAGE_INVALID` | Its image name isn't a valid image reference | No | Fix the `image` in the DAG |
 | `PRODUCT_RESULT_MISSING` | It ended without writing its result | Yes | Ask the product's team; the message has the end of its logs |
 | `PRODUCT_RESULT_INVALID` | It wrote a result the platform couldn't read (not JSON, the wrong shape, or over 4 KB) | Yes, unless it was over 4 KB | Ask the product's team |
+| `PRODUCT_CODE_RESERVED` | It failed, and reported its failure under one of the codes in this table, which only the platform sets. Its message is the product's own, and says which code it used | No | Ask the product's team to use a code of their own |
 | `OUTPUT_CONTAINS_CREDENTIAL` | Its outputs held something that looked like a credential, so they were discarded | No | Ask the product's team: outputs must never echo a secret |
 | `INPUT_INVALID` | Its inputs didn't fit the product's input schema, so it never started | No | Fix the inputs, or the earlier step whose output fed it, and run it again |
 | `OUTPUT_INVALID` | It finished, but its outputs didn't fit the product's output schema | No | Ask the product's team: their action returned something it doesn't promise |
@@ -116,7 +117,7 @@ A failed step shows a code, a message, what the code means and what to do. When 
 | `APPROVAL_DECLINED` | A maintainer of its team declined it, so it never ran | No | Ask them why, then run it again |
 | `APPROVAL_EXPIRED` | Nobody approved or declined it in time, so it never ran | No | Retry it to ask again, and tell its team |
 
-**Codes the product sets.** Any other code (say `MISSING_SECRET`) comes from the product's own code, with its own message, and is retried only if the product marked it retryable. The product's page, and its team's help on the failure card, say what it means.
+**Codes the product sets.** Any other code (say `MISSING_SECRET`) comes from the product's own code, with its own message, and is retried only if the product marked it retryable. A product can't report a code from the table above: that shows as `PRODUCT_CODE_RESERVED`, so a platform code always means what the table says. The product's page, and its team's help on the failure card, say what it means.
 
 **Refusals before anything runs.** These come back when you submit, retry or run again, and nothing starts:
 

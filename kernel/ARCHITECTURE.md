@@ -168,9 +168,17 @@ write is in order, in its transaction.
               (adopted: polled from now on, its Job not started twice)
     CLAIMED → back to READY, lease and handle cleared
 → [SCHEDULER_MAX_RUNNING_TASKS(_PER_TEAM)?] runningPerTeam() caps how many
-→ SELECT ... FOR UPDATE OF t SKIP LOCKED, a page at a time by (available_at, id)
+    [per team, a task counts against the team it runs in and, when another,
+     the team it runs for (for_team: a shared product's run); once in all]
+→ SELECT ... FOR UPDATE OF t SKIP LOCKED FOR NO KEY UPDATE OF e SKIP LOCKED,
+    a page at a time by (available_at, id)
     WHERE state = READY AND available_at <= now
       AND execution.state IN (PENDING, RUNNING)     [a dead execution gets no more claims]
+    [the execution's row is locked too, never waited for: one a cancel (or
+     another scheduler's settling) holds is passed over this pass, and one
+     cancelled since the snapshot is re-read and dropped; a cancel arriving
+     later waits for this pass to commit, then leaves the RUNNING task for
+     the next pass to stop]
     [held tasks (a cap, a key) stay READY in place: the next page (at least
      100) is read until ClaimLimit are claimed, none are left, or 2000 have
      been read; a cap scope or key found held is passed over for the rest of
@@ -330,7 +338,10 @@ implementation of `Executor`; the scheduler only knows the interface):
   is retried: its image might yet pull beside the retry. A `result.json`
   over the 4096 bytes the kubelet keeps arrives cut short, and fails as
   `PRODUCT_RESULT_INVALID` that isn't retried (the step would write as much
-  again).
+  again). A failure under a code the platform sets (`domain.ReservedCodes`:
+  the kernel's, the executor's and the chart's policies', which a test reads
+  from the source) is recorded as `PRODUCT_CODE_RESERVED`, its message kept
+  with the code it claimed, and not retried.
 - The pass hands back what finished (`Outcome.Finished`), and the loop
   calls `Release()` on it only after the pass committed, so a pass that
   rolls back can read the same result again. One missed is removed by the

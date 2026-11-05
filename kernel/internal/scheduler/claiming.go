@@ -5,6 +5,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/rburns629/vennir/kernel/internal/domain"
@@ -85,50 +86,73 @@ const (
 	minClaimPage = 100
 )
 
-func (p *pass) runningPerTeam() (map[string]int, error) {
-	rows, err := p.db.Query(p.ctx, `SELECT team, count(*) FROM execution_tasks
-		WHERE state IN ('CLAIMED', 'RUNNING') GROUP BY team`)
+// runningPerTeam counts the tasks claimed or running for each team they
+// count against (capTeams), and in all.
+func (p *pass) runningPerTeam() (map[string]int, int, error) {
+	rows, err := p.db.Query(p.ctx, `SELECT x.team, count(*), count(*) FILTER (WHERE x.team = t.team)
+		FROM execution_tasks t
+		CROSS JOIN LATERAL (SELECT t.team UNION SELECT t.for_team WHERE t.for_team IS NOT NULL AND t.for_team <> '') x(team)
+		WHERE t.state IN ('CLAIMED', 'RUNNING') GROUP BY x.team`)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
-	counts := map[string]int{}
+	counts, total := map[string]int{}, 0
 	for rows.Next() {
 		var team string
-		var n int
-		if err := rows.Scan(&team, &n); err != nil {
-			return nil, err
+		var n, own int
+		if err := rows.Scan(&team, &n, &own); err != nil {
+			return nil, 0, err
 		}
 		counts[team] = n
+		total += own // each task once, by the team it runs in
 	}
-	return counts, rows.Err()
+	return counts, total, rows.Err()
+}
+
+// capTeams are the teams a task counts against for MaxRunningPerTeam: the
+// team it runs in (its product's: a shared product runs in its own team's
+// namespace) and, when another, the team it runs for. So a team can't
+// run past its own cap by running other teams' shared products, nor
+// another team's runs of a team's product go uncounted for it.
+func capTeams(t *Task) []string {
+	if t.ForTeam != nil && *t.ForTeam != "" && *t.ForTeam != t.Team {
+		return []string{t.Team, *t.ForTeam}
+	}
+	return []string{t.Team}
 }
 
 // claimReadyTasks claims up to ClaimLimit READY tasks whose available_at
 // has passed and whose execution is still active, after recovering expired
-// leases. MaxRunning caps how many tasks are claimed or running across the
-// platform, MaxRunningPerTeam per team; a task over a cap stays READY. The
-// caps are exact with one scheduler; with several, each counts on its own.
-// Nothing is committed here: a pass commits claims and dispatches together,
-// so a commit that fails after a Job was created rolls the claim back, and
-// the next claim gets the same attempt number (and Job name) to adopt.
+// leases. Each task read is locked with its execution's row (FOR NO KEY
+// UPDATE, an UPDATE's own lock, as marking the execution RUNNING takes),
+// held until the pass commits, task then execution as kernel-api's cancel
+// takes them, both SKIP LOCKED so a claim never waits: an execution being
+// cancelled, or settled by another scheduler, is passed over this pass,
+// and one cancelled since the query's snapshot is re-read locked and
+// dropped. A cancel arriving after the claim waits for the pass to commit,
+// then finds the task RUNNING and leaves it to the next pass to stop.
+// MaxRunning caps how many tasks are claimed or running across the
+// platform, MaxRunningPerTeam per team (capTeams); a task over a cap stays
+// READY. The caps are exact with one scheduler; with several, each counts
+// on its own. Nothing is committed here: a pass commits claims and
+// dispatches together, so a commit that fails after a Job was created
+// rolls the claim back, and the next claim gets the same attempt number
+// (and Job name) to adopt.
 func (p *pass) claimReadyTasks() ([]*Task, error) {
 	if _, err := p.recoverExpiredLeases(); err != nil {
 		return nil, err
 	}
 	limit := p.opts.ClaimLimit
 	var perTeam map[string]int
+	total := 0
 	if p.opts.MaxRunning > 0 || p.opts.MaxRunningPerTeam > 0 {
 		var err error
-		if perTeam, err = p.runningPerTeam(); err != nil {
+		if perTeam, total, err = p.runningPerTeam(); err != nil {
 			return nil, err
 		}
 	}
 	if p.opts.MaxRunning > 0 {
-		total := 0
-		for _, n := range perTeam {
-			total += n
-		}
 		limit = min(limit, p.opts.MaxRunning-total)
 		if limit <= 0 {
 			return nil, nil
@@ -166,7 +190,8 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 			JOIN executions e ON e.id = t.execution_id
 			WHERE t.state = 'READY' AND t.available_at <= $1 AND e.state IN ('PENDING', 'RUNNING')
 			AND (t.available_at, t.id) > (COALESCE($3::timestamptz, '-infinity'), $4::uuid)
-			ORDER BY t.available_at, t.id LIMIT $2 FOR UPDATE OF t SKIP LOCKED`, p.now, page, afterAt, afterID)
+			ORDER BY t.available_at, t.id LIMIT $2
+			FOR UPDATE OF t SKIP LOCKED FOR NO KEY UPDATE OF e SKIP LOCKED`, p.now, page, afterAt, afterID)
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +204,9 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 			if len(claimed) == limit {
 				break
 			}
-			if p.opts.MaxRunningPerTeam > 0 && perTeam[t.Team] >= p.opts.MaxRunningPerTeam {
+			if p.opts.MaxRunningPerTeam > 0 && slices.ContainsFunc(capTeams(t), func(team string) bool {
+				return perTeam[team] >= p.opts.MaxRunningPerTeam
+			}) {
 				continue
 			}
 			if t.CapScope != nil && heldScopes[*t.CapScope] {
@@ -212,7 +239,9 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 				capped[*t.CapScope]++
 			}
 			if p.opts.MaxRunningPerTeam > 0 {
-				perTeam[t.Team]++
+				for _, team := range capTeams(t) {
+					perTeam[team]++
+				}
 			}
 			claimed = append(claimed, t)
 		}

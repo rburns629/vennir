@@ -647,8 +647,10 @@ func (p *pass) poll(t *Task, status executor.Status, statusErr error) (bool, err
 // any), so settling passes never deadlock each other. Other writers to an
 // execution don't take it and can: a dispatch failing its execution
 // (MISSING_UPSTREAM_OUTPUT, INPUT_INVALID, a refusal, EXECUTOR_START_FAILED)
-// holds the rows it claimed, in the queue's order, so it can't wait here
-// without risking a cycle of its own; and kernel-api's cancel and retry
+// holds the rows it claimed and their executions', in the queue's order, so
+// it can't wait here without risking a cycle of its own (a settling pass
+// waits for such an execution's row until the dispatch commits); and
+// kernel-api's cancel and retry
 // lock tasks, then the execution. Postgres aborts one of a deadlock, and
 // that pass is redone from the rows (a cancel or retry errs, and is sent
 // again).

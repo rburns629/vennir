@@ -156,10 +156,15 @@ func TestParseTaskResult(t *testing.T) {
 	}
 	same(t, "error", *failed.Error, StructuredError{Code: "QUOTA", Message: "no", Retryable: true})
 
-	_, err = ParseTaskResult([]byte(`{"status": "failed", "error": {"code": "IMAGE_NOT_ALLOWED", "message": "m"}}`))
-	var reserved *ReservedCodeError
-	if !errors.As(err, &reserved) || reserved.Code != "IMAGE_NOT_ALLOWED" {
-		t.Errorf("a reserved code: %v", err)
+	// The platform's codes are the platform's: a step's is recorded under
+	// a code of its own, its message kept, and never retried.
+	for _, code := range []string{"IMAGE_NOT_ALLOWED", "TASK_TIMEOUT", "OUTPUT_INVALID", "STEP_JOB_NOT_ALLOWED", ProductCodeReserved} {
+		claimed, err := ParseTaskResult([]byte(`{"status": "failed", "error": {"code": "` + code + `", "message": "it said so", "retryable": true}}`))
+		if err != nil {
+			t.Fatalf("%s: %v", code, err)
+		}
+		same(t, code, *claimed.Error, StructuredError{Code: ProductCodeReserved, Retryable: false,
+			Message: "it said so (The step reported its failure as " + code + ", a code only the platform sets.)"})
 	}
 
 	for _, bad := range []string{
@@ -171,8 +176,6 @@ func TestParseTaskResult(t *testing.T) {
 		`{"status": "failed", "error": {"code": "C", "message": "m", "detail": 1}}`,
 		`{"status": "succeeded", "error": {"code": "C", "message": "m"}}`,
 		`{"status": "succeeded"} {}`,
-		`{"status": "failed", "error": {"code": "IMAGE_NOT_ALLOWED", "message": "a refusal it didn't get"}}`,
-		`{"status": "failed", "error": {"code": "RESOURCES_NOT_ALLOWED", "message": "m"}}`,
 	} {
 		if _, err := ParseTaskResult([]byte(bad)); err == nil {
 			t.Errorf("%q was accepted", bad)
