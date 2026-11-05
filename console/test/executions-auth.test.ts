@@ -548,17 +548,18 @@ describe("retry and cancel check access again, over every team", () => {
     expect(retryTask).toHaveBeenCalledWith(id, "t", `user:${userId}`);
   });
 
-  it("scans and admits the steps a retry revives, not only the retried one", async () => {
+  it("scans and admits every step a retry may revive, not only the retried one", async () => {
     const revived = `other-image:1@sha256:${"d".repeat(64)}`;
     const id = await recorded([teamName], { tasks: [task("t", teamName), task("after", teamName, { image: revived, serviceAccount: "default", dependsOn: ["t"] })] });
-    // The failure cancelled "after": kernel-api revives it with the retry.
+    // "after" isn't finished: the failure may cancel it before the retry
+    // lands, and kernel-api then revives it with the retry.
     vi.mocked(getExecution).mockResolvedValueOnce({
       executionId: id,
       name: "",
       state: "FAILED",
       tasks: [
         { taskId: "t", state: "FAILED", attemptCount: 1, outputs: null, failure: null, dependsOn: [] },
-        { taskId: "after", state: "CANCELLED", attemptCount: 0, outputs: null, failure: null, dependsOn: ["t"] },
+        { taskId: "after", state: "BLOCKED", attemptCount: 0, outputs: null, failure: null, dependsOn: ["t"] },
       ],
     } as unknown as Awaited<ReturnType<typeof getExecution>>);
     vi.mocked(scanBlocker).mockClear();

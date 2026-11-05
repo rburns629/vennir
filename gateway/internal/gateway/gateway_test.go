@@ -746,14 +746,23 @@ func TestAddressesThatFailToSignInAreLimitedBeforeSignIn(t *testing.T) {
 		t.Errorf("another IPv4 client, written as IPv6: %d", w.Code)
 	}
 
-	// On the public listener with no trusted proxies, the peer may be a load
-	// balancer every caller shares: no address is limited there.
+	// On the public listener with no trusted proxies, the peer is the
+	// caller (a load balancer that keeps their address): limited.
 	f.gw.Settings.TrustedProxies = nil
+	for range 3 {
+		from("198.51.100.20:4000", path, "", nil)
+	}
+	if w := from("198.51.100.20:4000", path, "web-person", nil); w.Code != 429 {
+		t.Errorf("public, the peer the caller: %d", w.Code)
+	}
+	// Behind a proxy every caller shares and that isn't trusted (an
+	// Ingress, no trustedProxies): no address is limited there.
+	f.gw.Settings.PublicPeersShared = true
 	for range 5 {
 		from("10.0.0.3:4000", path, "", nil)
 	}
 	if w := from("10.0.0.3:4000", path, "web-person", nil); w.Code != 201 {
-		t.Errorf("public, no trusted proxies: %d", w.Code)
+		t.Errorf("public, behind a shared proxy: %d", w.Code)
 	}
 }
 

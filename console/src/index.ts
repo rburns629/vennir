@@ -137,14 +137,33 @@ async function main(): Promise<void> {
   // Products registered before image repositories had owners get theirs.
   await claimRegisteredImageRepositories();
   // Products registered by tag before identities were tied to digests get
-  // pinned (productPolicy.ts), in the background: a slow registry mustn't
-  // hold up serving. Until then they have no identity, as before; once
-  // pinned, the identity policy is written again so they have it at once.
-  void pinRegisteredTags(app.log)
-    .then((pinned) => (pinned > 0 ? syncIdentityPolicy() : undefined))
-    .catch((error: unknown) => {
+  // pinned (productPolicy.ts), then the identity policy written, so their
+  // steps have their identity from the first request. A slow registry holds
+  // up serving for PIN_WAIT_MS at most; past it, pinning finishes in the
+  // background, and until then their steps run without it, as before.
+  const pinning = pinRegisteredTags(app.log).then(
+    async (pinned) => {
+      if (pinned === 0) return;
+      await syncIdentityPolicy().catch((error: unknown) => {
+        app.log.error({ err: error, event: "identity_policy_sync_failed" }, "couldn't write the identity policy after pinning products");
+      });
+    },
+    (error: unknown) => {
       app.log.error({ err: error, event: "product_pinning_failed" }, "couldn't pin the products registered by tag");
-    });
+    },
+  );
+  const PIN_WAIT_MS = 30_000;
+  let pinWait: ReturnType<typeof setTimeout> | undefined;
+  const waited = await Promise.race([
+    pinning.then(() => true),
+    new Promise<false>((resolve) => {
+      pinWait = setTimeout(() => {
+        resolve(false);
+      }, PIN_WAIT_MS);
+    }),
+  ]);
+  clearTimeout(pinWait);
+  if (!waited) app.log.warn({ event: "product_pinning_slow" }, "still pinning products registered by tag; serving meanwhile");
   // Single sign-on as admins set it (sso.ts): read before anyone signs in,
   // then every few seconds, so a change made on another console reaches this one.
   await refreshSso(app.log);

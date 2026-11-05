@@ -183,9 +183,11 @@ export async function pinRegisteredTags(log: FastifyBaseLogger): Promise<number>
     .where(sql`substring(${products.image} from ${PINNED_DIGEST}) IS NULL`);
   if (tagged.length === 0) return 0;
   const prefixes = allowedPrefixes(await readImagePolicy());
+  // Every tag resolved at once: the registry's answers, not one at a time.
+  const { pinned } = await pinImages([...new Set(tagged.map((product) => product.image))], prefixes);
   let count = 0;
   for (const product of tagged) {
-    const resolved = (await pinImages([product.image], prefixes)).pinned.get(product.image);
+    const resolved = pinned.get(product.image);
     if (!resolved || !digestOf(resolved)) {
       log.warn({ event: "product_not_pinned", product: product.name, image: product.image }, "couldn't pin a product registered by tag; it has no identity until it's registered again");
       continue;
@@ -255,20 +257,29 @@ export function releaseVariables(maps: Map<string, Map<string, PolicyProduct[]>>
   return variables;
 }
 
-/** The digests the policy's releases maps list now; a literal that can't be read counts as empty. */
-/** A listed release, as admitReleases asks for one: its digest, and the product entry it runs as. */
+/**
+ * A release a step runs, as admitReleases asks for one: its digest, the
+ * product entry it runs as, and the team (namespace) it runs in, which the
+ * entry must be for, or a platform product's ("").
+ */
 export interface ReleaseUse {
   digest: string;
+  team: string;
   repository: string;
   action: string;
   serviceAccount: string;
 }
 
 function useKey(use: ReleaseUse): string {
-  return JSON.stringify([use.digest, use.repository, use.action, use.serviceAccount]);
+  return JSON.stringify([use.digest, use.team, use.repository, use.action, use.serviceAccount]);
 }
 
-/** Every (digest, entry) the policy's releases maps list. */
+/** Whether the policy lists a release for this use: an entry of its team's, or a platform product's. */
+function isListed(listed: Set<string>, use: ReleaseUse): boolean {
+  return listed.has(useKey(use)) || listed.has(useKey({ ...use, team: "" }));
+}
+
+/** Every (digest, entry) the policy's releases maps list; a literal that can't be read counts as empty. */
 function listedUses(variables: Record<string, string>): Set<string> {
   const listed = new Set<string>();
   for (const digit of DIGITS) {
@@ -282,7 +293,7 @@ function listedUses(variables: Record<string, string>): Set<string> {
     for (const [digest, entries] of Object.entries(parsed as Record<string, unknown>)) {
       if (!Array.isArray(entries)) continue;
       for (const e of entries as Partial<PolicyProduct>[]) {
-        listed.add(useKey({ digest, repository: e.repository ?? "", action: e.action ?? "", serviceAccount: e.serviceAccount ?? "" }));
+        listed.add(useKey({ digest, team: e.team ?? "", repository: e.repository ?? "", action: e.action ?? "", serviceAccount: e.serviceAccount ?? "" }));
       }
     }
   }
@@ -339,12 +350,12 @@ export async function admitReleases(uses: ReleaseUse[]): Promise<string[]> {
     config.identityPolicyName,
     async (current) => {
       listed = listedUses(current);
-      if (wanted.every((use) => listed.has(useKey(use)))) return current;
+      if (wanted.every((use) => isListed(listed, use))) return current;
       const variables = await wantedVariables(current);
       listed = listedUses(variables);
       return variables;
     },
     { settle: true },
   );
-  return exists ? [...new Set(wanted.filter((use) => !listed.has(useKey(use))).map((use) => use.digest))] : [];
+  return exists ? [...new Set(wanted.filter((use) => !isListed(listed, use)).map((use) => use.digest))] : [];
 }

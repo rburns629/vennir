@@ -224,7 +224,7 @@ describe("syncing", () => {
     // Pruned above; a submission marks it used first (core/executions.ts).
     const [row] = await db.select().from(products).where(eq(products.name, product.name));
     await db.update(productReleases).set({ lastUsedAt: new Date() }).where(eq(productReleases.productId, row?.id ?? ""));
-    const use = (d: string, action = "create") => ({ digest: digest(d), repository: `example.com/${prefix}/db`, action, serviceAccount: "db-v2" });
+    const use = (d: string, action = "create") => ({ digest: digest(d), team: prefix, repository: `example.com/${prefix}/db`, action, serviceAccount: "db-v2" });
     expect(await admitReleases([use("1")])).toEqual([]);
     expect(writes).toBe(1);
     expect(vi.mocked(updateIdentityPolicy).mock.lastCall?.[2]).toEqual({ settle: true });
@@ -237,6 +237,8 @@ describe("syncing", () => {
     // A listed digest, but not as this product's entry (another action of
     // the same image): not admitted, though the digest is listed.
     expect(await admitReleases([use("1", "delete")])).toEqual([digest("1")]);
+    // Nor for a step in another team's namespace: the entry is this team's.
+    expect(await admitReleases([{ ...use("1"), team: `${prefix}-other` }])).toEqual([digest("1")]);
   });
 
   it("writes each team's registered secrets with the releases", async () => {

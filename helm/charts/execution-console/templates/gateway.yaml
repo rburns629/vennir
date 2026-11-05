@@ -212,6 +212,9 @@ spec:
               value: {{ .Values.gateway.defaultPerMinute | quote }}
             - name: UNAUTHENTICATED_PER_MINUTE
               value: {{ .Values.gateway.unauthenticatedPerMinute | quote }}
+            # This chart's Ingress, untrusted, is every public caller's peer.
+            - name: PUBLIC_PEERS_SHARED
+              value: {{ or .Values.gateway.publicPeersShared (and .Values.gateway.publicListener .Values.gateway.ingress.enabled (not .Values.gateway.trustedProxies)) | quote }}
             - name: BODY_READ_TIMEOUT_SECONDS
               value: {{ .Values.gateway.bodyReadTimeoutSeconds | quote }}
             - name: CLOSED

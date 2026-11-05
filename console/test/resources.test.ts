@@ -484,6 +484,16 @@ describe("what depends on what (decision 25)", () => {
     expect(await linked(outsiderToken, `${prefix}-p1`)).toEqual([]);
   });
 
+  it("records nothing reported by another image of a product's repository, not a release", async () => {
+    const executionId = randomUUID();
+    const unreleased = `registry.example/${prov}/thing:2@sha256:${"e".repeat(64)}`;
+    await recordRun(
+      { executionId, submittedBy: null, template: null, onBehalfOf: null, payload: { tasks: [{ id: "create", team: prov, image: unreleased, action: "create" }] } },
+      { executionId, name: "x", state: "SUCCEEDED", tasks: [step("create", "SUCCEEDED", { resources: [{ type: "demo/thing", id: `${prefix}-unreleased` }] })] },
+    );
+    expect(await list(providerToken, { query: `${prefix}-unreleased` })).toEqual([]);
+  });
+
   it("links a step to the one its input was wired from in the same run", async () => {
     const executionId = randomUUID();
     const task = (id: string, name: string, inputs: Record<string, unknown> = {}) => ({ id, team: prov, image: `registry.example/${prov}/${name}:1@sha256:${"c".repeat(64)}`, action: "create", inputs });
