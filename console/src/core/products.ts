@@ -35,6 +35,7 @@ import {
 import { allowedPrefixes, readImagePolicy } from "../imagePolicy.js";
 import { ensureServiceAccount, NamespaceNotFoundError } from "../k8s.js";
 import { syncIdentityPolicy } from "../productPolicy.js";
+import { ESO_SERVICE_ACCOUNTS } from "../secretStores.js";
 import { checkNow } from "../readiness.js";
 import { refreshProvides } from "../resourceRecorder.js";
 import { pinImages } from "../registry.js";
@@ -224,9 +225,11 @@ async function ownershipMessage(error: ProductOwnershipError, name: string): Pro
     const team = await findTeamByIdIncludingDeleted(error.ownerTeamId);
     owner = team ? `team "${team.name}"${team.deletedAt ? " (purged)" : ""}` : "another team";
   }
-  return error.conflict === "name"
-    ? `The product name "${name}" belongs to ${owner}.`
-    : `This image's repository belongs to ${owner}: only its products may use it. An admin can release a repository no product uses.`;
+  if (error.conflict === "name") return `The product name "${name}" belongs to ${owner}.`;
+  if (error.conflict === "serviceAccount") {
+    return `${name}: its serviceAccount is another product's, of ${owner}: a product runs as its own; choose another.`;
+  }
+  return `This image's repository belongs to ${owner}: only its products may use it. An admin can release a repository no product uses.`;
 }
 
 /** Every product anyone signed in may see: all but hidden ones, which only
@@ -247,6 +250,11 @@ export async function registerProduct(caller: AuthUser | undefined, input: Regis
   // for those (its admission policy), so no product may run as one.
   if (input.serviceAccount?.endsWith("-api")) {
     throw new ApiError(422, "UNPROCESSABLE_ENTITY", `${input.name}: a serviceAccount ending in -api is an API's (the gateway mints its tokens); choose another.`);
+  }
+  // ESO signs in to the team's vault as these, with the identity the
+  // catalog's admins approved in its SecretStore files.
+  if (input.serviceAccount && ESO_SERVICE_ACCOUNTS.includes(input.serviceAccount)) {
+    throw new ApiError(422, "UNPROCESSABLE_ENTITY", `${input.name}: ${input.serviceAccount} is the ServiceAccount ESO reads the team's vault as; choose another.`);
   }
   if (input.hidden && (input.shareWith ?? []).length > 0) {
     throw new ApiError(422, "UNPROCESSABLE_ENTITY", `${input.name}: a hidden action can't be shared (shareWith).`);

@@ -11,12 +11,13 @@ import (
 func (c *Catalog) layoutOK() bool {
 	teams := c.ValidateTeams()
 	owners := c.ValidateCodeowners()
+	identities := c.ValidateServiceAccounts()
 	dags := c.ValidateDags()
 	apis := c.ValidateAPIs()
 	bases := c.ValidateBases()
 	types := c.ValidateWiringTypes()
 	environments := c.ValidateBuildEnvironments()
-	return teams && owners && dags && apis && bases && types && environments
+	return teams && owners && identities && dags && apis && bases && types && environments
 }
 
 // Check validates, builds, tests and scans, and returns the products that

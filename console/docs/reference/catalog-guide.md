@@ -106,7 +106,8 @@ description: Looks up a project by id, creating it if it doesn't exist.
 owner: gcp-team
 version: 1                  # optional: raise it for a breaking change (see below)
 runtime: python3.12         # what the Dockerfile installs (for readers)
-serviceAccount: project     # optional: the identity it runs as (otherwise default)
+serviceAccount: project     # optional: the identity it runs as (otherwise default): its own, no other product's,
+                            # and not eso-gcp, eso-aws or eso-azure (ESO's, for the team's vault)
 tokenAudiences: [sts.amazonaws.com]  # optional: tokens for another cloud (below)
 check: check                # optional: the action that says whether it's ready on an install (below)
 maxRunning: 5               # optional: at most 5 of its steps (all its actions) at once, per install

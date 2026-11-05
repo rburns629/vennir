@@ -40,7 +40,7 @@ GATEWAY=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-console-gateway
 PURGER_USER=$RELEASE-purger
 PURGER_GROUP=$RELEASE-purgers
 SOURCE=registry.example
-PRODUCTS='[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"},{"team":"","repository":"registry.example/platform","action":"run","serviceAccount":"plat-sa","audiences":""}]'
+PRODUCTS='[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"},{"team":"","repository":"registry.example/platform","action":"run","serviceAccount":"plat-sa","audiences":""},{"team":"'$TEAM_A'","repository":"registry.example/vault","action":"run","serviceAccount":"eso-gcp","audiences":""}]'
 TEAM_SECRETS='{"'$TEAM_A'":"api-token,db-key","'$TEAM_B'":"b-key"}'
 FAILURES=0
 
@@ -358,6 +358,7 @@ expect "the product's image, another action"     IDENTITY_NOT_ALLOWED  "$(job "$
 expect "a team's product in another team"        IDENTITY_NOT_ALLOWED  "$(job "$TEAM_B" $SOURCE/db:1 create db-sa "")"
 expect "a platform product in any team"          allowed               "$(job "$TEAM_B" $SOURCE/platform:2 run plat-sa "")"
 expect "an unregistered image as a product's SA" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run db-sa "")"
+expect "ESO's SA, even registered as a product's" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/vault:1 run eso-gcp "")"
 expect "default with a secret"                   IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run default db-key)"
 # The dispatch policy refuses any valueFrom too; either refusal will do.
 expect "a secret through env, not a volume"      "IDENTITY_NOT_ALLOWED\|own entrypoint"  "$(job "$TEAM_A" $SOURCE/app:1 run default "" ',"env":[{"name":"K","valueFrom":{"secretKeyRef":{"name":"db-key","key":"k"}}}]')"
