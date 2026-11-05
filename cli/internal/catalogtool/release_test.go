@@ -442,3 +442,23 @@ func TestAVersionNamesACommitsReleaseAndNeverMoves(t *testing.T) {
 		t.Errorf("v1.1.0 = %s, %v", reference, err)
 	}
 }
+
+func TestAReleaseReadsNothingThroughALink(t *testing.T) {
+	outside := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(outside, []byte("kind: SecretStore\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c := catalogWith(t, map[string]string{"teams/a/team.yaml": "apiVersion: vennir.dev/v2\nkind: Team\nname: a\ndisplayName: A\ndescription: A\nowner: a\n"})
+	if err := os.MkdirAll(filepath.Join(c.Root, "teams/a/secret-stores"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(c.Root, "teams/a/secret-stores/vault.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	c.Stdout, c.Stderr = &out, &out
+	release, err := c.BuildRelease(context.Background(), Settings{Registry: "registry.example/catalog-products", SigningMode: "none"}, "c1", "")
+	if err == nil || !strings.Contains(err.Error(), "secret-stores/vault.yaml: a symbolic link") {
+		t.Fatalf("release = %v, err = %v\n%s", release, err, out.String())
+	}
+}

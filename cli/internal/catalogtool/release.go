@@ -190,6 +190,13 @@ func (c *Catalog) BuildRelease(ctx context.Context, s Settings, commit, reposito
 			problems = append(problems, fmt.Sprintf("teams/%s: no team may be called %s: %s; rename the team", team, team, why))
 			continue
 		}
+		// Nothing of a team's is read through a link (validate's linkProblem).
+		if links := symlinks(dirs[team], nil); len(links) > 0 {
+			for _, link := range links {
+				problems = append(problems, fmt.Sprintf("%s: %s", link, linkProblem))
+			}
+			continue
+		}
 		t := &catalogv1.Team{Name: team}
 		spec, err := teamSpec(filepath.Join(dirs[team], "team.yaml"))
 		if err != nil {

@@ -638,7 +638,8 @@ Dockerfile whose final stage doesn't end with a numeric, non-root `USER`.
 What it can't give a case is `/platform/tokens`, or the cluster's network
 and quotas. A case that
 needs a secret puts a placeholder in `secrets/<name>/<key>` beside it (the
-case fails if the result contains it). Logic that calls a cloud API is tested
+case fails if the result contains it). Nothing in a team's folder may be a
+symbolic link: validate refuses one, since CI reads and mounts these files. Logic that calls a cloud API is tested
 in the image with the client mocked, as `actions/test_<action>.py`. Every
 product needs at least one test.
 

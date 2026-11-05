@@ -657,3 +657,42 @@ func TestAProductRunsAsItsOwnServiceAccount(t *testing.T) {
 		}
 	}
 }
+
+func TestNoSymbolicLinksInATeamsFolder(t *testing.T) {
+	outside := t.TempDir() // such as the runner's ~/.docker
+	if err := os.WriteFile(filepath.Join(outside, "config.json"), []byte(`{"auths":{}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := func(c *Catalog, from, to string) {
+		t.Helper()
+		full := filepath.Join(c.Root, filepath.FromSlash(from))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(to, full); err != nil {
+			t.Fatal(err)
+		}
+	}
+	team := "apiVersion: vennir.dev/v2\nkind: Team\nname: a\ndisplayName: A\ndescription: A\nowner: a\n"
+
+	// A product's test secrets, mounted into its image by its contract test.
+	c := catalogWith(t, map[string]string{"teams/a/team.yaml": team, "teams/a/products/p/product.yaml": productFile("p", "a", "[]")})
+	link(c, "teams/a/products/p/tests/run/case/secrets", outside)
+	if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateProduct(c.AllProducts()[0]) }, c); !strings.Contains(out, "tests/run/case/secrets: a symbolic link") {
+		t.Errorf("a linked secrets folder: %q", out)
+	}
+	if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateTeams() }, c); strings.Contains(out, "symbolic link") {
+		t.Errorf("a product's link is reported once, by ValidateProduct: %q", out)
+	}
+
+	// product.yaml itself, and a team's other files.
+	c = catalogWith(t, map[string]string{"teams/a/team.yaml": team})
+	link(c, "teams/a/products/p/product.yaml", filepath.Join(outside, "config.json"))
+	if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateProduct(c.AllProducts()[0]) }, c); !strings.Contains(out, "product.yaml: a symbolic link") || strings.Contains(out, "auths") {
+		t.Errorf("a linked product.yaml is refused unread: %q", out)
+	}
+	link(c, "teams/a/secret-stores/vault.yaml", filepath.Join(outside, "config.json"))
+	if out := errorsOf(t, func(c *Catalog) bool { return c.ValidateTeams() }, c); !strings.Contains(out, "secret-stores/vault.yaml: a symbolic link") {
+		t.Errorf("a linked secret store: %q", out)
+	}
+}

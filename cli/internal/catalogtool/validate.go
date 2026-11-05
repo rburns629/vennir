@@ -4,6 +4,7 @@ package catalogtool
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -128,6 +129,14 @@ func (c *Catalog) ValidateTeams() bool {
 	for _, dir := range c.TeamDirs() {
 		if why := reservedTeamName(filepath.Base(dir)); why != "" {
 			c.errorAt(dir, fmt.Sprintf("no team may be called %s: %s; rename the folder", quote(filepath.Base(dir)), why))
+			ok = false
+			continue
+		}
+		// Its products' folders are ValidateProduct's to report.
+		if links := symlinks(dir, inAProduct); len(links) > 0 {
+			for _, link := range links {
+				c.errorAt(link, linkProblem)
+			}
 			ok = false
 			continue
 		}
@@ -302,6 +311,41 @@ func (c *Catalog) ValidateServiceAccounts() bool {
 	return ok
 }
 
+// linkProblem is why a team's files may not be symbolic links: CI reads,
+// builds and mounts them (a product's tests/*/secrets into its image), so a
+// link could hand a team's code whatever it points at, such as the publish
+// job's registry credentials.
+const linkProblem = "a symbolic link: a team's folder holds only files and folders; copy what it points at instead"
+
+// inAProduct says whether a path in a team's folder is in one of its
+// products' (products/<name>/...), or is one.
+func inAProduct(rel string) bool {
+	parts := strings.Split(rel, string(filepath.Separator))
+	return len(parts) >= 2 && parts[0] == "products"
+}
+
+// symlinks are the symbolic links in dir, itself included, never followed;
+// skip (given the path relative to dir) leaves a folder's out.
+func symlinks(dir string, skip func(rel string) bool) []string {
+	var links []string
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if rel, _ := filepath.Rel(dir, path); skip != nil && rel != "." && skip(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			links = append(links, path)
+		}
+		return nil
+	})
+	return links
+}
+
 // ValidateCodeowners checks there's one .github/CODEOWNERS, every team is
 // owned, and the admin paths are the admins'.
 func (c *Catalog) ValidateCodeowners() bool {
@@ -361,6 +405,13 @@ func (c *Catalog) ValidateCodeowners() bool {
 // A valid product's Spec is set.
 func (c *Catalog) ValidateProduct(p *Product) bool {
 	path := filepath.Join(p.Dir, "product.yaml")
+	// Nothing in it is read, built or mounted through a link.
+	if links := symlinks(p.Dir, nil); len(links) > 0 {
+		for _, link := range links {
+			c.errorAt(link, linkProblem)
+		}
+		return false
+	}
 	var problems []string
 	var doc any
 	data, err := os.ReadFile(path)
