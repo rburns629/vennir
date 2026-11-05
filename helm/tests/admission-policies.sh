@@ -10,9 +10,11 @@
 # What a case deletes or replaces is made first, for real, in the scratch
 # namespaces.
 #
-# Renders the policies under their own release name, "policytest", so they
-# only ever match that release's (impersonated) identities: a Vennir
-# install on the same cluster is unaffected. Removes everything it added.
+# Renders the policies under their own release name, "policytest", and
+# team label (<release>.test/team), so they only ever match that release's
+# (impersonated) identities and namespaces: a Vennir install on the same
+# cluster is unaffected, and its policies (which cover every namespace with
+# its own team label) leave this run's alone. Removes everything it added.
 #
 #   bash helm/tests/admission-policies.sh            # kubectl's current context
 #   KUBE_CONTEXT=kind-vennir-local bash helm/tests/admission-policies.sh
@@ -50,13 +52,21 @@ SOURCE=registry.example
 # which the console empties once its rollout is over.
 LEGACY_PRODUCTS='[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}]'
 TEAM_SECRETS='{"'$TEAM_A'":"api-token,db-key","'$TEAM_B'":"b-key"}'
+# The team label this run's policies and namespaces use, its own: an
+# install on the same cluster (vennir/team) never matches this run's
+# namespaces, and its policies, which cover every namespace labelled with
+# its label, never refuse this run's identities.
+TEAM_LABEL=$RELEASE.test/team
 FAILURES=0
+
+# helm template, with this run's team label in both charts.
+ht() { helm template "$@" --set "dispatchPolicy.teamNamespaceLabel=$TEAM_LABEL" --set "writeFence.teamNamespaceLabel=$TEAM_LABEL"; }
 
 render() {
   {
     # Steps pull with vennir-pull, and a product asking for Spot runs on
     # its pool (helm/tests/step-job.json is such a step's Job).
-    helm template "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
+    ht "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
       --set imagePolicy.sourceRegistry=$SOURCE \
       --set scheduler.taskImagePullSecret=vennir-pull \
       --set scheduler.capacityPlacements.spot.nodeSelector.pool=spot \
@@ -68,29 +78,11 @@ render() {
       --show-only templates/image-policy.yaml \
       --show-only templates/identity-policy.yaml \
       --show-only templates/step-pods-policy.yaml \
+      --show-only templates/step-jobs-policy.yaml \
       --set scanPolicy.requireDigest=false --show-only templates/scan-policy.yaml
     echo "---"
-    # Only the scheduler makes ek- Jobs and ConfigMaps, in any team-labelled
-    # namespace: narrowed here to this run's, so an install on the same
-    # cluster (and another run beside this one) keeps making its own.
-    helm template "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
-      --show-only templates/step-jobs-policy.yaml \
-      | k create --dry-run=client -o json -f - \
-      | python3 -c '
-import json, sys
-text, decoder, docs, at = sys.stdin.read(), json.JSONDecoder(), [], 0
-while text[at:].strip():
-    doc, end = decoder.raw_decode(text, at + len(text[at:]) - len(text[at:].lstrip()))
-    docs.append(doc)
-    at = end
-for d in docs:
-    if d["kind"] == "ValidatingAdmissionPolicy":
-        d["spec"]["matchConstraints"]["namespaceSelector"]["matchExpressions"].append(
-            {"key": "kubernetes.io/metadata.name", "operator": "In", "values": sys.argv[1:]})
-print(json.dumps({"apiVersion": "v1", "kind": "List", "items": docs}))' "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS"
-    echo "---"
     # The console as the purger, as on kind and GKE, and a User and a Group.
-    helm template "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
+    ht "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
       --set 'purgePolicy.purgers[0].kind=ServiceAccount' \
       --set "purgePolicy.purgers[0].name=$RELEASE-execution-console" \
       --set "purgePolicy.purgers[0].namespace=$PLATFORM_NS" \
@@ -99,7 +91,7 @@ print(json.dumps({"apiVersion": "v1", "kind": "List", "items": docs}))' "$PLATFO
       --set "purgePolicy.protectedNamespaces[0]=$PROTECTED_NS" \
       --show-only templates/purge-policy.yaml
     echo "---"
-    helm template "$RELEASE" helm/charts/execution-console -n "$PLATFORM_NS" \
+    ht "$RELEASE" helm/charts/execution-console -n "$PLATFORM_NS" \
       --set kernelApiUrl=http://unused --set gateway.enabled=true --set teamNamespaces.blockMetadata=true \
       --set teamNamespaces.schedulerLogs.clusterRole=$RELEASE-execution-kernel-scheduler-logs \
       --set teamNamespaces.schedulerLogs.serviceAccount=$PLATFORM_NS/$RELEASE-execution-kernel \
@@ -112,7 +104,7 @@ print(json.dumps({"apiVersion": "v1", "kind": "List", "items": docs}))' "$PLATFO
       --show-only templates/console-jobs-policy.yaml
     echo "---"
     # Only the gateway's token policy, not the gateway itself.
-    helm template "$RELEASE" helm/charts/execution-console -n "$PLATFORM_NS" \
+    ht "$RELEASE" helm/charts/execution-console -n "$PLATFORM_NS" \
       --set kernelApiUrl=http://unused --set gateway.enabled=true \
       --show-only templates/gateway.yaml \
       | python3 -c '
@@ -139,8 +131,8 @@ done
 for ns in "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS" "$APIS_NS" "$RETIRED_APIS_NS" "$NOT_APIS_NS"; do
   k create namespace "$ns" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
-k label namespace "$TEAM_A" "$TEAM_B" vennir/team=true --overwrite > /dev/null
-k label namespace "$RETIRED_NS" "$PROTECTED_NS" vennir/team=retired --overwrite > /dev/null
+k label namespace "$TEAM_A" "$TEAM_B" "$TEAM_LABEL=true" --overwrite > /dev/null
+k label namespace "$RETIRED_NS" "$PROTECTED_NS" "$TEAM_LABEL=retired" --overwrite > /dev/null
 k label namespace "$APIS_NS" vennir/api-backends=true --overwrite > /dev/null
 k label namespace "$RETIRED_APIS_NS" "$NOT_APIS_NS" vennir/api-backends=retired --overwrite > /dev/null
 for sa in eso-gcp db-sa orders-api; do
@@ -618,21 +610,21 @@ expect "limits of another name"                  "only ResourceQuota" "$(echo "$
 expect "a quota in an API backends' namespace"   "may only write in team" "$(as_console -n "$APIS_NS" create quota vennir-team-quota --hard=pods=10)"
 
 echo "Console namespaces:"
-expect "create one labelled a team's"            allowed                      "$(new_namespace $RELEASE-new '{"vennir/team":"true"}')"
+expect "create one labelled a team's"            allowed                      "$(new_namespace $RELEASE-new '{"'"$TEAM_LABEL"'":"true"}')"
 expect "create one without the label"            "only create a namespace"    "$(new_namespace $RELEASE-plain '{}')"
-expect "create a kube-* one"                     "protected"                  "$(new_namespace kube-$RELEASE '{"vennir/team":"true"}')"
-expect "retire a team's"                         allowed                      "$(as_console label namespace "$TEAM_A" vennir/team=retired --overwrite)"
-expect "label a namespace that isn't a team's"   "isn't a team's"             "$(as_console label namespace "$OTHER_NS" vennir/team=true)"
-expect "label the platform's own"                "protected"                  "$(as_console label namespace "$PLATFORM_NS" vennir/team=true)"
-expect "a label value other than true/retired"   "isn't a team's"             "$(as_console label namespace "$TEAM_A" vennir/team=yes --overwrite)"
+expect "create a kube-* one"                     "protected"                  "$(new_namespace kube-$RELEASE '{"'"$TEAM_LABEL"'":"true"}')"
+expect "retire a team's"                         allowed                      "$(as_console label namespace "$TEAM_A" "$TEAM_LABEL=retired" --overwrite)"
+expect "label a namespace that isn't a team's"   "isn't a team's"             "$(as_console label namespace "$OTHER_NS" "$TEAM_LABEL=true")"
+expect "label the platform's own"                "protected"                  "$(as_console label namespace "$PLATFORM_NS" "$TEAM_LABEL=true")"
+expect "a label value other than true/retired"   "isn't a team's"             "$(as_console label namespace "$TEAM_A" "$TEAM_LABEL=yes" --overwrite)"
 expect "change another label too"                "isn't a team's"             "$(as_console label namespace "$TEAM_A" other=1)"
 expect "change an annotation"                    "isn't a team's"             "$(as_console annotate namespace "$TEAM_A" note=1)"
 expect "create a team's API backends' one"       allowed                      "$(new_namespace $RELEASE-new-apis '{"vennir/api-backends":"true"}')"
 expect "an API backends' one not named <x>-apis" "only create a namespace"    "$(new_namespace $RELEASE-new-backends '{"vennir/api-backends":"true"}')"
 expect "an API backends' one, retired"           "only create a namespace"    "$(new_namespace $RELEASE-new-apis '{"vennir/api-backends":"retired"}')"
-expect "create one with both labels"             "never both"                 "$(new_namespace $RELEASE-both-apis '{"vennir/team":"true","vennir/api-backends":"true"}')"
+expect "create one with both labels"             "never both"                 "$(new_namespace $RELEASE-both-apis '{"'"$TEAM_LABEL"'":"true","vennir/api-backends":"true"}')"
 expect "retire an API backends' one"             allowed                      "$(as_console label namespace "$APIS_NS" vennir/api-backends=retired --overwrite)"
-expect "an API backends' one, a team's too"      "never both"                 "$(as_console label namespace "$APIS_NS" vennir/team=true)"
+expect "an API backends' one, a team's too"      "never both"                 "$(as_console label namespace "$APIS_NS" "$TEAM_LABEL=true")"
 expect "a team's, an API backends' too"          "never both"                 "$(as_console label namespace "$TEAM_A" vennir/api-backends=true)"
 expect "an API backends' one, another label"     "isn't a team's"             "$(as_console label namespace "$APIS_NS" other=1)"
 expect "relabel one not named <x>-apis"          "isn't a team's"             "$(as_console label namespace "$NOT_APIS_NS" vennir/api-backends=true --overwrite)"
