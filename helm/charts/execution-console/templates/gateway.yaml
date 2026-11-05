@@ -204,6 +204,8 @@ spec:
               value: {{ .Values.gateway.publicUrl | default .Values.gateway.url | default (printf "http://%s.%s.svc.cluster.local:8080" $name .Release.Namespace) | quote }}
             - name: BACKEND_HOSTS
               value: {{ join "," .Values.gateway.backendHosts | quote }}
+            - name: CLUSTER_DOMAIN
+              value: {{ .Values.clusterDomain | quote }}
             - name: INTERNET_TEAMS
               value: {{ join "," .Values.gateway.internetTeams | quote }}
             - name: TRUSTED_PROXIES

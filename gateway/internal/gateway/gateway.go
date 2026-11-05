@@ -115,6 +115,9 @@ type Gateway struct {
 type Settings struct {
 	BackendHosts  []string
 	InternetTeams []string
+	// ClusterDomain is the cluster's DNS domain: which backend hosts are
+	// in the cluster, and in which namespace (store.BackendPlace).
+	ClusterDomain string
 	// TrustedProxies: the peers whose X-Forwarded-For names the caller
 	// (clientAddress), on the public listener only.
 	TrustedProxies []netip.Prefix
@@ -320,7 +323,7 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, o.as("unavailable"), http.StatusServiceUnavailable, "API_UNAVAILABLE", "This API can't be served as it's set up (its team sees why on its page), so nothing is forwarded.")
 	case !store.BackendAllowed(api.BackendURL, g.Settings.BackendHosts):
 		return g.refuse(w, o.as("held"), http.StatusServiceUnavailable, "API_HELD", "This API's backend isn't one this install allows yet.")
-	case store.BackendPlace(api.BackendURL, api.Team, api.APINamespaceTaken) == store.BackendElsewhere:
+	case store.BackendPlace(api.BackendURL, api.Team, api.APINamespaceTaken, g.Settings.ClusterDomain) == store.BackendElsewhere:
 		return g.refuse(w, o.as("held"), http.StatusServiceUnavailable, "API_HELD", "This API's backend isn't in its team's API backends' namespace: an API may only use its own team's.")
 	}
 
@@ -340,6 +343,14 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	if err != nil {
 		result.name = "invalid"
 		return g.refuse(w, result, http.StatusBadRequest, "INVALID_REQUEST", "The query can't be read (a \";\", a bad %-escape, or too many parameters): nothing was forwarded.")
+	}
+	// A ";" in a path is a matrix parameter to some backends' frameworks
+	// (or ends the segment, or is dropped with what follows) and part of
+	// the segment to the validator: only an API whose spec takes matrix
+	// parameters gets one, raw or %3B (rest is unescaped).
+	if strings.Contains(rest, ";") && !api.MatrixParameters {
+		result.name = "invalid"
+		return g.refuse(w, result, http.StatusBadRequest, "INVALID_REQUEST", "A \";\" in the path is taken only by an API whose OpenAPI document has matrix parameters: nothing was forwarded.")
 	}
 	// The validator reads the first, and a backend may read the last.
 	if len(r.Header.Values("Content-Type")) > 1 {
@@ -701,6 +712,17 @@ func (g *Gateway) transport(timeout time.Duration) *http.Transport {
 		t.ResponseHeaderTimeout = timeout
 		// A backend's redirect goes back to the caller, never followed here.
 		t.Proxy = nil
+		// The host as store.BackendPlace read it: never one the Pod's DNS
+		// search path finds somewhere else (store.DialHost).
+		dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+		domain := g.Settings.ClusterDomain
+		t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			return dialer.DialContext(ctx, network, net.JoinHostPort(store.DialHost(host, domain), port))
+		}
 		g.transports[timeout] = t
 	}
 	return t

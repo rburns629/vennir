@@ -431,6 +431,15 @@ function googleMonitoring(): { project: string; cluster: string } {
   return { project, cluster };
 }
 
+/** CLUSTER_DOMAIN: the cluster's DNS domain, cluster.local unless it was set up with another. */
+function clusterDomain(): string {
+  const value = (process.env["CLUSTER_DOMAIN"] || "cluster.local").replace(/\.$/, "");
+  if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/.test(value)) {
+    throw new Error(`Invalid CLUSTER_DOMAIN "${value}": a DNS name such as cluster.local`);
+  }
+  return value;
+}
+
 /** An http(s) address from the environment, or "" for none. */
 function httpUrl(name: string): string {
   const value = (process.env[name] ?? "").trim().replace(/\/+$/, "");
@@ -640,6 +649,9 @@ export const config = {
   teamPullSecretFile: process.env["TEAM_PULL_SECRET_FILE"] ?? "",
   // This release's own namespace (where scan Jobs run).
   platformNamespace: process.env["PLATFORM_NAMESPACE"] ?? "",
+  // The cluster's DNS domain: which API backend hosts are in the cluster,
+  // and in which namespace (core/apis.ts backendNamespace).
+  clusterDomain: clusterDomain(),
   // The ConfigMap the console records its last use in (activity.ts), for
   // the kernel's sleeper. Empty (as in tests): not recorded.
   activityConfigMap: process.env["ACTIVITY_CONFIGMAP"] ?? "",

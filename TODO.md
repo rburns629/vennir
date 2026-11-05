@@ -154,17 +154,19 @@ it was seen.
 - [ ] **From the security review of 2026-11-04** (six read-only reviewers,
   each finding checked against the code; the fixes so far are #213 to #226).
   Still open:
-  - Gateway: read a backend's namespace from Pod DNS names and a custom
-    cluster domain too; refuse a `;` in a path unless the document uses
-    matrix parameters; shorten or document how long a rotated session key
-    still verifies.
   - Kernel (found fixing the kernel's): a cancel racing a retry can leave
     the retried step READY in the cancelled execution (never claimed, but
     shown as waiting).
-  - Gateway and console (found fixing the kernel's): refuse IAM-token
-    database sign-in without a verified TLS connection, as the kernel does
-    (`verifiedTLSProblem`, `kernel/internal/config`); the console's failure
-    help explains `PRODUCT_CODE_RESERVED`.
+  - Console (found fixing the kernel's and the gateway's): refuse IAM-token
+    database sign-in without a verified TLS connection, as the kernel and
+    gateway do (`verifiedTLSProblem`, `kernel/internal/config`; the
+    gateway's `verifiedTLS`); the console's failure help explains
+    `PRODUCT_CODE_RESERVED`.
+  - Cluster domain (found fixing the gateway's): the console chart's own
+    URLs (the gateway's `CONSOLE_URL`, `GATEWAY_ISSUER`'s default,
+    `LOKI_URL`, `PROMETHEUS_URL`, NOTES) and the catalog tool's "http only
+    in the cluster" check (`cli/internal/catalogtool/apis.go`) still assume
+    `cluster.local`, not `clusterDomain`.
   - Console: a retired team's schedules don't run, and nothing runs for it
     in other teams' namespaces; an admin can't be a bot; with
     self-registration on, adding a member by email says when the account

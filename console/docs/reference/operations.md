@@ -316,7 +316,14 @@ Ingress or load balancer in front of it, at `gateway.publicUrl`. With
 public listener (the Ingress controller's namespace, a load balancer's
 ranges), and `gateway.trustedProxies` lists the proxies whose
 `X-Forwarded-For` names the caller; the chart refuses the second without
-the first. The whole walk-through, per cloud:
+the first. On a cluster set up with a DNS domain other than
+`cluster.local`, set the console chart's `clusterDomain` to it
+(`CLUSTER_DOMAIN` for the console and the gateway): it's how they tell
+which backend hosts are in the cluster, and in which namespace. With
+`database.iamAuth`, the gateway's `DATABASE_URL` must say
+`sslmode=verify-full` (or `verify-ca`) unless it connects to localhost (a
+Cloud SQL Auth Proxy beside it), or the gateway won't start; the URLs
+`vennir` makes for a managed database already do. The whole walk-through, per cloud:
 [the API gateway](../console/docs/21-api-gateway.md#putting-it-on-the-internet).
 `gateway.unauthenticatedPerMinute` (60; 0 turns it off) is how many
 failed sign-ins a minute one client address gets before its requests are
