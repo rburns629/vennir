@@ -210,6 +210,22 @@ describe("signing in with a CI's token", () => {
     expect(row?.lastUsedAt).not.toBeNull();
   });
 
+  it("gives a bot's rights, which make no tokens, identities or members: nothing outlasts its hour", async () => {
+    const signedIn = await exchange(await sign({ sub: SUBJECT, repository: "acme/app" }));
+    const session = signedIn.body.token ?? "";
+    for (const [method, body] of [
+      ["TokenService/CreateBotToken", { team, email: bot.email, label: "forever", expiresInDays: 0 }],
+      ["TokenService/CreateBotToken", { team, email: `${prefix}-new@bots.vennir.local`, label: "another" }],
+      ["TokenService/AddBotIdentity", { team, botId: bot.id, issuer: ISSUER, claims: { sub: "repo:acme/app:ref:refs/heads/feature" } }],
+      ["TeamService/AddMember", { team, email: bot.email, role: "TEAM_ROLE_MAINTAINER" }],
+      ["TeamService/SetTeamSignIn", { team, requireSso: false }],
+    ] as const) {
+      const refused = await call(session, method, body);
+      expect(refused.code, method).toBe("permission_denied");
+      expect(refused.message, method).toContain("A bot can't");
+    }
+  });
+
   it("is refused for another audience, an expired or forged token, or other claims", async () => {
     for (const token of [
       await sign({ sub: SUBJECT }, { audience: "someone-else" }),

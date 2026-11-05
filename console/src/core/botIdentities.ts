@@ -7,7 +7,7 @@
 import { Code } from "@connectrpc/connect";
 import { and, eq, inArray } from "drizzle-orm";
 import { ApiError } from "../apiError.js";
-import { ensureTeamMaintainer, ensureTeamMember } from "../auth/access.js";
+import { ensureNotBot, ensureTeamMaintainer, ensureTeamMember } from "../auth/access.js";
 import { identityProblem } from "../auth/keyless.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { config } from "../config.js";
@@ -68,6 +68,7 @@ const overlapping = () =>
   new ApiError(409, "IDENTITY_OVERLAPS", "Another bot already signs in with an identity a token matching these claims would match too: name more of what the token is for (its repository, branch or environment).", Code.AlreadyExists);
 
 export async function addBotIdentity(caller: AuthUser | undefined, teamName: string, botId: string, issuer: string, claims: Record<string, string>) {
+  ensureNotBot(caller, "add a keyless identity");
   const who = signedIn(caller);
   ensureTeamMaintainer(who, teamName);
   const team = await teamNamed(teamName);
@@ -93,6 +94,7 @@ export async function createKeylessBot(
   teamName: string,
   input: { email: string; ordering?: boolean; orderTemplates?: string[]; issuer: string; claims: Record<string, string> },
 ) {
+  ensureNotBot(caller, "make a keyless bot");
   const who = signedIn(caller);
   ensureTeamMaintainer(who, teamName);
   const team = await teamNamed(teamName);
@@ -113,6 +115,7 @@ export async function createKeylessBot(
 }
 
 export async function removeBotIdentity(caller: AuthUser | undefined, id: string): Promise<void> {
+  ensureNotBot(caller, "remove a keyless identity");
   const who = signedIn(caller);
   const [row] = await db
     .select({ id: botIdentities.id, teamId: teamMemberships.teamId })
