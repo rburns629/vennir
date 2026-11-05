@@ -26,6 +26,9 @@ Built and tested, proven on kind or against fakes, and not yet seen on a
 cloud. One billed run, on acyclix-dev and a minimal EKS install, as the
 last one was.
 
+- [ ] **The step-Pods policy on GKE and EKS** (#216): that their Job
+  controller makes Pods as a kube-system ServiceAccount, as kind's does, so
+  every step's Pod is admitted.
 - [ ] **Reading another install's catalog from ECR** (built 2026-10-30): a
   GKE reader of an EKS owner's ECR by AWS web identity
   (`externalCatalog.awsRoleArn`, `registryCheck.awsFederation`), and an EKS
@@ -153,6 +156,43 @@ it was seen.
   quota; a project raising it to 1000 GB was enough.
 
 ## Security
+
+- [ ] **From the security review of 2026-11-04** (six read-only reviewers,
+  each finding checked against the code; the fixes so far are #213 to #222).
+  Decided, still to build:
+  - **API backends in a namespace of their own**: a backend is its owning
+    team's, but not in the namespace its steps run in with product
+    identities and Secrets, where the step policies (which match only the
+    scheduler) don't hold anything else.
+  - **The scan policy admits only digests that passed** (or were accepted),
+    not every digest but those that failed.
+
+  Smaller, still open:
+  - Gateway: record a request's endpoint only once it's matched or signed
+    in, limit by peer before sign-in, and set a body-read deadline; reserve
+    the cloud federation audiences (`sts.amazonaws.com`, the GKE pool's) for
+    `serviceAccountToken`; read a backend's namespace from Pod DNS names and
+    a custom cluster domain too; `Set` (not add) `Vennir-*` on answers;
+    refuse a `;` in a path unless the document uses matrix parameters;
+    shorten or document how long a rotated session key still verifies.
+  - Kernel: count a shared product's runs against the team they're for as
+    well as its own; refuse IAM-token database sign-in without a verified
+    TLS connection; reserve every failure code the kernel itself sets; a
+    claim takes the execution's lock too, so a cancel can't race a start.
+  - Console: a retired team's schedules don't run, and nothing runs for it
+    in other teams' namespaces; an admin can't be a bot; with
+    self-registration on, adding a member by email says when the account
+    was never verified.
+  - Catalog: a release doesn't un-retire a team an admin retired; release
+    refuses two teams' products whose names collide; GCP catalog CI's
+    federation pins the repository by its ID.
+  - Cluster: the console replaces or registers only ExternalSecrets it
+    labelled; a step's identity is tied to its product's released digests,
+    not every image in its repository; the scheduler's Jobs may mount only
+    the volume kinds the executor uses, pull only with `vennir-pull`, and
+    name no node; an image's first part may not be uppercase.
+  - The chat agent's test of an admin's endpoint answers "didn't answer"
+    rather than the connection's error.
 
 - [ ] **Only the scheduler makes `ek-` Jobs and ConfigMaps in team
   namespaces** (found 2026-11-03, reviewing the suspended start): an
