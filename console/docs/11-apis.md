@@ -135,10 +135,11 @@ Anything with `Vennir-Answered-By: backend` came from the backend itself, unchan
 
 ## What does the backend receive?
 
-The request as you sent it: the same method, path (below `/<team>/<name>`), query, headers and body, with three changes:
+The request as you sent it: the same method, path (below `/<team>/<name>`), query, headers and body, with these changes:
 
 - your `Authorization` header stops at the gateway. The backend gets its own credential instead, minted per request from the API's own ServiceAccount: a Kubernetes token, a Google ID token, or an AWS SigV4 signature, whichever its `api.yaml` asks for;
 - any `Vennir-*` header you sent is dropped, so you can't forge one;
+- headers that would make a backend run another method or path than the one checked against the OpenAPI document (`X-HTTP-Method-Override`, `X-HTTP-Method`, `X-Method-Override`, `X-Original-URL`, `X-Rewrite-URL`) are dropped, and so are your `X-Amz-*` headers when the backend is signed with SigV4. A request with a `_method` field, in its query or a form body, or with two `Content-Type` headers, is refused (`INVALID_REQUEST`);
 - the gateway adds `Vennir-Caller` and `Vennir-Request-Id`.
 
 `Vennir-Caller` is a short-lived token (60 seconds) the gateway signs, naming who called (their user id and email, and whether it's a bot), the team they called as, and the API. A backend that cares checks it against the gateway's public key at `/.vennir/jwks.json` on the gateway; one that doesn't can ignore it.
