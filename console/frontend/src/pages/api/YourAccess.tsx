@@ -65,9 +65,11 @@ function Act({ button, note }: { button: ReactNode; note: ReactNode }) {
  * Your access to someone else's API (15a, 15c, 15d, 15e): not granted, with
  * Request access; your request waiting, with Withdraw; granted, by name
  * (Give up my access) or through a group; or declined, with its reason and
- * Ask again. A maintainer of other teams may also ask for one of their bots.
+ * Ask again. From the catalog only (shareWith, going away), the same, with
+ * a note of it. A maintainer of other teams may also ask for one of their
+ * bots. `groups`: yours, to offer in a request.
  */
-export function YourAccess({ api, standing, onChanged }: { api: ApiProduct; standing: Standing; onChanged: () => void }) {
+export function YourAccess({ api, standing, groups, onChanged }: { api: ApiProduct; standing: Standing; groups: string[]; onChanged: () => void }) {
   const { user } = useAuth();
   const [asking, setAsking] = useState<"you" | "bot" | null>(null);
   const { ask, dialog } = useAccessAsk(onChanged);
@@ -75,7 +77,10 @@ export function YourAccess({ api, standing, onChanged }: { api: ApiProduct; stan
   const t = api.team;
   const closed = api.accessRequests === "closed";
   const botTeams = botTeamsOf(user, t);
-  const title = access ? "Granted" : request?.state === "waiting" ? `Waiting for ${t}` : request?.state === "declined" ? "Declined" : "Not granted";
+  // From the catalog only: they may call it, and may ask for a grant of their own.
+  const catalog = access?.via === "catalog" ? access : null;
+  const title =
+    access && !catalog ? "Granted" : request?.state === "waiting" ? `Waiting for ${t}` : request?.state === "declined" ? "Declined" : catalog ? "From the catalog" : "Not granted";
 
   let body: ReactNode;
   if (access?.via === "user" || access?.via === "group") {
@@ -103,13 +108,6 @@ export function YourAccess({ api, standing, onChanged }: { api: ApiProduct; stan
           />
         )}
       </>
-    );
-  } else if (access?.via === "catalog") {
-    body = (
-      <Typography variant="body2">
-        From the catalog: its api.yaml’s shareWith names {access.callingTeam}, so its members and bots may call it, at {rateText(access.perMinute)}. shareWith is going
-        away: ask {t} to grant you instead.
-      </Typography>
     );
   } else if (request?.state === "waiting") {
     body = (
@@ -156,7 +154,7 @@ export function YourAccess({ api, standing, onChanged }: { api: ApiProduct; stan
     body = (
       <>
         <Typography variant="body2">
-          You aren’t on its access list: not by name, and not through a group.{" "}
+          {catalog ? "" : "You aren’t on its access list: not by name, and not through a group. "}
           {closed
             ? `${t} takes no requests for it (access.requests: closed): ask its team directly.`
             : api.accessRequests === "open"
@@ -187,6 +185,12 @@ export function YourAccess({ api, standing, onChanged }: { api: ApiProduct; stan
           {title}
         </Typography>
       </Box>
+      {catalog && (
+        <Typography variant="body2">
+          From the catalog: its api.yaml’s shareWith names {catalog.callingTeam}, so its members and bots may call it, at {rateText(catalog.perMinute)}. shareWith is going
+          away, so you’ll need a grant of your own.
+        </Typography>
+      )}
       {body}
       {!closed && botTeams.length > 0 && (
         <Act
@@ -205,6 +209,7 @@ export function YourAccess({ api, standing, onChanged }: { api: ApiProduct; stan
         open={asking !== null}
         api={api}
         forBot={asking === "bot"}
+        groups={groups}
         onClose={() => { setAsking(null); }}
         onDone={() => {
           setAsking(null);

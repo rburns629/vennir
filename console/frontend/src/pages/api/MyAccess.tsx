@@ -7,7 +7,7 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
-import { errorMessage, listMyApiAccess, listTeamBotApiAccess, type ApiAccessRequest, type ApiProduct, type MyApiAccess } from "../../api";
+import { errorMessage, listMyApiAccess, listTeamBotApiAccess, type ApiAccessRequest, type ApiProduct, type MyAccessList, type MyApiAccess } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Mono } from "../../components/Mono";
@@ -50,7 +50,7 @@ function how(row: Row): ReactNode {
  */
 export function MyAccess({ apis, search, onChanged }: { apis: ApiProduct[] | null; search: string; /** After a change: the APIs list reloads too. */ onChanged: () => void }) {
   const { user } = useAuth();
-  const [mine, setMine] = useState<{ access: MyApiAccess[]; requests: ApiAccessRequest[] } | null>(null);
+  const [mine, setMine] = useState<MyAccessList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [again, setAgain] = useState<ApiProduct | null>(null);
 
@@ -170,6 +170,7 @@ export function MyAccess({ apis, search, onChanged }: { apis: ApiProduct[] | nul
       <RequestAccessDialog
         open={again !== null}
         api={again}
+        groups={mine?.groups}
         onClose={() => { setAgain(null); }}
         onDone={() => {
           setAgain(null);

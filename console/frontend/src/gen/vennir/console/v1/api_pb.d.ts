@@ -210,17 +210,19 @@ export declare type ApiAccessRequest = Message<"vennir.console.v1.ApiAccessReque
   decidedAt?: Timestamp | undefined;
 
   /**
-   * A person's single sign-on groups (when they asked, or as read since),
-   * one of which may be granted instead: shown to the API's maintainers
-   * only, and only while it waits.
+   * The single sign-on groups the person offered when they asked (none,
+   * or some of theirs), one of which may be granted instead: shown to the
+   * API's maintainers only, and only while it waits. Never the person's
+   * other groups.
    *
    * @generated from field: repeated string groups = 15;
    */
   groups: string[];
 
   /**
-   * When those groups were read: older than 24 hours, a group can't be
-   * granted from them (GROUPS_STALE) unless Google Workspace confirms it.
+   * When those groups were read (when they asked, or a later sign-in that
+   * read them all again): older than 24 hours, a group can't be granted
+   * from them (GROUPS_STALE) unless Google Workspace confirms it.
    *
    * @generated from field: google.protobuf.Timestamp groups_read_at = 16;
    */
@@ -267,6 +269,15 @@ export declare type RequestApiAccessRequest = Message<"vennir.console.v1.Request
    * @generated from field: string bot_email = 4;
    */
   botEmail: string;
+
+  /**
+   * For the caller: which of their single sign-on groups (as last read,
+   * while they count) the API's maintainers may grant instead of them.
+   * Empty: none, so they're granted by name. Never for a bot.
+   *
+   * @generated from field: repeated string groups = 5;
+   */
+  groups: string[];
 };
 
 /**
@@ -650,6 +661,15 @@ export declare type ListMyApiAccessResponse = Message<"vennir.console.v1.ListMyA
    * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
    */
   requests: ApiAccessRequest[];
+
+  /**
+   * The caller's single sign-on groups as last read, which they may offer
+   * in a request; empty while their groups don't count (no group source,
+   * an older single sign-on session, or Google's read over 90 minutes ago).
+   *
+   * @generated from field: repeated string groups = 3;
+   */
+  groups: string[];
 };
 
 /**
@@ -1692,9 +1712,10 @@ export declare const ApiStateSchema: GenEnum<ApiState>;
  * Access (decision 26): each API has grants, to a group (each person in it)
  * or to one user (a person or a bot), each with its rate. Only the API's
  * team's maintainers add grants or change their rates. A person asks for
- * access for themselves; a maintainer of a bot's team asks for the bot.
- * The API's maintainers approve (granting the person, or one of their
- * groups) or decline. Revoking: the API's maintainers, an admin, the
+ * access for themselves, offering none or some of their groups; a
+ * maintainer of a bot's team asks for the bot. The API's maintainers
+ * approve (granting the person, or one of the groups they offered) or
+ * decline. Revoking: the API's maintainers, an admin, the
  * person a grant names, or the maintainers of the bot it names. Every
  * change is audited and told to whoever it's for and the API's maintainers.
  *
@@ -1782,8 +1803,10 @@ export declare const ApiService: GenService<{
    * Asks for access to an API, with a reason: a person for themselves, or a
    * maintainer of a bot's team for that bot (bot_email). Refused when its
    * api.yaml takes no requests (access.requests: closed), when whoever
-   * it's for may call it already, or while a request of theirs waits. An
-   * API whose requests are open grants it at once, at its default limit.
+   * it's for may call it already (but only "from the catalog", by its
+   * api.yaml's shareWith: then a grant may be asked for), or while a
+   * request of theirs waits. An API whose requests are open grants it at
+   * once, at its default limit.
    *
    * @generated from rpc vennir.console.v1.ApiService.RequestApiAccess
    */
@@ -1793,7 +1816,8 @@ export declare const ApiService: GenService<{
     output: typeof RequestApiAccessResponseSchema;
   },
   /**
-   * Withdraws a request while it waits: whoever asked.
+   * Withdraws a request while it waits: whoever asked, or, for a bot's, a
+   * maintainer of one of the bot's teams that isn't retired.
    *
    * @generated from rpc vennir.console.v1.ApiService.WithdrawApiAccessRequest
    */
@@ -1804,8 +1828,8 @@ export declare const ApiService: GenService<{
   },
   /**
    * Grants (approve) or declines a waiting request: a maintainer of the
-   * API's team. Granting a person may grant one of their groups instead,
-   * as the console last read them; a bot is granted by name only.
+   * API's team. Granting a person may grant one of the groups they offered
+   * instead (and only those); a bot is granted by name only.
    *
    * @generated from rpc vennir.console.v1.ApiService.DecideApiAccessRequest
    */

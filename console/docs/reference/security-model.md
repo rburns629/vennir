@@ -577,8 +577,8 @@ and a grant to themselves is audited like any other. Everyone else gets 403
 `NOT_GRANTED` and nothing reaches the backend. A person's groups are those
 the console last read that matter (`user_groups`: only groups mapped to a
 team or named by a grant; everything else a sign-in read stays in a column
-the gateway's role can't read, shown to an API's maintainers only on a
-waiting request), at each single sign-on, and hourly for Google Workspace
+the gateway's role can't read; an API's maintainers see, on a waiting
+request, only the groups its person chose to offer), at each single sign-on, and hourly for Google Workspace
 groups. They count only while single sign-on is on and a group source is
 set, and are cleared when the sources change; with Google's alone, only
 rows read within 90 minutes (a failing resync fails closed); while groups

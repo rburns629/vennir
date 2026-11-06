@@ -370,10 +370,10 @@ People and bots alike.
 | `must_change_password` | boolean | no | Its password was set by someone else (an admin's new account or reset, `vennir admin reset-password`): a session it signs in may only change it. |
 | `oidc_subject` | text, unique | yes | The single sign-on account bound at the first sign-in through it (`<issuer> <sub>`): from then on only that account signs in as this person. |
 | `last_signed_in_at` | timestamptz | yes | Its last sign-in, with a password or single sign-on; empty if it never has. Shown on the Admin page's list of people. |
-| `sso_groups` | text[] | yes | Every single sign-on group the person's last sign-in read (a groups claim's values, or of Google Workspace groups the ones asked about), lowercased, at most 1000; null without a group source, or once the sources change. The console's alone: the gateway's role can't read it. A request for access copies it (`api_access_requests.requester_groups`). |
+| `sso_groups` | text[] | yes | Every single sign-on group the person's last sign-in read (a groups claim's values, or of Google Workspace groups the ones asked about), lowercased, at most 1000; null without a group source, or once the sources change. The console's alone: the gateway's role can't read it. A request for access keeps the ones its person offers (`api_access_requests.requester_groups`), never the rest. |
 | `sso_groups_read_at` | timestamptz | yes | When `sso_groups` was read. |
 | `self_registered` | boolean | no | Made by its own sign-up (self-registration), which checks nothing about the email. Until single sign-on binds it (`oidc_subject`), nobody has verified the address is theirs, so a maintainer adding it to a team by email is refused, saying so (an admin may add it). Set, for accounts made before the column, from the audit log's successful registrations (as far back as it goes, and only since registrations were audited), unless that email's account was deleted or made by an admin after. |
-| `email_kinds` | text[] | no | Which of their notifications are emailed to them too, when the install sends email: `run_failed`, `approval_waiting`, `product_not_ready`, `catalog_failing`, `step_refused` and `platform_alert` by default. |
+| `email_kinds` | text[] | no | Which of their notifications are emailed to them too, when the install sends email: `run_failed`, `approval_waiting`, `product_not_ready`, `catalog_failing`, `step_refused`, `platform_alert` and `api_access` by default. |
 | `created_at` | timestamptz | no | |
 
 ### team_memberships
@@ -753,8 +753,8 @@ A request for access to an API: a person's for themselves, or a maintainer's for
 | `user_id` | uuid | no | Whom it's for: the person, or the bot. With `api_id`, unique while `waiting`. |
 | `requested_by` | uuid | yes | Who asked: the person themselves, or the bot's team's maintainer. |
 | `reason` | text | no | Why, as they said it. |
-| `requester_groups` | text[] | no | A person's groups when they asked (`users.sso_groups`), one of which the API's maintainers may grant instead; shown to them only while it waits (or the person's as read since, if later). Empty for a bot, and emptied when where groups come from changes. |
-| `requester_groups_read_at` | timestamptz | yes | When those groups were read. Over 24 hours ago, a group can't be granted from them unless Google Workspace confirms it. |
+| `requester_groups` | text[] | no | The groups the person offered when they asked (some of `users.sso_groups`, as last read while they counted; none unless they chose some), one of which the API's maintainers may grant instead, and only those; shown to them only while it waits, never the person's other groups. Empty for a bot, and emptied when where groups come from changes. |
+| `requester_groups_read_at` | timestamptz | yes | When those groups were read (or a later sign-in's, if its groups still include every one offered). Over 24 hours ago, a group can't be granted from them unless Google Workspace confirms it. |
 | `state` | text | no | `waiting`, `granted`, `declined` or `withdrawn`. |
 | `decided_by` | uuid | yes | The maintainer who granted or declined it, or who withdrew it. |
 | `decision_reason` | text | yes | A decline's reason. |

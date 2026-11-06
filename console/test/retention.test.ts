@@ -2,12 +2,19 @@
 /** Deleting what's past retention (retention.ts), and keeping the rest. */
 import { createHash, randomUUID } from "node:crypto";
 import { inArray, like } from "drizzle-orm";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { db } from "../src/db/client.js";
-import { auditLog, auditReads, imageScans, submittedExecutions } from "../src/db/schema.js";
+import { auditLog, auditReads, imageScans, revokedSessions, submittedExecutions } from "../src/db/schema.js";
+import { pruneAwayAccess } from "../src/core/apiAccess.js";
 import { deleteExpired } from "../src/retention.js";
 import { createUser } from "../src/db/queries.js";
 import { users } from "../src/db/schema.js";
+
+// The real one, unless a test makes it fail.
+vi.mock("../src/core/apiAccess.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../src/core/apiAccess.js")>();
+  return { ...real, pruneAwayAccess: vi.fn(real.pruneAwayAccess) };
+});
 
 const prefix = `ret-${randomUUID().slice(0, 6)}`;
 const longAgo = new Date("2000-01-01T00:00:00Z");
@@ -81,4 +88,14 @@ describe("retention", () => {
     expect(scans).toHaveLength(1);
   });
 
+  it("still deletes the rest when one step fails", async () => {
+    vi.mocked(pruneAwayAccess).mockRejectedValueOnce(new Error("the database said no"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await db.insert(revokedSessions).values({ sid: `${prefix}-expired`, expiresAt: longAgo });
+    await expect(deleteExpired()).resolves.toBeDefined();
+    // Signed-out sessions come after the away APIs' access: deleted all the same.
+    expect(await db.select().from(revokedSessions).where(like(revokedSessions.sid, `${prefix}%`))).toEqual([]);
+    expect(error).toHaveBeenCalledWith(expect.objectContaining({ event: "retention_failed", what: "away_api_access" }), expect.any(String));
+    error.mockRestore();
+  });
 });

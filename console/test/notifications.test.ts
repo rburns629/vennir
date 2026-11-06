@@ -362,11 +362,11 @@ describe("email", () => {
     const consoleUrl = config.consoleUrl;
     Object.assign(config, { consoleUrl: "https://vennir.example.test" });
     try {
-      // The member keeps the defaults (failures among them); the maintainer wants none.
+      // The member keeps the defaults (failures and API access changes among them); the maintainer wants none.
       expect((await call(maintainerToken, "NotificationService/SetEmailPreferences", { kinds: [] })).code).toBe("ok");
       expect((await call(maintainerToken, "NotificationService/SetEmailPreferences", { kinds: ["everything"] })).code).toBe("invalid_argument");
       const prefs = await call<{ available?: boolean; kinds?: string[] }>(memberToken, "NotificationService/GetEmailPreferences");
-      expect(prefs.body).toEqual({ available: true, kinds: ["run_failed", "approval_waiting", "product_not_ready", "catalog_failing", "step_refused", "platform_alert"] });
+      expect(prefs.body).toEqual({ available: true, kinds: ["run_failed", "approval_waiting", "product_not_ready", "catalog_failing", "step_refused", "platform_alert", "api_access"] });
 
       const executionId = randomUUID();
       await runFinished({ executionId, name: `${prefix} mailed`, state: "FAILED", submittedBy: member.id, teams: [], finishedAt: new Date().toISOString() });

@@ -111,14 +111,17 @@ type ApiServiceClient interface {
 	// Asks for access to an API, with a reason: a person for themselves, or a
 	// maintainer of a bot's team for that bot (bot_email). Refused when its
 	// api.yaml takes no requests (access.requests: closed), when whoever
-	// it's for may call it already, or while a request of theirs waits. An
-	// API whose requests are open grants it at once, at its default limit.
+	// it's for may call it already (but only "from the catalog", by its
+	// api.yaml's shareWith: then a grant may be asked for), or while a
+	// request of theirs waits. An API whose requests are open grants it at
+	// once, at its default limit.
 	RequestApiAccess(context.Context, *connect.Request[v1.RequestApiAccessRequest]) (*connect.Response[v1.RequestApiAccessResponse], error)
-	// Withdraws a request while it waits: whoever asked.
+	// Withdraws a request while it waits: whoever asked, or, for a bot's, a
+	// maintainer of one of the bot's teams that isn't retired.
 	WithdrawApiAccessRequest(context.Context, *connect.Request[v1.WithdrawApiAccessRequestRequest]) (*connect.Response[v1.WithdrawApiAccessRequestResponse], error)
 	// Grants (approve) or declines a waiting request: a maintainer of the
-	// API's team. Granting a person may grant one of their groups instead,
-	// as the console last read them; a bot is granted by name only.
+	// API's team. Granting a person may grant one of the groups they offered
+	// instead (and only those); a bot is granted by name only.
 	DecideApiAccessRequest(context.Context, *connect.Request[v1.DecideApiAccessRequestRequest]) (*connect.Response[v1.DecideApiAccessRequestResponse], error)
 	// Grants a group or a user (a person or a bot, by email) access: a
 	// maintainer of the API's team (not an admin, unless they maintain it).
@@ -419,14 +422,17 @@ type ApiServiceHandler interface {
 	// Asks for access to an API, with a reason: a person for themselves, or a
 	// maintainer of a bot's team for that bot (bot_email). Refused when its
 	// api.yaml takes no requests (access.requests: closed), when whoever
-	// it's for may call it already, or while a request of theirs waits. An
-	// API whose requests are open grants it at once, at its default limit.
+	// it's for may call it already (but only "from the catalog", by its
+	// api.yaml's shareWith: then a grant may be asked for), or while a
+	// request of theirs waits. An API whose requests are open grants it at
+	// once, at its default limit.
 	RequestApiAccess(context.Context, *connect.Request[v1.RequestApiAccessRequest]) (*connect.Response[v1.RequestApiAccessResponse], error)
-	// Withdraws a request while it waits: whoever asked.
+	// Withdraws a request while it waits: whoever asked, or, for a bot's, a
+	// maintainer of one of the bot's teams that isn't retired.
 	WithdrawApiAccessRequest(context.Context, *connect.Request[v1.WithdrawApiAccessRequestRequest]) (*connect.Response[v1.WithdrawApiAccessRequestResponse], error)
 	// Grants (approve) or declines a waiting request: a maintainer of the
-	// API's team. Granting a person may grant one of their groups instead,
-	// as the console last read them; a bot is granted by name only.
+	// API's team. Granting a person may grant one of the groups they offered
+	// instead (and only those); a bot is granted by name only.
 	DecideApiAccessRequest(context.Context, *connect.Request[v1.DecideApiAccessRequestRequest]) (*connect.Response[v1.DecideApiAccessRequestResponse], error)
 	// Grants a group or a user (a person or a bot, by email) access: a
 	// maintainer of the API's team (not an admin, unless they maintain it).

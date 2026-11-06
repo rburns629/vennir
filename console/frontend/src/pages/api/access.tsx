@@ -9,12 +9,14 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import FormGroup from "@mui/material/FormGroup";
 import FormLabel from "@mui/material/FormLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Radio from "@mui/material/Radio";
@@ -193,10 +195,11 @@ export function rateAsk(grant: ApiGrant, defaultPerMinute: number): AccessAsk {
 type ApiChoice = Pick<ApiProduct, "team" | "name" | "displayName" | "url" | "publicUrl" | "defaultPerMinute" | "accessRequests">;
 
 /**
- * Asking for access to an API (15b): for yourself, or for a bot of a team
- * you maintain (granted by name only), with a reason. On an API's page,
- * `api` is that one; on a team's Automation tab, `bot` is fixed and the API
- * is picked from `apis`.
+ * Asking for access to an API (15b): for yourself, offering none or some of
+ * your `groups` for a group grant (none ticked at first), or for a bot of a
+ * team you maintain (granted by name only), with a reason. On an API's
+ * page, `api` is that one; on a team's Automation tab, `bot` is fixed and
+ * the API is picked from `apis`.
  */
 export function RequestAccessDialog({
   open,
@@ -205,6 +208,7 @@ export function RequestAccessDialog({
   apisError = null,
   bot,
   forBot = false,
+  groups = [],
   onClose,
   onDone,
 }: {
@@ -218,6 +222,8 @@ export function RequestAccessDialog({
   bot?: string;
   /** Open on "a bot of a team you maintain". */
   forBot?: boolean;
+  /** Your groups as last read while they count (ListMyApiAccess), to offer some of. */
+  groups?: string[];
   onClose: () => void;
   /** It's asked, or (requests open) granted. */
   onDone: (granted: boolean) => void;
@@ -228,6 +234,8 @@ export function RequestAccessDialog({
   const [botEmail, setBotEmail] = useState("");
   // Each bot once, with every team of the caller's it's in.
   const [bots, setBots] = useState<{ email: string; teams: string[] }[] | null>(null);
+  const [botsError, setBotsError] = useState<string | null>(null);
+  const [offered, setOffered] = useState<string[]>([]);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -243,6 +251,7 @@ export function RequestAccessDialog({
     setReason("");
     setError(null);
     setPicked("");
+    setOffered([]);
   }, [open, bot, forBot]);
 
   // The bots that may be asked for: those of the live teams the caller maintains.
@@ -250,6 +259,7 @@ export function RequestAccessDialog({
   useEffect(() => {
     if (!open || bot || !teams) return;
     let cancelled = false;
+    setBotsError(null);
     Promise.all(teams.split(",").map((t) => listBots(t).then((list) => list.map((b) => ({ email: b.email, team: t })))))
       .then((lists) => {
         const byEmail = new Map<string, string[]>();
@@ -257,7 +267,7 @@ export function RequestAccessDialog({
         if (!cancelled) setBots([...byEmail].map(([email, of]) => ({ email, teams: of })));
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(errorMessage(err, "Couldn't load your teams' bots."));
+        if (!cancelled) setBotsError(errorMessage(err, "Couldn't load your teams' bots."));
       });
     return () => {
       cancelled = true;
@@ -266,14 +276,18 @@ export function RequestAccessDialog({
 
   const choosable = (bots ?? []).filter((b) => !b.teams.includes(target?.team ?? ""));
   const asBot = forWhom === "bot";
-  const ready = target !== null && reason.trim() !== "" && (!asBot || botEmail !== "");
+  // The bot asked for: the fixed one, or the one picked while it's still choosable (another API may be its own team's).
+  const chosenBot = bot ?? (choosable.some((b) => b.email === botEmail) ? botEmail : "");
+  // Your groups to offer: not for a bot, nor where requests are granted at once (by name).
+  const offerable = !asBot && target?.accessRequests !== "open" ? groups : [];
+  const ready = target !== null && reason.trim() !== "" && (!asBot || chosenBot !== "");
 
   async function submit(): Promise<void> {
     if (!target) return;
     setBusy(true);
     setError(null);
     try {
-      const { grant } = await requestApiAccess(target.team, target.name, reason.trim(), asBot ? botEmail : "");
+      const { grant } = await requestApiAccess(target.team, target.name, reason.trim(), asBot ? chosenBot : "", offered.filter((g) => offerable.includes(g)));
       onDone(grant !== null);
     } catch (err) {
       setError(accessError(err));
@@ -368,13 +382,15 @@ export function RequestAccessDialog({
               select
               size="small"
               label="Which bot"
-              value={botEmail}
+              value={chosenBot}
               onChange={(e) => {
                 setBotEmail(e.target.value);
               }}
-              helperText={`Only bots of ${maintained.join(" and ")}, the teams you maintain.`}
+              helperText={botsError ?? `Only bots of ${maintained.join(" and ")}, the teams you maintain.`}
+              error={Boolean(botsError)}
             >
-              {bots === null && <MenuItem disabled>Loading…</MenuItem>}
+              {botsError && <MenuItem disabled>Your teams’ bots couldn’t be loaded</MenuItem>}
+              {bots === null && !botsError && <MenuItem disabled>Loading…</MenuItem>}
               {bots !== null && choosable.length === 0 && <MenuItem disabled>Your teams have no bots yet</MenuItem>}
               {choosable.map((b) => (
                 <MenuItem key={b.email} value={b.email}>
@@ -383,6 +399,34 @@ export function RequestAccessDialog({
               ))}
             </TextField>
           )
+        )}
+        {offerable.length > 0 && (
+          <FormControl component="fieldset">
+            <FormLabel component="legend" sx={{ fontSize: 13 }}>
+              Offer a group of yours (optional)
+            </FormLabel>
+            <Typography variant="caption" color="text.secondary">
+              {target?.team ?? "Its team"}’s maintainers see only the groups you tick, never your others, and may grant one of them instead of you. None ticked: you, by name.
+            </Typography>
+            <FormGroup>
+              {offerable.map((g) => (
+                <FormControlLabel
+                  key={g}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={offered.includes(g)}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setOffered((was) => (on ? [...was, g] : was.filter((o) => o !== g)));
+                      }}
+                    />
+                  }
+                  label={<Mono sx={{ fontSize: 12.5, overflowWrap: "anywhere" }}>{g}</Mono>}
+                />
+              ))}
+            </FormGroup>
+          </FormControl>
         )}
         <TextField
           label="Why you need it"

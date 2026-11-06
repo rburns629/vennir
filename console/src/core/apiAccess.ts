@@ -58,6 +58,8 @@ export const MAX_GRANT_PER_MINUTE = 1_000_000;
 export const MAX_REASON = 1000;
 /** The longest group name a grant may name. */
 export const MAX_GROUP = 256;
+/** The most groups a request may offer. */
+export const MAX_OFFERED_GROUPS = 100;
 
 export type Via = "team" | "user" | "group" | "catalog";
 
@@ -406,14 +408,28 @@ async function requestViews(
 export const GROUPS_DECIDE_HOURS = 24;
 
 /**
- * A waiting request's groups to choose from: the ones it copied when they
- * asked, or the person's as read since (a sign-in after asking), whichever
- * were read later.
+ * A waiting request's groups to choose from: only the ones the person
+ * offered when they asked, never their others. Read when they asked, or
+ * (readAt) at a later sign-in whose groups still include every one of them.
  */
 async function requesterGroupsOf(r: AccessRequest): Promise<{ groups: string[]; readAt: Date | null }> {
+  if (r.requesterGroups.length === 0) return { groups: [], readAt: r.requesterGroupsReadAt };
   const [now] = await db.select({ groups: users.ssoGroups, readAt: users.ssoGroupsReadAt }).from(users).where(eq(users.id, r.userId));
-  if (now?.readAt && now.groups && (!r.requesterGroupsReadAt || now.readAt > r.requesterGroupsReadAt)) return { groups: now.groups, readAt: now.readAt };
+  const still = now?.readAt && now.groups && r.requesterGroups.every((g) => now.groups?.includes(g));
+  if (still && now.readAt && (!r.requesterGroupsReadAt || now.readAt > r.requesterGroupsReadAt)) return { groups: r.requesterGroups, readAt: now.readAt };
   return { groups: r.requesterGroups, readAt: r.requesterGroupsReadAt };
+}
+
+/**
+ * A person's groups as last read (users.sso_groups) while they count now,
+ * by the gateway's rule (groupsCurrent; with Google's groups alone, read
+ * within GOOGLE_GROUPS_FRESH_SECONDS): the ones they may offer in a
+ * request. Null while they don't count (and for a bot).
+ */
+function offerableGroups(who: Pick<AuthUser, "isBot" | "groupsCurrent">, read: { groups: string[] | null; readAt: Date | null } | undefined): string[] | null {
+  if (who.isBot || !who.groupsCurrent || !read?.groups || !read.readAt) return null;
+  if (groupSources().claim === "" && Date.now() - read.readAt.getTime() > GOOGLE_GROUPS_FRESH_SECONDS * 1000) return null;
+  return read.groups;
 }
 
 const one = <T>(views: T[]): T => {
@@ -467,14 +483,19 @@ const principal = (g: Pick<Grant, "groupName">, email: string) => (g.groupName ?
 // --- writes ---
 
 /**
- * Asks for access: for the caller, or (botEmail) for a bot of a team they
- * maintain. An open API's is granted at once, at its default limit.
+ * Asks for access: for the caller, offering `groups` (some of theirs, as
+ * last read while they count) for a group grant instead; or (botEmail) for
+ * a bot of a team they maintain. An open API's is granted at once, at its
+ * default limit. Someone who may call it only from the catalog (shareWith)
+ * may ask for a grant: shareWith is going away.
  */
-export async function requestAccess(caller: AuthUser | undefined, team: string, name: string, reason: string, botEmail: string) {
+export async function requestAccess(caller: AuthUser | undefined, team: string, name: string, reason: string, botEmail: string, groups: string[] = []) {
   const who = signedIn(caller);
   ensureNotBot(who, "ask for access to an API");
   const api = await visible(who, team, name);
   const why = reasonOf(reason, "you need it");
+  const offered = [...new Set(groups.map(groupOf))].sort();
+  if (botEmail && offered.length > 0) throw new ApiError(400, "BAD_REQUEST", "A bot is in no group: it's granted by name.");
   let target: Pick<AuthUser, "id" | "isBot" | "teamNames" | "groupsCurrent">;
   let targetEmail: string;
   if (botEmail) {
@@ -498,7 +519,7 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
     throw new ApiError(409, "REQUESTS_CLOSED", `${api.teamName}/${api.name} takes no requests for access: ask its team directly.`);
   }
   const access = accessFor(target, api, await callerContext(target));
-  if (access) {
+  if (access && access.via !== "catalog") {
     throw new ApiError(409, "ALREADY_ALLOWED", `${botEmail ? botEmail : "You"} may call ${api.teamName}/${api.name} already (${access.via}).`);
   }
   let made: { request: AccessRequest; grant: Grant | null };
@@ -512,15 +533,21 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
         .from(apiGrants)
         .where(and(eq(apiGrants.apiId, api.id), eq(apiGrants.userId, target.id), isNull(apiGrants.revokedAt)));
       if (granted) throw new ApiError(409, "ALREADY_ALLOWED", `${targetEmail} may call ${api.teamName}/${api.name} already.`);
-      // A person's groups as last read, for the API's maintainers to grant
-      // one of them: read here, their row share-locked, so emptying them
+      // The groups they offer, each one of theirs as last read while they
+      // count: read here, their row share-locked, so emptying them
       // (clearKeptGroups) waits for this request, and empties its copy too,
-      // or this sees them emptied.
-      const [read] = botEmail
-        ? []
-        : await tx.select({ groups: users.ssoGroups, readAt: users.ssoGroupsReadAt }).from(users).where(eq(users.id, who.id)).for("share");
-      const requesterGroups = read?.groups ?? [];
-      const requesterGroupsReadAt = read?.groups ? read.readAt : null;
+      // or this sees them emptied. Only those are kept, for the API's
+      // maintainers to grant one of them; never their others.
+      const [read] = offered.length === 0 ? [] : await tx.select({ groups: users.ssoGroups, readAt: users.ssoGroupsReadAt }).from(users).where(eq(users.id, who.id)).for("share");
+      const counted = offerableGroups(who, read);
+      if (offered.length > 0 && counted === null) {
+        throw new ApiError(409, "GROUPS_STALE", "Your groups haven't been read lately enough to offer one: sign in again, then ask.");
+      }
+      const theirs = counted ?? [];
+      const notTheirs = offered.filter((g) => !theirs.includes(g));
+      if (notTheirs.length > 0) throw new ApiError(400, "NOT_THEIR_GROUP", `You aren't in ${notTheirs.join(", ")}, as your groups were last read: offer only your own.`);
+      const requesterGroups = offered;
+      const requesterGroupsReadAt = offered.length > 0 ? (read?.readAt ?? null) : null;
       const key = { apiId: api.id, teamId: api.teamId, apiName: api.name };
       const [request] = await tx.insert(apiAccessRequests).values({ ...key, userId: target.id, requestedBy: who.id, reason: why, requesterGroups, requesterGroupsReadAt }).returning();
       if (!request) throw new Error("no request was made");
@@ -573,11 +600,17 @@ async function waitingOrAwayRequest(id: string): Promise<{ request: AccessReques
   return { request: away, api: { teamName: team.name, name: away.apiName } };
 }
 
-/** Withdraws a waiting request (its API published or away): whoever asked. */
+/**
+ * Withdraws a waiting request (its API published or away): whoever asked,
+ * or, for a bot's, a maintainer of one of the bot's teams that isn't
+ * retired (a bot's owners are its team's maintainers).
+ */
 export async function withdrawRequest(caller: AuthUser | undefined, id: string): Promise<void> {
   const who = signedIn(caller);
   const { request, api } = await waitingOrAwayRequest(id);
-  if (request.requestedBy !== who.id) throw new ApiError(403, "FORBIDDEN", "Only whoever asked may withdraw a request.");
+  if (request.requestedBy !== who.id && !(await ownsBot(who, request.userId))) {
+    throw new ApiError(403, "FORBIDDEN", "Only whoever asked may withdraw a request, or, for a bot's, its team's maintainers.");
+  }
   const [done] = await db
     .update(apiAccessRequests)
     .set({ state: "withdrawn", decidedBy: who.id, decidedAt: new Date() })
@@ -586,6 +619,14 @@ export async function withdrawRequest(caller: AuthUser | undefined, id: string):
   if (!done) throw new ApiError(409, "NOT_WAITING", "That request was answered meanwhile.");
   const email = (await findUserById(request.userId))?.email ?? "";
   await tell(api, `The request for ${email} to call ${api.teamName}/${api.name} was withdrawn`, "", [request.userId, request.requestedBy]);
+}
+
+/** Whether `userId` is a bot of a team `who` maintains that isn't retired. */
+async function ownsBot(who: AuthUser, userId: string): Promise<boolean> {
+  const user = await findUserById(userId);
+  if (!user?.isBot) return false;
+  const maintained = (await teamRolesForUser(user.id)).map((r) => r.name).filter((t) => who.maintainerOf.includes(t));
+  return (await liveTeams(maintained)).length > 0;
 }
 
 /** Grants or declines a waiting request: a maintainer of the API's team. */
@@ -615,14 +656,16 @@ export async function decideRequest(caller: AuthUser | undefined, id: string, ap
   if (group) {
     if (target.who.isBot) throw new ApiError(400, "BAD_REQUEST", "A bot is in no group: grant it by name.");
     groupName = groupOf(group);
-    // One of their groups when they asked (a claim's, or Google's they were
-    // asked about); or, with Google Workspace groups, one Google says
-    // they're in now (Google can't list a person's groups: it's asked of
-    // each named group).
+    // Only a group they offered when they asked: never another, so a
+    // refusal says nothing about groups they didn't offer.
     const read = await requesterGroupsOf(request);
+    if (!read.groups.includes(groupName)) {
+      throw new ApiError(400, "GROUP_NOT_OFFERED", `${target.email} didn't offer ${groupName} when they asked: grant one they offered, or them by name.`);
+    }
     const fresh = read.readAt !== null && Date.now() - read.readAt.getTime() <= GROUPS_DECIDE_HOURS * 3_600_000;
-    if (!(read.groups.includes(groupName) && fresh)) {
-      // Or, with Google Workspace groups, one Google says they're in now.
+    if (!fresh) {
+      // Read too long ago: with Google Workspace groups, Google may say
+      // they're in it still.
       const sources = groupSources();
       try {
         confirmed = currentSso() !== null && sources.google && groupName.includes("@") && (await inGoogleGroup(target.email, groupName));
@@ -630,11 +673,8 @@ export async function decideRequest(caller: AuthUser | undefined, id: string, ap
         if (error instanceof GroupsUnavailable) throw new ApiError(503, "GROUPS_UNAVAILABLE", error.message);
         throw error;
       }
-      if (!confirmed && read.groups.includes(groupName)) {
-        throw new ApiError(409, "GROUPS_STALE", `${target.email}'s groups were read over ${String(GROUPS_DECIDE_HOURS)} hours ago: ask them to sign in again, then decide.`);
-      }
       if (!confirmed) {
-        throw new ApiError(400, "NOT_THEIR_GROUP", `${target.email} isn't in ${groupName}: not among their groups as last read${sources.google ? ", nor in it now by Google Workspace" : ""}.`);
+        throw new ApiError(409, "GROUPS_STALE", `${target.email}'s groups were read over ${String(GROUPS_DECIDE_HOURS)} hours ago: ask them to sign in again, then decide.`);
       }
     }
   } else if (target.who.isBot) {
@@ -966,7 +1006,7 @@ async function liveApis(): Promise<Map<string, Api>> {
   return new Map(rows.map((r) => [r.api.id, { ...r.api, teamName: r.teamName }]));
 }
 
-/** The APIs the caller may call, and how; and their requests that wait or were declined. */
+/** The APIs the caller may call, and how; their requests that wait or were declined; and the groups they may offer in one. */
 export async function listMyAccess(caller: AuthUser | undefined) {
   const who = signedIn(caller);
   const all = await liveApis();
@@ -980,7 +1020,8 @@ export async function listMyAccess(caller: AuthUser | undefined) {
     .from(apiAccessRequests)
     .where(and(eq(apiAccessRequests.userId, who.id), inArray(apiAccessRequests.state, ["waiting", "declined"])))
     .orderBy(desc(apiAccessRequests.createdAt));
-  return { access, requests: await requestViews(requests, all, false, await awayTeamsOf(requests)) };
+  const [read] = who.isBot ? [] : await db.select({ groups: users.ssoGroups, readAt: users.ssoGroupsReadAt }).from(users).where(eq(users.id, who.id));
+  return { access, requests: await requestViews(requests, all, false, await awayTeamsOf(requests)), groups: offerableGroups(who, read) ?? [] };
 }
 
 /** A team's bots' active grants, and their requests that wait or were declined: its members, and admins. */

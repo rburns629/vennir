@@ -9,7 +9,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import DownloadIcon from "@mui/icons-material/FileDownloadOutlined";
-import { errorMessage, getApi, listApiAccess, listMyApiAccess, pauseApi, resumeApi, type ApiAccessRequest, type ApiProduct, type MyApiAccess } from "../api";
+import { errorMessage, getApi, listApiAccess, listMyApiAccess, pauseApi, resumeApi, type ApiProduct, type MyAccessList } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { HelpLink } from "../components/HelpLink";
 import { Mono } from "../components/Mono";
@@ -57,7 +57,7 @@ function ApiView({ team, name }: { team: string; name: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [hours, setHours] = useState(24);
-  const [mine, setMine] = useState<{ access: MyApiAccess[]; requests: ApiAccessRequest[] } | null>(null);
+  const [mine, setMine] = useState<MyAccessList | null>(null);
   const [mineError, setMineError] = useState<string | null>(null);
   const [accessList, setAccessList] = useState<ApiAccessList | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -278,7 +278,7 @@ function ApiView({ team, name }: { team: string; name: string }) {
             )}
           </Card>
 
-          {!inTeam && mine && <YourAccess api={api} standing={standing} onChanged={accessChanged} />}
+          {!inTeam && mine && <YourAccess api={api} standing={standing} groups={mine.groups} onChanged={accessChanged} />}
           {!inTeam && mineError && <Alert severity="error">{mineError}</Alert>}
 
           {ownTeam && (

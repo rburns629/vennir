@@ -439,7 +439,7 @@ export function AutomationTab({
         </Stack>
       </Box>
 
-      {bots && <BotApiAccess teamName={teamName} bots={bots} readOnly={readOnly} />}
+      {bots && <BotApiAccess key={teamName} teamName={teamName} bots={bots} readOnly={readOnly} />}
 
       <ConfirmDialog
         open={revoking !== null}

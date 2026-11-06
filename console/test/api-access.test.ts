@@ -22,6 +22,7 @@ import { addTeamMember, createTeam, findApi, findTeamByName, findUserByEmail } f
 import { apiAccessRequests, apiGrants, apis, auditLog, notificationEvents, teams, userGroups, userNotifications, users as users_ } from "../src/db/schema.js";
 import { ApiSchema } from "../src/gen/vennir/catalog/v1/release_pb.js";
 import { buildApp } from "../src/index.js";
+import { groupSourceSet } from "../src/sso.js";
 import { holdGroupSettingsLock } from "./groupSettingsLock.js";
 import { caller, rpcClient } from "./rpc.js";
 
@@ -31,6 +32,20 @@ vi.mock("../src/k8s.js", async (importOriginal) => ({
   ensureNamespaceExists: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("../src/gatewayTokenPolicy.js", () => ({ syncGatewayTokenPolicy: vi.fn(() => Promise.resolve()) }));
+// Single sign-on is off here, so groups count for nothing; a test that needs
+// them to (offering one) says a group source is set, for its own calls.
+vi.mock("../src/sso.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../src/sso.js")>();
+  return { ...real, groupSourceSet: vi.fn(real.groupSourceSet) };
+});
+async function withGroupSource<T>(run: () => Promise<T>): Promise<T> {
+  vi.mocked(groupSourceSet).mockReturnValue(true);
+  try {
+    return await run();
+  } finally {
+    vi.mocked(groupSourceSet).mockReset();
+  }
+}
 
 const prefix = `acc-${randomUUID().slice(0, 6)}`;
 const owner = `${prefix}-pay`;
@@ -101,8 +116,8 @@ type Listed = { team: string; name: string; mayCall?: boolean; accessVia?: strin
 
 const listed = async (who: keyof typeof tokens, name: string) =>
   ((await call<{ apis?: Listed[] }>(tokens[who], "ApiService/ListApis")).body.apis ?? []).find((a) => a.team === owner && a.name === name);
-const ask = (who: keyof typeof tokens, name: string, reason = "for the dashboard", bot = "") =>
-  call<{ request: Request; grant?: Grant }>(tokens[who], "ApiService/RequestApiAccess", { team: owner, name, reason, botEmail: bot });
+const ask = (who: keyof typeof tokens, name: string, reason = "for the dashboard", bot = "", groups: string[] = []) =>
+  call<{ request: Request; grant?: Grant }>(tokens[who], "ApiService/RequestApiAccess", { team: owner, name, reason, botEmail: bot, groups });
 const decide = (who: keyof typeof tokens, accessRequestId: string, body: object) =>
   call<{ request: Request; grant?: Grant }>(tokens[who], "ApiService/DecideApiAccessRequest", { accessRequestId, ...body });
 const add = (who: keyof typeof tokens, name: string, body: object) => call<{ grant: Grant }>(tokens[who], "ApiService/AddApiGrant", { team: owner, name, ...body });
@@ -239,9 +254,16 @@ describe("asking for access", () => {
     expect((await ask("bob", "orders", "  ")).failure).toBe("BAD_REQUEST");
     expect((await ask("bob", "closed")).failure).toBe("REQUESTS_CLOSED");
     expect((await ask("member", "orders")).failure).toBe("ALREADY_ALLOWED");
-    expect((await ask("consumer", "orders")).failure).toBe("ALREADY_ALLOWED");
     // A hidden API is as one that isn't there.
     expect((await ask("bob", "secret")).code).toBe("not_found");
+  });
+
+  it("may ask for a grant of their own, where they may call only from the catalog (shareWith)", async () => {
+    expect(await listed("consumer", "orders")).toMatchObject({ accessVia: "API_ACCESS_VIA_CATALOG" });
+    const asked = await ask("consumer", "orders", "shareWith is going away");
+    expect(asked.code).toBe("ok");
+    expect(asked.body.request).toMatchObject({ state: "API_ACCESS_REQUEST_STATE_WAITING", userEmail: emails.consumer });
+    expect((await call(tokens.consumer, "ApiService/WithdrawApiAccessRequest", { accessRequestId: asked.body.request.id })).code).toBe("ok");
   });
 
   it("is granted at once, at the default limit, where requests are open", async () => {
@@ -258,12 +280,32 @@ describe("asking for access", () => {
     expect((await ask("maintainer", "orders", "ci", botEmail)).failure).toBe("FORBIDDEN");
     const asked = await ask("toolsMaintainer", "orders", "the nightly export", botEmail);
     expect(asked.body.request).toMatchObject({ userEmail: botEmail, bot: true, requestedBy: emails.toolsMaintainer, groups: [] });
+    expect((await ask("toolsMaintainer", "orders", "ci", botEmail, ["eng@example.com"])).failure).toBe("BAD_REQUEST");
     await db.update(teams).set({ retiredAt: new Date() }).where(eq(teams.name, oldTools));
     try {
       expect((await ask("oldMaintainer", "orders", "ci", oldBotEmail)).failure).toBe("TEAM_RETIRED");
     } finally {
       await db.update(teams).set({ retiredAt: null }).where(eq(teams.name, oldTools));
     }
+  });
+
+  it("for a bot, may be withdrawn by any maintainer of its team that isn't retired, not only whoever asked", async () => {
+    const other = await users.makeUser();
+    await addTeamMember(other.id, (await findTeamByName(tools))?.id ?? "", "maintainer");
+    const otherToken = await users.signIn(other.email);
+    const asked = await ask("toolsMaintainer", "spare", "the weekly export", botEmail);
+    expect(asked.code).toBe("ok");
+    const withdraw = (token: string) => call(token, "ApiService/WithdrawApiAccessRequest", { accessRequestId: asked.body.request.id });
+    for (const who of ["toolsMember", "oldMaintainer", "maintainer"] as const) expect((await withdraw(tokens[who])).failure, who).toBe("FORBIDDEN");
+    await db.update(teams).set({ retiredAt: new Date() }).where(eq(teams.name, tools));
+    try {
+      expect((await withdraw(otherToken)).failure).toBe("FORBIDDEN");
+    } finally {
+      await db.update(teams).set({ retiredAt: null }).where(eq(teams.name, tools));
+    }
+    expect((await withdraw(otherToken)).code).toBe("ok");
+    const [row] = await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, asked.body.request.id));
+    expect(row).toMatchObject({ state: "withdrawn", decidedBy: other.id });
   });
 });
 
@@ -292,26 +334,42 @@ describe("deciding a request", () => {
     expect(declined.body.request).toMatchObject({ state: "API_ACCESS_REQUEST_STATE_DECLINED", decisionReason: "use the export", decidedBy: emails.maintainer });
     const mine = await call<{ requests?: Request[] }>(tokens.bob, "ApiService/ListMyApiAccess");
     expect(mine.body.requests?.find((r) => r.id === asked.body.request.id)?.state).toBe("API_ACCESS_REQUEST_STATE_DECLINED");
-    // Every group bob's last sign-in read (the console's own copy), which his
-    // request copies as he asks. (Set here, just before: another test file's
+    // Every group bob's last sign-in read (the console's own copy), of which
+    // he offers some as he asks. (Set here, just before: another test file's
     // change of where groups come from empties everyone's.)
-    await db
-      .update(users_)
-      .set({ ssoGroups: [`all@${prefix}.example.com`, `eng@${prefix}.example.com`], ssoGroupsReadAt: new Date() })
-      .where(eq(users_.id, ids.bob));
-    expect((await ask("bob", "orders", "reports, again")).code).toBe("ok");
+    const theirs = [`all@${prefix}.example.com`, `eng@${prefix}.example.com`, `private@${prefix}.example.com`];
+    await db.update(users_).set({ ssoGroups: theirs, ssoGroupsReadAt: new Date() }).where(eq(users_.id, ids.bob));
+    const offer = [`eng@${prefix}.example.com`, ` ALL@${prefix}.example.com`];
+    // While his groups don't count (no group source set), none can be offered, nor are any listed as his.
+    expect((await ask("bob", "orders", "reports, again", "", offer)).failure).toBe("GROUPS_STALE");
+    expect((await call<{ groups?: string[] }>(tokens.bob, "ApiService/ListMyApiAccess")).body.groups ?? []).toEqual([]);
+    await withGroupSource(async () => {
+      expect((await call<{ groups?: string[] }>(tokens.bob, "ApiService/ListMyApiAccess")).body.groups).toEqual(theirs);
+      // Only his own: not a group he isn't in.
+      expect((await ask("bob", "orders", "reports, again", "", [...offer, "ops@elsewhere.example.com"])).failure).toBe("NOT_THEIR_GROUP");
+      // Google's groups alone (no claim) count only while read within 90 minutes.
+      await db.update(users_).set({ ssoGroupsReadAt: new Date(Date.now() - 2 * 3_600_000) }).where(eq(users_.id, ids.bob));
+      expect((await ask("bob", "orders", "reports, again", "", offer)).failure).toBe("GROUPS_STALE");
+      await db.update(users_).set({ ssoGroupsReadAt: new Date() }).where(eq(users_.id, ids.bob));
+      expect((await ask("bob", "orders", "reports, again", "", offer)).code).toBe("ok");
+    });
   });
 
-  it("grants a person's group instead, only one of theirs as last read; a bot's only by name", async () => {
+  it("grants a person's group instead, only one they offered; a bot's only by name", async () => {
     const [waiting] = await db.select().from(apiAccessRequests).where(and(eq(apiAccessRequests.userId, ids.bob), eq(apiAccessRequests.state, "waiting")));
     const access = await call<{ requests?: Request[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "orders" });
+    // Only the groups he offered, never his others (private@).
     expect(access.body.requests?.find((r) => r.id === waiting?.id)?.groups).toEqual([`all@${prefix}.example.com`, `eng@${prefix}.example.com`]);
+    expect(waiting?.requesterGroups).toEqual([`all@${prefix}.example.com`, `eng@${prefix}.example.com`]);
     // Only to its maintainers: not to a plain member, nor an admin.
     for (const who of ["member", "admin"] as const) {
       const seen = await call<{ requests?: Request[] }>(tokens[who], "ApiService/ListApiAccess", { team: owner, name: "orders" });
       expect(seen.body.requests?.find((r) => r.id === waiting?.id)?.groups ?? [], who).toEqual([]);
     }
-    expect((await decide("maintainer", waiting?.id ?? "", { approve: true, group: "ops@elsewhere.example.com" })).failure).toBe("NOT_THEIR_GROUP");
+    // Not a group he didn't offer, whether he's in it or not: the answer is the same.
+    for (const group of ["ops@elsewhere.example.com", `private@${prefix}.example.com`]) {
+      expect((await decide("maintainer", waiting?.id ?? "", { approve: true, group })).failure, group).toBe("GROUP_NOT_OFFERED");
+    }
     // Groups read over a day ago can't be granted from: they sign in again first.
     const dayAgo = new Date(Date.now() - 25 * 3_600_000);
     await db.update(apiAccessRequests).set({ requesterGroupsReadAt: dayAgo }).where(eq(apiAccessRequests.id, waiting?.id ?? ""));

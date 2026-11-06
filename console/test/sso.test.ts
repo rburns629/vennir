@@ -358,7 +358,7 @@ describe("Google Workspace groups", () => {
     await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
   });
 
-  it("let a maintainer grant a requester's Google group, asked of Google as they decide", async () => {
+  it("let a maintainer grant a group the requester offered, read over a day ago, once Google says they're in it still", async () => {
     const [api] = await db
       .insert(apis)
       .values({ teamId: ids[teamA] ?? "", name: "gws-decided", displayName: "G", openapi: { openapi: "3.1.0", paths: {} }, backendUrl: "https://x.example", serviceAccount: "gws-decided-api" })
@@ -369,19 +369,29 @@ describe("Google Workspace groups", () => {
     const asMaintainer = { id: maintainer.id, teamNames: [teamA], maintainerOf: [teamA], isAdmin: false, scopes: [] };
     const asGws = { id: gws?.id ?? "", teamNames: [], maintainerOf: [], isAdmin: false, scopes: [], groupsCurrent: true };
     const real = globalThis.fetch;
+    const lookedUp: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const url = String(input instanceof Request ? input.url : input);
       if (url.startsWith("http://metadata.google.internal/")) return Promise.resolve(Response.json({ access_token: "t" }));
       if (url.startsWith("https://cloudidentity.googleapis.com/v1/groups:lookup")) {
         const group = new URL(url).searchParams.get("groupKey.id") ?? "";
-        return Promise.resolve(group === `readers@${domain}` ? Response.json({ name: "groups/readers1" }) : new Response("{}", { status: 404 }));
+        lookedUp.push(group);
+        return Promise.resolve(group === `readers@${domain}` || group === `others@${domain}` ? Response.json({ name: `groups/${group.split("@")[0] ?? ""}1` }) : new Response("{}", { status: 404 }));
       }
-      if (url.includes("/memberships:checkTransitiveMembership")) return Promise.resolve(Response.json({ hasMembership: ours(url) && url.includes("groups/readers1") }));
+      if (url.includes("/memberships:checkTransitiveMembership")) return Promise.resolve(Response.json({ hasMembership: ours(url) }));
       return real(input, init);
     });
-    const asked = await requestAccess(asGws, teamA, "gws-decided", "reports", "");
-    // Not a group Google says they're in: refused.
-    await expect(decideRequest(asMaintainer, asked.request.id, true, `others@${domain}`, 0, "")).rejects.toMatchObject({ code: "NOT_THEIR_GROUP" });
+    // Their groups as Google gave them just now: they offer readers, not others.
+    await db.update(users).set({ ssoGroups: [`others@${domain}`, `readers@${domain}`], ssoGroupsReadAt: new Date() }).where(eq(users.id, gws?.id ?? ""));
+    const asked = await requestAccess(asGws, teamA, "gws-decided", "reports", "", [`Readers@${domain}`]);
+    expect(asked.request.groups).toEqual([]);
+    // Read over a day ago since.
+    const dayAgo = new Date(Date.now() - 25 * 3_600_000);
+    await db.update(apiAccessRequests).set({ requesterGroupsReadAt: dayAgo }).where(eq(apiAccessRequests.id, asked.request.id));
+    await db.update(users).set({ ssoGroupsReadAt: dayAgo }).where(eq(users.id, gws?.id ?? ""));
+    // A group of theirs they didn't offer: refused, and Google never asked about it.
+    await expect(decideRequest(asMaintainer, asked.request.id, true, `others@${domain}`, 0, "")).rejects.toMatchObject({ code: "GROUP_NOT_OFFERED" });
+    expect(lookedUp).toEqual([]);
     const decided = await decideRequest(asMaintainer, asked.request.id, true, `Readers@${domain}`, 0, "");
     expect(decided.grant?.group).toBe(`readers@${domain}`);
     // Kept for them now, read now.
