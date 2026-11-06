@@ -1249,6 +1249,9 @@ export const apiGrants = pgTable(
     revokeReason: text("revoke_reason"),
     // When its API left the catalog's release (api_id null since); null while it's published.
     awaySince: timestamp("away_since", { withTimezone: true }),
+    // The last call through it, as the gateway records it (to a few
+    // minutes); null if none yet. So the API's team can revoke unused ones.
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   },
   (table) => [
     check("api_grants_one_principal", sql`(${table.groupName} IS NULL) <> (${table.userId} IS NULL)`),

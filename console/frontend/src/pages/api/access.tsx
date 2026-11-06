@@ -91,6 +91,11 @@ export function Principal({ grant }: { grant: Pick<ApiGrant, "group" | "userEmai
   );
 }
 
+/** A grant's last call, as the gateway records it (to within a few minutes). */
+export function lastCallText(lastUsedAt: string | null): string {
+  return lastUsedAt ? when(lastUsedAt) : "never";
+}
+
 /** Who granted it, and when. */
 export function grantedByText(grant: Pick<ApiGrant, "grantedBy" | "createdAt">): string {
   const at = grant.createdAt ? when(grant.createdAt) : "";

@@ -5,6 +5,7 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -98,10 +99,18 @@ func TestGrants(t *testing.T) {
 	if c := claimsOf("payments-person"); c.Via != "team" || c.Team != "payments" {
 		t.Errorf("by team: %+v", c)
 	}
-	// Traffic counts a grant's calls by grant or group, never by person.
-	teams := map[string]bool{}
+	// Traffic counts a grant's calls by grant or group, never by person,
+	// and notes each grant that let someone in (its last call): only those.
+	teams, used := map[string]bool{}, map[string]bool{}
 	for _, r := range *traffic {
+		if r.outcome == "used" {
+			used[r.endpoint] = true
+			continue
+		}
 		teams[r.team] = true
+	}
+	if want := map[string]bool{"g-ada": true, "g-eng": true, "g-ops": true, "g-bot": true}; !maps.Equal(used, want) {
+		t.Errorf("grants used: %v, want %v", used, want)
 	}
 	for _, want := range []string{"grant:user", "grant:group:eng@example.com", "payments"} {
 		if !teams[want] {

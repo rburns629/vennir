@@ -12,7 +12,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Mono } from "../../components/Mono";
 import { when } from "../../time";
-import { botTeamsOf, giveUpAsk, rateText, RequestAccessDialog, useAccessAsk, withdrawAsk } from "./access";
+import { botTeamsOf, giveUpAsk, lastCallText, rateText, RequestAccessDialog, useAccessAsk, withdrawAsk } from "./access";
 
 type Row = { key: string; team: string; name: string; access: MyApiAccess | null; request: ApiAccessRequest | null };
 
@@ -108,6 +108,18 @@ export function MyAccess({ apis, search, onChanged }: { apis: ApiProduct[] | nul
       header: "Your rate",
       render: (r) => (r.access ? <Two first={rateText(r.access.perMinute)} second={r.access.via === "group" ? "each member gets it" : undefined} /> : "—"),
       hideBelow: "sm",
+    },
+    {
+      key: "last",
+      header: "Your last call",
+      // A grant's: a team's calls aren't one person's; a group's is anyone's in it.
+      render: (r) =>
+        r.access?.via === "user" || r.access?.via === "group" ? (
+          <Two first={lastCallText(r.access.lastUsedAt)} second={r.access.via === "group" ? "anyone in the group" : undefined} />
+        ) : (
+          "—"
+        ),
+      hideBelow: "md",
     },
     {
       key: "actions",

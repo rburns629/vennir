@@ -751,7 +751,9 @@ principal and rate, never who granted it or why, and no request for
 access) and each person's groups (never a password hash, a sealed value, a
 secret's name or the audit log) and write only its traffic counts
 (`api_traffic`), why it can't serve an API (`api_problems`) and when an API
-token was last used (`api_tokens.last_used_at`, as the console keeps it).
+token was last used (`api_tokens.last_used_at`, as the console keeps it)
+or a grant last let someone in (`api_grants.last_used_at`, to within a few
+minutes, so the API's team can revoke the grants nobody uses).
 A retired team's members and bots don't call as it. It checks sessions with the console's public key (its
 JWKS, `/api/auth/jwks`), so it can verify a session but never make one,
 and never holds `JWT_SECRET` (proven on kind 2026-10-28: the gateway

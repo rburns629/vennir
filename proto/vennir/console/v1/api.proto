@@ -165,6 +165,9 @@ message ApiGrant {
   // When its API left the catalog's release; unset while it's published.
   // Removed 30 days after.
   google.protobuf.Timestamp away_since = 17;
+  // When a request was last let in through it, to within a few minutes;
+  // unset if none yet.
+  google.protobuf.Timestamp last_used_at = 18;
 }
 
 message ApiAccessRequest {
@@ -295,6 +298,9 @@ message MyApiAccess {
   string group = 5;
   string grant_id = 6;
   int32 per_minute = 7;
+  // VIA_USER and VIA_GROUP: the grant's last call, to within a few minutes
+  // (anyone's in the group, for a group's); unset if none yet.
+  google.protobuf.Timestamp last_used_at = 8;
 }
 
 message ListMyApiAccessRequest {}

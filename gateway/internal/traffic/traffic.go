@@ -3,8 +3,9 @@
 // Package traffic counts what the gateway did with each API's requests, a
 // minute at a time, by calling team, endpoint and outcome, and adds the
 // counts to the console's api_traffic table every so often (the API's page
-// shows them). The only thing the gateway writes. No caller's identity,
-// body or header is kept.
+// shows them). No caller's identity, body or header is kept. With them goes
+// when each grant (api_grants) was last called through, so the API's team
+// can revoke the ones nobody uses.
 package traffic
 
 import (
@@ -38,6 +39,11 @@ type counts struct {
 	durationMs int64
 }
 
+// GrantUseResolution is how stale a grant's last_used_at may get before a
+// call through it is written again (an API token's is the same,
+// auth.tokenUseResolution).
+const GrantUseResolution = 5 * time.Minute
+
 // Recorder holds counts until they're flushed.
 type Recorder struct {
 	DB interface {
@@ -48,6 +54,9 @@ type Recorder struct {
 	mu      sync.Mutex
 	pending map[key]counts
 	dropped int
+	// used is each grant's latest call not yet written, by its id; written,
+	// when its last one was, so it's written once a GrantUseResolution.
+	used, written map[string]time.Time
 }
 
 // text is endpoint as Postgres takes it: valid UTF-8 with no NUL (a
@@ -73,6 +82,32 @@ func (r *Recorder) Record(apiID, team, endpoint, outcome string, at time.Time, t
 	r.add(k, counts{n: 1, durationMs: took.Milliseconds()})
 }
 
+// Used notes a call let in through a grant, by its id.
+func (r *Recorder) Used(grantID string, at time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if w, ok := r.written[grantID]; ok && at.Sub(w) < GrantUseResolution {
+		return
+	}
+	r.use(grantID, at)
+}
+
+// use holds at as grantID's latest call, unless that's a new one past
+// MaxPending (grants are the console's, not made up by callers, so only a
+// database away for long gets there). r.mu is held.
+func (r *Recorder) use(grantID string, at time.Time) {
+	if r.used == nil {
+		r.used = map[string]time.Time{}
+	}
+	prev, held := r.used[grantID]
+	if !held && len(r.used) >= MaxPending {
+		return
+	}
+	if at.After(prev) {
+		r.used[grantID] = at
+	}
+}
+
 // add holds c under k, unless that's a new count past MaxPending. r.mu is held.
 func (r *Recorder) add(k key, c counts) {
 	if r.pending == nil {
@@ -88,19 +123,20 @@ func (r *Recorder) add(k key, c counts) {
 	r.pending[k] = p
 }
 
-// Flush adds what's pending to api_traffic, in one transaction; what can't
-// be written stays pending for the next flush.
+// Flush adds what's pending to api_traffic, and grants' last calls to
+// api_grants, in one transaction; what can't be written stays pending for
+// the next flush.
 func (r *Recorder) Flush(ctx context.Context) error {
 	r.mu.Lock()
-	batch := r.pending
-	r.pending = nil
+	batch, used := r.pending, r.used
+	r.pending, r.used = nil, nil
 	dropped := r.dropped
 	r.dropped = 0
 	r.mu.Unlock()
 	if dropped > 0 {
 		r.Log.Warn("traffic not recorded: too many different counts at once", "requests", dropped, "max", MaxPending)
 	}
-	if len(batch) == 0 {
+	if len(batch) == 0 && len(used) == 0 {
 		return nil
 	}
 	err := pgx.BeginFunc(ctx, txStarter{r.DB}, func(tx pgx.Tx) error {
@@ -124,16 +160,49 @@ func (r *Recorder) Flush(ctx context.Context) error {
 			}
 			r.Log.Warn("traffic count refused; dropped", "api", k.api, "outcome", k.outcome, "requests", c.n, "error", err)
 		}
+		for id, at := range used {
+			// As a count is: in a savepoint, kept or given up on by retry.
+			// Never earlier than what another replica wrote; a grant
+			// deleted meanwhile has no row, and is skipped.
+			err := pgx.BeginFunc(ctx, tx, func(row pgx.Tx) error {
+				_, err := row.Exec(ctx, `UPDATE api_grants SET last_used_at = $2
+					WHERE id = $1::uuid AND (last_used_at IS NULL OR last_used_at < $2)`, id, at)
+				return err
+			})
+			if err == nil {
+				continue
+			}
+			if retry(ctx, tx, err) {
+				return err
+			}
+			r.Log.Warn("a grant's last call refused; dropped", "grant", id, "error", err)
+		}
 		return nil
 	})
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if err != nil {
-		r.mu.Lock()
 		for k, c := range batch {
 			r.add(k, c)
 		}
-		r.mu.Unlock()
+		for id, at := range used {
+			r.use(id, at)
+		}
+		return err
 	}
-	return err
+	if r.written == nil {
+		r.written = map[string]time.Time{}
+	}
+	for id, at := range used {
+		r.written[id] = at
+	}
+	// What's past the resolution is written again at its next call anyway.
+	for id, w := range r.written {
+		if time.Since(w) >= GrantUseResolution {
+			delete(r.written, id)
+		}
+	}
+	return nil
 }
 
 // retry: whether a row's error says to try the whole flush again later,

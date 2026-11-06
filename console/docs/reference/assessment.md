@@ -1072,10 +1072,11 @@ catalog pull requests (every grant a change to someone else's folder, and
 the same grant on every install); a grant to a whole team as a group
 (broader than a bot's own grant, for convenience only).
 
-Open: whether a grant expires (proposed: no, but the API's team sees each
-grant's last call, and may revoke unused ones; `TODO.md`, "A grant's last
-call"). `shareWith` goes from `api.yaml` in the release after the one with
-both (`TODO.md`).
+A grant doesn't expire: the gateway records its last call
+(`api_grants.last_used_at`, to within a few minutes, 2026-11-06), so the
+API's team sees which grants nobody uses (each grant's **Last call** on the
+API's access list) and revokes them. `shareWith` went from
+`api.yaml` the release after the one with both (2026-11-06).
 
 **27. The cluster's policies from the catalog, written by the kernel**
 (proposed 2026-11-05; part 1 built 2026-11-06, below). The console keeps the admission policies' literals

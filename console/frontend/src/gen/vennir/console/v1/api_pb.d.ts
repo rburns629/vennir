@@ -121,6 +121,14 @@ export declare type ApiGrant = Message<"vennir.console.v1.ApiGrant"> & {
    * @generated from field: google.protobuf.Timestamp away_since = 17;
    */
   awaySince?: Timestamp | undefined;
+
+  /**
+   * When a request was last let in through it, to within a few minutes;
+   * unset if none yet.
+   *
+   * @generated from field: google.protobuf.Timestamp last_used_at = 18;
+   */
+  lastUsedAt?: Timestamp | undefined;
 };
 
 /**
@@ -626,6 +634,14 @@ export declare type MyApiAccess = Message<"vennir.console.v1.MyApiAccess"> & {
    * @generated from field: int32 per_minute = 7;
    */
   perMinute: number;
+
+  /**
+   * VIA_USER and VIA_GROUP: the grant's last call, to within a few minutes
+   * (anyone's in the group, for a group's); unset if none yet.
+   *
+   * @generated from field: google.protobuf.Timestamp last_used_at = 8;
+   */
+  lastUsedAt?: Timestamp | undefined;
 };
 
 /**

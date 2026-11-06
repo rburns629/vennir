@@ -17,7 +17,7 @@ import { addApiGrant, decideApiAccessRequest, type ApiAccessRequest, type ApiGra
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Mono } from "../../components/Mono";
 import { when } from "../../time";
-import { accessError, botName, grantedByText, grantName, MAX_REASON, Principal, rateAsk, rateText, revokeAsk, typedRate, useAccessAsk } from "./access";
+import { accessError, botName, grantedByText, grantName, lastCallText, MAX_REASON, Principal, rateAsk, rateText, revokeAsk, typedRate, useAccessAsk } from "./access";
 
 /** An API's access list and requests (ApiService.ListApiAccess). */
 export interface ApiAccessList {
@@ -244,6 +244,7 @@ export function WhoMayCall({ api, list, error, maintains, isAdmin, onChanged }: 
       ),
     },
     { key: "by", header: "Granted by", render: (g) => grantedByText(g), hideBelow: "sm" },
+    { key: "last", header: "Last call", render: (g) => lastCallText(g.lastUsedAt), hideBelow: "sm" },
   ];
   if (maintains || isAdmin) {
     columns.push({

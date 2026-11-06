@@ -10,7 +10,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { errorMessage, getGateway, listAllApiGrants, listApis, setGatewayClosed, type AllApiGrants, type ApiGrant, type ApiProduct, type GatewayInfo } from "../../api";
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
-import { grantedByText, grantName, Principal, rateText, revokeAsk, useAccessAsk } from "../api/access";
+import { grantedByText, grantName, lastCallText, Principal, rateText, revokeAsk, useAccessAsk } from "../api/access";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Mono } from "../../components/Mono";
 import { when } from "../../time";
@@ -342,6 +342,7 @@ function EveryGrant({
     { key: "to", header: "Granted to", render: (g) => <Principal grant={g} /> },
     { key: "rate", header: "Rate", render: (g) => rateText(g.perMinute, Boolean(g.group)), hideBelow: "sm" },
     { key: "by", header: "Granted by", render: grantedByText, hideBelow: "md" },
+    { key: "last", header: "Last call", render: (g) => lastCallText(g.lastUsedAt), hideBelow: "sm" },
     {
       key: "revoke",
       header: "Revoke",

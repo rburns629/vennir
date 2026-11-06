@@ -54,7 +54,7 @@ function product(a: ApiView) {
 }
 
 function grant(g: GrantView) {
-  return { ...g, createdAt: timestamp(g.createdAt), updatedAt: timestamp(g.updatedAt), revokedAt: timestamp(g.revokedAt), awaySince: timestamp(g.awaySince) };
+  return { ...g, createdAt: timestamp(g.createdAt), updatedAt: timestamp(g.updatedAt), revokedAt: timestamp(g.revokedAt), awaySince: timestamp(g.awaySince), lastUsedAt: timestamp(g.lastUsedAt) };
 }
 
 function request(r: RequestView) {
@@ -179,6 +179,7 @@ export function apiService(): ServiceImpl<typeof ApiService> {
           group: a.group ?? "",
           grantId: a.grantId ?? "",
           perMinute: a.perMinute,
+          lastUsedAt: timestamp(a.lastUsedAt),
         })),
         requests: mine.requests.map(request),
         groups: mine.groups,

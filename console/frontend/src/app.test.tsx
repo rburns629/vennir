@@ -1287,17 +1287,20 @@ describe("who may call an API (decision 26)", () => {
     await waitFor(() => { expect(withdrawn.seen).toEqual([{ accessRequestId: "r1" }]); });
   });
 
-  it("shows a grant by name, at its rate, and gives it up (15d)", async () => {
+  it("shows a grant by name, at its rate, its last call, and gives it up (15d)", async () => {
     const revoked = recorder();
     await renderAt("/apis/payments/orders", PRIYA, {
       "ApiService/GetApi": { api: { ...ORDERS, mayCall: true, accessVia: "API_ACCESS_VIA_USER", perMinute: 300 }, openapi: "{}" },
-      "ApiService/ListMyApiAccess": { access: [{ team: "payments", name: "orders", via: "API_ACCESS_VIA_USER", grantId: "g1", perMinute: 300 }] },
+      "ApiService/ListMyApiAccess": {
+        access: [{ team: "payments", name: "orders", via: "API_ACCESS_VIA_USER", grantId: "g1", perMinute: 300, lastUsedAt: new Date().toISOString() }],
+      },
       "ApiService/RevokeApiGrant": revoked.answer,
     });
     const card = await screen.findByRole("region", { name: "Your access" });
     expect(await within(card).findByRole("heading", { name: "Granted" })).toBeTruthy();
     expect(within(card).getByText("You, by name · not through a group")).toBeTruthy();
     expect(within(card).getByText(/300 a minute · payments may change it/)).toBeTruthy();
+    expect(within(card).getByText(/^today \d/)).toBeTruthy();
     fireEvent.click(within(card).getByRole("button", { name: "Give up my access…" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Give up my access" }));
     await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g1" }]); });
@@ -1333,7 +1336,7 @@ describe("who may call an API (decision 26)", () => {
     const OWN = { ...ORDERS, mayCall: true, backendUrl: "https://orders.internal", sourcePath: "teams/payments/apis/orders/api.yaml" };
     const ACCESS = {
       grants: [
-        { id: "g1", team: "payments", name: "orders", group: "orders-readers@acme.com", perMinute: 600, defaultRate: true, grantedBy: "dana@acme.com", createdAt: "2026-10-02T10:00:00Z" },
+        { id: "g1", team: "payments", name: "orders", group: "orders-readers@acme.com", perMinute: 600, defaultRate: true, grantedBy: "dana@acme.com", createdAt: "2026-10-02T10:00:00Z", lastUsedAt: new Date().toISOString() },
         { id: "g2", team: "payments", name: "orders", userId: "u-bot", userEmail: "growth-sync@bots.vennir.local", bot: true, perMinute: 1200, grantedBy: "dana@acme.com" },
         { id: "g3", team: "payments", name: "orders", userEmail: "campaign@bots.vennir.local", bot: true, perMinute: 60, revokedAt: new Date().toISOString(), revokedBy: "ana@acme.com" },
       ],
@@ -1352,6 +1355,10 @@ describe("who may call an API (decision 26)", () => {
       const list = within(section).getByRole("region", { name: "Access list" });
       expect(within(list).getByText("orders-readers@acme.com")).toBeTruthy();
       expect(within(list).getByText("growth-sync")).toBeTruthy();
+      // Each grant's last call, as the gateway records it; never, for one nobody used.
+      expect(within(list).getByRole("columnheader", { name: "Last call" })).toBeTruthy();
+      expect(within(list).getByText(/^today \d/)).toBeTruthy();
+      expect(within(list).getByText("never")).toBeTruthy();
       // A revoked grant is history, not on the list.
       expect(within(list).queryByText("campaign")).toBeNull();
       expect(within(screen.getByRole("region", { name: "Ended, last 30 days" })).getByText("campaign@bots.vennir.local")).toBeTruthy();

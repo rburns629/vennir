@@ -160,3 +160,74 @@ func TestABadRowDoesntStopTheRest(t *testing.T) {
 		t.Errorf("recorded %q, want %q", endpoints, want)
 	}
 }
+
+// A grant's last call is written at the next flush, then not again within
+// GrantUseResolution, and never made earlier (another replica's later one
+// stands); a deleted grant's is skipped, and one Postgres refuses dropped.
+func TestAGrantsLastCallIsWritten(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		url = "postgresql://postgres@localhost/execution_console_test"
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	var teamID, grantID string
+	if err := pool.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-grant-' || substr(md5(random()::text), 1, 6)) RETURNING id::text`).Scan(&teamID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID); err != nil {
+			t.Errorf("removing the test's team: %v", err)
+		}
+	})
+	if err := pool.QueryRow(ctx, `WITH api AS (INSERT INTO apis (team_id, name, display_name, openapi, backend_url, service_account)
+		VALUES ($1::uuid, 'orders', 'Orders', '{}', 'https://x', 'orders-api') RETURNING id)
+		INSERT INTO api_grants (api_id, team_id, api_name, group_name) SELECT id, $1::uuid, 'orders', 'eng' FROM api RETURNING id::text`, teamID).Scan(&grantID); err != nil {
+		t.Fatal(err)
+	}
+	lastUsed := func() time.Time {
+		var at *time.Time
+		if err := pool.QueryRow(ctx, `SELECT last_used_at FROM api_grants WHERE id = $1::uuid`, grantID).Scan(&at); err != nil {
+			t.Fatal(err)
+		}
+		if at == nil {
+			return time.Time{}
+		}
+		return *at
+	}
+	r := &Recorder{DB: pool, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	first := time.Now().Truncate(time.Microsecond)
+	r.Used(grantID, first)
+	r.Used(grantID, first.Add(-time.Second)) // an earlier call, flushed with it: the later stands
+	r.Used("00000000-0000-0000-0000-000000000000", first)
+	r.Used("not-a-uuid", first) // refused by Postgres: dropped, not keeping the rest back
+	if err := r.Flush(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := lastUsed(); !got.Equal(first) {
+		t.Fatalf("after the first call: %v, want %v", got, first)
+	}
+	r.Used(grantID, first.Add(time.Minute))
+	if err := r.Flush(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := lastUsed(); !got.Equal(first) {
+		t.Errorf("within %v: rewritten to %v", GrantUseResolution, got)
+	}
+	// Another replica wrote a later call; this one's earlier isn't written over it.
+	later := first.Add(10 * time.Minute)
+	if _, err := pool.Exec(ctx, `UPDATE api_grants SET last_used_at = $2 WHERE id = $1::uuid`, grantID, later); err != nil {
+		t.Fatal(err)
+	}
+	r.Used(grantID, first.Add(GrantUseResolution+time.Second))
+	if err := r.Flush(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := lastUsed(); !got.Equal(later) {
+		t.Errorf("an earlier call over a later one: %v, want %v", got, later)
+	}
+}

@@ -119,7 +119,7 @@ its own directory.
   access list grants, `api_grants`, decision 26, as
   `console/src/core/apiAccess.ts` decides it), writing
   only its own traffic counts (`api_traffic`), why an API can't be
-  served (`api_problems`) and API tokens' `last_used_at`. It checks sessions with the
+  served (`api_problems`) and API tokens' and grants' `last_used_at`. It checks sessions with the
   console's public key (`/api/auth/jwks`), never `JWT_SECRET`. The console chart deploys it (`gateway.enabled`); it may mint
   ServiceAccount tokens only for `*-api` ServiceAccounts in team namespaces,
   and only for the audiences each API's `backend.auth` needs (admission

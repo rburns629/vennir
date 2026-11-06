@@ -66,8 +66,9 @@ export interface Access {
   via: Via;
   /** team: the team the gateway counts the calls against. */
   callingTeam?: string;
-  /** user, group: the grant. */
+  /** user, group: the grant, and its last call (anyone's in the group, for a group's). */
   grantId?: string;
+  lastUsedAt?: Date | null;
   group?: string;
   perMinute: number;
 }
@@ -113,13 +114,13 @@ export function accessFor(who: Pick<AuthUser, "id" | "isBot" | "groupsCurrent">,
   const granted = ctx.grants.filter((g) => g.apiId === api.id && g.revokedAt === null);
   const named = granted.find((g) => g.userId === who.id);
   // A bot's grant counts while one of its teams is live: none from a retired team.
-  if (named && (!who.isBot || ctx.teams.length > 0)) return { via: "user", grantId: named.id, perMinute: grantRate(api, named) };
+  if (named && (!who.isBot || ctx.teams.length > 0)) return { via: "user", grantId: named.id, lastUsedAt: named.lastUsedAt, perMinute: grantRate(api, named) };
   if (!who.isBot && who.groupsCurrent) {
     const best = granted
       .filter((g) => g.groupName !== null && ctx.groups.includes(g.groupName))
       // The best rate, then the group's name byte for byte, as the gateway picks.
       .sort((a, b) => grantRate(api, b) - grantRate(api, a) || byteOrder(a.groupName ?? "", b.groupName ?? ""))[0];
-    if (best?.groupName) return { via: "group", grantId: best.id, group: best.groupName, perMinute: grantRate(api, best) };
+    if (best?.groupName) return { via: "group", grantId: best.id, lastUsedAt: best.lastUsedAt, group: best.groupName, perMinute: grantRate(api, best) };
   }
   return null;
 }
@@ -292,6 +293,8 @@ export interface GrantView {
   revokeReason: string;
   // When its API left the catalog's release; null while it's published.
   awaySince: Date | null;
+  // The last request let in through it (the gateway's, to a few minutes).
+  lastUsedAt: Date | null;
 }
 
 /**
@@ -330,6 +333,7 @@ async function grantViews(rows: Grant[], apisById: Map<string, Api>, awayTeams =
         revokedBy: g.revokedBy ? (people.get(g.revokedBy)?.email ?? "(deleted account)") : "",
         revokeReason: g.revokeReason ?? "",
         awaySince: g.awaySince,
+        lastUsedAt: g.lastUsedAt,
       },
     ];
   });

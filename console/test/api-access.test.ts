@@ -644,6 +644,18 @@ describe("the lists", () => {
     expect(access.body.requests?.[0]?.state).toBe("API_ACCESS_REQUEST_STATE_WAITING");
   });
 
+  it("say when each grant last let someone in, as the gateway records it, and nothing for one never used", async () => {
+    const used = await add("maintainer", "spare", { group: "last-call@example.com" });
+    const unused = await add("maintainer", "spare", { group: "never-called@example.com" });
+    const at = new Date("2026-11-06T12:00:00Z");
+    await db.update(apiGrants).set({ lastUsedAt: at }).where(eq(apiGrants.id, used.body.grant.id));
+    const access = await call<{ grants?: (Grant & { lastUsedAt?: string })[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "spare" });
+    const byId = new Map(access.body.grants?.map((g) => [g.id, g]));
+    expect(byId.get(used.body.grant.id)?.lastUsedAt).toBe("2026-11-06T12:00:00Z");
+    expect(byId.get(unused.body.grant.id)).toBeDefined();
+    expect(byId.get(unused.body.grant.id)?.lastUsedAt).toBeUndefined();
+  });
+
   it("of mine say how I may call each, and my requests that wait or were declined", async () => {
     const mine = await call<{ access?: { team: string; name: string; via: string; callingTeam?: string; perMinute: number }[]; requests?: Request[] }>(
       tokens.consumer,
@@ -651,9 +663,14 @@ describe("the lists", () => {
     );
     // None of the owner's: a team api.yaml names a limit for gives no access.
     expect((mine.body.access ?? []).filter((a) => a.team === owner)).toEqual([]);
-    const ada = await call<{ access?: { name: string; via: string }[]; requests?: Request[] }>(tokens.ada, "ApiService/ListMyApiAccess");
+    const ada = await call<{ access?: { name: string; via: string; grantId: string; lastUsedAt?: string }[]; requests?: Request[] }>(tokens.ada, "ApiService/ListMyApiAccess");
     expect(ada.body.access?.map((a) => `${a.name}:${a.via}`)).toEqual(["open:API_ACCESS_VIA_USER"]);
     expect(ada.body.requests?.map((r) => r.state)).toEqual(["API_ACCESS_REQUEST_STATE_WAITING"]);
+    // With their grant's last call, once the gateway has recorded one.
+    expect(ada.body.access?.[0]?.lastUsedAt).toBeUndefined();
+    await db.update(apiGrants).set({ lastUsedAt: new Date("2026-11-06T12:00:00Z") }).where(eq(apiGrants.id, ada.body.access?.[0]?.grantId ?? ""));
+    const again = await call<{ access?: { lastUsedAt?: string }[] }>(tokens.ada, "ApiService/ListMyApiAccess");
+    expect(again.body.access?.[0]?.lastUsedAt).toBe("2026-11-06T12:00:00Z");
   });
 
   it("of a team's bots' are its members' and admins'", async () => {

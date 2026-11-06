@@ -8,7 +8,7 @@ import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
 import { when } from "../../time";
-import { botName, botTeamsOf, grantedByText, grantName, rateText, RequestAccessDialog, revokeAsk, useAccessAsk, withdrawAsk } from "../api/access";
+import { botName, botTeamsOf, grantedByText, grantName, lastCallText, rateText, RequestAccessDialog, revokeAsk, useAccessAsk, withdrawAsk } from "../api/access";
 import { CardTitle, SectionLabel } from "./shared";
 
 type Row = { key: string; team: string; name: string; grant: ApiGrant | null; request: ApiAccessRequest | null };
@@ -114,6 +114,7 @@ export function BotApiAccess({ teamName, bots, readOnly }: { teamName: string; b
             ? `asked by ${r.request.requestedBy === user?.email ? "you" : r.request.requestedBy}${r.request.createdAt ? `, ${when(r.request.createdAt)}` : ""}`
             : `${r.request?.decidedBy ?? ""}${r.request?.decidedAt ? `, ${when(r.request.decidedAt)}` : ""}`,
     },
+    { key: "last", header: "Last call", render: (r) => (r.grant ? lastCallText(r.grant.lastUsedAt) : "—"), hideBelow: "sm" },
     {
       key: "actions",
       header: "Actions",
