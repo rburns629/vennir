@@ -506,6 +506,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `step-job.json` | A step's Job exactly as the kernel's executor makes it (a kernel test keeps it equal), which `admission-policies.sh` dry-runs as the scheduler and as anyone else. |
 | `admission-policies.sh` | Proves the charts' admission policies on a real cluster (dispatch and a step's Job shape, step Jobs, image sources, step identity, scans, purging, the console's write fence, namespaces and Jobs, the gateway's tokens), case by case with server-side dry runs; and the kernel's catalog policies beside the console's (both apply), and who may update which. Run by CI's kubernetes job. |
 | `catalog-policy-render.sh` | The kernel chart's catalog policies rendered with no cluster (no lookup): their maps empty, `apiAudiencesWritten` false, and the settings the chart refuses. Run by CI's helm job. |
+| `console-render.sh` | The console chart's refusals, rendered with no cluster: the gateway on the console's own host, where an API's page could read the console's session. CI's helm job runs it. |
 
 ### `helm/values/`: each cluster's settings
 

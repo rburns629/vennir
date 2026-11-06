@@ -229,6 +229,8 @@ jobs:
           done
       - name: The catalog policies rendered with no cluster (decision 27)
         run: bash helm/tests/catalog-policy-render.sh
+      - name: The console chart's refusals, rendered with no cluster
+        run: bash helm/tests/console-render.sh
       - name: The alerts, evaluated by promtool
         run: bash helm/tests/prometheus-rules.sh
       - name: Render every size, with sleeping and headroom on

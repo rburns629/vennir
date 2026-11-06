@@ -163,23 +163,6 @@ it was seen.
   namespace from API backends' log search (`console/src/core/logs.ts`).
   Before, check the gateway's logs for the warning on each install.
 
-- [ ] **Every API shares the gateway's origin** (found 2026-11-03, in the
-  review of the day's fixes): the gateway keeps a backend's cookies to its
-  API's path, so no backend can set or overwrite another's, but a path is no
-  boundary inside one origin. A page one team's backend serves can run
-  script that reads another API's cookies that aren't HttpOnly (through a
-  same-origin frame), and can fetch other APIs' paths with their cookies
-  attached. The gateway's own sign-in is a bearer header, so that fetch gets
-  the gateway's 401, but a backend that takes its own cookies as sign-in
-  would answer it. The gateway takes only a bearer token, which a browser
-  never sends on a navigation or a frame, so no browser can load an API's
-  page there as a signed-in person; check this holds, then close the item.
-  Decision 26 (`docs/assessment.md`, approved 2026-11-05): the paths stay,
-  the gateway passes everything through, and each API has an access list
-  of grants to groups or users (built: `console/src/core/apiAccess.ts`, the
-  gateway's `accessFor`) with its console pages (what they can't show yet
-  is below, under Console).
-
 - [ ] **Drop the `apis.share_with` column** (the release after the one
   that stopped reading it, 2026-11-06): nothing reads or writes it now
   (migration 0073 emptied it, so a gateway from before still running
