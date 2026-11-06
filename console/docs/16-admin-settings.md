@@ -205,7 +205,9 @@ Set by the install, in the console chart's `scanning`: `enabled` (on by default)
 
 `/admin/gateway`. One front door for every team's API products. It signs callers in, lets through only what each API's reviewed OpenAPI file describes, and forwards the request to the API's backend.
 
-If the gateway isn't running, the section says so: turn it on with `gateway.enabled` in vennir.yaml. Otherwise it shows its state, the APIs published, the requests in the last 24 hours, and how many were refused at the door.
+If the gateway isn't running, the section says so: turn it on with `gateway.enabled` in vennir.yaml. Otherwise it shows its state, the APIs published, the requests in the last 24 hours, how many were refused at the door, how many APIs are held, the grants (groups, people, bots) and the requests waiting for the APIs' teams.
+
+**Held APIs** lists each API whose backend's host isn't allowed, with why. **Every grant** lists every active grant on every API (API, to whom, rate, who granted it), with **Find a grant**; for an incident, **Revoke…** ends one (calls stop within a minute, and the API's team and whom it names are told). Admins don't add or change grants or answer requests: those are each API team's, on its page.
 
 **This install's settings** shows, read-only:
 
@@ -220,7 +222,7 @@ These change with `vennir apply`, not here. See [operations](operations.md#the-a
 
 **Close the gateway…** takes a **Message to every caller**, and asks you to confirm. While it's closed, every API answers 503 with that message and nothing is forwarded. The console and runs carry on. **Reopen** undoes it. Both are recorded in the audit log. The console chart's `gateway.closed` keeps it closed from the install's side. A team's maintainers can pause one of their own APIs from its page.
 
-**Refused at the door, last 24 hours** lists why requests were stopped (not in the API's spec, didn't match it, not signed in, not shared with the caller's team, over a limit, paused, and so on), what the gateway answered, how many, and the team most of them came from. Each one, with its caller, is in Observe.
+**Refused at the door, last 24 hours** lists why requests were stopped (not in the API's spec, didn't match it, not signed in, not on the API's access list, over a limit, paused, and so on), what the gateway answered, how many, and the team most of them came from. Each one, with its caller, is in Observe.
 
 ### Chat agent
 

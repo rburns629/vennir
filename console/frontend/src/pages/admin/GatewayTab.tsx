@@ -8,7 +8,9 @@ import Card from "@mui/material/Card";
 import Link from "@mui/material/Link";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { errorMessage, getGateway, setGatewayClosed, type GatewayInfo } from "../../api";
+import { errorMessage, getGateway, listApiAccess, listApis, setGatewayClosed, type ApiAccessRequest, type ApiGrant, type ApiProduct, type GatewayInfo } from "../../api";
+import { DataTable, type DataTableColumn } from "../../components/DataTable";
+import { grantedByText, Principal, rateText, revokeAsk, useAccessAsk } from "../api/access";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Mono } from "../../components/Mono";
 import { when } from "../../time";
@@ -20,7 +22,7 @@ const OUTCOME: Record<string, { why: string; answered: string }> = {
   blocked: { why: "Not in the API's spec", answered: "404" },
   invalid: { why: "Didn't match the spec, or too large", answered: "400, 413" },
   unauthenticated: { why: "Not signed in, or token unknown", answered: "401" },
-  forbidden: { why: "Not shared with the caller's team", answered: "403" },
+  forbidden: { why: "Not on the API's access list", answered: "403" },
   limited: { why: "Over a limit", answered: "429" },
   paused: { why: "API paused by its team", answered: "503" },
   closed: { why: "The gateway was closed", answered: "503" },
@@ -28,6 +30,8 @@ const OUTCOME: Record<string, { why: string; answered: string }> = {
   unavailable: { why: "The API or its caller couldn't be checked", answered: "503" },
   backend_error: { why: "The backend failed or didn't answer", answered: "500, 502, 504" },
 };
+
+const count = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
 
 function Figure({ label, value, note }: { label: string; value: ReactNode; note: ReactNode }) {
   return (
@@ -47,7 +51,9 @@ function Figure({ label, value, note }: { label: string; value: ReactNode; note:
  * The API gateway: how busy it is, this install's settings (its Helm
  * values, changed by an upgrade, not here), closing it (every API answers
  * 503 with the message, and nothing is forwarded, until it's reopened), and
- * what it refused at the door over the last day.
+ * what it refused at the door over the last day; its held APIs, and every
+ * grant on every API (decision 26), which an admin may revoke in an
+ * incident but not add or change.
  */
 export function GatewayTab() {
   const [gateway, setGateway] = useState<GatewayInfo | null>(null);
@@ -62,6 +68,20 @@ export function GatewayTab() {
       .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the gateway.")); });
   }, []);
   useEffect(load, [load]);
+
+  // Every API, and each one's access list: what's held, every grant, what waits.
+  const [apis, setApis] = useState<ApiProduct[] | null>(null);
+  const [access, setAccess] = useState<{ grants: ApiGrant[]; requests: ApiAccessRequest[] } | null>(null);
+  const loadAccess = useCallback(() => {
+    listApis()
+      .then(async (list) => {
+        setApis(list);
+        const lists = await Promise.all(list.map((a) => listApiAccess(a.team, a.name)));
+        setAccess({ grants: lists.flatMap((l) => l.grants.filter((g) => !g.revokedAt)), requests: lists.flatMap((l) => l.requests.filter((r) => r.state === "waiting")) });
+      })
+      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the APIs' grants.")); });
+  }, []);
+  useEffect(loadAccess, [loadAccess]);
 
   const changed = useAdminChanged();
   async function toggle(): Promise<void> {
@@ -83,6 +103,9 @@ export function GatewayTab() {
     }
   }
 
+  const held = apis?.filter((a) => a.state === "HELD") ?? [];
+  const grants = access?.grants ?? [];
+  const waitingApis = new Set(access?.requests.map((r) => `${r.team}/${r.name}`)).size;
   const refused = gateway?.refused.reduce((n, r) => n + r.count, 0) ?? 0;
   const share = gateway && gateway.requests24h > 0 ? `${((refused / gateway.requests24h) * 100).toFixed(1)}% of requests` : "of no requests";
   return (
@@ -106,7 +129,38 @@ export function GatewayTab() {
             <Figure label="APIs published" value={gateway.apis} note={gateway.backendHosts.length === 0 ? "held until a backend host is allowed" : "on this install"} />
             <Figure label="Requests, 24 hours" value={gateway.requests24h.toLocaleString()} note={`to ${String(gateway.apis)} ${gateway.apis === 1 ? "API" : "APIs"}`} />
             <Figure label="Refused at the door" value={refused.toLocaleString()} note={share} />
+            <Figure label="APIs held" value={apis ? `${String(held.length)} of ${String(apis.length)}` : "…"} note="its backend’s host isn’t allowed" />
+            <Figure
+              label="Grants"
+              value={access ? grants.length : "…"}
+              note={[
+                count(grants.filter((g) => g.group).length, "group", "groups"),
+                count(grants.filter((g) => !g.group && !g.bot).length, "person", "people"),
+                count(grants.filter((g) => g.bot).length, "bot", "bots"),
+              ].join(", ")}
+            />
+            <Figure label="Requests waiting" value={access ? access.requests.length : "…"} note={`on ${String(waitingApis)} ${waitingApis === 1 ? "API" : "APIs"}, for their teams`} />
           </Box>
+
+          {held.length > 0 && (
+            <AdminCard title={`Held APIs · ${String(held.length)}`} accent="warning">
+              <Typography variant="body2" color="text.secondary">
+                Not served, with the reason, on their pages too. Each serves by itself once its reason clears.
+              </Typography>
+              {held.map((a) => (
+                <Box key={`${a.team}/${a.name}`} sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+                  <Link component={RouterLink} to={`/apis/${encodeURIComponent(a.team)}/${encodeURIComponent(a.name)}`} variant="body2" sx={{ fontWeight: 600 }}>
+                    {a.displayName || a.name} <Mono sx={{ fontSize: 12, color: "text.secondary" }}>{a.team}/{a.name}</Mono>
+                  </Link>
+                  <Typography variant="body2" color="text.secondary">
+                    {a.heldReason}
+                  </Typography>
+                </Box>
+              ))}
+            </AdminCard>
+          )}
+
+          <EveryGrant apis={apis ?? []} grants={access ? grants : null} waiting={access?.requests.length ?? 0} onChanged={loadAccess} />
 
           <AdminCard title="This install's settings" status={<Aside>Read-only: an upgrade changes them</Aside>}>
             <KeyValues
@@ -215,7 +269,7 @@ export function GatewayTab() {
             )}
           </AdminCard>
           <Typography variant="body2" color="text.secondary">
-            Each API&apos;s own limits, sharing and traffic are on its page in{" "}
+            Each API&apos;s own limits, access list and traffic are on its page in{" "}
             <Link component={RouterLink} to="/apis">
               APIs
             </Link>
@@ -234,5 +288,63 @@ export function GatewayTab() {
         </>
       )}
     </>
+  );
+}
+
+/** Every active grant on every API, for an incident: an admin revokes one; adding and changing them, and answering requests, are each API team's. */
+function EveryGrant({ apis, grants, waiting, onChanged }: { apis: ApiProduct[]; grants: ApiGrant[] | null; waiting: number; onChanged: () => void }) {
+  const [search, setSearch] = useState("");
+  const { ask, dialog } = useAccessAsk(onChanged);
+  const names = new Map(apis.map((a) => [`${a.team}/${a.name}`, a.displayName || a.name]));
+  const q = search.trim().toLowerCase();
+  const shown = grants?.filter((g) => !q || [g.team, g.name, g.group, g.userEmail, names.get(`${g.team}/${g.name}`) ?? ""].some((s) => s.toLowerCase().includes(q))) ?? null;
+  const columns: DataTableColumn<ApiGrant>[] = [
+    {
+      key: "api",
+      header: "API",
+      render: (g) => (
+        <Link component={RouterLink} to={`/apis/${encodeURIComponent(g.team)}/${encodeURIComponent(g.name)}`} variant="body2">
+          {names.get(`${g.team}/${g.name}`) ?? g.name}{" "}
+          <Typography component="span" variant="caption" color="text.secondary">
+            {g.team}’s
+          </Typography>
+        </Link>
+      ),
+    },
+    { key: "to", header: "Granted to", render: (g) => <Principal grant={g} /> },
+    { key: "rate", header: "Rate", render: (g) => rateText(g.perMinute, Boolean(g.group)), hideBelow: "sm" },
+    { key: "by", header: "Granted by", render: grantedByText, hideBelow: "md" },
+    {
+      key: "revoke",
+      header: "Revoke",
+      align: "right",
+      render: (g) => (
+        <Button size="small" color="error" onClick={() => { ask(revokeAsk(g, `For an incident: ${g.team}’s maintainers and whom it names are told.`)); }}>
+          Revoke…
+        </Button>
+      ),
+    },
+  ];
+  return (
+    <AdminCard title={`Every grant${grants ? ` · ${String(grants.length)}` : ""}`} label="Every grant">
+      <Typography variant="body2" color="text.secondary">
+        For an incident, an admin may revoke any grant; calls stop within a minute, and the API’s team and the one granted are told. Adding and changing
+        grants{waiting > 0 ? `, and answering the ${String(waiting)} waiting ${waiting === 1 ? "request" : "requests"},` : ""} are each API team’s.
+      </Typography>
+      <TextField
+        size="small"
+        type="search"
+        placeholder="Find a grant"
+        value={search}
+        onChange={(e) => { setSearch(e.target.value); }}
+        sx={{ maxWidth: 340 }}
+        slotProps={{ htmlInput: { "aria-label": "Find a grant" } }}
+      />
+      <DataTable columns={columns} rows={shown} getRowKey={(g) => g.id} skeletonRowCount={2} emptyMessage={q ? "No grant matches." : "No grants yet: each API's team grants who may call it."} />
+      <Typography variant="caption" color="text.secondary">
+        A group’s rate is each member’s.
+      </Typography>
+      {dialog}
+    </AdminCard>
   );
 }

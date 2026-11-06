@@ -17,7 +17,14 @@ import { fromJson, type JsonObject, type JsonValue } from "@bufbuild/protobuf";
 import { timestampDate, timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { AdminService } from "./gen/vennir/console/v1/admin_pb.js";
 import { AuthService } from "./gen/vennir/console/v1/auth_pb.js";
-import { ApiService, ApiState } from "./gen/vennir/console/v1/api_pb.js";
+import {
+  ApiAccessRequestState,
+  ApiAccessVia as ApiAccessViaMessage,
+  ApiService,
+  ApiState,
+  type ApiAccessRequest as ApiAccessRequestMessage,
+  type ApiGrant as ApiGrantMessage,
+} from "./gen/vennir/console/v1/api_pb.js";
 import { ObserveService } from "./gen/vennir/console/v1/observe_pb.js";
 import {
   DagSchema,
@@ -1833,8 +1840,10 @@ export interface ApiProduct {
   backendAuth: string;
   specTitle: string;
   specVersion: string;
-  /** When the caller may not call it: an issue asking its team to share it, on the catalog repository. */
-  askForAccessUrl: string | null;
+  /** How the caller may call it (decision 26), or null when they may not. */
+  accessVia: ApiAccessVia | null;
+  /** Its api.yaml's access.requests: open (granted at once), approval, or closed (no requests). */
+  accessRequests: "open" | "approval" | "closed";
   /** Each team its api.yaml names a limit for; everyone else gets defaultPerMinute (api.yaml's, else the gateway's own). */
   limits: { team: string; perMinute: number }[];
   defaultPerMinute: number;
@@ -1868,7 +1877,8 @@ function apiProduct(a: Awaited<ReturnType<typeof apisApi.listApis>>["apis"][numb
     backendAuth: a.backendAuth,
     specTitle: a.specTitle,
     specVersion: a.specVersion,
-    askForAccessUrl: a.askForAccessUrl || null,
+    accessVia: via(a.accessVia),
+    accessRequests: a.accessRequests === "open" || a.accessRequests === "closed" ? a.accessRequests : "approval",
     limits: a.limits.map((l) => ({ team: l.team, perMinute: l.perMinute })),
     defaultPerMinute: a.defaultPerMinute,
     defaultFromGateway: a.defaultFromGateway,
@@ -1962,6 +1972,182 @@ export async function getGateway(): Promise<GatewayInfo> {
 /** Closes the gateway with a message, or reopens it (""). */
 export async function setGatewayClosed(message: string): Promise<void> {
   await call(() => apisApi.setGatewayClosed({ message }));
+}
+
+/** How a caller may call an API (decision 26): its own team's, a grant naming them, a group's grant, or its api.yaml's shareWith (from the catalog). */
+export type ApiAccessVia = "team" | "user" | "group" | "catalog";
+
+function via(v: ApiAccessViaMessage): ApiAccessVia | null {
+  return v === ApiAccessViaMessage.UNSPECIFIED ? null : (ApiAccessViaMessage[v].toLowerCase() as ApiAccessVia);
+}
+
+/** One grant of an API's access list: to a group (each person in it) or one user (a person or a bot). */
+export interface ApiGrant {
+  id: string;
+  team: string;
+  name: string;
+  /** A single sign-on group, or else a user. */
+  group: string;
+  userId: string;
+  userEmail: string;
+  bot: boolean;
+  /** Requests a minute (a group's: each member's); defaultRate: the API's default limit, which it follows. */
+  perMinute: number;
+  defaultRate: boolean;
+  grantedBy: string;
+  accessRequestId: string;
+  createdAt: string | null;
+  revokedAt: string | null;
+  revokedBy: string;
+  revokeReason: string;
+  /** When its API left the catalog's release; null while it's published. */
+  awaySince: string | null;
+}
+
+function apiGrant(g: ApiGrantMessage): ApiGrant {
+  return {
+    id: g.id,
+    team: g.team,
+    name: g.name,
+    group: g.group,
+    userId: g.userId,
+    userEmail: g.userEmail,
+    bot: g.bot,
+    perMinute: g.perMinute,
+    defaultRate: g.defaultRate,
+    grantedBy: g.grantedBy,
+    accessRequestId: g.accessRequestId,
+    createdAt: iso(g.createdAt),
+    revokedAt: iso(g.revokedAt),
+    revokedBy: g.revokedBy,
+    revokeReason: g.revokeReason,
+    awaySince: iso(g.awaySince),
+  };
+}
+
+/** A request for access to an API: for a person (by themselves) or a bot (by its team's maintainer). */
+export interface ApiAccessRequest {
+  id: string;
+  team: string;
+  name: string;
+  userId: string;
+  userEmail: string;
+  bot: boolean;
+  requestedBy: string;
+  reason: string;
+  state: "waiting" | "granted" | "declined" | "withdrawn";
+  decidedBy: string;
+  decisionReason: string;
+  grantId: string;
+  createdAt: string | null;
+  decidedAt: string | null;
+  /** A person's groups, one of which may be granted instead: the API's maintainers only, while it waits. */
+  groups: string[];
+  groupsReadAt: string | null;
+  awaySince: string | null;
+}
+
+function accessRequest(r: ApiAccessRequestMessage): ApiAccessRequest {
+  return {
+    id: r.id,
+    team: r.team,
+    name: r.name,
+    userId: r.userId,
+    userEmail: r.userEmail,
+    bot: r.bot,
+    requestedBy: r.requestedBy,
+    reason: r.reason,
+    state: (ApiAccessRequestState[r.state] ?? "WAITING").toLowerCase() as ApiAccessRequest["state"],
+    decidedBy: r.decidedBy,
+    decisionReason: r.decisionReason,
+    grantId: r.grantId,
+    createdAt: iso(r.createdAt),
+    decidedAt: iso(r.decidedAt),
+    groups: r.groups,
+    groupsReadAt: iso(r.groupsReadAt),
+    awaySince: iso(r.awaySince),
+  };
+}
+
+/** Asks for access, with a reason: for yourself, or (botEmail) for a bot of a team you maintain. An open API's grant comes back at once. */
+export async function requestApiAccess(team: string, name: string, reason: string, botEmail = ""): Promise<{ request: ApiAccessRequest | null; grant: ApiGrant | null }> {
+  const r = await call(() => apisApi.requestApiAccess({ team, name, reason, botEmail }));
+  return { request: r.request ? accessRequest(r.request) : null, grant: r.grant ? apiGrant(r.grant) : null };
+}
+
+/** Withdraws a waiting request: whoever asked. */
+export async function withdrawApiAccessRequest(id: string): Promise<void> {
+  await call(() => apisApi.withdrawApiAccessRequest({ accessRequestId: id }));
+}
+
+/** Grants a waiting request (to the person, or `group` of theirs, at `perMinute`, 0 the API's default), or declines it with a reason: the API's maintainers. */
+export async function decideApiAccessRequest(
+  id: string,
+  decision: { approve: true; group?: string; perMinute?: number } | { approve: false; reason: string },
+): Promise<void> {
+  await call(() =>
+    apisApi.decideApiAccessRequest(
+      decision.approve
+        ? { accessRequestId: id, approve: true, group: decision.group ?? "", perMinute: decision.perMinute ?? 0 }
+        : { accessRequestId: id, approve: false, reason: decision.reason },
+    ),
+  );
+}
+
+/** Grants a group, or a user by email, at `perMinute` (0: the API's default): the API's maintainers. */
+export async function addApiGrant(team: string, name: string, to: { group: string } | { email: string }, perMinute: number): Promise<ApiGrant | null> {
+  const r = await call(() => apisApi.addApiGrant({ team, name, perMinute, ...to }));
+  return r.grant ? apiGrant(r.grant) : null;
+}
+
+/** Changes a grant's rate (0: the API's default): the API's maintainers. */
+export async function setApiGrantRate(id: string, perMinute: number): Promise<void> {
+  await call(() => apisApi.setApiGrantRate({ grantId: id, perMinute }));
+}
+
+/** Revokes a grant: the API's maintainers, an admin, whom it names, or the maintainers of the bot it names. */
+export async function revokeApiGrant(id: string, reason = ""): Promise<void> {
+  await call(() => apisApi.revokeApiGrant({ grantId: id, reason }));
+}
+
+/** An API's grants (active first, then revoked) and requests (waiting first), and the teams its api.yaml's shareWith names: its own team, and admins. */
+export async function listApiAccess(team: string, name: string): Promise<{ grants: ApiGrant[]; requests: ApiAccessRequest[]; shareWith: string[] }> {
+  const r = await call(() => apisApi.listApiAccess({ team, name }));
+  return { grants: r.grants.map(apiGrant), requests: r.requests.map(accessRequest), shareWith: r.shareWith };
+}
+
+/** One API the caller may call, and how. */
+export interface MyApiAccess {
+  team: string;
+  name: string;
+  via: ApiAccessVia;
+  /** team and catalog: the team the calls count against. */
+  callingTeam: string;
+  /** group: the group; user and group: the grant. */
+  group: string;
+  grantId: string;
+  perMinute: number;
+}
+
+/** What the caller may call, and how, and their requests that wait or were declined. */
+export async function listMyApiAccess(): Promise<{ access: MyApiAccess[]; requests: ApiAccessRequest[] }> {
+  const r = await call(() => apisApi.listMyApiAccess({}));
+  return {
+    access: r.access.map((a) => ({ team: a.team, name: a.name, via: via(a.via) ?? "user", callingTeam: a.callingTeam, group: a.group, grantId: a.grantId, perMinute: a.perMinute })),
+    requests: r.requests.map(accessRequest),
+  };
+}
+
+/** A team's bots' active grants, and their requests that wait or were declined: its members, and admins. */
+export async function listTeamBotApiAccess(team: string): Promise<{ grants: ApiGrant[]; requests: ApiAccessRequest[] }> {
+  const r = await call(() => apisApi.listTeamBotApiAccess({ team }));
+  return { grants: r.grants.map(apiGrant), requests: r.requests.map(accessRequest) };
+}
+
+/** The grants and requests of a team's APIs that left the catalog's release, kept 30 days: its members, and admins. */
+export async function listAwayApiAccess(team: string): Promise<{ grants: ApiGrant[]; requests: ApiAccessRequest[] }> {
+  const r = await call(() => apisApi.listAwayApiAccess({ team }));
+  return { grants: r.grants.map(apiGrant), requests: r.requests.map(accessRequest) };
 }
 
 export interface SecurityView {

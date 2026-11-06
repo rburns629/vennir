@@ -22,12 +22,13 @@ import { Pill } from "../components/Pill";
 import { errorMessage, listApis, type ApiProduct } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { size } from "./api/ApiOverview";
+import { MyAccess } from "./api/MyAccess";
 import { ApiStatePill } from "./api/ApiStatePill";
 
 type Filter = "all" | "call" | "mine" | "stopped";
 const FILTERS: [Filter, string, (a: ApiProduct, mine: boolean) => boolean][] = [
   ["all", "All", () => true],
-  ["call", "You can call", (a) => a.mayCall],
+  ["call", "You may call", (a) => a.mayCall],
   ["mine", "Your teams’", (_a, mine) => mine],
   ["stopped", "Not live", (a) => a.state !== "LIVE"],
 ];
@@ -38,18 +39,16 @@ function gatewayBase(address: string, a: ApiProduct): string {
   return address.endsWith(suffix) ? address.slice(0, -suffix.length) : "";
 }
 
+const VIA: Record<string, string> = { user: "by name", group: "through a group", catalog: "from the catalog (shareWith)" };
+
 /** The You column: whether you may call it, and on what terms. */
 function You({ api, mine }: { api: ApiProduct; mine: boolean }) {
-  // Calls are made as a team: someone in none may call nothing.
-  const teamless = (useAuth().user?.teamNames.length ?? 0) === 0;
   const terms = `${String(api.perMinute)} a minute · ${size(api.maxRequestBytes)} · ${String(api.timeoutSeconds)} s`;
   const [label, note] = mine
     ? ["Your team’s", api.state === "PAUSED" ? "every call gets 503 while paused" : api.state === "UNAVAILABLE" ? "every call gets 503 until its spec is fixed" : terms]
     : api.mayCall
-      ? ["May call", terms]
-      : teamless
-        ? ["In no team", "calls are made as one of your teams: join one to call it"]
-        : ["Not shared", "the gateway answers your calls with 403"];
+      ? [`May call${api.accessVia && VIA[api.accessVia] ? `, ${VIA[api.accessVia]}` : ""}`, terms]
+      : ["Not granted", api.accessRequests === "closed" ? "it takes no requests: ask its team" : "the gateway answers your calls with 403"];
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
       <Typography variant="body2" sx={{ fontWeight: 500, color: api.mayCall || mine ? "text.primary" : "warning.main" }}>
@@ -58,23 +57,11 @@ function You({ api, mine }: { api: ApiProduct; mine: boolean }) {
       <Typography variant="caption" color="text.secondary">
         {note}
       </Typography>
-      {!api.mayCall && !mine && !teamless &&
-        (api.askForAccessUrl ? (
-          <Link
-            href={api.askForAccessUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={`Opens an issue on the catalog repository asking ${api.team} to share it with your team.`}
-            variant="body2"
-            sx={{ fontSize: 12.5 }}
-          >
-            Ask {api.team} for access ↗
-          </Link>
-        ) : (
-          <Link component={RouterLink} to={`/teams/${encodeURIComponent(api.team)}`} variant="body2" sx={{ fontSize: 12.5 }}>
-            Ask {api.team} for access
-          </Link>
-        ))}
+      {!api.mayCall && !mine && api.accessRequests !== "closed" && (
+        <Link component={RouterLink} to={`/apis/${encodeURIComponent(api.team)}/${encodeURIComponent(api.name)}`} variant="body2" sx={{ fontSize: 12.5 }}>
+          Request access
+        </Link>
+      )}
     </Box>
   );
 }
@@ -194,7 +181,8 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
  * Every API product the signed-in user may see (ApiService.ListApis):
  * backends teams already run, published through the gateway, which
  * forwards only what each one's OpenAPI document describes. Grouped as
- * your teams' own, shared with your teams, and not shared.
+ * your teams' own, the ones you may call, and the ones not granted to you;
+ * You may call lists your own access and requests (MyAccess).
  */
 export function ApisPage() {
   const { user } = useAuth();
@@ -285,112 +273,116 @@ export function ApisPage() {
         </Box>
       </Box>
 
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "flex-start" }}>
-        <Card component="section" aria-label="APIs you can see" sx={{ flex: "3 1 680px", minWidth: 0, overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ pl: { sm: 2.75 } }}>API</TableCell>
-                <TableCell>State</TableCell>
-                <TableCell align="right" sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                  Endpoints
-                </TableCell>
-                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>You</TableCell>
-                <TableCell sx={{ display: { xs: "none", md: "table-cell" }, pr: 2.75 }}>Reachable</TableCell>
-              </TableRow>
-            </TableHead>
-            {shown === null && !error && (
-              <TableBody>
-                {[0, 1, 2].map((i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={5}>
-                      <Skeleton variant="text" />
+      {filter === "call" && <MyAccess apis={apis} search={search} />}
+      {filter !== "call" && (
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "flex-start" }}>
+          <Card component="section" aria-label="APIs you can see" sx={{ flex: "3 1 680px", minWidth: 0, overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ pl: { sm: 2.75 } }}>API</TableCell>
+                  <TableCell>State</TableCell>
+                  <TableCell align="right" sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    Endpoints
+                  </TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>You</TableCell>
+                  <TableCell sx={{ display: { xs: "none", md: "table-cell" }, pr: 2.75 }}>Reachable</TableCell>
+                </TableRow>
+              </TableHead>
+              {shown === null && !error && (
+                <TableBody>
+                  {[0, 1, 2].map((i) => (
+                    <TableRow key={i}>
+                      <TableCell colSpan={5}>
+                        <Skeleton variant="text" />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              )}
+              {shown?.length === 0 && (
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={5} sx={{ py: 4, textAlign: "center", color: "text.secondary" }}>
+                      {apis?.length
+                        ? "No API matches."
+                        : "No APIs yet. A team publishes one with an api.yaml and its OpenAPI file in its catalog folder."}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            )}
-            {shown?.length === 0 && (
-              <TableBody>
-                <TableRow>
-                  <TableCell colSpan={5} sx={{ py: 4, textAlign: "center", color: "text.secondary" }}>
-                    {apis?.length
-                      ? "No API matches."
-                      : "No APIs yet. A team publishes one with an api.yaml and its OpenAPI file in its catalog folder."}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            )}
-            <Group
-              title="Your teams’"
-              note={`${myTeamsWithApis.join(", ")}: you see their traffic and backends`}
-              apis={mine}
-              mine
-            />
-            <Group title="Shared with your teams" note="you may call these" apis={shared} mine={false} />
-            <Group
-              title="Not shared with your teams"
-              note="listed so you know they exist; the gateway refuses your calls"
-              apis={others}
-              mine={false}
-            />
-          </Table>
-        </Card>
-
-        <Box component="aside" sx={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-          <Card component="section" aria-label="Calling an API" sx={{ p: 2.75, display: "flex", flexDirection: "column", gap: 1.5 }}>
-            <Typography variant="h6" component="h2">
-              Calling any of them
-            </Typography>
-            <Box component="dl" sx={{ m: 0, display: "flex", flexDirection: "column", gap: 1.25 }}>
-              {internet && (
-                <Fact label="From the internet">
-                  <Mono sx={{ fontSize: 12.5 }}>{internet}/&lt;team&gt;/&lt;api&gt;</Mono>
-                </Fact>
+                </TableBody>
               )}
-              {inCluster && (
-                <Fact label="In the cluster">
-                  <Mono sx={{ fontSize: 12.5 }}>{inCluster}/&lt;team&gt;/&lt;api&gt;</Mono>
-                </Fact>
-              )}
-              <Fact label="Signed in as">
-                You, or one of your team’s bots: <Mono sx={{ fontSize: 12 }}>Authorization: Bearer $VENNIR_TOKEN</Mono>. It stops at the
-                gateway; the backend gets who called in <Mono sx={{ fontSize: 12 }}>Vennir-Caller</Mono>.
-              </Fact>
-              <Fact label="Limits">
-                Counted per calling team, a minute at a time: the API’s own limit for your team, or the gateway’s default.
-              </Fact>
-            </Box>
-            {botTeam && (
-              <Button
-                component={RouterLink}
-                to={`/teams/${encodeURIComponent(botTeam)}?tab=automation`}
-                variant="outlined"
-                size="large"
-                sx={{ alignSelf: "flex-start" }}
-              >
-                A bot for {botTeam}
-              </Button>
-            )}
+              <Group
+                title="Your teams’"
+                note={`${myTeamsWithApis.join(", ")}: you see their traffic and backends`}
+                apis={mine}
+                mine
+              />
+              <Group title="You may call" note="granted to you, a group of yours, or from the catalog" apis={shared} mine={false} />
+              <Group
+                title="Not granted to you"
+                note="listed so you know they exist; ask for access from its page"
+                apis={others}
+                mine={false}
+              />
+            </Table>
           </Card>
 
-          <Card component="section" aria-label="Publishing an API" sx={{ p: 2.75, display: "flex", flexDirection: "column", gap: 1.25 }}>
-            <Typography variant="h6" component="h2">
-              Publishing one of yours
-            </Typography>
-            <Box component="ol" sx={{ m: 0, p: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 1.25 }}>
-              <Step n={1}>
-                Add <Mono sx={{ fontSize: 12 }}>api.yaml</Mono> and its OpenAPI file under{" "}
-                <Mono sx={{ fontSize: 12 }}>teams/&lt;team&gt;/apis/</Mono> in your catalog repository.
-              </Step>
-              <Step n={2}>It’s reviewed like a product, and goes live with the next catalog release.</Step>
-              <Step n={3}>Its backend’s host must be one the admins allow; until then it’s Held.</Step>
-              <Step n={4}>The gateway must be able to use its OpenAPI document. When it can’t, the API shows Can’t serve, with why, and every call gets 503 until a release fixes the file.</Step>
-            </Box>
-            <HelpLink guide="11-apis" section="publishing-or-changing-an-api" label="Publishing an API" />
-          </Card>
+          <Box component="aside" sx={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            <Card component="section" aria-label="Calling an API" sx={{ p: 2.75, display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Typography variant="h6" component="h2">
+                Calling any of them
+              </Typography>
+              <Box component="dl" sx={{ m: 0, display: "flex", flexDirection: "column", gap: 1.25 }}>
+                {internet && (
+                  <Fact label="From the internet">
+                    <Mono sx={{ fontSize: 12.5 }}>{internet}/&lt;team&gt;/&lt;api&gt;</Mono>
+                  </Fact>
+                )}
+                {inCluster && (
+                  <Fact label="In the cluster">
+                    <Mono sx={{ fontSize: 12.5 }}>{inCluster}/&lt;team&gt;/&lt;api&gt;</Mono>
+                  </Fact>
+                )}
+                <Fact label="Signed in as">
+                  You, or one of your team’s bots: <Mono sx={{ fontSize: 12 }}>Authorization: Bearer $VENNIR_TOKEN</Mono>. It stops at the
+                  gateway; the backend gets who called in <Mono sx={{ fontSize: 12 }}>Vennir-Caller</Mono>.
+                </Fact>
+                <Fact label="Who may call">
+                  Access is per person or per bot, never per team: whoever an API’s team grants, by name or through a single sign-on group, and its own
+                  team always. Each grant has its own rate, counted a minute at a time.
+                </Fact>
+              </Box>
+              {botTeam && (
+                <Button
+                  component={RouterLink}
+                  to={`/teams/${encodeURIComponent(botTeam)}?tab=automation`}
+                  variant="outlined"
+                  size="large"
+                  sx={{ alignSelf: "flex-start" }}
+                >
+                  A bot for {botTeam}
+                </Button>
+              )}
+            </Card>
+
+            <Card component="section" aria-label="Publishing an API" sx={{ p: 2.75, display: "flex", flexDirection: "column", gap: 1.25 }}>
+              <Typography variant="h6" component="h2">
+                Publishing one of yours
+              </Typography>
+              <Box component="ol" sx={{ m: 0, p: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 1.25 }}>
+                <Step n={1}>
+                  Add <Mono sx={{ fontSize: 12 }}>api.yaml</Mono> and its OpenAPI file under{" "}
+                  <Mono sx={{ fontSize: 12 }}>teams/&lt;team&gt;/apis/</Mono> in your catalog repository.
+                </Step>
+                <Step n={2}>It’s reviewed like a product, and goes live with the next catalog release.</Step>
+                <Step n={3}>Its backend’s host must be one the admins allow; until then it’s Held.</Step>
+                <Step n={4}>The gateway must be able to use its OpenAPI document. When it can’t, the API shows Can’t serve, with why, and every call gets 503 until a release fixes the file.</Step>
+              </Box>
+              <HelpLink guide="11-apis" section="publishing-or-changing-an-api" label="Publishing an API" />
+            </Card>
+          </Box>
         </Box>
-      </Box>
+      )}
     </Box>
   );
 }

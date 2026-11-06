@@ -21,11 +21,11 @@ const STEPS: [string, string][] = [
   ["Who is calling", "A person's session or a bot's token; Google sign-in when the caller's team requires it; else 401. Until then, nothing about the API is said."],
   ["Can they see it?", "A hidden API is its own team's and admins' only; else 404, as for no API at all."],
   ["Open?", "The gateway isn't closed, and the API isn't paused (with its message), held or unusable; else 503."],
-  ["Shared with them?", "Its shareWith covers the caller's team; else 403."],
+  ["May they call it?", "Its own team, a grant naming them or a group of theirs, or (for now) its shareWith; else 403."],
   ["Small enough?", "The body is within its size limit; else 413."],
   ["In the spec?", "The method and path are an operation in its OpenAPI file; else 404, blocked."],
   ["Does it fit?", "Only the query parameters and body it declares, against that operation's schemas; else 400."],
-  ["Within its limit", "The calling team's requests a minute; else 429."],
+  ["Within its rate", "Their grant's rate (a group's, each member's), or their team's limit; else 429."],
   ["Forward", "Same method, path, query and body; Authorization swapped for the backend's, Vennir-Caller added; the caller's Forwarded and X-Forwarded-* dropped."],
   ["Answer", "The backend's response; any cookie it sets is kept to this API's path."],
 ];
@@ -70,7 +70,7 @@ export function ApiBackend({ api }: { api: ApiProduct }) {
         </Row>
         <Row label="The gateway signs in there with">{AUTH[api.backendAuth] ?? api.backendAuth}</Row>
         <Row label="Reachable">{api.internet ? "From the internet, and in the cluster" : "In the cluster only"}</Row>
-        <Row label="Shared with">{sharedWith(api)}</Row>
+        {api.shareWith.length > 0 && <Row label="Shared with (catalog, going away)">{sharedWith(api)}</Row>}
       </Box>
     </Card>
   );

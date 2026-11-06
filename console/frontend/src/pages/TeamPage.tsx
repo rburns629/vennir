@@ -294,7 +294,7 @@ export function TeamPage() {
             />
           )}
           {tab === "schedules" && <SchedulesTab teamName={teamName} readOnly={retired || !canMaintain} />}
-          {tab === "apis" && <ApisTab teamName={teamName} />}
+          {tab === "apis" && <ApisTab teamName={teamName} canMaintain={canMaintain && (isAdmin || !retired)} />}
           {tab === "running" && <RunningTab teamName={teamName} />}
           {tab === "settings" && team && (
             <SettingsTab

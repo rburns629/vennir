@@ -1085,16 +1085,13 @@ describe("an API", () => {
     expect(screen.getByText("teams/payments/apis/orders/api.yaml")).toBeTruthy();
   });
 
-  it("offers whoever it isn't shared with an issue asking its team", async () => {
+  it("offers whoever may not call it a request, not an issue on the catalog", async () => {
     const theirs = { ...ORDERS, mayCall: false, askForAccessUrl: "https://github.com/acme/catalog/issues/new?title=orders" };
-    await renderAt("/apis/payments/orders", MEMBER, { "ApiService/GetApi": { api: theirs, openapi: "{}" } });
-    expect((await screen.findByRole("link", { name: "Ask for access ↗" })).getAttribute("href")).toBe("https://github.com/acme/catalog/issues/new?title=orders");
-  });
-
-  it("tells someone in no team to join one, rather than asking for an API shared with everyone", async () => {
-    await renderAt("/apis/payments/orders", { ...ADMIN, teamNames: [], maintainerOf: [] }, { "ApiService/GetApi": { api: { ...ORDERS, mayCall: false }, openapi: "{}" } });
-    expect(await screen.findByText(/You're in no team, and calls are made as one of your teams/)).toBeTruthy();
+    await renderAt("/apis/payments/orders", { ...ADMIN, teamNames: [], maintainerOf: [] }, { "ApiService/GetApi": { api: theirs, openapi: "{}" } });
+    expect(await screen.findByRole("button", { name: "Request access…" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Ask for access ↗" })).toBeNull();
+    // Someone in no team may be granted too: access is per person.
+    expect(screen.queryByText(/You're in no team/)).toBeNull();
   });
 
   it("shows its own team each endpoint's traffic, its backend's logs, and lets a maintainer pause it", async () => {
@@ -1122,7 +1119,7 @@ describe("an API", () => {
         return {};
       },
     });
-    expect(await screen.findByText("teams/payments/apis/orders/api.yaml")).toBeTruthy();
+    expect((await screen.findAllByText("teams/payments/apis/orders/api.yaml")).length).toBeGreaterThan(0);
     expect(screen.getByRole("navigation", { name: "On this page" })).toBeTruthy();
     // The endpoint's own row carries its traffic; what the spec doesn't describe is listed apart.
     expect(await screen.findByText("4,321")).toBeTruthy();
@@ -1144,6 +1141,372 @@ describe("an API", () => {
   });
 });
 
+describe("who may call an API (decision 26)", () => {
+  const ORDERS = {
+    team: "payments",
+    name: "orders",
+    displayName: "Orders API",
+    state: "API_STATE_LIVE",
+    mayCall: false,
+    endpoints: [],
+    url: "http://gateway.vennir-system.svc/payments/orders",
+    defaultPerMinute: 600,
+    accessRequests: "approval",
+  };
+  const PRIYA = { ...MEMBER, userId: "u-priya", email: "priya@acme.com", teamNames: ["ml"], maintainerOf: ["ml"] };
+  const ASKED = { id: "r1", team: "payments", name: "orders", userId: "u-priya", userEmail: "priya@acme.com", requestedBy: "priya@acme.com", reason: "Checkout fraud model, GET only.", createdAt: "2026-11-05T10:42:00Z" };
+  /** Records each call of `method`'s requests. */
+  const recorder = () => {
+    const seen: Record<string, unknown>[] = [];
+    return { seen, answer: (request: Record<string, unknown>) => { seen.push(request); return {}; } };
+  };
+
+  it("lets a person without access ask for it, for themselves, with a reason (15a, 15b)", async () => {
+    const asked = recorder();
+    await renderAt("/apis/payments/orders", PRIYA, {
+      "ApiService/GetApi": { api: ORDERS, openapi: "{}" },
+      "TokenService/ListBots": { bots: [{ id: "b1", email: "ml-scorer@bots.vennir.local" }] },
+      "ApiService/RequestApiAccess": asked.answer,
+    });
+    const card = await screen.findByRole("region", { name: "Your access" });
+    expect(await within(card).findByRole("heading", { name: "Not granted" })).toBeTruthy();
+    expect(screen.getByText("You may not call it")).toBeTruthy();
+    expect(within(card).getByText(/Requests need approval by payments/)).toBeTruthy();
+    fireEvent.click(within(card).getByRole("button", { name: "Request access…" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("radio", { name: /^You/ })).toHaveProperty("checked", true);
+    const ask = within(dialog).getByRole("button", { name: "Ask payments" });
+    expect(ask).toHaveProperty("disabled", true);
+    fireEvent.change(within(dialog).getByLabelText(/Why you need it/), { target: { value: "Checkout fraud model, GET only." } });
+    fireEvent.click(ask);
+    await waitFor(() => { expect(asked.seen).toEqual([{ team: "payments", name: "orders", reason: "Checkout fraud model, GET only." }]); });
+  });
+
+  it("lets a maintainer ask for a bot of their team (15b)", async () => {
+    const asked = recorder();
+    await renderAt("/apis/payments/orders", PRIYA, {
+      "ApiService/GetApi": { api: ORDERS, openapi: "{}" },
+      "TokenService/ListBots": { bots: [{ id: "b1", email: "ml-scorer@bots.vennir.local" }] },
+      "ApiService/RequestApiAccess": asked.answer,
+    });
+    expect(await screen.findByText(/You maintain ml, so you may ask for their bots/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Request access for a bot…" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("radio", { name: /A bot of a team you maintain/ })).toHaveProperty("checked", true);
+    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /Which bot/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "ml-scorer · ml" }));
+    fireEvent.change(within(dialog).getByLabelText(/Why you need it/), { target: { value: "Nightly scoring." } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ask payments" }));
+    await waitFor(() => { expect(asked.seen).toEqual([{ team: "payments", name: "orders", reason: "Nightly scoring.", botEmail: "ml-scorer@bots.vennir.local" }]); });
+  });
+
+  it("offers no request where its api.yaml takes none", async () => {
+    await renderAt("/apis/payments/orders", PRIYA, { "ApiService/GetApi": { api: { ...ORDERS, accessRequests: "closed" }, openapi: "{}" } });
+    expect(await screen.findByText(/payments takes no requests for it/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Request access/ })).toBeNull();
+  });
+
+  it("shows a waiting request, and withdraws it once confirmed (15c)", async () => {
+    const withdrawn = recorder();
+    await renderAt("/apis/payments/orders", PRIYA, {
+      "ApiService/GetApi": { api: ORDERS, openapi: "{}" },
+      "ApiService/ListMyApiAccess": { requests: [{ ...ASKED, state: "API_ACCESS_REQUEST_STATE_WAITING" }] },
+      "ApiService/WithdrawApiAccessRequest": withdrawn.answer,
+    });
+    const card = await screen.findByRole("region", { name: "Your access" });
+    expect(await within(card).findByRole("heading", { name: "Waiting for payments" })).toBeTruthy();
+    expect(screen.getByText("Your request is waiting")).toBeTruthy();
+    expect(within(card).getByText("Checkout fraud model, GET only.")).toBeTruthy();
+    fireEvent.click(within(card).getByRole("button", { name: "Withdraw the request" }));
+    expect(withdrawn.seen).toEqual([]);
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Withdraw" }));
+    await waitFor(() => { expect(withdrawn.seen).toEqual([{ accessRequestId: "r1" }]); });
+  });
+
+  it("shows a grant by name, at its rate, and gives it up (15d)", async () => {
+    const revoked = recorder();
+    await renderAt("/apis/payments/orders", PRIYA, {
+      "ApiService/GetApi": { api: { ...ORDERS, mayCall: true, accessVia: "API_ACCESS_VIA_USER", perMinute: 300 }, openapi: "{}" },
+      "ApiService/ListMyApiAccess": { access: [{ team: "payments", name: "orders", via: "API_ACCESS_VIA_USER", grantId: "g1", perMinute: 300 }] },
+      "ApiService/RevokeApiGrant": revoked.answer,
+    });
+    const card = await screen.findByRole("region", { name: "Your access" });
+    expect(await within(card).findByRole("heading", { name: "Granted" })).toBeTruthy();
+    expect(within(card).getByText("You, by name · not through a group")).toBeTruthy();
+    expect(within(card).getByText(/300 a minute · payments may change it/)).toBeTruthy();
+    fireEvent.click(within(card).getByRole("button", { name: "Give up my access…" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Give up my access" }));
+    await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g1" }]); });
+  });
+
+  it("shows a group's grant as not yours to give up", async () => {
+    await renderAt("/apis/payments/orders", PRIYA, {
+      "ApiService/GetApi": { api: { ...ORDERS, mayCall: true }, openapi: "{}" },
+      "ApiService/ListMyApiAccess": { access: [{ team: "payments", name: "orders", via: "API_ACCESS_VIA_GROUP", group: "eng-all@acme.com", grantId: "g2", perMinute: 600 }] },
+    });
+    expect(await screen.findByText(/A group you’re in: eng-all@acme\.com/)).toBeTruthy();
+    expect(screen.getByText(/not yours to give up/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Give up my access…" })).toBeNull();
+  });
+
+  it("shows a decline with its reason, and asks again (15e)", async () => {
+    await renderAt("/apis/payments/orders", PRIYA, {
+      "ApiService/GetApi": { api: ORDERS, openapi: "{}" },
+      "ApiService/ListMyApiAccess": {
+        requests: [{ ...ASKED, state: "API_ACCESS_REQUEST_STATE_DECLINED", decidedBy: "dana@acme.com", decidedAt: "2026-11-04T09:30:00Z", decisionReason: "Use the anonymised extract." }],
+      },
+    });
+    const card = await screen.findByRole("region", { name: "Your access" });
+    expect(await within(card).findByRole("heading", { name: "Declined" })).toBeTruthy();
+    expect(within(card).getByText("Use the anonymised extract.")).toBeTruthy();
+    expect(within(card).getByText(/^dana@acme\.com · /)).toBeTruthy();
+    fireEvent.click(within(card).getByRole("button", { name: "Ask again…" }));
+    expect(await screen.findByRole("dialog", { name: /Request access to Orders API/ })).toBeTruthy();
+  });
+
+  describe("its team's Who may call (15f)", () => {
+    const DANA = { ...MEMBER, userId: "u-dana", email: "dana@acme.com", teamNames: ["payments"], maintainerOf: ["payments"] };
+    const OWN = { ...ORDERS, mayCall: true, backendUrl: "https://orders.internal", sourcePath: "teams/payments/apis/orders/api.yaml" };
+    const ACCESS = {
+      grants: [
+        { id: "g1", team: "payments", name: "orders", group: "orders-readers@acme.com", perMinute: 600, defaultRate: true, grantedBy: "dana@acme.com", createdAt: "2026-10-02T10:00:00Z" },
+        { id: "g2", team: "payments", name: "orders", userId: "u-bot", userEmail: "growth-sync@bots.vennir.local", bot: true, perMinute: 1200, grantedBy: "dana@acme.com" },
+        { id: "g3", team: "payments", name: "orders", userEmail: "campaign@bots.vennir.local", bot: true, perMinute: 60, revokedAt: new Date().toISOString(), revokedBy: "ana@acme.com" },
+      ],
+      requests: [
+        { ...ASKED, state: "API_ACCESS_REQUEST_STATE_WAITING", groups: ["ml-engineers@acme.com", "fraud-signals@acme.com"], groupsReadAt: "2026-11-05T09:12:00Z" },
+        { id: "r2", team: "payments", name: "orders", userId: "u-batch", userEmail: "ml-scoring-batch@bots.vennir.local", bot: true, requestedBy: "priya@acme.com", reason: "Nightly scoring.", state: "API_ACCESS_REQUEST_STATE_WAITING" },
+      ],
+    };
+    const own = (extra: Record<string, Answer> = {}) => ({ "ApiService/GetApi": { api: OWN, openapi: "{}" }, "ApiService/ListApiAccess": ACCESS, ...extra });
+
+    it("lists requests, the access list and what ended, and counts what waits", async () => {
+      await renderAt("/apis/payments/orders", DANA, own());
+      const section = await screen.findByRole("region", { name: "Who may call" });
+      expect(await within(section).findByRole("heading", { name: "Asking for access · 2" })).toBeTruthy();
+      expect(within(screen.getByRole("navigation", { name: "On this page" })).getByRole("link", { name: "Who may call · 2 waiting" })).toBeTruthy();
+      const list = within(section).getByRole("region", { name: "Access list" });
+      expect(within(list).getByText("orders-readers@acme.com")).toBeTruthy();
+      expect(within(list).getByText("growth-sync")).toBeTruthy();
+      // A revoked grant is history, not on the list.
+      expect(within(list).queryByText("campaign")).toBeNull();
+      expect(within(screen.getByRole("region", { name: "Ended, last 30 days" })).getByText("campaign@bots.vennir.local")).toBeTruthy();
+      expect(screen.queryByRole("region", { name: "Your access" })).toBeNull();
+    });
+
+    it("approves a person by name at the API's limit, or one of their groups at a rate", async () => {
+      const decided = recorder();
+      await renderAt("/apis/payments/orders", DANA, own({ "ApiService/DecideApiAccessRequest": decided.answer }));
+      const priya = await screen.findByRole("article", { name: "Request for priya@acme.com" });
+      fireEvent.click(within(priya).getByRole("button", { name: "Approve at 600" }));
+      await waitFor(() => { expect(decided.seen).toEqual([{ accessRequestId: "r1", approve: true }]); });
+
+      fireEvent.click(within(priya).getByRole("radio", { name: /ml-engineers@acme\.com/ }));
+      fireEvent.change(within(priya).getByLabelText(/Its rate, a minute/), { target: { value: "120" } });
+      fireEvent.click(within(priya).getByRole("button", { name: "Approve at 120" }));
+      await waitFor(() => { expect(decided.seen[1]).toEqual({ accessRequestId: "r1", approve: true, group: "ml-engineers@acme.com", perMinute: 120 }); });
+    });
+
+    it("grants a bot by name only, and declines with a reason", async () => {
+      const decided = recorder();
+      await renderAt("/apis/payments/orders", DANA, own({ "ApiService/DecideApiAccessRequest": decided.answer }));
+      const bot = await screen.findByRole("article", { name: "Request for ml-scoring-batch" });
+      expect(within(bot).queryByRole("radio")).toBeNull();
+      expect(within(bot).getByText(/a bot is in no group/)).toBeTruthy();
+      fireEvent.click(within(bot).getByRole("button", { name: "Decline…" }));
+      const dialog = await screen.findByRole("dialog");
+      const decline = within(dialog).getByRole("button", { name: "Decline" });
+      expect(decline).toHaveProperty("disabled", true);
+      fireEvent.change(within(dialog).getByLabelText(/Why you’re declining/), { target: { value: "Use the nightly export." } });
+      fireEvent.click(decline);
+      await waitFor(() => { expect(decided.seen).toEqual([{ accessRequestId: "r2", reason: "Use the nightly export." }]); });
+    });
+
+    it("says why a group can't be granted from groups read too long ago", async () => {
+      await renderAt("/apis/payments/orders", DANA, own({ "ApiService/DecideApiAccessRequest": refused(409, "failed_precondition", "priya@acme.com's groups were read over 24 hours ago: ask them to sign in again, then decide.", "GROUPS_STALE") }));
+      const priya = await screen.findByRole("article", { name: "Request for priya@acme.com" });
+      fireEvent.click(within(priya).getByRole("radio", { name: /fraud-signals@acme\.com/ }));
+      fireEvent.click(within(priya).getByRole("button", { name: "Approve at 600" }));
+      expect(await within(priya).findByText(/read over 24 hours ago.*Or grant them by name\./)).toBeTruthy();
+    });
+
+    it("adds a grant, changes a rate and revokes one", async () => {
+      const added = recorder();
+      const rated = recorder();
+      const revoked = recorder();
+      await renderAt("/apis/payments/orders", DANA, own({ "ApiService/AddApiGrant": added.answer, "ApiService/SetApiGrantRate": rated.answer, "ApiService/RevokeApiGrant": revoked.answer }));
+      const list = await screen.findByRole("region", { name: "Access list" });
+      fireEvent.click(within(list).getByRole("button", { name: "Add a grant" }));
+      const form = within(list).getByRole("form", { name: "Add a grant" });
+      fireEvent.change(within(form).getByLabelText(/^Group/), { target: { value: "finance-analysts@acme.com" } });
+      fireEvent.change(within(form).getByLabelText(/Its rate, a minute/), { target: { value: "120" } });
+      fireEvent.click(within(form).getByRole("button", { name: "Grant finance-analysts@acme.com" }));
+      await waitFor(() => { expect(added.seen).toEqual([{ team: "payments", name: "orders", group: "finance-analysts@acme.com", perMinute: 120 }]); });
+
+      fireEvent.click(within(list).getAllByRole("button", { name: "Change rate…" })[1]!);
+      let dialog = await screen.findByRole("dialog");
+      fireEvent.change(within(dialog).getByLabelText(/Its rate, a minute/), { target: { value: "900" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Change rate" }));
+      await waitFor(() => { expect(rated.seen).toEqual([{ grantId: "g2", perMinute: 900 }]); });
+
+      fireEvent.click((await within(list).findAllByRole("button", { name: "Revoke…" }))[0]!);
+      dialog = await screen.findByRole("dialog");
+      fireEvent.change(within(dialog).getByLabelText(/Why/), { target: { value: "Moved to a new group." } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Revoke" }));
+      await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g1", reason: "Moved to a new group." }]); });
+    });
+
+    it("lets an admin who doesn't maintain it revoke a grant, and nothing else", async () => {
+      const revoked = recorder();
+      await renderAt("/apis/payments/orders", ADMIN, own({ "ApiService/RevokeApiGrant": revoked.answer }));
+      const list = await screen.findByRole("region", { name: "Access list" });
+      await within(list).findByText("orders-readers@acme.com");
+      expect(within(list).queryByRole("button", { name: "Add a grant" })).toBeNull();
+      expect(within(list).queryByRole("button", { name: "Change rate…" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Approve/ })).toBeNull();
+      fireEvent.click(within(list).getAllByRole("button", { name: "Revoke…" })[1]!);
+      fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Revoke" }));
+      await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g2" }]); });
+    });
+  });
+
+  it("lists what you may call and how, with each one's action (15g)", async () => {
+    const withdrawn = recorder();
+    const revoked = recorder();
+    await renderAt("/apis", PRIYA, {
+      "ApiService/ListApis": {
+        apis: [
+          { ...ORDERS, mayCall: true },
+          { ...ORDERS, team: "identity", name: "users", displayName: "Users API", mayCall: true },
+          { ...ORDERS, team: "ml", name: "scoring", displayName: "Scoring API", mayCall: true },
+          { ...ORDERS, team: "data-platform", name: "events", displayName: "Events API" },
+          { ...ORDERS, team: "growth", name: "experiments", displayName: "Experiments API" },
+        ],
+      },
+      "ApiService/ListMyApiAccess": {
+        access: [
+          { team: "payments", name: "orders", via: "API_ACCESS_VIA_USER", grantId: "g1", perMinute: 300 },
+          { team: "identity", name: "users", via: "API_ACCESS_VIA_GROUP", group: "eng-all@acme.com", grantId: "g2", perMinute: 600 },
+          { team: "ml", name: "scoring", via: "API_ACCESS_VIA_TEAM", callingTeam: "ml", perMinute: 600 },
+        ],
+        requests: [
+          { ...ASKED, id: "r5", team: "data-platform", name: "events", state: "API_ACCESS_REQUEST_STATE_WAITING" },
+          { ...ASKED, id: "r6", team: "growth", name: "experiments", state: "API_ACCESS_REQUEST_STATE_DECLINED", decidedBy: "kim@acme.com", decisionReason: "Read them from the event stream." },
+        ],
+      },
+      "ApiService/ListTeamBotApiAccess": { grants: [{ id: "g9", userId: "b1" }], requests: [{ id: "r9", state: "API_ACCESS_REQUEST_STATE_WAITING" }] },
+      "ApiService/WithdrawApiAccessRequest": withdrawn.answer,
+      "ApiService/RevokeApiGrant": revoked.answer,
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /^You may call/ }));
+    const table = await screen.findByRole("region", { name: "What you may call" });
+    expect(await within(table).findByText("By name")).toBeTruthy();
+    expect(within(table).getByText(/eng-all@acme\.com, as of your sign-in; not yours to give up/)).toBeTruthy();
+    expect(within(table).getByText("you’re in ml, so always")).toBeTruthy();
+    expect(within(table).getByText("Waiting for data-platform")).toBeTruthy();
+    expect(within(table).getByText(/Read them from the event stream/)).toBeTruthy();
+    expect(within(table).getByRole("button", { name: "Ask again…" })).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Your teams' bots" })).getByText("1 grant · 1 waiting")).toBeTruthy();
+
+    fireEvent.click(within(table).getByRole("button", { name: "Withdraw" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Withdraw" }));
+    await waitFor(() => { expect(withdrawn.seen).toEqual([{ accessRequestId: "r5" }]); });
+    fireEvent.click(await within(table).findByRole("button", { name: "Give up…" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Give up my access" }));
+    await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g1" }]); });
+  });
+
+  it("lists a team's bots' grants and requests, asks for a bot, and revokes its grant (15i)", async () => {
+    const asked = recorder();
+    const revoked = recorder();
+    const withdrawn = recorder();
+    await renderAt("/teams/ml?tab=automation", PRIYA, {
+      "TeamService/GetTeam": { team: { id: "t-ml", name: "ml" } },
+      "TokenService/ListBots": { bots: [{ id: "b1", email: "ml-scorer@bots.vennir.local" }, { id: "b2", email: "ml-scoring-batch@bots.vennir.local" }] },
+      "ApiService/ListApis": { apis: [ORDERS, { ...ORDERS, team: "identity", name: "users", displayName: "Users API" }, { ...ORDERS, team: "ml", name: "scoring", displayName: "Scoring API" }] },
+      "ApiService/ListTeamBotApiAccess": {
+        grants: [{ id: "g1", team: "payments", name: "orders", userId: "b1", userEmail: "ml-scorer@bots.vennir.local", bot: true, perMinute: 600, grantedBy: "dana@acme.com" }],
+        requests: [{ id: "r2", team: "identity", name: "users", userId: "b2", userEmail: "ml-scoring-batch@bots.vennir.local", bot: true, requestedBy: "priya@acme.com", reason: "Nightly.", state: "API_ACCESS_REQUEST_STATE_WAITING" }],
+      },
+      "ApiService/RequestApiAccess": asked.answer,
+      "ApiService/RevokeApiGrant": revoked.answer,
+      "ApiService/WithdrawApiAccessRequest": withdrawn.answer,
+    });
+    const scorer = await screen.findByRole("article", { name: "ml-scorer's API access" });
+    expect(await within(scorer).findByText("Orders API")).toBeTruthy();
+    expect(within(scorer).getByText("Granted")).toBeTruthy();
+    expect(within(scorer).getByText(/Always, without a grant: ml’s own APIs \(Scoring API\)/)).toBeTruthy();
+    const batch = screen.getByRole("article", { name: "ml-scoring-batch's API access" });
+    expect(within(batch).getByText("Waiting for identity")).toBeTruthy();
+    expect(within(batch).getByText(/asked by you/)).toBeTruthy();
+
+    fireEvent.click(within(scorer).getByRole("button", { name: "Revoke…" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Revoke" }));
+    await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g1" }]); });
+    fireEvent.click(await within(batch).findByRole("button", { name: "Withdraw" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Withdraw" }));
+    await waitFor(() => { expect(withdrawn.seen).toEqual([{ accessRequestId: "r2" }]); });
+
+    fireEvent.click(await within(scorer).findByRole("button", { name: "Request access for a bot…" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /Which API/ }));
+    // Another team's APIs only: its own team's it calls already.
+    expect(screen.queryByRole("option", { name: /Scoring API/ })).toBeNull();
+    fireEvent.click(await screen.findByRole("option", { name: "Users API · identity" }));
+    fireEvent.change(within(dialog).getByLabelText(/Why you need it/), { target: { value: "Score by user." } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ask identity" }));
+    await waitFor(() => { expect(asked.seen).toEqual([{ team: "identity", name: "users", reason: "Score by user.", botEmail: "ml-scorer@bots.vennir.local" }]); });
+  });
+
+  it("lists the grants kept for a team's API that left the catalog, and revokes one", async () => {
+    const revoked = recorder();
+    await renderAt("/teams/payments?tab=apis", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
+      "TeamService/GetTeam": { team: { id: "t2", name: "payments" } },
+      "ApiService/ListAwayApiAccess": {
+        grants: [{ id: "g7", team: "payments", name: "ledger", group: "finance@acme.com", perMinute: 60, grantedBy: "dana@acme.com", awaySince: "2026-11-01T00:00:00Z" }],
+        requests: [],
+      },
+      "ApiService/RevokeApiGrant": revoked.answer,
+    });
+    const away = await screen.findByRole("region", { name: "Away from the catalog’s release" });
+    expect(within(away).getByText("finance@acme.com")).toBeTruthy();
+    expect(within(away).getByText("ledger")).toBeTruthy();
+    fireEvent.click(within(away).getByRole("button", { name: "Revoke…" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Revoke" }));
+    await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g7" }]); });
+  });
+
+  it("gives an admin every grant to revoke, the held APIs, and what waits (15h)", async () => {
+    const revoked = recorder();
+    await renderAt("/admin/gateway", ADMIN, {
+      "ApiService/GetGateway": { enabled: true, url: "http://gateway:8080", apis: 2 },
+      "ApiService/ListApis": { apis: [ORDERS, { ...ORDERS, team: "growth", name: "experiments", displayName: "Experiments API", state: "API_STATE_HELD", heldReason: "Its backend's host isn't allowed." }] },
+      "ApiService/ListApiAccess": (request: Record<string, unknown>) =>
+        request["name"] === "orders"
+          ? {
+              grants: [
+                { id: "g1", team: "payments", name: "orders", group: "orders-readers@acme.com", perMinute: 600, grantedBy: "dana@acme.com" },
+                { id: "g2", team: "payments", name: "orders", userEmail: "priya@acme.com", perMinute: 300, grantedBy: "dana@acme.com" },
+              ],
+              requests: [{ id: "r1", team: "payments", name: "orders", state: "API_ACCESS_REQUEST_STATE_WAITING" }],
+            }
+          : {},
+      "ApiService/RevokeApiGrant": revoked.answer,
+    });
+    const every = await screen.findByRole("region", { name: "Every grant" });
+    expect(await within(every).findByText("priya@acme.com")).toBeTruthy();
+    expect(within(every).getByText(/answering the 1 waiting request/)).toBeTruthy();
+    expect(screen.getByText("1 group, 1 person, 0 bots")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Held APIs · 1" })).getByText("Its backend's host isn't allowed.")).toBeTruthy();
+    expect(within(every).queryByRole("button", { name: /Change rate/ })).toBeNull();
+    fireEvent.change(within(every).getByLabelText("Find a grant"), { target: { value: "priya" } });
+    expect(within(every).queryByText("orders-readers@acme.com")).toBeNull();
+    fireEvent.click(within(every).getByRole("button", { name: "Revoke…" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Revoke" }));
+    await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g2" }]); });
+  });
+});
+
 describe("the APIs page", () => {
   const api = (team: string, name: string, extra: Record<string, unknown> = {}) => ({ team, name, displayName: `${name} API`, state: "API_STATE_LIVE", endpoints: [], url: `http://gateway.vennir-system.svc/${team}/${name}`, ...extra });
 
@@ -1154,17 +1517,19 @@ describe("the APIs page", () => {
           api("payments", "orders", { mayCall: true }),
           api("identity", "users", { mayCall: true }),
           api("ml", "scoring", { state: "API_STATE_HELD", heldReason: "Its backend's host isn't allowed here yet" }),
-          api("risk", "fraud", { askForAccessUrl: "https://github.com/acme/catalog/issues/new?title=fraud" }),
+          api("risk", "fraud", { askForAccessUrl: "https://github.com/acme/catalog/issues/new?title=fraud", accessRequests: "closed" }),
         ],
       },
     });
     await screen.findByText("orders API");
     const table = screen.getByRole("region", { name: "APIs you can see" });
     const groups = [...table.querySelectorAll("th[scope=rowgroup]")].map((h) => h.textContent);
-    expect(groups).toEqual([expect.stringMatching(/^Your teams’ · payments/), expect.stringMatching(/^Shared with your teams/), expect.stringMatching(/^Not shared/)]);
-    // An issue on the catalog asking its team, when the console can build one; else the team's page.
-    expect(within(table).getByRole("link", { name: "Ask ml for access" }).getAttribute("href")).toBe("/teams/ml");
-    expect(within(table).getByRole("link", { name: "Ask risk for access ↗" }).getAttribute("href")).toBe("https://github.com/acme/catalog/issues/new?title=fraud");
+    expect(groups).toEqual([expect.stringMatching(/^Your teams’ · payments/), expect.stringMatching(/^You may call/), expect.stringMatching(/^Not granted to you/)]);
+    // A request from the API's own page, never an issue on the catalog; none where it takes no requests.
+    const asks = within(table).getAllByRole("link", { name: "Request access" }).map((l) => l.getAttribute("href"));
+    expect(asks).toEqual(["/apis/ml/scoring"]);
+    expect(within(table).getByText(/it takes no requests/)).toBeTruthy();
+    expect(within(table).queryByRole("link", { name: /Ask risk for access/ })).toBeNull();
     expect(screen.getByText("http://gateway.vennir-system.svc/<team>/<api>")).toBeTruthy();
     expect(screen.getByRole("link", { name: "A bot for payments" }).getAttribute("href")).toBe("/teams/payments?tab=automation");
 
@@ -2904,12 +3269,12 @@ describe("Observe's log search, for one API", () => {
 });
 
 describe("an API's limits", () => {
-  it("say each calling team's, and everyone else's, to whoever sees it", async () => {
-    const api = { team: "payments", name: "orders", displayName: "Orders API", state: "API_STATE_LIVE", mayCall: false, endpoints: [], limits: [{ team: "growth", perMinute: 1200 }], defaultPerMinute: 600 };
+  it("say a grant's default, and the limits of the teams its catalog's shareWith names", async () => {
+    const api = { team: "payments", name: "orders", displayName: "Orders API", state: "API_STATE_LIVE", mayCall: false, endpoints: [], shareWith: ["growth"], limits: [{ team: "growth", perMinute: 1200 }], defaultPerMinute: 600 };
     await renderAt("/apis/payments/orders", MEMBER, { "ApiService/GetApi": { api, openapi: "{}" } });
     expect(await screen.findByText("growth · 1,200 a minute")).toBeTruthy();
     expect(screen.getByText("Every other team · 600 a minute")).toBeTruthy();
-    expect(screen.getByText(/its api\.yaml's default/)).toBeTruthy();
+    expect(screen.getByText("600 a minute by default")).toBeTruthy();
   });
 });
 
