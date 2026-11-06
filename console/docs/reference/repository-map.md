@@ -437,7 +437,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/backup-cronjob.yaml` | Scheduled database backup (both databases when they share the instance) to GCS, S3, Azure Blob or a volume. |
 | `templates/configmap.yaml`, `secret.yaml`, `serviceaccount.yaml` | Settings, the database password, the kernel's identity. |
 | `templates/rbac.yaml` | What the scheduler may do: create and delete Jobs and ConfigMaps, read Pods; and its logs-only ClusterRole, bound per team namespace by the console (or cluster-wide, `rbac.schedulerLogs: cluster`). |
-| `templates/dispatch-policy.yaml` | Admission policy: the scheduler may only create Jobs (hardened, with `taskPodHardening`) in namespaces labelled `vennir/team=true`, and delete only its own Jobs and ConfigMaps there. |
+| `templates/dispatch-policy.yaml` | Admission policy: the scheduler may only create Jobs (hardened) in namespaces labelled `vennir/team=true`, and delete only its own Jobs and ConfigMaps there. |
 | `templates/step-jobs-policy.yaml` | Admission policy: in a team namespace, only the scheduler (and Kubernetes' own controllers) may create or change a Job or ConfigMap named `ek-`. |
 | `templates/step-pods-policy.yaml` | Admission policy: in a team namespace, only Kubernetes' own controllers may make or change a Pod with a task Job's labels or owner. |
 | `templates/image-policy.yaml` | Admission policy: task images only from allowed sources (the console edits the list). |

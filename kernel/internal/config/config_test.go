@@ -28,11 +28,21 @@ func TestTheDefaultsAreThePythonKernels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.LeaseDuration != time.Minute || s.ClaimLimit != 50 || s.ExecutorConcurrency != 16 || !s.TaskPodHardening ||
+	if s.LeaseDuration != time.Minute || s.ClaimLimit != 50 || s.ExecutorConcurrency != 16 ||
 		s.JobDeadlineGrace != 600*time.Second || s.TaskLogMaxLines != 5000 || s.MetricsPort != 9090 || s.MaxRunning != 0 ||
 		s.KubernetesQPS != 50 || s.KubernetesBurst != 100 || s.DatabaseMaxConnections != 10 ||
 		s.DatabaseConnectTimeout != 10*time.Second {
 		t.Errorf("defaults = %+v", s)
+	}
+}
+
+// TASK_POD_HARDENING was removed (step Pods are always hardened); an older
+// chart's ConfigMap that still sets it, even to false, starts as any other.
+func TestARemovedSettingIsIgnored(t *testing.T) {
+	for _, v := range []string{"false", "true", "maybe"} {
+		if _, err := load(t, map[string]string{"TASK_POD_HARDENING": v}); err != nil {
+			t.Errorf("TASK_POD_HARDENING=%s: %v", v, err)
+		}
 	}
 }
 
@@ -80,7 +90,6 @@ func TestAMisconfigurationStopsTheSchedulerAtStartup(t *testing.T) {
 		"zero":                {"SCHEDULER_CLAIM_LIMIT": "0"},
 		"negative":            {"SCHEDULER_MAX_RUNNING_TASKS": "-1"},
 		"fraction":            {"SCHEDULER_CLAIM_LIMIT": "1.5"},
-		"not a boolean":       {"TASK_POD_HARDENING": "maybe"},
 		"unknown auth":        {"API_AUTH": "none"},
 		"callers not a list":  {"API_ALLOWED_CALLERS": "system:serviceaccount:a:b"},
 		"kernel's label":      {"TASK_POD_LABELS": `{"vennir.dev/execution-id": "x"}`},

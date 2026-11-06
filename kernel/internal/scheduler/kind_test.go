@@ -27,7 +27,7 @@ func kindChain(t *testing.T, projectInputs map[string]any, outputKey string) []T
 
 func kindExecutor(t *testing.T) *executor.Kubernetes {
 	return executor.NewKubernetes(kindtest.Cluster(t), executor.KubernetesOptions{JobTTL: time.Hour, ImagePullGrace: 120 * time.Second,
-		JobDeadlineGrace: 600 * time.Second, RequestTimeout: 30 * time.Second, WatchResync: 30 * time.Second, PodHardening: true,
+		JobDeadlineGrace: 600 * time.Second, RequestTimeout: 30 * time.Second, WatchResync: 30 * time.Second,
 		LogMaxLines: 5000, LogMaxBytes: 1 << 20}, logging.NewTo(io.Discard, "kernel-scheduler-test", "kind"))
 }
 

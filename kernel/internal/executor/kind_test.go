@@ -30,7 +30,7 @@ import (
 
 func kindOptions() executor.KubernetesOptions {
 	return executor.KubernetesOptions{JobTTL: time.Hour, ImagePullGrace: 120 * time.Second, JobDeadlineGrace: 600 * time.Second,
-		RequestTimeout: 30 * time.Second, WatchResync: 30 * time.Second, PodHardening: true, LogMaxLines: 5000, LogMaxBytes: 1 << 20}
+		RequestTimeout: 30 * time.Second, WatchResync: 30 * time.Second, LogMaxLines: 5000, LogMaxBytes: 1 << 20}
 }
 
 func kindExecutor(t *testing.T, change ...func(*executor.KubernetesOptions)) (*executor.Kubernetes, kubernetes.Interface) {

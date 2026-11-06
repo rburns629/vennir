@@ -165,7 +165,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
               <li>Only allowed image sources, pinned, with a passing scan</li>
               <li>Only the product's own ServiceAccount, and its team's registered Secrets, as volumes</li>
               <li>Signed images, with policy-controller installed</li>
-              <li>Only hardened Jobs, while hardening is on</li>
+              <li>Only hardened Jobs</li>
             </ul>
             <span class="mono" style="margin-top: auto; font-size: 12px; line-height: 1.6; color: #F2C08A">DISPATCH_REJECTED · IMAGE_NOT_ALLOWED · IMAGE_NOT_PINNED · IMAGE_SCAN_FAILED · IDENTITY_NOT_ALLOWED · IMAGE_NOT_SIGNED</span>
           </li>
@@ -253,7 +253,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <tbody>
             <tr>
               <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/dispatch-policy.yaml" class="mono" style="font-size: 13px">dispatch-policy.yaml</a></th>
-              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">A Job outside a namespace labelled <span class="mono" style="font-size: 13px; color: #E8EAEE">vennir/team=true</span>, or in the platform's own; a Job that isn't hardened while <span class="mono" style="font-size: 13px; color: #E8EAEE">taskPodHardening</span> is on</td>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">A Job outside a namespace labelled <span class="mono" style="font-size: 13px; color: #E8EAEE">vennir/team=true</span>, or in the platform's own; a Job that isn't hardened</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">DISPATCH_REJECTED</td>
             </tr>
             <tr>
@@ -509,10 +509,6 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
           <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Without the copy, the audit log can be rewritten</h3>
           <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">It lives in the console's database. Someone who can write there could rewrite the chain after a change. Turn on <span class="mono" style="font-size: 14px; color: #E8EAEE">audit.export</span>, or ship the audit log lines to a SIEM.</p>
-        </div>
-        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Step hardening is a chart setting</h3>
-          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">With <span class="mono" style="font-size: 14px; color: #E8EAEE">taskPodHardening: false</span>, only Pod Security holds a step, and only in namespaces the console created; in an adopted one it runs as root with an API token.</p>
         </div>
         <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
           <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">A raw DAG shows every step's outputs</h3>

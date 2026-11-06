@@ -72,7 +72,6 @@ type KubernetesOptions struct {
 	// runs where any step does.
 	CapacityPlacements map[string]Placement
 	PodLabels          map[string]string
-	PodHardening       bool
 	ImagePullSecret    string
 	LogMaxLines        int
 	LogMaxBytes        int
@@ -452,24 +451,20 @@ func (k *Kubernetes) jobFor(name string, task ResolvedTask) (*batchv1.Job, error
 	if strings.HasSuffix(task.Image, ":latest") && strings.Contains(task.Image, "/") {
 		pullPolicy = corev1.PullAlways
 	}
-	f := false
-	security := &corev1.SecurityContext{Privileged: &f, AllowPrivilegeEscalation: &f}
-	var podSecurity *corev1.PodSecurityContext
-	var automount *bool
-	if k.opts.PodHardening {
-		// Pod Security's restricted: non-root (a numeric non-root USER), a
-		// read-only root filesystem with a writable /tmp, no capabilities,
-		// the runtime's seccomp profile, no Kubernetes token.
-		t := true
-		seccomp := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
-		security.RunAsNonRoot, security.ReadOnlyRootFilesystem = &t, &t
-		security.Capabilities = &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}
-		security.SeccompProfile = seccomp
-		podSecurity = &corev1.PodSecurityContext{RunAsNonRoot: &t, SeccompProfile: seccomp}
-		automount = &f
-		mounts = append(mounts, corev1.VolumeMount{Name: "tmp", MountPath: "/tmp"})
-		volumes = append(volumes[:2], append([]corev1.Volume{{Name: "tmp", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}, volumes[2:]...)...)
+	// Pod Security's restricted, always: non-root (a numeric non-root
+	// USER), a read-only root filesystem with a writable /tmp, no
+	// capabilities or privilege escalation, the runtime's seccomp profile,
+	// no Kubernetes token. The dispatch policy refuses a Job without it.
+	f, t := false, true
+	seccomp := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	security := &corev1.SecurityContext{
+		Privileged: &f, AllowPrivilegeEscalation: &f, RunAsNonRoot: &t, ReadOnlyRootFilesystem: &t,
+		Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}, SeccompProfile: seccomp,
 	}
+	podSecurity := &corev1.PodSecurityContext{RunAsNonRoot: &t, SeccompProfile: seccomp}
+	automount := &f
+	mounts = append(mounts, corev1.VolumeMount{Name: "tmp", MountPath: "/tmp"})
+	volumes = append(volumes[:2], append([]corev1.Volume{{Name: "tmp", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}, volumes[2:]...)...)
 	var pullSecrets []corev1.LocalObjectReference
 	if k.opts.ImagePullSecret != "" {
 		pullSecrets = []corev1.LocalObjectReference{{Name: k.opts.ImagePullSecret}}

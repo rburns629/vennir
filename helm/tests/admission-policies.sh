@@ -328,7 +328,7 @@ print(json.dumps({"apiVersion": "batch/v1", "kind": "Job", "metadata": {"name": 
 PY
 }
 
-# Hardened as the executor makes a step's Job (scheduler.taskPodHardening),
+# Hardened as the executor makes a step's Job (the dispatch policy requires it),
 # unless the seventh argument is "unhardened" (neither), or "own" (the
 # container's securityContext is the sixth argument's).
 job() {  # namespace, image, action, serviceAccount, secret ("" for none), extra container JSON, hardening, extra volumes JSON, extra Pod spec JSON

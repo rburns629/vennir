@@ -189,11 +189,6 @@ type Settings struct {
 	// console copies the platform's pull Secret into each team namespace
 	// under this name. Empty: none.
 	TaskImagePullSecret string
-	// Step Pods meet Pod Security's restricted: non-root (a numeric USER), a
-	// read-only root filesystem with a writable /tmp, no capabilities, no
-	// privilege escalation, the runtime's seccomp profile, no Kubernetes
-	// token. Off only for images that can't.
-	TaskPodHardening bool
 
 	// How long Kubernetes keeps a finished Job the scheduler hasn't
 	// released (more than 0: at 0 it may delete one before its result is
@@ -289,21 +284,6 @@ func (r *reader) seconds(name string, fallback float64, positive bool) time.Dura
 	return time.Duration(r.number(name, fallback, positive) * float64(time.Second))
 }
 
-func (r *reader) boolean(name string, fallback bool) bool {
-	v, ok := r.raw(name)
-	if !ok {
-		return fallback
-	}
-	switch strings.ToLower(v) {
-	case "1", "true", "yes", "on", "t", "y":
-		return true
-	case "0", "false", "no", "off", "f", "n":
-		return false
-	}
-	r.problems = append(r.problems, fmt.Sprintf("%s: not true or false: %q", name, v))
-	return fallback
-}
-
 // jsonValue decodes a JSON setting; empty or "null" leaves into as it is.
 // An unknown field is refused: a misspelt toleration would otherwise be
 // dropped without a word.
@@ -360,7 +340,6 @@ func Load(getenv func(string) string) (Settings, error) {
 		KubernetesQPS:          r.number("KUBERNETES_CLIENT_QPS", 50, true),
 		KubernetesBurst:        r.integer("KUBERNETES_CLIENT_BURST", 100, true),
 		TaskImagePullSecret:    r.str("TASK_IMAGE_PULL_SECRET", ""),
-		TaskPodHardening:       r.boolean("TASK_POD_HARDENING", true),
 		JobTTL:                 r.seconds("KUBERNETES_JOB_TTL_SECONDS", 3600, true),
 		ReleaseFinishedAfter:   r.seconds("RELEASE_FINISHED_AFTER_SECONDS", 30, false),
 		ImagePullGrace:         r.seconds("IMAGE_PULL_GRACE_SECONDS", 120, true),

@@ -37,7 +37,7 @@ func stepTask() ResolvedTask {
 
 func options() KubernetesOptions {
 	return KubernetesOptions{RequestTimeout: 5 * time.Second, ImagePullGrace: 120 * time.Second,
-		JobDeadlineGrace: 600 * time.Second, WatchResync: 30 * time.Second, PodHardening: true,
+		JobDeadlineGrace: 600 * time.Second, WatchResync: 30 * time.Second,
 		LogMaxLines: 1000, LogMaxBytes: 1 << 20}
 }
 
@@ -397,6 +397,13 @@ func TestAStepPodMeetsPodSecurityRestricted(t *testing.T) {
 	check(t, "read-only root", *container.SecurityContext.ReadOnlyRootFilesystem, true)
 	check(t, "escalation", *container.SecurityContext.AllowPrivilegeEscalation, false)
 	check(t, "capabilities", container.SecurityContext.Capabilities.Drop, []corev1.Capability{"ALL"})
+	check(t, "no capabilities added", len(container.SecurityContext.Capabilities.Add), 0)
+	check(t, "privileged", *container.SecurityContext.Privileged, false)
+	check(t, "container non-root", *container.SecurityContext.RunAsNonRoot, true)
+	check(t, "container seccomp", container.SecurityContext.SeccompProfile.Type, corev1.SeccompProfileTypeRuntimeDefault)
+	if pod.Volumes[2].Name != "tmp" || pod.Volumes[2].EmptyDir == nil {
+		t.Errorf("/tmp's volume = %+v, want an emptyDir", pod.Volumes[2])
+	}
 	var mounts []string
 	for _, m := range container.VolumeMounts {
 		mounts = append(mounts, m.MountPath)
@@ -404,16 +411,6 @@ func TestAStepPodMeetsPodSecurityRestricted(t *testing.T) {
 	check(t, "mounts", mounts, []string{"/platform/input", "/platform/output", "/tmp"})
 	check(t, "args", container.Args, []string{"create"})
 	check(t, "termination message", container.TerminationMessagePath, "/platform/output/result.json")
-}
-
-func TestPodHardeningCanBeTurnedOffForImagesThatNeedIt(t *testing.T) {
-	opts := options()
-	opts.PodHardening = false
-	c := newCluster(opts)
-	_, _ = c.k.Start(context.Background(), stepTask())
-	pod := c.job(t).Spec.Template.Spec
-	check(t, "pod security", pod.SecurityContext, (*corev1.PodSecurityContext)(nil))
-	check(t, "escalation", *pod.Containers[0].SecurityContext.AllowPrivilegeEscalation, false)
 }
 
 func TestSecretsAreMountedEachUnderItsName(t *testing.T) {

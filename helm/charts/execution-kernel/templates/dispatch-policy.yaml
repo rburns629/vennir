@@ -39,9 +39,9 @@ a chart upgrade, not only the scheduler's ConfigMap.
 helm/tests/step-job.json is the executor's own Job (a kernel test keeps it
 so), which the admission tests admit.
 
-With scheduler.taskPodHardening on, a Job must also be hardened as the
-executor makes it (kernel/internal/executor/kubernetes.go): no Kubernetes
-token, non-root, no privilege escalation, a read-only root filesystem, no
+A Job must also be hardened as the executor makes it
+(kernel/internal/executor/kubernetes.go), always: no Kubernetes token,
+non-root, no privilege escalation, a read-only root filesystem, no
 capabilities, nothing of the host's. The cluster then holds this even in a
 team namespace without Pod Security's restricted label (one the console
 didn't create), and for a Job the scheduler was tricked into making.
@@ -215,8 +215,7 @@ spec:
         places steps (scheduler.taskPlacement, capacityPlacements), on no
         node named
       reason: Forbidden
-    {{- if .Values.scheduler.taskPodHardening }}
-    # A step's Job, hardened as the executor makes it (scheduler.taskPodHardening).
+    # A step's Job, hardened as the executor makes it.
     - expression: >-
         request.operation != "CREATE" || request.resource.resource != "jobs" || (
         has(object.spec.template.spec.automountServiceAccountToken) &&
@@ -247,12 +246,11 @@ spec:
         object.spec.template.spec.securityContext.seccompProfile.type == "RuntimeDefault" &&
         (!has(object.spec.template.spec.securityContext.runAsUser) || object.spec.template.spec.securityContext.runAsUser != 0))
       message: >-
-        a step's Job must run hardened (scheduler.taskPodHardening): no
-        Kubernetes token, non-root (each container too), seccomp RuntimeDefault,
+        a step's Job must run hardened: no Kubernetes token, non-root
+        (each container too), seccomp RuntimeDefault,
         a read-only root filesystem, no capabilities or privilege, nothing of
         the host's
       reason: Forbidden
-    {{- end }}
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
