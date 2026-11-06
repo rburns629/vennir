@@ -269,7 +269,30 @@ func TestAJobTheKernelDidntMakeIsntAdopted(t *testing.T) {
 		"another container": func(j *batchv1.Job) {
 			j.Spec.Template.Spec.Containers = append(j.Spec.Template.Spec.Containers, corev1.Container{Name: "x"})
 		},
-		"an init container": func(j *batchv1.Job) { j.Spec.Template.Spec.InitContainers = []corev1.Container{{Name: "x"}} },
+		"an init container":    func(j *batchv1.Job) { j.Spec.Template.Spec.InitContainers = []corev1.Container{{Name: "x"}} },
+		"its Kubernetes token": func(j *batchv1.Job) { j.Spec.Template.Spec.AutomountServiceAccountToken = nil },
+		"running as root": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.SecurityContext = nil
+			j.Spec.Template.Spec.Containers[0].SecurityContext = nil
+		},
+		"a writable root": func(j *batchv1.Job) {
+			f := false
+			j.Spec.Template.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = &f
+		},
+		"the host's network": func(j *batchv1.Job) { j.Spec.Template.Spec.HostNetwork = true },
+		"a Secret in its environment": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.Containers[0].Env = append(j.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: "K",
+				ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "other"}, Key: "k"}}})
+		},
+		"a host path": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.Volumes = append(j.Spec.Template.Spec.Volumes, corev1.Volume{Name: "h",
+				VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/"}}})
+		},
+		"another token audience": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.Volumes = append(j.Spec.Template.Spec.Volumes, corev1.Volume{Name: "t",
+				VolumeSource: corev1.VolumeSource{Projected: &corev1.ProjectedVolumeSource{Sources: []corev1.VolumeProjection{
+					{ServiceAccountToken: &corev1.ServiceAccountTokenProjection{Audience: "sts.amazonaws.com", Path: "t"}}}}}})
+		},
 		"another team's Secret": func(j *batchv1.Job) {
 			j.Spec.Template.Spec.Volumes = append(j.Spec.Template.Spec.Volumes, corev1.Volume{Name: "s",
 				VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "other"}}})
