@@ -80,6 +80,7 @@ func cloudFromAWS(outputs map[string]json.RawMessage) (*install.Cloud, bool, err
 			Issuer string `json:"issuer"`
 		}
 		TaskRegistry string
+		PolicyRole   string
 		Backup       *struct {
 			Bucket string `json:"bucket"`
 			Region string `json:"region"`
@@ -127,6 +128,7 @@ func cloudFromAWS(outputs map[string]json.RawMessage) (*install.Cloud, bool, err
 		"cluster": &v.Cluster, "task_registry": &v.TaskRegistry, "backup": &v.Backup, "logs": &v.Logs, "audit": &v.Audit, "prometheus": &v.Prometheus,
 		"step_placement": &v.StepPlacement, "capacity_placements": &v.Capacities, "spot": &v.Spot, "catalog": &v.Catalog,
 		"console_address": &v.ConsoleAddress, "signing": &v.Signing, "database": &v.Database,
+		"policy_role": &v.PolicyRole,
 	} {
 		raw, ok := outputs[name]
 		if !ok {
@@ -148,6 +150,7 @@ func cloudFromAWS(outputs map[string]json.RawMessage) (*install.Cloud, bool, err
 		ClusterName:        v.Cluster.Name,
 		ClusterLocation:    v.Cluster.Region,
 		ClusterIssuer:      v.Cluster.Issuer,
+		PolicyRole:         v.PolicyRole,
 	}
 	if v.Backup != nil {
 		cloud.BackupBucket, cloud.BackupRegion = v.Backup.Bucket, v.Backup.Region
@@ -176,7 +179,7 @@ func cloudFromAWS(outputs map[string]json.RawMessage) (*install.Cloud, bool, err
 		cloud.Database = &install.ManagedDatabase{
 			Provider: "aws", Instance: d.Instance, Host: d.Host, Region: d.Region,
 			KernelUser: d.Users["kernel"], ConsoleUser: d.Users["console"], GatewayUser: d.Users["gateway"],
-			AdminUser: d.AdminUser, AdminSecret: d.AdminSecret,
+			PolicyUser: d.Users["policy"], AdminUser: d.AdminUser, AdminSecret: d.AdminSecret,
 		}
 	}
 	return cloud, v.Spot, nil

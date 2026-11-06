@@ -41,8 +41,11 @@ type Cloud struct {
 	// release, and with a managed database signing in as PolicyUser; empty
 	// from a module before it.
 	PolicyServiceAccount string
-	BackupBucket         string
-	BackupRegion         string // aws: the bucket's region
+	// PolicyRole is kernel policy's (aws: Pod Identity binds it by
+	// ServiceAccount name); empty from a module before it.
+	PolicyRole   string
+	BackupBucket string
+	BackupRegion string // aws: the bucket's region
 	// BackupServiceAccount is the cloud identity the backups run as (gcp);
 	// on aws, EKS Pod Identity binds the role by ServiceAccount name.
 	BackupServiceAccount string
@@ -513,14 +516,15 @@ func gatewayTokenAudience(c *config.Config) string {
 // catalogPolicy, decision 27) on a cloud install whose own catalog is
 // signed: the kernel verifies the release itself, from the release and
 // signers the console chart gets, reading the registry as its own identity
-// (PolicyServiceAccount, by Workload Identity), and with a managed
-// database signs in as its own user. GKE only for now: on EKS it has no
-// identity of its own yet (TODO.md). nil otherwise: off a cloud, unsigned,
-// another install's catalog (read by the console's identity, which kernel
-// policy doesn't borrow), or a module from before kernel policy's identity.
+// (gcp: PolicyServiceAccount, by Workload Identity; aws: PolicyRole, by Pod
+// Identity, with ECR's token), and with a managed database signs in as its
+// own user. nil otherwise: off a cloud, unsigned, another install's catalog
+// (read by the console's identity, which kernel policy doesn't borrow), or
+// a module from before kernel policy's identity.
 func catalogPolicyValues(c *config.Config, cloud *Cloud) map[string]any {
 	release := ownCatalogRelease(c, cloud)
-	if release == "" || c.ExternalCatalog.Registry != "" || cloud.Provider != "gcp" || cloud.PolicyServiceAccount == "" {
+	if release == "" || c.ExternalCatalog.Registry != "" ||
+		(cloud.Provider == "gcp" && cloud.PolicyServiceAccount == "") || (cloud.Provider == "aws" && cloud.PolicyRole == "") {
 		return nil
 	}
 	trust := SignatureTrust(c, cloud)
@@ -534,10 +538,19 @@ func catalogPolicyValues(c *config.Config, cloud *Cloud) map[string]any {
 	if c.CatalogVersion == "newest" {
 		p["newestVersion"] = true
 	}
-	p["registry"] = map[string]any{"gcpMetadataToken": true}
-	p["serviceAccountAnnotations"] = googleIdentity(cloud.PolicyServiceAccount)
+	gateway := map[string]any{"serviceAccount": ConsoleRelease + "-execution-console-gateway"}
+	switch cloud.Provider {
+	case "gcp":
+		p["registry"] = map[string]any{"gcpMetadataToken": true}
+		p["serviceAccountAnnotations"] = googleIdentity(cloud.PolicyServiceAccount)
+		gateway["gcpTokenAudience"] = gatewayTokenAudience(c)
+	case "aws":
+		p["registry"] = map[string]any{"ecrToken": true}
+	default:
+		return nil
+	}
 	if c.Gateway.Enabled {
-		p["gateway"] = map[string]any{"serviceAccount": ConsoleRelease + "-execution-console-gateway", "gcpTokenAudience": gatewayTokenAudience(c)}
+		p["gateway"] = gateway
 	}
 	if db := cloud.Database; db != nil && db.PolicyUser != "" {
 		p["database"] = map[string]any{"role": db.PolicyUser, "existingSecret": PolicyDatabaseSecret}
