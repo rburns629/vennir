@@ -78,10 +78,82 @@ subjects:
     name: {{ $name }}
     namespace: {{ .Release.Namespace }}
 ---
+{{- /*
+Which audiences each API's ServiceAccount may get a token for: exactly what
+its published API needs the gateway to ask for (a serviceAccountToken
+backend's audience; AWS STS's for awsSigV4; gateway.gcp.tokenAudience for
+googleIdToken), and nothing for an API that's held, or whose team is
+retired or purged. So a serviceAccountToken API's backend can't be handed a
+token with an audience a cloud exchanges for that ServiceAccount's
+identity, even though the gateway asks for such audiences for other APIs'
+ServiceAccounts, and no API's ServiceAccount gets another API's audience.
+
+The lists live in this policy itself, as CEL literals the console rewrites
+whenever the catalog's APIs change, every few minutes and at startup
+(console/src/gatewayTokenPolicy.ts; its RBAC allows updating this one
+policy by name), as the kernel chart's identity policy holds the registered
+products: `apiAudiences0` to `apiAudiencesf`, JSON maps of
+"<namespace>/<serviceAccount>" to the list of its audiences, by the key's
+length modulo 16 (a hex digit), since the API server compiles at most
+100,000 characters per CEL expression (the console writes at most 95,000 a
+map and 600,000 in all: gatewayTokenPolicy.ts's MAX_MAP_CHARS and
+MAX_TOTAL_CHARS). This chart seeds them empty on install and keeps what's
+there on upgrade (lookup), re-encoded as JSON so they can only ever be
+literals; the console owns those fields under Helm 4's server-side apply,
+so upgrades pass --force-conflicts. Until the console has written an API's
+audiences (just published, the console not yet up), the gateway's mint is
+refused, it answers that request 502 BACKEND_CREDENTIAL, and it asks again
+on the next: it keeps no failed credential.
+
+`apiAudiencesWritten` says whether the console has written the maps since
+the policy was made: seeded false on install, on the upgrade from a chart
+whose policy had none, and whenever lookup sees nothing (helm template,
+GitOps rendering); kept from the lookup otherwise; set true by the console
+with every write (it writes every few minutes). While it's false only the
+other validations hold, so a console that's slow to roll out (or a render
+that couldn't look the policy up) doesn't refuse every API's credential;
+the exact-audience check starts with the console's next write.
+*/}}
+{{- $tokensPolicy := printf "%s-tokens" $name }}
+{{- $digits := splitList "" "0123456789abcdef" }}
+{{- $shards := dict }}
+{{- range $digits }}
+{{- $_ := set $shards . dict }}
+{{- end }}
+{{- $shardIndex := dict }}
+{{- range $i, $digit := $digits }}
+{{- $_ := set $shardIndex $digit $i }}
+{{- end }}
+{{- $written := "false" }}
+{{- $existingPolicy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $tokensPolicy }}
+{{- if $existingPolicy }}
+{{- range $existingPolicy.spec.variables }}
+{{- if eq .name "apiAudiencesWritten" }}
+{{- if not (has .expression (list "true" "false")) }}
+{{- fail (printf "%s's apiAudiencesWritten isn't true or false; delete the policy and let the console resync it." $tokensPolicy) }}
+{{- end }}
+{{- $written = .expression }}
+{{- end }}
+{{- $digit := trimPrefix "apiAudiences" .name }}
+{{- if and (ne $digit .name) (hasKey $shards $digit) }}
+{{- range $key, $audiences := fromJson .expression }}
+{{- if not (and (regexMatch "^[a-z0-9-]+/[a-z0-9.-]+$" $key) (kindIs "slice" $audiences) (eq (mod (len $key) 16) (index $shardIndex $digit))) }}
+{{- fail (printf "%s's apiAudiences%s isn't a JSON map of <namespace>/<serviceAccount> keys whose length modulo 16 is %d to lists of audiences; delete the policy and let the console resync it." $tokensPolicy $digit (index $shardIndex $digit)) }}
+{{- end }}
+{{- range $audiences }}
+{{- if not (kindIs "string" .) }}
+{{- fail (printf "%s's apiAudiences%s has an audience that isn't a string; delete the policy and let the console resync it." $tokensPolicy $digit) }}
+{{- end }}
+{{- end }}
+{{- $_ := set (index $shards $digit) $key $audiences }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
-  name: {{ $name }}-tokens
+  name: {{ $tokensPolicy }}
   labels:
     {{- include "execution-console.labels" . | nindent 4 }}
 spec:
@@ -95,6 +167,25 @@ spec:
   matchConditions:
     - name: from-the-gateway
       expression: request.userInfo.username == {{ printf "system:serviceaccount:%s:%s" .Release.Namespace $name | quote }}
+  variables:
+    # The ones the console edits: whether it has written the maps yet, and
+    # the sixteen maps of each API ServiceAccount's audiences.
+    - name: apiAudiencesWritten
+      expression: {{ $written | quote }}
+    {{- range $digits }}
+    - name: apiAudiences{{ . }}
+      expression: {{ toJson (index $shards .) | toJson }}
+    {{- end }}
+    - name: apiAudiences
+      expression: >-
+        { {{- range $i, $digit := $digits }}{{ if $i }}, {{ end }}{{ $i }}: dyn(variables.apiAudiences{{ $digit }}){{ end -}} }
+    - name: key
+      expression: request.namespace + "/" + request.name
+    - name: shard
+      expression: variables.apiAudiences[size(variables.key) % 16]
+    - name: allowedAudiences
+      expression: >-
+        variables.key in variables.shard ? variables.shard[variables.key] : []
   validations:
     - expression: >-
         request.name.endsWith("-api") && has(namespaceObject.metadata.labels) &&
@@ -110,9 +201,8 @@ spec:
     # or a GKE pool's STS audience, which the gateway never asks for. AWS's
     # (sts.amazonaws.com) and the Google pool's or provider's
     # (gateway.gcp.tokenAudience) it does ask for, for its own exchanges
-    # (awsSigV4, googleIdToken), for the same ServiceAccounts as a backend's
-    # token: those the gateway itself refuses for serviceAccountToken, as
-    # the console and the catalog tool refuse them in an API.
+    # (awsSigV4, googleIdToken): the last validation allows those only for
+    # the ServiceAccounts of APIs that use them. Kept as defence in depth.
     - expression: >-
         has(object.spec.audiences) && object.spec.audiences.size() > 0 &&
         object.spec.audiences.all(a, !(a in {{ concat (list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" .Values.kernelApiToken.audience) .Values.gateway.reservedAudiences | toJson }}) &&
@@ -122,6 +212,16 @@ spec:
       reason: Forbidden
     - expression: has(object.spec.expirationSeconds) && object.spec.expirationSeconds <= 3600
       message: "The gateway mints tokens lasting an hour at most."
+      reason: Forbidden
+    # Only what its published API needs, once the console has written the
+    # lists (this file's comment above).
+    - expression: >-
+        !variables.apiAudiencesWritten ||
+        (has(object.spec.audiences) && object.spec.audiences.all(a, a in variables.allowedAudiences))
+      messageExpression: >-
+        "The gateway mints tokens for " + variables.key + " only for the audiences its published API needs (" +
+        (size(variables.allowedAudiences) == 0 ? "none: no published API runs as it" : variables.allowedAudiences.join(", ")) +
+        "), not " + (has(object.spec.audiences) ? object.spec.audiences.join(", ") : "none") + "."
       reason: Forbidden
 ---
 apiVersion: admissionregistration.k8s.io/v1

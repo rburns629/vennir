@@ -1,7 +1,7 @@
 # execution-console on GKE (release `console`, namespace vennir-system):
 #   make gke-deploy VERSION=v<x.y.z>   (the release's signed chart and images)
 #   or: helm upgrade --install console oci://ghcr.io/rburns629/vennir/charts/execution-console --version <x.y.z> -n vennir-system \
-#     --reset-values --kube-context gke_my-gcp-project_us-central1_vennir-gke \
+#     --reset-values --force-conflicts --kube-context gke_my-gcp-project_us-central1_vennir-gke \
 #     -f helm/values/gke/console.yaml
 # No bootstrapAdmin.password here on purpose: a fresh install's first admin
 # gets a random one, never printed; give it one with resetAdmin.js

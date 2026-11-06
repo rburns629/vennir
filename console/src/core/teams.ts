@@ -62,6 +62,7 @@ import {
   unfinishedPodsByNamespace,
 } from "../k8s.js";
 import { getExecutionStates } from "../kernel/client.js";
+import { syncGatewayTokenPolicy } from "../gatewayTokenPolicy.js";
 import { syncIdentityPolicy } from "../productPolicy.js";
 import { copyPullSecret } from "../pullSecret.js";
 import { ensureSchedulerLogsBinding } from "../schedulerLogs.js";
@@ -461,6 +462,8 @@ export async function retireTeam(caller: AuthUser | undefined, name: string, log
   if (!team.retiredAt) await setTeamRetired(team.id, true, await whoRetires(caller));
   const unregisteredProducts = await deleteProductsForTeam(team.id);
   await syncIdentityPolicy();
+  // Its APIs are off the gateway: their ServiceAccounts' audiences go.
+  await syncGatewayTokenPolicy();
   log.info({ team: team.name, by: caller?.id, unregisteredProducts }, "team retired");
   return { name: team.name, retired: true, unregisteredProducts };
 }
@@ -485,6 +488,8 @@ export async function unretireTeam(caller: AuthUser | undefined, name: string, l
   if (!team) throw noSuchTeam();
   await setTeamNamespaceState(team.name, "true", true, log);
   if (team.retiredAt) await setTeamRetired(team.id, false);
+  // Its APIs are back on the gateway: their ServiceAccounts' audiences too.
+  await syncGatewayTokenPolicy();
   log.info({ team: team.name, by: caller?.id }, "team un-retired");
   return { name: team.name, retired: false };
 }

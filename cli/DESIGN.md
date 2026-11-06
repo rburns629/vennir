@@ -200,7 +200,8 @@ the sign-in that follows.
 6. `tofu apply` the saved plan; then the cluster's credentials; the
    platform namespace; policy-controller if signing is on; External
    Secrets Operator; `helm upgrade --install` of the kernel, then the
-   console (`--reset-values`, `--force-conflicts` for the kernel).
+   console (`--reset-values`, `--force-conflicts`: the console edits admission
+   policies in both charts).
 7. Wait until both are ready; print where the console is and how to reach
    it, and where the first admin's password is: `admin-password` in the
    environment's folder, readable only by you and listed in a

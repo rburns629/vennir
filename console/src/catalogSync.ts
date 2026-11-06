@@ -58,6 +58,7 @@ import { catalogSync, products, teams } from "./db/schema.js";
 import { ReleaseSchema, type BackendAuth as ReleaseBackendAuth, type Release } from "./gen/vennir/catalog/v1/release_pb.js";
 import { createVerifyJob, deleteScanJob, ensureServiceAccount, readScanJob } from "./k8s.js";
 import { catalogSyncs } from "./metrics.js";
+import { syncGatewayTokenPolicy } from "./gatewayTokenPolicy.js";
 import { fetchRelease, listTags } from "./registry.js";
 import { apiTokenAudienceProblem } from "./tokenAudiences.js";
 
@@ -147,7 +148,7 @@ async function record(values: Partial<typeof catalogSync.$inferInsert>): Promise
 /**
  * Each named team's API products, as the release has them, each with its
  * ServiceAccount; every other API of those teams goes. One that fails to
- * apply keeps what was stored.
+ * apply keeps what was stored. Then the gateway token policy is rewritten.
  */
 export async function applyApis(
   released: Release["apis"],
@@ -206,6 +207,13 @@ export async function applyApis(
     });
   }
   await attempt("removing APIs", () => deleteApisExcept(teamIds, keepApis));
+  // The audiences each API's ServiceAccount may have, as the APIs now are,
+  // at once: a newly published API, or one whose audience or kind of
+  // credential just changed, can be minted for without waiting for the rest
+  // of the release (until then its mint is refused, and the gateway asks
+  // again on the next request). Each team the release retires resyncs it
+  // again (retireTeam).
+  await attempt("gateway token policy", () => syncGatewayTokenPolicy());
 }
 
 function backendAuth(auth: ReleaseBackendAuth | undefined): BackendAuth | null {

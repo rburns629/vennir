@@ -2,7 +2,8 @@
 /**
  * Keeps the cluster's copies of the console's lists from drifting: the
  * identity policy (products and team secrets, productPolicy.ts), the scan
- * policy (admitted digests, scanning.ts) and each team's copy of the pull
+ * policy (admitted digests, scanning.ts), the gateway token policy (each
+ * API ServiceAccount's audiences, gatewayTokenPolicy.ts) and each team's copy of the pull
  * Secret (pullSecret.ts). Each is rewritten whenever its data changes; this
  * also rewrites them every few minutes, so a write that
  * failed, or a hand edit to a policy, is put right without waiting for the
@@ -11,6 +12,7 @@
  */
 import type { FastifyBaseLogger } from "fastify";
 import { syncApiNamespaces } from "./core/teams.js";
+import { syncGatewayTokenPolicy } from "./gatewayTokenPolicy.js";
 import { syncIdentityPolicy } from "./productPolicy.js";
 import { syncPullSecrets } from "./pullSecret.js";
 import { syncScanPolicy } from "./scanning.js";
@@ -32,6 +34,7 @@ const outcomes = new Map<string, SyncOutcome>();
 const SYNCS: Record<string, () => Promise<boolean>> = {
   identityPolicy: syncIdentityPolicy,
   scanPolicy: syncScanPolicy,
+  gatewayTokenPolicy: syncGatewayTokenPolicy,
   pullSecrets: syncPullSecrets,
   apiNamespaces: syncApiNamespaces,
   teamNetworkPolicies: syncTeamNetworkPolicies,

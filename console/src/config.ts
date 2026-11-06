@@ -649,6 +649,13 @@ export const config = {
     // The gateway's limit for a team an API's limits don't name and no
     // default covers (its DEFAULT_PER_MINUTE), shown on an API's page.
     defaultPerMinute: positiveInt("GATEWAY_DEFAULT_PER_MINUTE", 600),
+    // The chart's gateway token policy (gateway.yaml), whose audiences per
+    // API ServiceAccount this console keeps current (gatewayTokenPolicy.ts);
+    // unset (the gateway off, tests) means it's never written. And the
+    // audience the gateway's googleIdToken exchanges ask for (its
+    // GCP_TOKEN_AUDIENCE, gateway.gcp.tokenAudience); empty: it mints none.
+    tokenPolicyName: process.env["GATEWAY_TOKEN_POLICY_NAME"] ?? "",
+    gcpTokenAudience: process.env["GATEWAY_GCP_TOKEN_AUDIENCE"] ?? "",
   },
   // A registry on another cloud (or another AWS account), read with no
   // stored key (registryFederation.ts), exchanging the console's projected

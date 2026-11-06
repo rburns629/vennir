@@ -593,11 +593,33 @@ may not carry an audience a cloud exchanges for an identity either
 `<project>.svc.id.goog` or its `identitynamespace:` audience, a GCP
 workload identity provider), or the backend could sign in to that cloud as
 the API's ServiceAccount: the catalog tool, the console's catalog sync and
-the gateway refuse them. The admission policy refuses Azure's and the
-`identitynamespace:` ones too, but not AWS's or the Google pool's: the
-gateway asks for those itself, for the same ServiceAccounts, for its own
-`awsSigV4` and `googleIdToken` exchanges, and a request doesn't say which
-it's for, so there the gateway's own check is what holds. `-api` is reserved: no product may run as
+the gateway refuse them, and so does the admission policy. It refuses
+Azure's and the `identitynamespace:` ones outright; and it lets each API's
+ServiceAccount (`<team>/<serviceAccount>`) have only the audiences its
+published API needs the gateway to ask for: a `serviceAccountToken`
+backend's own audience, AWS STS's (`sts.amazonaws.com`) for `awsSigV4`,
+`gateway.gcp.tokenAudience` for `googleIdToken`, and nothing for an API
+that's held or whose team is retired. So a `serviceAccountToken` API's
+backend can't be handed a token for AWS's or the Google pool's audience,
+though the gateway asks for those for other APIs' ServiceAccounts, and no
+API's ServiceAccount gets another API's audience. The lists are CEL
+literals in the policy itself, which the console rewrites whenever the
+catalog's APIs or a team's retirement change, every few minutes and at
+startup (`console/src/gatewayTokenPolicy.ts`, the identity policy's
+pattern; its RBAC may update that one policy by name), and the chart keeps
+on upgrade (so upgrade the console chart with `--force-conflicts` too).
+The exact-audience check holds only once a console has written the lists
+(`apiAudiencesWritten`): on a fresh install, on the upgrade from a chart
+without them, and whenever the chart is rendered without looking the
+policy up (`helm template`, GitOps tools), the policy starts with it off,
+so only the other rules above apply (an `*-api` ServiceAccount in an
+active team namespace, a named audience that isn't the cluster's,
+kernel-api's, Azure's or a GKE pool's STS one, an hour at most) until the
+console's next write: at its startup, after a catalog sync, and every few
+minutes (`policySyncIntervalSeconds`). That window keeps a slow console
+rollout from refusing every API's credential. Until the console has written a newly published API's audiences, the
+gateway's mint is refused and that request gets 502 `BACKEND_CREDENTIAL`;
+the gateway keeps no failed credential, so the next request asks again. `-api` is reserved: no product may run as
 such a ServiceAccount, and an API's must end in it. It reads the
 console's database as a role of its own (`vennir_gateway`,
 `console/src/db/gatewayAccess.ts`): it may read the columns it needs to
@@ -880,6 +902,7 @@ without going through the console:
 | Team deletion | A configured purger deleting a team namespace that isn't labelled retired (or a team's API backends' namespace, `<team>-apis`, not labelled `vennir/api-backends=retired`). None is configured by default: the console leaves a purged team's namespace, labelled retired, for a cluster administrator to delete, so the identity that retires a namespace can't also delete it (`teamNamespaces.purge` would let it) | `templates/purge-policy.yaml` |
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
 | Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own); creating an ExternalSecret without its `app.kubernetes.io/managed-by: vennir-console` label, or updating one that didn't carry it | console chart, `templates/write-fence-policy.yaml` |
+| Gateway tokens | The gateway minting a token for anything but an API ServiceAccount (`*-api`) in an active team namespace; for no audience, the Kubernetes API's, kernel-api's, Azure's or a GKE pool's STS audience; lasting over an hour; or for any audience its published API doesn't need (a `serviceAccountToken` backend's audience, AWS STS's for `awsSigV4`, the Google pool's for `googleIdToken`; none for a held API or a retired team's). The console keeps each API ServiceAccount's audiences current (sixteen maps, about 500 APIs each); that last check holds once it has first written them, so not between an install, an upgrade onto this chart or a render without lookup and the console's next write (every few minutes) | console chart, `templates/gateway.yaml` |
 
 The platform's namespace is never a team's (never labelled `vennir/team`).
 One that was would lose more than the dispatch guardrail there:
@@ -1047,13 +1070,16 @@ taken, and what would still hold.
   and delete Secrets, product ServiceAccounts, ExternalSecrets,
   SecretStores, NetworkPolicies and quotas in team namespaces (the write
   fence keeps it to those); read every Pod in the cluster, specs included;
-  and update the image, identity and scan policies (and read, never
+  and update the image, identity and scan policies and the gateway token
+  policy (and read, never
   change, the kernel's signature policy, by its name). Kubernetes doesn't
   apply admission policies to admission policies, so nothing narrows that
-  last right: the console only ever writes their lists, and every kernel
+  last right: the console only ever writes their lists, and every
   upgrade resets the rest, but a compromised console could rewrite them to
   allow any image, ServiceAccount or Secret, then submit through kernel-api,
-  which trusts it, a step that mounts any team's Secret. This is a known,
+  which trusts it, a step that mounts any team's Secret (or let the gateway
+  mint any audience but the cluster's own for an API's ServiceAccount;
+  the gateway still asks only for what each API needs). This is a known,
   deliberate trade-off (the comment in that file). It also holds its
   database (every account, and the values it seals) and `JWT_SECRET`, so it
   can make a session as anyone. Still holding: steps run only in team

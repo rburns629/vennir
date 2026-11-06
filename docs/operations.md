@@ -782,11 +782,20 @@ It leaves:
 `helm upgrade` with the same values files and `--reset-values`. Two things
 to know:
 
-- **Upgrade the kernel chart with `--force-conflicts`.** The console edits
-  the kernel's image, identity and scan policies, so Helm's server-side
-  apply sees it as their owner; without the flag the upgrade fails with a
-  conflict. The chart writes back what the console last set, so nothing is
-  lost.
+- **Upgrade both charts with `--force-conflicts`.** The console edits
+  the kernel's image, identity and scan policies, and (with the gateway on)
+  its own chart's gateway token policy, so Helm's server-side apply sees it
+  as their owner; without the flag the upgrade fails with a conflict. Each
+  chart writes back what the console last set, so nothing is lost.
+- **The gateway's exact-audience check waits for the console.** The
+  gateway token policy holds each API's ServiceAccount to its API's own
+  audiences only once the console has written them (`apiAudiencesWritten`).
+  The upgrade onto the chart that adds them, and any render without lookup
+  (`helm template`, a GitOps tool applying rendered manifests), sets the
+  check off, leaving the policy's other rules; the new console turns it
+  back on with its next write: at startup, and every few minutes after
+  (`policySyncIntervalSeconds`). A GitOps tool that reapplies the rendered
+  policy turns it off again each time, until that next write.
 - **Migrations run first**, as a Helm hook, before any new Pod starts, on
   every upgrade (a no-op when nothing's pending), against the database the
   upgrade is going to: the kernel's hook reads its URL from a hook Secret
