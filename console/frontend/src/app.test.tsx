@@ -11,8 +11,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { create, toBinary } from "@bufbuild/protobuf";
 import { FailureSchema } from "./gen/vennir/console/v1/common_pb.js";
 import { CssBaseline, ThemeProvider } from "@mui/material";
-import type { ComponentType } from "react";
-import { MemoryRouter } from "react-router-dom";
+import type { ComponentType, ReactNode } from "react";
+import { Link as RouterLink, MemoryRouter } from "react-router-dom";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { theme } from "./theme";
 
@@ -108,7 +108,7 @@ const ADMIN = { userId: "u1", email: "ana@acme.com", teamNames: ["azure-apps"], 
 const MEMBER = { ...ADMIN, isAdmin: false, maintainerOf: [] };
 
 let App: ComponentType;
-async function renderAt(path: string, me: typeof ADMIN | null, extra: Record<string, Answer> = {}) {
+async function renderAt(path: string, me: (typeof ADMIN & { retiredTeams?: string[] }) | null, extra: Record<string, Answer> = {}, beside?: ReactNode) {
   App ??= (await import("./App")).App;
   if (me) localStorage.setItem("token", "a-session");
   answers = { "AuthService/GetEnvironment": { label: "test" }, ...(me ? { "AuthService/GetMe": me } : {}), ...extra };
@@ -117,6 +117,7 @@ async function renderAt(path: string, me: typeof ADMIN | null, extra: Record<str
       <CssBaseline />
       <MemoryRouter initialEntries={[path]}>
         <App />
+        {beside}
       </MemoryRouter>
     </ThemeProvider>,
   );
@@ -1086,7 +1087,7 @@ describe("an API", () => {
   });
 
   it("offers whoever may not call it a request, not an issue on the catalog", async () => {
-    const theirs = { ...ORDERS, mayCall: false, askForAccessUrl: "https://github.com/acme/catalog/issues/new?title=orders" };
+    const theirs = { ...ORDERS, mayCall: false };
     await renderAt("/apis/payments/orders", { ...ADMIN, teamNames: [], maintainerOf: [] }, { "ApiService/GetApi": { api: theirs, openapi: "{}" } });
     expect(await screen.findByRole("button", { name: "Request access…" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Ask for access ↗" })).toBeNull();
@@ -1343,13 +1344,13 @@ describe("who may call an API (decision 26)", () => {
       fireEvent.click(within(form).getByRole("button", { name: "Grant finance-analysts@acme.com" }));
       await waitFor(() => { expect(added.seen).toEqual([{ team: "payments", name: "orders", group: "finance-analysts@acme.com", perMinute: 120 }]); });
 
-      fireEvent.click(within(list).getAllByRole("button", { name: "Change rate…" })[1]!);
+      fireEvent.click(within(list).getByRole("button", { name: "Change rate of growth-sync’s grant…" }));
       let dialog = await screen.findByRole("dialog");
       fireEvent.change(within(dialog).getByLabelText(/Its rate, a minute/), { target: { value: "900" } });
       fireEvent.click(within(dialog).getByRole("button", { name: "Change rate" }));
       await waitFor(() => { expect(rated.seen).toEqual([{ grantId: "g2", perMinute: 900 }]); });
 
-      fireEvent.click((await within(list).findAllByRole("button", { name: "Revoke…" }))[0]!);
+      fireEvent.click(await within(list).findByRole("button", { name: "Revoke orders-readers@acme.com’s access…" }));
       dialog = await screen.findByRole("dialog");
       fireEvent.change(within(dialog).getByLabelText(/Why/), { target: { value: "Moved to a new group." } });
       fireEvent.click(within(dialog).getByRole("button", { name: "Revoke" }));
@@ -1362,9 +1363,9 @@ describe("who may call an API (decision 26)", () => {
       const list = await screen.findByRole("region", { name: "Access list" });
       await within(list).findByText("orders-readers@acme.com");
       expect(within(list).queryByRole("button", { name: "Add a grant" })).toBeNull();
-      expect(within(list).queryByRole("button", { name: "Change rate…" })).toBeNull();
+      expect(within(list).queryByRole("button", { name: /^Change rate/ })).toBeNull();
       expect(screen.queryByRole("button", { name: /^Approve/ })).toBeNull();
-      fireEvent.click(within(list).getAllByRole("button", { name: "Revoke…" })[1]!);
+      fireEvent.click(within(list).getByRole("button", { name: "Revoke growth-sync’s access…" }));
       fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Revoke" }));
       await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g2" }]); });
     });
@@ -1440,7 +1441,7 @@ describe("who may call an API (decision 26)", () => {
     expect(within(batch).getByText("Waiting for identity")).toBeTruthy();
     expect(within(batch).getByText(/asked by you/)).toBeTruthy();
 
-    fireEvent.click(within(scorer).getByRole("button", { name: "Revoke…" }));
+    fireEvent.click(within(scorer).getByRole("button", { name: "Revoke ml-scorer’s access to Orders API…" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Revoke" }));
     await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g1" }]); });
     fireEvent.click(await within(batch).findByRole("button", { name: "Withdraw" }));
@@ -1471,7 +1472,7 @@ describe("who may call an API (decision 26)", () => {
     const away = await screen.findByRole("region", { name: "Away from the catalog’s release" });
     expect(within(away).getByText("finance@acme.com")).toBeTruthy();
     expect(within(away).getByText("ledger")).toBeTruthy();
-    fireEvent.click(within(away).getByRole("button", { name: "Revoke…" }));
+    fireEvent.click(within(away).getByRole("button", { name: "Revoke finance@acme.com’s access to ledger…" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Revoke" }));
     await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g7" }]); });
   });
@@ -1481,29 +1482,179 @@ describe("who may call an API (decision 26)", () => {
     await renderAt("/admin/gateway", ADMIN, {
       "ApiService/GetGateway": { enabled: true, url: "http://gateway:8080", apis: 2 },
       "ApiService/ListApis": { apis: [ORDERS, { ...ORDERS, team: "growth", name: "experiments", displayName: "Experiments API", state: "API_STATE_HELD", heldReason: "Its backend's host isn't allowed." }] },
-      "ApiService/ListApiAccess": (request: Record<string, unknown>) =>
-        request["name"] === "orders"
-          ? {
+      // Two pages: one, then the rest.
+      "ApiService/ListAllApiGrants": (request: Record<string, unknown>) => {
+        const cursor = (request["page"] as { cursor?: string } | undefined)?.cursor ?? "";
+        const counts = { total: 3, groups: 1, people: 2, waitingRequests: 1, waitingApis: 1 };
+        return cursor === ""
+          ? { grants: [{ id: "g1", team: "payments", name: "orders", group: "orders-readers@acme.com", perMinute: 600, grantedBy: "dana@acme.com" }], nextCursor: "1", ...counts }
+          : {
               grants: [
-                { id: "g1", team: "payments", name: "orders", group: "orders-readers@acme.com", perMinute: 600, grantedBy: "dana@acme.com" },
                 { id: "g2", team: "payments", name: "orders", userEmail: "priya@acme.com", perMinute: 300, grantedBy: "dana@acme.com" },
+                { id: "g3", team: "payments", name: "ledger", userEmail: "omar@acme.com", perMinute: 60, awaySince: "2026-11-01T00:00:00Z" },
               ],
-              requests: [{ id: "r1", team: "payments", name: "orders", state: "API_ACCESS_REQUEST_STATE_WAITING" }],
-            }
-          : {},
+              ...counts,
+            };
+      },
       "ApiService/RevokeApiGrant": revoked.answer,
     });
     const every = await screen.findByRole("region", { name: "Every grant" });
+    expect(await within(every).findByText("orders-readers@acme.com")).toBeTruthy();
+    expect(within(every).getByText(/Showing 1 of 3, newest first/)).toBeTruthy();
+    fireEvent.click(within(every).getByRole("button", { name: "Show more" }));
     expect(await within(every).findByText("priya@acme.com")).toBeTruthy();
+    expect(within(every).getByText(/left the catalog’s release/)).toBeTruthy();
+    expect(within(every).queryByRole("button", { name: "Show more" })).toBeNull();
     expect(within(every).getByText(/answering the 1 waiting request/)).toBeTruthy();
-    expect(screen.getByText("1 group, 1 person, 0 bots")).toBeTruthy();
+    expect(screen.getByText("1 group, 2 people, 0 bots")).toBeTruthy();
+    expect(calls).not.toContain("ApiService/ListApiAccess");
     expect(within(screen.getByRole("region", { name: "Held APIs · 1" })).getByText("Its backend's host isn't allowed.")).toBeTruthy();
     expect(within(every).queryByRole("button", { name: /Change rate/ })).toBeNull();
     fireEvent.change(within(every).getByLabelText("Find a grant"), { target: { value: "priya" } });
     expect(within(every).queryByText("orders-readers@acme.com")).toBeNull();
-    fireEvent.click(within(every).getByRole("button", { name: "Revoke…" }));
+    fireEvent.click(within(every).getByRole("button", { name: "Revoke priya@acme.com’s access to Orders API…" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Revoke" }));
     await waitFor(() => { expect(revoked.seen).toEqual([{ grantId: "g2" }]); });
+  });
+});
+
+describe("who may call an API: the edges", () => {
+  const ORDERS = { team: "payments", name: "orders", displayName: "Orders API", state: "API_STATE_LIVE", mayCall: false, endpoints: [], defaultPerMinute: 600, accessRequests: "approval" };
+  const USERS = { ...ORDERS, team: "identity", name: "users", displayName: "Users API" };
+  const PRIYA = { ...MEMBER, userId: "u-priya", email: "priya@acme.com", teamNames: ["ml"], maintainerOf: ["ml"] };
+  const OWN = { ...ORDERS, mayCall: true, backendUrl: "https://orders.internal" };
+  const WAITING = { id: "r1", team: "payments", name: "orders", userId: "u-priya", userEmail: "priya@acme.com", requestedBy: "priya@acme.com", reason: "Fraud model.", state: "API_ACCESS_REQUEST_STATE_WAITING", groups: ["ml-engineers@acme.com"] };
+
+  it("starts afresh on another API's page, whatever the last one's late answers say", async () => {
+    let late: (value: unknown) => void = () => undefined;
+    let asked = 0;
+    await renderAt(
+      "/apis/payments/orders",
+      PRIYA,
+      {
+        "ApiService/GetApi": (request: Record<string, unknown>) => ({ api: request["name"] === "users" ? USERS : ORDERS, openapi: "{}" }),
+        // The first page's answer comes after the second page's, and would say you may call Users API.
+        "ApiService/ListMyApiAccess": () =>
+          asked++ === 0 ? new Promise((resolve) => { late = resolve; }) : {},
+      },
+      <RouterLink to="/apis/identity/users">to Users API</RouterLink>,
+    );
+    expect(await screen.findByRole("heading", { name: "Orders API" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("link", { name: "to Users API" }));
+    expect(await screen.findByRole("heading", { name: "Users API" })).toBeTruthy();
+    const card = await screen.findByRole("region", { name: "Your access" });
+    expect(await within(card).findByRole("heading", { name: "Not granted" })).toBeTruthy();
+    await act(async () => {
+      late({ access: [{ team: "identity", name: "users", via: "API_ACCESS_VIA_USER", grantId: "g1", perMinute: 300 }] });
+      await Promise.resolve();
+    });
+    expect(within(screen.getByRole("region", { name: "Your access" })).getByRole("heading", { name: "Not granted" })).toBeTruthy();
+    expect(screen.queryByText("Orders API")).toBeNull();
+  });
+
+  it("offers a retired team's maintainer nothing for its bots", async () => {
+    await renderAt("/apis/payments/orders", { ...PRIYA, retiredTeams: ["ml"] }, { "ApiService/GetApi": { api: ORDERS, openapi: "{}" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Request access…" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByRole("radio", { name: /A bot of a team you maintain/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Request access for a bot…" })).toBeNull();
+    expect(calls).not.toContain("TokenService/ListBots");
+  });
+
+  it("lists a bot that's in two teams you maintain once", async () => {
+    await renderAt("/apis/payments/orders", { ...PRIYA, teamNames: ["ml", "fraud-ops"], maintainerOf: ["ml", "fraud-ops"] }, {
+      "ApiService/GetApi": { api: ORDERS, openapi: "{}" },
+      "TokenService/ListBots": { bots: [{ id: "b1", email: "shared@bots.vennir.local" }] },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Request access for a bot…" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /Which bot/ }));
+    expect(await screen.findAllByRole("option", { name: /^shared/ })).toHaveLength(1);
+    expect(screen.getByRole("option", { name: "shared · ml, fraud-ops" })).toBeTruthy();
+  });
+
+  it("says why a request was refused: a bot of a retired team", async () => {
+    await renderAt("/apis/payments/orders", PRIYA, {
+      "ApiService/GetApi": { api: ORDERS, openapi: "{}" },
+      "ApiService/RequestApiAccess": refused(409, "failed_precondition", "ml is retired, so nothing new can be asked for its bots. An admin can un-retire it.", "TEAM_RETIRED"),
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Request access…" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/Why you need it/), { target: { value: "x" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ask payments" }));
+    expect(await within(dialog).findByText(/ml is retired, so nothing new can be asked/)).toBeTruthy();
+  });
+
+  it("says why a group can't be granted: not one of theirs", async () => {
+    await renderAt("/apis/payments/orders", { ...MEMBER, teamNames: ["payments"], maintainerOf: ["payments"] }, {
+      "ApiService/GetApi": { api: OWN, openapi: "{}" },
+      "ApiService/ListApiAccess": { requests: [WAITING] },
+      "ApiService/DecideApiAccessRequest": refused(400, "invalid_argument", "priya@acme.com isn't in ml-engineers@acme.com: not among their groups as last read.", "NOT_THEIR_GROUP"),
+    });
+    const priya = await screen.findByRole("article", { name: "Request for priya@acme.com" });
+    fireEvent.click(within(priya).getByRole("radio", { name: /ml-engineers@acme\.com/ }));
+    fireEvent.click(within(priya).getByRole("button", { name: "Approve at 600" }));
+    expect(await within(priya).findByText(/isn't in ml-engineers@acme\.com/)).toBeTruthy();
+  });
+
+  it("shows a member who doesn't maintain it who may call, and changes nothing", async () => {
+    await renderAt("/apis/payments/orders", { ...MEMBER, teamNames: ["payments"] }, {
+      "ApiService/GetApi": { api: OWN, openapi: "{}" },
+      "ApiService/ListApiAccess": { grants: [{ id: "g1", team: "payments", name: "orders", group: "orders-readers@acme.com", perMinute: 600 }], requests: [WAITING] },
+    });
+    const section = await screen.findByRole("region", { name: "Who may call" });
+    expect(await within(section).findByText("Fraud model.")).toBeTruthy();
+    expect(within(section).getByText("orders-readers@acme.com")).toBeTruthy();
+    for (const name of [/^Approve/, "Decline…", "Add a grant", /^Change rate/, /^Revoke/]) {
+      expect(within(section).queryByRole("button", { name })).toBeNull();
+    }
+    expect(within(section).queryByRole("radio")).toBeNull();
+  });
+
+  it("hides Withdraw from a bot's maintainer who didn't ask, and lets an admin revoke a retired team's bot's grant", async () => {
+    const bots = {
+      "TokenService/ListBots": { bots: [{ id: "b1", email: "ml-scorer@bots.vennir.local" }] },
+      "ApiService/ListApis": { apis: [ORDERS] },
+      "ApiService/ListTeamBotApiAccess": {
+        grants: [{ id: "g1", team: "payments", name: "orders", userId: "b1", userEmail: "ml-scorer@bots.vennir.local", bot: true, perMinute: 600 }],
+        requests: [{ id: "r2", team: "identity", name: "users", userId: "b1", userEmail: "ml-scorer@bots.vennir.local", bot: true, requestedBy: "omar@acme.com", state: "API_ACCESS_REQUEST_STATE_WAITING" }],
+      },
+    };
+    await renderAt("/teams/ml?tab=automation", PRIYA, { "TeamService/GetTeam": { team: { id: "t-ml", name: "ml" } }, ...bots });
+    const scorer = await screen.findByRole("article", { name: "ml-scorer's API access" });
+    expect(await within(scorer).findByText(/asked by omar@acme\.com/)).toBeTruthy();
+    expect(within(scorer).queryByRole("button", { name: "Withdraw" })).toBeNull();
+    cleanup();
+    await renderAt("/teams/ml?tab=automation", ADMIN, { "TeamService/GetTeam": { team: { id: "t-ml", name: "ml", retiredAt: "2026-11-01T00:00:00Z" } }, ...bots });
+    const retired = await screen.findByRole("article", { name: "ml-scorer's API access" });
+    expect(await within(retired).findByRole("button", { name: "Revoke ml-scorer’s access to Orders API…" })).toBeTruthy();
+    expect(within(retired).queryByRole("button", { name: "Request access for a bot…" })).toBeNull();
+  });
+
+  it("says when the APIs to ask a bot's access for can't be loaded", async () => {
+    await renderAt("/teams/ml?tab=automation", PRIYA, {
+      "TeamService/GetTeam": { team: { id: "t-ml", name: "ml" } },
+      "TokenService/ListBots": { bots: [{ id: "b1", email: "ml-scorer@bots.vennir.local" }] },
+      "ApiService/ListApis": refused(503, "unavailable", "The console is restarting."),
+    });
+    const scorer = await screen.findByRole("article", { name: "ml-scorer's API access" });
+    fireEvent.click(within(scorer).getByRole("button", { name: "Request access for a bot…" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("The console is restarting.")).toBeTruthy();
+    expect(within(dialog).queryByText("No other team’s API takes requests.")).toBeNull();
+  });
+
+  it("reads the APIs list again after giving up a grant under You may call", async () => {
+    await renderAt("/apis", PRIYA, {
+      "ApiService/ListApis": { apis: [{ ...ORDERS, mayCall: true }] },
+      "ApiService/ListMyApiAccess": { access: [{ team: "payments", name: "orders", via: "API_ACCESS_VIA_USER", grantId: "g1", perMinute: 300 }] },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /^You may call/ }));
+    const table = await screen.findByRole("region", { name: "What you may call" });
+    const before = calls.filter((c) => c === "ApiService/ListApis").length;
+    fireEvent.click(await within(table).findByRole("button", { name: "Give up…" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Give up my access" }));
+    await waitFor(() => { expect(calls.filter((c) => c === "ApiService/ListApis").length).toBeGreaterThan(before); });
   });
 });
 
@@ -1517,7 +1668,7 @@ describe("the APIs page", () => {
           api("payments", "orders", { mayCall: true }),
           api("identity", "users", { mayCall: true }),
           api("ml", "scoring", { state: "API_STATE_HELD", heldReason: "Its backend's host isn't allowed here yet" }),
-          api("risk", "fraud", { askForAccessUrl: "https://github.com/acme/catalog/issues/new?title=fraud", accessRequests: "closed" }),
+          api("risk", "fraud", { accessRequests: "closed" }),
         ],
       },
     });

@@ -4,6 +4,7 @@ syntax = "proto3";
 
 package vennir.console.v1;
 
+import "vennir/console/v1/common.proto";
 import "google/protobuf/timestamp.proto";
 
 // API products (decision 20): a backend a team already runs, published
@@ -100,6 +101,13 @@ service ApiService {
   // same name, and revocable meanwhile by the team's maintainers and
   // admins. Its members, and admins.
   rpc ListAwayApiAccess(ListAwayApiAccessRequest) returns (ListAwayApiAccessResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Every active grant on this install, newest first, a page at a time:
+  // published APIs' and away ones' (away_since), for an incident (an admin
+  // revokes; the APIs' teams add and change them). With how many there are
+  // of each kind, and the requests waiting. Admins.
+  rpc ListAllApiGrants(ListAllApiGrantsRequest) returns (ListAllApiGrantsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -509,4 +517,24 @@ message ListAwayApiAccessRequest {
 message ListAwayApiAccessResponse {
   repeated ApiGrant grants = 1;
   repeated ApiAccessRequest requests = 2;
+}
+
+message ListAllApiGrantsRequest {
+  // 100 when unset, at most 500.
+  PageRequest page = 1;
+}
+
+message ListAllApiGrantsResponse {
+  repeated ApiGrant grants = 1;
+  // Empty on the last page.
+  string next_cursor = 2;
+  // Every active grant, whatever the page: in all, and to groups, people
+  // and bots.
+  int32 total = 3;
+  int32 groups = 4;
+  int32 people = 5;
+  int32 bots = 6;
+  // Requests waiting for their APIs' teams, and on how many APIs.
+  int32 waiting_requests = 7;
+  int32 waiting_apis = 8;
 }

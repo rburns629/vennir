@@ -7,6 +7,7 @@
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import type { PageRequest } from "./common_pb";
 
 /**
  * Describes the file vennir/console/v1/api.proto.
@@ -1472,6 +1473,82 @@ export declare type ListAwayApiAccessResponse = Message<"vennir.console.v1.ListA
 export declare const ListAwayApiAccessResponseSchema: GenMessage<ListAwayApiAccessResponse>;
 
 /**
+ * @generated from message vennir.console.v1.ListAllApiGrantsRequest
+ */
+export declare type ListAllApiGrantsRequest = Message<"vennir.console.v1.ListAllApiGrantsRequest"> & {
+  /**
+   * 100 when unset, at most 500.
+   *
+   * @generated from field: vennir.console.v1.PageRequest page = 1;
+   */
+  page?: PageRequest | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAllApiGrantsRequest.
+ * Use `create(ListAllApiGrantsRequestSchema)` to create a new message.
+ */
+export declare const ListAllApiGrantsRequestSchema: GenMessage<ListAllApiGrantsRequest>;
+
+/**
+ * @generated from message vennir.console.v1.ListAllApiGrantsResponse
+ */
+export declare type ListAllApiGrantsResponse = Message<"vennir.console.v1.ListAllApiGrantsResponse"> & {
+  /**
+   * @generated from field: repeated vennir.console.v1.ApiGrant grants = 1;
+   */
+  grants: ApiGrant[];
+
+  /**
+   * Empty on the last page.
+   *
+   * @generated from field: string next_cursor = 2;
+   */
+  nextCursor: string;
+
+  /**
+   * Every active grant, whatever the page: in all, and to groups, people
+   * and bots.
+   *
+   * @generated from field: int32 total = 3;
+   */
+  total: number;
+
+  /**
+   * @generated from field: int32 groups = 4;
+   */
+  groups: number;
+
+  /**
+   * @generated from field: int32 people = 5;
+   */
+  people: number;
+
+  /**
+   * @generated from field: int32 bots = 6;
+   */
+  bots: number;
+
+  /**
+   * Requests waiting for their APIs' teams, and on how many APIs.
+   *
+   * @generated from field: int32 waiting_requests = 7;
+   */
+  waitingRequests: number;
+
+  /**
+   * @generated from field: int32 waiting_apis = 8;
+   */
+  waitingApis: number;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAllApiGrantsResponse.
+ * Use `create(ListAllApiGrantsResponseSchema)` to create a new message.
+ */
+export declare const ListAllApiGrantsResponseSchema: GenMessage<ListAllApiGrantsResponse>;
+
+/**
  * How a caller may call an API (the gateway's rule, in its order).
  *
  * @generated from enum vennir.console.v1.ApiAccessVia
@@ -1815,6 +1892,19 @@ export declare const ApiService: GenService<{
     methodKind: "unary";
     input: typeof ListAwayApiAccessRequestSchema;
     output: typeof ListAwayApiAccessResponseSchema;
+  },
+  /**
+   * Every active grant on this install, newest first, a page at a time:
+   * published APIs' and away ones' (away_since), for an incident (an admin
+   * revokes; the APIs' teams add and change them). With how many there are
+   * of each kind, and the requests waiting. Admins.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListAllApiGrants
+   */
+  listAllApiGrants: {
+    methodKind: "unary";
+    input: typeof ListAllApiGrantsRequestSchema;
+    output: typeof ListAllApiGrantsResponseSchema;
   },
 }>;
 

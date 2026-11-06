@@ -14,7 +14,7 @@ import type { FastifyInstance } from "fastify";
 import { loginWaitSeconds, recordLoginFailure, recordLoginSuccess } from "../../auth/loginThrottle.js";
 import { hashPassword, NewPassword, verifyAgainstNothing, verifyPassword } from "../../auth/password.js";
 import { config } from "../../config.js";
-import { createUser, findUserByEmail, findUserById, recordSignIn, revokeSession, setUserPassword, teamRolesForUser } from "../../db/queries.js";
+import { createUser, findUserByEmail, findUserById, recordSignIn, retiredTeamNames, revokeSession, setUserPassword, teamRolesForUser } from "../../db/queries.js";
 import { newSession, ssoRequiredBy } from "../../auth/plugin.js";
 import type { AuthService } from "../../gen/vennir/console/v1/auth_pb.js";
 import { callerOf, kClientIp, kSignedIn, logOf } from "../context.js";
@@ -130,6 +130,7 @@ export function authService(app: FastifyInstance): ServiceImpl<typeof AuthServic
         mustChangePassword: caller.mustChangePassword ?? false,
         hasPassword: user.passwordHash !== null,
         usesSso: user.oidcSubject !== null,
+        retiredTeams: await retiredTeamNames(caller.teamNames),
       };
     },
 

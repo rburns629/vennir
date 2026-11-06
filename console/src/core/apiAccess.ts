@@ -858,6 +858,60 @@ export async function listAwayAccess(caller: AuthUser | undefined, team: string)
   return { grants: await grantViews(grants, new Map(), away), requests: await requestViews(requests, new Map(), false, away) };
 }
 
+/** ListAllApiGrants' page when none is asked for, and its largest. */
+export const ALL_GRANTS_PAGE = 100;
+export const ALL_GRANTS_MAX = 500;
+
+/**
+ * Every active grant on the install, newest first, a page at a time (the
+ * cursor is how many came before): published APIs' and away ones', of
+ * teams that aren't retired. With how many there are of each kind and the
+ * requests waiting, for the whole install. Admins: for an incident, they
+ * revoke; adding and changing grants are each API's team's.
+ */
+export async function listAllGrants(caller: AuthUser | undefined, limit: number, cursor: string) {
+  const who = signedIn(caller);
+  if (!who.isAdmin) throw new ApiError(403, "FORBIDDEN", "Only admins see every API's grants.");
+  const size = Math.min(limit > 0 ? limit : ALL_GRANTS_PAGE, ALL_GRANTS_MAX);
+  const offset = /^\d{1,9}$/.test(cursor) ? Number(cursor) : 0;
+  if (cursor && !/^\d{1,9}$/.test(cursor)) throw new ApiError(400, "BAD_REQUEST", "That cursor isn't one this list gave.");
+  const liveTeam = and(isNull(teams.deletedAt), isNull(teams.retiredAt));
+  const active = and(isNull(apiGrants.revokedAt), liveTeam);
+  const rows = await db
+    .select({ grant: apiGrants, teamName: teams.name })
+    .from(apiGrants)
+    .innerJoin(teams, eq(teams.id, apiGrants.teamId))
+    .where(active)
+    .orderBy(desc(apiGrants.createdAt), desc(apiGrants.id))
+    .limit(size + 1)
+    .offset(offset);
+  const page = rows.slice(0, size);
+  const away = new Map(page.filter((r) => r.grant.apiId === null).map((r) => [r.grant.teamId, r.teamName]));
+  const grants = await grantViews(page.map((r) => r.grant), await liveApis(), away);
+  // The counts, for the whole install: one small row per grant.
+  const kinds = await db
+    .select({ group: apiGrants.groupName, bot: users.isBot })
+    .from(apiGrants)
+    .innerJoin(teams, eq(teams.id, apiGrants.teamId))
+    .leftJoin(users, eq(users.id, apiGrants.userId))
+    .where(active);
+  const waiting = await db
+    .select({ teamId: apiAccessRequests.teamId, apiName: apiAccessRequests.apiName })
+    .from(apiAccessRequests)
+    .innerJoin(teams, eq(teams.id, apiAccessRequests.teamId))
+    .where(and(eq(apiAccessRequests.state, "waiting"), liveTeam));
+  return {
+    grants,
+    nextCursor: rows.length > size ? String(offset + size) : "",
+    total: kinds.length,
+    groups: kinds.filter((k) => k.group !== null).length,
+    people: kinds.filter((k) => k.group === null && k.bot !== true).length,
+    bots: kinds.filter((k) => k.group === null && k.bot === true).length,
+    waitingRequests: waiting.length,
+    waitingApis: new Set(waiting.map((w) => `${w.teamId}/${w.apiName}`)).size,
+  };
+}
+
 /**
  * What API_AWAY_DAYS after its API left the release is past keeping
  * (retention.ts, hourly): its grants deleted; its waiting requests

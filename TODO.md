@@ -262,11 +262,10 @@ it was seen.
   person's team and a group's size (15f); the gateway's certificate (15h);
   a picker of people and bots for Add a grant (it takes an email). The
   boards cap a grant's rate at the API's limit; the backend allows up to
-  1,000,000 a minute, so the pages say "by default" instead of "up to". Admin's
-  Every grant reads each API's `ListApiAccess` in turn: a single rpc for
-  every grant would scale better. Also drop the backend's issue link for
-  APIs (`catalogLinks.ts`'s `askForAccessUrl`, `ApiProduct.ask_for_access_url`),
-  which no page uses any more. A grant's last call is the item above.
+  1,000,000 a minute, so the pages say "by default" instead of "up to".
+  Also drop the backend's issue link for APIs (`catalogLinks.ts`'s
+  `askForAccessUrl`, `ApiProduct.ask_for_access_url`), which no page uses
+  any more. A grant's last call is the item above.
 
 - [ ] **A page for who read what** (built 2026-11-05, backend only):
   `audit_reads` and `AdminService/ListAuditReads` record and list who was

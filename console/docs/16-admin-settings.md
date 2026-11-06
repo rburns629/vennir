@@ -207,7 +207,7 @@ Set by the install, in the console chart's `scanning`: `enabled` (on by default)
 
 If the gateway isn't running, the section says so: turn it on with `gateway.enabled` in vennir.yaml. Otherwise it shows its state, the APIs published, the requests in the last 24 hours, how many were refused at the door, how many APIs are held, the grants (groups, people, bots) and the requests waiting for the APIs' teams.
 
-**Held APIs** lists each API whose backend's host isn't allowed, with why. **Every grant** lists every active grant on every API (API, to whom, rate, who granted it), with **Find a grant**; for an incident, **Revoke…** ends one (calls stop within a minute, and the API's team and whom it names are told). Admins don't add or change grants or answer requests: those are each API team's, on its page.
+**Held APIs** lists each API whose backend's host isn't allowed, with why. **Every grant** lists every active grant on the install, newest first, a page at a time (**Show more**; `ApiService/ListAllApiGrants`): the API (marked when it left the catalog's release), to whom, rate, who granted it. **Find a grant** searches those shown; for an incident, **Revoke…** ends one (calls stop within a minute, and the API's team and whom it names are told). Admins don't add or change grants or answer requests: those are each API team's, on its page.
 
 **This install's settings** shows, read-only:
 

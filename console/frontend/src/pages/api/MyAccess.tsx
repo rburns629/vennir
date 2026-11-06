@@ -12,7 +12,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Mono } from "../../components/Mono";
 import { when } from "../../time";
-import { giveUpAsk, rateText, RequestAccessDialog, useAccessAsk, withdrawAsk } from "./access";
+import { botTeamsOf, giveUpAsk, rateText, RequestAccessDialog, useAccessAsk, withdrawAsk } from "./access";
 
 type Row = { key: string; team: string; name: string; access: MyApiAccess | null; request: ApiAccessRequest | null };
 
@@ -48,7 +48,7 @@ function how(row: Row): ReactNode {
  * withdraw a request, ask again. Beside it, your teams' bots' grants, and
  * how access works.
  */
-export function MyAccess({ apis, search }: { apis: ApiProduct[] | null; search: string }) {
+export function MyAccess({ apis, search, onChanged }: { apis: ApiProduct[] | null; search: string; /** After a change: the APIs list reloads too. */ onChanged: () => void }) {
   const { user } = useAuth();
   const [mine, setMine] = useState<{ access: MyApiAccess[]; requests: ApiAccessRequest[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,11 +56,19 @@ export function MyAccess({ apis, search }: { apis: ApiProduct[] | null; search: 
 
   const load = useCallback(() => {
     listMyApiAccess()
-      .then(setMine)
+      .then((m) => {
+        setMine(m);
+        setError(null);
+      })
       .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load what you may call.")); });
   }, []);
   useEffect(load, [load]);
-  const { ask, dialog } = useAccessAsk(load);
+  const changed = () => {
+    load();
+    onChanged();
+  };
+  const { ask, dialog } = useAccessAsk(changed);
+  const botTeams = botTeamsOf(user);
 
   const byKey = new Map((apis ?? []).map((a) => [`${a.team}/${a.name}`, a]));
   const rows: Row[] | null = mine && [
@@ -156,7 +164,7 @@ export function MyAccess({ apis, search }: { apis: ApiProduct[] | null; search: 
         <DataTable columns={columns} rows={error ? [] : shown} getRowKey={(r) => r.key} skeletonRowCount={3} emptyMessage={q ? "No API matches." : "Nothing yet: ask for access from an API’s page."} />
       </Card>
       <Box component="aside" sx={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-        {(user?.maintainerOf.length ?? 0) > 0 && <YourTeamsBots teams={user?.maintainerOf ?? []} />}
+        {botTeams.length > 0 && <YourTeamsBots teams={botTeams} />}
         <HowAccessWorks />
       </Box>
       <RequestAccessDialog
@@ -165,7 +173,7 @@ export function MyAccess({ apis, search }: { apis: ApiProduct[] | null; search: 
         onClose={() => { setAgain(null); }}
         onDone={() => {
           setAgain(null);
-          load();
+          changed();
         }}
       />
       {dialog}

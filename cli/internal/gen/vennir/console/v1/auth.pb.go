@@ -457,8 +457,11 @@ type GetMeResponse struct {
 	MustChangePassword bool `protobuf:"varint,6,opt,name=must_change_password,json=mustChangePassword,proto3" json:"must_change_password,omitempty"`
 	// How they sign in: a password of their own, single sign-on (bound at
 	// its first), or both.
-	HasPassword   bool `protobuf:"varint,7,opt,name=has_password,json=hasPassword,proto3" json:"has_password,omitempty"`
-	UsesSso       bool `protobuf:"varint,8,opt,name=uses_sso,json=usesSso,proto3" json:"uses_sso,omitempty"`
+	HasPassword bool `protobuf:"varint,7,opt,name=has_password,json=hasPassword,proto3" json:"has_password,omitempty"`
+	UsesSso     bool `protobuf:"varint,8,opt,name=uses_sso,json=usesSso,proto3" json:"uses_sso,omitempty"`
+	// The teams in team_names that are retired: read-only, so nothing new is
+	// asked or changed for them (not even for their bots).
+	RetiredTeams  []string `protobuf:"bytes,9,rep,name=retired_teams,json=retiredTeams,proto3" json:"retired_teams,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -547,6 +550,13 @@ func (x *GetMeResponse) GetUsesSso() bool {
 		return x.UsesSso
 	}
 	return false
+}
+
+func (x *GetMeResponse) GetRetiredTeams() []string {
+	if x != nil {
+		return x.RetiredTeams
+	}
+	return nil
 }
 
 type ChangePasswordRequest struct {
@@ -776,7 +786,7 @@ const file_vennir_console_v1_auth_proto_rawDesc = "" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"\x10\n" +
 	"\x0eSignOutRequest\"\x11\n" +
 	"\x0fSignOutResponse\"\x0e\n" +
-	"\fGetMeRequest\"\x8d\x02\n" +
+	"\fGetMeRequest\"\xb2\x02\n" +
 	"\rGetMeResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x1d\n" +
@@ -786,7 +796,8 @@ const file_vennir_console_v1_auth_proto_rawDesc = "" +
 	"\rmaintainer_of\x18\x05 \x03(\tR\fmaintainerOf\x120\n" +
 	"\x14must_change_password\x18\x06 \x01(\bR\x12mustChangePassword\x12!\n" +
 	"\fhas_password\x18\a \x01(\bR\vhasPassword\x12\x19\n" +
-	"\buses_sso\x18\b \x01(\bR\ausesSso\"e\n" +
+	"\buses_sso\x18\b \x01(\bR\ausesSso\x12#\n" +
+	"\rretired_teams\x18\t \x03(\tR\fretiredTeams\"e\n" +
 	"\x15ChangePasswordRequest\x12)\n" +
 	"\x10current_password\x18\x01 \x01(\tR\x0fcurrentPassword\x12!\n" +
 	"\fnew_password\x18\x02 \x01(\tR\vnewPassword\".\n" +

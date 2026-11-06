@@ -10,7 +10,7 @@ import { Mono } from "../../components/Mono";
 import { errorMessage, listApis, listAwayApiAccess, type ApiAccessRequest, type ApiGrant, type ApiProduct } from "../../api";
 import { when } from "../../time";
 import { ApiStatePill } from "../api/ApiStatePill";
-import { grantedByText, Principal, rateText, revokeAsk, useAccessAsk } from "../api/access";
+import { grantedByText, grantName, Principal, rateText, revokeAsk, useAccessAsk } from "../api/access";
 import { CardTitle } from "./shared";
 
 const COLUMNS: DataTableColumn<ApiProduct>[] = [
@@ -58,7 +58,7 @@ function AwayAccess({ teamName, canRevoke }: { teamName: string; canRevoke: bool
       header: "Revoke",
       align: "right",
       render: (g) => (
-        <Button size="small" color="error" onClick={() => { ask(revokeAsk(g, "It won’t come back with the API. Whom it names is told.")); }}>
+        <Button size="small" color="error" aria-label={`Revoke ${grantName(g)}’s access to ${g.name}…`} onClick={() => { ask(revokeAsk(g, "It won’t come back with the API. Whom it names is told.")); }}>
           Revoke…
         </Button>
       ),

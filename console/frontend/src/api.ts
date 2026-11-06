@@ -215,6 +215,8 @@ export interface Me {
   /** How they sign in: a password of their own, single sign-on, or both. */
   hasPassword: boolean;
   usesSso: boolean;
+  /** The teams in teamNames that are retired: read-only, so nothing new is asked for them or their bots. */
+  retiredTeams: string[];
 }
 
 export interface Team {
@@ -273,6 +275,7 @@ export async function getMe(): Promise<Me> {
     mustChangePassword: me.mustChangePassword,
     hasPassword: me.hasPassword,
     usesSso: me.usesSso,
+    retiredTeams: me.retiredTeams,
   };
 }
 
@@ -2142,6 +2145,32 @@ export async function listMyApiAccess(): Promise<{ access: MyApiAccess[]; reques
 export async function listTeamBotApiAccess(team: string): Promise<{ grants: ApiGrant[]; requests: ApiAccessRequest[] }> {
   const r = await call(() => apisApi.listTeamBotApiAccess({ team }));
   return { grants: r.grants.map(apiGrant), requests: r.requests.map(accessRequest) };
+}
+
+/** One page of every active grant on the install (published APIs' and away ones'), and the install's counts: admins. */
+export interface AllApiGrants {
+  grants: ApiGrant[];
+  nextCursor: string;
+  total: number;
+  groups: number;
+  people: number;
+  bots: number;
+  waitingRequests: number;
+  waitingApis: number;
+}
+
+export async function listAllApiGrants(cursor = "", limit = 0): Promise<AllApiGrants> {
+  const r = await call(() => apisApi.listAllApiGrants({ page: { limit, cursor } }));
+  return {
+    grants: r.grants.map(apiGrant),
+    nextCursor: r.nextCursor,
+    total: r.total,
+    groups: r.groups,
+    people: r.people,
+    bots: r.bots,
+    waitingRequests: r.waitingRequests,
+    waitingApis: r.waitingApis,
+  };
 }
 
 /** The grants and requests of a team's APIs that left the catalog's release, kept 30 days: its members, and admins. */

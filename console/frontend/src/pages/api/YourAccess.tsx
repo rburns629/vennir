@@ -8,7 +8,7 @@ import type { ApiAccessRequest, ApiProduct, MyApiAccess } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
 import { Pill } from "../../components/Pill";
 import { when } from "../../time";
-import { giveUpAsk, rateText, RequestAccessDialog, useAccessAsk, withdrawAsk } from "./access";
+import { botTeamsOf, giveUpAsk, rateText, RequestAccessDialog, useAccessAsk, withdrawAsk } from "./access";
 
 /** Where the caller stands with one API: how they may call it, else their newest request for it (a waiting one first). */
 export interface Standing {
@@ -74,7 +74,7 @@ export function YourAccess({ api, standing, onChanged }: { api: ApiProduct; stan
   const { access, request } = standing;
   const t = api.team;
   const closed = api.accessRequests === "closed";
-  const botTeams = (user?.maintainerOf ?? []).filter((m) => m !== t);
+  const botTeams = botTeamsOf(user, t);
   const title = access ? "Granted" : request?.state === "waiting" ? `Waiting for ${t}` : request?.state === "declined" ? "Declined" : "Not granted";
 
   let body: ReactNode;

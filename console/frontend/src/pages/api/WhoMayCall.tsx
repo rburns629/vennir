@@ -17,7 +17,7 @@ import { addApiGrant, decideApiAccessRequest, type ApiAccessRequest, type ApiGra
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Mono } from "../../components/Mono";
 import { when } from "../../time";
-import { accessError, botName, grantedByText, MAX_REASON, Principal, rateAsk, rateText, revokeAsk, useAccessAsk } from "./access";
+import { accessError, botName, grantedByText, grantName, MAX_REASON, Principal, rateAsk, rateText, revokeAsk, typedRate, useAccessAsk } from "./access";
 
 /** An API's access list and requests (ApiService.ListApiAccess). */
 export interface ApiAccessList {
@@ -27,9 +27,6 @@ export interface ApiAccessList {
 }
 
 const DAY = 24 * 60 * 60 * 1000;
-
-/** A rate as typed: empty is the API's limit (0). */
-const typedRate = (text: string) => Math.max(0, Math.floor(Number(text) || 0));
 
 function Heading({ title, note }: { title: string; note?: string }) {
   return (
@@ -257,13 +254,14 @@ export function WhoMayCall({ api, list, error, maintains, isAdmin, onChanged }: 
       render: (g) => (
         <Box sx={{ display: "flex", gap: 0.5, justifyContent: "flex-end", flexWrap: "wrap" }}>
           {maintains && (
-            <Button size="small" onClick={() => { ask(rateAsk(g, api.defaultPerMinute)); }}>
+            <Button size="small" aria-label={`Change rate of ${grantName(g)}’s grant…`} onClick={() => { ask(rateAsk(g, api.defaultPerMinute)); }}>
               Change rate…
             </Button>
           )}
           <Button
             size="small"
             color="error"
+            aria-label={`Revoke ${grantName(g)}’s access…`}
             onClick={() => {
               ask(revokeAsk(g, maintains ? "Whom it names is told." : `For an incident: ${t}’s maintainers and whom it names are told.`));
             }}

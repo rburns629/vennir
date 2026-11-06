@@ -8,7 +8,7 @@ import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
 import { when } from "../../time";
-import { botName, grantedByText, rateText, RequestAccessDialog, revokeAsk, useAccessAsk, withdrawAsk } from "../api/access";
+import { botName, botTeamsOf, grantedByText, grantName, rateText, RequestAccessDialog, revokeAsk, useAccessAsk, withdrawAsk } from "../api/access";
 import { CardTitle, SectionLabel } from "./shared";
 
 type Row = { key: string; team: string; name: string; grant: ApiGrant | null; request: ApiAccessRequest | null };
@@ -22,7 +22,8 @@ type Row = { key: string; team: string; name: string; grant: ApiGrant | null; re
 export function BotApiAccess({ teamName, bots, readOnly }: { teamName: string; bots: Bot[]; readOnly: boolean }) {
   const { user } = useAuth();
   const [access, setAccess] = useState<{ grants: ApiGrant[]; requests: ApiAccessRequest[] } | null>(null);
-  const [apis, setApis] = useState<ApiProduct[]>([]);
+  const [apis, setApis] = useState<ApiProduct[] | null>(null);
+  const [apisError, setApisError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
 
@@ -33,16 +34,27 @@ export function BotApiAccess({ teamName, bots, readOnly }: { teamName: string; b
   }, [teamName]);
   useEffect(load, [load]);
   useEffect(() => {
-    // Display only: without them, the API is named by its path.
-    listApis().then(setApis).catch(() => undefined);
+    let cancelled = false;
+    listApis()
+      .then((list) => {
+        if (!cancelled) setApis(list);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setApisError(errorMessage(err, "Couldn't load the APIs to ask for."));
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
   const { ask, dialog } = useAccessAsk(load);
 
   const maintains = user?.maintainerOf.includes(teamName) ?? false;
-  const canAsk = maintains && !readOnly;
-  const own = apis.filter((a) => a.team === teamName);
-  const others = apis.filter((a) => a.team !== teamName && a.accessRequests !== "closed");
-  const display = (team: string, name: string) => apis.find((a) => a.team === team && a.name === name)?.displayName || `${team}/${name}`;
+  const isAdmin = user?.isAdmin ?? false;
+  // A retired team's bots get nothing new; an admin may still revoke (an incident).
+  const canAsk = maintains && !readOnly && botTeamsOf(user).includes(teamName);
+  const own = apis?.filter((a) => a.team === teamName) ?? [];
+  const others = apis?.filter((a) => a.team !== teamName && a.accessRequests !== "closed") ?? null;
+  const display = (team: string, name: string) => apis?.find((a) => a.team === team && a.name === name)?.displayName || `${team}/${name}`;
 
   const columns: DataTableColumn<Row>[] = [
     {
@@ -92,9 +104,9 @@ export function BotApiAccess({ teamName, bots, readOnly }: { teamName: string; b
       align: "right",
       render: (r) => {
         const { grant, request } = r;
-        if (grant && !readOnly && (maintains || user?.isAdmin)) {
+        if (grant && (isAdmin || (maintains && !readOnly))) {
           return (
-            <Button size="small" color="error" onClick={() => { ask(revokeAsk(grant, `${r.team}’s maintainers are told.`)); }}>
+            <Button size="small" color="error" aria-label={`Revoke ${grantName(grant)}’s access to ${display(r.team, r.name)}…`} onClick={() => { ask(revokeAsk(grant, `${r.team}’s maintainers are told.`)); }}>
               Revoke…
             </Button>
           );
@@ -175,6 +187,7 @@ export function BotApiAccess({ teamName, bots, readOnly }: { teamName: string; b
         open={asking !== null}
         bot={asking ?? undefined}
         apis={others}
+        apisError={apisError}
         onClose={() => { setAsking(null); }}
         onDone={() => {
           setAsking(null);

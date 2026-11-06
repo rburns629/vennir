@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link as RouterLink, useParams, useSearchParams } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -45,6 +45,11 @@ const OLD_TABS: Record<string, string> = { traffic: "endpoints", definition: "ba
  */
 export function ApiPage() {
   const { team = "", name = "" } = useParams();
+  // Another API is another page: nothing of the last one's state, or its late answers, carries over.
+  return <ApiView key={`${team}/${name}`} team={team} name={name} />;
+}
+
+function ApiView({ team, name }: { team: string; name: string }) {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const [api, setApi] = useState<ApiProduct | null>(null);
@@ -53,49 +58,74 @@ export function ApiPage() {
   const [busy, setBusy] = useState(false);
   const [hours, setHours] = useState(24);
   const [mine, setMine] = useState<{ access: MyApiAccess[]; requests: ApiAccessRequest[] } | null>(null);
+  const [mineError, setMineError] = useState<string | null>(null);
   const [accessList, setAccessList] = useState<ApiAccessList | null>(null);
-  const [accessError, setAccessError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  // Bumped to read again: the API after a change, its access after an access change.
+  const [apiVersion, setApiVersion] = useState(0);
+  const [accessVersion, setAccessVersion] = useState(0);
+  const load = () => {
+    setApiVersion((v) => v + 1);
+  };
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
     getApi(team, name)
       .then((result) => {
+        if (cancelled) return;
         setApi(result.api);
         setOpenapi(result.openapi);
       })
       .catch((err: unknown) => {
-        setError(errorMessage(err, "Couldn't load the API."));
+        if (!cancelled) setError(errorMessage(err, "Couldn't load the API."));
       });
-  }, [team, name]);
-
-  useEffect(load, [load]);
+    return () => {
+      cancelled = true;
+    };
+  }, [team, name, apiVersion]);
 
   const ownTeam = Boolean(api?.backendUrl);
   const maintains = !!user && (user.isAdmin || user.maintainerOf.includes(team));
   const inTeam = user?.teamNames.includes(team) ?? false;
   const grants = !!user && user.maintainerOf.includes(team);
 
-  // Your own access, when it isn't your team's; its access list, for its team and admins.
+  // Your own access, when it isn't your team's; its access list, for its team and admins: each its own error.
   const loaded = api !== null;
-  const loadAccess = useCallback(() => {
-    if (!loaded) return;
-    if (!inTeam) {
-      listMyApiAccess()
-        .then(setMine)
-        .catch((err: unknown) => { setAccessError(errorMessage(err, "Couldn't load your access.")); });
-    }
-    if (ownTeam) {
-      listApiAccess(team, name)
-        .then((list) => {
-          setAccessList(list);
-          setAccessError(null);
-        })
-        .catch((err: unknown) => { setAccessError(errorMessage(err, "Couldn't load who may call it.")); });
-    }
-  }, [loaded, inTeam, ownTeam, team, name]);
-  useEffect(loadAccess, [loadAccess]);
+  useEffect(() => {
+    if (!loaded || inTeam) return;
+    let cancelled = false;
+    listMyApiAccess()
+      .then((m) => {
+        if (cancelled) return;
+        setMine(m);
+        setMineError(null);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setMineError(errorMessage(err, "Couldn't load your access."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, inTeam, accessVersion]);
+  useEffect(() => {
+    if (!loaded || !ownTeam) return;
+    let cancelled = false;
+    listApiAccess(team, name)
+      .then((list) => {
+        if (cancelled) return;
+        setAccessList(list);
+        setListError(null);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setListError(errorMessage(err, "Couldn't load who may call it."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, ownTeam, team, name, accessVersion]);
   const accessChanged = () => {
     load();
-    loadAccess();
+    setAccessVersion((v) => v + 1);
   };
   const standing = standingFor(team, name, mine);
   const waiting = accessList?.requests.filter((r) => r.state === "waiting").length ?? 0;
@@ -249,7 +279,7 @@ export function ApiPage() {
           </Card>
 
           {!inTeam && mine && <YourAccess api={api} standing={standing} onChanged={accessChanged} />}
-          {!inTeam && !ownTeam && accessError && <Alert severity="error">{accessError}</Alert>}
+          {!inTeam && mineError && <Alert severity="error">{mineError}</Alert>}
 
           {ownTeam && (
             <Box component="nav" aria-label="On this page" sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.5, borderBottom: 1, borderColor: "divider" }}>
@@ -298,7 +328,7 @@ export function ApiPage() {
           </Box>
 
           {ownTeam && (
-            <WhoMayCall api={api} list={accessList} error={accessError} maintains={grants} isAdmin={user?.isAdmin ?? false} onChanged={accessChanged} />
+            <WhoMayCall api={api} list={accessList} error={listError} maintains={grants} isAdmin={user?.isAdmin ?? false} onChanged={accessChanged} />
           )}
 
           {ownTeam && (

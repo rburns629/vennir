@@ -592,6 +592,55 @@ describe("the lists", () => {
   });
 });
 
+describe("every grant on the install", () => {
+  type All = { grants?: Grant[]; nextCursor?: string; total?: number; groups?: number; people?: number; bots?: number; waitingRequests?: number; waitingApis?: number };
+  it("is admins' only, a page at a time, with the counts for the whole install", async () => {
+    for (const who of ["maintainer", "member", "ada", "bot"] as const) {
+      expect((await call(tokens[who], "ApiService/ListAllApiGrants", {})).failure, who).toBe("FORBIDDEN");
+    }
+    const all = await call<All>(tokens.admin, "ApiService/ListAllApiGrants", { page: { limit: 500 } });
+    expect(all.code).toBe("ok");
+    // Other test files share the database: this file's own team's grants, exactly.
+    const ownerId = (await findTeamByName(owner))?.id ?? "";
+    const ours = (await db.select().from(apiGrants).where(eq(apiGrants.teamId, ownerId))).filter((g) => g.revokedAt === null).map((g) => g.id);
+    const listedOurs = (grants: Grant[] | undefined) => (grants ?? []).filter((g) => ours.includes(g.id) || (g as { team?: string }).team === owner).map((g) => g.id);
+    expect(ours.length).toBeGreaterThan(0);
+    expect(listedOurs(all.body.grants).sort()).toEqual([...ours].sort());
+    expect(all.body.total ?? 0).toBeGreaterThanOrEqual(ours.length);
+    expect((all.body.groups ?? 0) + (all.body.people ?? 0) + (all.body.bots ?? 0)).toBe(all.body.total);
+    expect(all.body.grants?.every((g) => !g.revokedAt)).toBe(true);
+    expect(all.body.waitingRequests ?? 0).toBeGreaterThan(0);
+    expect(all.body.waitingApis ?? 0).toBeGreaterThan(0);
+    // A page at a time: each page's cursor reaches the next, none twice.
+    const seen: string[] = [];
+    let cursor = "";
+    for (let pages = 0; pages < 3; pages++) {
+      const page = await call<All>(tokens.admin, "ApiService/ListAllApiGrants", { page: { limit: 1, cursor } });
+      expect(page.body.grants?.length).toBe(1);
+      seen.push(...(page.body.grants ?? []).map((g) => g.id));
+      cursor = page.body.nextCursor ?? "";
+      if (!cursor) break;
+    }
+    expect(new Set(seen).size).toBe(seen.length);
+    expect((await call(tokens.admin, "ApiService/ListAllApiGrants", { page: { cursor: "nope" } })).failure).toBe("BAD_REQUEST");
+  });
+});
+
+describe("GetMe", () => {
+  it("names the caller's retired teams, so the pages offer nothing new for them", async () => {
+    const me = () => call<{ retiredTeams?: string[]; maintainerOf?: string[] }>(tokens.oldMaintainer, "AuthService/GetMe");
+    expect((await me()).body.retiredTeams ?? []).toEqual([]);
+    await db.update(teams).set({ retiredAt: new Date() }).where(eq(teams.name, oldTools));
+    try {
+      const got = await me();
+      expect(got.body.retiredTeams).toEqual([oldTools]);
+      expect(got.body.maintainerOf).toContain(oldTools);
+    } finally {
+      await db.update(teams).set({ retiredAt: null }).where(eq(teams.name, oldTools));
+    }
+  });
+});
+
 describe("retired teams", () => {
   it("can't be granted to or from: the API's team's APIs aren't found; a bot of retired teams can't be granted, and its grant doesn't count", async () => {
     const made = await add("maintainer", "open", { email: oldBotEmail });

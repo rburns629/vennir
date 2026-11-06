@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -191,11 +191,19 @@ export function ApisPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
+  // Read again after a change under You may call (a grant given up is a row that moves).
+  const [version, setVersion] = useState(0);
+  const load = useCallback(() => {
+    setVersion((v) => v + 1);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     listApis()
       .then((list) => {
-        if (!cancelled) setApis(list);
+        if (!cancelled) {
+          setApis(list);
+          setError(null);
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(errorMessage(err, "Failed to load APIs."));
@@ -203,7 +211,7 @@ export function ApisPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [version]);
 
   const teams = useMemo(() => user?.teamNames ?? [], [user]);
   const isMine = (a: ApiProduct) => teams.includes(a.team);
@@ -273,7 +281,7 @@ export function ApisPage() {
         </Box>
       </Box>
 
-      {filter === "call" && <MyAccess apis={apis} search={search} />}
+      {filter === "call" && <MyAccess apis={apis} search={search} onChanged={load} />}
       {filter !== "call" && (
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "flex-start" }}>
           <Card component="section" aria-label="APIs you can see" sx={{ flex: "3 1 680px", minWidth: 0, overflowX: "auto" }}>

@@ -8,9 +8,9 @@ import Card from "@mui/material/Card";
 import Link from "@mui/material/Link";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { errorMessage, getGateway, listApiAccess, listApis, setGatewayClosed, type ApiAccessRequest, type ApiGrant, type ApiProduct, type GatewayInfo } from "../../api";
+import { errorMessage, getGateway, listAllApiGrants, listApis, setGatewayClosed, type AllApiGrants, type ApiGrant, type ApiProduct, type GatewayInfo } from "../../api";
 import { DataTable, type DataTableColumn } from "../../components/DataTable";
-import { grantedByText, Principal, rateText, revokeAsk, useAccessAsk } from "../api/access";
+import { grantedByText, grantName, Principal, rateText, revokeAsk, useAccessAsk } from "../api/access";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Mono } from "../../components/Mono";
 import { when } from "../../time";
@@ -69,19 +69,28 @@ export function GatewayTab() {
   }, []);
   useEffect(load, [load]);
 
-  // Every API, and each one's access list: what's held, every grant, what waits.
+  // Every API (what's held), and every grant a page at a time with the install's counts.
   const [apis, setApis] = useState<ApiProduct[] | null>(null);
-  const [access, setAccess] = useState<{ grants: ApiGrant[]; requests: ApiAccessRequest[] } | null>(null);
-  const loadAccess = useCallback(() => {
+  const [apisError, setApisError] = useState<string | null>(null);
+  useEffect(() => {
     listApis()
-      .then(async (list) => {
-        setApis(list);
-        const lists = await Promise.all(list.map((a) => listApiAccess(a.team, a.name)));
-        setAccess({ grants: lists.flatMap((l) => l.grants.filter((g) => !g.revokedAt)), requests: lists.flatMap((l) => l.requests.filter((r) => r.state === "waiting")) });
-      })
-      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the APIs' grants.")); });
+      .then(setApis)
+      .catch((err: unknown) => { setApisError(errorMessage(err, "Couldn't load the APIs.")); });
   }, []);
-  useEffect(loadAccess, [loadAccess]);
+  const [access, setAccess] = useState<AllApiGrants | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  const loadAccess = useCallback((cursor = "") => {
+    setMore(cursor !== "");
+    listAllApiGrants(cursor)
+      .then((page) => {
+        setAccess((had) => (cursor && had ? { ...page, grants: [...had.grants, ...page.grants] } : page));
+        setAccessError(null);
+      })
+      .catch((err: unknown) => { setAccessError(errorMessage(err, "Couldn't load the grants.")); })
+      .finally(() => { setMore(false); });
+  }, []);
+  useEffect(() => { loadAccess(); }, [loadAccess]);
 
   const changed = useAdminChanged();
   async function toggle(): Promise<void> {
@@ -104,8 +113,7 @@ export function GatewayTab() {
   }
 
   const held = apis?.filter((a) => a.state === "HELD") ?? [];
-  const grants = access?.grants ?? [];
-  const waitingApis = new Set(access?.requests.map((r) => `${r.team}/${r.name}`)).size;
+  const waitingApis = access?.waitingApis ?? 0;
   const refused = gateway?.refused.reduce((n, r) => n + r.count, 0) ?? 0;
   const share = gateway && gateway.requests24h > 0 ? `${((refused / gateway.requests24h) * 100).toFixed(1)}% of requests` : "of no requests";
   return (
@@ -132,14 +140,10 @@ export function GatewayTab() {
             <Figure label="APIs held" value={apis ? `${String(held.length)} of ${String(apis.length)}` : "…"} note="its backend’s host isn’t allowed" />
             <Figure
               label="Grants"
-              value={access ? grants.length : "…"}
-              note={[
-                count(grants.filter((g) => g.group).length, "group", "groups"),
-                count(grants.filter((g) => !g.group && !g.bot).length, "person", "people"),
-                count(grants.filter((g) => g.bot).length, "bot", "bots"),
-              ].join(", ")}
+              value={access ? access.total : "…"}
+              note={access ? [count(access.groups, "group", "groups"), count(access.people, "person", "people"), count(access.bots, "bot", "bots")].join(", ") : ""}
             />
-            <Figure label="Requests waiting" value={access ? access.requests.length : "…"} note={`on ${String(waitingApis)} ${waitingApis === 1 ? "API" : "APIs"}, for their teams`} />
+            <Figure label="Requests waiting" value={access ? access.waitingRequests : "…"} note={`on ${String(waitingApis)} ${waitingApis === 1 ? "API" : "APIs"}, for their teams`} />
           </Box>
 
           {held.length > 0 && (
@@ -160,7 +164,15 @@ export function GatewayTab() {
             </AdminCard>
           )}
 
-          <EveryGrant apis={apis ?? []} grants={access ? grants : null} waiting={access?.requests.length ?? 0} onChanged={loadAccess} />
+          {apisError && <Alert severity="error">{apisError}</Alert>}
+          <EveryGrant
+            apis={apis ?? []}
+            access={access}
+            error={accessError}
+            loadingMore={more}
+            onMore={() => { if (access?.nextCursor) loadAccess(access.nextCursor); }}
+            onChanged={() => { loadAccess(); }}
+          />
 
           <AdminCard title="This install's settings" status={<Aside>Read-only: an upgrade changes them</Aside>}>
             <KeyValues
@@ -292,7 +304,23 @@ export function GatewayTab() {
 }
 
 /** Every active grant on every API, for an incident: an admin revokes one; adding and changing them, and answering requests, are each API team's. */
-function EveryGrant({ apis, grants, waiting, onChanged }: { apis: ApiProduct[]; grants: ApiGrant[] | null; waiting: number; onChanged: () => void }) {
+function EveryGrant({
+  apis,
+  access,
+  error,
+  loadingMore,
+  onMore,
+  onChanged,
+}: {
+  apis: ApiProduct[];
+  access: AllApiGrants | null;
+  error: string | null;
+  loadingMore: boolean;
+  onMore: () => void;
+  onChanged: () => void;
+}) {
+  const grants = access?.grants ?? (error ? [] : null);
+  const waiting = access?.waitingRequests ?? 0;
   const [search, setSearch] = useState("");
   const { ask, dialog } = useAccessAsk(onChanged);
   const names = new Map(apis.map((a) => [`${a.team}/${a.name}`, a.displayName || a.name]));
@@ -306,7 +334,7 @@ function EveryGrant({ apis, grants, waiting, onChanged }: { apis: ApiProduct[]; 
         <Link component={RouterLink} to={`/apis/${encodeURIComponent(g.team)}/${encodeURIComponent(g.name)}`} variant="body2">
           {names.get(`${g.team}/${g.name}`) ?? g.name}{" "}
           <Typography component="span" variant="caption" color="text.secondary">
-            {g.team}’s
+            {g.team}’s{g.awaySince ? " · left the catalog’s release" : ""}
           </Typography>
         </Link>
       ),
@@ -319,14 +347,14 @@ function EveryGrant({ apis, grants, waiting, onChanged }: { apis: ApiProduct[]; 
       header: "Revoke",
       align: "right",
       render: (g) => (
-        <Button size="small" color="error" onClick={() => { ask(revokeAsk(g, `For an incident: ${g.team}’s maintainers and whom it names are told.`)); }}>
+        <Button size="small" color="error" aria-label={`Revoke ${grantName(g)}’s access to ${names.get(`${g.team}/${g.name}`) ?? g.name}…`} onClick={() => { ask(revokeAsk(g, `For an incident: ${g.team}’s maintainers and whom it names are told.`)); }}>
           Revoke…
         </Button>
       ),
     },
   ];
   return (
-    <AdminCard title={`Every grant${grants ? ` · ${String(grants.length)}` : ""}`} label="Every grant">
+    <AdminCard title={`Every grant${access ? ` · ${String(access.total)}` : ""}`} label="Every grant">
       <Typography variant="body2" color="text.secondary">
         For an incident, an admin may revoke any grant; calls stop within a minute, and the API’s team and the one granted are told. Adding and changing
         grants{waiting > 0 ? `, and answering the ${String(waiting)} waiting ${waiting === 1 ? "request" : "requests"},` : ""} are each API team’s.
@@ -340,10 +368,18 @@ function EveryGrant({ apis, grants, waiting, onChanged }: { apis: ApiProduct[]; 
         sx={{ maxWidth: 340 }}
         slotProps={{ htmlInput: { "aria-label": "Find a grant" } }}
       />
+      {error && <Alert severity="error">{error}</Alert>}
       <DataTable columns={columns} rows={shown} getRowKey={(g) => g.id} skeletonRowCount={2} emptyMessage={q ? "No grant matches." : "No grants yet: each API's team grants who may call it."} />
       <Typography variant="caption" color="text.secondary">
-        A group’s rate is each member’s.
+        {access && access.nextCursor ? `Showing ${String(access.grants.length)} of ${String(access.total)}, newest first${q ? " (finding among those shown)" : ""}. ` : ""}A group’s rate is each member’s.
       </Typography>
+      {access?.nextCursor && (
+        <Box>
+          <Button variant="outlined" disabled={loadingMore} onClick={onMore}>
+            {loadingMore ? "Loading…" : "Show more"}
+          </Button>
+        </Box>
+      )}
       {dialog}
     </AdminCard>
   );

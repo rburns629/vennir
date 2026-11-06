@@ -32,6 +32,7 @@ import {
   type ApiAccessRequest,
   type ApiGrant,
   type ApiProduct,
+  type Me,
 } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
@@ -41,8 +42,22 @@ import { when } from "../../time";
 /** The longest reason the console takes (core/apiAccess.ts's MAX_REASON). */
 export const MAX_REASON = 1000;
 
+/** The highest rate a grant may have (core/apiAccess.ts's MAX_GRANT_PER_MINUTE). */
+export const MAX_RATE = 1_000_000;
+
+/** A rate as typed: a whole number of requests a minute, 0 (empty) for the API's limit, never above MAX_RATE. */
+export const typedRate = (text: string) => Math.min(MAX_RATE, Math.max(0, Math.floor(Number(text) || 0)));
+
 /** A bot's name: its email before the @. */
 export const botName = (email: string) => email.split("@")[0] ?? email;
+
+/** Whom a grant names, in a word: its group, its bot's name, or its person's email. */
+export const grantName = (grant: Pick<ApiGrant, "group" | "userEmail" | "bot">) => grant.group || (grant.bot ? botName(grant.userEmail) : grant.userEmail);
+
+/** The teams whose bots the caller may ask for: those they maintain that aren't retired, but `except` (an API's own team, whose bots call it already). */
+export function botTeamsOf(user: Pick<Me, "maintainerOf" | "retiredTeams"> | null, except?: string): string[] {
+  return (user?.maintainerOf ?? []).filter((t) => t !== except && !user?.retiredTeams.includes(t));
+}
 
 /** What an access error says, with what to do for the ones that need it. */
 export function accessError(err: unknown): string {
@@ -132,7 +147,7 @@ export function useAccessAsk(onChanged: () => void): { ask: (a: AccessAsk) => vo
 
 /** Asking before revoking a grant; `who` says whose it is, for the title. */
 export function revokeAsk(grant: ApiGrant, note: string): AccessAsk {
-  const named = grant.group || (grant.bot ? botName(grant.userEmail) : grant.userEmail);
+  const named = grantName(grant);
   return {
     title: `Revoke ${named}'s access to ${grant.team}/${grant.name}?`,
     description: `${note} The gateway stops its calls within a minute.`,
@@ -171,7 +186,7 @@ export function rateAsk(grant: ApiGrant, defaultPerMinute: number): AccessAsk {
     description: `Requests a minute${grant.group ? ", for each person in the group" : ""}. Empty: the API's limit, ${defaultPerMinute.toLocaleString()}. It takes effect within a minute, without revoking.`,
     confirmLabel: "Change rate",
     input: { label: "Its rate, a minute", type: "number", initial: grant.defaultRate ? "" : String(grant.perMinute) },
-    run: (value) => setApiGrantRate(grant.id, Number(value) || 0),
+    run: (value) => setApiGrantRate(grant.id, typedRate(value)),
   };
 }
 
@@ -187,6 +202,7 @@ export function RequestAccessDialog({
   open,
   api,
   apis = [],
+  apisError = null,
   bot,
   forBot = false,
   onClose,
@@ -194,7 +210,10 @@ export function RequestAccessDialog({
 }: {
   open: boolean;
   api?: ApiChoice | null;
-  apis?: ApiChoice[];
+  /** The APIs to pick from (no `api`); null while they load. */
+  apis?: ApiChoice[] | null;
+  /** Why `apis` couldn't be loaded. */
+  apisError?: string | null;
   /** A bot's email: asking for it. */
   bot?: string;
   /** Open on "a bot of a team you maintain". */
@@ -207,14 +226,15 @@ export function RequestAccessDialog({
   const [picked, setPicked] = useState("");
   const [forWhom, setForWhom] = useState<"you" | "bot">("you");
   const [botEmail, setBotEmail] = useState("");
-  const [bots, setBots] = useState<{ email: string; team: string }[] | null>(null);
+  // Each bot once, with every team of the caller's it's in.
+  const [bots, setBots] = useState<{ email: string; teams: string[] }[] | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const target = api ?? apis.find((a) => `${a.team}/${a.name}` === picked) ?? null;
-  // A bot of the API's own team may call it already.
-  const maintained = (user?.maintainerOf ?? []).filter((t) => t !== target?.team);
+  const target = api ?? apis?.find((a) => `${a.team}/${a.name}` === picked) ?? null;
+  // A bot of the API's own team may call it already; a retired team's can't be asked for.
+  const maintained = botTeamsOf(user, target?.team);
 
   useEffect(() => {
     if (!open) return;
@@ -225,14 +245,16 @@ export function RequestAccessDialog({
     setPicked("");
   }, [open, bot, forBot]);
 
-  // The bots that may be asked for: those of the teams the caller maintains.
-  const teams = (user?.maintainerOf ?? []).join(",");
+  // The bots that may be asked for: those of the live teams the caller maintains.
+  const teams = botTeamsOf(user).join(",");
   useEffect(() => {
     if (!open || bot || !teams) return;
     let cancelled = false;
     Promise.all(teams.split(",").map((t) => listBots(t).then((list) => list.map((b) => ({ email: b.email, team: t })))))
       .then((lists) => {
-        if (!cancelled) setBots(lists.flat());
+        const byEmail = new Map<string, string[]>();
+        for (const b of lists.flat()) byEmail.set(b.email, [...(byEmail.get(b.email) ?? []), b.team]);
+        if (!cancelled) setBots([...byEmail].map(([email, of]) => ({ email, teams: of })));
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(errorMessage(err, "Couldn't load your teams' bots."));
@@ -242,7 +264,7 @@ export function RequestAccessDialog({
     };
   }, [open, bot, teams]);
 
-  const choosable = (bots ?? []).filter((b) => b.team !== target?.team);
+  const choosable = (bots ?? []).filter((b) => !b.teams.includes(target?.team ?? ""));
   const asBot = forWhom === "bot";
   const ready = target !== null && reason.trim() !== "" && (!asBot || botEmail !== "");
 
@@ -281,10 +303,14 @@ export function RequestAccessDialog({
             onChange={(e) => {
               setPicked(e.target.value);
             }}
-            helperText={apis.length === 0 ? "No other team’s API takes requests." : "Another team’s API that takes requests."}
+            helperText={
+              apisError ? "The APIs couldn’t be loaded." : apis === null ? "Loading the APIs…" : apis.length === 0 ? "No other team’s API takes requests." : "Another team’s API that takes requests."
+            }
+            error={Boolean(apisError)}
             sx={{ mt: 1 }}
           >
-            {apis.map((a) => (
+            {apis === null && !apisError && <MenuItem disabled>Loading…</MenuItem>}
+            {(apis ?? []).map((a) => (
               <MenuItem key={`${a.team}/${a.name}`} value={`${a.team}/${a.name}`}>
                 {a.displayName || a.name} · {a.team}
               </MenuItem>
@@ -352,7 +378,7 @@ export function RequestAccessDialog({
               {bots !== null && choosable.length === 0 && <MenuItem disabled>Your teams have no bots yet</MenuItem>}
               {choosable.map((b) => (
                 <MenuItem key={b.email} value={b.email}>
-                  {botName(b.email)} · {b.team}
+                  {botName(b.email)} · {b.teams.join(", ")}
                 </MenuItem>
               ))}
             </TextField>
@@ -377,6 +403,7 @@ export function RequestAccessDialog({
               : `A ${target.team} maintainer approves it, at a rate (by default ${target.defaultPerMinute.toLocaleString()} a minute), or declines it with a reason. You’re told either way, and may withdraw it while it waits.`}
           </Typography>
         )}
+        {apisError && <Alert severity="error">{apisError}</Alert>}
         {error && <Alert severity="error">{error}</Alert>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
