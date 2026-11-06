@@ -1264,36 +1264,6 @@ describe("who may call an API (decision 26)", () => {
     expect(within(await screen.findByRole("dialog")).queryByRole("checkbox")).toBeNull();
   });
 
-  it("lets someone who may call only from the catalog ask for a grant of their own", async () => {
-    const asked = recorder();
-    await renderAt("/apis/payments/orders", PRIYA, {
-      "ApiService/GetApi": { api: { ...ORDERS, mayCall: true }, openapi: "{}" },
-      "ApiService/ListMyApiAccess": { access: [{ team: "payments", name: "orders", via: "API_ACCESS_VIA_CATALOG", callingTeam: "ml", perMinute: 600 }] },
-      "ApiService/RequestApiAccess": asked.answer,
-    });
-    const card = await screen.findByRole("region", { name: "Your access" });
-    expect(await within(card).findByRole("heading", { name: "From the catalog" })).toBeTruthy();
-    expect(within(card).getByText(/shareWith names ml/)).toBeTruthy();
-    fireEvent.click(within(card).getByRole("button", { name: "Request access…" }));
-    const dialog = await screen.findByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText(/Why you need it/), { target: { value: "shareWith is going." } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Ask payments" }));
-    await waitFor(() => { expect(asked.seen).toEqual([{ team: "payments", name: "orders", reason: "shareWith is going." }]); });
-  });
-
-  it("shows a catalog caller's waiting request, to withdraw", async () => {
-    await renderAt("/apis/payments/orders", PRIYA, {
-      "ApiService/GetApi": { api: { ...ORDERS, mayCall: true }, openapi: "{}" },
-      "ApiService/ListMyApiAccess": {
-        access: [{ team: "payments", name: "orders", via: "API_ACCESS_VIA_CATALOG", callingTeam: "ml", perMinute: 600 }],
-        requests: [{ ...ASKED, state: "API_ACCESS_REQUEST_STATE_WAITING" }],
-      },
-    });
-    const card = await screen.findByRole("region", { name: "Your access" });
-    expect(await within(card).findByRole("heading", { name: "Waiting for payments" })).toBeTruthy();
-    expect(within(card).getByRole("button", { name: "Withdraw the request" })).toBeTruthy();
-  });
-
   it("offers no request where its api.yaml takes none", async () => {
     await renderAt("/apis/payments/orders", PRIYA, { "ApiService/GetApi": { api: { ...ORDERS, accessRequests: "closed" }, openapi: "{}" } });
     expect(await screen.findByText(/payments takes no requests for it/)).toBeTruthy();
@@ -3661,12 +3631,11 @@ describe("Observe's log search, for one API", () => {
 });
 
 describe("an API's limits", () => {
-  it("say a grant's default, and the limits of the teams its catalog's shareWith names", async () => {
-    const api = { team: "payments", name: "orders", displayName: "Orders API", state: "API_STATE_LIVE", mayCall: false, endpoints: [], shareWith: ["growth"], limits: [{ team: "growth", perMinute: 1200 }], defaultPerMinute: 600 };
+  it("say a grant's default; a team api.yaml names a limit for gets no access from it", async () => {
+    const api = { team: "payments", name: "orders", displayName: "Orders API", state: "API_STATE_LIVE", mayCall: false, endpoints: [], limits: [{ team: "growth", perMinute: 1200 }], defaultPerMinute: 600 };
     await renderAt("/apis/payments/orders", MEMBER, { "ApiService/GetApi": { api, openapi: "{}" } });
-    expect(await screen.findByText("growth · 1,200 a minute")).toBeTruthy();
-    expect(screen.getByText("Every other team · 600 a minute")).toBeTruthy();
-    expect(screen.getByText("600 a minute by default")).toBeTruthy();
+    expect(await screen.findByText("600 a minute by default")).toBeTruthy();
+    expect(screen.queryByText("growth · 1,200 a minute")).toBeNull();
   });
 });
 

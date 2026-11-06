@@ -23,7 +23,6 @@ import { accessError, botName, grantedByText, grantName, MAX_REASON, Principal, 
 export interface ApiAccessList {
   grants: ApiGrant[];
   requests: ApiAccessRequest[];
-  shareWith: string[];
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -333,15 +332,6 @@ export function WhoMayCall({ api, list, error, maintains, isAdmin, onChanged }: 
             without a grant: {t}’s own members and bots. Admins call it only if granted, like anyone else.
           </Typography>
         </Box>
-        {(list?.shareWith.length ?? 0) > 0 && (
-          <Box component="section" aria-label="From the catalog" sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
-            <Heading
-              title="From the catalog"
-              note="Its api.yaml’s shareWith lets these teams’ members and bots call it, at their limits: not revocable here, and going away. Grant whoever needs it, then drop shareWith."
-            />
-            <Typography variant="body2">{list?.shareWith.includes("*") ? "every team" : list?.shareWith.join(", ")}</Typography>
-          </Box>
-        )}
       </Card>
 
       <Box component="aside" sx={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>

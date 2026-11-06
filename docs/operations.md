@@ -906,6 +906,17 @@ to know:
   other resources, its main Secret included, are updated only after it. The scheduler waits for
   them on a fresh install.
 
+**`shareWith` is gone from `api.yaml`** (unreleased, on main since
+2026-11-06; decision 26): only an API's own team and whoever its access
+list grants may call it. The teams an `api.yaml`'s `shareWith` named stop
+calling at this upgrade (the console's migration empties what it held, so
+even a gateway from before, still running, lets them in no more), and
+`vennir catalog validate` refuses an `api.yaml` that still has it. Before
+upgrading, have each API's team grant the people and bots that called
+through it (in the console, or `ApiService/AddApiGrant`), then drop
+`shareWith` from the catalog. A team named in `limits` gets no access from
+it either.
+
 **Settings the console now refuses or turns off** (since 2026-11-03):
 
 - A `jwtSecret` set by hand shorter than 32 bytes stops the console at
@@ -943,7 +954,7 @@ to know:
   as *from the catalog*, and `vennir catalog validate` warns; the next
   release drops `shareWith`, so have each API's team grant its callers
   first. A catalog's `api.yaml` may say `access.requests` only once its
-  `./vennir` pin is a release that knows it (`TODO.md`).
+  `./vennir` pin is a release that knows it (0.12.0 or later).
 - **Single sign-on with a groups claim signs people in for an hour.** A
   team a groups claim gave someone counts only for a single sign-on from
   the last hour, at the console and the gateway, and that sign-in's

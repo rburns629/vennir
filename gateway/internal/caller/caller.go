@@ -41,8 +41,7 @@ type Claims struct {
 	// <team>/<name>.
 	Team string `json:"team"`
 	// Via is how it may call: team (its own team's), user (a grant names
-	// it), group (a grant names Group, a single sign-on group it's in) or
-	// catalog (shareWith names Team; deprecated).
+	// it) or group (a grant names Group, a single sign-on group it's in).
 	Via       string `json:"via"`
 	Group     string `json:"group,omitempty"`
 	API       string `json:"api"`

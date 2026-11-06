@@ -65,8 +65,7 @@ kernel and module in the console, a run call by call, and the state machines.
   in-cluster one is also held to its team's API backends' namespace,
   `<team>-apis`. It signs callers in as the console does and lets through
   only the API's own team and the people, bots and single sign-on groups
-  its access list grants (decision 26; for one release, also the teams its
-  `api.yaml`'s deprecated `shareWith` names), reading the console's database as
+  its access list grants (decision 26), reading the console's database as
   a role of its own (docs/security-model.md, "The API gateway").
 - **Two Postgres databases**, one per project, never shared between them
   (on a small install they can live on one Postgres instance, each with its

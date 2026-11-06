@@ -54,16 +54,14 @@ func (c *Catalog) AllAPIs() []*API {
 	return apis
 }
 
-// ShareWithDeprecated is the warning for an api.yaml with shareWith, which
-// each install's grants replace (decision 26): this release still lets its
-// teams call, and the next drops it.
-const ShareWithDeprecated = "shareWith is deprecated and goes in the next release: " +
-	"each install's API grants replace it. Its teams still call this release; " +
-	"grant the people and bots that call it in the console, then remove shareWith " +
-	"(access.requests says how requests for access are answered)"
+// ShareWithRemoved is the problem with an api.yaml that still has
+// shareWith, which each install's grants replaced (decision 26).
+const ShareWithRemoved = "shareWith was removed: each install's grants say who else may call it, " +
+	"made by your team's maintainers in the console, and access.requests says how a request for access " +
+	"is answered. Grant whoever called through it, then delete shareWith"
 
 // ValidateAPIs checks every API: api.yaml against its schema and its
-// folder, and its OpenAPI file (openapiProblems), and warns of shareWith.
+// folder, and its OpenAPI file (openapiProblems).
 func (c *Catalog) ValidateAPIs() bool {
 	ok := true
 	for _, a := range c.AllAPIs() {
@@ -73,9 +71,6 @@ func (c *Catalog) ValidateAPIs() bool {
 			c.errorAt(path, p)
 		}
 		ok = ok && len(problems) == 0
-		if _, shared := a.Spec["shareWith"]; shared {
-			c.warnAt(path, ShareWithDeprecated)
-		}
 	}
 	return ok
 }
@@ -91,6 +86,12 @@ func (c *Catalog) apiProblems(a *API) []string {
 	}
 	if problem != "" {
 		return []string{problem}
+	}
+	// Said plainly, before the schema's "not allowed".
+	if spec, ok := doc.(map[string]any); ok {
+		if _, shared := spec["shareWith"]; shared {
+			return []string{ShareWithRemoved}
+		}
 	}
 	if problems := schemaErrors(apiSchema(), doc); len(problems) > 0 {
 		return problems
@@ -329,7 +330,6 @@ func (c *Catalog) releaseAPIs() ([]*catalogv1.Api, error) {
 			BackendUrl:      text(backend, "url"),
 			BackendAuth:     backendAuth(backend),
 			ServiceAccount:  or(text(a.Spec, "serviceAccount"), a.Name()+"-api"),
-			ShareWith:       stringList(a.Spec["shareWith"]),
 			Hidden:          text(a.Spec, "visibility") == "hidden",
 			Deprecated:      text(a.Spec, "deprecated"),
 			Internet:        text(a.Spec, "reachable") == "internet",

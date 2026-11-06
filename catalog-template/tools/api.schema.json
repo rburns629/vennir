@@ -13,23 +13,6 @@
     "spec",
     "backend"
   ],
-  "if": {
-    "properties": {
-      "visibility": {
-        "const": "hidden"
-      }
-    },
-    "required": [
-      "visibility"
-    ]
-  },
-  "then": {
-    "not": {
-      "required": [
-        "shareWith"
-      ]
-    }
-  },
   "properties": {
     "apiVersion": {
       "description": "The catalog format: vennir.dev/v2. A file without it is from before v2: ./vennir catalog migrate rewrites it.",
@@ -146,23 +129,6 @@
       "type": "string",
       "pattern": "^[a-z0-9]([-a-z0-9]{0,57}[a-z0-9])?-api$"
     },
-    "shareWith": {
-      "description": "Deprecated: access's grants replace it, made per install in the console, and it goes in the next release (vennir catalog validate warns). The other teams whose members and bots may call it, or [\"*\"] for every team. Left out, only its own team.",
-      "deprecated": true,
-      "type": "array",
-      "uniqueItems": true,
-      "maxItems": 200,
-      "items": {
-        "anyOf": [
-          {
-            "const": "*"
-          },
-          {
-            "$ref": "#/$defs/dnsLabel"
-          }
-        ]
-      }
-    },
     "access": {
       "description": "Who else may call it: each install's grants, to single sign-on groups and to users (people and bots), each with its rate, which the API's team's maintainers add in the console. This says how a request for access is answered.",
       "type": "object",
@@ -179,7 +145,7 @@
       }
     },
     "visibility": {
-      "description": "listed (the default): every team sees it, and those it isn't shared with can ask for access. hidden: only its own team sees it, so it can't have shareWith.",
+      "description": "listed (the default): every team sees it, and anyone may ask for access. hidden: only its own team, whoever a grant names, and admins see it.",
       "enum": [
         "listed",
         "hidden"
@@ -199,7 +165,7 @@
       ]
     },
     "limits": {
-      "description": "Requests per minute or second: default for every caller (its own team, a grant without a rate of its own, and each person in a group a grant names), and any calling team by name (its own, or a shareWith team).",
+      "description": "Requests per minute or second: default for every caller (its own team, a grant without a rate of its own, and each person in a group a grant names), and its own team by name.",
       "type": "object",
       "maxProperties": 100,
       "propertyNames": {

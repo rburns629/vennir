@@ -13,9 +13,7 @@
  *      the grant's rate (each member's), the best of their groups'; only
  *      while their groups count (plugin.ts's groupsCurrent: while groups
  *      come from an ID token's claim, a single sign-on session signed in
- *      within the hour);
- *   4. for this release, a member or bot of a team its api.yaml's shareWith
- *      names ("from the catalog": not revocable here), at that team's limit.
+ *      within the hour).
  *
  * Anyone else may not, admins included (the gateway answers 403
  * NOT_GRANTED). A team's limit is api.yaml's limit for it, else its
@@ -61,12 +59,12 @@ export const MAX_GROUP = 256;
 /** The most groups a request may offer. */
 export const MAX_OFFERED_GROUPS = 100;
 
-export type Via = "team" | "user" | "group" | "catalog";
+export type Via = "team" | "user" | "group";
 
 /** How a caller may call an API, and at what rate. */
 export interface Access {
   via: Via;
-  /** team, catalog: the team the gateway counts the calls against. */
+  /** team: the team the gateway counts the calls against. */
   callingTeam?: string;
   /** user, group: the grant. */
   grantId?: string;
@@ -123,8 +121,6 @@ export function accessFor(who: Pick<AuthUser, "id" | "isBot" | "groupsCurrent">,
       .sort((a, b) => grantRate(api, b) - grantRate(api, a) || byteOrder(a.groupName ?? "", b.groupName ?? ""))[0];
     if (best?.groupName) return { via: "group", grantId: best.id, group: best.groupName, perMinute: grantRate(api, best) };
   }
-  const shared = ctx.teams.find((t) => api.shareWith.includes("*") || api.shareWith.includes(t));
-  if (shared !== undefined) return { via: "catalog", callingTeam: shared, perMinute: teamRate(api, shared) };
   return null;
 }
 
@@ -486,8 +482,7 @@ const principal = (g: Pick<Grant, "groupName">, email: string) => (g.groupName ?
  * Asks for access: for the caller, offering `groups` (some of theirs, as
  * last read while they count) for a group grant instead; or (botEmail) for
  * a bot of a team they maintain. An open API's is granted at once, at its
- * default limit. Someone who may call it only from the catalog (shareWith)
- * may ask for a grant: shareWith is going away.
+ * default limit.
  */
 export async function requestAccess(caller: AuthUser | undefined, team: string, name: string, reason: string, botEmail: string, groups: string[] = []) {
   const who = signedIn(caller);
@@ -519,7 +514,7 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
     throw new ApiError(409, "REQUESTS_CLOSED", `${api.teamName}/${api.name} takes no requests for access: ask its team directly.`);
   }
   const access = accessFor(target, api, await callerContext(target));
-  if (access && access.via !== "catalog") {
+  if (access) {
     throw new ApiError(409, "ALREADY_ALLOWED", `${botEmail ? botEmail : "You"} may call ${api.teamName}/${api.name} already (${access.via}).`);
   }
   let made: { request: AccessRequest; grant: Grant | null };
@@ -991,7 +986,7 @@ export async function listApiAccess(caller: AuthUser | undefined, team: string, 
     .from(apiAccessRequests)
     .where(eq(apiAccessRequests.apiId, api.id))
     .orderBy(sql`${apiAccessRequests.state} <> 'waiting'`, desc(apiAccessRequests.createdAt));
-  return { grants: await grantViews(grants, byApi), requests: await requestViews(requests, byApi, who.maintainerOf.includes(api.teamName)), shareWith: api.shareWith };
+  return { grants: await grantViews(grants, byApi), requests: await requestViews(requests, byApi, who.maintainerOf.includes(api.teamName)) };
 }
 
 /** Every live API, by id. */

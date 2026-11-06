@@ -111,9 +111,7 @@ type ApiServiceClient interface {
 	// Asks for access to an API, with a reason: a person for themselves, or a
 	// maintainer of a bot's team for that bot (bot_email). Refused when its
 	// api.yaml takes no requests (access.requests: closed), when whoever
-	// it's for may call it already (but only "from the catalog", by its
-	// api.yaml's shareWith: then a grant may be asked for), or while a
-	// request of theirs waits. An API whose requests are open grants it at
+	// it's for may call it already, or while a request of theirs waits. An API whose requests are open grants it at
 	// once, at its default limit.
 	RequestApiAccess(context.Context, *connect.Request[v1.RequestApiAccessRequest]) (*connect.Response[v1.RequestApiAccessResponse], error)
 	// Withdraws a request while it waits: whoever asked, or, for a bot's, a
@@ -136,7 +134,7 @@ type ApiServiceClient interface {
 	// admins.
 	ListApiAccess(context.Context, *connect.Request[v1.ListApiAccessRequest]) (*connect.Response[v1.ListApiAccessResponse], error)
 	// The APIs the caller may call, and how (their team's, granted to them,
-	// through a group, from the catalog), and their requests that wait or
+	// or through a group), and their requests that wait or
 	// were declined.
 	ListMyApiAccess(context.Context, *connect.Request[v1.ListMyApiAccessRequest]) (*connect.Response[v1.ListMyApiAccessResponse], error)
 	// A team's bots' grants and requests: its members, and admins.
@@ -422,9 +420,7 @@ type ApiServiceHandler interface {
 	// Asks for access to an API, with a reason: a person for themselves, or a
 	// maintainer of a bot's team for that bot (bot_email). Refused when its
 	// api.yaml takes no requests (access.requests: closed), when whoever
-	// it's for may call it already (but only "from the catalog", by its
-	// api.yaml's shareWith: then a grant may be asked for), or while a
-	// request of theirs waits. An API whose requests are open grants it at
+	// it's for may call it already, or while a request of theirs waits. An API whose requests are open grants it at
 	// once, at its default limit.
 	RequestApiAccess(context.Context, *connect.Request[v1.RequestApiAccessRequest]) (*connect.Response[v1.RequestApiAccessResponse], error)
 	// Withdraws a request while it waits: whoever asked, or, for a bot's, a
@@ -447,7 +443,7 @@ type ApiServiceHandler interface {
 	// admins.
 	ListApiAccess(context.Context, *connect.Request[v1.ListApiAccessRequest]) (*connect.Response[v1.ListApiAccessResponse], error)
 	// The APIs the caller may call, and how (their team's, granted to them,
-	// through a group, from the catalog), and their requests that wait or
+	// or through a group), and their requests that wait or
 	// were declined.
 	ListMyApiAccess(context.Context, *connect.Request[v1.ListMyApiAccessRequest]) (*connect.Response[v1.ListMyApiAccessResponse], error)
 	// A team's bots' grants and requests: its members, and admins.

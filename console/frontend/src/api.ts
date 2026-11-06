@@ -1867,7 +1867,6 @@ export interface ApiProduct {
   problemFoundAt: string | null;
   pausedMessage: string;
   mayCall: boolean;
-  shareWith: string[];
   hidden: boolean;
   deprecated: string;
   internet: boolean;
@@ -1905,7 +1904,6 @@ function apiProduct(a: Awaited<ReturnType<typeof apisApi.listApis>>["apis"][numb
     problemFoundAt: iso(a.problemFoundAt),
     pausedMessage: a.pausedMessage,
     mayCall: a.mayCall,
-    shareWith: a.shareWith,
     hidden: a.hidden,
     deprecated: a.deprecated,
     internet: a.internet,
@@ -2017,8 +2015,8 @@ export async function setGatewayClosed(message: string): Promise<void> {
   await call(() => apisApi.setGatewayClosed({ message }));
 }
 
-/** How a caller may call an API (decision 26): its own team's, a grant naming them, a group's grant, or its api.yaml's shareWith (from the catalog). */
-export type ApiAccessVia = "team" | "user" | "group" | "catalog";
+/** How a caller may call an API (decision 26): its own team's, a grant naming them, or a group's grant. */
+export type ApiAccessVia = "team" | "user" | "group";
 
 function via(v: ApiAccessViaMessage): ApiAccessVia | null {
   return v === ApiAccessViaMessage.UNSPECIFIED ? null : (ApiAccessViaMessage[v].toLowerCase() as ApiAccessVia);
@@ -2153,10 +2151,10 @@ export async function revokeApiGrant(id: string, reason = ""): Promise<void> {
   await call(() => apisApi.revokeApiGrant({ grantId: id, reason }));
 }
 
-/** An API's grants (active first, then revoked) and requests (waiting first), and the teams its api.yaml's shareWith names: its own team, and admins. */
-export async function listApiAccess(team: string, name: string): Promise<{ grants: ApiGrant[]; requests: ApiAccessRequest[]; shareWith: string[] }> {
+/** An API's grants (active first, then revoked) and requests (waiting first): its own team, and admins. */
+export async function listApiAccess(team: string, name: string): Promise<{ grants: ApiGrant[]; requests: ApiAccessRequest[] }> {
   const r = await call(() => apisApi.listApiAccess({ team, name }));
-  return { grants: r.grants.map(apiGrant), requests: r.requests.map(accessRequest), shareWith: r.shareWith };
+  return { grants: r.grants.map(apiGrant), requests: r.requests.map(accessRequest) };
 }
 
 /** One API the caller may call, and how. */

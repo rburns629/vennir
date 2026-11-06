@@ -16,12 +16,6 @@ export function size(bytes: number): string {
   return bytes >= 1 << 20 ? `${String(bytes / (1 << 20))} MiB` : `${String(Math.round(bytes / 1024))} KiB`;
 }
 
-/** Who it's shared with, in words: "*" is every team. */
-export function sharedWith(api: ApiProduct): string {
-  if (api.shareWith.includes("*")) return "every team";
-  return api.shareWith.length > 0 ? api.shareWith.join(", ") : "its own team only";
-}
-
 /** A path with its parameters as placeholders, for the sample call. */
 function sample(path: string): string {
   return path.replace(/\{([^}]+)\}/g, (_, name: string) => `<${name}>`);
