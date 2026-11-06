@@ -608,7 +608,16 @@ catalog's APIs or a team's retirement change, every few minutes and at
 startup (`console/src/gatewayTokenPolicy.ts`, the identity policy's
 pattern; its RBAC may update that one policy by name), and the chart keeps
 on upgrade (so upgrade the console chart with `--force-conflicts` too).
-Until the console has written a newly published API's audiences, the
+The exact-audience check holds only once a console has written the lists
+(`apiAudiencesWritten`): on a fresh install, on the upgrade from a chart
+without them, and whenever the chart is rendered without looking the
+policy up (`helm template`, GitOps tools), the policy starts with it off,
+so only the other rules above apply (an `*-api` ServiceAccount in an
+active team namespace, a named audience that isn't the cluster's,
+kernel-api's, Azure's or a GKE pool's STS one, an hour at most) until the
+console's next write: at its startup, after a catalog sync, and every few
+minutes (`policySyncIntervalSeconds`). That window keeps a slow console
+rollout from refusing every API's credential. Until the console has written a newly published API's audiences, the
 gateway's mint is refused and that request gets 502 `BACKEND_CREDENTIAL`;
 the gateway keeps no failed credential, so the next request asks again. `-api` is reserved: no product may run as
 such a ServiceAccount, and an API's must end in it. It reads the
@@ -893,7 +902,7 @@ without going through the console:
 | Team deletion | A configured purger deleting a team namespace that isn't labelled retired (or a team's API backends' namespace, `<team>-apis`, not labelled `vennir/api-backends=retired`). None is configured by default: the console leaves a purged team's namespace, labelled retired, for a cluster administrator to delete, so the identity that retires a namespace can't also delete it (`teamNamespaces.purge` would let it) | `templates/purge-policy.yaml` |
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
 | Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own); creating an ExternalSecret without its `app.kubernetes.io/managed-by: vennir-console` label, or updating one that didn't carry it | console chart, `templates/write-fence-policy.yaml` |
-| Gateway tokens | The gateway minting a token for anything but an API ServiceAccount (`*-api`) in an active team namespace; for no audience, the Kubernetes API's, kernel-api's, Azure's or a GKE pool's STS audience; lasting over an hour; or for any audience its published API doesn't need (a `serviceAccountToken` backend's audience, AWS STS's for `awsSigV4`, the Google pool's for `googleIdToken`; none for a held API or a retired team's). The console keeps each API ServiceAccount's audiences current (sixteen maps, about 500 APIs each) | console chart, `templates/gateway.yaml` |
+| Gateway tokens | The gateway minting a token for anything but an API ServiceAccount (`*-api`) in an active team namespace; for no audience, the Kubernetes API's, kernel-api's, Azure's or a GKE pool's STS audience; lasting over an hour; or for any audience its published API doesn't need (a `serviceAccountToken` backend's audience, AWS STS's for `awsSigV4`, the Google pool's for `googleIdToken`; none for a held API or a retired team's). The console keeps each API ServiceAccount's audiences current (sixteen maps, about 500 APIs each); that last check holds once it has first written them, so not between an install, an upgrade onto this chart or a render without lookup and the console's next write (every few minutes) | console chart, `templates/gateway.yaml` |
 
 The platform's namespace is never a team's (never labelled `vennir/team`).
 One that was would lose more than the dispatch guardrail there:

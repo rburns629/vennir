@@ -1574,13 +1574,14 @@ export async function updateScanPolicy(
 }
 
 /** The gateway token policy's variables the console writes (this console chart's gateway.yaml). */
-const GATEWAY_TOKEN_POLICY_VARIABLES = new Set(
-  ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"].map((digit) => `apiAudiences${digit}`),
-);
+const GATEWAY_TOKEN_POLICY_VARIABLES = new Set([
+  "apiAudiencesWritten",
+  ...["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"].map((digit) => `apiAudiences${digit}`),
+]);
 
 /**
- * Rewrites the gateway token policy's literals (the apiAudiences maps, by
- * name) with what `build` returns, given what they say now, as
+ * Rewrites the gateway token policy's literals (apiAudiencesWritten and the
+ * apiAudiences maps, by name) with what `build` returns, given what they say now, as
  * updateIdentityPolicy does. Returns false when the policy doesn't exist
  * (the gateway is off).
  */

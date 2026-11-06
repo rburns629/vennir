@@ -3,17 +3,25 @@
  * The cluster's copy of which audiences each API's ServiceAccount may get a
  * token for (gatewayTokenPolicy.ts): exactly what the gateway asks for per
  * backend.auth, nothing for a held API or a retired team's, the sixteen
- * maps as the policy's CEL shards them, and the size limits. Kubernetes is
+ * maps as the policy's CEL shards them, the size limits, that every write
+ * says the maps are written, and who rewrites them. Kubernetes is
  * faked: updateGatewayTokenPolicy runs the build the console hands it and
  * keeps what it would have written.
  */
 import { randomUUID } from "node:crypto";
+import { create } from "@bufbuild/protobuf";
 import { inArray, like } from "drizzle-orm";
+import type { FastifyBaseLogger } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { AuthUser } from "../src/auth/plugin.js";
+import { applyApis } from "../src/catalogSync.js";
 import { config } from "../src/config.js";
+import { retireTeam, unretireTeam } from "../src/core/teams.js";
 import { db } from "../src/db/client.js";
 import { createTeam, setTeamRetired, upsertApi } from "../src/db/queries.js";
 import { teams, type BackendAuth } from "../src/db/schema.js";
+import { ApiSchema } from "../src/gen/vennir/catalog/v1/release_pb.js";
+import { updateGatewayTokenPolicy } from "../src/k8s.js";
 import {
   audienceVariables,
   AWS_STS_AUDIENCE,
@@ -26,7 +34,8 @@ import {
 } from "../src/gatewayTokenPolicy.js";
 
 const DIGITS = "0123456789abcdef".split("");
-let policy: Record<string, string> = Object.fromEntries(DIGITS.map((d) => [`apiAudiences${d}`, "{}"]));
+// As the chart seeds it on install: empty, and not yet written.
+let policy: Record<string, string> = { apiAudiencesWritten: "false", ...Object.fromEntries(DIGITS.map((d) => [`apiAudiences${d}`, "{}"])) };
 
 vi.mock("../src/k8s.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/k8s.js")>()),
@@ -34,6 +43,7 @@ vi.mock("../src/k8s.js", async (importOriginal) => ({
     policy = { ...policy, ...(await build({ ...policy })) };
     return true;
   }),
+  ensureServiceAccount: vi.fn(() => Promise.resolve()),
 }));
 
 const POOL = "acme.svc.id.goog";
@@ -173,6 +183,8 @@ describe("syncing", () => {
 
   it("writes each published API's ServiceAccount's audiences, and none for a held one or a retired team's", async () => {
     expect(await syncGatewayTokenPolicy()).toBe(true);
+    // From then on the policy holds mints to the maps.
+    expect(policy["apiAudiencesWritten"]).toBe("true");
     expect(ours()).toEqual({ [`${live}/ledger-api`]: [AWS_STS_AUDIENCE], [`${live}/orders-api`]: ["https://a.example"] });
   });
 
@@ -181,6 +193,50 @@ describe("syncing", () => {
     await setTeamRetired(team?.id ?? "", true, null);
     await syncGatewayTokenPolicy();
     expect(ours()).toEqual({});
+  });
+
+  it("is rewritten when a team retires or comes back, and when the catalog's APIs are applied", async () => {
+    const admin = { id: randomUUID(), teamNames: [], maintainerOf: [], isAdmin: true, scopes: [] } as unknown as AuthUser;
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as FastifyBaseLogger;
+    const writes = () => vi.mocked(updateGatewayTokenPolicy).mock.calls.length;
+    let before = writes();
+    await unretireTeam(admin, live, log);
+    expect(writes()).toBe(before + 1);
+    expect(ours()[`${live}/orders-api`]).toEqual(["https://a.example"]);
+    before = writes();
+    await retireTeam(admin, live, log);
+    expect(writes()).toBe(before + 1);
+    expect(ours()).toEqual({});
+    await unretireTeam(admin, live, log);
+    // A release changing an API's credential: written at once.
+    before = writes();
+    const problems: string[] = [];
+    await applyApis(
+      [
+        create(ApiSchema, {
+          name: "orders",
+          team: live,
+          displayName: "A",
+          openapi: JSON.stringify({ openapi: "3.1.0", info: { title: "A", version: "1" }, paths: {} }),
+          backendUrl: "https://a.example",
+          backendAuth: { kind: { case: "awsSigV4", value: { roleArn: "arn:aws:iam::1:role/r", region: "us-east-1", service: "lambda" } } },
+          serviceAccount: "orders-api",
+        }),
+      ],
+      new Set([live]),
+      new Set(),
+      async (item, work) => {
+        try {
+          await work();
+        } catch (error) {
+          problems.push(`${item}: ${String(error)}`);
+        }
+      },
+    );
+    expect(problems).toEqual([]);
+    expect(writes()).toBe(before + 1);
+    // The release had only orders: ledger went, and orders signs in to AWS now.
+    expect(ours()).toEqual({ [`${live}/orders-api`]: [AWS_STS_AUDIENCE] });
   });
 
   it("writes nothing with the gateway off", async () => {

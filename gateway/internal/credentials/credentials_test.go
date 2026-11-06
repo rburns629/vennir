@@ -59,9 +59,6 @@ func TestServiceAccountTokensAreMintedAndKeptMostOfTheirLife(t *testing.T) {
 	}
 }
 
-// A backend's token never carries an audience a cloud federates: it could
-// be traded for the API ServiceAccount's cloud identity. The gateway's own
-// exchanges still get them.
 // A newly published API's mint is refused until the console has written its
 // audiences into the gateway token policy: nothing failed is kept, so the
 // next request asks again.
@@ -86,6 +83,9 @@ func TestARefusedMintIsAskedAgain(t *testing.T) {
 	}
 }
 
+// A backend's token never carries an audience a cloud federates: it could
+// be traded for the API ServiceAccount's cloud identity. The gateway's own
+// exchanges still get them.
 func TestServiceAccountTokensRefuseCloudAudiences(t *testing.T) {
 	var asked []string
 	m := minter(&asked)

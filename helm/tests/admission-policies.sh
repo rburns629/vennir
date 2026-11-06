@@ -26,7 +26,8 @@ set -uo pipefail
 cd "$(dirname "$0")/../.."
 
 CONTEXT_ARGS=()
-[ -n "${KUBE_CONTEXT:-}" ] && CONTEXT_ARGS=(--context "$KUBE_CONTEXT")
+HELM_CONTEXT_ARGS=()
+[ -n "${KUBE_CONTEXT:-}" ] && CONTEXT_ARGS=(--context "$KUBE_CONTEXT") && HELM_CONTEXT_ARGS=(--kube-context "$KUBE_CONTEXT")
 # ${a[@]+...}: an empty array is "unbound" to bash 3.2 (macOS) under set -u.
 k() { kubectl ${CONTEXT_ARGS[@]+"${CONTEXT_ARGS[@]}"} "$@"; }
 
@@ -136,7 +137,7 @@ k label namespace "$TEAM_A" "$TEAM_B" "$TEAM_LABEL=true" --overwrite > /dev/null
 k label namespace "$RETIRED_NS" "$PROTECTED_NS" "$TEAM_LABEL=retired" --overwrite > /dev/null
 k label namespace "$APIS_NS" vennir/api-backends=true --overwrite > /dev/null
 k label namespace "$RETIRED_APIS_NS" "$NOT_APIS_NS" vennir/api-backends=retired --overwrite > /dev/null
-for sa in eso-gcp db-sa orders-api ledger-api unpublished-api; do
+for sa in eso-gcp db-sa orders-api ledger-api site-api unpublished-api; do
   k -n "$TEAM_A" create serviceaccount "$sa" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
 for ns in "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$APIS_NS"; do
@@ -311,27 +312,48 @@ identity_literal '[]' "$TEAM_SECRETS" "$RELEASES" full
 # The gateway token policy's literals as the console writes them
 # (console/src/gatewayTokenPolicy.ts): each published API's ServiceAccount
 # ("<namespace>/<name>") to its audiences, in sixteen maps by the key's
-# length modulo 16. Team A's orders API signs in with a backend token
-# (serviceAccountToken), its ledger API with AWS SigV4 (STS's audience);
-# its unpublished-api is no published API's.
-API_AUDIENCES='{"'$TEAM_A'/orders-api":["https://orders.example"],"'$TEAM_A'/ledger-api":["sts.amazonaws.com"]}'
-gateway_literal() {  # each key to its audiences, as JSON
+# length modulo 16, and apiAudiencesWritten "true" (the chart seeds it
+# "false"). Team A's orders API signs in with a backend token
+# (serviceAccountToken), its ledger API with AWS SigV4 (STS's audience), its
+# site API with a Google ID token (the GKE pool's audience,
+# gateway.gcp.tokenAudience); its unpublished-api is no published API's.
+API_AUDIENCES='{"'$TEAM_A'/orders-api":["https://orders.example"],"'$TEAM_A'/ledger-api":["sts.amazonaws.com"],"'$TEAM_A'/site-api":["acme.svc.id.goog"]}'
+gateway_literal() {  # each key to its audiences, as JSON; "misplaced" puts each in the wrong map
   k get validatingadmissionpolicy $RELEASE-execution-console-gateway-tokens -o json \
     | python3 -c '
 import json, sys
 policy = json.load(sys.stdin)
 policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+shift = 1 if sys.argv[2] == "misplaced" else 0
 maps = {digit: {} for digit in "0123456789abcdef"}
 for key, audiences in json.loads(sys.argv[1]).items():
-    maps["0123456789abcdef"[len(key) % 16]][key] = audiences
+    maps["0123456789abcdef"[(len(key) + shift) % 16]][key] = audiences
 for variable in policy["spec"]["variables"]:
     digit = variable["name"][len("apiAudiences"):]
-    if variable["name"].startswith("apiAudiences") and digit in maps:
+    if variable["name"] == "apiAudiencesWritten":
+        variable["expression"] = "true"
+    elif variable["name"].startswith("apiAudiences") and digit in maps:
         variable["expression"] = json.dumps(maps[digit], separators=(",", ":"))
-print(json.dumps(policy))' "$1" \
+print(json.dumps(policy))' "$1" "${2:-}" \
     | k replace -f - > /dev/null || { echo "  FAIL  writing the gateway token policy's literals"; FAILURES=$((FAILURES + 1)); }
 }
-gateway_literal "$API_AUDIENCES"
+# The console chart rendered as an upgrade would (lookup reads this run's
+# policy), only the gateway token policy's variables.
+gateway_seed() {
+  ht "$RELEASE" helm/charts/execution-console -n "$PLATFORM_NS" ${HELM_CONTEXT_ARGS[@]+"${HELM_CONTEXT_ARGS[@]}"} \
+    --set kernelApiUrl=http://unused --set gateway.enabled=true --dry-run=server --take-ownership \
+    --show-only templates/gateway.yaml 2>&1 \
+    | python3 -c '
+import re, sys
+text = sys.stdin.read()
+if "Error" in text and "kind: ValidatingAdmissionPolicy" not in text:
+    print(text.strip()); sys.exit()
+for doc in re.split(r"^---$", text, flags=re.M):
+    if re.search(r"^kind: ValidatingAdmissionPolicy$", doc, re.M):
+        for name, expression in re.findall(r"- name: (apiAudiences\w*)\n\s+expression: (.*)", doc):
+            if name != "apiAudiences":
+                print(name, expression)'
+}
 
 # A Job as the console makes an image scan (console/src/k8s.ts), with one
 # change made by the python expression given (to s, the Pod spec).
@@ -721,6 +743,21 @@ expect "update a product's"                      "only update the ServiceAccount
 expect "update an API's"                         "only update the ServiceAccounts ESO" "$(as_console -n "$TEAM_A" label serviceaccount orders-api a=b)"
 expect "update default"                          "only update the ServiceAccounts ESO" "$(as_console -n "$TEAM_A" annotate serviceaccount default iam.gke.io/gcp-service-account=x)"
 
+echo "Gateway tokens, before the console's first write (apiAudiencesWritten false):"
+expect "as installed: not yet written"          'apiAudiencesWritten "false"' "$(gateway_seed | grep Written)"
+expect "an API's, for any backend audience"      allowed                      "$(token "$TEAM_A" orders-api https://ledger.example)"
+expect "for AWS's STS (audience rules only)"     allowed                      "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
+expect "an API ServiceAccount no API publishes"  allowed                      "$(token "$TEAM_A" unpublished-api https://orders.example)"
+expect "still never for Azure's federation"      "never the Kubernetes API"   "$(token "$TEAM_A" orders-api api://AzureADTokenExchange)"
+expect "still never over an hour"                "an hour at most"            "$(token "$TEAM_A" orders-api https://orders.example 7200)"
+expect "still never a ServiceAccount not an API's" "only mint tokens for API" "$(token "$TEAM_A" db-sa https://orders.example)"
+
+gateway_literal "$API_AUDIENCES"
+API_ONLY="only for the audiences its published API needs"
+for _ in $(seq 1 30); do
+  token "$TEAM_A" orders-api sts.amazonaws.com | grep -q "$API_ONLY" && break
+  sleep 1
+done
 echo "Gateway tokens:"
 expect "an API's, for its backend"               allowed                      "$(token "$TEAM_A" orders-api https://orders.example)"
 expect "a ServiceAccount that isn't an API's"    "only mint tokens for API"   "$(token "$TEAM_A" db-sa https://orders.example)"
@@ -737,14 +774,23 @@ expect "lasting over an hour"                    "an hour at most"            "$
 # Each API's ServiceAccount, only what its published API needs: AWS's STS
 # (the gateway's own awsSigV4 exchange) for the API that signs in with it,
 # never for a backend token's API, nor another API's audience.
-API_ONLY="only for the audiences its published API needs"
 expect "for AWS's STS, an awsSigV4 API's"        allowed                      "$(token "$TEAM_A" ledger-api sts.amazonaws.com)"
+expect "for the Google pool, a googleIdToken API's" allowed                   "$(token "$TEAM_A" site-api acme.svc.id.goog)"
+expect "for AWS's STS, a googleIdToken API's"    "$API_ONLY"                  "$(token "$TEAM_A" site-api sts.amazonaws.com)"
 expect "for AWS's STS, a backend token's API"    "$API_ONLY"                  "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
 expect "for a Google pool, a backend token's API" "$API_ONLY"                 "$(token "$TEAM_A" orders-api acme.svc.id.goog)"
 expect "another API's audience"                  "$API_ONLY"                  "$(token "$TEAM_A" ledger-api https://orders.example)"
 expect "an API's, for an audience it doesn't use" "$API_ONLY"                 "$(token "$TEAM_A" orders-api https://ledger.example)"
 expect "an API ServiceAccount no API publishes"  "$API_ONLY"                  "$(token "$TEAM_A" unpublished-api https://orders.example)"
 expect "the same name in another team"           "$API_ONLY"                  "$(token "$TEAM_B" orders-api https://orders.example)"
+
+echo "Gateway token policy, upgrade seed (lookup):"
+SEED=$(gateway_seed)
+expect "keeps apiAudiencesWritten"               allowed  "$(echo "$SEED" | grep -q 'apiAudiencesWritten "true"' && echo '(server dry run)' || echo "$SEED")"
+expect "keeps each API's audiences, in its map"  allowed  "$(echo "$SEED" | grep -F "$TEAM_A/site-api" | grep -q "^apiAudiences$(printf '%x' $(( ${#TEAM_A} + 9 & 15 ))) " && echo '(server dry run)' || echo "$SEED")"
+gateway_literal "$API_AUDIENCES" misplaced
+expect "refuses a key in the wrong map"          "length modulo 16"           "$(gateway_seed)"
+gateway_literal "$API_AUDIENCES"
 
 echo "Console Jobs (image scans and catalog verifications):"
 expect "a scan as the console makes it"          allowed                   "$(console_job 'pass')"

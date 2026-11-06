@@ -104,6 +104,15 @@ so upgrades pass --force-conflicts. Until the console has written an API's
 audiences (just published, the console not yet up), the gateway's mint is
 refused, it answers that request 502 BACKEND_CREDENTIAL, and it asks again
 on the next: it keeps no failed credential.
+
+`apiAudiencesWritten` says whether the console has written the maps since
+the policy was made: seeded false on install, on the upgrade from a chart
+whose policy had none, and whenever lookup sees nothing (helm template,
+GitOps rendering); kept from the lookup otherwise; set true by the console
+with every write (it writes every few minutes). While it's false only the
+other validations hold, so a console that's slow to roll out (or a render
+that couldn't look the policy up) doesn't refuse every API's credential;
+the exact-audience check starts with the console's next write.
 */}}
 {{- $tokensPolicy := printf "%s-tokens" $name }}
 {{- $digits := splitList "" "0123456789abcdef" }}
@@ -111,14 +120,25 @@ on the next: it keeps no failed credential.
 {{- range $digits }}
 {{- $_ := set $shards . dict }}
 {{- end }}
+{{- $shardIndex := dict }}
+{{- range $i, $digit := $digits }}
+{{- $_ := set $shardIndex $digit $i }}
+{{- end }}
+{{- $written := "false" }}
 {{- $existingPolicy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $tokensPolicy }}
 {{- if $existingPolicy }}
 {{- range $existingPolicy.spec.variables }}
+{{- if eq .name "apiAudiencesWritten" }}
+{{- if not (has .expression (list "true" "false")) }}
+{{- fail (printf "%s's apiAudiencesWritten isn't true or false; delete the policy and let the console resync it." $tokensPolicy) }}
+{{- end }}
+{{- $written = .expression }}
+{{- end }}
 {{- $digit := trimPrefix "apiAudiences" .name }}
 {{- if and (ne $digit .name) (hasKey $shards $digit) }}
 {{- range $key, $audiences := fromJson .expression }}
-{{- if not (and (regexMatch "^[a-z0-9-]+/[a-z0-9.-]+$" $key) (kindIs "slice" $audiences)) }}
-{{- fail (printf "%s's apiAudiences%s isn't a JSON map of <namespace>/<serviceAccount> to lists of audiences; delete the policy and let the console resync it." $tokensPolicy $digit) }}
+{{- if not (and (regexMatch "^[a-z0-9-]+/[a-z0-9.-]+$" $key) (kindIs "slice" $audiences) (eq (mod (len $key) 16) (index $shardIndex $digit))) }}
+{{- fail (printf "%s's apiAudiences%s isn't a JSON map of <namespace>/<serviceAccount> keys whose length modulo 16 is %d to lists of audiences; delete the policy and let the console resync it." $tokensPolicy $digit (index $shardIndex $digit)) }}
 {{- end }}
 {{- range $audiences }}
 {{- if not (kindIs "string" .) }}
@@ -148,8 +168,10 @@ spec:
     - name: from-the-gateway
       expression: request.userInfo.username == {{ printf "system:serviceaccount:%s:%s" .Release.Namespace $name | quote }}
   variables:
-    # The ones the console edits: the sixteen maps of each API
-    # ServiceAccount's audiences.
+    # The ones the console edits: whether it has written the maps yet, and
+    # the sixteen maps of each API ServiceAccount's audiences.
+    - name: apiAudiencesWritten
+      expression: {{ $written | quote }}
     {{- range $digits }}
     - name: apiAudiences{{ . }}
       expression: {{ toJson (index $shards .) | toJson }}
@@ -191,9 +213,11 @@ spec:
     - expression: has(object.spec.expirationSeconds) && object.spec.expirationSeconds <= 3600
       message: "The gateway mints tokens lasting an hour at most."
       reason: Forbidden
-    # Only what its published API needs (this file's comment above).
+    # Only what its published API needs, once the console has written the
+    # lists (this file's comment above).
     - expression: >-
-        has(object.spec.audiences) && object.spec.audiences.all(a, a in variables.allowedAudiences)
+        !variables.apiAudiencesWritten ||
+        (has(object.spec.audiences) && object.spec.audiences.all(a, a in variables.allowedAudiences))
       messageExpression: >-
         "The gateway mints tokens for " + variables.key + " only for the audiences its published API needs (" +
         (size(variables.allowedAudiences) == 0 ? "none: no published API runs as it" : variables.allowedAudiences.join(", ")) +

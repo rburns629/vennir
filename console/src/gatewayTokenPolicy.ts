@@ -9,6 +9,10 @@
  * catalog's APIs change, every few minutes (policySync.ts) and at startup,
  * as productPolicy.ts writes the kernel's identity policy:
  *
+ * - `apiAudiencesWritten`: "true" once a console has written the maps; the
+ *   chart seeds it "false" where it can't keep what's there (an install, the
+ *   upgrade from a chart without the maps, a render with no lookup), and
+ *   the exact-audience check applies only once it's true.
  * - `apiAudiences0` to `apiAudiencesf`: JSON maps of
  *   "<namespace>/<serviceAccount>" (the API's team, its ServiceAccount) to
  *   the audiences it may have, sharded by the key's length modulo 16 (the
@@ -45,6 +49,15 @@ export const AWS_STS_AUDIENCE = "sts.amazonaws.com";
 export const MAX_MAP_CHARS = 95_000;
 /** The most characters all sixteen may hold, keeping the policy, and Helm's release Secret, well under their limits. */
 export const MAX_TOTAL_CHARS = 600_000;
+
+/**
+ * Keys in byte order, as Helm's toJson (Go's encoding/json) writes a map, so
+ * the chart's upgrade seed re-encodes what this wrote unchanged and the next
+ * sync has nothing to rewrite. (Keys and audiences here are ASCII.)
+ */
+function byteOrder(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
 
 const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"];
 
@@ -94,7 +107,7 @@ export function policyApiAudiences(apis: PolicyApi[], taken: Set<string>, gcpTok
     for (const audience of audiences) set.add(audience);
     byKey.set(key, set);
   }
-  return new Map([...byKey].sort(([a], [b]) => a.localeCompare(b)).map(([key, set]) => [key, [...set].sort()]));
+  return new Map([...byKey].sort(([a], [b]) => byteOrder(a, b)).map(([key, set]) => [key, [...set].sort()]));
 }
 
 /**
@@ -117,7 +130,7 @@ export function audienceVariables(audiences: Map<string, string[]>): Record<stri
   let total = 0;
   for (const digit of DIGITS) {
     const map = maps.get(digit) ?? {};
-    const literal = JSON.stringify(Object.fromEntries(Object.entries(map).sort(([a], [b]) => a.localeCompare(b))));
+    const literal = JSON.stringify(Object.fromEntries(Object.entries(map).sort(([a], [b]) => byteOrder(a, b))));
     if (literal.length > MAX_MAP_CHARS) {
       throw new Error(
         `The API ServiceAccounts' audiences in map ${digit} take ${String(literal.length)} characters, more than the gateway token policy holds in one map (${String(MAX_MAP_CHARS)}).`,
@@ -132,11 +145,16 @@ export function audienceVariables(audiences: Map<string, string[]>): Record<stri
   return variables;
 }
 
-/** Everything the policy should say now. */
+/**
+ * Everything the policy should say now: the maps, and that they've been
+ * written (`apiAudiencesWritten`: until a console first writes them, the
+ * policy doesn't hold mints to them, so a console that's slow to roll out
+ * after an upgrade, or a render with no lookup, refuses no API's credential).
+ */
 export async function wantedAudienceVariables(): Promise<Record<string, string>> {
   const apis = await listLiveTeamApis();
   const taken = await apiNamespacesTaken(apis.map((api) => api.teamName));
-  return audienceVariables(policyApiAudiences(apis, taken));
+  return { ...audienceVariables(policyApiAudiences(apis, taken)), apiAudiencesWritten: "true" };
 }
 
 /**
