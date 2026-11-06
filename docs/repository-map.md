@@ -402,6 +402,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `chatTasks.ts` | Ordering tasks for the chat agent, judged by what it did: the tools it used, in order; the cart it proposed, or that it proposed none; what it must say. And `OFF_TOPIC`, questions it must refuse. Scored with the question set by `scripts/chat-eval.ts`. |
 | `docQuestions.ts` | The question set: questions as people ask them, each with the sections that answer it. `docs.test.ts` holds the search's retrieval at 90% or more of them; the chat agent's answers are scored against them. |
 | `rpc.ts` | Calling the Connect services as JSON through `app.inject`, and reading their error details. |
+| `groupSettingsLock.ts` | A Postgres advisory lock the files that change single sign-on's settings or rely on kept groups (`sso.test.ts`, `api-access.test.ts`) hold for their whole run, so they never run at once on the shared test database. |
 | `wiringTypesLock.ts` | A Postgres advisory lock the tests that read or replace the install-wide wiring types hold, since test files run in parallel. |
 | `rpc-*.test.ts` | Each Connect service (auth, users, tokens, admin, secrets, products, teams, executions): who may call it, its refusals as Connect codes and details, and requests checked against their schemas. |
 | `api-reference.test.ts` | The generated API reference marks exactly the public methods, and documents every service and method. |

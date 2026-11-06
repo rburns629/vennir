@@ -29,6 +29,7 @@ import { buildApp } from "../src/index.js";
 import { decideRequest, requestAccess } from "../src/core/apiAccess.js";
 import { CLAIM_GROUPS_SESSION_SECONDS, groupSettingsNow, keepGrantedGroup, refreshSso, resyncGoogleGroups, storeUserGroups } from "../src/sso.js";
 import { CLIENT_ID, CLIENT_SECRET, startProvider } from "./oidcProvider.js";
+import { holdGroupSettingsLock } from "./groupSettingsLock.js";
 import { caller, PASSWORD, rpcClient } from "./rpc.js";
 
 const prefix = `ssoa-${randomUUID().slice(0, 6)}`;
@@ -70,6 +71,9 @@ async function teamsOf(email: string): Promise<Record<string, string>> {
     .where(and(eq(users.email, email), like(teams.name, `${prefix}%`)));
   return Object.fromEntries(rows.map((r) => [r.team, r.role]));
 }
+
+// It changes the settings and empties kept groups: not while api-access.test.ts relies on them.
+holdGroupSettingsLock();
 
 beforeAll(async () => {
   provider = await startProvider();
@@ -601,12 +605,13 @@ describe("kept groups and the settings they're read under", () => {
   it("are emptied in the same transaction as the settings saved: a failed emptying keeps the old settings, and groups", async () => {
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
     const [someone] = await db.insert(users).values({ email: `atomic@${domain}`, ssoGroups: ["g-kept"], ssoGroupsReadAt: new Date() }).returning();
-    // A waiting request whose emptying fails (a trigger on this row alone).
+    // A waiting request whose emptying fails: a trigger on this row's emptying alone (it's marked
+    // away, so another file's release, marking rows away, doesn't touch it).
     const marker = `fail-clear-${prefix}`;
-    await db.insert(apiAccessRequests).values({ teamId: ids[teamA] ?? "", apiName: "atomic", userId: someone?.id ?? "", reason: marker, requesterGroups: ["g-kept"] });
+    await db.insert(apiAccessRequests).values({ teamId: ids[teamA] ?? "", apiName: "atomic", userId: someone?.id ?? "", reason: marker, requesterGroups: ["g-kept"], awaySince: new Date() });
     const fn = `fail_clear_${prefix.replace(/-/g, "_")}`;
     await db.execute(sql.raw(`CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'emptying fails'; END $$`));
-    await db.execute(sql.raw(`CREATE TRIGGER ${fn} BEFORE UPDATE ON api_access_requests FOR EACH ROW WHEN (OLD.reason = '${marker}') EXECUTE FUNCTION ${fn}()`));
+    await db.execute(sql.raw(`CREATE TRIGGER ${fn} BEFORE UPDATE ON api_access_requests FOR EACH ROW WHEN (OLD.reason = '${marker}' AND NEW.requester_groups IS DISTINCT FROM OLD.requester_groups) EXECUTE FUNCTION ${fn}()`));
     try {
       const saved = await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "roles" }));
       expect(saved.code).toBe("internal");

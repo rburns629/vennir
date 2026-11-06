@@ -22,6 +22,7 @@ import { addTeamMember, createTeam, findApi, findTeamByName, findUserByEmail } f
 import { apiAccessRequests, apiGrants, apis, auditLog, notificationEvents, teams, userGroups, userNotifications, users as users_ } from "../src/db/schema.js";
 import { ApiSchema } from "../src/gen/vennir/catalog/v1/release_pb.js";
 import { buildApp } from "../src/index.js";
+import { holdGroupSettingsLock } from "./groupSettingsLock.js";
 import { caller, rpcClient } from "./rpc.js";
 
 vi.mock("../src/k8s.js", async (importOriginal) => ({
@@ -106,6 +107,9 @@ const decide = (who: keyof typeof tokens, accessRequestId: string, body: object)
   call<{ request: Request; grant?: Grant }>(tokens[who], "ApiService/DecideApiAccessRequest", { accessRequestId, ...body });
 const add = (who: keyof typeof tokens, name: string, body: object) => call<{ grant: Grant }>(tokens[who], "ApiService/AddApiGrant", { team: owner, name, ...body });
 const revoke = (who: keyof typeof tokens, grantId: string, reason = "") => call(tokens[who], "ApiService/RevokeApiGrant", { grantId, reason });
+
+// Not while sso.test.ts changes the settings and empties kept groups.
+holdGroupSettingsLock();
 
 beforeAll(async () => {
   app = await buildApp();
