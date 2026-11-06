@@ -702,7 +702,8 @@ in catalog CI, and a catalog pinning a whole `vennir` release.
 **20. API products, through one gateway** (decided 2026-10-21). Besides
 steps, which run as Jobs, a team may publish a backend it already runs as
 an API product: `api.yaml` (`kind: Api`: the backend's URL and how to
-authenticate to it, `shareWith`, limits) and its OpenAPI file, reviewed and
+authenticate to it, `shareWith` (since replaced by each install's access
+list: decision 26), limits) and its OpenAPI file, reviewed and
 released with the catalog like any product. A gateway, a process of its
 own, forwards each request directly to the backend: the same method, path,
 query, headers and body, with the caller's credential swapped for the
@@ -997,12 +998,14 @@ is refused and alerts the admins; it goes ahead only once an admin
 approves it, and the approval is audited as theirs.
 
 **26. One gateway, and who may call each API** (proposed 2026-11-05,
-revised the same day with the owner). Today every API is a path on the
-gateway's one host (`/<team>/<api>/`), shared team by team by its
-`api.yaml`'s `shareWith`, and a team without access asks for it by opening
-an issue: access is a pull request to someone else's catalog folder, and
-it's granted to whole teams, not to the people and services that call.
-Proposed:
+revised and approved the same day with the owner; built 2026-11-05: the
+access list in `console/src/core/apiAccess.ts` and the gateway's
+`accessFor`, its pages from chapter 15 of the mockups canvas). Before it,
+every API was a path on the gateway's one host (`/<team>/<api>/`), shared
+team by team by its `api.yaml`'s `shareWith`, and a team without access
+asked for it by opening an issue: access was a pull request to someone
+else's catalog folder, and it was granted to whole teams, not to the
+people and services that call. Decided:
 
 1. *The gateway assigns the endpoint, as a path:* each API stays at
    `/<team>/<api>/` on the gateway's one host, as Google's API Gateway
@@ -1066,12 +1069,13 @@ catalog pull requests (every grant a change to someone else's folder, and
 the same grant on every install); a grant to a whole team as a group
 (broader than a bot's own grant, for convenience only).
 
-Open, for review: whether a grant expires (proposed: no, but the API's team
-sees each grant's last call, and may revoke unused ones); the console's
-pages for it, which go on the mockups canvas first.
+Open: whether a grant expires (proposed: no, but the API's team sees each
+grant's last call, and may revoke unused ones; `TODO.md`, "A grant's last
+call"). `shareWith` goes from `api.yaml` in the release after the one with
+both (`TODO.md`).
 
 **27. The cluster's policies from the catalog, written by the kernel**
-(proposed 2026-11-05). The console keeps the admission policies' literals
+(proposed 2026-11-05; part 1 built 2026-11-06, below). The console keeps the admission policies' literals
 current: which digests are a product's releases and as which
 ServiceAccount, with which token audiences (the identity policy), each
 API's ServiceAccount's audiences, the scan allowlist, the image sources,
@@ -1138,8 +1142,12 @@ its rules); signing each policy edit (the console would hold the key).
   ServiceAccount may be minted, as the release's `api.yaml`s need them,
   with `gateway.gcp.tokenAudience` given to the kernel chart too). The
   kernel computes them as `productPolicy.ts` and `gatewayTokenPolicy.ts`
-  do, its earlier releases kept while an unfinished `execution_tasks` row
-  runs one or for an hour after a release dropped it (its own tables).
+  do, its earlier releases kept for an hour after a release dropped them,
+  or while an execution submitted before then runs one and is still moving
+  (bounded per step by `catalogPolicy.inUseMaxSeconds` and in all by
+  `inUseLimitSeconds`, so a console asking for retries can't keep one
+  forever), and only while a signer that verified that release is still
+  trusted (its own tables).
   Both are seeded on upgrade from the console's current ones (lookup), and
   written only once it has applied a verified release, so an install
   doesn't refuse every step while it first reads the catalog.

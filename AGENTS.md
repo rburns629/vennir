@@ -63,12 +63,13 @@ its own directory.
     it), releases dependents. A failed pass is logged and retried from
     durable state on the next one.
   - `kernel policy` (kernel-policy, `internal/policy`; the kernel chart's
-    `catalogPolicy`, decision 27): with a signed catalog, verifies the
-    catalog's release itself (cosign's Go library, against signers set in
-    the kernel chart) and writes what it decides (each product's released
-    digests as its ServiceAccount and token audiences, each API's
-    audiences) into two admission policies only it may update, beside the
-    console's. Off with an unsigned catalog: the console writes them all.
+    `catalogPolicy`, decision 27, off by default): with a signed catalog,
+    verifies the catalog's release itself (cosign's Go library, against
+    signers set in the kernel chart) and writes what it decides (each
+    product's released digests as its ServiceAccount and token audiences;
+    with `catalogPolicy.gateway` set, each API's audiences too) into
+    admission policies only it may update, beside the console's. Off, or
+    with an unsigned catalog: the console writes them all.
   - `kernel migrate` (`internal/migrate`) owns the schema: `sql/NNNN_*.sql`,
     applied in order by the chart's hook Job; a released file never
     changes. kernel-api and the scheduler wait until the database is at
@@ -113,15 +114,22 @@ its own directory.
   console's database as a role of its own (`vennir_gateway`, granted by
   `console/src/db/gatewayAccess.ts`: a column it starts to read is granted
   there) (published APIs; who callers are, checked exactly as
-  `console/src/auth/plugin.ts` does, and kept in step with it), writing
+  `console/src/auth/plugin.ts` does, and kept in step with it; who may call
+  each API: its own team, and the users and single sign-on groups its
+  access list grants, `api_grants`, decision 26, as
+  `console/src/core/apiAccess.ts` decides it), writing
   only its own traffic counts (`api_traffic`), why an API can't be
   served (`api_problems`) and API tokens' `last_used_at`. It checks sessions with the
   console's public key (`/api/auth/jwks`), never `JWT_SECRET`. The console chart deploys it (`gateway.enabled`); it may mint
-  ServiceAccount tokens only for `*-api` ServiceAccounts in team namespaces
-  (an admission policy). Its tests read the console's migrated test
+  ServiceAccount tokens only for `*-api` ServiceAccounts in team namespaces,
+  and only for the audiences each API's `backend.auth` needs (admission
+  policies: the console's gateway token policy,
+  `console/src/gatewayTokenPolicy.ts`, and with `catalogPolicy` and
+  `catalogPolicy.gateway` the kernel's too). Its tests read the console's migrated test
   database (`TEST_DATABASE_URL`).
 - **`helm/`**: everything Helm. `helm/charts/` holds the two charts,
-  `execution-kernel` (api + scheduler + Postgres) and `execution-console`
+  `execution-kernel` (api + scheduler + Postgres, and `kernel policy` with
+  `catalogPolicy`, off by default) and `execution-console`
   (+ its own Postgres), with neutral defaults; `helm/values/{kind,gke,eks}/` holds
   each cluster's settings for them and for the third-party charts (ESO,
   policy-controller; on kind, cert-manager and Traefik for `make kind-tls`). The Helm release names are
@@ -159,10 +167,16 @@ its own directory.
   each team's secret names live as CEL literals in the policy, which the
   console rewrites whenever products or secrets change, every few minutes
   and at startup (`console/src/productPolicy.ts`). A refusal
-  is a non-retryable `IDENTITY_NOT_ALLOWED`. Because the console edits this
-  policy and the image policy, Helm 4's server-side apply sees it as their
-  owner: upgrade the kernel chart with `--force-conflicts` (the Makefile
-  does), or it fails with a conflict.
+  is a non-retryable `IDENTITY_NOT_ALLOWED`. With a signed catalog and the
+  kernel chart's `catalogPolicy`, a second policy applies too
+  (`templates/catalog-policy.yaml`, `-catalog-identity`), which only
+  `kernel policy` may update, from the release it verified itself: a step
+  must pass both, and the console refuses to submit a product step the
+  kernel's doesn't list yet (`IDENTITY_PENDING`). Because the console edits
+  this policy, the image policy and (in its own chart) the gateway token
+  policy, Helm 4's server-side apply sees it as their owner: upgrade both
+  charts with `--force-conflicts` (the Makefile does), or it fails with a
+  conflict.
 - **Every image is pinned and scanned.** The console pins each task's image
   to its digest at submission (`repo:latest@sha256:…`, `console/src/
   registry.ts`; DAGs may say `:latest`), and scans every digest before it's

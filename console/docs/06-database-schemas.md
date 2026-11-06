@@ -2,8 +2,8 @@
 
 Vennir has two PostgreSQL databases, one per service, and neither service ever reads the other's:
 
-- **The kernel's** (`execution_kernel`) holds the work itself: every execution, its tasks, their attempts, outputs, logs and events. The kernel knows nothing about people or teams beyond the namespace each task runs in.
-- **The console's** (`execution_console`) holds who may do what: teams, users, bots and their tokens, registered products, which secrets each team has, and which teams can see which execution.
+- **The kernel's** (`execution_kernel`) holds the work itself: every execution, its tasks, their attempts, outputs, logs and events, and, with a signed catalog, the catalog release `kernel policy` verified. The kernel knows nothing about people or teams beyond the namespace each task runs in.
+- **The console's** (`execution_console`) holds who may do what: teams, users, bots and their tokens, registered products, which secrets each team has, who may call each API, which teams can see which execution, and the audit log.
 
 The two meet at one value: an execution's id. The kernel creates it; the console records it in `submitted_executions`, with the teams allowed to see it.
 
@@ -15,6 +15,8 @@ flowchart LR
   kapi --> kdb[(execution_kernel)]
   sched[kernel-scheduler] --> kdb
   sched -->|Jobs| k8s[Kubernetes]
+  pol["kernel policy (signed catalog)"] -->|catalog_policy_*| kdb
+  pol -->|its two admission policies| k8s
 ```
 
 Times are all `timestamptz` (stored in UTC). Ids are UUIDs unless noted.

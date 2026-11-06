@@ -56,3 +56,8 @@ scheduler:
       nodeSelector: {vennir.dev/pool: steps, karpenter.sh/capacity-type: on-demand}
       tolerations:
         - {key: vennir.dev/steps, operator: Equal, value: "true", effect: NoSchedule}
+# No catalogPolicy (kernel policy verifying the signed catalog release and
+# writing which images run as each product, decision 27): off here until
+# its ServiceAccount, kernel-execution-kernel-policy, may read the
+# catalog's registry and it's proven on this cloud (TODO.md). Meanwhile the
+# console writes those policies alone, and its Admin page says so.

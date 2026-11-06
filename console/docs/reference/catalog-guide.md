@@ -468,8 +468,8 @@ diff, then `./vennir catalog validate`.
 ## API products (`apis/`)
 
 A backend your team already runs (a Cloud Run service, a Service in your
-namespace) can be published through the install's gateway, without
-changing it. Its OpenAPI file is the allowlist: the gateway forwards a
+team's API backends' namespace) can be published through the install's
+gateway, without changing it. Its OpenAPI file is the allowlist: the gateway forwards a
 request only when its method and path are an operation in the file and it
 fits that operation's schemas, with its query, headers and body as sent
 (less what's the gateway's own, below) and the caller's credential swapped

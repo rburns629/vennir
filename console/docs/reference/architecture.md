@@ -38,8 +38,9 @@ kernel and module in the console, a run call by call, and the state machines.
 
 - **console** (`console/`, TypeScript, Fastify, React): the only front door.
   People and bots sign in here; it holds teams, memberships, bots and
-  automation tokens, registered products and secrets, and an index of which
-  team may see which execution. It authorizes every request, then calls
+  automation tokens, registered products and secrets, each API's access
+  list, and an index of which team may see which execution. It authorizes
+  every request, then calls
   kernel-api. It also owns team namespaces, writes teams' Secrets (it can't
   read them), pins and scans images, and keeps the kernel's admission
   policies' lists current.
@@ -53,18 +54,20 @@ kernel and module in the console, a run call by call, and the state machines.
     them.
   - **kernel policy** (optional, with a signed catalog: `catalogPolicy`)
     verifies the catalog's release itself and writes what it decides
-    (which digests are a product's releases, as which identity; each API's
-    token audiences) into admission policies only it may update, beside
+    (which digests are a product's releases, as which identity; with
+    `catalogPolicy.gateway`, each API's token audiences) into admission policies only it may update, beside
     the console's (decision 27).
 - **gateway** (`gateway/`, Go; optional, `gateway.enabled` in the console
   chart): serves API products (decision 20), forwarding to each one's
-  backend only what its reviewed OpenAPI document describes. Every backend
-  must be under a host `gateway.backendHosts` allows, which may be outside
-  the cluster; only an in-cluster one is also held to its own team's
-  namespace. It signs callers in as the
-  console does, reading the
-  console's database as a role of its own (docs/security-model.md, "The
-  API gateway").
+  backend only what its reviewed OpenAPI document describes, at
+  `/<team>/<api>/` on its one host. Every backend must be under a host
+  `gateway.backendHosts` allows, which may be outside the cluster; an
+  in-cluster one is also held to its team's API backends' namespace,
+  `<team>-apis`. It signs callers in as the console does and lets through
+  only the API's own team and the people, bots and single sign-on groups
+  its access list grants (decision 26; for one release, also the teams its
+  `api.yaml`'s deprecated `shareWith` names), reading the console's database as
+  a role of its own (docs/security-model.md, "The API gateway").
 - **Two Postgres databases**, one per project, never shared between them
   (on a small install they can live on one Postgres instance, each with its
   own role).
@@ -172,7 +175,7 @@ publishing.
 | Database | Tables | Reference |
 | --- | --- | --- |
 | Kernel (`execution_kernel`) | `executions`, `execution_tasks` (state, lease, attempt count, inputs as submitted and resolved, the Job's handle), `task_dependencies` (the DAG's edges), `task_attempts`, `task_outputs`, `task_logs`, `execution_events` (append-only, the activity feed) | [`console/docs/06-database-schemas.md`](../console/docs/06-database-schemas.md); `kernel/internal/migrate/sql/` |
-| Console (`execution_console`) | users, teams, memberships, API tokens (hashed), registered secrets (names, never values), products and their releases, image repositories, image scans, submitted executions (which teams may see each), the audit log | [`console/docs/06-database-schemas.md`](../console/docs/06-database-schemas.md) |
+| Console (`execution_console`) | users, teams, memberships, API tokens (hashed), registered secrets (names, never values), products and their releases, image repositories, image scans, submitted executions (which teams may see each), each API's grants and requests for access, the audit log, and who read runs' outputs, logs and secret names | [`console/docs/06-database-schemas.md`](../console/docs/06-database-schemas.md) |
 
 Tests in both projects keep the schema document in step with the tables.
 Each project's migrations (SQL files in `kernel/internal/migrate/sql/`, run
@@ -201,7 +204,9 @@ in `docs/architecture/` (`5-states`), with the rest of the diagrams.
   the gateway; the scheduler's liveness is its heartbeat
   (`kernel check-heartbeat`).
 - **Audit:** every console call that changes something, with who, what,
-  the target and the outcome (`audit_log`, `AdminService/ListAuditEntries`).
+  the target and the outcome (`audit_log`, `AdminService/ListAuditEntries`),
+  and, apart from it, who was shown runs' outputs, logs and secret names
+  (`audit_reads`, `AdminService/ListAuditReads`).
 - **State:** the databases themselves; see
   [operations.md](operations.md#databases).
 
@@ -283,9 +288,12 @@ what's still open is in [`TODO.md`](../TODO.md).
   secrets it uses in `product.yaml`, so it keeps them in any DAG a consumer
   composes; steps use a product's latest release, guarded by compatibility
   checks.
-- **Pull requests come from people.** Asking for access or proposing a
-  template opens GitHub in the person's browser; the console only reads the
-  catalog.
+- **Pull requests come from people.** Asking for access to a product or
+  template, or proposing a template, opens GitHub in the person's browser;
+  the console only reads the catalog. Access to an API is the exception
+  (decision 26, built 2026-11-05): it's asked for and granted in the
+  console, per install, because grants name people and groups, not
+  catalog teams.
 - **Still Postgres and Jobs.** No new services: the additions are tables,
   fields and console pages. Azure and GitLab wait until this is done.
 - **Languages and APIs** (decided 2026-10-20). The console stays

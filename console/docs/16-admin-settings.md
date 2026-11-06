@@ -270,12 +270,14 @@ Set by the install: `notifications.email` (an SMTP server) and `notifications.we
 | --- | --- |
 | Products, and the identities and secrets each may use | Which ServiceAccount each product runs as, and which of its team's Secrets a step may mount (`IDENTITY_NOT_ALLOWED`) |
 | Images that failed their scan | [Image scans](#image-scans) (`IMAGE_SCAN_FAILED`) |
+| The gateway's backend credentials | The token audiences each API's ServiceAccount may have: only what its published API's backend sign-in needs |
 | Registry sign-in for each team | The pull secret each team namespace uses to fetch images from private registries |
+| Each team's API backends' namespace | `<team>-apis`, where a team runs its API backends, apart from its steps and their Secrets |
 | What each team's steps may reach | Each team namespace's network policies: no other team's Pods, and only the gateway into its API backends |
 | The scheduler's log reading | Lets the kernel's scheduler read its steps' logs in team namespaces, and nothing else |
 | What each team may use together | Each team namespace's quota and per-step memory ceiling: its own, or the install's |
 
-One this install doesn't have the console keep says **Not used here**. The card shows **In sync**, or how many weren't written, with each one's error. The console rewrites them when products, secrets or image sources change, at startup, and every 5 minutes (the console chart's `policySyncIntervalSeconds`). **Write them again** rewrites them now. Admins are alerted when one has been failing for 10 minutes. Where images may come from ([Image sources](#image-sources), `IMAGE_NOT_ALLOWED`) is written when they're saved.
+One this install doesn't have the console keep says **Not used here**. A line under the card says who writes which images run as each product, and each API's token audiences: the console alone, with an unsigned catalog (or with `catalogPolicy` off in the kernel chart, as by default); with a signed one and `catalogPolicy` on, the kernel too, from the catalog release it verified itself, so a step must pass both and the console can't loosen them. The kernel writes the API audiences only with the kernel chart's `catalogPolicy.gateway` set; otherwise the line says the console alone writes those. The card shows **In sync**, or how many weren't written, with each one's error. The console rewrites them when products, secrets or image sources change, at startup, and every 5 minutes (the console chart's `policySyncIntervalSeconds`). **Write them again** rewrites them now. Admins are alerted when one has been failing for 10 minutes. Where images may come from ([Image sources](#image-sources), `IMAGE_NOT_ALLOWED`) is written when they're saved.
 
 **Installed with the kernel** lists the admission policies the kernel chart installs, which hold however the console is set: where steps may run (`DISPATCH_REJECTED`), where images may come from (`IMAGE_NOT_ALLOWED`), images pinned (`IMAGE_NOT_PINNED`), catalog images signed when the install requires it (`IMAGE_NOT_SIGNED`), and who may delete a team's namespace. An upgrade changes them, not this page.
 

@@ -933,6 +933,31 @@ to know:
   and an unhardened Job it made but hadn't started is never adopted by the
   new one; steps already running finish as they started.
 
+**Changes people will notice** (unreleased, on main since 2026-11-05):
+
+- **Who may call an API is its access list** (decision 26 in
+  `assessment.md`; `console/docs/11-apis.md`). Besides the API's own team,
+  only the single sign-on groups, people and bots its team's maintainers
+  grant may call it, on each install; admins too need a grant. For this
+  release, the teams an `api.yaml`'s `shareWith` names keep calling, shown
+  as *from the catalog*, and `vennir catalog validate` warns; the next
+  release drops `shareWith`, so have each API's team grant its callers
+  first. A catalog's `api.yaml` may say `access.requests` only once its
+  `./vennir` pin is a release that knows it (`TODO.md`).
+- **Single sign-on with a groups claim signs people in for an hour.** A
+  team a groups claim gave someone counts only for a single sign-on from
+  the last hour, at the console and the gateway, and that sign-in's
+  session lasts an hour at most ([Signing in](security-model.md#signing-in)).
+  Google Workspace groups alone keep the usual session length.
+- **A raw DAG's steps are seen by their own teams.** A member of one of
+  its teams sees that team's steps in full and the others' state, timing
+  and failure code only; admins and whoever submitted it see everything
+  ([Who sees a run that spans
+  teams](security-model.md#who-sees-a-run-that-spans-teams)).
+- **Reads are recorded.** Who was shown runs' outputs, logs and secret
+  names goes in `audit_reads` (`AdminService/ListAuditReads`), kept for
+  the console chart's `retention.auditReadsDays` (90 days by default).
+
 **Changes an upgrade must carry together** (since 2026-11-03):
 
 - **The kernel's image and chart.** A step's Job is now created suspended

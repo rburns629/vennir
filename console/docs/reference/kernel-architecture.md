@@ -549,8 +549,13 @@ kernel-scheduler, at the start of every pass, in its own transaction : ExpireApp
   digest, refused when older than the one applied, then `Store.Apply`
   (under an advisory lock). Then `write`, once any release is applied:
   `Listed` (the applied release's products, an earlier one for
-  `CATALOG_POLICY_RELEASE_GRACE_SECONDS` after a release dropped it or
-  while an unfinished task runs it) into the identity policy, and
+  `CATALOG_POLICY_RELEASE_GRACE_SECONDS` after a release dropped it, or
+  while an execution submitted before then runs it and is moving: a step
+  running, or one ready or awaiting approval within
+  `CATALOG_POLICY_IN_USE_MAX_SECONDS`, never past
+  `CATALOG_POLICY_IN_USE_LIMIT_SECONDS` after the drop; each only while
+  a signer that verified its release is still trusted) into the identity
+  policy, and
   `Audiences` into the gateway token policy, by `Kubernetes.Write`
   (conditional on the version read, only when something changed); then
   `Store.Prune`.
@@ -560,9 +565,10 @@ kernel-scheduler, at the start of every pass, in its own transaction : ExpireApp
   limits as `console/src/productPolicy.ts` and `gatewayTokenPolicy.ts`).
 - `Registry` — reading the registry as this Pod's own identity (a Docker
   config, GKE's metadata token, ECR's), through the console's mirrors.
-- `Store` — `catalog_policy_state` (the release applied, its APIs) and
-  `catalog_policy_releases` (each product release it named, and until
-  when).
+- `Store` — `catalog_policy_state` (the release applied, its APIs, the
+  signers that verified it) and `catalog_policy_releases` (each product
+  release it named, its signers, and until when); `InUse`, the releases
+  unfinished tasks run.
 
 #### `internal/logging/`, `internal/metrics/`
 - JSON logs with `timestamp`, `severity`, `logger`, `message`, `service`;
