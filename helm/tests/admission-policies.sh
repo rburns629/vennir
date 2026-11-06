@@ -1049,9 +1049,11 @@ print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if 
 identity_literal "$LEGACY_PRODUCTS" "$TEAM_SECRETS" '{"'$UNRELEASED_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}]}'
 expect "it matches no releases (no candidates)"  allowed "$([ -z "$(seeded "$RELEASE-execution-kernel-identity" candidates)" ] && echo '(server dry run)' || echo 'it still matches them')"
 # Until the API server has the new version: the full one's refusal names
-# "a registered product's release".
-for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/app:1 run default db-key | grep -q "registered product's release" || break
+# "a registered product's release". Where both policies refuse, either
+# refusal may come back, so every probe must show the new one.
+for _ in $(seq 1 60); do
+  { job "$TEAM_A" $SOURCE/app:1 run default db-key; job "$TEAM_A" $SOURCE/db:1 create db-sa ""; } \
+    | grep -q "registered product's release" || break
   sleep 1
 done
 expect "a release the kernel lists, its team's secret"  allowed            "$(job "$TEAM_A" $DB create db-sa db-key)"
