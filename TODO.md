@@ -212,13 +212,10 @@ it was seen.
   install whose own catalog is signed
   (`catalogPolicyValues`), reading the catalog's registry as that service
   account, with the console's release, signers and gateway token audience
-  (one helper each, so the two charts can't disagree). Next:
-  - **Prove `kernel policy` on EKS** (built 2026-11-06, unproven): the
-    aws module gives it a role of its own (`<name>-policy`, by Pod
-    Identity: ECR read on the task registry, and `rds-db:connect` as
-    `vennir_kernel_policy`, which `database-setup` makes in `rds_iam`), and
-    `vennir` turns it on as on GKE (`registry.ecrToken`). Needs a billed
-    run on AWS, as the GKE one (2026-11-06) did.
+  (one helper each, so the two charts can't disagree). Proven on both
+  clouds on 2026-11-06: on GKE end to end with `vennir catalog create`
+  (keyless-signed release from catalog CI, its starter run), on EKS with a
+  by-hand signed release (ECR read and RDS sign-in as its own role). Next:
   - **Another install's catalog, beyond another GCP project's**:
     `kernel policy` reads another project's Artifact Registry as its own
     service account (the owner's `vennir catalog grant` names it), but is
