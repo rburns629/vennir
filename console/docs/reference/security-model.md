@@ -222,7 +222,9 @@ gives only what it uses (`migrate.GrantPolicy`: it reads
 `catalog_policy_*`), so a flaw in what parses a registry's or Sigstore's
 answers reaches no other table; with the bundled Postgres the chart makes
 it (`postgres.auth.policyUsername`, its password in a Secret its Pod alone
-mounts), and with a managed one it's still the kernel's (`TODO.md`). A digest a newer release names as another ServiceAccount or
+mounts), with Cloud SQL its own IAM user (the gcp module's `policy` service
+account, bound to its ServiceAccount alone, which also reads the catalog's
+registry), and elsewhere the kernel's (`TODO.md`). A digest a newer release names as another ServiceAccount or
 other audiences loses the old ones at once. Each release records which of
 the trusted signers (each key, the keyless identity) verified it, and is
 listed only while one of them is still trusted: removing a key takes the

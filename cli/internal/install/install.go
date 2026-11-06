@@ -37,8 +37,12 @@ type Cloud struct {
 	// ScannerServiceAccount: its scan Jobs' (gcp), reading the task
 	// registry and nothing else; the console's, from a module before it.
 	ScannerServiceAccount string
-	BackupBucket          string
-	BackupRegion          string // aws: the bucket's region
+	// PolicyServiceAccount is kernel policy's (gcp): reading the catalog's
+	// release, and with a managed database signing in as PolicyUser; empty
+	// from a module before it.
+	PolicyServiceAccount string
+	BackupBucket         string
+	BackupRegion         string // aws: the bucket's region
 	// BackupServiceAccount is the cloud identity the backups run as (gcp);
 	// on aws, EKS Pod Identity binds the role by ServiceAccount name.
 	BackupServiceAccount string
@@ -481,7 +485,64 @@ func KernelValues(c *config.Config, img Images, volume string, cloud *Cloud) map
 		v["monitoring"] = monitoring
 		v["networkPolicy"] = map[string]any{"metricsFrom": metricsFrom}
 	}
+	if p := catalogPolicyValues(c, cloud); p != nil {
+		v["catalogPolicy"] = p
+	}
 	return v
+}
+
+// ownCatalogRelease is this install's own catalog's release, which its CI
+// pushes beside the images: what the console reads, and with a signed
+// catalog kernel policy too. Empty off a cloud or without a catalog.
+func ownCatalogRelease(c *config.Config, cloud *Cloud) string {
+	if cloud == nil || c.Catalog.Repo() == "" {
+		return ""
+	}
+	return cloud.TaskRegistry + "/catalog-release:" + releaseTag(c)
+}
+
+// gatewayTokenAudience is the audience the gateway's Google ID tokens are
+// minted for (gcp): the cluster's Workload Identity pool. The console
+// chart's gateway.gcp.tokenAudience and the kernel chart's
+// catalogPolicy.gateway.gcpTokenAudience, the same.
+func gatewayTokenAudience(c *config.Config) string {
+	return c.GCP.Project + ".svc.id.goog"
+}
+
+// catalogPolicyValues turn on kernel policy (the kernel chart's
+// catalogPolicy, decision 27) on a cloud install whose own catalog is
+// signed: the kernel verifies the release itself, from the release and
+// signers the console chart gets, reading the registry as its own identity
+// (PolicyServiceAccount, by Workload Identity), and with a managed
+// database signs in as its own user. GKE only for now: on EKS it has no
+// identity of its own yet (TODO.md). nil otherwise: off a cloud, unsigned,
+// another install's catalog (read by the console's identity, which kernel
+// policy doesn't borrow), or a module from before kernel policy's identity.
+func catalogPolicyValues(c *config.Config, cloud *Cloud) map[string]any {
+	release := ownCatalogRelease(c, cloud)
+	if release == "" || c.ExternalCatalog.Registry != "" || cloud.Provider != "gcp" || cloud.PolicyServiceAccount == "" {
+		return nil
+	}
+	trust := SignatureTrust(c, cloud)
+	if trust == nil {
+		trust = CatalogSignerTrust(c)
+	}
+	if trust == nil {
+		return nil
+	}
+	p := map[string]any{"enabled": true, "release": release, "signature": trust}
+	if c.CatalogVersion == "newest" {
+		p["newestVersion"] = true
+	}
+	p["registry"] = map[string]any{"gcpMetadataToken": true}
+	p["serviceAccountAnnotations"] = googleIdentity(cloud.PolicyServiceAccount)
+	if c.Gateway.Enabled {
+		p["gateway"] = map[string]any{"serviceAccount": ConsoleRelease + "-execution-console-gateway", "gcpTokenAudience": gatewayTokenAudience(c)}
+	}
+	if db := cloud.Database; db != nil && db.PolicyUser != "" {
+		p["database"] = map[string]any{"role": db.PolicyUser, "existingSecret": PolicyDatabaseSecret}
+	}
+	return p
 }
 
 // ConsoleValues are the values vennir generates for the console chart.
@@ -595,10 +656,8 @@ func ConsoleValues(c *config.Config, env string, img Images, cloud *Cloud) map[s
 		}
 	}
 	catalog := map[string]any{}
-	if cloud != nil && c.Catalog.Repo() != "" {
-		// The catalog's release, which its CI pushes beside the images and
-		// the console reads.
-		catalog["release"] = cloud.TaskRegistry + "/catalog-release:" + releaseTag(c)
+	if release := ownCatalogRelease(c, cloud); release != "" {
+		catalog["release"] = release
 	}
 	if e := c.ExternalCatalog; e.Registry != "" {
 		catalog["release"] = e.Registry + "/catalog-release:" + releaseTag(c)
@@ -663,7 +722,7 @@ func ConsoleValues(c *config.Config, env string, img Images, cloud *Cloud) map[s
 			// grants its principal roles/iam.serviceAccountOpenIdTokenCreator.
 			pool := c.GCP.Project + ".svc.id.goog"
 			gateway["gcp"] = map[string]any{
-				"tokenAudience": pool,
+				"tokenAudience": gatewayTokenAudience(c),
 				"stsAudience": fmt.Sprintf("identitynamespace:%s:https://container.googleapis.com/v1/projects/%s/locations/%s/clusters/%s",
 					pool, c.GCP.Project, cloud.ClusterLocation, cloud.ClusterName),
 			}

@@ -29,6 +29,10 @@ output "scanner_service_account" {
   value = google_service_account.scanner.email
 }
 
+output "policy_service_account" {
+  value = google_service_account.policy.email
+}
+
 output "audit" {
   value = var.audit_export ? { bucket = google_storage_bucket.audit[0].name } : null
 }

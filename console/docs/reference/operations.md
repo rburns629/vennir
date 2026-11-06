@@ -921,9 +921,12 @@ it either.
 since 2026-11-06): with `catalogPolicy` and the bundled Postgres, the
 upgrade's migration Job makes `postgres.auth.policyUsername`
 (`vennir_kernel_policy`) and the migration grants it only what it uses; its
-Pod restarts onto it. With a managed database it still signs in as the
-kernel's (`TODO.md`); name a role of your own with `catalogPolicy.database`
-(and a Secret whose `database-url` signs in as it) to narrow it there.
+Pod restarts onto it. On GKE, `vennir` turns `catalogPolicy` on for an
+install whose own catalog is signed: the gcp module gives kernel policy a
+Google service account of its own (reading the catalog's registry, and
+with Cloud SQL signing in as its own IAM user). Elsewhere, name a role of
+your own with `catalogPolicy.database` (and a Secret whose `database-url`
+signs in as it) to narrow it.
 
 **Settings the console now refuses or turns off** (since 2026-11-03):
 

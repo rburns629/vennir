@@ -86,6 +86,21 @@ func TestDatabaseSetupRunsAsTheAdministratorAndOpensEachDatabaseToItsService(t *
 	}
 }
 
+// With kernel policy's own user, the kernel may pass CONNECT and the
+// schema's USAGE on to it (kernel migrate grants it what it uses).
+func TestDatabaseSetupLetsTheKernelGrantKernelPolicysUser(t *testing.T) {
+	db := managedCloud().Database
+	db.PolicyUser = "vennir-policy@p.iam"
+	m, err := databaseSetupManifest(db, "img")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{\"grants\":[{\"database\":\"execution_kernel\",\"role\":\"vennir-kernel@p.iam\",\"regrant\":true},{\"database\":\"execution_console\",\"role\":\"vennir-console@p.iam\",\"regrant\":true}]}`
+	if !strings.Contains(m, want) {
+		t.Errorf("missing %s in:\n%s", want, m)
+	}
+}
+
 // The database volume grows with the size on a cloud, never shrinks, and
 // stays as it is on kind (whose volumes can't grow).
 func TestTheDatabaseVolumeGrowsWithTheSize(t *testing.T) {
