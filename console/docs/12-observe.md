@@ -157,8 +157,8 @@ Credentials a step or backend prints are redacted before anything is kept. Older
 | Lines | Who sees them |
 | --- | --- |
 | Your teams' steps, every level | You |
-| Another team's steps in a run you own (you submitted it, or it's your team's template run or DAG) | Their `info` lines only |
-| Another team's steps in runs you don't own | No one but that team and admins |
+| Another team's steps in a run you own (you submitted it, or it's a template run for your team) | Their `info` lines only |
+| Another team's steps in runs you don't own (a raw DAG over your team and theirs that someone else submitted included) | No one but that team, the run's submitter and admins |
 | An API backend's lines (Pods labelled `vennir/api-backend: "true"`), every level | Its own team and admins only: they belong to no run, so no caller sees them |
 | The platform's own logs | Admins only |
 

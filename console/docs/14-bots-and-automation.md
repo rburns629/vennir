@@ -101,7 +101,7 @@ The message's fields and a receiver's signature check in code: [Hearing back wit
 
 ## How do I get every run's outcome posted to our systems?
 
-A team can have an **outcome webhook**: every run the team owns posts a `run.finished` message there when it finishes, with each step's state, outputs and failure code. It's for the team's own systems, not for chat.
+A team can have an **outcome webhook**: every template run for the team, and every raw DAG with a step in it, posts a `run.finished` message there when it finishes, with each step's state, outputs and failure code. A raw DAG's message carries only the team's own steps' outputs (the others' are `null`). It's for the team's own systems, not for chat.
 
 It's on your team's **Settings** tab, under **Outcome webhook**, and works like an ordering bot's callback: a URL under a host your install allows (**Allowed hosts** are listed there), **Save**, a signing secret shown once, signed the same way, **Save with a new secret** and **Remove**. Its maintainers set it; every member sees where it posts and whether the last post worked. When the install allows no hosts and none is set, the card isn't shown.
 

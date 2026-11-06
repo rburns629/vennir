@@ -22,7 +22,8 @@ import { caller, rpcClient } from "./rpc.js";
 const prefix = `logs-${randomUUID().slice(0, 6)}`;
 const teamA = `${prefix}-a`;
 const teamB = `${prefix}-b`;
-const sharedRun = randomUUID(); // steps in A and B
+const sharedRun = randomUUID(); // steps in A and B: a template run B's member ran for A
+const rawRun = randomUUID(); // steps in A and B: a raw DAG B's member submitted
 const runInA = randomUUID(); // A's alone
 // A team named before names ending in -apis were refused: its namespace is
 // its own, never team B's API backends' namespace.
@@ -68,7 +69,8 @@ beforeAll(async () => {
   await addTeamMember(a.id, (await createTeam(teamA)).id);
   await addTeamMember(b.id, (await createTeam(teamB)).id);
   await createTeam(legacyApisTeam);
-  await recordSubmittedExecution({ executionId: sharedRun, teams: [teamA, teamB], submittedBy: b.id, name: "shared", payload: {} });
+  await recordSubmittedExecution({ executionId: sharedRun, teams: [teamA, teamB], submittedBy: b.id, name: "shared", payload: {}, template: "t", onBehalfOf: teamA });
+  await recordSubmittedExecution({ executionId: rawRun, teams: [teamA, teamB], submittedBy: b.id, name: "raw", payload: {} });
   await recordSubmittedExecution({ executionId: runInA, teams: [teamA], submittedBy: a.id, name: "a's", payload: {} });
 });
 
@@ -79,7 +81,7 @@ beforeEach(() => {
 afterAll(async () => {
   config.logs.lokiUrl = "";
   loki.close();
-  await db.delete(submittedExecutions).where(inArray(submittedExecutions.executionId, [sharedRun, runInA]));
+  await db.delete(submittedExecutions).where(inArray(submittedExecutions.executionId, [sharedRun, rawRun, runInA]));
   await db.delete(teams).where(like(teams.name, `${prefix}%`));
   await app.close();
   await cleanUp();
@@ -95,9 +97,19 @@ describe("log search", () => {
     expect(queries[0]).toBe(`{component="step", namespace=~"^(${teamA})$"}`);
     expect(queries[1]).toContain(`{component="step", level="info", namespace!~"^(${teamA})$"} | execution_id=~"^(`);
     expect(queries[1]).toContain(sharedRun);
+    // A raw DAG over A and B isn't A's to see B's lines of (core/runView.ts).
+    expect(queries[1]).not.toContain(rawRun);
     // Newest first, from both.
     expect(found.body.lines?.map((l) => l.line)).toEqual(["A's debug", "B's info"]);
     expect(found.body.lines?.[0]).toMatchObject({ team: teamA, executionId: runInA, level: "debug" });
+  });
+
+  it("gives a raw DAG's team member only their own team's lines of it; its submitter the rest's INFO", async () => {
+    expect((await search(memberOfA, { executionId: rawRun })).code).toBe("ok");
+    expect(queries).toEqual([`{component="step", namespace=~"^(${teamA})$"} | execution_id="${rawRun}"`]);
+    queries.length = 0;
+    await search(memberOfB, { executionId: rawRun });
+    expect(queries[1]).toContain(`namespace!~"^(${teamB})$"} | execution_id=~"^(${rawRun})$"`);
   });
 
   it("never names a run the caller can't see", async () => {

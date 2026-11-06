@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: MIT
 /**
- * How much of a run a caller sees (decided 2026-10-22). A run's owners see
- * every step: admins, whoever submitted it, and the members of the team it
- * was run for (a template run's onBehalfOf; a raw DAG's every team, all of
- * them its submitter's). Anyone else may see it only because their team
- * provides one of its steps: they see their own team's steps in full and,
- * of the rest, only each step's product, state, timing and failure code,
- * never its inputs, outputs, failure messages or logs. A consumer still sees
- * what a provider's step returned; a provider never sees the consumer's.
+ * How much of a run a caller sees (decided 2026-10-22, narrowed for raw
+ * DAGs 2026-11-05). A run's owners see every step: admins, whoever
+ * submitted it, and, for a template run, the members of the team it was run
+ * for (its onBehalfOf). A raw DAG is run for no one team: its owners are
+ * admins and its submitter alone, so being in one of its teams shows that
+ * team's steps in full, not the others'. Anyone else may see a run only
+ * because their team runs one of its steps: they see the run's own status,
+ * their own team's steps in full and, of the rest, only each step's
+ * product, state, timing and failure code, never its inputs, outputs,
+ * failure messages or logs. A
+ * template's consumer still sees what a provider's step returned; a
+ * provider never sees the consumer's.
  */
 import type { JsonObject } from "@bufbuild/protobuf";
 import type { AuthUser } from "../auth/plugin.js";
@@ -25,13 +29,18 @@ export function runView(
   run: { submittedBy: string | null; teams: string[]; template: string | null; onBehalfOf: string | null; payload: unknown },
 ): RunView {
   const mine = new Set(caller?.teamNames ?? []);
-  const owners = run.template !== null ? (run.onBehalfOf ? [run.onBehalfOf] : []) : run.teams;
+  const owners = runOwnerTeams(run);
   const full =
     caller?.isAdmin === true ||
     (caller !== undefined && run.submittedBy === caller.id) ||
     owners.some((team) => mine.has(team));
   const teamOf = taskTeams(run.payload);
   return { full, sees: (taskId) => full || mine.has(teamOf.get(taskId) ?? "") };
+}
+
+/** The teams whose members see every step of a run: a template run's onBehalfOf; a raw DAG's none. */
+export function runOwnerTeams(run: { template: string | null; onBehalfOf: string | null }): string[] {
+  return run.template !== null && run.onBehalfOf ? [run.onBehalfOf] : [];
 }
 
 /** A failure as someone outside the step's team sees it: its code only. */
