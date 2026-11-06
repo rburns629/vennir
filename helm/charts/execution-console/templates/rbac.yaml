@@ -120,14 +120,17 @@ subjects:
 # Three of the kernel's admission policies, by name and nothing else: the
 # image policy (the Admin page's image sources), the identity policy (the
 # registered products, productPolicy.ts) and the scan policy (the digests
-# that failed). Updating them lets the console rewrite those whole
-# policies, not just their lists (Kubernetes doesn't apply admission
-# policies to admission policies, so no guard can narrow it further); the
-# console itself only ever writes the lists, and every kernel upgrade resets
-# the rest to the chart's version. A compromised console could loosen them,
-# and so run any image with any team's Secrets: an accepted trade-off
-# (docs/security-model.md, "If a component is compromised"). The dispatch
-# policy, the namespace policy and the write fence still hold.
+# that failed); and, with the gateway, this chart's gateway token policy
+# (each API ServiceAccount's audiences, gatewayTokenPolicy.ts). Updating
+# them lets the console rewrite those whole policies, not just their lists
+# (Kubernetes doesn't apply admission policies to admission policies, so no
+# guard can narrow it further); the console itself only ever writes the
+# lists, and every upgrade resets the rest to the chart's version. A
+# compromised console could loosen them, and so run any image with any
+# team's Secrets, or let the gateway mint any audience for an API's
+# ServiceAccount: an accepted trade-off (docs/security-model.md, "If a
+# component is compromised"). The dispatch policy, the namespace policy and
+# the write fence still hold.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -144,6 +147,11 @@ rules:
       {{- end }}
       {{- if and .Values.scanning.enabled .Values.scanning.policyName }}
       - {{ .Values.scanning.policyName | quote }}
+      {{- end }}
+      {{- if .Values.gateway.enabled }}
+      # This chart's own gateway token policy (gateway.yaml): the audiences
+      # each API's ServiceAccount may get a token for (gatewayTokenPolicy.ts).
+      - {{ printf "%s-gateway-tokens" (include "execution-console.fullname" .) | quote }}
       {{- end }}
     verbs: ["get", "update"]
   {{- with .Values.imageSignature.policyName }}

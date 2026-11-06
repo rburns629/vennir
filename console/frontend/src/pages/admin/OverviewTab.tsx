@@ -34,6 +34,10 @@ const POLICY: Record<string, { label: string; about: ReactNode; code?: string }>
     about: <>The digests that may not run, from <Link component={RouterLink} to="/admin/scans">Image scans</Link>.</>,
     code: "IMAGE_SCAN_FAILED",
   },
+  gatewayTokenPolicy: {
+    label: "The gateway's backend credentials",
+    about: "The token audiences each API's ServiceAccount may have: only what its published API's backend sign-in needs.",
+  },
   pullSecrets: { label: "Registry sign-in for each team", about: "The pull secret each team namespace uses to fetch images from private registries." },
   apiNamespaces: { label: "Each team's API backends' namespace", about: "<team>-apis, where a team runs its API backends, apart from its steps and their Secrets." },
   teamNetworkPolicies: {

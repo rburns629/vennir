@@ -246,9 +246,10 @@ catalog-publish: kind-registry
 # settings in helm/values/kind/*.yaml (--reset-values: the files are the whole
 # story). The image is loaded straight onto the node; the restart is because
 # the tag is a reused :latest.
-# --force-conflicts: the console edits two of the kernel chart's admission
-# policies (allowed image sources, registered products), which makes it the
-# owner of those fields under Helm 4's server-side apply, so a plain upgrade
+# --force-conflicts: the console edits the kernel chart's admission policies'
+# lists (allowed image sources, registered products, scanned digests) and its
+# own chart's gateway token policy's (each API ServiceAccount's audiences),
+# which makes it the owner of those fields under Helm 4's server-side apply, so a plain upgrade
 # fails with a conflict. The chart writes back whatever the console last set
 # (it looks the policy up first), so forcing changes ownership, not content.
 KIND_HELM_UPGRADE := --kube-context $(KIND_CONTEXT) -n $(PLATFORM_NAMESPACE) --reset-values --force-conflicts --wait --timeout 10m

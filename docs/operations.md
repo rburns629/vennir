@@ -782,11 +782,11 @@ It leaves:
 `helm upgrade` with the same values files and `--reset-values`. Two things
 to know:
 
-- **Upgrade the kernel chart with `--force-conflicts`.** The console edits
-  the kernel's image, identity and scan policies, so Helm's server-side
-  apply sees it as their owner; without the flag the upgrade fails with a
-  conflict. The chart writes back what the console last set, so nothing is
-  lost.
+- **Upgrade both charts with `--force-conflicts`.** The console edits
+  the kernel's image, identity and scan policies, and (with the gateway on)
+  its own chart's gateway token policy, so Helm's server-side apply sees it
+  as their owner; without the flag the upgrade fails with a conflict. Each
+  chart writes back what the console last set, so nothing is lost.
 - **Migrations run first**, as a Helm hook, before any new Pod starts, on
   every upgrade (a no-op when nothing's pending), against the database the
   upgrade is going to: the kernel's hook reads its URL from a hook Secret

@@ -136,10 +136,10 @@ k label namespace "$TEAM_A" "$TEAM_B" "$TEAM_LABEL=true" --overwrite > /dev/null
 k label namespace "$RETIRED_NS" "$PROTECTED_NS" "$TEAM_LABEL=retired" --overwrite > /dev/null
 k label namespace "$APIS_NS" vennir/api-backends=true --overwrite > /dev/null
 k label namespace "$RETIRED_APIS_NS" "$NOT_APIS_NS" vennir/api-backends=retired --overwrite > /dev/null
-for sa in eso-gcp db-sa orders-api; do
+for sa in eso-gcp db-sa orders-api ledger-api unpublished-api; do
   k -n "$TEAM_A" create serviceaccount "$sa" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
-for ns in "$OTHER_NS" "$RETIRED_NS" "$APIS_NS"; do
+for ns in "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$APIS_NS"; do
   k -n "$ns" create serviceaccount orders-api --dry-run=client -o yaml | k apply -f - > /dev/null
 done
 # What the scheduler may and may not delete: ConfigMaps as the executor
@@ -307,6 +307,31 @@ print(json.dumps(policy))' "$1" "$2" "$3" "${4:-}" \
     | k replace -f - > /dev/null || { echo "  FAIL  writing the identity policy's literals"; FAILURES=$((FAILURES + 1)); }
 }
 identity_literal '[]' "$TEAM_SECRETS" "$RELEASES" full
+
+# The gateway token policy's literals as the console writes them
+# (console/src/gatewayTokenPolicy.ts): each published API's ServiceAccount
+# ("<namespace>/<name>") to its audiences, in sixteen maps by the key's
+# length modulo 16. Team A's orders API signs in with a backend token
+# (serviceAccountToken), its ledger API with AWS SigV4 (STS's audience);
+# its unpublished-api is no published API's.
+API_AUDIENCES='{"'$TEAM_A'/orders-api":["https://orders.example"],"'$TEAM_A'/ledger-api":["sts.amazonaws.com"]}'
+gateway_literal() {  # each key to its audiences, as JSON
+  k get validatingadmissionpolicy $RELEASE-execution-console-gateway-tokens -o json \
+    | python3 -c '
+import json, sys
+policy = json.load(sys.stdin)
+policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+maps = {digit: {} for digit in "0123456789abcdef"}
+for key, audiences in json.loads(sys.argv[1]).items():
+    maps["0123456789abcdef"[len(key) % 16]][key] = audiences
+for variable in policy["spec"]["variables"]:
+    digit = variable["name"][len("apiAudiences"):]
+    if variable["name"].startswith("apiAudiences") and digit in maps:
+        variable["expression"] = json.dumps(maps[digit], separators=(",", ":"))
+print(json.dumps(policy))' "$1" \
+    | k replace -f - > /dev/null || { echo "  FAIL  writing the gateway token policy's literals"; FAILURES=$((FAILURES + 1)); }
+}
+gateway_literal "$API_AUDIENCES"
 
 # A Job as the console makes an image scan (console/src/k8s.ts), with one
 # change made by the python expression given (to s, the Pod spec).
@@ -708,10 +733,18 @@ expect "for GKE's API"                           "never the Kubernetes API"   "$
 expect "for kernel-api"                          "never the Kubernetes API"   "$(token "$TEAM_A" orders-api vennir-kernel-api)"
 expect "for Azure's federation"                  "never the Kubernetes API"   "$(token "$TEAM_A" orders-api api://AzureADTokenExchange)"
 expect "for a GKE pool's STS audience"           "never the Kubernetes API"   "$(token "$TEAM_A" orders-api identitynamespace:p.svc.id.goog:https://container.googleapis.com/v1/projects/p)"
-# The gateway's own exchanges (awsSigV4, googleIdToken) ask for these: it
-# refuses them for serviceAccountToken itself.
-expect "for AWS's STS, the gateway's own"        allowed                      "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
 expect "lasting over an hour"                    "an hour at most"            "$(token "$TEAM_A" orders-api https://orders.example 7200)"
+# Each API's ServiceAccount, only what its published API needs: AWS's STS
+# (the gateway's own awsSigV4 exchange) for the API that signs in with it,
+# never for a backend token's API, nor another API's audience.
+API_ONLY="only for the audiences its published API needs"
+expect "for AWS's STS, an awsSigV4 API's"        allowed                      "$(token "$TEAM_A" ledger-api sts.amazonaws.com)"
+expect "for AWS's STS, a backend token's API"    "$API_ONLY"                  "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
+expect "for a Google pool, a backend token's API" "$API_ONLY"                 "$(token "$TEAM_A" orders-api acme.svc.id.goog)"
+expect "another API's audience"                  "$API_ONLY"                  "$(token "$TEAM_A" ledger-api https://orders.example)"
+expect "an API's, for an audience it doesn't use" "$API_ONLY"                 "$(token "$TEAM_A" orders-api https://ledger.example)"
+expect "an API ServiceAccount no API publishes"  "$API_ONLY"                  "$(token "$TEAM_A" unpublished-api https://orders.example)"
+expect "the same name in another team"           "$API_ONLY"                  "$(token "$TEAM_B" orders-api https://orders.example)"
 
 echo "Console Jobs (image scans and catalog verifications):"
 expect "a scan as the console makes it"          allowed                   "$(console_job 'pass')"

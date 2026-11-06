@@ -153,6 +153,16 @@ spec:
               value: {{ .Values.gateway.publicUrl | quote }}
             - name: GATEWAY_DEFAULT_PER_MINUTE
               value: {{ .Values.gateway.defaultPerMinute | quote }}
+            {{- if .Values.gateway.enabled }}
+            # The gateway's token policy (gateway.yaml), whose audiences per
+            # API ServiceAccount this console keeps current
+            # (gatewayTokenPolicy.ts), and the audience the gateway's
+            # googleIdToken exchanges ask for.
+            - name: GATEWAY_TOKEN_POLICY_NAME
+              value: {{ printf "%s-gateway-tokens" (include "execution-console.fullname" .) | quote }}
+            - name: GATEWAY_GCP_TOKEN_AUDIENCE
+              value: {{ .Values.gateway.gcp.tokenAudience | quote }}
+            {{- end }}
             {{- if include "execution-console.registryFederationAudience" . }}
             {{- with .Values.registryCheck.gcpFederation }}
             {{- if .workloadIdentityProvider }}

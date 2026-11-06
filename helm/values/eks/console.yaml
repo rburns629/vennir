@@ -1,6 +1,6 @@
 # execution-console on EKS, as `vennir apply` writes it (see kernel.yaml):
 #   helm upgrade --install console oci://ghcr.io/rburns629/vennir/charts/execution-console --version <x.y.z> \
-#     -n vennir-system --reset-values --kube-context <context> -f helm/values/eks/console.yaml
+#     -n vennir-system --reset-values --force-conflicts --kube-context <context> -f helm/values/eks/console.yaml
 # Its ServiceAccount gets its AWS identity from an EKS Pod Identity
 # association (made outside the chart: no annotation), a role that may read
 # the products' ECR repositories; see docs/operations.md, Cloud identities.

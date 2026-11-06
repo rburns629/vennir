@@ -1573,6 +1573,31 @@ export async function updateScanPolicy(
   );
 }
 
+/** The gateway token policy's variables the console writes (this console chart's gateway.yaml). */
+const GATEWAY_TOKEN_POLICY_VARIABLES = new Set(
+  ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"].map((digit) => `apiAudiences${digit}`),
+);
+
+/**
+ * Rewrites the gateway token policy's literals (the apiAudiences maps, by
+ * name) with what `build` returns, given what they say now, as
+ * updateIdentityPolicy does. Returns false when the policy doesn't exist
+ * (the gateway is off).
+ */
+export async function updateGatewayTokenPolicy(
+  name: string,
+  build: (current: Record<string, string>) => Promise<Record<string, string>>,
+  { settle = false } = {},
+): Promise<boolean> {
+  return updatePolicyVariables(
+    name,
+    GATEWAY_TOKEN_POLICY_VARIABLES,
+    `Gateway token policy "${name}" doesn't have the API audiences' variables: upgrade the console chart.`,
+    build,
+    settle,
+  );
+}
+
 /**
  * Rewrites the named variables of an admission policy the console keeps
  * (`build` gets what they say now, and may return them unchanged). `build`

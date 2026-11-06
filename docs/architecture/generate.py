@@ -407,7 +407,7 @@ def console_package(relative: str) -> str | None:
         return "auth"
     if relative.startswith("src/db/"):
         return "db"
-    if relative in ("src/k8s.ts", "src/kernel/client.ts", "src/registry.ts", "src/imagePolicy.ts", "src/productPolicy.ts"):
+    if relative in ("src/k8s.ts", "src/kernel/client.ts", "src/registry.ts", "src/imagePolicy.ts", "src/productPolicy.ts", "src/gatewayTokenPolicy.ts"):
         return "integrations"
     if relative.startswith("src/"):
         return "entry"

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -61,6 +62,30 @@ func TestServiceAccountTokensAreMintedAndKeptMostOfTheirLife(t *testing.T) {
 // A backend's token never carries an audience a cloud federates: it could
 // be traded for the API ServiceAccount's cloud identity. The gateway's own
 // exchanges still get them.
+// A newly published API's mint is refused until the console has written its
+// audiences into the gateway token policy: nothing failed is kept, so the
+// next request asks again.
+func TestARefusedMintIsAskedAgain(t *testing.T) {
+	refused := true
+	asks := 0
+	m := &Minter{Now: func() time.Time { return now }, TokenRequest: func(_ context.Context, _, _, aud string) (string, time.Time, error) {
+		asks++
+		if refused {
+			return "", time.Time{}, errors.New("TokenRequest for payments/orders-api answered 403")
+		}
+		return "k8s-token-for-" + aud, now.Add(TokenLifetime), nil
+	}}
+	auth := map[string]map[string]string{"serviceAccountToken": {"audience": "orders"}}
+	if err := m.Authorize(context.Background(), request(t), nil, "payments", "orders-api", auth); err == nil {
+		t.Fatal("a refused mint signed the request in")
+	}
+	refused = false
+	r := request(t)
+	if err := m.Authorize(context.Background(), r, nil, "payments", "orders-api", auth); err != nil || r.Header.Get("Authorization") != "Bearer k8s-token-for-orders" || asks != 2 {
+		t.Fatalf("%q %v after %d asks", r.Header.Get("Authorization"), err, asks)
+	}
+}
+
 func TestServiceAccountTokensRefuseCloudAudiences(t *testing.T) {
 	var asked []string
 	m := minter(&asked)
