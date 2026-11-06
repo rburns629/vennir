@@ -48,3 +48,8 @@ export function logOf(ctx: HandlerContext): FastifyBaseLogger {
   if (!log) throw new Error("A Connect call without its request's logger.");
   return log;
 }
+
+/** The call, for what the chat agent's tools read on the caller's behalf (auditReads.ts). */
+export function chatCallOf(ctx: HandlerContext): { route: string; clientIp: string; requestId: string } {
+  return { route: `${ctx.service.typeName}/${ctx.method.name}`, clientIp: ctx.values.get(kClientIp), requestId: ctx.values.get(kRequestId) };
+}

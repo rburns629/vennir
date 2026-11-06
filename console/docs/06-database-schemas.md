@@ -259,6 +259,12 @@ erDiagram
     int id PK
     bigint last_id
   }
+  audit_reads {
+    bigserial id PK
+    uuid actor_id
+    uuid_array execution_ids
+    text_array teams
+  }
   secret_grants {
     uuid id PK
     uuid team_id FK
@@ -463,6 +469,22 @@ Who changed what (`src/audit.ts`): one row per call that tried to change somethi
 | `status` | integer | no | The answer's status, as HTTP would say it (200, 403, 409, ...): a refusal is recorded too. |
 | `request_id` | text | yes | The request's id, as in the logs. |
 | `hash` | text | yes | sha256 of the previous entry's hash and this entry's fields, so changing, removing or adding an entry breaks every later hash. Null on entries from before the chain. |
+
+### audit_reads
+
+Who read what (`src/auditReads.ts`): one row per call that returned sensitive content to its caller: a run's outputs or failure messages (`ExecutionService/GetExecution`, `WatchExecution`, `ListExecutionEvents`), what resources provided, which are steps' outputs (`ResourceService/ListResources`; `OrderService/PreviewOrder` when its plan fills an input with a resource's value), step logs (`ExecutionService/GetExecutionLogs`, `ObserveService/SearchLogs`), a team's secret or SecretStore names (`SecretService/ListSecrets`, `ListSecretStores`), the chat agent's tools that read a run, resources or an order's plan (`get_run`, `list_team_resources`, `plan_order`; recorded as the person it acted for), and reading this table (`AdminService/ListAuditReads`). Only what was returned: a step whose outputs the caller doesn't see (`src/core/runView.ts`), or one with nothing to show yet, isn't recorded, and a call that returned nothing sensitive leaves no row. Page views aren't recorded. A list is one row, its runs in `execution_ids`. The same reader, from the same address, shown the same content again (same method, runs, teams and target, and the same outputs, failure messages, log lines or provided values, compared by a hash that's never stored) within 10 minutes gets one row, by each console process: the cache (of sha256 keys) is in memory, so a restart or another replica records it again. Changed content or a new address is a new row; reading this table is never deduped. Kept apart from `audit_log`, so the write chain doesn't grow with every read, for `retention.auditReadsDays` (90 by default). Recorded after the answer, without holding it up: a row that can't be written is logged at error (`event: "audit_read_write_failed"`, with what it would have said), and the read is still answered; every read is also logged (`event: "audit_read"`), a repeat included. Admins read it with `AdminService/ListAuditReads`; the gateway's role has no grant on it.
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `id` | bigserial | no | Increasing; pages go by it. |
+| `at` | timestamptz | no | When it was read. |
+| `actor_id` | uuid | yes | Who read it (a user or a bot); no foreign key, so a deleted account's reads stay. |
+| `route` | text | no | The method, such as `vennir.console.v1.ExecutionService/GetExecution` (the chat agent's: `ChatService/Ask`, `AskStream` or `TestChatConfig`, with the tool in `target`). |
+| `execution_ids` | uuid[] | no | The runs read: one for a run's page, several for a list (resources, a log search, an order's plan's resources); empty for secrets. |
+| `teams` | text[] | no | The teams whose data it was: the steps' teams, the resources' (made by and for), or the secrets'. |
+| `target` | jsonb | no | What was read, by name only: `tasks` (the step keys seen in full), `runs` (a log search's steps, by run), `secrets` or `stores` (names), `resources` (ids), `lines` (a count), `tool` (the chat agent's), a filter (an admin's `ListAuditReads`). Never an output, a log line, a failure message, a provided value or a secret value. |
+| `client_ip` | text | yes | The client's address, as `audit_log` records it. |
+| `request_id` | text | yes | The request's id, as in the logs. |
 
 ### audit_export
 

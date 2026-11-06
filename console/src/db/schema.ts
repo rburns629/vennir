@@ -424,6 +424,42 @@ export const auditLog = pgTable(
 );
 
 /**
+ * Who read what (auditReads.ts): one row per call that returned a run's
+ * outputs, failure messages or step logs, or a team's secret or store
+ * names, to the caller who got them (the chat agent's reads as the person
+ * it acted for). What was read is named, never returned again: the run,
+ * the teams whose steps it was, the step keys seen in full, the secrets'
+ * names. Apart from audit_log, so the write chain doesn't grow with every
+ * read, with its own retention (retention.auditReadsDays). Admins read it
+ * (AdminService/ListAuditReads); the gateway has no grant on it.
+ */
+export const auditReads = pgTable(
+  "audit_reads",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    // The reader (bots are users); no foreign key, so deleting an account keeps what it read.
+    actorId: uuid("actor_id"),
+    // The RPC's procedure (vennir.console.v1.<Service>/<Method>).
+    route: text("route").notNull(),
+    // The runs read: one for a run's page, several for a list (resources, a log search).
+    executionIds: uuid("execution_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    // The teams whose data it was: the steps' teams, or the secrets' team.
+    teams: text("teams").array().notNull().default(sql`'{}'::text[]`),
+    // What was read, by name: step keys, secret names, a chat tool.
+    target: jsonb("target").notNull().default({}),
+    clientIp: text("client_ip"),
+    requestId: text("request_id"),
+  },
+  (table) => [
+    index("audit_reads_at_idx").on(table.at),
+    index("audit_reads_actor_idx").on(table.actorId),
+    index("audit_reads_executions_idx").using("gin", table.executionIds),
+    index("audit_reads_teams_idx").using("gin", table.teams),
+  ],
+);
+
+/**
  * Shipping the audit log to write-once storage (auditExport.ts): one row,
  * the last entry exported and its hash, from which the next export's chain
  * is checked.

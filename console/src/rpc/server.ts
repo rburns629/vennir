@@ -35,7 +35,7 @@ import { ChatService } from "../gen/vennir/console/v1/chat_pb.js";
 import { OrderService } from "../gen/vennir/console/v1/order_pb.js";
 import { SsoService } from "../gen/vennir/console/v1/sso_pb.js";
 import { kAuthError, kAuthProblem, kCaller, kClientIp, kLog, kRecheckCaller, kRequestId } from "./context.js";
-import { audit, maskErrors, requireCaller } from "./interceptors.js";
+import { audit, auditReads, maskErrors, requireCaller } from "./interceptors.js";
 import { countCalls } from "../metrics.js";
 import { adminService } from "./services/admin.js";
 import { observeService } from "./services/observe.js";
@@ -108,7 +108,7 @@ export async function registerRpc(app: FastifyInstance, api: FastifyInstance): P
         router.service(SsoService, ssoService());
       },
       // Outermost first.
-      interceptors: [countCalls, maskErrors, audit, requireCaller],
+      interceptors: [countCalls, maskErrors, audit, auditReads, requireCaller],
       // Defaults spelled out (false, 0, [], ""), for callers reading the JSON.
       jsonOptions: { alwaysEmitImplicit: true },
       contextValues: (request) =>

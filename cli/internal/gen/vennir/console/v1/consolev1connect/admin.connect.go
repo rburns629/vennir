@@ -40,6 +40,9 @@ const (
 	// AdminServiceListAuditEntriesProcedure is the fully-qualified name of the AdminService's
 	// ListAuditEntries RPC.
 	AdminServiceListAuditEntriesProcedure = "/vennir.console.v1.AdminService/ListAuditEntries"
+	// AdminServiceListAuditReadsProcedure is the fully-qualified name of the AdminService's
+	// ListAuditReads RPC.
+	AdminServiceListAuditReadsProcedure = "/vennir.console.v1.AdminService/ListAuditReads"
 	// AdminServiceGetPolicySyncProcedure is the fully-qualified name of the AdminService's
 	// GetPolicySync RPC.
 	AdminServiceGetPolicySyncProcedure = "/vennir.console.v1.AdminService/GetPolicySync"
@@ -67,6 +70,10 @@ type AdminServiceClient interface {
 	// newest first: who, what, what it named (never a secret value, password
 	// or token) and the outcome.
 	ListAuditEntries(context.Context, *connect.Request[v1.ListAuditEntriesRequest]) (*connect.Response[v1.ListAuditEntriesResponse], error)
+	// Who read a run's outputs, failure messages or logs, or a team's secret
+	// names, newest first: who, by which method, and what they read, by name
+	// only (never the content). Reading it is itself recorded.
+	ListAuditReads(context.Context, *connect.Request[v1.ListAuditReadsRequest]) (*connect.Response[v1.ListAuditReadsResponse], error)
 	// Whether the cluster's policies are current: the last outcome of
 	// rewriting each from the console's database.
 	GetPolicySync(context.Context, *connect.Request[v1.GetPolicySyncRequest]) (*connect.Response[v1.GetPolicySyncResponse], error)
@@ -111,6 +118,13 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AdminServiceListAuditEntriesProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("ListAuditEntries")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listAuditReads: connect.NewClient[v1.ListAuditReadsRequest, v1.ListAuditReadsResponse](
+			httpClient,
+			baseURL+AdminServiceListAuditReadsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListAuditReads")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
@@ -163,6 +177,7 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 type adminServiceClient struct {
 	getStats         *connect.Client[v1.GetStatsRequest, v1.GetStatsResponse]
 	listAuditEntries *connect.Client[v1.ListAuditEntriesRequest, v1.ListAuditEntriesResponse]
+	listAuditReads   *connect.Client[v1.ListAuditReadsRequest, v1.ListAuditReadsResponse]
 	getPolicySync    *connect.Client[v1.GetPolicySyncRequest, v1.GetPolicySyncResponse]
 	syncPolicies     *connect.Client[v1.SyncPoliciesRequest, v1.SyncPoliciesResponse]
 	getCatalogStatus *connect.Client[v1.GetCatalogStatusRequest, v1.GetCatalogStatusResponse]
@@ -179,6 +194,11 @@ func (c *adminServiceClient) GetStats(ctx context.Context, req *connect.Request[
 // ListAuditEntries calls vennir.console.v1.AdminService.ListAuditEntries.
 func (c *adminServiceClient) ListAuditEntries(ctx context.Context, req *connect.Request[v1.ListAuditEntriesRequest]) (*connect.Response[v1.ListAuditEntriesResponse], error) {
 	return c.listAuditEntries.CallUnary(ctx, req)
+}
+
+// ListAuditReads calls vennir.console.v1.AdminService.ListAuditReads.
+func (c *adminServiceClient) ListAuditReads(ctx context.Context, req *connect.Request[v1.ListAuditReadsRequest]) (*connect.Response[v1.ListAuditReadsResponse], error) {
+	return c.listAuditReads.CallUnary(ctx, req)
 }
 
 // GetPolicySync calls vennir.console.v1.AdminService.GetPolicySync.
@@ -219,6 +239,10 @@ type AdminServiceHandler interface {
 	// newest first: who, what, what it named (never a secret value, password
 	// or token) and the outcome.
 	ListAuditEntries(context.Context, *connect.Request[v1.ListAuditEntriesRequest]) (*connect.Response[v1.ListAuditEntriesResponse], error)
+	// Who read a run's outputs, failure messages or logs, or a team's secret
+	// names, newest first: who, by which method, and what they read, by name
+	// only (never the content). Reading it is itself recorded.
+	ListAuditReads(context.Context, *connect.Request[v1.ListAuditReadsRequest]) (*connect.Response[v1.ListAuditReadsResponse], error)
 	// Whether the cluster's policies are current: the last outcome of
 	// rewriting each from the console's database.
 	GetPolicySync(context.Context, *connect.Request[v1.GetPolicySyncRequest]) (*connect.Response[v1.GetPolicySyncResponse], error)
@@ -259,6 +283,13 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServiceListAuditEntriesProcedure,
 		svc.ListAuditEntries,
 		connect.WithSchema(adminServiceMethods.ByName("ListAuditEntries")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListAuditReadsHandler := connect.NewUnaryHandler(
+		AdminServiceListAuditReadsProcedure,
+		svc.ListAuditReads,
+		connect.WithSchema(adminServiceMethods.ByName("ListAuditReads")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -310,6 +341,8 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceGetStatsHandler.ServeHTTP(w, r)
 		case AdminServiceListAuditEntriesProcedure:
 			adminServiceListAuditEntriesHandler.ServeHTTP(w, r)
+		case AdminServiceListAuditReadsProcedure:
+			adminServiceListAuditReadsHandler.ServeHTTP(w, r)
 		case AdminServiceGetPolicySyncProcedure:
 			adminServiceGetPolicySyncHandler.ServeHTTP(w, r)
 		case AdminServiceSyncPoliciesProcedure:
@@ -337,6 +370,10 @@ func (UnimplementedAdminServiceHandler) GetStats(context.Context, *connect.Reque
 
 func (UnimplementedAdminServiceHandler) ListAuditEntries(context.Context, *connect.Request[v1.ListAuditEntriesRequest]) (*connect.Response[v1.ListAuditEntriesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.AdminService.ListAuditEntries is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListAuditReads(context.Context, *connect.Request[v1.ListAuditReadsRequest]) (*connect.Response[v1.ListAuditReadsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.AdminService.ListAuditReads is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) GetPolicySync(context.Context, *connect.Request[v1.GetPolicySyncRequest]) (*connect.Response[v1.GetPolicySyncResponse], error) {

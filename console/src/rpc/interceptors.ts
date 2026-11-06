@@ -10,6 +10,9 @@
  *    allowed or refused, with its request's identifying fields only
  *    (audit.ts), and the run it started, if any, and the client's
  *    address. Reads aren't; sign-ins are.
+ * 2b. auditReads: a method that returns a run's outputs or logs, or a
+ *    team's secret names (auditReads.ts's READERS), records what its answer
+ *    gave the caller, once answered, without waiting for the row.
  * 3. requireCaller: every method but the few public ones needs a valid
  *    credential; one that couldn't be checked (the database failed) fails
  *    the call, whatever the method.
@@ -19,6 +22,7 @@ import { toJson, type JsonObject } from "@bufbuild/protobuf";
 import { MethodOptions_IdempotencyLevel } from "@bufbuild/protobuf/wkt";
 import { ApiError } from "../apiError.js";
 import { targetFields, writeAuditEntry } from "../audit.js";
+import { READERS, recordReads } from "../auditReads.js";
 import { AuthService } from "../gen/vennir/console/v1/auth_pb.js";
 import { ProblemSchema } from "../gen/vennir/console/v1/common_pb.js";
 import { kAuthError, kAuthProblem, kCaller, kClientIp, kLog, kRequestId, kSignedIn } from "./context.js";
@@ -142,6 +146,45 @@ export const audit: Interceptor = (next) => async (req) => {
       });
     }
   }
+};
+
+export const auditReads: Interceptor = (next) => async (req) => {
+  const name = procedure(req.service, req.method);
+  const reader = Object.hasOwn(READERS, name) ? READERS[name]?.() : undefined;
+  if (!reader) return next(req);
+  const res = await next(req);
+  // Only a caller's: requireCaller (inside this) refuses anyone else first.
+  const caller = req.contextValues.get(kCaller);
+  const log = req.contextValues.get(kLog);
+  if (!caller || !log) return res;
+  // Every method recorded takes one request message; connect-es marks a
+  // server stream's (WatchExecution's) request as a stream, of that one.
+  const request = req.stream ? undefined : req.message;
+  const who = { actorId: caller.id, route: name, clientIp: req.contextValues.get(kClientIp), requestId: req.contextValues.get(kRequestId) };
+  // A read that was answered stays answered: failing to name it is logged, never the caller's error.
+  const record = (message: unknown) => {
+    try {
+      recordReads(log, who, reader(request, message));
+    } catch (error) {
+      log.error({ err: error, event: "audit_read_write_failed", procedure: name, actorId: caller.id }, "couldn't record who read what");
+    }
+  };
+  if (!res.stream) {
+    record(res.message);
+    return res;
+  }
+  // A stream (WatchExecution): each message as it goes out; the reader
+  // names only what's new since the last.
+  const messages = res.message;
+  return {
+    ...res,
+    message: (async function* () {
+      for await (const message of messages) {
+        record(message);
+        yield message;
+      }
+    })(),
+  };
 };
 
 export const requireCaller: Interceptor = (next) => async (req) => {

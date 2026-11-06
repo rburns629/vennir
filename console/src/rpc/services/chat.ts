@@ -9,7 +9,7 @@ import { countQuestion, getChatLimits, setChatLimits, type ChatLimitsView } from
 import { getChatConfig, resetChatConfig, setChatConfig, testChatConfig, type ChatConfigInput, type ChatConfigView } from "../../core/chatSettings.js";
 import { currentChat } from "../../chat/settings.js";
 import type { AskRequest, AskStreamRequest, ChatConfigInput as ChatConfigMessage, ChatService } from "../../gen/vennir/console/v1/chat_pb.js";
-import { callerOf, logOf } from "../context.js";
+import { callerOf, chatCallOf, logOf } from "../context.js";
 import { timestamp } from "../convert.js";
 import { FixedWindowLimit } from "../rateLimit.js";
 import { check } from "../validate.js";
@@ -170,7 +170,7 @@ export function chatService(): ServiceImpl<typeof ChatService> {
     },
 
     async testChatConfig(req, ctx) {
-      return testChatConfig(callerOf(ctx), configInput(req.config), logOf(ctx));
+      return testChatConfig(callerOf(ctx), configInput(req.config), logOf(ctx), chatCallOf(ctx));
     },
 
     async getChatLimits(_req, ctx) {
@@ -183,12 +183,12 @@ export function chatService(): ServiceImpl<typeof ChatService> {
 
     async ask(req, ctx) {
       const counted = () => countQuestion(callerOf(ctx), ctx);
-      return response(await ask(callerOf(ctx), asked(req), logOf(ctx), chatModel(), { signal: ctx.signal, counted }));
+      return response(await ask(callerOf(ctx), asked(req), logOf(ctx), chatModel(), { signal: ctx.signal, counted, via: chatCallOf(ctx) }));
     },
 
     async *askStream(req, ctx) {
       const counted = () => countQuestion(callerOf(ctx), ctx);
-      for await (const event of askStream(callerOf(ctx), asked(req), logOf(ctx), chatModel(), ctx.signal, counted)) {
+      for await (const event of askStream(callerOf(ctx), asked(req), logOf(ctx), chatModel(), ctx.signal, counted, chatCallOf(ctx))) {
         yield "step" in event ? { event: { case: "step" as const, value: event.step } } : { event: { case: "answer" as const, value: response(event.answer) } };
       }
     },

@@ -4,7 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { inArray, like } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { db } from "../src/db/client.js";
-import { auditLog, imageScans, submittedExecutions } from "../src/db/schema.js";
+import { auditLog, auditReads, imageScans, submittedExecutions } from "../src/db/schema.js";
 import { deleteExpired } from "../src/retention.js";
 import { createUser } from "../src/db/queries.js";
 import { users } from "../src/db/schema.js";
@@ -24,10 +24,22 @@ afterAll(async () => {
   await db.delete(users).where(inArray(users.email, [email]));
   await db.delete(submittedExecutions).where(inArray(submittedExecutions.executionId, [oldId, newId, runningId]));
   await db.delete(auditLog).where(like(auditLog.route, `/api/${prefix}%`));
+  await db.delete(auditReads).where(like(auditReads.route, `${prefix}%`));
   await db.delete(imageScans).where(like(imageScans.image, `${prefix}%`));
 });
 
 describe("retention", () => {
+  it("drops reads older than retention.auditReadsDays (audit_reads), and keeps recent ones", async () => {
+    await db.insert(auditReads).values([
+      { route: `${prefix}/old-read`, at: longAgo },
+      { route: `${prefix}/new-read` },
+    ]);
+    const deleted = await deleteExpired();
+    expect(deleted.reads).toBeGreaterThanOrEqual(1);
+    const left = await db.select().from(auditReads).where(like(auditReads.route, `${prefix}%`));
+    expect(left.map((r) => r.route)).toEqual([`${prefix}/new-read`]);
+  });
+
   it("deletes old execution records, audit entries and unused scans, and keeps recent ones", async () => {
     const submittedBy = (await createUser(email, "not-a-real-hash")).id;
     await db.insert(submittedExecutions).values([

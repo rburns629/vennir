@@ -27,7 +27,7 @@ import type { AuthUser } from "../auth/plugin.js";
 import { checkCitations, type Citation } from "./citations.js";
 import { chatModel, ModelUnavailable, type ChatMessage, type ChatModel, type Usage } from "./model.js";
 import { currentChat } from "./settings.js";
-import { forModel, MAX_RESULT, runTool, toolSpecs, type ProposedCart, type TurnState } from "./tools.js";
+import { forModel, MAX_RESULT, runTool, toolSpecs, type ChatCall, type ProposedCart, type TurnState } from "./tools.js";
 
 export interface AskRequest {
   /** The team the person is working for, if they've chosen one. */
@@ -225,6 +225,8 @@ export interface AskOptions {
   signal?: AbortSignal;
   /** Counts the question, once it's one the agent will answer (core/chatLimits.ts); throws to refuse it. */
   counted?: () => Promise<void>;
+  /** The call this came in through, for what its tools read (auditReads.ts). */
+  via?: ChatCall;
 }
 
 /** The person's latest question answered. `model`: the install's, unless given (tests). */
@@ -240,7 +242,7 @@ export async function ask(
   await options.counted?.();
   const started = Date.now();
   const { model: counting, tokens } = counted(model);
-  const state: TurnState = { caller: who, team, log, sources: [], cart: null };
+  const state: TurnState = { caller: who, team, log, sources: [], cart: null, via: options.via ?? { route: "vennir.console.v1.ChatService/Ask", clientIp: "", requestId: "" } };
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt(who, team) },
     // Earlier answers' citations named that turn's sources, not this one's.
@@ -385,6 +387,7 @@ export async function* askStream(
   model: ChatModel | null,
   signal?: AbortSignal,
   counted?: () => Promise<void>,
+  via?: ChatCall,
 ): AsyncGenerator<{ step: Answer["steps"][number] } | { answer: Answer }> {
   const pending: Answer["steps"] = [];
   let wake = () => {};
@@ -392,6 +395,7 @@ export async function* askStream(
   const answer = ask(caller, request, log, model, {
     ...(signal ? { signal } : {}),
     ...(counted ? { counted } : {}),
+    ...(via ? { via } : {}),
     onStep: (step) => {
       pending.push(step);
       wake();

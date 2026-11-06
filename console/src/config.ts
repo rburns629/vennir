@@ -700,6 +700,8 @@ export const config = {
     // execution_retention_days, which deletes the executions themselves.
     executionDays: wholeNumber("EXECUTION_RETENTION_DAYS", 90),
     auditDays: wholeNumber("AUDIT_RETENTION_DAYS", 365),
+    // Who read runs' outputs, logs and secret names (audit_reads, auditReads.ts).
+    auditReadsDays: wholeNumber("AUDIT_READS_RETENTION_DAYS", 90),
     // Scan verdicts of images not used for this long; never a blocking one.
     scanDays: wholeNumber("SCAN_RETENTION_DAYS", 90),
   },

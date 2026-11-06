@@ -139,11 +139,14 @@ policySyncIntervalSeconds: 300
 # -- How long records are kept, in days; 0 keeps them forever. executionDays:
 # who may see an execution (keep it the kernel chart's executionRetentionDays,
 # which deletes the executions themselves); auditDays: the audit log;
+# auditReadsDays: who read runs' outputs, logs and secret names (audit_reads,
+# apart from the audit log so its chain doesn't grow with every read);
 # scanDays: scan verdicts of images not used for that long (never a failed
 # one an admin hasn't accepted: that keeps the cluster refusing it).
 retention:
   executionDays: 90
   auditDays: 365
+  auditReadsDays: 90
   scanDays: 90
 
 # -- Scanning every image before it's registered or run, whoever built it

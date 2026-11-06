@@ -1202,10 +1202,32 @@ shows ([operations](operations.md)). On
 Observe, admins see every entry; anyone else their own, and what was done
 to their teams or to runs in them.
 
+Reads of sensitive content are recorded apart, in `audit_reads`
+(`console/src/auditReads.ts`, by an interceptor reading each answer): who
+was returned a run's outputs or failure messages (GetExecution,
+WatchExecution, ListExecutionEvents), what resources provided (ListResources,
+and PreviewOrder when its plan fills an input with a resource's value), step
+logs (GetExecutionLogs, SearchLogs), or a team's secret or SecretStore names
+(ListSecrets, ListSecretStores), and the chat agent's reads of a run,
+resources or an order's plan, as the person it acted for. Each row names what was read (the
+run, the teams, the step keys seen in full, the secrets' names), never the
+content, with the client's address and the request's id. Only what was
+returned: a step whose outputs the caller doesn't see isn't recorded as
+read. The same reader, from the same address, shown the same content again
+within 10 minutes gets one row per console process (an in-memory cache), so
+a page that polls doesn't add a row every few seconds; changed outputs or
+logs, or a new address, get a new row, and every read is still logged. A row is written after the answer, without holding it up; one that
+can't be written is logged at error (`event: "audit_read_write_failed"`),
+and every read is logged as `event: "audit_read"`, but the read isn't
+refused. The table isn't hash-chained or copied, so the write chain doesn't
+grow with every read; it's kept `retention.auditReadsDays` (90 by default).
+Admins read it with `AdminService/ListAuditReads`, by reader, team or run,
+and reading it is recorded too.
+
 Not recorded:
 
-- **Reads.** Who looked at a run, its outputs or logs, or a team's secrets'
-  names, isn't recorded.
+- **Page views and other reads**: lists of runs, products, teams, and a
+  run's state or a step's failure code without its message.
 - **What the console does on its own**, such as a schedule's runs: the
   schedule's creation is in the log, and each run in its own records.
 - **Anything done to the cluster directly**, outside the console: that's
@@ -1288,7 +1310,7 @@ Vennir isn't production-ready yet.
 | Gap | Impact | Plan |
 | --- | --- | --- |
 | A compromised console can loosen the image, identity and scan policies, and write any team's Secrets | It could run a step of its choosing with any team's secrets ([If a component is compromised](#if-a-component-is-compromised)) | Accepted for now: Kubernetes can't guard admission policies from their editor; treat the console as the most privileged component |
-| Reads aren't audited ([Audit](#audit)) | Who looked at a run's outputs or logs isn't recorded | Not decided |
+| Reads are recorded apart from the audit log, unchained and uncopied ([Audit](#audit)) | Someone who can write the console's database could remove a record of who read what; a row that failed to write is only in the logs | Ship the `event: "audit_read"` log lines to a SIEM where that matters |
 | The audit log lives in the console's own database unless `audit.export` copies it to write-once storage (its entries are hash-chained, and with the copy compared with the database entry by entry; Observe shows the log as each caller may see it) | Without the copy, someone who can write that database could change it, rewriting the chain after it | Turn on `audit.export`, or ship the `event: "audit"` log lines to a SIEM |
 
 ## Out of scope

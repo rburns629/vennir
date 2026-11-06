@@ -3,7 +3,7 @@
 import type { ServiceImpl } from "@connectrpc/connect";
 import type { JsonObject } from "@bufbuild/protobuf";
 import type { CatalogStatus } from "../../catalogSync.js";
-import { AuditQuery, adoptCatalogTeam, auditEntries, type auditPage, catalogState, install, platformStats, policySync, syncCatalogNow, syncPoliciesNow } from "../../core/admin.js";
+import { AuditQuery, AuditReadsQuery, adoptCatalogTeam, auditEntries, auditReadEntries, type auditPage, catalogState, install, platformStats, policySync, syncCatalogNow, syncPoliciesNow } from "../../core/admin.js";
 import type { AdminService } from "../../gen/vennir/console/v1/admin_pb.js";
 import type { SyncOutcome } from "../../policySync.js";
 import { timestamp, unsetIfEmpty } from "../convert.js";
@@ -81,6 +81,38 @@ export function adminService(): ServiceImpl<typeof AdminService> {
       const page = await auditEntries(callerOf(ctx), query);
       return {
         entries: page.entries.map(auditEntryMessage),
+        nextBefore: BigInt(page.nextBefore ?? 0),
+      };
+    },
+
+    async listAuditReads(req, ctx) {
+      const query = check(
+        { query: AuditReadsQuery },
+        {
+          query: {
+            before: unsetIfEmpty(Number(req.before)),
+            actor: unsetIfEmpty(req.actorId),
+            team: unsetIfEmpty(req.team),
+            executionId: unsetIfEmpty(req.executionId),
+            limit: unsetIfEmpty(req.limit),
+          },
+        },
+      ).query;
+      const page = await auditReadEntries(callerOf(ctx), query);
+      return {
+        reads: page.reads.map((read) => ({
+          id: BigInt(read.id),
+          at: timestamp(read.at),
+          actorId: read.actorId ?? undefined,
+          actorEmail: read.actorEmail ?? undefined,
+          actorIsBot: read.actorIsBot ?? false,
+          route: read.route,
+          executionIds: read.executionIds,
+          teams: read.teams,
+          target: read.target as JsonObject,
+          clientIp: read.clientIp ?? undefined,
+          requestId: read.requestId ?? undefined,
+        })),
         nextBefore: BigInt(page.nextBefore ?? 0),
       };
     },

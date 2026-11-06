@@ -226,6 +226,12 @@ it was seen.
   last sign-in, `users.last_signed_in_at`), or drop group-given rows of
   people who haven't signed in for an hour.
 
+- [ ] **A page for who read what** (built 2026-11-05, backend only):
+  `audit_reads` and `AdminService/ListAuditReads` record and list who was
+  shown runs' outputs, logs and secret names (`console/src/auditReads.ts`).
+  Admins can read them through the API only. Design the page on the mockups
+  canvas first (likely beside Observe's audit log).
+
 ## Products and catalog
 
 - [ ] **`vennir catalog create` applies `main`'s ruleset** (found
