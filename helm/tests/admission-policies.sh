@@ -1105,7 +1105,7 @@ k get validatingadmissionpolicy "$RELEASE-execution-kernel-identity" -o json | p
 import json, sys
 policy = json.load(sys.stdin)
 policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
-# Unconditionally: the API server writes the policy's type-checking status
+# Unconditionally: the API server writes the type-checking status of the policy
 # just after the replace above, which would make this one conflict.
 policy["metadata"].pop("resourceVersion", None)
 dropped = {"candidates", "digest", "releases"} | {"releases" + d for d in "0123456789abcdef"}
