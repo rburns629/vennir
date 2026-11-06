@@ -104,6 +104,22 @@ export declare type ApiGrant = Message<"vennir.console.v1.ApiGrant"> & {
    * @generated from field: string revoked_by = 15;
    */
   revokedBy: string;
+
+  /**
+   * Why the platform revoked it (superseded by a grant made while its API
+   * was away), when it did.
+   *
+   * @generated from field: string revoke_reason = 16;
+   */
+  revokeReason: string;
+
+  /**
+   * When its API left the catalog's release; unset while it's published.
+   * Removed 30 days after.
+   *
+   * @generated from field: google.protobuf.Timestamp away_since = 17;
+   */
+  awaySince?: Timestamp | undefined;
 };
 
 /**
@@ -193,12 +209,28 @@ export declare type ApiAccessRequest = Message<"vennir.console.v1.ApiAccessReque
   decidedAt?: Timestamp | undefined;
 
   /**
-   * A person's single sign-on groups as the console last read them, one of
-   * which may be granted instead: shown to the API's team only.
+   * A person's single sign-on groups (when they asked, or as read since),
+   * one of which may be granted instead: shown to the API's maintainers
+   * only, and only while it waits.
    *
    * @generated from field: repeated string groups = 15;
    */
   groups: string[];
+
+  /**
+   * When those groups were read: older than 24 hours, a group can't be
+   * granted from them (GROUPS_STALE) unless Google Workspace confirms it.
+   *
+   * @generated from field: google.protobuf.Timestamp groups_read_at = 16;
+   */
+  groupsReadAt?: Timestamp | undefined;
+
+  /**
+   * When its API left the catalog's release; unset while it's published.
+   *
+   * @generated from field: google.protobuf.Timestamp away_since = 17;
+   */
+  awaySince?: Timestamp | undefined;
 };
 
 /**
@@ -1403,6 +1435,43 @@ export declare type SetGatewayClosedResponse = Message<"vennir.console.v1.SetGat
 export declare const SetGatewayClosedResponseSchema: GenMessage<SetGatewayClosedResponse>;
 
 /**
+ * @generated from message vennir.console.v1.ListAwayApiAccessRequest
+ */
+export declare type ListAwayApiAccessRequest = Message<"vennir.console.v1.ListAwayApiAccessRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAwayApiAccessRequest.
+ * Use `create(ListAwayApiAccessRequestSchema)` to create a new message.
+ */
+export declare const ListAwayApiAccessRequestSchema: GenMessage<ListAwayApiAccessRequest>;
+
+/**
+ * @generated from message vennir.console.v1.ListAwayApiAccessResponse
+ */
+export declare type ListAwayApiAccessResponse = Message<"vennir.console.v1.ListAwayApiAccessResponse"> & {
+  /**
+   * @generated from field: repeated vennir.console.v1.ApiGrant grants = 1;
+   */
+  grants: ApiGrant[];
+
+  /**
+   * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
+   */
+  requests: ApiAccessRequest[];
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAwayApiAccessResponse.
+ * Use `create(ListAwayApiAccessResponseSchema)` to create a new message.
+ */
+export declare const ListAwayApiAccessResponseSchema: GenMessage<ListAwayApiAccessResponse>;
+
+/**
  * How a caller may call an API (the gateway's rule, in its order).
  *
  * @generated from enum vennir.console.v1.ApiAccessVia
@@ -1733,6 +1802,19 @@ export declare const ApiService: GenService<{
     methodKind: "unary";
     input: typeof ListTeamBotApiAccessRequestSchema;
     output: typeof ListTeamBotApiAccessResponseSchema;
+  },
+  /**
+   * The grants and requests of a team's APIs that left the catalog's
+   * release (away_since): kept 30 days, to come back with an API of the
+   * same name, and revocable meanwhile by the team's maintainers and
+   * admins. Its members, and admins.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListAwayApiAccess
+   */
+  listAwayApiAccess: {
+    methodKind: "unary";
+    input: typeof ListAwayApiAccessRequestSchema;
+    output: typeof ListAwayApiAccessResponseSchema;
   },
 }>;
 

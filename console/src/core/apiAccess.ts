@@ -36,13 +36,13 @@
  */
 import { Code } from "@connectrpc/connect";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { ApiError } from "../apiError.js";
 import { ensureNotBot } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { config } from "../config.js";
 import { db } from "../db/client.js";
-import { findApi, findTeamByName, findUserByEmail, findUserById, listBotsForTeam, teamRolesForUser, type ApiRow } from "../db/queries.js";
+import { API_AWAY_DAYS, findApi, findTeamByName, findUserByEmail, findUserById, listBotsForTeam, teamRolesForUser, type ApiRow } from "../db/queries.js";
 import { apiAccessRequests, apiGrants, apis, teamMemberships, teams, userGroups, users, type AccessRequestState } from "../db/schema.js";
 import { notify } from "../notifier.js";
 import { currentSso, GOOGLE_GROUPS_FRESH_SECONDS, groupSources, groupSourceSet, GroupsUnavailable, inGoogleGroup, keepConfirmedGroup, keepGrantedGroup } from "../sso.js";
@@ -124,6 +124,17 @@ export function accessFor(who: Pick<AuthUser, "id" | "isBot" | "groupsCurrent">,
   const shared = ctx.teams.find((t) => api.shareWith.includes("*") || api.shareWith.includes(t));
   if (shared !== undefined) return { via: "catalog", callingTeam: shared, perMinute: teamRate(api, shared) };
   return null;
+}
+
+/**
+ * Whether a person who may not call `api` would through a group's grant,
+ * but their groups don't count now: the gateway then asks a single sign-on
+ * session to sign in again (401) rather than refusing it (its accessFor's
+ * staleGroup, the same).
+ */
+export function staleGroupFor(who: Pick<AuthUser, "id" | "isBot" | "groupsCurrent">, api: Api, ctx: CallerContext): boolean {
+  if (who.isBot || who.groupsCurrent || accessFor(who, api, ctx) !== null) return false;
+  return ctx.grants.some((g) => g.apiId === api.id && g.revokedAt === null && g.groupName !== null && ctx.groups.includes(g.groupName));
 }
 
 /** Of these team names, the live ones (not retired or purged), in the order given. */
@@ -212,7 +223,9 @@ async function botTeamsMaintainedBy(who: AuthUser, botId: string): Promise<strin
 
 /** Locks an API's row for the rest of a transaction: its grants and requests change one writer at a time. */
 async function lockApi(tx: Pick<typeof db, "select">, apiId: string): Promise<void> {
-  await tx.select({ id: apis.id }).from(apis).where(eq(apis.id, apiId)).for("update");
+  const [row] = await tx.select({ id: apis.id }).from(apis).where(eq(apis.id, apiId)).for("update");
+  // Gone meanwhile (a release dropped it): nothing to grant or ask for.
+  if (!row) throw new ApiError(404, "NOT_FOUND", "That API isn't published any more.");
 }
 
 /** A bot may be granted while one of its teams is live. */
@@ -277,24 +290,39 @@ export interface GrantView {
   updatedAt: Date;
   revokedAt: Date | null;
   revokedBy: string;
+  // Why the platform revoked it (superseded), when it did.
+  revokeReason: string;
+  // When its API left the catalog's release; null while it's published.
+  awaySince: Date | null;
 }
 
-async function grantViews(rows: Grant[], apisById: Map<string, Api>): Promise<GrantView[]> {
+/**
+ * Where a row's API is: published (apisById), or away from the release, by
+ * its team's name (awayTeams, by team id) and its own api_name.
+ */
+function placeOf(row: { apiId: string | null; teamId: string; apiName: string }, apisById: Map<string, Api>, awayTeams: Map<string, string>) {
+  const api = row.apiId ? apisById.get(row.apiId) : undefined;
+  if (api) return { api, team: api.teamName, name: api.name };
+  const team = row.apiId === null ? awayTeams.get(row.teamId) : undefined;
+  return team === undefined ? null : { api: null, team, name: row.apiName };
+}
+
+async function grantViews(rows: Grant[], apisById: Map<string, Api>, awayTeams = new Map<string, string>()): Promise<GrantView[]> {
   const people = await emailsOf(rows.flatMap((g) => [g.userId, g.grantedBy, g.revokedBy]));
   return rows.flatMap((g) => {
-    const api = g.apiId ? apisById.get(g.apiId) : undefined;
-    if (!api) return [];
+    const place = placeOf(g, apisById, awayTeams);
+    if (!place) return [];
     const user = g.userId ? people.get(g.userId) : undefined;
     return [
       {
         id: g.id,
-        team: api.teamName,
-        name: api.name,
+        team: place.team,
+        name: place.name,
         group: g.groupName ?? "",
         userId: g.userId ?? "",
         userEmail: user?.email ?? "",
         bot: user?.isBot ?? false,
-        perMinute: grantRate(api, g),
+        perMinute: place.api ? grantRate(place.api, g) : (g.perMinute ?? config.gateway.defaultPerMinute),
         defaultRate: g.perMinute === null,
         grantedBy: g.grantedBy ? (people.get(g.grantedBy)?.email ?? "(deleted account)") : "",
         accessRequestId: g.fromRequest ?? "",
@@ -302,6 +330,8 @@ async function grantViews(rows: Grant[], apisById: Map<string, Api>): Promise<Gr
         updatedAt: g.updatedAt,
         revokedAt: g.revokedAt,
         revokedBy: g.revokedBy ? (people.get(g.revokedBy)?.email ?? "(deleted account)") : "",
+        revokeReason: g.revokeReason ?? "",
+        awaySince: g.awaySince,
       },
     ];
   });
@@ -323,6 +353,10 @@ export interface RequestView {
   createdAt: Date;
   decidedAt: Date | null;
   groups: string[];
+  // When those groups were read: a group read over GROUPS_DECIDE_HOURS ago
+  // can't be granted from them (decideRequest).
+  groupsReadAt: Date | null;
+  awaySince: Date | null;
 }
 
 /**
@@ -330,17 +364,25 @@ export interface RequestView {
  * they asked), for the API's maintainers to grant one of them; never an
  * ended request's, and never to anyone else.
  */
-async function requestViews(rows: AccessRequest[], apisById: Map<string, Api>, withGroups = false): Promise<RequestView[]> {
+async function requestViews(
+  rows: AccessRequest[],
+  apisById: Map<string, Api>,
+  withGroups = false,
+  awayTeams = new Map<string, string>(),
+): Promise<RequestView[]> {
   const people = await emailsOf(rows.flatMap((r) => [r.userId, r.requestedBy, r.decidedBy]));
+  const groups = new Map<string, { groups: string[]; readAt: Date | null }>();
+  if (withGroups) for (const r of rows) if (r.state === "waiting") groups.set(r.id, await requesterGroupsOf(r));
   return rows.flatMap((r) => {
-    const api = r.apiId ? apisById.get(r.apiId) : undefined;
-    if (!api) return [];
+    const place = placeOf(r, apisById, awayTeams);
+    if (!place) return [];
     const user = people.get(r.userId);
+    const shown = withGroups && r.state === "waiting" && !user?.isBot ? groups.get(r.id) : undefined;
     return [
       {
         id: r.id,
-        team: api.teamName,
-        name: api.name,
+        team: place.team,
+        name: place.name,
         userId: r.userId,
         userEmail: user?.email ?? "",
         bot: user?.isBot ?? false,
@@ -352,10 +394,26 @@ async function requestViews(rows: AccessRequest[], apisById: Map<string, Api>, w
         grantId: r.grantId ?? "",
         createdAt: r.createdAt,
         decidedAt: r.decidedAt,
-        groups: withGroups && r.state === "waiting" && !user?.isBot ? r.requesterGroups : [],
+        groups: shown?.groups ?? [],
+        groupsReadAt: shown?.readAt ?? null,
+        awaySince: r.awaySince,
       },
     ];
   });
+}
+
+/** How long a person's groups, as read, may be granted from (decideRequest): older, they sign in again first. */
+export const GROUPS_DECIDE_HOURS = 24;
+
+/**
+ * A waiting request's groups to choose from: the ones it copied when they
+ * asked, or the person's as read since (a sign-in after asking), whichever
+ * were read later.
+ */
+async function requesterGroupsOf(r: AccessRequest): Promise<{ groups: string[]; readAt: Date | null }> {
+  const [now] = await db.select({ groups: users.ssoGroups, readAt: users.ssoGroupsReadAt }).from(users).where(eq(users.id, r.userId));
+  if (now?.readAt && now.groups && (!r.requesterGroupsReadAt || now.readAt > r.requesterGroupsReadAt)) return { groups: now.groups, readAt: now.readAt };
+  return { groups: r.requesterGroups, readAt: r.requesterGroupsReadAt };
 }
 
 const one = <T>(views: T[]): T => {
@@ -437,7 +495,9 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
     targetEmail = (await findUserById(who.id))?.email ?? "";
   }
   // A person's groups as last read, for the API's maintainers to grant one of them.
-  const requesterGroups = botEmail ? [] : ((await db.select({ groups: users.ssoGroups }).from(users).where(eq(users.id, who.id)))[0]?.groups ?? []);
+  const [read] = botEmail ? [] : await db.select({ groups: users.ssoGroups, readAt: users.ssoGroupsReadAt }).from(users).where(eq(users.id, who.id));
+  const requesterGroups = read?.groups ?? [];
+  const requesterGroupsReadAt = read?.groups ? read.readAt : null;
   if (api.accessRequests === "closed") {
     throw new ApiError(409, "REQUESTS_CLOSED", `${api.teamName}/${api.name} takes no requests for access: ask its team directly.`);
   }
@@ -457,7 +517,7 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
         .where(and(eq(apiGrants.apiId, api.id), eq(apiGrants.userId, target.id), isNull(apiGrants.revokedAt)));
       if (granted) throw new ApiError(409, "ALREADY_ALLOWED", `${targetEmail} may call ${api.teamName}/${api.name} already.`);
       const key = { apiId: api.id, teamId: api.teamId, apiName: api.name };
-      const [request] = await tx.insert(apiAccessRequests).values({ ...key, userId: target.id, requestedBy: who.id, reason: why, requesterGroups }).returning();
+      const [request] = await tx.insert(apiAccessRequests).values({ ...key, userId: target.id, requestedBy: who.id, reason: why, requesterGroups, requesterGroupsReadAt }).returning();
       if (!request) throw new Error("no request was made");
       if (api.accessRequests !== "open") return { request, grant: null };
       // Open: granted at once, by nobody, at the API's default limit; the
@@ -541,7 +601,10 @@ export async function decideRequest(caller: AuthUser | undefined, id: string, ap
     // asked about); or, with Google Workspace groups, one Google says
     // they're in now (Google can't list a person's groups: it's asked of
     // each named group).
-    if (!request.requesterGroups.includes(groupName)) {
+    const read = await requesterGroupsOf(request);
+    const fresh = read.readAt !== null && Date.now() - read.readAt.getTime() <= GROUPS_DECIDE_HOURS * 3_600_000;
+    if (!(read.groups.includes(groupName) && fresh)) {
+      // Or, with Google Workspace groups, one Google says they're in now.
       const sources = groupSources();
       try {
         confirmed = currentSso() !== null && sources.google && groupName.includes("@") && (await inGoogleGroup(target.email, groupName));
@@ -549,8 +612,11 @@ export async function decideRequest(caller: AuthUser | undefined, id: string, ap
         if (error instanceof GroupsUnavailable) throw new ApiError(503, "GROUPS_UNAVAILABLE", error.message);
         throw error;
       }
+      if (!confirmed && read.groups.includes(groupName)) {
+        throw new ApiError(409, "GROUPS_STALE", `${target.email}'s groups were read over ${String(GROUPS_DECIDE_HOURS)} hours ago: ask them to sign in again, then decide.`);
+      }
       if (!confirmed) {
-        throw new ApiError(400, "NOT_THEIR_GROUP", `${target.email} isn't in ${groupName}: not among their groups when they asked${sources.google ? ", nor in it now by Google Workspace" : ""}.`);
+        throw new ApiError(400, "NOT_THEIR_GROUP", `${target.email} isn't in ${groupName}: not among their groups as last read${sources.google ? ", nor in it now by Google Workspace" : ""}.`);
       }
     }
   } else if (target.who.isBot) {
@@ -684,6 +750,8 @@ export async function setGrantRate(caller: AuthUser | undefined, id: string, per
 export async function revokeGrant(caller: AuthUser | undefined, id: string, reason: string): Promise<void> {
   const who = signedIn(caller);
   ensureNotBot(who, "revoke an API's grant");
+  const [away] = await db.select().from(apiGrants).where(and(eq(apiGrants.id, id), isNull(apiGrants.apiId)));
+  if (away) return revokeAwayGrant(who, away, reason);
   const { grant, api } = await activeGrant(id);
   const subject = grant.userId ? await findUserById(grant.userId) : undefined;
   const asMaintainer = who.maintainerOf.includes(api.teamName) && api.retiredAt === null;
@@ -710,6 +778,86 @@ export async function revokeGrant(caller: AuthUser | undefined, id: string, reas
     `Revoked by ${(await findUserById(who.id))?.email ?? ""}${why ? `: ${why}` : "."}`,
     [grant.userId],
   );
+}
+
+/**
+ * Revokes a grant of an API that left the release (kept API_AWAY_DAYS to
+ * come back with it): its team's maintainers, while the team is live, or
+ * an admin.
+ */
+async function revokeAwayGrant(who: AuthUser, grant: Grant, reason: string): Promise<void> {
+  const [team] = await db.select().from(teams).where(and(eq(teams.id, grant.teamId), isNull(teams.deletedAt)));
+  if (!team) throw new ApiError(404, "NOT_FOUND", "No such grant.");
+  if (grant.revokedAt) throw new ApiError(409, "REVOKED", "That grant was revoked already.");
+  if (!who.isAdmin) {
+    if (!who.maintainerOf.includes(team.name)) throw new ApiError(403, "FORBIDDEN", `Only ${team.name}'s maintainers, or an admin, may revoke a grant of its API that left the release.`);
+    ensureNotRetired(team);
+  }
+  const [revoked] = await db
+    .update(apiGrants)
+    .set({ revokedAt: new Date(), revokedBy: who.id })
+    .where(and(eq(apiGrants.id, grant.id), isNull(apiGrants.revokedAt)))
+    .returning({ id: apiGrants.id });
+  if (!revoked) throw new ApiError(409, "REVOKED", "That grant was revoked meanwhile.");
+  const why = reason.trim().slice(0, MAX_REASON);
+  const subject = grant.userId ? await findUserById(grant.userId) : undefined;
+  await tell(
+    { teamName: team.name, name: grant.apiName } as Api,
+    `${principal(grant, subject?.email ?? "")} won't call ${team.name}/${grant.apiName} if it's back`,
+    `Revoked while the API is out of the catalog's release, by ${(await findUserById(who.id))?.email ?? ""}${why ? `: ${why}` : "."}`,
+    [grant.userId],
+  );
+}
+
+/** The teams these rows' APIs are of, by id: for the ones away from the release. */
+async function awayTeamsOf(rows: { apiId: string | null; teamId: string }[]): Promise<Map<string, string>> {
+  const ids = [...new Set(rows.filter((r) => r.apiId === null).map((r) => r.teamId))];
+  if (ids.length === 0) return new Map();
+  const found = await db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, ids));
+  return new Map(found.map((t) => [t.id, t.name]));
+}
+
+/**
+ * The grants and requests of a team's APIs that left the release, each
+ * with when (away_since): its members, and admins.
+ */
+export async function listAwayAccess(caller: AuthUser | undefined, team: string) {
+  const who = signedIn(caller);
+  const row = await findTeamByName(team);
+  if (!row) throw new ApiError(404, "NOT_FOUND", `No team "${team}".`);
+  if (!who.isAdmin && !who.teamNames.includes(row.name)) throw new ApiError(403, "FORBIDDEN", `Not a member of team "${team}", and not a platform admin.`);
+  const away = new Map([[row.id, row.name]]);
+  const grants = await db
+    .select()
+    .from(apiGrants)
+    .where(and(eq(apiGrants.teamId, row.id), isNull(apiGrants.apiId)))
+    .orderBy(asc(apiGrants.apiName), sql`${apiGrants.revokedAt} IS NOT NULL`, desc(apiGrants.createdAt));
+  const requests = await db
+    .select()
+    .from(apiAccessRequests)
+    .where(and(eq(apiAccessRequests.teamId, row.id), isNull(apiAccessRequests.apiId)))
+    .orderBy(asc(apiAccessRequests.apiName), desc(apiAccessRequests.createdAt));
+  return { grants: await grantViews(grants, new Map(), away), requests: await requestViews(requests, new Map(), false, away) };
+}
+
+/**
+ * What API_AWAY_DAYS after its API left the release is past keeping
+ * (retention.ts, hourly): its grants deleted; its waiting requests
+ * declined, saying why (the person sees it among their requests); and its
+ * ended requests deleted once ended that long. Returns how many went.
+ */
+export async function pruneAwayAccess(): Promise<number> {
+  const cutoff = sql`now() - make_interval(days => ${API_AWAY_DAYS})`;
+  const grants = await db.delete(apiGrants).where(and(isNull(apiGrants.apiId), lt(apiGrants.awaySince, cutoff))).returning({ id: apiGrants.id });
+  await db
+    .update(apiAccessRequests)
+    .set({ state: "declined", decisionReason: `The API left the catalog's release over ${String(API_AWAY_DAYS)} days ago.`, decidedAt: new Date() })
+    .where(and(isNull(apiAccessRequests.apiId), lt(apiAccessRequests.awaySince, cutoff), eq(apiAccessRequests.state, "waiting")));
+  const requests = await db
+    .delete(apiAccessRequests)
+    .where(and(isNull(apiAccessRequests.apiId), lt(apiAccessRequests.awaySince, cutoff), ne(apiAccessRequests.state, "waiting"), lt(apiAccessRequests.decidedAt, cutoff)))
+    .returning({ id: apiAccessRequests.id });
+  return grants.length + requests.length;
 }
 
 // --- lists ---
@@ -760,7 +908,7 @@ export async function listMyAccess(caller: AuthUser | undefined) {
     .from(apiAccessRequests)
     .where(and(eq(apiAccessRequests.userId, who.id), inArray(apiAccessRequests.state, ["waiting", "declined"])))
     .orderBy(desc(apiAccessRequests.createdAt));
-  return { access, requests: await requestViews(requests, all) };
+  return { access, requests: await requestViews(requests, all, false, await awayTeamsOf(requests)) };
 }
 
 /** A team's bots' active grants, and their requests that wait or were declined: its members, and admins. */

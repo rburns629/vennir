@@ -16,7 +16,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { applyApis } from "../src/catalogSync.js";
 import { config } from "../src/config.js";
-import { accessFor, type CallerContext } from "../src/core/apiAccess.js";
+import { accessFor, pruneAwayAccess, staleGroupFor, type CallerContext } from "../src/core/apiAccess.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, findApi, findTeamByName, findUserByEmail } from "../src/db/queries.js";
 import { apiAccessRequests, apiGrants, apis, auditLog, notificationEvents, teams, userGroups, userNotifications, users as users_ } from "../src/db/schema.js";
@@ -179,8 +179,9 @@ describe("who may call", () => {
         name: string;
         api?: Fields;
         caller: { id: string; bot?: boolean; teams?: string[]; groups?: string[]; groupsCurrent?: boolean };
-        grants: { id: string; userId?: string; group?: string; perMinute?: number }[];
+        grants: { id: string; userId?: string; group?: string; perMinute?: number; revoked?: boolean; away?: boolean }[];
         expect: { via: string; team?: string; group?: string; grant?: string; perMinute: number } | null;
+        staleGroup?: boolean;
       }[];
     };
     const kept = config.gateway.defaultPerMinute;
@@ -191,13 +192,19 @@ describe("who may call", () => {
         const a = { id: table.api.id, teamName: table.api.team, shareWith: c.api?.shareWith ?? table.api.shareWith, perMinute: c.api?.perMinute ?? table.api.perMinute } as unknown as Parameters<typeof accessFor>[1];
         const grants = c.grants.map(
           (g) =>
-            ({ id: g.id, apiId: table.api.id, groupName: g.group ?? null, userId: g.userId ?? null, perMinute: g.perMinute || null, revokedAt: null }) as CallerContext["grants"][number],
+            ({
+              id: g.id,
+              apiId: g.away ? null : table.api.id,
+              groupName: g.group ?? null,
+              userId: g.userId ?? null,
+              perMinute: g.perMinute || null,
+              revokedAt: g.revoked ? new Date() : null,
+            }) as CallerContext["grants"][number],
         );
-        const got = accessFor(
-          { id: c.caller.id, isBot: c.caller.bot ?? false, groupsCurrent: c.caller.groupsCurrent ?? false },
-          a,
-          { teams: c.caller.teams ?? [], groups: c.caller.groups ?? [], grants },
-        );
+        const who = { id: c.caller.id, isBot: c.caller.bot ?? false, groupsCurrent: c.caller.groupsCurrent ?? false };
+        const ctx = { teams: c.caller.teams ?? [], groups: c.caller.groups ?? [], grants };
+        const got = accessFor(who, a, ctx);
+        expect(staleGroupFor(who, a, ctx), `${c.name}: staleGroup`).toBe(c.staleGroup ?? false);
         const shown = got ? { via: got.via, team: got.callingTeam ?? "", group: got.group ?? "", grant: got.grantId ?? "", perMinute: got.perMinute } : null;
         const want = c.expect ? { via: c.expect.via, team: c.expect.team ?? "", group: c.expect.group ?? "", grant: c.expect.grant ?? "", perMinute: c.expect.perMinute } : null;
         expect(shown, c.name).toEqual(want);
@@ -298,6 +305,15 @@ describe("deciding a request", () => {
       expect(seen.body.requests?.find((r) => r.id === waiting?.id)?.groups ?? [], who).toEqual([]);
     }
     expect((await decide("maintainer", waiting?.id ?? "", { approve: true, group: "ops@elsewhere.example.com" })).failure).toBe("NOT_THEIR_GROUP");
+    // Groups read over a day ago can't be granted from: they sign in again first.
+    const dayAgo = new Date(Date.now() - 25 * 3_600_000);
+    await db.update(apiAccessRequests).set({ requesterGroupsReadAt: dayAgo }).where(eq(apiAccessRequests.id, waiting?.id ?? ""));
+    await db.update(users_).set({ ssoGroupsReadAt: dayAgo }).where(eq(users_.id, ids.bob));
+    const stale = await decide("maintainer", waiting?.id ?? "", { approve: true, group: `eng@${prefix}.example.com` });
+    expect(stale.failure).toBe("GROUPS_STALE");
+    expect(stale.message).toContain("sign in again");
+    // They sign in again (their groups read now): the fresher read is the one that counts.
+    await db.update(users_).set({ ssoGroupsReadAt: new Date() }).where(eq(users_.id, ids.bob));
     const decided = await decide("maintainer", waiting?.id ?? "", { approve: true, group: `ENG@${prefix}.example.com`, perMinute: 5 });
     expect(decided.body.grant).toMatchObject({ group: `eng@${prefix}.example.com`, perMinute: 5 });
     // Ended, its groups aren't shown any more.
@@ -337,10 +353,55 @@ describe("grants", () => {
     expect(await listed("ada", "open")).toBeUndefined();
     const away = await db.select().from(apiGrants).where(inArray(apiGrants.id, before.map((g) => g.id)));
     expect(away.map((g) => g.apiId)).toEqual(before.map(() => null));
+    // Listed meanwhile, marked away, for its team and admins.
+    type Away = { grants?: (Grant & { name: string; awaySince?: string })[] };
+    const listedAway = await call<Away>(tokens.member, "ApiService/ListAwayApiAccess", { team: owner });
+    expect(listedAway.body.grants?.map((g) => g.id).sort()).toEqual(before.map((g) => g.id).sort());
+    expect(listedAway.body.grants?.every((g) => g.name === "open" && g.awaySince)).toBe(true);
+    expect((await call(tokens.consumer, "ApiService/ListAwayApiAccess", { team: owner })).failure).toBe("FORBIDDEN");
+    // Revocable meanwhile: by its maintainers or an admin, nobody else.
+    const ops = before.find((g) => g.group === "ops@example.com")?.id ?? "";
+    expect((await revoke("member", ops)).failure).toBe("FORBIDDEN");
+    expect((await revoke("maintainer", ops, "not needed")).code).toBe("ok");
     await apply(release());
     const after = (await call<{ grants?: Grant[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "open" })).body.grants ?? [];
     expect(after.map((g) => g.id).sort()).toEqual(before.map((g) => g.id).sort());
+    expect(after.find((g) => g.id === ops)?.revokedAt).toBeTruthy();
     expect(await listed("ada", "open")).toMatchObject({ mayCall: true, accessVia: "API_ACCESS_VIA_USER" });
+  });
+
+  it("away over 30 days, are gone: not linked again, and pruned; a waiting request declined", async () => {
+    // On "older" (approval), which nothing after this needs.
+    const asked = await ask("bob", "older", "while away");
+    const grant = await add("maintainer", "older", { email: emails.ada });
+    await apply(release().filter((a) => a.name !== "older"));
+    const longAgo = new Date(Date.now() - 31 * 24 * 3_600_000);
+    await db.update(apiGrants).set({ awaySince: longAgo }).where(eq(apiGrants.id, grant.body.grant.id));
+    await db.update(apiAccessRequests).set({ awaySince: longAgo }).where(eq(apiAccessRequests.id, asked.body.request.id));
+    await apply(release());
+    // Back, but too late: neither is its again.
+    expect((await call<{ grants?: Grant[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "older" })).body.grants ?? []).toEqual([]);
+    await pruneAwayAccess();
+    expect(await db.select().from(apiGrants).where(eq(apiGrants.id, grant.body.grant.id))).toEqual([]);
+    const [declined] = await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, asked.body.request.id));
+    expect(declined).toMatchObject({ state: "declined", decisionReason: expect.stringContaining("over 30 days ago") as unknown });
+  });
+
+  it("coming back, give way to a grant made meanwhile: the away one is superseded, not an error", async () => {
+    const grant = await add("maintainer", "closed", { email: emails.toolsMember });
+    await apply(release().filter((a) => a.name !== "closed"));
+    // A grant to the same user on the API as it's published again by some other path.
+    const team = (await findTeamByName(owner))?.id ?? "";
+    const [row] = await db
+      .insert(apis)
+      .values({ teamId: team, name: "closed", displayName: "closed", openapi, backendUrl: "https://orders.example.run.app", serviceAccount: "closed-api" })
+      .returning();
+    await db.insert(apiGrants).values({ apiId: row?.id ?? "", teamId: team, apiName: "closed", userId: ids.toolsMember });
+    await apply(release());
+    expect(problems).toEqual([]);
+    const [superseded] = await db.select().from(apiGrants).where(eq(apiGrants.id, grant.body.grant.id));
+    expect(superseded).toMatchObject({ apiId: row?.id, revokeReason: expect.stringContaining("superseded") as unknown });
+    expect(superseded?.revokedAt).not.toBeNull();
   });
 
   it("answer a request of theirs that waits", async () => {

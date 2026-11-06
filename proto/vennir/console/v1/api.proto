@@ -95,6 +95,13 @@ service ApiService {
   rpc ListTeamBotApiAccess(ListTeamBotApiAccessRequest) returns (ListTeamBotApiAccessResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  // The grants and requests of a team's APIs that left the catalog's
+  // release (away_since): kept 30 days, to come back with an API of the
+  // same name, and revocable meanwhile by the team's maintainers and
+  // admins. Its members, and admins.
+  rpc ListAwayApiAccess(ListAwayApiAccessRequest) returns (ListAwayApiAccessResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 }
 
 // How a caller may call an API (the gateway's rule, in its order).
@@ -142,6 +149,12 @@ message ApiGrant {
   // Set once revoked.
   google.protobuf.Timestamp revoked_at = 14;
   string revoked_by = 15;
+  // Why the platform revoked it (superseded by a grant made while its API
+  // was away), when it did.
+  string revoke_reason = 16;
+  // When its API left the catalog's release; unset while it's published.
+  // Removed 30 days after.
+  google.protobuf.Timestamp away_since = 17;
 }
 
 message ApiAccessRequest {
@@ -162,9 +175,15 @@ message ApiAccessRequest {
   string grant_id = 12;
   google.protobuf.Timestamp created_at = 13;
   google.protobuf.Timestamp decided_at = 14;
-  // A person's single sign-on groups as the console last read them, one of
-  // which may be granted instead: shown to the API's team only.
+  // A person's single sign-on groups (when they asked, or as read since),
+  // one of which may be granted instead: shown to the API's maintainers
+  // only, and only while it waits.
   repeated string groups = 15;
+  // When those groups were read: older than 24 hours, a group can't be
+  // granted from them (GROUPS_STALE) unless Google Workspace confirms it.
+  google.protobuf.Timestamp groups_read_at = 16;
+  // When its API left the catalog's release; unset while it's published.
+  google.protobuf.Timestamp away_since = 17;
 }
 
 message RequestApiAccessRequest {
@@ -482,3 +501,12 @@ message SetGatewayClosedRequest {
 }
 
 message SetGatewayClosedResponse {}
+
+message ListAwayApiAccessRequest {
+  string team = 1;
+}
+
+message ListAwayApiAccessResponse {
+  repeated ApiGrant grants = 1;
+  repeated ApiAccessRequest requests = 2;
+}

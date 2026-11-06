@@ -498,6 +498,13 @@
       "when": 1793934221028,
       "tag": "0070_api_grants_kept",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1793935903070,
+      "tag": "0071_api_grants_away",
+      "breakpoints": true
     }
   ]
 }

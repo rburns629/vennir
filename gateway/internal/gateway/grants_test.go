@@ -167,6 +167,7 @@ func TestAccessCasesSharedWithTheConsole(t *testing.T) {
 	type grant struct {
 		ID, UserID, Group string
 		PerMinute         int
+		Revoked, Away     bool
 	}
 	type apiFields struct {
 		ID        string
@@ -213,6 +214,10 @@ func TestAccessCasesSharedWithTheConsole(t *testing.T) {
 		st := &store.Store{}
 		var grants []store.Grant
 		for _, g := range c.Grants {
+			// The store holds only active grants of published APIs (store.readGrants).
+			if g.Revoked || g.Away {
+				continue
+			}
 			grants = append(grants, store.Grant{ID: g.ID, UserID: g.UserID, Group: g.Group, PerMinute: g.PerMinute})
 		}
 		st.PutGrants(api.ID, grants)

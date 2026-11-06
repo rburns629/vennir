@@ -1,5 +1,5 @@
 {
-  "_comment": "Who may call an API (decision 26): one table both accessFor implementations run, the console's (console/test/api-access.test.ts, core/apiAccess.ts) and the gateway's (gateway/internal/gateway/grants_test.go), so they can't drift. Grants are the API's active ones; a perMinute of 0 is the API's default. expect null: the caller may not call it; staleGroup: the gateway's 'sign in again' case (a group's grant would let them in, but their groups don't count now).",
+  "_comment": "Who may call an API (decision 26): one table both accessFor implementations run, the console's (console/test/api-access.test.ts, core/apiAccess.ts) and the gateway's (gateway/internal/gateway/grants_test.go), so they can't drift. A grant is active unless revoked, and of the published API unless away (no api_id; the gateway's store never holds either); a perMinute of 0 is the API's default. expect null: the caller may not call it; staleGroup: the gateway's 'sign in again' case (a group's grant would let them in, but their groups don't count now).",
   "gatewayDefaultPerMinute": 600,
   "api": { "id": "api-1", "team": "pay", "shareWith": ["web"], "perMinute": { "default": 60, "web": 600 } },
   "cases": [
@@ -95,6 +95,30 @@
       "caller": { "id": "p", "teams": ["data", "web"], "groupsCurrent": true },
       "grants": [],
       "expect": { "via": "catalog", "team": "data", "perMinute": 5 }
+    },
+    {
+      "name": "a revoked grant",
+      "caller": { "id": "p", "groupsCurrent": true },
+      "grants": [{ "id": "g1", "userId": "p", "revoked": true }],
+      "expect": null
+    },
+    {
+      "name": "a revoked group grant: not even 'sign in again'",
+      "caller": { "id": "p", "groups": ["eng"], "groupsCurrent": false },
+      "grants": [{ "id": "g-eng", "group": "eng", "revoked": true }],
+      "expect": null
+    },
+    {
+      "name": "a grant of the API while it was away from the release (no api_id)",
+      "caller": { "id": "p", "groups": ["eng"], "groupsCurrent": true },
+      "grants": [{ "id": "g1", "userId": "p", "away": true }, { "id": "g-eng", "group": "eng", "away": true }],
+      "expect": null
+    },
+    {
+      "name": "a stale group, a revoked user grant, and an active one: the active one",
+      "caller": { "id": "p", "groups": ["eng"], "groupsCurrent": false },
+      "grants": [{ "id": "g0", "userId": "p", "revoked": true }, { "id": "g-eng", "group": "eng" }, { "id": "g1", "userId": "p", "perMinute": 7 }],
+      "expect": { "via": "user", "grant": "g1", "perMinute": 7 }
     },
     {
       "name": "nobody",

@@ -679,14 +679,14 @@ Why the gateway can't serve an API: its OpenAPI document can't be read or used, 
 
 ### api_grants
 
-Who may call an API besides its own team (decision 26): a single sign-on group (each person in it) or one user (a person or a bot). Made and changed by the API's team's maintainers, directly or by approving a request; revoked by them, an admin, the person it names (their own), or a maintainer of the bot's team (their bot's). Revoked grants stay, for the history. The gateway reads the active ones every few seconds, so a revoked one stops calls within its refresh (well under a minute). Grants are this install's own: the catalog doesn't carry them. Kept while their API is out of the catalog's release (its row gone, `api_id` null; such a grant lets nobody call anything), and linked again when an API of the same team and name is back. Deleted with its team.
+Who may call an API besides its own team (decision 26): a single sign-on group (each person in it) or one user (a person or a bot). Made and changed by the API's team's maintainers, directly or by approving a request; revoked by them, an admin, the person it names (their own), or a maintainer of the bot's team (their bot's). Revoked grants stay, for the history. The gateway reads the active ones every few seconds, so a revoked one stops calls within its refresh (well under a minute). Grants are this install's own: the catalog doesn't carry them. Kept for 30 days while their API is out of the catalog's release (its row gone, `api_id` null, `away_since` set; such a grant lets nobody call anything, and its team's maintainers or an admin may revoke it), linked again when an API of the same team and name is back within them, and deleted after (retention.ts). Deleted with its team.
 
 | Column | Type | Null | Meaning |
 | --- | --- | --- | --- |
 | `id` | uuid | no | |
 | `api_id` | uuid | yes | The API (`apis.id`); null while it's out of the release. Among active grants, unique with the principal. |
 | `team_id` | uuid | no | The API's team (`teams.id`). |
-| `api_name` | text | no | The API's name: with `team_id`, how the grant finds its API again when it's back in a release. |
+| `api_name` | text | no | The API's name: with `team_id` (indexed together), how the grant finds its API again when it's back in a release. |
 | `group_name` | text | yes | A group, trimmed and lowercased as group mappings take them (a groups claim value, spaces and all, or a Google group's email), up to 256 characters. Exactly one of this and `user_id`. Among active grants, unique with `api_id`. |
 | `user_id` | uuid | yes | A person or a bot (`users.id`). Among active grants, unique with `api_id`. Deleted with the user. |
 | `per_minute` | integer | yes | Requests a minute: a user's, or each member's of a group. Null: the API's default limit (`per_minute`'s `default`, else the gateway's). |
@@ -695,11 +695,13 @@ Who may call an API besides its own team (decision 26): a single sign-on group (
 | `created_at` | timestamptz | no | |
 | `updated_at` | timestamptz | no | When its rate last changed. |
 | `revoked_at` | timestamptz | yes | When it was revoked; null while it's active. |
-| `revoked_by` | uuid | yes | Who revoked it. |
+| `revoked_by` | uuid | yes | Who revoked it; null when the platform did (`revoke_reason`). |
+| `revoke_reason` | text | yes | Why the platform revoked it: superseded by a grant to the same group or user made while its API was away. |
+| `away_since` | timestamptz | yes | When its API left the catalog's release; null while it's published. 30 days after, it's deleted. |
 
 ### api_access_requests
 
-A request for access to an API: a person's for themselves, or a maintainer's for one of their team's bots, with a reason. At most one waits per API and user; after a decline, the next may be asked at once. Kept, as grants are, while its API is out of the release. Deleted with its team or its user.
+A request for access to an API: a person's for themselves, or a maintainer's for one of their team's bots, with a reason. At most one waits per API and user; after a decline, the next may be asked at once. Kept, as grants are, for 30 days while its API is out of the release; then a waiting one is declined, saying why, and one ended that long ago deleted. Deleted with its team or its user.
 
 | Column | Type | Null | Meaning |
 | --- | --- | --- | --- |
@@ -710,13 +712,15 @@ A request for access to an API: a person's for themselves, or a maintainer's for
 | `user_id` | uuid | no | Whom it's for: the person, or the bot. With `api_id`, unique while `waiting`. |
 | `requested_by` | uuid | yes | Who asked: the person themselves, or the bot's team's maintainer. |
 | `reason` | text | no | Why, as they said it. |
-| `requester_groups` | text[] | no | A person's groups when they asked (`users.sso_groups`), one of which the API's maintainers may grant instead; shown to them only while it waits. Empty for a bot. |
+| `requester_groups` | text[] | no | A person's groups when they asked (`users.sso_groups`), one of which the API's maintainers may grant instead; shown to them only while it waits (or the person's as read since, if later). Empty for a bot, and emptied when where groups come from changes. |
+| `requester_groups_read_at` | timestamptz | yes | When those groups were read. Over 24 hours ago, a group can't be granted from them unless Google Workspace confirms it. |
 | `state` | text | no | `waiting`, `granted`, `declined` or `withdrawn`. |
 | `decided_by` | uuid | yes | The maintainer who granted or declined it, or who withdrew it. |
 | `decision_reason` | text | yes | A decline's reason. |
 | `grant_id` | uuid | yes | The grant it made (`api_grants.id`), when granted. |
 | `created_at` | timestamptz | no | |
 | `decided_at` | timestamptz | yes | When it was granted, declined or withdrawn. |
+| `away_since` | timestamptz | yes | When its API left the catalog's release; null while it's published. |
 
 ### user_groups
 

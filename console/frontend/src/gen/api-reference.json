@@ -236,6 +236,15 @@
      "streaming": false,
      "idempotency": "read",
      "public": false
+    },
+    {
+     "name": "ListAwayApiAccess",
+     "comment": "The grants and requests of a team's APIs that left the catalog's\nrelease (away_since): kept 30 days, to come back with an API of the\nsame name, and revocable meanwhile by the team's maintainers and\nadmins. Its members, and admins.",
+     "input": "vennir.console.v1.ListAwayApiAccessRequest",
+     "output": "vennir.console.v1.ListAwayApiAccessResponse",
+     "streaming": false,
+     "idempotency": "read",
+     "public": false
     }
    ]
   },
@@ -2466,6 +2475,20 @@
      "repeated": false,
      "optional": false,
      "comment": ""
+    },
+    {
+     "name": "revokeReason",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Why the platform revoked it (superseded by a grant made while its API\nwas away), when it did."
+    },
+    {
+     "name": "awaySince",
+     "type": "timestamp (RFC 3339 string)",
+     "repeated": false,
+     "optional": false,
+     "comment": "When its API left the catalog's release; unset while it's published.\nRemoved 30 days after."
     }
    ]
   },
@@ -2577,7 +2600,21 @@
      "type": "string",
      "repeated": true,
      "optional": false,
-     "comment": "A person's single sign-on groups as the console last read them, one of\nwhich may be granted instead: shown to the API's team only."
+     "comment": "A person's single sign-on groups (when they asked, or as read since),\none of which may be granted instead: shown to the API's maintainers\nonly, and only while it waits."
+    },
+    {
+     "name": "groupsReadAt",
+     "type": "timestamp (RFC 3339 string)",
+     "repeated": false,
+     "optional": false,
+     "comment": "When those groups were read: older than 24 hours, a group can't be\ngranted from them (GROUPS_STALE) unless Google Workspace confirms it."
+    },
+    {
+     "name": "awaySince",
+     "type": "timestamp (RFC 3339 string)",
+     "repeated": false,
+     "optional": false,
+     "comment": "When its API left the catalog's release; unset while it's published."
     }
    ]
   },
@@ -3724,6 +3761,41 @@
    "name": "SetGatewayClosedResponse",
    "comment": "",
    "fields": []
+  },
+  "vennir.console.v1.ListAwayApiAccessRequest": {
+   "name": "ListAwayApiAccessRequest",
+   "comment": "",
+   "fields": [
+    {
+     "name": "team",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    }
+   ]
+  },
+  "vennir.console.v1.ListAwayApiAccessResponse": {
+   "name": "ListAwayApiAccessResponse",
+   "comment": "",
+   "fields": [
+    {
+     "name": "grants",
+     "type": "ApiGrant",
+     "ref": "vennir.console.v1.ApiGrant",
+     "repeated": true,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "requests",
+     "type": "ApiAccessRequest",
+     "ref": "vennir.console.v1.ApiAccessRequest",
+     "repeated": true,
+     "optional": false,
+     "comment": ""
+    }
+   ]
   },
   "vennir.console.v1.GetEnvironmentRequest": {
    "name": "GetEnvironmentRequest",

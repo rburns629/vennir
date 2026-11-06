@@ -290,7 +290,12 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 // meanwhile, with a groups claim saved, the gateway drops group-given teams
 // from API tokens and password sessions, and refuses older single sign-on
 // sessions holding one, where the console counts them. It errs on the
-// refusing side.
+// refusing side there. For an API's group grants, where on would be the
+// permissive side, the console stops reading groups while it treats single
+// sign-on as off (no sign-in reads them, and its Google resync runs only
+// while single sign-on is in effect), so Google's rows age out past
+// googleGroupsFresh and a claim's need a recent single sign-on, which can't
+// be had: groups stop counting here too.
 func (r *Resolver) ssoOn(saved bool) bool {
 	return r.SSO || saved
 }

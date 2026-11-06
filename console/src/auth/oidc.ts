@@ -30,7 +30,7 @@ import fastifyCookie from "@fastify/cookie";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply } from "fastify";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { config } from "../config.js";
-import { currentSso, groupsOf, GroupsUnavailable, holdsGroupGrant, ssoSessionSeconds, storeUserGroups, syncMappedTeams, type Sso } from "../sso.js";
+import { currentSso, groupSettingsNow, groupsOf, GroupsUnavailable, holdsGroupGrant, ssoSessionSeconds, storeUserGroups, syncMappedTeams, type Sso } from "../sso.js";
 import { bindOidcSubject, createSsoUser, findUserByEmail, findUserByOidcSubject, recordSignIn, teamRolesForUser } from "../db/queries.js";
 import { newSession } from "./plugin.js";
 import { writeAuditEntry } from "../audit.js";
@@ -210,6 +210,8 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
       if (!idToken) throw new Error("the provider sent no ID token");
 
       const { email, subject, claims } = await verifiedClaims(oidc, idToken, flow.nonce);
+      // The settings groups are read under, so a change meanwhile skips their write.
+      const readUnder = groupSettingsNow();
       let groups: string[] | null;
       try {
         groups = await groupsOf(claims, email);
@@ -220,7 +222,7 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
       const user = await accountFor(email, subject, request.log);
       if (groups !== null) await syncMappedTeams(user.id, groups, request.log);
       // Their groups for the gateway's group grants (none without a source).
-      await storeUserGroups(user.id, groups);
+      await storeUserGroups(user.id, groups, readUnder);
       // An hour at most while a group gives them a team or an API's grant.
       const expiresIn = ssoSessionSeconds(
         groups !== null && ((await teamRolesForUser(user.id)).some((row) => row.fromGroups) || (await holdsGroupGrant(user.id))),

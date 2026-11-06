@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /** Thin, explicit query wrappers — no logic beyond the query itself. */
-import { and, arrayContains, arrayOverlaps, count, desc, eq, gte, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, arrayContains, arrayOverlaps, count, desc, eq, gt, gte, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { imageRepository } from "../imageRef.js";
 import { db } from "./client.js";
 import {
@@ -1383,23 +1383,59 @@ export async function upsertApi(
   input: Omit<typeof apis.$inferInsert, "id" | "pausedMessage" | "pausedBy" | "updatedAt">,
 ): Promise<void> {
   const { teamId, name, ...rest } = input;
-  const [row] = await db
-    .insert(apis)
-    .values({ teamId, name, ...rest })
-    .onConflictDoUpdate({ target: [apis.teamId, apis.name], set: { ...rest, updatedAt: new Date() } })
-    .returning({ id: apis.id });
-  if (!row) return;
-  // Back in the release after being dropped: its grants and requests are its
-  // again (they're kept by its team and name while it's away).
-  const away = and(isNull(apiGrants.apiId), eq(apiGrants.teamId, teamId), eq(apiGrants.apiName, name));
-  await db.update(apiGrants).set({ apiId: row.id }).where(away);
-  await db
-    .update(apiAccessRequests)
-    .set({ apiId: row.id })
-    .where(and(isNull(apiAccessRequests.apiId), eq(apiAccessRequests.teamId, teamId), eq(apiAccessRequests.apiName, name)));
+  await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(apis)
+      .values({ teamId, name, ...rest })
+      .onConflictDoUpdate({ target: [apis.teamId, apis.name], set: { ...rest, updatedAt: new Date() } })
+      .returning({ id: apis.id });
+    if (!row) return;
+    // Back in the release within API_AWAY_DAYS of leaving it: its grants and
+    // requests are its again (kept by its team and name meanwhile), in the
+    // same transaction. One that would collide with a grant or request made
+    // meanwhile is superseded: revoked, or declined, by the platform.
+    const within = sql`now() - make_interval(days => ${API_AWAY_DAYS})`;
+    const awayGrants = and(isNull(apiGrants.apiId), eq(apiGrants.teamId, teamId), eq(apiGrants.apiName, name), gt(apiGrants.awaySince, within));
+    await tx
+      .update(apiGrants)
+      .set({ revokedAt: new Date(), revokeReason: "superseded: a grant to the same group or user was made while the API was away" })
+      .where(
+        and(
+          awayGrants,
+          isNull(apiGrants.revokedAt),
+          sql`exists (select 1 from api_grants o where o.api_id = ${row.id} and o.revoked_at is null
+            and (o.user_id = ${apiGrants.userId} or o.group_name = ${apiGrants.groupName}))`,
+        ),
+      );
+    await tx.update(apiGrants).set({ apiId: row.id, awaySince: null }).where(awayGrants);
+    const awayRequests = and(
+      isNull(apiAccessRequests.apiId),
+      eq(apiAccessRequests.teamId, teamId),
+      eq(apiAccessRequests.apiName, name),
+      gt(apiAccessRequests.awaySince, within),
+    );
+    await tx
+      .update(apiAccessRequests)
+      .set({ state: "declined", decisionReason: "superseded: another request of theirs was made while the API was away", decidedAt: new Date() })
+      .where(
+        and(
+          awayRequests,
+          eq(apiAccessRequests.state, "waiting"),
+          sql`exists (select 1 from api_access_requests o where o.api_id = ${row.id} and o.state = 'waiting' and o.user_id = ${apiAccessRequests.userId})`,
+        ),
+      );
+    await tx.update(apiAccessRequests).set({ apiId: row.id, awaySince: null }).where(awayRequests);
+  });
 }
 
-/** Removes every API of these teams but those kept ("<team id>/<name>"); returns how many went. */
+/** How long an API's grants and requests are kept after it leaves the catalog's release, to come back with it. */
+export const API_AWAY_DAYS = 30;
+
+/**
+ * Removes every API of these teams but those kept ("<team id>/<name>");
+ * returns how many went. Their grants and requests stay, away since now
+ * (api_id null), for API_AWAY_DAYS.
+ */
 export async function deleteApisExcept(teamIds: string[], keep: Set<string>): Promise<number> {
   if (teamIds.length === 0) return 0;
   const all = await db
@@ -1407,7 +1443,14 @@ export async function deleteApisExcept(teamIds: string[], keep: Set<string>): Pr
     .from(apis)
     .where(inArray(apis.teamId, teamIds));
   const gone = all.filter((a) => !keep.has(`${a.teamId}/${a.name}`)).map((a) => a.id);
-  if (gone.length > 0) await db.delete(apis).where(inArray(apis.id, gone));
+  if (gone.length > 0) {
+    await db.transaction(async (tx) => {
+      const now = new Date();
+      await tx.update(apiGrants).set({ awaySince: now }).where(inArray(apiGrants.apiId, gone));
+      await tx.update(apiAccessRequests).set({ awaySince: now }).where(inArray(apiAccessRequests.apiId, gone));
+      await tx.delete(apis).where(inArray(apis.id, gone));
+    });
+  }
   return gone.length;
 }
 

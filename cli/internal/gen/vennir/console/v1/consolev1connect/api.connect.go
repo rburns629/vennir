@@ -77,6 +77,9 @@ const (
 	// ApiServiceListTeamBotApiAccessProcedure is the fully-qualified name of the ApiService's
 	// ListTeamBotApiAccess RPC.
 	ApiServiceListTeamBotApiAccessProcedure = "/vennir.console.v1.ApiService/ListTeamBotApiAccess"
+	// ApiServiceListAwayApiAccessProcedure is the fully-qualified name of the ApiService's
+	// ListAwayApiAccess RPC.
+	ApiServiceListAwayApiAccessProcedure = "/vennir.console.v1.ApiService/ListAwayApiAccess"
 )
 
 // ApiServiceClient is a client for the vennir.console.v1.ApiService service.
@@ -132,6 +135,11 @@ type ApiServiceClient interface {
 	ListMyApiAccess(context.Context, *connect.Request[v1.ListMyApiAccessRequest]) (*connect.Response[v1.ListMyApiAccessResponse], error)
 	// A team's bots' grants and requests: its members, and admins.
 	ListTeamBotApiAccess(context.Context, *connect.Request[v1.ListTeamBotApiAccessRequest]) (*connect.Response[v1.ListTeamBotApiAccessResponse], error)
+	// The grants and requests of a team's APIs that left the catalog's
+	// release (away_since): kept 30 days, to come back with an API of the
+	// same name, and revocable meanwhile by the team's maintainers and
+	// admins. Its members, and admins.
+	ListAwayApiAccess(context.Context, *connect.Request[v1.ListAwayApiAccessRequest]) (*connect.Response[v1.ListAwayApiAccessResponse], error)
 }
 
 // NewApiServiceClient constructs a client for the vennir.console.v1.ApiService service. By default,
@@ -248,6 +256,13 @@ func NewApiServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		listAwayApiAccess: connect.NewClient[v1.ListAwayApiAccessRequest, v1.ListAwayApiAccessResponse](
+			httpClient,
+			baseURL+ApiServiceListAwayApiAccessProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("ListAwayApiAccess")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -269,6 +284,7 @@ type apiServiceClient struct {
 	listApiAccess            *connect.Client[v1.ListApiAccessRequest, v1.ListApiAccessResponse]
 	listMyApiAccess          *connect.Client[v1.ListMyApiAccessRequest, v1.ListMyApiAccessResponse]
 	listTeamBotApiAccess     *connect.Client[v1.ListTeamBotApiAccessRequest, v1.ListTeamBotApiAccessResponse]
+	listAwayApiAccess        *connect.Client[v1.ListAwayApiAccessRequest, v1.ListAwayApiAccessResponse]
 }
 
 // ListApis calls vennir.console.v1.ApiService.ListApis.
@@ -351,6 +367,11 @@ func (c *apiServiceClient) ListTeamBotApiAccess(ctx context.Context, req *connec
 	return c.listTeamBotApiAccess.CallUnary(ctx, req)
 }
 
+// ListAwayApiAccess calls vennir.console.v1.ApiService.ListAwayApiAccess.
+func (c *apiServiceClient) ListAwayApiAccess(ctx context.Context, req *connect.Request[v1.ListAwayApiAccessRequest]) (*connect.Response[v1.ListAwayApiAccessResponse], error) {
+	return c.listAwayApiAccess.CallUnary(ctx, req)
+}
+
 // ApiServiceHandler is an implementation of the vennir.console.v1.ApiService service.
 type ApiServiceHandler interface {
 	// Every API the caller may see, by team and name.
@@ -404,6 +425,11 @@ type ApiServiceHandler interface {
 	ListMyApiAccess(context.Context, *connect.Request[v1.ListMyApiAccessRequest]) (*connect.Response[v1.ListMyApiAccessResponse], error)
 	// A team's bots' grants and requests: its members, and admins.
 	ListTeamBotApiAccess(context.Context, *connect.Request[v1.ListTeamBotApiAccessRequest]) (*connect.Response[v1.ListTeamBotApiAccessResponse], error)
+	// The grants and requests of a team's APIs that left the catalog's
+	// release (away_since): kept 30 days, to come back with an API of the
+	// same name, and revocable meanwhile by the team's maintainers and
+	// admins. Its members, and admins.
+	ListAwayApiAccess(context.Context, *connect.Request[v1.ListAwayApiAccessRequest]) (*connect.Response[v1.ListAwayApiAccessResponse], error)
 }
 
 // NewApiServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -516,6 +542,13 @@ func NewApiServiceHandler(svc ApiServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	apiServiceListAwayApiAccessHandler := connect.NewUnaryHandler(
+		ApiServiceListAwayApiAccessProcedure,
+		svc.ListAwayApiAccess,
+		connect.WithSchema(apiServiceMethods.ByName("ListAwayApiAccess")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/vennir.console.v1.ApiService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ApiServiceListApisProcedure:
@@ -550,6 +583,8 @@ func NewApiServiceHandler(svc ApiServiceHandler, opts ...connect.HandlerOption) 
 			apiServiceListMyApiAccessHandler.ServeHTTP(w, r)
 		case ApiServiceListTeamBotApiAccessProcedure:
 			apiServiceListTeamBotApiAccessHandler.ServeHTTP(w, r)
+		case ApiServiceListAwayApiAccessProcedure:
+			apiServiceListAwayApiAccessHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -621,4 +656,8 @@ func (UnimplementedApiServiceHandler) ListMyApiAccess(context.Context, *connect.
 
 func (UnimplementedApiServiceHandler) ListTeamBotApiAccess(context.Context, *connect.Request[v1.ListTeamBotApiAccessRequest]) (*connect.Response[v1.ListTeamBotApiAccessResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.ListTeamBotApiAccess is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) ListAwayApiAccess(context.Context, *connect.Request[v1.ListAwayApiAccessRequest]) (*connect.Response[v1.ListAwayApiAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.ListAwayApiAccess is not implemented"))
 }

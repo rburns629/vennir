@@ -24,10 +24,10 @@ import { db } from "../src/db/client.js";
 import { hashPassword } from "../src/auth/password.js";
 import { newSession } from "../src/auth/plugin.js";
 import { addTeamMember, createTeam, createUser, purgeTeam, setUserPassword, teamRolesForUser } from "../src/db/queries.js";
-import { apiGrants, apis, auditLog, ssoGroupMappings, ssoSettings, teamMemberships, teams, userGroups, users } from "../src/db/schema.js";
+import { apiAccessRequests, apiGrants, apis, auditLog, ssoGroupMappings, ssoSettings, teamMemberships, teams, userGroups, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { decideRequest, requestAccess } from "../src/core/apiAccess.js";
-import { CLAIM_GROUPS_SESSION_SECONDS, keepGrantedGroup, refreshSso, resyncGoogleGroups } from "../src/sso.js";
+import { CLAIM_GROUPS_SESSION_SECONDS, groupSettingsNow, keepGrantedGroup, refreshSso, resyncGoogleGroups, storeUserGroups } from "../src/sso.js";
 import { CLIENT_ID, CLIENT_SECRET, startProvider } from "./oidcProvider.js";
 import { caller, PASSWORD, rpcClient } from "./rpc.js";
 
@@ -557,6 +557,54 @@ describe("a session that groups from a claim gave a team", () => {
     await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-premapped", team });
     expect(await teamsSeen(old)).toBe("unauthenticated");
     expect(await teamsSeen(signedInAgo(early.id, 60))).toEqual([team]);
+  });
+});
+
+describe("kept groups and the settings they're read under", () => {
+  it("aren't written when the settings changed since they were read (another console changed them)", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const [row] = await db.insert(users).values({ email: `under@${domain}` }).returning();
+    const readUnder = groupSettingsNow();
+    expect(await storeUserGroups(row?.id ?? "", ["g-x"], { ...readUnder, claim: "roles" })).toBe(false);
+    expect(await storeUserGroups(row?.id ?? "", ["g-x"], { ...readUnder, issuer: "https://elsewhere.example" })).toBe(false);
+    expect((await db.select({ g: users.ssoGroups }).from(users).where(eq(users.id, row?.id ?? "")))[0]?.g).toBeNull();
+    expect(await storeUserGroups(row?.id ?? "", ["g-x"], readUnder)).toBe(true);
+    expect((await db.select({ g: users.ssoGroups }).from(users).where(eq(users.id, row?.id ?? "")))[0]?.g).toEqual(["g-x"]);
+  });
+
+  it("are emptied with waiting requests' copies when the sources change; an issuer change counts", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const [api] = await db
+      .insert(apis)
+      .values({ teamId: ids[teamA] ?? "", name: "copies", displayName: "C", openapi: { openapi: "3.1.0", paths: {} }, backendUrl: "https://x.example", serviceAccount: "copies-api" })
+      .returning();
+    const [someone] = await db.insert(users).values({ email: `copied@${domain}` }).returning();
+    const [request] = await db
+      .insert(apiAccessRequests)
+      .values({ apiId: api?.id ?? "", teamId: ids[teamA] ?? "", apiName: "copies", userId: someone?.id ?? "", reason: "r", requesterGroups: ["g-a"], requesterGroupsReadAt: new Date() })
+      .returning();
+    // The same settings again: nothing changes.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]?.requesterGroups).toEqual(["g-a"]);
+    // Another issuer: everyone's groups, and the copies, go.
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const url = String(input instanceof Request ? input.url : input);
+      return Promise.resolve(url.includes("openid-configuration") ? Response.json({ issuer: "https://other.example" }) : new Response("", { status: 404 }));
+    });
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", issuer: "https://other.example" }));
+    vi.restoreAllMocks();
+    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]).toMatchObject({ requesterGroups: [], requesterGroupsReadAt: null });
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
+  });
+
+  it("from Google aren't read again while single sign-on isn't in effect here", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "", googleGroups: true, enabled: false }));
+    const spy = vi.spyOn(globalThis, "fetch");
+    expect(await resyncGoogleGroups(app.log)).toBe(0);
+    expect(spy.mock.calls.filter(([input]) => String(input instanceof Request ? input.url : input).includes("cloudidentity"))).toEqual([]);
+    spy.mockRestore();
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
   });
 });
 

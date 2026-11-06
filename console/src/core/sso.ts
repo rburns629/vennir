@@ -138,7 +138,7 @@ export async function setSsoSettings(caller: AuthUser | undefined, input: SsoSet
   const sourcesChanged =
     (stored?.groupsClaim ?? "") !== groups.groupsClaim ||
     (stored?.googleGroups ?? false) !== groups.googleGroups ||
-    (!config.oidc && (stored?.enabled ?? false) !== input.enabled);
+    (!config.oidc && ((stored?.enabled ?? false) !== input.enabled || (stored?.issuer ?? "") !== input.issuer));
   if (sourcesChanged) await clearKeptGroups();
   // Groups decide mapped teams' single sign-on members from now on, those
   // added by hand while no source was set included.

@@ -6,6 +6,7 @@ import {
   addGrant,
   decideRequest,
   listApiAccess,
+  listAwayAccess,
   listMyAccess,
   listTeamBotAccess,
   MAX_GRANT_PER_MINUTE,
@@ -51,11 +52,11 @@ function product(a: ApiView) {
 }
 
 function grant(g: GrantView) {
-  return { ...g, createdAt: timestamp(g.createdAt), updatedAt: timestamp(g.updatedAt), revokedAt: timestamp(g.revokedAt) };
+  return { ...g, createdAt: timestamp(g.createdAt), updatedAt: timestamp(g.updatedAt), revokedAt: timestamp(g.revokedAt), awaySince: timestamp(g.awaySince) };
 }
 
 function request(r: RequestView) {
-  return { ...r, state: REQUEST_STATE[r.state], createdAt: timestamp(r.createdAt), decidedAt: timestamp(r.decidedAt) };
+  return { ...r, state: REQUEST_STATE[r.state], createdAt: timestamp(r.createdAt), decidedAt: timestamp(r.decidedAt), groupsReadAt: timestamp(r.groupsReadAt), awaySince: timestamp(r.awaySince) };
 }
 
 export function apiService(): ServiceImpl<typeof ApiService> {
@@ -176,6 +177,12 @@ export function apiService(): ServiceImpl<typeof ApiService> {
         })),
         requests: mine.requests.map(request),
       };
+    },
+
+    async listAwayApiAccess(req, ctx) {
+      const { team } = check({ team: Name }, req);
+      const a = await listAwayAccess(callerOf(ctx), team);
+      return { grants: a.grants.map(grant), requests: a.requests.map(request) };
     },
 
     async listTeamBotApiAccess(req, ctx) {

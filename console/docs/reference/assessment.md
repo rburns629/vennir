@@ -1047,6 +1047,11 @@ Proposed:
    ```
 
    Closed refuses new requests; grants already made stay until revoked.
+   An API that leaves the catalog's release keeps its grants and requests
+   for 30 days (listed as away, revocable by its team's maintainers and
+   admins, letting nobody call), gets them back if it returns under the
+   same team and name within them, and loses them after (built
+   2026-11-05).
    During the release with both, a `shareWith` team's members and bots
    keep calling, marked "from the catalog" (not revocable in the console;
    their named limit kept), and the catalog tool warns that `shareWith` is

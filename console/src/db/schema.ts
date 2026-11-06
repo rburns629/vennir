@@ -1244,6 +1244,10 @@ export const apiGrants = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     revokedBy: uuid("revoked_by").references(() => users.id, { onDelete: "set null" }),
+    // Why, when the platform revoked it (revoked_by null): one superseded by a grant made while its API was away.
+    revokeReason: text("revoke_reason"),
+    // When its API left the catalog's release (api_id null since); null while it's published.
+    awaySince: timestamp("away_since", { withTimezone: true }),
   },
   (table) => [
     check("api_grants_one_principal", sql`(${table.groupName} IS NULL) <> (${table.userId} IS NULL)`),
@@ -1252,6 +1256,7 @@ export const apiGrants = pgTable(
     uniqueIndex("api_grants_active_group").on(table.apiId, table.groupName).where(sql`revoked_at IS NULL AND group_name IS NOT NULL`),
     uniqueIndex("api_grants_active_user").on(table.apiId, table.userId).where(sql`revoked_at IS NULL AND user_id IS NOT NULL`),
     index("api_grants_user_idx").on(table.userId),
+    index("api_grants_team_api_idx").on(table.teamId, table.apiName),
   ],
 );
 
@@ -1282,17 +1287,22 @@ export const apiAccessRequests = pgTable(
     // A person's single sign-on groups when they asked (users.sso_groups),
     // one of which the API's maintainers may grant instead; none for a bot.
     requesterGroups: text("requester_groups").array().notNull().default(sql`'{}'::text[]`),
+    // When those groups were read (users.sso_groups_read_at then).
+    requesterGroupsReadAt: timestamp("requester_groups_read_at", { withTimezone: true }),
     state: text("state").$type<AccessRequestState>().notNull().default("waiting"),
     decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
     decisionReason: text("decision_reason"),
     grantId: uuid("grant_id").references((): AnyPgColumn => apiGrants.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
+    // When its API left the catalog's release (api_id null since); null while it's published.
+    awaySince: timestamp("away_since", { withTimezone: true }),
   },
   (table) => [
     check("api_access_requests_state", sql`${table.state} IN ('waiting', 'granted', 'declined', 'withdrawn')`),
     uniqueIndex("api_access_requests_one_waiting").on(table.apiId, table.userId).where(sql`state = 'waiting'`),
     index("api_access_requests_user_idx").on(table.userId),
+    index("api_access_requests_team_api_idx").on(table.teamId, table.apiName),
   ],
 );
 
