@@ -206,29 +206,23 @@ it was seen.
   console's identity policy holds the secret names alone). `kernel policy`
   signs in as a database role of its own, which `kernel migrate` gives
   only what it uses (`migrate.GrantPolicy`): with the bundled Postgres the
-  chart makes it (`postgres.auth.policyUsername`); with a managed one, as
-  the kernel's identity until the item below gives it its own. Next:
-  - **`kernel policy` on GKE and EKS**: its ServiceAccount
-    (`kernel-execution-kernel-policy`) needs read on the catalog's
-    registry (with a managed database it signs in as the kernel's
-    database identity, which both clouds' modules now bind it to, so that
-    identity, or another one bound for it, needs the read), and `vennir`
-    should set `catalogPolicy` from vennir.yaml as it sets
-    the console's `catalog` (`cli/internal/install`); then turn it on in
-    `helm/values/{gke,eks}/kernel.yaml` and prove it on a cloud. An
-    install reading another's catalog by federation needs its own grant
-    for it too (`vennir catalog grant`). With a managed database it needs
-    an identity of its own too: a cloud user (Cloud SQL IAM, or an RDS role
-    `database-setup` makes, in `rds_iam`) bound to its ServiceAccount
-    alone, `catalogPolicy.database.role` and `existingSecret` naming it,
-    and the kernel's grant in `DATABASE_SETUP` given `regrant` (so `kernel
-    migrate` can pass on CONNECT and the schema's USAGE). When `vennir` sets
-    `catalogPolicy`, generate the kernel chart's `catalogPolicy.release`
-    and `catalogPolicy.gateway.gcpTokenAudience` from the same values as the console
-    chart's `catalog.release` and `gateway.gcp.tokenAudience`: today
-    nothing checks they match. A mismatch fails closed (the kernel reads
-    another release, or gives `googleIdToken` APIs' ServiceAccounts an
-    audience the gateway doesn't ask for), but it breaks those APIs.
+  chart makes it (`postgres.auth.policyUsername`); with Cloud SQL, its own
+  IAM user (the gcp module's `policy` service account). On GKE `vennir`
+  turns it on for an install whose own catalog is signed
+  (`catalogPolicyValues`), reading the catalog's registry as that service
+  account, with the console's release, signers and gateway token audience
+  (one helper each, so the two charts can't disagree). Next:
+  - **`kernel policy` on EKS**: the aws module has no identity of its own
+    for it (it shares the kernel's database role, with no ECR read): a role
+    for `kernel-execution-kernel-policy` by Pod Identity, with ECR read on
+    the task registry and `rds-db:connect` as its own RDS user
+    (`database-setup` makes it, in `rds_iam`), then `catalogPolicyValues`
+    for aws (`registry.ecrToken`) and a proof on EKS.
+  - **Another install's catalog**: `kernel policy` is off when the catalog
+    is another install's (`externalCatalog`): the console reads it by its
+    own identity, or by federation, which `kernel policy` doesn't borrow.
+    It needs its own grant on that registry (`vennir catalog grant`), or
+    federation of its own.
 
 ## Console
 

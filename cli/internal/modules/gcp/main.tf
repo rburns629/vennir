@@ -284,6 +284,32 @@ resource "google_service_account_iam_member" "scanner_workload_identity" {
   depends_on         = [google_container_cluster.this]
 }
 
+# --- kernel policy's identity (decision 27): reads the task registry, where
+# the catalog's release is, to verify it itself, and with a managed database
+# signs in as its own user, which kernel migrate gives only what it uses.
+# Not the kernel's, nor the console's. ------------------------------------
+
+resource "google_service_account" "policy" {
+  account_id   = "${var.name}-policy"
+  display_name = "Vennir ${var.name}: kernel policy (reads the catalog's release)"
+  depends_on   = [google_project_service.apis]
+}
+
+resource "google_artifact_registry_repository_iam_member" "policy_read" {
+  location   = var.region
+  repository = var.task_registry
+  role       = "roles/artifactregistry.reader"
+  member     = google_service_account.policy.member
+  depends_on = [google_artifact_registry_repository.tasks]
+}
+
+resource "google_service_account_iam_member" "policy_workload_identity" {
+  service_account_id = google_service_account.policy.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "${local.ksa}/kernel-execution-kernel-policy]"
+  depends_on         = [google_container_cluster.this]
+}
+
 # --- backups of the in-cluster database ------------------------------------
 
 resource "google_storage_bucket" "backups" {
@@ -347,6 +373,7 @@ locals {
     kernel  = trimsuffix(google_service_account.kernel_db[0].email, ".gserviceaccount.com")
     console = trimsuffix(google_service_account.console.email, ".gserviceaccount.com")
     gateway = trimsuffix(google_service_account.gateway_db[0].email, ".gserviceaccount.com")
+    policy  = trimsuffix(google_service_account.policy.email, ".gserviceaccount.com")
     admin   = trimsuffix(google_service_account.database_admin[0].email, ".gserviceaccount.com")
   } : {}
 }
@@ -458,6 +485,7 @@ resource "google_project_iam_member" "database" {
     kernel  = google_service_account.kernel_db[0].member
     console = google_service_account.console.member
     gateway = google_service_account.gateway_db[0].member
+    policy  = google_service_account.policy.member
     admin   = google_service_account.database_admin[0].member
     } : {
     "${who}-client" = { member = sa, role = "roles/cloudsql.client" }
@@ -479,15 +507,14 @@ resource "google_project_iam_member" "database" {
 }
 
 # Which Kubernetes ServiceAccounts sign in as which: every kernel Pod that
-# connects (the scheduler, kernel-api and its migration, the sleeper, kernel
-# policy with the chart's catalogPolicy), the
-# gateway, and database-setup's Job. The console's is bound above.
+# connects (the scheduler, kernel-api and its migration, the sleeper), the
+# gateway, and database-setup's Job. The console's and kernel policy's are
+# bound above.
 resource "google_service_account_iam_member" "database_workload_identity" {
   for_each = var.managed_database ? {
     "kernel-execution-kernel"           = google_service_account.kernel_db[0].name
     "kernel-execution-kernel-api"       = google_service_account.kernel_db[0].name
     "kernel-execution-kernel-sleeper"   = google_service_account.kernel_db[0].name
-    "kernel-execution-kernel-policy"    = google_service_account.kernel_db[0].name
     "console-execution-console-gateway" = google_service_account.gateway_db[0].name
     "vennir-db-admin"                   = google_service_account.database_admin[0].name
   } : {}

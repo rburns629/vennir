@@ -563,3 +563,58 @@ func TestMonitoringValues(t *testing.T) {
 		t.Errorf("google console: %v", g)
 	}
 }
+
+// kernel policy (the kernel chart's catalogPolicy) on a GKE install whose
+// own catalog is signed: the console's release and signers, read as its
+// own Google identity, signing in as its own database user with a managed
+// one, and the gateway's token audience as the console chart has it.
+// Off when unsigned, on EKS, from a module before its identity, or with
+// another install's catalog.
+func TestKernelPolicyRunsOnAGKEInstallWhoseCatalogIsSigned(t *testing.T) {
+	c := kindConfig()
+	c.Target = "gcp"
+	c.GCP.Project = "acme"
+	c.Catalog.Owner, c.Catalog.Repository = "octocat", "vennir-catalog"
+	c.Gateway.Enabled = true
+	cloud := &Cloud{Provider: "gcp", TaskRegistry: "us-central1-docker.pkg.dev/p/vennir-products", PolicyServiceAccount: "dev-policy@acme.iam.gserviceaccount.com",
+		SigningPublicKey: "-----BEGIN PUBLIC KEY-----\nabc\n-----END PUBLIC KEY-----\n"}
+	if _, on := KernelValues(c, Images{}, "", cloud)["catalogPolicy"]; on {
+		t.Error("an unsigned catalog: no catalogPolicy")
+	}
+	c.Signing = "kms"
+	p, _ := KernelValues(c, Images{}, "", cloud)["catalogPolicy"].(map[string]any)
+	console := ConsoleValues(c, "dev", Images{}, cloud)
+	catalog := console["catalog"].(map[string]any)
+	if p["enabled"] != true || p["release"] != catalog["release"] || fmt.Sprint(p["signature"]) != fmt.Sprint(catalog["signature"]) {
+		t.Fatalf("catalogPolicy %v, the console's catalog %v", p, catalog)
+	}
+	if fmt.Sprint(p["registry"]) != "map[gcpMetadataToken:true]" ||
+		fmt.Sprint(p["serviceAccountAnnotations"]) != "map[iam.gke.io/gcp-service-account:dev-policy@acme.iam.gserviceaccount.com]" {
+		t.Errorf("its identity: %v %v", p["registry"], p["serviceAccountAnnotations"])
+	}
+	gateway := p["gateway"].(map[string]any)
+	if gateway["serviceAccount"] != "console-execution-console-gateway" ||
+		gateway["gcpTokenAudience"] != console["gateway"].(map[string]any)["gcp"].(map[string]any)["tokenAudience"] {
+		t.Errorf("the gateway: %v, the console's %v", gateway, console["gateway"])
+	}
+	if _, set := p["database"]; set {
+		t.Errorf("the bundled Postgres: the chart's own role, not %v", p["database"])
+	}
+	cloud.Database = &ManagedDatabase{Provider: "gcp", KernelUser: "dev-kernel@acme.iam", PolicyUser: "dev-policy@acme.iam"}
+	p = KernelValues(c, Images{}, "", cloud)["catalogPolicy"].(map[string]any)
+	if fmt.Sprint(p["database"]) != "map[existingSecret:vennir-kernel-policy-db role:dev-policy@acme.iam]" {
+		t.Errorf("a managed database: %v", p["database"])
+	}
+
+	for name, change := range map[string]func(*Cloud, *config.Config){
+		"EKS":                       func(cl *Cloud, _ *config.Config) { cl.Provider = "aws" },
+		"a module from before":      func(cl *Cloud, _ *config.Config) { cl.PolicyServiceAccount = "" },
+		"another install's catalog": func(_ *Cloud, cfg *config.Config) { cfg.ExternalCatalog.Registry = "us-docker.pkg.dev/other/catalog" },
+	} {
+		cl, cfg := *cloud, *c
+		change(&cl, &cfg)
+		if _, on := KernelValues(&cfg, Images{}, "", &cl)["catalogPolicy"]; on {
+			t.Errorf("%s: no catalogPolicy", name)
+		}
+	}
+}

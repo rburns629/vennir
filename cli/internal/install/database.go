@@ -35,6 +35,9 @@ type ManagedDatabase struct {
 	// The database user each service signs in as, and the administrator
 	// database-setup runs as.
 	KernelUser, ConsoleUser, GatewayUser, AdminUser string
+	// PolicyUser is kernel policy's own (empty from a module before it: it
+	// then signs in as KernelUser), which kernel migrate grants what it uses.
+	PolicyUser string
 	// gcp: the Google service accounts the kernel's, the gateway's and
 	// database-setup's Kubernetes ServiceAccounts are bound to (the
 	// console's is ConsoleServiceAccount).
@@ -50,6 +53,7 @@ const (
 	// The console's and the gateway's database URLs (no password in them).
 	ConsoleDatabaseSecret = "vennir-console-db"
 	GatewayDatabaseSecret = "vennir-gateway-db"
+	PolicyDatabaseSecret  = "vennir-kernel-policy-db"
 	// DatabaseAdminAccount is the ServiceAccount database-setup runs as,
 	// bound to the module's administrator identity.
 	DatabaseAdminAccount = "vennir-db-admin"
@@ -201,6 +205,18 @@ metadata:
 		ConsoleDatabaseSecret, db.url(db.ConsoleUser, "execution_console", true),
 		GatewayDatabaseSecret, db.url(db.GatewayUser, "execution_console", false),
 		DatabaseAdminAccount, annotations)
+	if db.PolicyUser != "" {
+		// kernel policy's own sign-in (the kernel chart's catalogPolicy.database).
+		secrets += fmt.Sprintf(`---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: %s
+  labels: {app.kubernetes.io/managed-by: vennir}
+stringData:
+  database-url: %q
+`, PolicyDatabaseSecret, db.url(db.PolicyUser, "execution_kernel", false))
+	}
 	if err := r.RunInput(ctx, secrets, "kubectl", k("apply", "-f", "-")...); err != nil {
 		return err
 	}
@@ -241,7 +257,12 @@ func databaseSetupManifest(db *ManagedDatabase, image string) (string, error) {
 		Databases []string `json:"databases,omitempty"`
 		Roles     []role   `json:"roles,omitempty"`
 		Grants    []grant  `json:"grants"`
-	}{Grants: []grant{{Database: "execution_kernel", Role: db.KernelUser}, {Database: "execution_console", Role: db.ConsoleUser, Regrant: true}}}
+	}{Grants: []grant{
+		// The kernel passes CONNECT and the schema's USAGE on to kernel
+		// policy's user (migrate.GrantPolicy), as the console to the gateway's.
+		{Database: "execution_kernel", Role: db.KernelUser, Regrant: db.PolicyUser != ""},
+		{Database: "execution_console", Role: db.ConsoleUser, Regrant: true},
+	}}
 	env := `            - {name: DATABASE_IAM_AUTH, value: gcp}`
 	if db.Provider == "aws" {
 		setup.Databases = []string{"execution_kernel", "execution_console"}
