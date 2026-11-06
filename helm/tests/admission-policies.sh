@@ -397,6 +397,8 @@ for variable in policy["spec"]["variables"]:
     name = variable["name"]
     if name == "apiAudiencesWritten":
         variable["expression"] = "true"
+    elif name == "products":
+        variable["expression"] = "[]"  # as the kernel writes it: the legacy list emptied
     elif name.startswith(prefix) and name[len(prefix):] in maps:
         variable["expression"] = json.dumps(maps[name[len(prefix):]], separators=(",", ":"))
 print(json.dumps(policy))' "$2" "$3" \
@@ -901,13 +903,29 @@ echo "Catalog policies (decision 27: what the catalog decides, written by kernel
 # console's identity and gateway token policies, as they are now), and its
 # RBAC beside the console chart's (who may update which policy, by name).
 # Not the Deployment: no kernel runs here.
+# An upgrade from a console that wrote only the legacy list (v0.11 and
+# older): its products (by repository, any digest) are seeded too, held to
+# the kernel's rules.
+LEGACY_SEED='[{"team":"'$TEAM_A'","repository":"registry.example/legacy","action":"run","serviceAccount":"legacy-sa","audiences":""},{"team":"","repository":"registry.example/legacy-platform","action":"run","serviceAccount":"plat-sa"},{"team":"'$TEAM_A'","repository":"registry.example/legacy-eso","action":"run","serviceAccount":"eso-gcp","audiences":""},{"team":"'$TEAM_A'","repository":"registry.example/legacy-api","action":"run","serviceAccount":"legacy-api","audiences":""},{"team":"'$TEAM_A'","repository":"registry.example/legacy-kernel","action":"run","serviceAccount":"kernel-sa","audiences":"sts.amazonaws.com,vennir-kernel-api"}]'
+k get validatingadmissionpolicy "$RELEASE-execution-kernel-identity" -o json | python3 -c '
+import json, sys
+policy = json.load(sys.stdin)
+policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+for variable in policy["spec"]["variables"]:
+    if variable["name"] == "products":
+        variable["expression"] = sys.argv[1]
+print(json.dumps(policy))' "$LEGACY_SEED" | k replace -f - > /dev/null || { echo "  FAIL  writing the legacy list"; FAILURES=$((FAILURES + 1)); }
 render_catalog | k apply -f - > /dev/null
+identity_literal '[]' "$TEAM_SECRETS" "$RELEASES"
 CATALOG_IDENTITY=$RELEASE-execution-kernel-catalog-identity
 CATALOG_TOKENS=$RELEASE-execution-kernel-catalog-tokens
 POLICY_SA=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-kernel-policy
 seeded() { k get validatingadmissionpolicy "$1" -o jsonpath="{.spec.variables[?(@.name==\"$2\")].expression}"; }
 expect "upgrade seed: the console's releases kept" allowed "$(grep -q "$TEAM_A" <<<"$(seeded "$CATALOG_IDENTITY" releases0)" && echo '(server dry run)' || seeded "$CATALOG_IDENTITY" releases0)"
 expect "upgrade seed: the console's API audiences kept" allowed "$(grep -q true <<<"$(seeded "$CATALOG_TOKENS" apiAudiencesWritten)" && echo '(server dry run)' || echo 'not seeded')"
+LEGACY_SEEDED=$(seeded "$CATALOG_IDENTITY" products)
+expect "upgrade seed: the console's legacy list kept" allowed "$(grep -q 'registry.example/legacy"' <<<"$LEGACY_SEEDED" && echo '(server dry run)' || echo "not seeded: $LEGACY_SEEDED")"
+expect "upgrade seed: legacy, but no platform product, ESO's or an API's SA, or a reserved audience" allowed "$(grep -qE 'legacy-(platform|eso|api|kernel)' <<<"$LEGACY_SEEDED" && echo "seeded: $LEGACY_SEEDED" || echo '(server dry run)')"
 # Held to the kernel's rules: no platform product (team ""), no ESO
 # ServiceAccount, though the console's lists them.
 expect "upgrade seed: no platform product"       allowed "$(grep -q 'plat-sa' <<<"$(seeded "$CATALOG_IDENTITY" releases1)" && echo 'seeded it' || echo '(server dry run)')"
@@ -942,6 +960,18 @@ for _ in $(seq 1 30); do
 done
 expect "an API's backend audience, both list it" allowed                "$(token "$TEAM_A" orders-api https://orders.example)"
 expect "an audience only the console lists"      "catalog's verified release says its API needs" "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
+# A token for one of the cluster's own audiences (kernel-api's), though
+# both policies list it as the product's: the kernel's refuses it.
+catalog_literal "$CATALOG_IDENTITY" releases '{"'$ZERO_DIGEST'":[{"action":"create","audiences":"sts.amazonaws.com,vennir-kernel-api","repository":"registry.example/db","serviceAccount":"db-sa","team":"'$TEAM_A'"}]}'
+identity_literal '[]' "$TEAM_SECRETS" '{"'$ZERO_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com,vennir-kernel-api"}]}'
+for _ in $(seq 1 30); do
+  grep -q "this cluster's own" <<<"$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'vennir-kernel-api","expirationSeconds":3600}}]}}')" && break
+  sleep 1
+done
+expect "a token for kernel-api's audience, listed" "this cluster's own" "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'vennir-kernel-api","expirationSeconds":3600}}]}}')"
+expect "beside it, its cloud's"                  allowed                "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
+catalog_literal "$CATALOG_IDENTITY" releases '{"'$ZERO_DIGEST'":[{"action":"create","audiences":"sts.amazonaws.com","repository":"registry.example/db","serviceAccount":"db-sa","team":"'$TEAM_A'"}],"'$PASSED_DIGEST'":[{"action":"run","audiences":"","repository":"registry.example/big","serviceAccount":"db-sa","team":"'$TEAM_A'"}]}'
+identity_literal '[]' "$TEAM_SECRETS" '{"'$ZERO_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}],"'$UNRELEASED_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}],"'$PLATFORM_DIGEST'":[{"team":"","repository":"registry.example/platform","action":"run","serviceAccount":"plat-sa","audiences":""}]}'
 # Who may write which: RBAC by name (admission policies don't apply to
 # admission policy objects). The console's own ClusterRole, as its chart
 # grants it, and kernel policy's.

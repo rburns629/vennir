@@ -14,11 +14,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/rburns629/vennir/kernel/internal/dbtest"
 	catalogv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/catalog/v1"
+	"github.com/rburns629/vennir/kernel/internal/metrics"
 )
 
 var testPool *pgxpool.Pool
@@ -173,6 +175,9 @@ func TestAVerifiedReleaseIsWrittenIntoBothPolicies(t *testing.T) {
 	want := []Entry{{Team: "local", Repository: "registry.example/local/db", Action: "create", ServiceAccount: "db-sa", Audiences: "sts.amazonaws.com"}}
 	if got := writer.listed(t, digest("1")); len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("listed: %+v", got)
+	}
+	if writer.policies["identity"]["products"] != "[]" {
+		t.Fatalf("the legacy list the chart may have seeded isn't emptied: %q", writer.policies["identity"]["products"])
 	}
 	if writer.policies["tokens"]["apiAudiencesWritten"] != "true" || writer.policies["tokens"]["apiAudiences0"] != `{"local/orders-api":["sts.amazonaws.com"]}` {
 		t.Fatalf("tokens: %v", writer.policies["tokens"])
@@ -635,5 +640,85 @@ func TestAPolicyThatIsntInstalledFailsThePass(t *testing.T) {
 	}
 	if len(writer.listed(t, digest("1"))) != 1 {
 		t.Fatal("the identity policy, installed, wasn't written")
+	}
+}
+
+func TestAnAudienceReservedSinceIsntListedWithoutANewRelease(t *testing.T) {
+	ctx := context.Background()
+	source := &fakeSource{}
+	c, writer, _ := newController(t, source)
+	source.release(t, digest("a"), releaseAt(time.Now(), db("1")))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(writer.listed(t, digest("1"))) != 1 {
+		t.Fatal("not listed")
+	}
+	// kernel-api's audience (or the issuer's) is now STS's: the same
+	// release, already applied, no longer lists the product asking for it.
+	c.Reserved = ReservedAudiences("sts.amazonaws.com")
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := writer.listed(t, digest("1")); len(got) != 0 {
+		t.Fatalf("still listed: %+v", got)
+	}
+}
+
+// A higher version tag on an older signed release (a registry writer who
+// can push but not sign): refused every pass, holding back what comes
+// after, so it's said: a metric, and the identity policy's annotation the
+// Admin page reads. A newer release clears both.
+func TestARefusedNewestReleaseIsMadeVisible(t *testing.T) {
+	ctx := context.Background()
+	source := &fakeSource{}
+	c, writer, _ := newController(t, source)
+	now := time.Now()
+	source.release(t, digest("a"), releaseAt(now, db("1")))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := writer.annotations["identity"][RefusedAnnotation]; got != "" {
+		t.Fatalf("refused before anything was: %q", got)
+	}
+	source.release(t, digest("b"), releaseAt(now.Add(-time.Hour), db("2")))
+	for range 2 {
+		if err := c.Pass(ctx); err == nil {
+			t.Fatal("an older release was applied")
+		}
+		if got := writer.annotations["identity"][RefusedAnnotation]; !strings.Contains(got, "before the one applied") || !strings.Contains(got, digest("b")) {
+			t.Fatalf("annotation: %q", got)
+		}
+		if got := testutil.ToFloat64(metrics.CatalogPolicyNewestRefused.WithLabelValues("older")); got != 1 {
+			t.Fatalf("metric: %v", got)
+		}
+	}
+	source.release(t, digest("c"), releaseAt(now.Add(time.Second), db("3")))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := writer.annotations["identity"][RefusedAnnotation]; got != "" {
+		t.Fatalf("still refused: %q", got)
+	}
+	if got := testutil.ToFloat64(metrics.CatalogPolicyNewestRefused.WithLabelValues("older")); got != 0 {
+		t.Fatalf("metric: %v", got)
+	}
+}
+
+// Refused before any release was applied (unsigned): the policies' literals
+// stand as seeded, but the annotation says why.
+func TestARefusalBeforeAnyReleaseIsAppliedIsSaid(t *testing.T) {
+	source := &fakeSource{}
+	c, writer, _ := newController(t, source)
+	source.release(t, digest("a"), releaseAt(time.Now(), db("1")))
+	source.verified = false
+	if err := c.Pass(context.Background()); err == nil {
+		t.Fatal("applied")
+	}
+	if writer.writes != 0 || !strings.Contains(writer.annotations["identity"][RefusedAnnotation], "no trusted signer") {
+		t.Fatalf("%d writes, annotation %q", writer.writes, writer.annotations["identity"][RefusedAnnotation])
+	}
+	if got := testutil.ToFloat64(metrics.CatalogPolicyNewestRefused.WithLabelValues("unsigned")); got != 1 {
+		t.Fatalf("metric: %v", got)
 	}
 }

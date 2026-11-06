@@ -41,11 +41,17 @@ export interface CatalogPolicies {
   /** Whether the gateway is on, and the kernel writes its API audiences too. */
   gateway: boolean;
   tokens: boolean;
+  /**
+   * With the kernel: why it refused the newest release the catalog names
+   * (it holds back every release after it); "" when it didn't.
+   */
+  refused: string;
 }
 
 /** Annotations kernel policy sets on its policies (kernel/internal/policy). */
 const RELEASE_ANNOTATION = "vennir.dev/catalog-release";
 const COMMIT_ANNOTATION = "vennir.dev/catalog-commit";
+const REFUSED_ANNOTATION = "vennir.dev/catalog-refused";
 
 function catalogSigned(): boolean {
   const { publicKeys, keylessIssuer } = config.catalog.signature;
@@ -58,7 +64,7 @@ function catalogSigned(): boolean {
  */
 export async function catalogPolicies(log: FastifyBaseLogger): Promise<CatalogPolicies> {
   const gateway = config.gateway.tokenPolicyName !== "";
-  const base = { catalogSigned: catalogSigned(), gateway, release: "", commit: "", tokens: false };
+  const base = { catalogSigned: catalogSigned(), gateway, release: "", commit: "", tokens: false, refused: "" };
   try {
     const policy = config.catalogIdentityPolicyName ? await readPolicyVariables(config.catalogIdentityPolicyName) : null;
     if (!policy) return { ...base, writer: "console" };
@@ -68,6 +74,7 @@ export async function catalogPolicies(log: FastifyBaseLogger): Promise<CatalogPo
       writer: "kernel",
       release: policy.annotations[RELEASE_ANNOTATION] ?? "",
       commit: policy.annotations[COMMIT_ANNOTATION] ?? "",
+      refused: policy.annotations[REFUSED_ANNOTATION] ?? "",
       tokens,
     };
   } catch (error) {

@@ -2410,6 +2410,13 @@
      "repeated": false,
      "optional": false,
      "comment": ""
+    },
+    {
+     "name": "refused",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "With the kernel: why it refused the newest release the catalog names\n(unsigned, older than the one applied, ...), which holds back every\nrelease after it until the catalog names another; empty when it didn't."
     }
    ]
   },

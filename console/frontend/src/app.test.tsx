@@ -2087,6 +2087,16 @@ describe("admin", () => {
       },
     });
     expect(await screen.findByText(/catalogPolicy.gateway isn't set/)).toBeTruthy();
+    expect(screen.queryByText(/refuses the newest catalog release/)).toBeNull();
+    cleanup();
+    // The newest release refused (a higher tag on an older release): said, with why.
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": {
+        outcomes: {},
+        catalog: { writer: "kernel", release: "r@sha256:abc", commit: "c", refused: "catalog release r:v9@sha256:def: it was made before the one applied" },
+      },
+    });
+    expect(await screen.findByText(/refuses the newest catalog release.*made before the one applied/)).toBeTruthy();
     cleanup();
     // A signed catalog the kernel doesn't write for; and a read that failed.
     await renderAt("/admin/policies", ADMIN, {

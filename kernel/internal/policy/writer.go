@@ -12,10 +12,14 @@ import (
 )
 
 // Annotations this process sets on the policies it writes, for the
-// console's Admin page: the release they're from.
+// console's Admin page: the release they're from, and why the newest one
+// was refused.
 const (
 	ReleaseAnnotation = "vennir.dev/catalog-release"
 	CommitAnnotation  = "vennir.dev/catalog-commit"
+	// RefusedAnnotation is why the newest release the catalog names was
+	// refused, "" when it wasn't (ErrRefused).
+	RefusedAnnotation = "vennir.dev/catalog-refused"
 )
 
 // Writer rewrites named variables of an admission policy (their literals),

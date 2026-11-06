@@ -44,6 +44,16 @@ var (
 		Help: "kernel policy's passes over the catalog release and the policies it writes, by outcome.",
 	}, []string{"outcome"})
 
+	// CatalogPolicyNewestRefused is 1, by why, while the newest release the
+	// catalog names is refused (internal/policy): unsigned, older than the
+	// one applied, dated in the future, not a release, or too big for the
+	// policies. Refused every pass until the catalog names another, it
+	// holds back every newer release and revocation; 0 otherwise.
+	CatalogPolicyNewestRefused = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "kernel_catalog_policy_newest_refused",
+		Help: "1 while kernel policy refuses the newest catalog release (holding back newer ones), by reason; 0 otherwise.",
+	}, []string{"reason"})
+
 	// Tasks and OldestReady are sampled from the database by every
 	// scheduler replica (take the max across them).
 	Tasks = promauto.NewGaugeVec(prometheus.GaugeOpts{

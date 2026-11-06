@@ -127,7 +127,6 @@ if [ "$WRITER" = kernel ]; then
     fail "a product no signed release names: $(jq -c '{code, message, state: .execution.state}' <<< "$answer")"
   fi
   # A product of the verified release does: its Job passes the kernel's
-  # catalog policy and the console's.
   # catalog policy and the console's, mounting a Secret its team (local, the
   # catalog's) registered; revoked again at the end. (No catalog sample
   # reports what a Secret holds: the mount is what's proven here.)
@@ -142,25 +141,29 @@ if [ "$WRITER" = kernel ]; then
     sleep 1
   done
   sleep 3
-  catalog_step() {  # secretRefs as JSON; prints the execution's state, or the refusal's code
-    local submitted id state=none
+  catalog_step() {  # secretRefs as JSON; prints the execution's state (a failed one's task failure code), or the refusal's code
+    local submitted id state=none execution=""
     submitted=$(rpc ExecutionService/SubmitExecution "$(jq -nc --arg i "$catalog_image" --arg r "e2e-$suffix-catalog-$RANDOM" --argjson s "$1" \
       '{dag: {name: "secrets e2e: a catalog product", requestId: $r, tasks: [{id: "up", image: $i, action: "transform", team: "local", secretRefs: $s, inputs: {text: "vennir"}}]}}')")
     id=$(jq -r '.executionId // empty' <<< "$submitted")
     [ -n "$id" ] || { jq -r '.code // "nothing"' <<< "$submitted"; return; }
     for _ in $(seq 1 90); do
-      state=$(rpc ExecutionService/GetExecution "$(jq -nc --arg id "$id" '{executionId: $id}')" | jq -r '.execution.state')
+      execution=$(rpc ExecutionService/GetExecution "$(jq -nc --arg id "$id" '{executionId: $id}')")
+      state=$(jq -r '.execution.state' <<< "$execution")
       case "$state" in *SUCCEEDED|*FAILED|*CANCELLED) break ;; esac
       sleep 2
     done
-    echo "$state"
+    case "$state" in *FAILED) jq -r '.execution.tasks[0].failure.code // "FAILED"' <<< "$execution" ;; *) echo "$state" ;; esac
   }
   state=$(catalog_step "[\"$CATALOG_SECRET\"]")
   case "$state" in *SUCCEEDED) pass "a product of the catalog's verified release runs as its product, mounting its team's Secret" ;;
     *) fail "the local sample's upper-case product with a team Secret: $state (local must be published: make catalog-publish)" ;;
   esac
-  case "$(catalog_step '["e2e-never-registered"]')" in permission_denied|*FAILED) pass "the same product can't mount a Secret its team never registered" ;;
-    *) fail "a catalog product mounted a Secret its team never registered" ;;
+  # Refused by name: the console's check before submitting, or the
+  # cluster's identity policy as the Job is made; not any failure.
+  code=$(catalog_step '["e2e-never-registered"]')
+  case "$code" in permission_denied|IDENTITY_NOT_ALLOWED) pass "the same product can't mount a Secret its team never registered ($code)" ;;
+    *) fail "a catalog product naming a Secret its team never registered: $code, not IDENTITY_NOT_ALLOWED or permission_denied" ;;
   esac
   rpc SecretService/RevokeSecret "$(jq -nc --arg n "$CATALOG_SECRET" '{team: "local", secretName: $n}')" > /dev/null
 else

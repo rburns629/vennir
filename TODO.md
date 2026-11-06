@@ -231,7 +231,13 @@ it was seen.
      the console's `catalog` (`cli/internal/install`); then turn it on in
      `helm/values/{gke,eks}/kernel.yaml` and prove it on a cloud. An
      install reading another's catalog by federation needs its own grant
-     for it too (`vennir catalog grant`).
+     for it too (`vennir catalog grant`). When `vennir` sets
+     `catalogPolicy`, generate the kernel chart's `catalogPolicy.release`
+     and `catalogPolicy.gateway.gcpTokenAudience` from the same values as the console
+     chart's `catalog.release` and `gateway.gcp.tokenAudience`: today
+     nothing checks they match. A mismatch fails closed (the kernel reads
+     another release, or gives `googleIdToken` APIs' ServiceAccounts an
+     audience the gateway doesn't ask for), but it breaks those APIs.
 
 ## Console
 

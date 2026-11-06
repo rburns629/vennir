@@ -35,8 +35,13 @@ audience check waits (as the console chart's).
 
 Both are seeded on install and upgrade: from what they say (lookup), else,
 on the upgrade that adds them, from the console's (identity-policy.yaml's
-releases, the console chart's gateway token policy), re-encoded as JSON so
-they can only ever be literals. The kernel writes them only once it has
+releases and its legacy `products` list, the console chart's gateway token
+policy), re-encoded as JSON so they can only ever be literals, and held to
+the kernel's rules (no platform product, no API's or ESO's ServiceAccount,
+no audience of this cluster's own). The legacy list, matched by repository
+at any digest as identity-policy.yaml's, is there only for that: an upgrade
+from a console that wrote nothing else (v0.11 and older) keeps its products
+running until the kernel's first write, which empties it. The kernel writes them only once it has
 applied a verified release, so they stand as seeded until then. Without
 lookup (helm template, GitOps) they start empty: a product's step is refused
 (IDENTITY_NOT_ALLOWED) until the kernel writes them, and the console refuses
@@ -64,12 +69,43 @@ to submit one the kernel hasn't listed (IDENTITY_PENDING).
 {{- range $digits }}
 {{- $_ := set $shards . dict }}
 {{- end }}
+{{- /* This cluster's own audiences, which no step's token may have (the
+     kernel's Reserved, but the issuer's, which isn't known here; the
+     kernel leaves out a release asking for it at every write). */}}
+{{- $reserved := list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" }}
+{{- with .Values.api.auth.audience }}
+{{- $reserved = append $reserved . }}
+{{- end }}
+{{- /* The legacy products list (matched by repository, any digest): what a
+     console from before released digests (v0.11 and older) wrote, seeded
+     from the console's identity policy on the upgrade that adds this one,
+     and kept until the kernel first writes, which empties it. */}}
+{{- $products := list }}
 {{- $seed := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $identity }}
 {{- if not $seed }}
 {{- $seed = lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" (printf "%s-identity" $fullname) }}
 {{- end }}
 {{- if $seed }}
 {{- range $seed.spec.variables }}
+{{- if eq .name "products" }}
+{{- range fromJsonArray .expression }}
+{{- $entry := . }}
+{{- if or (not (kindIs "map" $entry)) (not (and (kindIs "string" (get $entry "team")) (kindIs "string" (get $entry "repository")) (kindIs "string" (get $entry "action")) (kindIs "string" (get $entry "serviceAccount")))) (and (hasKey $entry "audiences") (not (kindIs "string" (get $entry "audiences")))) }}
+{{- fail (printf "%s's products list isn't a JSON list of {team, repository, action, serviceAccount, audiences} strings; set its expression to [] (kubectl edit): the kernel empties it at its first write anyway." $seed.metadata.name) }}
+{{- end }}
+{{- $audiences := default "" (get $entry "audiences") }}
+{{- $audiencesOk := true }}
+{{- range splitList "," $audiences }}
+{{- if and (has . $reserved) (ne $audiences "") }}
+{{- $audiencesOk = false }}
+{{- end }}
+{{- end }}
+{{- /* Held to the same rules as the release maps, below. */}}
+{{- if and (ne $entry.team "") (not (hasSuffix "-api" $entry.serviceAccount)) (not (has $entry.serviceAccount (list "eso-gcp" "eso-aws" "eso-azure"))) $audiencesOk }}
+{{- $products = append $products (dict "team" $entry.team "repository" $entry.repository "action" $entry.action "serviceAccount" $entry.serviceAccount "audiences" $audiences) }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- $digit := trimPrefix "releases" .name }}
 {{- if and (ne $digit .name) (hasKey $shards $digit) }}
 {{- range $digest, $entries := fromJson .expression }}
@@ -88,7 +124,6 @@ to submit one the kernel hasn't listed (IDENTITY_PENDING).
      the console's copy, seeded until a verified release is applied, is
      held to the kernel's rules. (Its issuer's audience isn't known here;
      the kernel drops it at its first write.) */}}
-{{- $reserved := list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" $.Values.api.auth.audience "" }}
 {{- $audiencesOk := true }}
 {{- range splitList "," $entry.audiences }}
 {{- if and (has . $reserved) (ne $entry.audiences "") }}
@@ -258,7 +293,11 @@ spec:
     - name: from-kernel-scheduler
       expression: request.userInfo.username == {{ $scheduler | quote }}
   variables:
-    # The ones the kernel writes: the sixteen releases maps.
+    # The ones the kernel writes: the legacy products list (seeded on an
+    # upgrade from a console that wrote it; the kernel writes it []) and the
+    # sixteen releases maps.
+    - name: products
+      expression: {{ toJson $products | toJson }}
     {{- range $digits }}
     - name: releases{{ . }}
       expression: {{ toJson (index $shards .) | toJson }}
@@ -310,11 +349,12 @@ spec:
         variables.normalizedImage.contains("@") &&
           variables.normalizedImage.split("@")[1].matches("^sha256:[a-f0-9]{64}$") ?
           variables.normalizedImage.split("@")[1] : ""
-    # The catalog's products this step is a release of, as it runs.
+    # The catalog's products this step is a release of, as it runs (and,
+    # until the kernel first writes, the legacy list's, by repository).
     - name: matched
       expression: >-
-        (variables.digest != "" && variables.digest in variables.releases[variables.digest.substring(7, 8)] ?
-          variables.releases[variables.digest.substring(7, 8)][variables.digest] : []).filter(p,
+        ((variables.digest != "" && variables.digest in variables.releases[variables.digest.substring(7, 8)] ?
+          variables.releases[variables.digest.substring(7, 8)][variables.digest] : []) + variables.products).filter(p,
           p.team == request.namespace && p.repository == variables.repository &&
           p.action == variables.action && p.serviceAccount == variables.serviceAccount)
     - name: tokens
@@ -353,12 +393,13 @@ spec:
         variables.tokens.all(v, v.projected.sources.all(s, !has(s.serviceAccountToken) ||
           !has(s.serviceAccountToken.audience) || s.serviceAccountToken.audience == "" ||
           ((!has(s.serviceAccountToken.expirationSeconds) || s.serviceAccountToken.expirationSeconds <= 3600) &&
+            !(s.serviceAccountToken.audience in {{ toJson $reserved }}) &&
             variables.matched.exists(p, s.serviceAccountToken.audience in p.audiences.split(",")))))
       messageExpression: >-
         "IDENTITY_NOT_ALLOWED: " + variables.repository + " (action \"" + variables.action +
         "\") may not have a ServiceAccount token for an audience its product didn't declare " +
-        "(product.yaml's tokenAudiences, in the catalog's verified release), or one lasting over an hour, in " +
-        request.namespace + "."
+        "(product.yaml's tokenAudiences, in the catalog's verified release), one of this cluster's own, " +
+        "or one lasting over an hour, in " + request.namespace + "."
       reason: Forbidden
 ---
 apiVersion: admissionregistration.k8s.io/v1

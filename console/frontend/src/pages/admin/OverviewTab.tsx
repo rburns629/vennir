@@ -223,6 +223,12 @@ export function PoliciesCard() {
             {catalogLine(catalog)}
           </Typography>
         )}
+        {catalog?.writer === "kernel" && catalog.refused && (
+          <Alert severity="warning">
+            The kernel refuses the newest catalog release, so no release after it is applied, and nothing it would revoke is revoked,
+            until the catalog names another: {catalog.refused}
+          </Alert>
+        )}
       </AdminCard>
 
       <AdminCard title="Installed with the kernel" status={<Aside>Changed by an upgrade, not here</Aside>}>
