@@ -132,6 +132,7 @@ A failed step shows a code, a message, what the code means and what to do. When 
 | `IMAGE_NOT_RESOLVED` | The registry didn't answer which digest a tag is; try again |
 | `IMAGE_SCAN_FAILED` | An image failed its security scan |
 | `IMAGE_SCAN_PENDING` | An image is still being scanned; try again in a minute |
+| `IDENTITY_PENDING` | With a signed catalog, the kernel's policy doesn't list a step's product release yet: a new release it hasn't read (try again in a minute or two), an earlier one it no longer keeps (run the current one), or a product registered by hand rather than released through the catalog |
 | `MAX_TASK_COUNT_EXCEEDED`, `CYCLE_DETECTED`, `UNKNOWN_DEPENDENCY`, `NON_UPSTREAM_INPUT_REFERENCE`, ... | The DAG itself is invalid; every problem is listed at once |
 
 ## What are the limits?

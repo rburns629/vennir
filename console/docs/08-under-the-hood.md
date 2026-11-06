@@ -67,8 +67,8 @@ flowchart TB
 
 ### Who may mount a Secret is an admission policy, not RBAC
 - **Normally:** access to a Secret is RBAC: a Role and a RoleBinding.
-- **Here:** RBAC doesn't apply to mounts (the kubelet mounts whatever a Pod names), so no Role is involved. A team's secrets are the ones it registered in the console; the identity policy lets a step mount them only if it runs one of the team's registered products' releases (a digest the product was registered at, not any image in its repository), running as the ServiceAccount its product declares. The console keeps the policy's released digests and each team's secret names current, and creates no RBAC at all (it may only delete the per-secret Roles older versions made).
-- **Code:** `console/src/productPolicy.ts`, `helm/charts/execution-kernel/templates/identity-policy.yaml`.
+- **Here:** RBAC doesn't apply to mounts (the kubelet mounts whatever a Pod names), so no Role is involved. A team's secrets are the ones it registered in the console; the identity policy lets a step mount them only if it runs one of the team's registered products' releases (a digest the product was registered at, not any image in its repository), running as the ServiceAccount its product declares. The console keeps the policy's released digests and each team's secret names current, and creates no RBAC for Secrets (its only RBAC write is the RoleBinding that lets the scheduler read its steps' logs; it may only delete the per-secret Roles older versions made). With a signed catalog and the kernel chart's `catalogPolicy`, a second policy, which only the kernel's `kernel policy` may update, lists the released digests too, from the catalog release it verified itself: a step must pass both.
+- **Code:** `console/src/productPolicy.ts`, `helm/charts/execution-kernel/templates/identity-policy.yaml`; `kernel/internal/policy/`, `helm/charts/execution-kernel/templates/catalog-policy.yaml`.
 
 ### Admission policies as the last line of defence
 - **Normally:** a ValidatingAdmissionPolicy enforces cluster-wide rules, written in CEL and run by the API server itself, with no webhook server to operate.

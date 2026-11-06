@@ -132,10 +132,14 @@ console/   the authenticated front door: sign-in, teams, bots, secrets,
            (Fastify, React). The only way in for people and pipelines.
 kernel/    the DAG engine: kernel-api accepts runs, kernel-scheduler claims
            ready steps, starts each as a Kubernetes Job, collects its result
-           and releases the steps that depend on it. Go (Connect,
+           and releases the steps that depend on it; with a signed
+           catalog, kernel policy verifies the catalog's release itself and
+           writes which images run as each product. Go (Connect,
            client-go). Deliberately blind to what any step does.
 gateway/   the API gateway: forwards calls to teams' API products, exactly
-           as each one's OpenAPI document describes. Go.
+           as each one's OpenAPI document describes, for its own team and
+           whoever its access list grants (people, bots, single sign-on
+           groups). Go.
 cli/       vennir, the installer: a cloud (Google Cloud or AWS) or an
            existing cluster, from one config file. Go, with OpenTofu.
 helm/      the two Helm charts (execution-kernel, execution-console) and the

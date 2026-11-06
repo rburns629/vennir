@@ -73,7 +73,7 @@ Around them: `helm/` packages both for Kubernetes, with each cluster's settings,
 
 ## `kernel/`: the execution engine
 
-Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never call each other and meet only in Postgres: **kernel-api** (`kernel api`), **kernel-scheduler** (`kernel scheduler`), the migration hook (`kernel migrate`) and the sleeper (`kernel sleep`). Python until 2026-10-20 (decision 17 in `docs/assessment.md`). The package rules and a call-by-call trace are in [`ARCHITECTURE.md`](../kernel/ARCHITECTURE.md).
+Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never call each other and meet only in Postgres: **kernel-api** (`kernel api`), **kernel-scheduler** (`kernel scheduler`), **kernel policy** (`kernel policy`, with a signed catalog), the migration hook (`kernel migrate`) and the sleeper (`kernel sleep`). Python until 2026-10-20 (decision 17 in `docs/assessment.md`). The package rules and a call-by-call trace are in [`ARCHITECTURE.md`](../kernel/ARCHITECTURE.md).
 
 | Path | What it's for |
 | --- | --- |
@@ -82,7 +82,7 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | `go.mod`, `go.sum` | The kernel's Go module (`github.com/rburns629/vennir/kernel`). |
 | `Dockerfile` | The image: a Go stage builds the binary; it runs on distroless (no shell) as a non-root user. |
 | `.dockerignore`, `.gcloudignore` | Keep test binaries and local files out of the image and the Cloud Build upload. |
-| `cmd/kernel/main.go` | The binary: `api`, `scheduler`, `migrate`, `database-setup`, `sleep [--now]`, `wake`; for the chart `wait-for-postgres` (init containers) and `check-heartbeat` (the scheduler's liveness probe); and `database-token FILE` (a managed database's sign-in for pg_restore, when vennir moves an install's data in). |
+| `cmd/kernel/main.go` | The binary: `api`, `scheduler`, `policy`, `migrate`, `database-setup`, `sleep [--now]`, `wake`; for the chart `wait-for-postgres` (init containers) and `check-heartbeat` (the scheduler's liveness probe); and `database-token FILE` (a managed database's sign-in for pg_restore, when vennir moves an install's data in). |
 | `internal/config/config.go` | Every setting, for every process, read from the environment (the chart's ConfigMap) and checked at startup. |
 | `internal/dbauth/` | Signing in to a managed database with the workload's own identity: on GKE, its Workload Identity token from the metadata server (Cloud SQL's IAM database authentication); on EKS, an RDS token its Pod Identity role signs (`rds.go`), and the RDS administrator's password from Secrets Manager, for database-setup. |
 | `internal/dbsetup/` | `kernel database-setup`: as a managed server's administrator, makes what the cloud didn't (on RDS, the databases and the services' `rds_iam` users), then opens each database to its own service alone (the console may pass on its CONNECT and schema USAGE, for the gateway). |
@@ -462,7 +462,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/image-policy.yaml` | Admission policy: task images only from allowed sources (the console edits the list). |
 | `templates/image-signature.yaml` | With Sigstore's policy-controller: only signed images from the source registry run in team namespaces, checked on Pods; a second policy passes the workloads that make them. |
 | `templates/purge-policy.yaml` | Admission policy: only the purge identity may delete a team's namespace, or its API backends' namespace, and only a retired one. |
-| `templates/networkpolicy.yaml` | Only the release's Pods (and the console) may reach Postgres; only the console may reach kernel-api. |
+| `templates/networkpolicy.yaml` | Only the release's Pods (and the console) may reach Postgres; only the console may reach kernel-api; `kernel policy`'s metrics port only from `metricsFrom`. |
 | `templates/identity-policy.yaml` | Admission policy: a step runs as `default` with no Secrets, or, running one of its registered product's released digests, as the product's ServiceAccount with only its team's Secrets. The console keeps its released digests current. |
 | `templates/catalog-policy.yaml` | With `catalogPolicy` (a signed catalog): `kernel policy`'s Deployment, ServiceAccount and RBAC (update on its two policies, by name, only), and those policies: a step runs a digest the catalog's verified release names as its product's ServiceAccount and token audiences, or as `default` with no Secrets and no tokens; the gateway mints an API's ServiceAccount only the audiences its `api.yaml` needs. Seeded on upgrade from the console's. |
 | `templates/scan-policy.yaml` | Admission policy: a step's image must be pinned by digest, and a digest that passed its security scan (the console keeps that list, pruned to the digests in use). |
