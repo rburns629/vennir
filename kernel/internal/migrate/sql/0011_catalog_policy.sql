@@ -29,6 +29,9 @@ CREATE TABLE catalog_policy_releases (
     action text NOT NULL,
     service_account text NOT NULL,
     audiences text NOT NULL,
+    -- The signers its release was verified by (as catalog_policy_state's):
+    -- when the chart trusts others, an earlier release only they signed goes.
+    signers text NOT NULL DEFAULT '',
     released_until timestamptz,
     PRIMARY KEY (digest, team, repository, action, service_account, audiences)
 );

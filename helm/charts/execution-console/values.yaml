@@ -141,6 +141,10 @@ identityPolicy:
 # there is. Empty: never read.
 catalogPolicy:
   identityPolicyName: kernel-execution-kernel-catalog-identity
+  # -- And its catalog token policy (with catalogPolicy.gateway in the kernel
+  # chart), read only to say on the Admin page whether the kernel writes the
+  # gateway's API audiences too.
+  tokensPolicyName: kernel-execution-kernel-catalog-tokens
 
 # -- How often the identity and scan policies are rewritten from the
 # console's database whatever changed, so a failed write or a hand edit

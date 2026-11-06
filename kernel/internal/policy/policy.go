@@ -124,13 +124,13 @@ type Controller struct {
 	// ReleaseGrace is how long an earlier release stays listed after a
 	// release stopped naming it (the console's RELEASE_GRACE_MINUTES).
 	ReleaseGrace time.Duration
+	// InUseMax bounds which unfinished executions keep an earlier release
+	// listed: those submitted within it (the scheduler's approval timeout,
+	// by default).
+	InUseMax     time.Duration
 	PollInterval time.Duration
 	PassTimeout  time.Duration
 	Log          *slog.Logger
-
-	// untrusted: the release applied didn't verify against the signers
-	// trusted now, and none since has: the policies list nothing.
-	untrusted bool
 }
 
 // Run passes every PollInterval until ctx ends; a failed pass is logged.
@@ -167,8 +167,8 @@ func (c *Controller) Pass(ctx context.Context) error {
 // look applies the release the catalog names now, if it's new, signed by a
 // trusted signer, and not older than the one applied. First, the release
 // applied under other signers than the chart trusts now (a key removed, a
-// keyless identity changed) is verified again: until one verifies, the
-// policies list nothing (untrusted).
+// keyless identity changed) is verified again; until one verifies under
+// them, the policies list nothing (write: its signers aren't these).
 func (c *Controller) look(ctx context.Context) error {
 	current, err := c.Store.State(ctx)
 	if err != nil {
@@ -177,14 +177,13 @@ func (c *Controller) look(ctx context.Context) error {
 	var reverifyErr error
 	if current != nil && current.Signers != c.Source.Fingerprint() {
 		if err := c.Source.Verify(ctx, current.Reference, current.Digest); err != nil {
-			c.untrusted = true
 			reverifyErr = fmt.Errorf("the catalog release applied (%s) doesn't verify against the signers trusted now, "+
 				"so no product is listed until one that does is applied: %w", pinned(current.Reference, current.Digest), err)
 		} else {
 			if err := c.Store.Reverified(ctx, current.Digest, c.Source.Fingerprint()); err != nil {
 				return err
 			}
-			c.untrusted = false
+			current.Signers = c.Source.Fingerprint()
 			c.Log.Info("catalog release applied verified against the signers trusted now", "digest", current.Digest)
 		}
 	}
@@ -202,7 +201,6 @@ func (c *Controller) look(ctx context.Context) error {
 	if err := c.apply(ctx, ref, digest, current); err != nil {
 		return errors.Join(reverifyErr, err)
 	}
-	c.untrusted = false
 	return nil
 }
 
@@ -232,12 +230,14 @@ func (c *Controller) apply(ctx context.Context, ref, digest string, current *Sta
 	}
 	// Never an older release than the one applied, though it was signed
 	// too: its createdAt is part of what's signed. Going back is releasing
-	// the older commit again.
+	// the older commit again. Unless the one applied isn't trusted now (its
+	// signers aren't these): its date doesn't hold a trusted one back.
 	if release.GetCreatedAt() == nil {
 		return fmt.Errorf("catalog release %s@%s says when it was made nowhere; nothing was applied", ref, digest)
 	}
 	releasedAt := release.GetCreatedAt().AsTime()
-	if current != nil && releasedAt.Before(current.ReleasedAt) {
+	trusted := current != nil && current.Signers == c.Source.Fingerprint()
+	if trusted && releasedAt.Before(current.ReleasedAt) {
 		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, ErrOlder{Release: releasedAt, Applied: current.ReleasedAt})
 	}
 	if releasedAt.After(time.Now().Add(FutureSkew)) {
@@ -248,6 +248,14 @@ func (c *Controller) apply(ctx context.Context, ref, digest string, current *Sta
 	apis, apiProblems := APIs(release)
 	for _, p := range append(problems, apiProblems...) {
 		c.Log.Warn("catalog release: not listed", "item", p.Item, "problem", p.Message, "digest", digest)
+	}
+	// What it lists by itself must fit the policies, or it isn't applied:
+	// applied, it couldn't be written, and what's written now would stand.
+	if _, err := IdentityVariables(Listed(releases, nil, time.Now(), 0)); err != nil {
+		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err)
+	}
+	if _, err := AudienceVariables(Audiences(apis, c.GCPAudience, c.Reserved)); err != nil {
+		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err)
 	}
 	applied, err := c.Store.Apply(ctx, State{Reference: ref, Digest: digest, ReleasedAt: releasedAt, Commit: release.GetCommit(),
 		Signers: c.Source.Fingerprint(), APIs: apis}, releases)
@@ -263,7 +271,9 @@ func (c *Controller) apply(ctx context.Context, ref, digest string, current *Sta
 }
 
 // write writes both policies from what's applied, pruning the releases no
-// longer listed. Nothing before a release has been applied.
+// longer listed. Nothing before a release has been applied. When the
+// release applied wasn't verified by the signers trusted now, both list
+// nothing, and say they're from no release.
 func (c *Controller) write(ctx context.Context) error {
 	state, err := c.Store.State(ctx)
 	if err != nil {
@@ -273,12 +283,11 @@ func (c *Controller) write(ctx context.Context) error {
 		c.Log.Info("no catalog release applied yet: the policies stay as the chart seeded them")
 		return nil
 	}
-	annotations := map[string]string{ReleaseAnnotation: pinned(state.Reference, state.Digest), CommitAnnotation: state.Commit}
 	releases, err := c.Store.Releases(ctx)
 	if err != nil {
 		return err
 	}
-	inUse, err := c.Store.InUse(ctx)
+	inUse, err := c.Store.InUse(ctx, c.InUseMax)
 	if err != nil {
 		return err
 	}
@@ -286,45 +295,63 @@ func (c *Controller) write(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	annotations := map[string]string{ReleaseAnnotation: pinned(state.Reference, state.Digest), CommitAnnotation: state.Commit}
 	listed := Listed(releases, inUse, now, c.ReleaseGrace)
 	apis := state.APIs
-	if c.untrusted {
-		// Nothing verified under the signers trusted now: nothing listed.
+	if state.Signers != c.Source.Fingerprint() {
 		listed, apis = map[string][]Entry{}, nil
+		annotations = map[string]string{ReleaseAnnotation: "", CommitAnnotation: ""}
 	}
 	variables, err := IdentityVariables(listed)
+	var overflow error
 	if err != nil {
-		return err
+		// Too many earlier releases kept: only what the applied release
+		// names (it fit when applied), then nothing, rather than leave what's
+		// written now (revoked releases with it) standing.
+		overflow = err
+		current := map[string][]Entry{}
+		for _, r := range releases {
+			if r.ReleasedUntil == nil && state.Signers == c.Source.Fingerprint() {
+				current[r.Digest] = append(current[r.Digest], r.Entry)
+			}
+		}
+		if variables, err = IdentityVariables(current); err != nil {
+			variables, _ = IdentityVariables(map[string][]Entry{})
+		}
+		listed = current
 	}
 	changed, err := c.Writer.Write(ctx, c.IdentityPolicy, variables, annotations)
 	if err != nil {
-		return err
+		return errors.Join(overflow, err)
 	}
 	if changed {
 		c.Log.Info("identity policy written", "policy", c.IdentityPolicy, "digests", len(listed), "release", state.Digest)
 	}
 	pruned, err := c.Store.Prune(ctx, releases, inUse, now, c.ReleaseGrace)
 	if err != nil {
-		return err
+		return errors.Join(overflow, err)
 	}
 	if pruned > 0 {
 		c.Log.Info("earlier releases no longer listed", "pruned", pruned)
 	}
 	if c.GatewayPolicy == "" {
-		return nil
+		return overflow
 	}
 	audiences := Audiences(apis, c.GCPAudience, c.Reserved)
 	variables, err = AudienceVariables(audiences)
 	if err != nil {
-		return err
+		// It fit when applied; the install's settings changed since.
+		overflow = errors.Join(overflow, err)
+		audiences = map[string][]string{}
+		variables, _ = AudienceVariables(audiences)
 	}
 	variables["apiAudiencesWritten"] = "true"
 	changed, err = c.Writer.Write(ctx, c.GatewayPolicy, variables, annotations)
 	if err != nil {
-		return err
+		return errors.Join(overflow, err)
 	}
 	if changed {
 		c.Log.Info("gateway token policy written", "policy", c.GatewayPolicy, "serviceAccounts", len(audiences), "release", state.Digest)
 	}
-	return nil
+	return overflow
 }

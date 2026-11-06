@@ -698,6 +698,9 @@ export const config = {
   // it doesn't list yet. Not installed (an unsigned catalog): this console
   // writes them all. Unset (tests): never read.
   catalogIdentityPolicyName: process.env["CATALOG_IDENTITY_POLICY_NAME"] ?? "",
+  // And its catalog token policy (the gateway's API audiences), read only to
+  // say whether the kernel writes those too (catalogPolicy.gateway).
+  catalogTokensPolicyName: process.env["CATALOG_TOKENS_POLICY_NAME"] ?? "",
   // How often the identity and scan policies are rewritten from the
   // database whatever changed (policySync.ts), so drift doesn't last.
   policySyncIntervalSeconds: positiveInt("POLICY_SYNC_INTERVAL_SECONDS", 300),

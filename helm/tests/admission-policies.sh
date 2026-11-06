@@ -908,6 +908,10 @@ POLICY_SA=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-kernel-policy
 seeded() { k get validatingadmissionpolicy "$1" -o jsonpath="{.spec.variables[?(@.name==\"$2\")].expression}"; }
 expect "upgrade seed: the console's releases kept" allowed "$(seeded "$CATALOG_IDENTITY" releases0 | grep -q "$TEAM_A" && echo '(server dry run)' || seeded "$CATALOG_IDENTITY" releases0)"
 expect "upgrade seed: the console's API audiences kept" allowed "$(seeded "$CATALOG_TOKENS" apiAudiencesWritten | grep -q true && echo '(server dry run)' || echo 'not seeded')"
+# Held to the kernel's rules: no platform product (team ""), no ESO
+# ServiceAccount, though the console's lists them.
+expect "upgrade seed: no platform product"       allowed "$(seeded "$CATALOG_IDENTITY" releases1 | grep -q 'plat-sa' && echo 'seeded it' || echo '(server dry run)')"
+expect "upgrade seed: no ESO ServiceAccount"     allowed "$(seeded "$CATALOG_IDENTITY" releases0 | grep -q 'eso-gcp' && echo 'seeded it' || echo '(server dry run)')"
 # What kernel policy writes from the verified release: db's release and
 # big's, with their audiences; no platform product (no release names one);
 # orders-api's backend audience only.
@@ -950,6 +954,12 @@ expect "kernel policy updating its own"                    allowed "$(can "$POLI
 expect "kernel policy updating the console's"              "no"  "$(can "$POLICY_SA" update "$RELEASE-execution-kernel-identity")"
 # And a write tried for real (dry run), as the console.
 expect "the console replacing the kernel's identity policy" "forbidden" "$(k get validatingadmissionpolicy "$CATALOG_IDENTITY" -o json | k --as="$CONSOLE" replace --dry-run=server -f - 2>&1)"
+# The next upgrade: the chart seeds from the kernel's own policy (as
+# written), not the console's (loosened above).
+render_catalog | k apply -f - > /dev/null
+expect "second upgrade: the kernel's literals kept" allowed "$(seeded "$CATALOG_IDENTITY" releasesc | grep -q 'registry.example/big' && echo '(server dry run)' || echo 'lost')"
+expect "second upgrade: not the console's"       allowed "$(seeded "$CATALOG_IDENTITY" "releases$(printf %s "$UNRELEASED_DIGEST" | cut -c8)" | grep -q "$UNRELEASED_DIGEST" && echo 'seeded the console'"'"'s' || echo '(server dry run)')"
+expect "second upgrade: still written"           allowed "$(seeded "$CATALOG_TOKENS" apiAudiencesWritten | grep -q true && echo '(server dry run)' || echo 'reset')"
 
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"

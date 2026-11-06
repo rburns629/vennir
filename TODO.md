@@ -211,7 +211,12 @@ it was seen.
   scan allowlist and each team's secret names stay the console's (so a
   compromised console can run a reviewed product with any of its team's
   Secrets, or an image that failed its scan as `default`), and an unsigned
-  catalog leaves all of it to the console. Next, in order:
+  catalog leaves all of it to the console. Also: `kernel policy` signs in
+  as the kernel's database role, which owns the whole database; it needs
+  only read on `executions` and `execution_tasks` and write on
+  `catalog_policy_*`. A role of its own means the migration Job making it
+  (bundled Postgres), `database-setup` and the cloud modules' IAM users
+  (managed), and its own Secret: not done with decision 27. Next, in order:
   1. **Drop the released digests from the console's identity policy** (the
      release after `kernel policy` ships, as decision 27's upgrade path
      says): with `catalogPolicy` on, it keeps each team's secret names

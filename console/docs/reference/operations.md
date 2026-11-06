@@ -469,7 +469,40 @@ an unsigned catalog keeps the console writing these policies, and the Admin
 page's policies card says which. A release it can't verify, or one older
 than the one it applied, isn't applied (it logs why, and
 `kernel_catalog_policy_passes_total{outcome="failed"}` counts it); what it
-wrote stands.
+wrote stands. A release too big for the policies (over 400,000 characters
+of product releases, 300,000 of API audiences: less than the console's
+600,000, for Helm's release Secret, which keeps both) isn't applied; with
+too many earlier releases kept beside the current one, they go first, then
+everything, rather than what's written standing.
+
+Keep the kernel chart's settings the console chart's: `release`,
+`newestVersion` and `signature` as its `catalog`, `gateway.gcpTokenAudience`
+as its `gateway.gcp.tokenAudience`, and `gateway.serviceAccount` set
+whenever the console chart's gateway is on (otherwise only the console's
+token policy holds each API's audiences, and the Admin page says so). The
+chart refuses `catalogPolicy` without `identityPolicy` (the console's,
+which holds each team's secret names). An earlier release stays listed for
+`CATALOG_POLICY_RELEASE_GRACE_SECONDS` (an hour) after a release dropped it,
+or while an unfinished execution submitted before then, and within
+`CATALOG_POLICY_IN_USE_MAX_SECONDS` (three days, the scheduler's approval
+timeout), runs it.
+
+**Rotating its signers.** Add the new key (or identity) to
+`catalogPolicy.signature` beside the old, publish a release signed by it,
+and only then remove the old. Replacing it in one step leaves the release
+applied unverified by the signers trusted now: both policies then list
+nothing until a release they signed is applied, and every product step is
+refused meanwhile. Earlier releases only the old signers signed go when
+the signers change.
+
+**GitOps.** kernel policy owns `spec.variables` and two annotations of both
+policies, as the console owns its policies' lists: a tool that applies the
+rendered manifests should ignore differences there (Argo CD's
+`ignoreDifferences` on `/spec/variables` and the `vennir.dev/catalog-*`
+annotations of `ValidatingAdmissionPolicy` `<kernel>-execution-kernel-catalog-*`).
+Without lookup the chart renders them empty, and `apiAudiencesWritten`
+false: product steps are refused until kernel policy's next write (a
+minute), and the API audience check waits for it.
 
 On kind, whose local catalog isn't signed, try it with a key of your own,
 kept out of git (`_local/` is ignored): generate one with `cosign
@@ -929,6 +962,14 @@ since 2026-11-06; decision 27 in `assessment.md`). With the kernel chart's
   as `default` with no Secrets, or release them through the catalog. So
   does a new release's product until `kernel policy` has read it
   (`catalogPolicy.pollSeconds`, a minute by default): try again then.
+- **Let unfinished executions finish first.** A step the kernel starts
+  after the upgrade (a later step of a DAG, a retry, one awaiting an
+  approval) must pass the kernel's policy too: one of a platform product,
+  or of a product registered by hand, or one still running an older chart's
+  legacy list (by repository, which the kernel's seed doesn't carry), is
+  refused, not retried (`IDENTITY_NOT_ALLOWED`). Wait for such executions to
+  finish (Observe's runs list the unfinished ones), or turn `catalogPolicy` on
+  when none run.
 - **The next release** drops the released digests from the console's
   identity policy when `catalogPolicy` is on, leaving it each team's secret
   names; the console stops computing them. An install whose catalog isn't

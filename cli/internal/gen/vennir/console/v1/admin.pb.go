@@ -1651,12 +1651,20 @@ type CatalogPolicies struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// "kernel": kernel policy, from the catalog release it verified itself,
 	// into policies this console may only read (beside this console's own);
-	// "console": this console (the catalog isn't signed).
+	// "console": this console (the kernel's catalog policy isn't installed);
+	// "unknown": it couldn't be read.
 	Writer string `protobuf:"bytes,1,opt,name=writer,proto3" json:"writer,omitempty"`
 	// With the kernel: the release it last wrote them from
-	// (<repository>@<digest>), and that release's commit.
-	Release       string `protobuf:"bytes,2,opt,name=release,proto3" json:"release,omitempty"`
-	Commit        string `protobuf:"bytes,3,opt,name=commit,proto3" json:"commit,omitempty"`
+	// (<repository>@<digest>), and that release's commit; empty until it has
+	// applied one it trusts.
+	Release string `protobuf:"bytes,2,opt,name=release,proto3" json:"release,omitempty"`
+	Commit  string `protobuf:"bytes,3,opt,name=commit,proto3" json:"commit,omitempty"`
+	// Whether this console's catalog trusts a signer (catalog.signature).
+	CatalogSigned bool `protobuf:"varint,4,opt,name=catalog_signed,json=catalogSigned,proto3" json:"catalog_signed,omitempty"`
+	// Whether the gateway is on, and whether the kernel writes its API
+	// ServiceAccounts' audiences too (the kernel chart's catalogPolicy.gateway).
+	Gateway       bool `protobuf:"varint,5,opt,name=gateway,proto3" json:"gateway,omitempty"`
+	Tokens        bool `protobuf:"varint,6,opt,name=tokens,proto3" json:"tokens,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1710,6 +1718,27 @@ func (x *CatalogPolicies) GetCommit() string {
 		return x.Commit
 	}
 	return ""
+}
+
+func (x *CatalogPolicies) GetCatalogSigned() bool {
+	if x != nil {
+		return x.CatalogSigned
+	}
+	return false
+}
+
+func (x *CatalogPolicies) GetGateway() bool {
+	if x != nil {
+		return x.Gateway
+	}
+	return false
+}
+
+func (x *CatalogPolicies) GetTokens() bool {
+	if x != nil {
+		return x.Tokens
+	}
+	return false
 }
 
 type SyncPoliciesRequest struct {
@@ -1958,11 +1987,14 @@ const file_vennir_console_v1_admin_proto_rawDesc = "" +
 	"\acatalog\x18\x02 \x01(\v2\".vennir.console.v1.CatalogPoliciesR\acatalog\x1aa\n" +
 	"\rOutcomesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12:\n" +
-	"\x05value\x18\x02 \x01(\v2$.vennir.console.v1.PolicySyncOutcomeR\x05value:\x028\x01\"[\n" +
+	"\x05value\x18\x02 \x01(\v2$.vennir.console.v1.PolicySyncOutcomeR\x05value:\x028\x01\"\xb4\x01\n" +
 	"\x0fCatalogPolicies\x12\x16\n" +
 	"\x06writer\x18\x01 \x01(\tR\x06writer\x12\x18\n" +
 	"\arelease\x18\x02 \x01(\tR\arelease\x12\x16\n" +
-	"\x06commit\x18\x03 \x01(\tR\x06commit\"\x15\n" +
+	"\x06commit\x18\x03 \x01(\tR\x06commit\x12%\n" +
+	"\x0ecatalog_signed\x18\x04 \x01(\bR\rcatalogSigned\x12\x18\n" +
+	"\agateway\x18\x05 \x01(\bR\agateway\x12\x16\n" +
+	"\x06tokens\x18\x06 \x01(\bR\x06tokens\"\x15\n" +
 	"\x13SyncPoliciesRequest\"\x8a\x02\n" +
 	"\x14SyncPoliciesResponse\x12Q\n" +
 	"\boutcomes\x18\x01 \x03(\v25.vennir.console.v1.SyncPoliciesResponse.OutcomesEntryR\boutcomes\x12<\n" +

@@ -19,7 +19,9 @@ ServiceAccounts ESO reads a team's vault as. The literals: `releases0` to
 `releasesf`, JSON maps of a digest to its products ({action, audiences,
 repository, serviceAccount, team}), by the digest's first hex digit (the API
 server compiles at most 100,000 characters a CEL expression; the kernel
-writes at most 95,000 a map and 600,000 in all).
+writes at most 95,000 a map and 400,000 in all, 300,000 for the token
+policy: Helm's release Secret keeps these beside the console's identity
+policy, internal/policy's MaxIdentityChars).
 
 <release>-execution-kernel-catalog-tokens, with catalogPolicy.gateway, on
 the gateway's token requests: each API ServiceAccount gets only the
@@ -42,6 +44,9 @@ to submit one the kernel hasn't listed (IDENTITY_PENDING).
 */}}
 {{- if .Values.catalogPolicy.enabled }}
 {{- $c := .Values.catalogPolicy }}
+{{- if not .Values.identityPolicy.enabled }}
+{{- fail "catalogPolicy needs identityPolicy.enabled: the console's identity policy holds each team's secret names, which this one doesn't check." }}
+{{- end }}
 {{- if not $c.release }}
 {{- fail "catalogPolicy.release: the catalog release the kernel reads (the console chart's catalog.release)." }}
 {{- end }}
@@ -77,9 +82,26 @@ to submit one the kernel hasn't listed (IDENTITY_PENDING).
 {{- if or (not (kindIs "map" $entry)) (not (and (kindIs "string" (get $entry "team")) (kindIs "string" (get $entry "repository")) (kindIs "string" (get $entry "action")) (kindIs "string" (get $entry "serviceAccount")) (kindIs "string" (get $entry "audiences")))) }}
 {{- fail (printf "%s's releases%s has a product that isn't {team, repository, action, serviceAccount, audiences} strings; delete the policy and let the kernel rewrite it." $seed.metadata.name $digit) }}
 {{- end }}
+{{- /* Only what the kernel would list itself (internal/policy's
+     Releases): a team's (none of the platform's), not as an API's or
+     ESO's ServiceAccount, and with no audience of this cluster's own:
+     the console's copy, seeded until a verified release is applied, is
+     held to the kernel's rules. (Its issuer's audience isn't known here;
+     the kernel drops it at its first write.) */}}
+{{- $reserved := list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" $.Values.api.auth.audience "" }}
+{{- $audiencesOk := true }}
+{{- range splitList "," $entry.audiences }}
+{{- if and (has . $reserved) (ne $entry.audiences "") }}
+{{- $audiencesOk = false }}
+{{- end }}
+{{- end }}
+{{- if and (ne $entry.team "") (not (hasSuffix "-api" $entry.serviceAccount)) (not (has $entry.serviceAccount (list "eso-gcp" "eso-aws" "eso-azure"))) $audiencesOk }}
 {{- $kept = append $kept (dict "team" $entry.team "repository" $entry.repository "action" $entry.action "serviceAccount" $entry.serviceAccount "audiences" $entry.audiences) }}
 {{- end }}
+{{- end }}
+{{- if $kept }}
 {{- $_ := set (index $shards $digit) $digest $kept }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

@@ -227,6 +227,8 @@ jobs:
             helm template console helm/charts/execution-console --set kernelApiUrl=http://x \
               --set logs.enabled=true --set logs.storage.type=$storage --set logs.storage.bucket=b > /dev/null
           done
+      - name: The catalog policies rendered with no cluster (decision 27)
+        run: bash helm/tests/catalog-policy-render.sh
       - name: The alerts, evaluated by promtool
         run: bash helm/tests/prometheus-rules.sh
       - name: Render every size, with sleeping and headroom on

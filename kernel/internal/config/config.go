@@ -144,6 +144,7 @@ type Settings struct {
 	CatalogPolicyGatewayPolicy    string
 	CatalogPolicyGatewayAudience  string
 	CatalogPolicyReleaseGrace     time.Duration
+	CatalogPolicyInUseMax         time.Duration
 	CatalogPolicyRegistryMirrors  map[string]string
 	CatalogPolicyRegistryGCPToken bool
 	CatalogPolicyRegistryECRToken bool
@@ -367,6 +368,7 @@ func Load(getenv func(string) string) (Settings, error) {
 		CatalogPolicyGatewayPolicy:      r.str("CATALOG_POLICY_GATEWAY_POLICY", ""),
 		CatalogPolicyGatewayAudience:    r.str("CATALOG_POLICY_GATEWAY_GCP_AUDIENCE", ""),
 		CatalogPolicyReleaseGrace:       r.seconds("CATALOG_POLICY_RELEASE_GRACE_SECONDS", 3600, true),
+		CatalogPolicyInUseMax:           r.seconds("CATALOG_POLICY_IN_USE_MAX_SECONDS", 259200, true),
 		CatalogPolicyRegistryGCPToken:   r.boolean("CATALOG_POLICY_REGISTRY_GCP_METADATA_TOKEN", false),
 		CatalogPolicyRegistryECRToken:   r.boolean("CATALOG_POLICY_REGISTRY_ECR_TOKEN", false),
 		PollInterval:                    r.seconds("SCHEDULER_POLL_INTERVAL_SECONDS", 1, true),

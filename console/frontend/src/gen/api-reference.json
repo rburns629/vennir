@@ -2374,18 +2374,39 @@
      "type": "string",
      "repeated": false,
      "optional": false,
-     "comment": "\"kernel\": kernel policy, from the catalog release it verified itself,\ninto policies this console may only read (beside this console's own);\n\"console\": this console (the catalog isn't signed)."
+     "comment": "\"kernel\": kernel policy, from the catalog release it verified itself,\ninto policies this console may only read (beside this console's own);\n\"console\": this console (the kernel's catalog policy isn't installed);\n\"unknown\": it couldn't be read."
     },
     {
      "name": "release",
      "type": "string",
      "repeated": false,
      "optional": false,
-     "comment": "With the kernel: the release it last wrote them from\n(<repository>@<digest>), and that release's commit."
+     "comment": "With the kernel: the release it last wrote them from\n(<repository>@<digest>), and that release's commit; empty until it has\napplied one it trusts."
     },
     {
      "name": "commit",
      "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "catalogSigned",
+     "type": "boolean",
+     "repeated": false,
+     "optional": false,
+     "comment": "Whether this console's catalog trusts a signer (catalog.signature)."
+    },
+    {
+     "name": "gateway",
+     "type": "boolean",
+     "repeated": false,
+     "optional": false,
+     "comment": "Whether the gateway is on, and whether the kernel writes its API\nServiceAccounts' audiences too (the kernel chart's catalogPolicy.gateway)."
+    },
+    {
+     "name": "tokens",
+     "type": "boolean",
      "repeated": false,
      "optional": false,
      "comment": ""

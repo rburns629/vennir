@@ -135,17 +135,24 @@ func TestAnEarlierReleaseIsListedWhileInUseOrForAnHour(t *testing.T) {
 		{Digest: digest("4"), Entry: entry("r.example/db", "create"), ReleasedUntil: ago(2 * time.Hour)},    // long ago, running
 		// Long ago, and a task runs its digest as another product: not its.
 		{Digest: digest("5"), Entry: entry("r.example/db", "create"), ReleasedUntil: ago(2 * time.Hour)},
+		// Long ago, run by a task submitted after the release dropped it
+		// (during its grace, say never to be approved): that keeps nothing.
+		{Digest: digest("6"), Entry: entry("r.example/db", "create"), ReleasedUntil: ago(2 * time.Hour)},
 	}
-	inUse := map[Use]bool{
-		{Digest: digest("4"), Team: "local", Repository: "r.example/db", Action: "create", ServiceAccount: "db-sa"}: true,
-		{Digest: digest("5"), Team: "local", Repository: "r.example/db", Action: "delete", ServiceAccount: "db-sa"}: true,
-		{Digest: digest("5"), Team: "other", Repository: "r.example/db", Action: "create", ServiceAccount: "db-sa"}: true,
+	use := func(d, team, action string) Use {
+		return Use{Digest: digest(d), Team: team, Repository: "r.example/db", Action: action, ServiceAccount: "db-sa"}
+	}
+	inUse := map[Use]time.Time{
+		use("4", "local", "create"): *ago(3 * time.Hour),
+		use("5", "local", "delete"): *ago(3 * time.Hour),
+		use("5", "other", "create"): *ago(3 * time.Hour),
+		use("6", "local", "create"): *ago(90 * time.Minute),
 	}
 	listed := Listed(releases, inUse, now, time.Hour)
 	for _, c := range []struct {
 		digest string
 		listed bool
-	}{{"1", true}, {"2", true}, {"3", false}, {"4", true}, {"5", false}} {
+	}{{"1", true}, {"2", true}, {"3", false}, {"4", true}, {"5", false}, {"6", false}} {
 		if _, ok := listed[digest(c.digest)]; ok != c.listed {
 			t.Errorf("release %s listed: %v", c.digest, ok)
 		}

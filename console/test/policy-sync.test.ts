@@ -71,7 +71,11 @@ describe("policy sync", () => {
         variables: {},
         annotations: { "vennir.dev/catalog-release": "r.example/catalog-release@sha256:abc", "vennir.dev/catalog-commit": "c0ffee" },
       });
-      expect((await read(admin)).body.catalog).toEqual({ writer: "kernel", release: "r.example/catalog-release@sha256:abc", commit: "c0ffee" });
+      expect((await read(admin)).body.catalog).toMatchObject({ writer: "kernel", release: "r.example/catalog-release@sha256:abc", commit: "c0ffee", catalogSigned: false });
+      // A read that fails is unknown, never "console".
+      vi.mocked(readPolicyVariables).mockRejectedValueOnce(new Error("API server unreachable"));
+      expect((await read(admin)).body.catalog).toMatchObject({ writer: "unknown" });
+      expect((await read(admin)).body.outcomes).toBeDefined();
       // The console only ever reads it.
       expect(readPolicyVariables).toHaveBeenCalledWith("kernel-execution-kernel-catalog-identity");
     } finally {

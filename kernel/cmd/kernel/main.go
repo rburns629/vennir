@@ -469,6 +469,7 @@ func runPolicy(ctx context.Context, s config.Settings, log *slog.Logger) error {
 		GCPAudience:    s.CatalogPolicyGatewayAudience,
 		Reserved:       policy.ReservedAudiences(append(own, s.APITokenAudience)...),
 		ReleaseGrace:   s.CatalogPolicyReleaseGrace,
+		InUseMax:       s.CatalogPolicyInUseMax,
 		PollInterval:   s.CatalogPolicyPoll,
 		PassTimeout:    5 * time.Minute,
 		Log:            log,

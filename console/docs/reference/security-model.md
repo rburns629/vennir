@@ -203,14 +203,33 @@ ServiceAccount may update. It lists what the console would register from
 that release (an action pinned, of a team the release names, not as an
 API's or ESO's ServiceAccount, with token audiences the console accepts;
 no repository two teams claim, no ServiceAccount two of a team's products
-share), and an earlier release while an unfinished task runs it as that
-product (`execution_tasks`) or for an hour after a release stopped naming
-it. Both policies apply, so a step runs as a product only if both list it,
-and mounts only its team's registered Secrets (the console's policy).
-Products registered by hand, and platform products, aren't in any release:
-with `catalogPolicy` on they run only as `default`, and the console refuses
-to submit one as its product (`IDENTITY_PENDING`, as for a new release the
-kernel hasn't read yet).
+share), and an earlier release for an hour after a release stopped naming
+it, or while an unfinished task runs it as that product (`execution_tasks`)
+in an execution submitted before the release dropped it and within three
+days (so one submitted during the hour, say never to be approved, doesn't
+hold it open). A digest a newer release names as another ServiceAccount or
+other audiences loses the old ones at once. When the kernel chart's signers
+change, the release applied is verified again (and until a release they
+signed is applied, both policies list nothing), and earlier releases only
+the old signers signed go. Until the first verified release, the policies
+hold the chart's seed from the console's, held to the kernel's own rules
+(no platform product, no API's or ESO's ServiceAccount, no audience of the
+cluster's). Both policies apply, so a step runs as a product only if both
+list it, and mounts only its team's registered Secrets (the console's
+policy). Products registered by hand, and platform products, aren't in any
+release: with `catalogPolicy` on they run only as `default`, and the
+console refuses to submit one as its product (`IDENTITY_PENDING`, as for a
+new release the kernel hasn't read yet, or one listed with other token
+audiences).
+
+What it can't know is freshness: it applies the newest release the
+registry serves at the reference it follows, and refuses older ones than
+it applied, but whoever controls the registry (not its signers) can
+withhold newer releases, so a release that revokes a product may never
+arrive. A signed release names when it was made; nothing bounds how old
+the one applied may be. That's the same for the console's pull of the
+catalog; watch the Admin page's Catalog card (the version applied, its
+age).
 
 ## Consumers and templates
 

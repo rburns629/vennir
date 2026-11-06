@@ -157,13 +157,13 @@ rules:
       - {{ printf "%s-gateway-tokens" (include "execution-console.fullname" .) | quote }}
       {{- end }}
     verbs: ["get", "update"]
-  {{- with .Values.catalogPolicy.identityPolicyName }}
-  # The kernel's catalog identity policy (decision 27), which only kernel
-  # policy may update: read, to say who writes it and to refuse a
-  # submission it doesn't list yet; never changed.
+  {{- with compact (list .Values.catalogPolicy.identityPolicyName .Values.catalogPolicy.tokensPolicyName) }}
+  # The kernel's catalog policies (decision 27), which only kernel policy
+  # may update: read, to say who writes them and to refuse a submission
+  # its identity policy doesn't list yet; never changed.
   - apiGroups: ["admissionregistration.k8s.io"]
     resources: ["validatingadmissionpolicies"]
-    resourceNames: [{{ . | quote }}]
+    resourceNames: {{ toJson . }}
     verbs: ["get"]
   {{- end }}
   {{- with .Values.imageSignature.policyName }}

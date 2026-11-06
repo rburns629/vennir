@@ -220,6 +220,7 @@ Each product release a verified catalog release named, as the catalog identity p
 | `action` | text | no | |
 | `service_account` | text | no | What it runs as (`default` when its `product.yaml` declares none). |
 | `audiences` | text | no | Its token audiences, comma-separated. |
+| `signers` | text | no | The fingerprint of the signers its release was verified by: when the kernel chart trusts others, an earlier release only they signed goes. |
 | `released_until` | timestamptz | yes | When a later release stopped naming it; null while the applied one does. It's listed for an hour after, or while an unfinished task runs it, then removed. |
 
 `schema_migrations` also exists: which of `kernel/internal/migrate/sql/` the database has (`kernel migrate`).

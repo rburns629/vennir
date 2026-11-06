@@ -258,7 +258,8 @@ describe("SubmitExecution: a product runs as its ServiceAccount, with its team's
     it("refuses one it doesn't list yet (or another team's), and forwards nothing", async () => {
       config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
       // Not at all, in another team, as another action, or as a platform product (team ""), which the kernel never lists.
-      for (const listed of [[], [{ ...productA, team: otherTeamName }], [{ ...productA, team: teamName, action: "delete" }], [productA]]) {
+      // And with other token audiences than its product declares: its token would be refused.
+      for (const listed of [[], [{ ...productA, team: otherTeamName }], [{ ...productA, team: teamName, action: "delete" }], [productA], [{ ...productA, team: teamName, audiences: "" }]]) {
         vi.mocked(submitExecution).mockClear();
         vi.mocked(readPolicyVariables).mockResolvedValue(kernelPolicy(listed));
         forgetKernelPolicy();

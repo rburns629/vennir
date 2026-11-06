@@ -126,6 +126,7 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | `internal/policy/registry.go` | Reading the release from the registry as this Pod's own identity (a Docker config, GKE's metadata token, ECR's), through mirrors; following the newest version. |
 | `internal/policy/store.go` | The release applied and the product releases it named, in the kernel's database; which releases unfinished tasks run. |
 | `internal/policy/writer.go` | Rewriting an admission policy's literals through the API server, conditionally on the version read. |
+| `internal/policy/cel_test.go` | The policies' literals compiled by cel-go as the API server compiles them, whatever strings a catalog release carries. |
 | `internal/policy/testdata/keyless/` | A real keyless cosign signature (of cosign's own release image) and Sigstore's trusted root, for the verification tests. |
 | `internal/logging/`, `internal/metrics/` | JSON logs; the Prometheus metrics. |
 | `internal/gen/` | `KernelService`'s generated Go, and the catalog release's (`make proto`). |
@@ -502,6 +503,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `prometheus-rules.sh`, `prometheus/alerts.test.yaml` | Both charts' alerts rendered and evaluated by promtool (the bundled Prometheus's image) against made-up series: what fires and what doesn't. Run by CI's helm job. |
 | `step-job.json` | A step's Job exactly as the kernel's executor makes it (a kernel test keeps it equal), which `admission-policies.sh` dry-runs as the scheduler and as anyone else. |
 | `admission-policies.sh` | Proves the charts' admission policies on a real cluster (dispatch and a step's Job shape, step Jobs, image sources, step identity, scans, purging, the console's write fence, namespaces and Jobs, the gateway's tokens), case by case with server-side dry runs; and the kernel's catalog policies beside the console's (both apply), and who may update which. Run by CI's kubernetes job. |
+| `catalog-policy-render.sh` | The kernel chart's catalog policies rendered with no cluster (no lookup): their maps empty, `apiAudiencesWritten` false, and the settings the chart refuses. Run by CI's helm job. |
 
 ### `helm/values/`: each cluster's settings
 

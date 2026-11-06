@@ -632,13 +632,28 @@ export async function getPolicySync(): Promise<PolicySync[]> {
  * verified (with that release), or "console" (the catalog isn't signed).
  */
 export interface CatalogPolicies {
-  writer: "kernel" | "console";
+  /** "unknown": it couldn't be read (the console's log says why). */
+  writer: "kernel" | "console" | "unknown";
   release: string;
   commit: string;
+  catalogSigned: boolean;
+  /** The gateway is on; the kernel writes its API audiences too. */
+  gateway: boolean;
+  tokens: boolean;
 }
 
-function catalogPolicies(c: { writer: string; release: string; commit: string } | undefined): CatalogPolicies {
-  return { writer: c?.writer === "kernel" ? "kernel" : "console", release: c?.release ?? "", commit: c?.commit ?? "" };
+function catalogPolicies(
+  c: { writer: string; release: string; commit: string; catalogSigned: boolean; gateway: boolean; tokens: boolean } | undefined,
+): CatalogPolicies {
+  const writer = c?.writer === "kernel" || c?.writer === "console" ? c.writer : "unknown";
+  return {
+    writer,
+    release: c?.release ?? "",
+    commit: c?.commit ?? "",
+    catalogSigned: c?.catalogSigned ?? false,
+    gateway: c?.gateway ?? false,
+    tokens: c?.tokens ?? false,
+  };
 }
 
 /** Admins: getPolicySync's outcomes, and who writes the catalog's policies. */

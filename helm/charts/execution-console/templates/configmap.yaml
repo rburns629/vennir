@@ -139,6 +139,7 @@ data:
   # The kernel's catalog identity policy, which the console only reads
   # (catalogPolicy.ts; the kernel chart's catalog-policy.yaml).
   CATALOG_IDENTITY_POLICY_NAME: {{ .Values.catalogPolicy.identityPolicyName | quote }}
+  CATALOG_TOKENS_POLICY_NAME: {{ .Values.catalogPolicy.tokensPolicyName | quote }}
   POLICY_SYNC_INTERVAL_SECONDS: {{ .Values.policySyncIntervalSeconds | quote }}
   EXECUTION_RETENTION_DAYS: {{ .Values.retention.executionDays | quote }}
   AUDIT_RETENTION_DAYS: {{ .Values.retention.auditDays | quote }}

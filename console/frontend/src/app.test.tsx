@@ -1879,6 +1879,7 @@ describe("admin", () => {
           schedulerLogs: { applies: true, ok: true },
           teamQuotas: { applies: true, ok: false, error: "quota refused" },
         },
+        catalog: { writer: "console", catalogSigned: false },
       },
     });
     expect(await screen.findByText("Registry sign-in for each team")).toBeTruthy();
@@ -1906,6 +1907,27 @@ describe("admin", () => {
       "AdminService/GetPolicySync": { outcomes: {}, catalog: { writer: "kernel", release: "", commit: "" } },
     });
     expect(await screen.findByText(/once it has verified a catalog release/)).toBeTruthy();
+    cleanup();
+    // The gateway on, but no kernel token policy: said, not claimed.
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": {
+        outcomes: {},
+        catalog: { writer: "kernel", release: "r@sha256:abc", commit: "c", gateway: true, tokens: false },
+      },
+    });
+    expect(await screen.findByText(/catalogPolicy.gateway isn't set/)).toBeTruthy();
+    cleanup();
+    // A signed catalog the kernel doesn't write for; and a read that failed.
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": { outcomes: {}, catalog: { writer: "console", catalogSigned: true } },
+    });
+    expect(await screen.findByText(/The catalog is signed, but the kernel doesn't write/)).toBeTruthy();
+    cleanup();
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": { outcomes: {}, catalog: { writer: "unknown" } },
+    });
+    expect(await screen.findByText(/couldn't be read from the cluster/)).toBeTruthy();
+    expect(screen.queryByText(/The catalog isn't signed/)).toBeNull();
   });
 
   it("sets the chat agent's model in place of the install's, keeps its key unshown, and tries it first", async () => {

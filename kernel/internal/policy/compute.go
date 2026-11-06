@@ -32,10 +32,19 @@ const AWSAudience = "sts.amazonaws.com"
 // room for the rest (console/src/productPolicy.ts's MAX_MAP_CHARS).
 const MaxMapChars = 95_000
 
-// MaxTotalChars is the most all sixteen may hold, keeping the policy object
-// well under etcd's 1.5 MiB and Helm's release Secret, which keeps it,
-// under its 1 MiB.
-const MaxTotalChars = 600_000
+// MaxIdentityChars and MaxAudienceChars are the most all sixteen maps of
+// each policy may hold. Less than the console's 600,000 a policy: Helm's
+// release Secret for the kernel chart (under 1 MiB) keeps these beside the
+// console's identity policy and the scan policy, all re-encoded by the
+// upgrade seed. Measured 2026-11-06 with every list at its most (the
+// console's identity policy too, as while both write): about 680 KB of
+// the Secret for the literals, plus about 140 KB for the rest of the
+// release. Still about 1,700 product (digest, action) pairs, and 1,500 API
+// ServiceAccounts.
+const (
+	MaxIdentityChars = 400_000
+	MaxAudienceChars = 300_000
+)
 
 // MaxTokenAudiences is the most a product may declare (tokenAudiences.ts).
 const MaxTokenAudiences = 8
@@ -83,6 +92,9 @@ type Release struct {
 	// ReleasedUntil is when a release stopped naming it; nil while the
 	// release applied names it.
 	ReleasedUntil *time.Time
+	// Signers is the fingerprint of the signers its release was verified
+	// by (Signers.Fingerprint).
+	Signers string
 }
 
 // API is what one of the release's APIs needs minted: its ServiceAccount
@@ -198,8 +210,12 @@ func TokenAudiences(file string) ([]string, error) {
 	if json.Unmarshal(claims.Audience, &one) == nil {
 		return []string{one}, nil
 	}
+	// Its issuer's audience must be reserved: a token we can't read it from
+	// is an error, not "none".
 	var many []string
-	_ = json.Unmarshal(claims.Audience, &many)
+	if err := json.Unmarshal(claims.Audience, &many); err != nil || len(many) == 0 {
+		return nil, fmt.Errorf("%s has no audience (aud) a string or a list of strings", file)
+	}
 	return many, nil
 }
 
@@ -407,17 +423,28 @@ func Audiences(apis []API, gcpAudience string, reserved Reserved) map[string][]s
 	return out
 }
 
-// Listed are the releases the identity policy lists now, by digest: those
-// the applied release names, those it stopped naming less than grace ago,
-// and those an unfinished task runs, as that product (its team, repository,
-// action and ServiceAccount; another product released at the same digest
-// doesn't count).
-func Listed(releases []Release, inUse map[Use]bool, now time.Time, grace time.Duration) map[string][]Entry {
+// Kept says whether a release is still listed: the applied release names
+// it, it stopped naming it less than grace ago, or an unfinished task runs
+// it as that product (its team, repository, action and ServiceAccount;
+// another product released at the same digest doesn't count) in an
+// execution submitted before a release stopped naming it. One submitted
+// after (during the grace) keeps nothing: it can't hold a dropped release
+// open. inUse carries each use's earliest submission, from executions
+// recent enough to count at all (Store.InUse's bound).
+func Kept(r Release, inUse map[Use]time.Time, now time.Time, grace time.Duration) bool {
+	if r.ReleasedUntil == nil || now.Sub(*r.ReleasedUntil) < grace {
+		return true
+	}
+	submitted, ok := inUse[Use{Digest: r.Digest, Team: r.Team, Repository: r.Repository, Action: r.Action, ServiceAccount: r.ServiceAccount}]
+	return ok && !submitted.After(*r.ReleasedUntil)
+}
+
+// Listed are the releases the identity policy lists now (Kept), by digest.
+func Listed(releases []Release, inUse map[Use]time.Time, now time.Time, grace time.Duration) map[string][]Entry {
 	listed := map[string][]Entry{}
 	seen := map[string]bool{}
 	for _, r := range releases {
-		use := Use{Digest: r.Digest, Team: r.Team, Repository: r.Repository, Action: r.Action, ServiceAccount: r.ServiceAccount}
-		if r.ReleasedUntil != nil && now.Sub(*r.ReleasedUntil) >= grace && !inUse[use] {
+		if !Kept(r, inUse, now, grace) {
 			continue
 		}
 		key := r.Digest + "\x00" + mustJSON(r.Entry)
@@ -445,7 +472,7 @@ func IdentityVariables(listed map[string][]Entry) (map[string]string, error) {
 	for digest, entries := range listed {
 		shards[digest[7:8]][digest] = entries
 	}
-	return literals("releases", shards, "the product releases in use")
+	return literals("releases", shards, "the product releases in use", MaxIdentityChars)
 }
 
 // AudienceVariables are the gateway token policy's sixteen maps
@@ -460,10 +487,10 @@ func AudienceVariables(audiences map[string][]string) (map[string]string, error)
 	for key, list := range audiences {
 		shards[Digits[len(key)%16]][key] = list
 	}
-	return literals("apiAudiences", shards, "the API ServiceAccounts' audiences")
+	return literals("apiAudiences", shards, "the API ServiceAccounts' audiences", MaxAudienceChars)
 }
 
-func literals[V any](prefix string, shards map[string]map[string]V, what string) (map[string]string, error) {
+func literals[V any](prefix string, shards map[string]map[string]V, what string, max int) (map[string]string, error) {
 	out := map[string]string{}
 	total := 0
 	for _, d := range Digits {
@@ -474,8 +501,8 @@ func literals[V any](prefix string, shards map[string]map[string]V, what string)
 		total += len(literal)
 		out[prefix+d] = literal
 	}
-	if total > MaxTotalChars {
-		return nil, fmt.Errorf("%s take %d characters, more than the policy holds (%d)", what, total, MaxTotalChars)
+	if total > max {
+		return nil, fmt.Errorf("%s take %d characters, more than the policy holds (%d)", what, total, max)
 	}
 	return out, nil
 }
