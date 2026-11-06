@@ -24,9 +24,9 @@ backend:
       roleArn: arn:aws:iam::123456789012:role/vennir-orders-api
       region: us-east-2
       service: lambda
-shareWith: [web]
+access:
+  requests: approval    # its team's maintainers grant or decline each request
 limits:
   default: 300/min
-  web: 600/min
 timeout: 15s
 maxRequest: 16KiB

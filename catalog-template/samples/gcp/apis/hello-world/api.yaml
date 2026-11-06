@@ -32,7 +32,8 @@ backend:
       serviceAccount: hello-invoker@sandbox-web-1.iam.gserviceaccount.com
       # Cloud Run takes its own URL as the audience.
       audience: https://hello-world-7xk2abcdq-uc.a.run.app
-shareWith: ["*"]
+access:
+  requests: open        # anyone who asks is granted at once, at the default limit
 limits:
   default: 120/min
 timeout: 30s

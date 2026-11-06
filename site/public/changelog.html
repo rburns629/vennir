@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vennir changelog</title>
-<meta name="description" content="What changed in each Vennir release, newest first, and what&#x27;s merged on main but not released yet.">
+<meta name="description" content="What changed in each Vennir release, newest first.">
 <link rel="canonical" href="https://vennir.io/changelog">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Vennir">
 <meta property="og:title" content="Vennir changelog">
-<meta property="og:description" content="What changed in each Vennir release, newest first, and what&#x27;s merged on main but not released yet.">
+<meta property="og:description" content="What changed in each Vennir release, newest first.">
 <meta property="og:url" content="https://vennir.io/changelog">
 <meta property="og:image" content="https://vennir.io/og.png">
 <meta property="og:image:width" content="1200">
@@ -78,65 +78,6 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <p style="margin: 0; font-size: 19px; line-height: 1.6; color: #AEB5C2; max-width: 680px; text-wrap: pretty">Vennir is 0.x: releases come often, and only the latest gets security fixes. Each release attaches the two Helm charts and vennir for Linux and macOS, with checksums.</p>
     <div style="display: flex; gap: 12px; flex-wrap: wrap">
       <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/releases">All releases on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
-      <a class="btn btn-ghost" href="#unreleased">On main, not yet released</a>
-    </div>
-  </section>
-  <!-- Unreleased -->
-  <section id="unreleased" aria-labelledby="unrel-h" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
-    <div class="wrap" style="padding-top: 96px; padding-bottom: 96px; display: flex; flex-direction: column; gap: 40px">
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 24px 32px; align-items: end">
-        <div style="display: flex; flex-direction: column; gap: 16px">
-          <span style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><span class="eyebrow">Unreleased</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">on main since v0.11.0</span></span>
-          <h2 id="unrel-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Coming in the next release.</h2>
-        </div>
-        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Merged, tested and on <a href="https://github.com/rburns629/vennir/compare/v0.11.0...main">main</a>, but not in a tagged release yet. Build from main to try it, or wait for the tag.</p>
-      </div>
-      <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
-        <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 14px">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Guides for getting going</h3>
-          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Onboarding, from installing Vennir to a first deploy, and where to host it: kind, GKE, EKS or your own cluster.</span></li>
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Deploying to Google Cloud and to AWS from Vennir: every step a team takes so its products can make resources there.</span></li>
-          </ul>
-        </li>
-        <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 14px">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">The API gateway and the network</h3>
-          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">The API gateway, start to finish: turning it on, publishing a backend, calling it, and putting it on the internet.</span></li>
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Addresses and firewall rules: which address each part uses, how to find it, and when a fixed outbound address is worth it.</span></li>
-          </ul>
-        </li>
-        <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 14px">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Who may call each API</h3>
-          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Each API has an access list on each install: grants to a single sign-on group or to one person or bot, each with its own rate. Its team's maintainers grant and change them; they, an admin, the person a grant names, or a bot's team's maintainers can revoke one. Besides the API's own team (and, this release, its shareWith teams), nobody else gets past the gateway, admins included.</span></li>
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">People ask for access in the console, with a reason, and a bot's team asks for its bot. <span class="mono" style="font-size: 14px; color: #E8EAEE">access.requests</span> in api.yaml says how a request is answered: <span class="mono" style="font-size: 14px; color: #E8EAEE">open</span>, <span class="mono" style="font-size: 14px; color: #E8EAEE">approval</span> or <span class="mono" style="font-size: 14px; color: #E8EAEE">closed</span>.</span></li>
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">shareWith</span> in api.yaml still works for this release, shown as from the catalog, and goes in the next: grant your callers in the console first.</span></li>
-          </ul>
-        </li>
-        <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 14px">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">The kernel checks the catalog itself</h3>
-          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">With a signed catalog and the kernel chart's <span class="mono" style="font-size: 14px; color: #E8EAEE">catalogPolicy</span>, <span class="mono" style="font-size: 14px; color: #E8EAEE">kernel policy</span> verifies the catalog's release on its own and writes which images run as each product (and, with <span class="mono" style="font-size: 14px; color: #E8EAEE">catalogPolicy.gateway</span> set, each API's token audiences) into admission policies only it may update. A taken-over console can no longer run an image no release names as a product.</span></li>
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Off by default. Earlier releases stay allowed while they're in use, within set limits, and its signers can be rotated without a gap.</span></li>
-          </ul>
-        </li>
-        <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 14px">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Tighter defaults</h3>
-          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">In a raw DAG, each team sees its own steps' outputs and logs in full, and only the state of other teams' steps.</span></li>
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">A team that a single sign-on groups claim gave someone counts only for a session from the last hour, at the console and the gateway, so someone the provider takes out of the group is out of its team within the hour.</span></li>
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">The gateway can get tokens for an API's ServiceAccount only for the audiences its api.yaml needs. Upgrade the console chart with <span class="mono" style="font-size: 14px; color: #E8EAEE">--force-conflicts</span> too.</span></li>
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Who was shown a run's outputs or logs, or a team's secret names, is recorded, and admins can list it through the API (<span class="mono" style="font-size: 14px; color: #E8EAEE">AdminService/ListAuditReads</span>).</span></li>
-          </ul>
-        </li>
-        <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 14px">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Steps always hardened</h3>
-          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
-            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">The kernel chart's <span class="mono" style="font-size: 14px; color: #E8EAEE">scheduler.taskPodHardening</span> is gone: every step runs non-root, on a read-only root filesystem, with no capabilities and no Kubernetes token. A values file that sets it can drop the key.</span></li>
-          </ul>
-        </li>
-      </ul>
     </div>
   </section>
   <!-- Releases -->
@@ -146,10 +87,56 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <h2 id="rel-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Newest first.</h2>
     </div>
     <div>
+      <article id="v0-12-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.12.0</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">6 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.12.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.11.0...v0.12.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.11.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Guides for getting going</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Onboarding, from installing Vennir to a first deploy, and where to host it: kind, GKE, EKS or your own cluster.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Deploying to Google Cloud and to AWS from Vennir: every step a team takes so its products can make resources there.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">The API gateway and the network</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The API gateway, start to finish: turning it on, publishing a backend, calling it, and putting it on the internet.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Addresses and firewall rules: which address each part uses, how to find it, and when a fixed outbound address is worth it.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Who may call each API</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Each API has an access list on each install: grants to a single sign-on group or to one person or bot, each with its own rate. Its team's maintainers grant and change them; they, an admin, the person a grant names, or a bot's team's maintainers can revoke one. Besides the API's own team (and, in 0.12.0, its shareWith teams), nobody else gets past the gateway, admins included.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">People ask for access in the console, with a reason, and a bot's team asks for its bot. <span class="mono" style="font-size: 14px; color: #E8EAEE">access.requests</span> in api.yaml says how a request is answered: <span class="mono" style="font-size: 14px; color: #E8EAEE">open</span>, <span class="mono" style="font-size: 14px; color: #E8EAEE">approval</span> or <span class="mono" style="font-size: 14px; color: #E8EAEE">closed</span>.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">shareWith</span> in api.yaml still works for 0.12.0, shown as from the catalog, and goes in the next: grant your callers in the console first.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">The kernel checks the catalog itself</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">With a signed catalog and the kernel chart's <span class="mono" style="font-size: 14px; color: #E8EAEE">catalogPolicy</span>, <span class="mono" style="font-size: 14px; color: #E8EAEE">kernel policy</span> verifies the catalog's release on its own and writes which images run as each product (and, with <span class="mono" style="font-size: 14px; color: #E8EAEE">catalogPolicy.gateway</span> set, each API's token audiences) into admission policies only it may update. A taken-over console can no longer run an image no release names as a product.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Off by default. Earlier releases stay allowed while they're in use, within set limits, and its signers can be rotated without a gap.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Tighter defaults</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">In a raw DAG, each team sees its own steps' outputs and logs in full, and only the state of other teams' steps.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">A team that a single sign-on groups claim gave someone counts only for a session from the last hour, at the console and the gateway, so someone the provider takes out of the group is out of its team within the hour.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The gateway can get tokens for an API's ServiceAccount only for the audiences its api.yaml needs. Upgrade the console chart with <span class="mono" style="font-size: 14px; color: #E8EAEE">--force-conflicts</span> too.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Who was shown a run's outputs or logs, or a team's secret names, is recorded, and admins can list it through the API (<span class="mono" style="font-size: 14px; color: #E8EAEE">AdminService/ListAuditReads</span>).</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Steps always hardened</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The kernel chart's <span class="mono" style="font-size: 14px; color: #E8EAEE">scheduler.taskPodHardening</span> is gone: every step runs non-root, on a read-only root filesystem, with no capabilities and no Kubernetes token. A values file that sets it can drop the key.</span></li>
+          </ul>
+        </div>
+      </article>
       <article id="v0-11-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
         <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
           <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
-            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.11.0</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.11.0</h3>
           </div>
           <time class="mono" style="font-size: 14px; color: #AEB5C2">4 Nov 2026</time>
           <div style="display: flex; flex-direction: column; gap: 0">

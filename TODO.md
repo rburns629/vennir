@@ -190,10 +190,7 @@ it was seen.
   last step, the console's `accessFor` and its `catalog` way, and the docs
   (`console/docs/11-apis.md`, `21-api-gateway.md`, the catalog guide).
   Before, tell each API's team that still has it to grant its callers. The
-  template's samples (`samples/{local,gcp,aws}/apis/*/api.yaml`) still say
-  `shareWith`, because the vennir the template pins (0.11.0) refuses
-  `access`: once a release with it is pinned, give them `access.requests`
-  instead (`open` for the hello-world ones, `approval` for orders).
+  template's samples use `access.requests` since 0.12.0 was pinned.
 
 - [ ] **A grant's last call** (decision 26's open question, 2026-11-05):
   grants don't expire; the proposal is that the API's team sees each
