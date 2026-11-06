@@ -903,6 +903,15 @@ export declare type CatalogPolicies = Message<"vennir.console.v1.CatalogPolicies
    * @generated from field: bool tokens = 6;
    */
   tokens: boolean;
+
+  /**
+   * With the kernel: why it refused the newest release the catalog names
+   * (unsigned, older than the one applied, ...), which holds back every
+   * release after it until the catalog names another; empty when it didn't.
+   *
+   * @generated from field: string refused = 7;
+   */
+  refused: string;
 };
 
 /**

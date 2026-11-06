@@ -1663,8 +1663,12 @@ type CatalogPolicies struct {
 	CatalogSigned bool `protobuf:"varint,4,opt,name=catalog_signed,json=catalogSigned,proto3" json:"catalog_signed,omitempty"`
 	// Whether the gateway is on, and whether the kernel writes its API
 	// ServiceAccounts' audiences too (the kernel chart's catalogPolicy.gateway).
-	Gateway       bool `protobuf:"varint,5,opt,name=gateway,proto3" json:"gateway,omitempty"`
-	Tokens        bool `protobuf:"varint,6,opt,name=tokens,proto3" json:"tokens,omitempty"`
+	Gateway bool `protobuf:"varint,5,opt,name=gateway,proto3" json:"gateway,omitempty"`
+	Tokens  bool `protobuf:"varint,6,opt,name=tokens,proto3" json:"tokens,omitempty"`
+	// With the kernel: why it refused the newest release the catalog names
+	// (unsigned, older than the one applied, ...), which holds back every
+	// release after it until the catalog names another; empty when it didn't.
+	Refused       string `protobuf:"bytes,7,opt,name=refused,proto3" json:"refused,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1739,6 +1743,13 @@ func (x *CatalogPolicies) GetTokens() bool {
 		return x.Tokens
 	}
 	return false
+}
+
+func (x *CatalogPolicies) GetRefused() string {
+	if x != nil {
+		return x.Refused
+	}
+	return ""
 }
 
 type SyncPoliciesRequest struct {
@@ -1987,14 +1998,15 @@ const file_vennir_console_v1_admin_proto_rawDesc = "" +
 	"\acatalog\x18\x02 \x01(\v2\".vennir.console.v1.CatalogPoliciesR\acatalog\x1aa\n" +
 	"\rOutcomesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12:\n" +
-	"\x05value\x18\x02 \x01(\v2$.vennir.console.v1.PolicySyncOutcomeR\x05value:\x028\x01\"\xb4\x01\n" +
+	"\x05value\x18\x02 \x01(\v2$.vennir.console.v1.PolicySyncOutcomeR\x05value:\x028\x01\"\xce\x01\n" +
 	"\x0fCatalogPolicies\x12\x16\n" +
 	"\x06writer\x18\x01 \x01(\tR\x06writer\x12\x18\n" +
 	"\arelease\x18\x02 \x01(\tR\arelease\x12\x16\n" +
 	"\x06commit\x18\x03 \x01(\tR\x06commit\x12%\n" +
 	"\x0ecatalog_signed\x18\x04 \x01(\bR\rcatalogSigned\x12\x18\n" +
 	"\agateway\x18\x05 \x01(\bR\agateway\x12\x16\n" +
-	"\x06tokens\x18\x06 \x01(\bR\x06tokens\"\x15\n" +
+	"\x06tokens\x18\x06 \x01(\bR\x06tokens\x12\x18\n" +
+	"\arefused\x18\a \x01(\tR\arefused\"\x15\n" +
 	"\x13SyncPoliciesRequest\"\x8a\x02\n" +
 	"\x14SyncPoliciesResponse\x12Q\n" +
 	"\boutcomes\x18\x01 \x03(\v25.vennir.console.v1.SyncPoliciesResponse.OutcomesEntryR\boutcomes\x12<\n" +

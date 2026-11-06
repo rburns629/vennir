@@ -57,20 +57,58 @@ const KERNEL_POLICIES: { label: string; about: ReactNode; code?: string }[] = [
   { label: "Who may delete a team's namespace", about: "Only a retired team's (or its API backends' namespace), and only by the purger the install names." },
 ];
 
-/** Who writes the cluster's policies of what the catalog decides, in a line (decision 27). */
-function catalogLine(c: CatalogPolicies): string {
+/** Who writes the cluster's policies of what the catalog decides, in a line, when it isn't the kernel (decision 27; the kernel's card says the rest). */
+function catalogLine(c: CatalogPolicies): string | null {
   if (c.writer === "unknown") return "Who writes which images run as each product couldn't be read from the cluster just now; the console's log says why.";
   if (c.writer === "console") {
     return c.catalogSigned
       ? "The catalog is signed, but the kernel doesn't write which images run as each product (its chart's catalogPolicy is off, or this console's catalogPolicy.identityPolicyName doesn't name its policy): the console alone does, and a console that's taken over could loosen it."
       : "The catalog isn't signed, so the console alone writes which images run as each product, and each API's token audiences: a console that's taken over could loosen them.";
   }
-  const apis = c.gateway && !c.tokens ? " Each API's token audiences the console alone writes: the kernel chart's catalogPolicy.gateway isn't set." : "";
-  const what = c.gateway && c.tokens ? "Which images run as each product, and each API's token audiences," : "Which images run as each product";
-  if (!c.release) {
-    return `${what} the kernel will also write once it has verified a catalog release its signers signed; until then its copies are what the chart seeded, or nothing after its signers changed.${apis}`;
-  }
-  return `${what} the kernel also writes, from the catalog release it verified${c.commit ? ` (commit ${c.commit.slice(0, 12)})` : ""}: a step must pass both, so the console can't loosen them.${apis}`;
+  return null;
+}
+
+/** The policies the kernel writes from the catalog release it verified (decision 27): what it applied, and whether it refuses the newest. */
+function KernelPoliciesCard({ c }: { c: CatalogPolicies }) {
+  const pill = c.refused
+    ? <Pill tone="warning" dot="warning.main">Refusing the newest release</Pill>
+    : c.release
+      ? <Pill tone="success" dot="success.main">Applied</Pill>
+      : <Pill tone="neutral">Waiting for a verified release</Pill>;
+  const audiences = !c.gateway
+    ? "None: the gateway is off"
+    : c.tokens
+      ? <>Written by the kernel too (<Mono>catalogPolicy.gateway</Mono> is set)</>
+      : <>The console alone writes them: the kernel chart&apos;s <Mono>catalogPolicy.gateway</Mono> isn&apos;t set</>;
+  return (
+    <AdminCard label="Written by the kernel" title="Written by the kernel, from the signed catalog" status={pill}>
+      <Typography variant="body2" color="text.secondary">
+        Which images run as each product, with which ServiceAccount and tokens, and each API&apos;s token audiences, from the catalog release the
+        kernel verified itself. The console can&apos;t loosen them.
+      </Typography>
+      {c.refused && (
+        <Alert severity="warning">
+          The kernel refuses the newest catalog release, so no release after it is applied, and nothing it would revoke is revoked, until the
+          catalog names another: <Mono>{c.refused}</Mono>
+        </Alert>
+      )}
+      <KeyValues
+        rows={[
+          ["Release applied", c.release ? <Mono>{c.release}</Mono> : "None yet: until the kernel verifies one its signers signed, its policies stand as the chart seeded them, or list nothing after its signers changed"],
+          ["From commit", c.commit ? <Mono>{c.commit}</Mono> : "—"],
+          ["API token audiences", audiences],
+        ]}
+      />
+      <Typography variant="caption" color="text.secondary">
+        Set by the install: the kernel chart&apos;s <Mono>catalogPolicy</Mono>, and which signers it trusts.
+        {c.refused && (
+          <>
+            {" "}The same reason is in the kernel policy&apos;s log and the <Mono>kernel_catalog_policy_newest_refused</Mono> metric.
+          </>
+        )}
+      </Typography>
+    </AdminCard>
+  );
 }
 
 /** Steps the cluster refused in the last day, from Observe's Security view. */
@@ -218,12 +256,14 @@ export function PoliciesCard() {
           </Link>{" "}
           are saved.
         </Typography>
-        {catalog && (
+        {catalog && catalogLine(catalog) && (
           <Typography variant="caption" color="text.secondary">
             {catalogLine(catalog)}
           </Typography>
         )}
       </AdminCard>
+
+      {catalog?.writer === "kernel" && <KernelPoliciesCard c={catalog} />}
 
       <AdminCard title="Installed with the kernel" status={<Aside>Changed by an upgrade, not here</Aside>}>
         <Typography variant="body2" color="text.secondary">

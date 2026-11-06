@@ -15,7 +15,8 @@
 //   - the identity policy (<kernel>-catalog-identity): each released
 //     digest's products, {team, repository, action, serviceAccount,
 //     audiences}, as console/src/productPolicy.ts lists them, in sixteen maps
-//     by the digest's first hex digit. Which releases: those the applied
+//     by the digest's first hex digit (and the legacy products list, which
+//     the chart may have seeded on an upgrade, written empty). Which releases: those the applied
 //     release names, and an earlier one for ReleaseGrace after a release
 //     stopped naming it, or while an unfinished task (execution_tasks) runs
 //     it as that product;
@@ -36,6 +37,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -136,6 +138,69 @@ type Controller struct {
 	PollInterval time.Duration
 	PassTimeout  time.Duration
 	Log          *slog.Logger
+
+	// refused is why the newest release the catalog names was refused, ""
+	// when it wasn't (as last looked at; RefusedAnnotation).
+	refused string
+}
+
+// Refusal reasons (ErrRefused.Reason; the CatalogPolicyNewestRefused metric's label).
+var refusalReasons = []string{"unsigned", "older", "future", "invalid", "too_big"}
+
+// ErrRefused is the newest release the catalog names, refused for what it
+// is, not for something out of reach: it's refused again every pass until
+// the catalog names another, holding back every release after it (and the
+// revocations they'd bring). Made visible (a metric, the policy's
+// RefusedAnnotation for the Admin page), as a registry writer who can push
+// tags but not sign could cause it on purpose: a higher version tag on an
+// older signed release.
+type ErrRefused struct {
+	Reason string
+	Err    error
+}
+
+func (e *ErrRefused) Error() string { return e.Err.Error() }
+func (e *ErrRefused) Unwrap() error { return e.Err }
+
+func refuse(reason string, err error) error { return &ErrRefused{Reason: reason, Err: err} }
+
+// MaxRefusalBytes bounds the refusal's annotation and log line: cosign's
+// failure says something for every signature it found, and whoever can push
+// to the registry chooses those. An annotation too big would fail every
+// write of the policies, freezing what they list.
+const MaxRefusalBytes = 1024
+
+// truncate is s cut to at most max bytes, on a rune boundary, marked "…".
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	const mark = "…"
+	cut := max - len(mark)
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + mark
+}
+
+// noteRefused records why the newest release was refused (nil: it wasn't).
+func (c *Controller) noteRefused(refused *ErrRefused) {
+	reason, message := "", ""
+	if refused != nil {
+		reason, message = refused.Reason, truncate(refused.Error(), MaxRefusalBytes)
+	}
+	for _, r := range refusalReasons {
+		value := 0.0
+		if r == reason {
+			value = 1
+		}
+		metrics.CatalogPolicyNewestRefused.WithLabelValues(r).Set(value)
+	}
+	if message != "" && message != c.refused {
+		c.Log.Warn("the catalog's newest release is refused: newer releases and revocations wait until the catalog names another",
+			"reason", reason, "error", message)
+	}
+	c.refused = message
 }
 
 // Run passes every PollInterval until ctx ends; a failed pass is logged.
@@ -209,11 +274,17 @@ func (c *Controller) look(ctx context.Context) error {
 		return errors.Join(reverifyErr, err)
 	}
 	if current != nil && current.Digest == digest {
+		c.noteRefused(nil)
 		return reverifyErr
 	}
 	if err := c.apply(ctx, ref, digest, current); err != nil {
+		var refused *ErrRefused
+		if errors.As(err, &refused) {
+			c.noteRefused(refused)
+		}
 		return errors.Join(reverifyErr, err)
 	}
+	c.noteRefused(nil)
 	return nil
 }
 
@@ -229,7 +300,11 @@ func (c *Controller) apply(ctx context.Context, ref, digest string, current *Sta
 	// bytes applied are exactly the ones signed.
 	signers, err := c.Source.Verify(ctx, ref, digest)
 	if err != nil {
-		return fmt.Errorf("catalog release %s: %w; nothing was applied", ref, err)
+		err = fmt.Errorf("catalog release %s: %w; nothing was applied", ref, err)
+		if errors.Is(err, ErrNotSigned) {
+			return refuse("unsigned", err)
+		}
+		return err
 	}
 	fetched, err := c.Source.Fetch(ctx, pinned(ref, digest))
 	if err != nil {
@@ -240,23 +315,23 @@ func (c *Controller) apply(ctx context.Context, ref, digest string, current *Sta
 	}
 	release := &catalogv1.Release{}
 	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(fetched.JSON, release); err != nil {
-		return fmt.Errorf("catalog release %s@%s isn't a release: %w", ref, digest, err)
+		return refuse("invalid", fmt.Errorf("catalog release %s@%s isn't a release: %w", ref, digest, err))
 	}
 	// Never an older release than the one applied, though it was signed
 	// too: its createdAt is part of what's signed. Going back is releasing
 	// the older commit again. Unless the one applied isn't trusted now (its
 	// signers aren't these): its date doesn't hold a trusted one back.
 	if release.GetCreatedAt() == nil {
-		return fmt.Errorf("catalog release %s@%s says when it was made nowhere; nothing was applied", ref, digest)
+		return refuse("invalid", fmt.Errorf("catalog release %s@%s says when it was made nowhere; nothing was applied", ref, digest))
 	}
 	releasedAt := release.GetCreatedAt().AsTime()
 	trusted := current != nil && TrustedBy(current.Signers, c.Source.Trusted())
 	if trusted && releasedAt.Before(current.ReleasedAt) {
-		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, ErrOlder{Release: releasedAt, Applied: current.ReleasedAt})
+		return refuse("older", fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, ErrOlder{Release: releasedAt, Applied: current.ReleasedAt}))
 	}
 	if releasedAt.After(time.Now().Add(FutureSkew)) {
-		return fmt.Errorf("catalog release %s@%s says it was made %s, in the future; nothing was applied",
-			ref, digest, releasedAt.Format(time.RFC3339))
+		return refuse("future", fmt.Errorf("catalog release %s@%s says it was made %s, in the future; nothing was applied",
+			ref, digest, releasedAt.Format(time.RFC3339)))
 	}
 	releases, problems := Releases(release, c.Reserved)
 	apis, apiProblems := APIs(release)
@@ -266,15 +341,19 @@ func (c *Controller) apply(ctx context.Context, ref, digest string, current *Sta
 	// What it lists by itself must fit the policies, or it isn't applied:
 	// applied, it couldn't be written, and what's written now would stand.
 	if _, err := IdentityVariables(Listed(releases, nil, time.Now(), Window{})); err != nil {
-		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err)
+		return refuse("too_big", fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err))
 	}
 	if _, err := AudienceVariables(Audiences(apis, c.GCPAudience, c.Reserved)); err != nil {
-		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err)
+		return refuse("too_big", fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err))
 	}
 	applied, err := c.Store.Apply(ctx, State{Reference: ref, Digest: digest, ReleasedAt: releasedAt, Commit: release.GetCommit(),
 		Signers: signers, APIs: apis}, releases, c.Source.Trusted())
 	if err != nil {
-		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err)
+		err = fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err)
+		if errors.As(err, new(ErrOlder)) {
+			return refuse("older", err)
+		}
+		return err
 	}
 	if !applied {
 		return errors.New("another kernel policy is applying a release")
@@ -295,7 +374,10 @@ func (c *Controller) write(ctx context.Context) error {
 	}
 	if state == nil {
 		c.Log.Info("no catalog release applied yet: the policies stay as the chart seeded them")
-		return nil
+		// Their literals stand, but the Admin page says why the newest
+		// release wasn't applied.
+		_, err := c.Writer.Write(ctx, c.IdentityPolicy, nil, map[string]string{RefusedAnnotation: c.refused})
+		return err
 	}
 	releases, err := c.Store.Releases(ctx)
 	if err != nil {
@@ -309,16 +391,20 @@ func (c *Controller) write(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	annotations := map[string]string{ReleaseAnnotation: pinned(state.Reference, state.Digest), CommitAnnotation: state.Commit}
+	annotations := map[string]string{ReleaseAnnotation: pinned(state.Reference, state.Digest), CommitAnnotation: state.Commit,
+		RefusedAnnotation: c.refused}
 	// Only releases a signer trusted now verified: an earlier release only
 	// a removed key signed isn't listed, in its grace or in use.
-	trusted := TrustedReleases(releases, c.Source.Trusted())
+	trusted, reserved := WithoutReserved(TrustedReleases(releases, c.Source.Trusted()), c.Reserved)
+	if reserved > 0 {
+		c.Log.Warn("product releases not listed: a token audience of theirs is this cluster's own now", "releases", reserved)
+	}
 	window := Window{Grace: c.ReleaseGrace, Limit: c.InUseLimit}
 	listed := Listed(trusted, inUse, now, window)
 	apis := state.APIs
 	if !TrustedBy(state.Signers, c.Source.Trusted()) {
 		listed, apis = map[string][]Entry{}, nil
-		annotations = map[string]string{ReleaseAnnotation: "", CommitAnnotation: ""}
+		annotations = map[string]string{ReleaseAnnotation: "", CommitAnnotation: "", RefusedAnnotation: c.refused}
 	}
 	variables, err := IdentityVariables(listed)
 	var overflow error
@@ -338,6 +424,9 @@ func (c *Controller) write(ctx context.Context) error {
 		}
 		listed = current
 	}
+	// The legacy list the chart seeds from a console from before released
+	// digests (by repository, any digest): empty once the kernel writes.
+	variables["products"] = "[]"
 	changed, err := c.Writer.Write(ctx, c.IdentityPolicy, variables, annotations)
 	if err != nil {
 		return errors.Join(overflow, err)

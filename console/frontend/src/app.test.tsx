@@ -1235,7 +1235,9 @@ describe("who may call an API (decision 26)", () => {
     expect(boxes[100]?.disabled).toBe(true);
     fireEvent.change(within(dialog).getByLabelText("Find a group"), { target: { value: "G100" } });
     expect(within(dialog).getAllByRole("checkbox")).toHaveLength(1);
-  });
+    // A hundred clicks, each re-rendering a hundred and one boxes: about 3s
+    // here, twice over 5s on CI's runners.
+  }, 20_000);
 
   it("tells you, not a maintainer's way out, when your groups are too old to offer", async () => {
     await renderAt("/apis/payments/orders", PRIYA, {
@@ -2067,17 +2069,30 @@ describe("admin", () => {
     await renderAt("/admin/policies", ADMIN, {
       "AdminService/GetPolicySync": {
         outcomes: { identityPolicy: { applies: true, ok: true } },
-        catalog: { writer: "kernel", release: "r.example/catalog-release@sha256:abc", commit: "0123456789abcdef" },
+        catalog: { writer: "kernel", release: "r.example/catalog-release@sha256:abc", commit: "0123456789abcdef", gateway: true, tokens: true },
       },
     });
-    expect(await screen.findByText(/the kernel also writes, from the catalog release it verified \(commit 0123456789ab\)/)).toBeTruthy();
+    const card = await screen.findByRole("region", { name: "Written by the kernel" });
+    expect(within(card).getByRole("heading", { name: "Written by the kernel, from the signed catalog" })).toBeTruthy();
+    expect(within(card).getByText("Applied")).toBeTruthy();
+    expect(within(card).getByText("r.example/catalog-release@sha256:abc")).toBeTruthy();
+    expect(within(card).getByText("0123456789abcdef")).toBeTruthy();
+    expect(within(card).getByText(/Written by the kernel too/)).toBeTruthy();
+    expect(within(card).queryByText(/refuses the newest catalog release/)).toBeNull();
+    expect(within(card).queryByText(/kernel_catalog_policy_newest_refused/)).toBeNull();
+    // Between the console's card and the kernel chart's.
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    const at = (t: string) => headings.findIndex((h) => h?.startsWith(t));
+    expect(at("Written by the console")).toBeLessThan(at("Written by the kernel"));
+    expect(at("Written by the kernel")).toBeLessThan(at("Installed with the kernel"));
     expect(screen.queryByText(/The catalog isn't signed/)).toBeNull();
     cleanup();
     // Before it has verified one, it says so, not that it already holds.
     await renderAt("/admin/policies", ADMIN, {
       "AdminService/GetPolicySync": { outcomes: {}, catalog: { writer: "kernel", release: "", commit: "" } },
     });
-    expect(await screen.findByText(/once it has verified a catalog release/)).toBeTruthy();
+    expect(await screen.findByText("Waiting for a verified release")).toBeTruthy();
+    expect(screen.getByText(/until the kernel verifies one its signers signed/)).toBeTruthy();
     cleanup();
     // The gateway on, but no kernel token policy: said, not claimed.
     await renderAt("/admin/policies", ADMIN, {
@@ -2086,7 +2101,21 @@ describe("admin", () => {
         catalog: { writer: "kernel", release: "r@sha256:abc", commit: "c", gateway: true, tokens: false },
       },
     });
-    expect(await screen.findByText(/catalogPolicy.gateway isn't set/)).toBeTruthy();
+    expect(await screen.findByText(/catalogPolicy.gateway/)).toBeTruthy();
+    expect(screen.getByText(/The console alone writes them/)).toBeTruthy();
+    cleanup();
+    // The newest release refused (a higher tag on an older release): said, with why, in the kernel's card.
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": {
+        outcomes: {},
+        catalog: { writer: "kernel", release: "r@sha256:abc", commit: "c", refused: "catalog release r:v9@sha256:def: it was made before the one applied" },
+      },
+    });
+    const refused = await screen.findByRole("region", { name: "Written by the kernel" });
+    expect(within(refused).getByText("Refusing the newest release")).toBeTruthy();
+    expect(within(refused).getByRole("alert").textContent).toMatch(/refuses the newest catalog release.*made before the one applied/);
+    expect(within(refused).getByText("kernel_catalog_policy_newest_refused")).toBeTruthy();
+    expect(within(refused).queryByText("Applied")).toBeNull();
     cleanup();
     // A signed catalog the kernel doesn't write for; and a read that failed.
     await renderAt("/admin/policies", ADMIN, {

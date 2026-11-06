@@ -640,10 +640,12 @@ export interface CatalogPolicies {
   /** The gateway is on; the kernel writes its API audiences too. */
   gateway: boolean;
   tokens: boolean;
+  /** Why the kernel refused the newest catalog release (holding back the ones after it); "" when it didn't. */
+  refused: string;
 }
 
 function catalogPolicies(
-  c: { writer: string; release: string; commit: string; catalogSigned: boolean; gateway: boolean; tokens: boolean } | undefined,
+  c: { writer: string; release: string; commit: string; catalogSigned: boolean; gateway: boolean; tokens: boolean; refused: string } | undefined,
 ): CatalogPolicies {
   const writer = c?.writer === "kernel" || c?.writer === "console" ? c.writer : "unknown";
   return {
@@ -653,6 +655,7 @@ function catalogPolicies(
     catalogSigned: c?.catalogSigned ?? false,
     gateway: c?.gateway ?? false,
     tokens: c?.tokens ?? false,
+    refused: c?.refused ?? "",
   };
 }
 

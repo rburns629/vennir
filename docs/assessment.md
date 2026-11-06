@@ -1169,6 +1169,17 @@ its rules); signing each policy edit (the console would hold the key).
   when the kernel writes them, leaving it the secret names. An install
   whose catalog trusts no signer runs no `kernel policy` and keeps the
   console writing them, and the Admin page says which.
+- *Which teams:* every team the release names, including one made by hand
+  that the console hasn't adopted (decided with the user 2026-11-06):
+  adopting is the console's choice about managing a team, not about which
+  images run as which ServiceAccount there, which is the signed catalog's.
+- *Refusals said:* the newest release refused (unsigned, older than the one
+  applied, as when someone who can push tags but not sign points a higher
+  version at an older release) holds back every release after it, so it's
+  a metric (`kernel_catalog_policy_newest_refused`) and an annotation on
+  the identity policy that the Admin page's Policies card shows. The
+  cluster's own audiences are checked again at every write, and in the
+  policy's CEL, so a changed `api.auth.audience` holds without a release.
 - *Reading the registry:* anonymously, with a Docker config Secret by name,
   or as its own ServiceAccount's cloud identity (GKE's metadata server,
   ECR), with the console's mirrors; never as the console. GKE and EKS

@@ -241,7 +241,10 @@ func TestAnExistingJobForThisAttemptIsAdopted(t *testing.T) {
 func existingJob(t *testing.T, task ResolvedTask, change func(*batchv1.Job)) (*cluster, string) {
 	t.Helper()
 	name := JobName(task.ExecutionID, task.TaskKey, task.Attempt)
-	job, err := newCluster(options()).k.jobFor(name, task)
+	// With an environment of the deployment's, so a change can reach it.
+	opts := options()
+	opts.ExtraEnvironment = map[string]string{"EXAMPLE_SETTING": "example-value"}
+	job, err := newCluster(opts).k.jobFor(name, task)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +252,7 @@ func existingJob(t *testing.T, task ResolvedTask, change func(*batchv1.Job)) (*c
 	if change != nil {
 		change(job)
 	}
-	return newCluster(options(), job), name
+	return newCluster(opts, job), name
 }
 
 // Only the scheduler's own creates are checked by the cluster's policies:
@@ -280,9 +283,35 @@ func TestAJobTheKernelDidntMakeIsntAdopted(t *testing.T) {
 			j.Spec.Template.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = &f
 		},
 		"the host's network": func(j *batchv1.Job) { j.Spec.Template.Spec.HostNetwork = true },
+		// Its environment's own variable, by name and value, but from a Secret.
 		"a Secret in its environment": func(j *batchv1.Job) {
-			j.Spec.Template.Spec.Containers[0].Env = append(j.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{Name: "K",
-				ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "other"}, Key: "k"}}})
+			env := &j.Spec.Template.Spec.Containers[0].Env[0]
+			env.ValueFrom = &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "other"}, Key: "k"}}
+		},
+		"a postStart hook": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.Containers[0].Lifecycle = &corev1.Lifecycle{PostStart: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{Command: []string{"sh", "-c", "echo {} > /platform/output/result.json"}}}}
+		},
+		"a probe": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.Containers[0].StartupProbe = &corev1.Probe{ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{Command: []string{"sh", "-c", "echo {} > /platform/output/result.json"}}}}
+		},
+		"another working directory": func(j *batchv1.Job) { j.Spec.Template.Spec.Containers[0].WorkingDir = "/tmp" },
+		"its result read elsewhere": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.Containers[0].TerminationMessagePath = "/tmp/result.json"
+		},
+		"its result read from its logs": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.Containers[0].TerminationMessagePolicy = corev1.TerminationMessageFallbackToLogsOnError
+		},
+		"its own name servers": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.DNSConfig = &corev1.PodDNSConfig{Nameservers: []string{"10.0.0.53"}}
+		},
+		"its own hosts": func(j *batchv1.Job) {
+			j.Spec.Template.Spec.HostAliases = []corev1.HostAlias{{IP: "10.0.0.1", Hostnames: []string{"sts.amazonaws.com"}}}
+		},
+		"a process namespace shared": func(j *batchv1.Job) {
+			t := true
+			j.Spec.Template.Spec.ShareProcessNamespace = &t
 		},
 		"a host path": func(j *batchv1.Job) {
 			j.Spec.Template.Spec.Volumes = append(j.Spec.Template.Spec.Volumes, corev1.Volume{Name: "h",

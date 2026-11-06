@@ -316,6 +316,8 @@ identity_literal() {  # legacy products, team secrets, releases (digest to produ
 import hashlib, json, sys
 policy = json.load(sys.stdin)
 policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+# Unconditionally, as below: the type-checking status of a replace just before may still be landing.
+policy["metadata"].pop("resourceVersion", None)
 MAX_MAP_CHARS, MAX_RELEASE_CHARS = 95000, 600000
 maps = {digit: {} for digit in "0123456789abcdef"}
 for digest, entries in json.loads(sys.argv[3]).items():
@@ -397,6 +399,8 @@ for variable in policy["spec"]["variables"]:
     name = variable["name"]
     if name == "apiAudiencesWritten":
         variable["expression"] = "true"
+    elif name == "products":
+        variable["expression"] = "[]"  # as the kernel writes it: the legacy list emptied
     elif name.startswith(prefix) and name[len(prefix):] in maps:
         variable["expression"] = json.dumps(maps[name[len(prefix):]], separators=(",", ":"))
 print(json.dumps(policy))' "$2" "$3" \
@@ -901,13 +905,65 @@ echo "Catalog policies (decision 27: what the catalog decides, written by kernel
 # console's identity and gateway token policies, as they are now), and its
 # RBAC beside the console chart's (who may update which policy, by name).
 # Not the Deployment: no kernel runs here.
+# The console's legacy list (by repository, any digest) seeds the kernel's
+# only on the upgrade from v0.11 and older: a console policy of that shape
+# (no candidates, no release maps), held to the kernel's rules. Rendered,
+# not applied, while the kernel's policy isn't there yet.
+LEGACY_SEED='[{"team":"'$TEAM_A'","repository":"registry.example/legacy","action":"run","serviceAccount":"legacy-sa","audiences":""},{"team":"","repository":"registry.example/legacy-platform","action":"run","serviceAccount":"plat-sa"},{"team":"'$TEAM_A'","repository":"registry.example/legacy-eso","action":"run","serviceAccount":"eso-gcp","audiences":""},{"team":"'$TEAM_A'","repository":"registry.example/legacy-api","action":"run","serviceAccount":"legacy-api","audiences":""},{"team":"'$TEAM_A'","repository":"registry.example/legacy-kernel","action":"run","serviceAccount":"kernel-sa","audiences":"sts.amazonaws.com,vennir-kernel-api"}]'
+console_legacy() {  # "v011" (reshaped as v0.11 rendered it) or "full": the console's identity policy with LEGACY_SEED as its legacy list
+  k get validatingadmissionpolicy "$RELEASE-execution-kernel-identity" -o json | python3 -c '
+import json, sys
+policy = json.load(sys.stdin)
+policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+# Unconditionally: the API server may still be writing the type-checking
+# status of the last replace, which would make this one conflict.
+policy["metadata"].pop("resourceVersion", None)
+dropped = {"candidates", "digest", "releases"} | {"releases" + d for d in "0123456789abcdef"}
+variables = []
+for v in policy["spec"]["variables"]:
+    if sys.argv[2] == "v011" and v["name"] in dropped:
+        continue
+    if v["name"] == "products":
+        v["expression"] = sys.argv[1]
+    if sys.argv[2] == "v011" and v["name"] == "matched":
+        v["expression"] = ("variables.products.filter(p, (p.team == \"\" || p.team == request.namespace) && "
+                           "p.repository == variables.repository && p.action == variables.action && "
+                           "p.serviceAccount == variables.serviceAccount)")
+    variables.append(v)
+policy["spec"]["variables"] = variables
+print(json.dumps(policy))' "$LEGACY_SEED" "$1" | k replace -f - > /dev/null || { echo "  FAIL  writing the console's legacy list ($1)"; FAILURES=$((FAILURES + 1)); }
+}
+catalog_products() {  # the kernel's catalog-identity policy as an upgrade would render it now: its products literal
+  render_catalog | python3 -c '
+import json, re, sys
+for d in re.split(r"^---$", sys.stdin.read(), flags=re.M):
+    if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M) and re.search(r"^  name: \S+-catalog-identity$", d, re.M):
+        # The chart writes it as toJson | toJson: a JSON string on one line.
+        print(json.loads(re.search(r"- name: products\n\s+expression: (.*)$", d, re.M).group(1)))'
+}
+console_legacy v011
+LEGACY_SEEDED=$(catalog_products)
+expect "v0.11 upgrade seed: the console's legacy list kept" allowed "$(grep -q 'registry.example/legacy"' <<<"$LEGACY_SEEDED" && echo '(server dry run)' || echo "not seeded: $LEGACY_SEEDED")"
+expect "v0.11 upgrade seed: no platform product, ESO's or an API's SA, or a reserved audience" allowed "$(grep -qE 'legacy-(platform|eso|api|kernel)' <<<"$LEGACY_SEEDED" && echo "seeded: $LEGACY_SEEDED" || echo '(server dry run)')"
+# The console's policy full again (the chart's render of it), then a newer
+# console's legacy list (only one from before writes it, during a
+# rollout): never seeded.
+ht "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" ${HELM_CONTEXT_ARGS[@]+"${HELM_CONTEXT_ARGS[@]}"} \
+  --dry-run=server --take-ownership --show-only templates/identity-policy.yaml | python3 -c '
+import re, sys
+print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M)))' \
+  | k replace -f - > /dev/null || { echo "  FAIL  restoring the identity policy"; FAILURES=$((FAILURES + 1)); }
+identity_literal '[]' "$TEAM_SECRETS" "$RELEASES"
+console_legacy full
 render_catalog | k apply -f - > /dev/null
+identity_literal '[]' "$TEAM_SECRETS" "$RELEASES"
 CATALOG_IDENTITY=$RELEASE-execution-kernel-catalog-identity
 CATALOG_TOKENS=$RELEASE-execution-kernel-catalog-tokens
 POLICY_SA=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-kernel-policy
 seeded() { k get validatingadmissionpolicy "$1" -o jsonpath="{.spec.variables[?(@.name==\"$2\")].expression}"; }
 expect "upgrade seed: the console's releases kept" allowed "$(grep -q "$TEAM_A" <<<"$(seeded "$CATALOG_IDENTITY" releases0)" && echo '(server dry run)' || seeded "$CATALOG_IDENTITY" releases0)"
 expect "upgrade seed: the console's API audiences kept" allowed "$(grep -q true <<<"$(seeded "$CATALOG_TOKENS" apiAudiencesWritten)" && echo '(server dry run)' || echo 'not seeded')"
+expect "upgrade seed: a newer console's legacy list isn't" allowed "$([ "$(seeded "$CATALOG_IDENTITY" products)" = "[]" ] && echo '(server dry run)' || echo "seeded: $(seeded "$CATALOG_IDENTITY" products)")"
 # Held to the kernel's rules: no platform product (team ""), no ESO
 # ServiceAccount, though the console's lists them.
 expect "upgrade seed: no platform product"       allowed "$(grep -q 'plat-sa' <<<"$(seeded "$CATALOG_IDENTITY" releases1)" && echo 'seeded it' || echo '(server dry run)')"
@@ -942,6 +998,18 @@ for _ in $(seq 1 30); do
 done
 expect "an API's backend audience, both list it" allowed                "$(token "$TEAM_A" orders-api https://orders.example)"
 expect "an audience only the console lists"      "catalog's verified release says its API needs" "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
+# A token for one of the cluster's own audiences (kernel-api's), though
+# both policies list it as the product's: the kernel's refuses it.
+catalog_literal "$CATALOG_IDENTITY" releases '{"'$ZERO_DIGEST'":[{"action":"create","audiences":"sts.amazonaws.com,vennir-kernel-api","repository":"registry.example/db","serviceAccount":"db-sa","team":"'$TEAM_A'"}]}'
+identity_literal '[]' "$TEAM_SECRETS" '{"'$ZERO_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com,vennir-kernel-api"}]}'
+for _ in $(seq 1 30); do
+  grep -q "this cluster's own" <<<"$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'vennir-kernel-api","expirationSeconds":3600}}]}}')" && break
+  sleep 1
+done
+expect "a token for kernel-api's audience, listed" "this cluster's own" "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'vennir-kernel-api","expirationSeconds":3600}}]}}')"
+expect "beside it, its cloud's"                  allowed                "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
+catalog_literal "$CATALOG_IDENTITY" releases '{"'$ZERO_DIGEST'":[{"action":"create","audiences":"sts.amazonaws.com","repository":"registry.example/db","serviceAccount":"db-sa","team":"'$TEAM_A'"}],"'$PASSED_DIGEST'":[{"action":"run","audiences":"","repository":"registry.example/big","serviceAccount":"db-sa","team":"'$TEAM_A'"}]}'
+identity_literal '[]' "$TEAM_SECRETS" '{"'$ZERO_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}],"'$UNRELEASED_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}],"'$PLATFORM_DIGEST'":[{"team":"","repository":"registry.example/platform","action":"run","serviceAccount":"plat-sa","audiences":""}]}'
 # Who may write which: RBAC by name (admission policies don't apply to
 # admission policy objects). The console's own ClusterRole, as its chart
 # grants it, and kernel policy's.

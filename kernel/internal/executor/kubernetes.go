@@ -268,7 +268,7 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 			// is off) was never checked, and its result would become this
 			// step's outputs.
 			return nil, &DispatchRejected{Code: "DISPATCH_REJECTED", Message: fmt.Sprintf(
-				"A Job named %s already exists in %s that the kernel didn't make for this attempt (its labels, image, command, ServiceAccount, Secrets, tokens, environment or hardening differ), so it wasn't adopted.", job.Name, namespace)}
+				"A Job named %s already exists in %s that the kernel didn't make for this attempt (its labels, image, command, ServiceAccount, Secrets, tokens, environment, hardening, hooks, probes or result path differ), so it wasn't adopted.", job.Name, namespace)}
 		}
 		k.log.Info("adopting this attempt's existing Job", "namespace", namespace, "job", job.Name)
 		return created, nil
@@ -280,9 +280,12 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 }
 
 // sameAttempt says found is the Job jobFor built as want, as far as what
-// the step runs, as whom, with which Secrets, tokens and environment, and
-// how hardened: what a Job made by anyone else, or by a scheduler from
-// before step Pods were always hardened, would change.
+// the step runs, as whom, with which Secrets, tokens and environment, how
+// hardened, and what else could run in its container or write its result
+// (hooks, probes, its working directory, where its result is read, its
+// names and hosts, a process namespace shared): what a Job made by anyone
+// else, or by a scheduler from before step Pods were always hardened, would
+// change.
 func sameAttempt(found, want *batchv1.Job) bool {
 	for _, key := range []string{"app", "vennir.dev/execution-id", "vennir.dev/attempt"} {
 		if found.Labels[key] != want.Labels[key] {
@@ -297,10 +300,20 @@ func sameAttempt(found, want *batchv1.Job) bool {
 		return false
 	}
 	if f.HostNetwork || f.HostPID || f.HostIPC || !sameBool(f.AutomountServiceAccountToken, w.AutomountServiceAccountToken) ||
-		!equality.Semantic.DeepEqual(f.SecurityContext, w.SecurityContext) {
+		!sameBool(f.ShareProcessNamespace, w.ShareProcessNamespace) ||
+		!equality.Semantic.DeepEqual(f.SecurityContext, w.SecurityContext) ||
+		!equality.Semantic.DeepEqual(f.DNSConfig, w.DNSConfig) || !equality.Semantic.DeepEqual(f.HostAliases, w.HostAliases) {
 		return false
 	}
 	fc, wc := f.Containers[0], w.Containers[0]
+	// Anything that runs a command of its own in the container (a hook, a
+	// probe), or moves where it starts or where its result is read from,
+	// could write result.json in the product's place.
+	if !equality.Semantic.DeepEqual(fc.Lifecycle, wc.Lifecycle) || fc.LivenessProbe != nil || fc.ReadinessProbe != nil ||
+		fc.StartupProbe != nil || fc.WorkingDir != wc.WorkingDir || fc.TerminationMessagePath != wc.TerminationMessagePath ||
+		fc.TerminationMessagePolicy != wc.TerminationMessagePolicy {
+		return false
+	}
 	if fc.Name != wc.Name || fc.Image != wc.Image || len(fc.Command) != 0 || !slices.Equal(fc.Args, wc.Args) ||
 		!equality.Semantic.DeepEqual(fc.SecurityContext, wc.SecurityContext) || len(fc.EnvFrom) != 0 ||
 		!slices.EqualFunc(fc.Env, wc.Env, func(a, b corev1.EnvVar) bool { return a.Name == b.Name && a.Value == b.Value && a.ValueFrom == nil }) ||

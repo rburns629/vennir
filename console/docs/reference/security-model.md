@@ -239,7 +239,15 @@ policy). Products registered by hand, and platform products, aren't in any
 release: with `catalogPolicy` on they run only as `default`, and the
 console refuses to submit one as its product (`IDENTITY_PENDING`, as for a
 new release the kernel hasn't read yet, or one listed with other token
-audiences).
+audiences). The release decides identities for every team it names,
+including a team made by hand that the console hasn't adopted
+(`teams.from_catalog` false, `AdminService/AdoptCatalogTeam`): adopting is
+the console's choice about managing that team (its products, SecretStores
+and lifecycle), not about which images run as which ServiceAccount in its
+namespace, which is the signed catalog's (decided 2026-11-06). Token
+audiences that became the cluster's own since a release was applied
+(another `api.auth.audience`, another issuer) are dropped at the kernel's
+next write, not at the next release.
 
 What it can't know is freshness: it applies the newest release the
 registry serves at the reference it follows, and refuses older ones than
@@ -248,7 +256,13 @@ withhold newer releases, so a release that revokes a product may never
 arrive. A signed release names when it was made; nothing bounds how old
 the one applied may be. That's the same for the console's pull of the
 catalog; watch the Admin page's Catalog card (the version applied, its
-age).
+age). One case is said outright: someone who may push tags to the catalog's
+registry but not sign can point a higher version tag at an older signed
+release, which the kernel refuses every pass, holding back every release
+after it. kernel policy then sets `kernel_catalog_policy_newest_refused`
+(by reason: older, unsigned, future, invalid, too_big) and its identity
+policy's `vennir.dev/catalog-refused` annotation, which the Admin page's
+Policies card shows.
 
 ## Consumers and templates
 

@@ -121,6 +121,22 @@ func TrustedReleases(releases []Release, trusted []string) []Release {
 	return out
 }
 
+// WithoutReserved are the releases none of whose token audiences is
+// reserved now, and how many weren't. Releases checks them when a release
+// is applied; this, at every write, so an audience that became this
+// cluster's own since (api.auth.audience changed, another issuer) is no
+// longer listed without waiting for a new release.
+func WithoutReserved(releases []Release, reserved Reserved) ([]Release, int) {
+	var out []Release
+	for _, r := range releases {
+		if r.Audiences != "" && slices.ContainsFunc(strings.Split(r.Audiences, ","), reserved) {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out, len(releases) - len(out)
+}
+
 // API is what one of the release's APIs needs minted: its ServiceAccount
 // (team/serviceAccount) and its backend's sign-in, before the install's
 // settings say what audiences that means.

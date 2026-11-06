@@ -190,7 +190,7 @@ func stopWriters(ctx context.Context, r *run.Runner, c *config.Config, replicas 
 	}
 	// The scheduler releases its leases on the way out.
 	return r.Run(ctx, "kubectl", kubectl(c, "wait", "--for=delete", "pod", "--timeout=5m", "--selector",
-		"app.kubernetes.io/instance in ("+install.KernelRelease+","+install.ConsoleRelease+"),app.kubernetes.io/component in (api,scheduler,app,gateway)")...)
+		"app.kubernetes.io/instance in ("+install.KernelRelease+","+install.ConsoleRelease+"),app.kubernetes.io/component in (api,scheduler,policy,app,gateway)")...)
 }
 
 // startWriters starts each writer at zero at its recorded copies, waits

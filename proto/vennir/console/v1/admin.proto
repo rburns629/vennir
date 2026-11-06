@@ -303,6 +303,10 @@ message CatalogPolicies {
   // ServiceAccounts' audiences too (the kernel chart's catalogPolicy.gateway).
   bool gateway = 5;
   bool tokens = 6;
+  // With the kernel: why it refused the newest release the catalog names
+  // (unsigned, older than the one applied, ...), which holds back every
+  // release after it until the catalog names another; empty when it didn't.
+  string refused = 7;
 }
 
 message SyncPoliciesRequest {}

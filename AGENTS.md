@@ -48,7 +48,7 @@ Three independent projects share one repo so they can be deployed together.
 They share no environment or code. Build and test each one from inside
 its own directory.
 
-- **`kernel/`** (Go 1.26+, pgx, client-go, Connect): one binary,
+- **`kernel/`** (Go 1.27+, pgx, client-go, Connect): one binary,
   `kernel`, run as processes that never talk to each other directly and
   coordinate only through Postgres rows (`cmd/kernel`; the subcommand
   picks the process):
@@ -323,7 +323,7 @@ CI (`.github/workflows/ci.yml`, `security.yml`) runs every check below on
 each PR, plus `helm lint`/render of `helm/values/*`, actionlint, a Trivy/OSV scan
 of both platform images, Semgrep and gitleaks.
 
-Kernel (`cd kernel`, Go 1.26+; CI uses the same pinned
+Kernel (`cd kernel`, Go 1.27+; CI uses the same pinned
 `golang:1.27-alpine` image as the CLI, and `make test` runs it there):
 
 ```

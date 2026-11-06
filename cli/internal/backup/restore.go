@@ -20,6 +20,9 @@ import (
 var writers = []string{
 	install.KernelRelease + "-execution-kernel-api",
 	install.KernelRelease + "-execution-kernel-scheduler",
+	// kernel policy (the kernel chart's catalogPolicy): its applied
+	// release and the releases it lists live in the kernel's database.
+	install.KernelRelease + "-execution-kernel-policy",
 	install.ConsoleRelease + "-execution-console",
 	install.ConsoleRelease + "-execution-console-gateway",
 }
@@ -100,7 +103,7 @@ func Restore(ctx context.Context, r *run.Runner, c *config.Config, out io.Writer
 	}
 	// The scheduler releases its leases on the way out.
 	if err := r.Run(ctx, "kubectl", kubectl(c, "wait", "--for=delete", "pod", "--timeout=5m", "--selector",
-		"app.kubernetes.io/instance in ("+install.KernelRelease+","+install.ConsoleRelease+"),app.kubernetes.io/component in (api,scheduler,app,gateway)")...); err != nil {
+		"app.kubernetes.io/instance in ("+install.KernelRelease+","+install.ConsoleRelease+"),app.kubernetes.io/component in (api,scheduler,policy,app,gateway)")...); err != nil {
 		return err
 	}
 
