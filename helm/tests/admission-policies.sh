@@ -1051,9 +1051,11 @@ expect "it matches no releases (no candidates)"  allowed "$([ -z "$(seeded "$REL
 # Until the API server has the new version: the full one's refusal names
 # "a registered product's release". Where both policies refuse, either
 # refusal may come back, so every probe must show the new one.
+# (Each captured: a refused dry run exits 1, which pipefail would take for
+# the grep's answer.)
 for _ in $(seq 1 60); do
-  { job "$TEAM_A" $SOURCE/app:1 run default db-key; job "$TEAM_A" $SOURCE/db:1 create db-sa ""; } \
-    | grep -q "registered product's release" || break
+  probes="$(job "$TEAM_A" $SOURCE/app:1 run default db-key)$(job "$TEAM_A" $SOURCE/db:1 create db-sa "")"
+  grep -q "registered product's release" <<<"$probes" || break
   sleep 1
 done
 expect "a release the kernel lists, its team's secret"  allowed            "$(job "$TEAM_A" $DB create db-sa db-key)"
@@ -1067,21 +1069,27 @@ expect "ESO's SA (both)"                                 IDENTITY_NOT_ALLOWED "$
 expect "an unregistered image as default"                allowed            "$(job "$TEAM_A" $SOURCE/app:1 run default "")"
 
 echo "The identity policy's shape, rendered (candidates: it matches releases):"
-shape() {  # release, extra helm arguments: prints whether it renders candidates
-  local release=$1; shift
-  ht "$release" helm/charts/execution-kernel -n "$PLATFORM_NS" ${HELM_CONTEXT_ARGS[@]+"${HELM_CONTEXT_ARGS[@]}"} \
-    --dry-run=server --take-ownership --show-only templates/identity-policy.yaml "$@" 2>&1
+shape() {  # release, extra helm arguments: the identity policy rendered, or "not rendered: <helm's error>"
+  local release=$1 out; shift
+  out=$(ht "$release" helm/charts/execution-kernel -n "$PLATFORM_NS" ${HELM_CONTEXT_ARGS[@]+"${HELM_CONTEXT_ARGS[@]}"} \
+    --dry-run=server --take-ownership --show-only templates/identity-policy.yaml "$@" 2>&1)
+  if grep -q '^kind: ValidatingAdmissionPolicy$' <<<"$out"; then echo "$out"; else echo "not rendered: $(tail -1 <<<"$out")"; fi
+}
+form() {  # release, extra helm arguments: full (candidates: it matches releases), split, or not rendered
+  local out
+  out=$(shape "$@")
+  if grep -q '^not rendered' <<<"$out"; then echo "$out"; elif grep -q 'name: candidates' <<<"$out"; then echo full; else echo split; fi
 }
 CATALOG_ON=(--set catalogPolicy.enabled=true --set catalogPolicy.release=$SOURCE/catalog-release:latest --set 'catalogPolicy.signature.publicKeys[0]=unused')
-expect "catalogPolicy on, the kernel's policy there: split" allowed "$(shape "$RELEASE" "${CATALOG_ON[@]}" | grep -q 'name: candidates' && echo 'full' || echo '(server dry run)')"
-expect "catalogPolicy on, no kernel policy yet: full"      allowed "$(shape "$RELEASE-none" "${CATALOG_ON[@]}" | grep -q 'name: candidates' && echo '(server dry run)' || echo 'split')"
+expect "catalogPolicy on, the kernel's policy there: split" split "$(form "$RELEASE" "${CATALOG_ON[@]}")"
+expect "catalogPolicy on, no kernel policy yet: full"      full  "$(form "$RELEASE-none" "${CATALOG_ON[@]}")"
 # Turning catalogPolicy off again: the releases back from the kernel's
 # policy, but never a platform product's (team "": every namespace here).
 catalog_literal "$CATALOG_IDENTITY" releases '{"'$ZERO_DIGEST'":[{"action":"create","audiences":"sts.amazonaws.com","repository":"registry.example/db","serviceAccount":"db-sa","team":"'$TEAM_A'"}],"'$PLATFORM_DIGEST'":[{"action":"run","audiences":"","repository":"registry.example/platform","serviceAccount":"plat-sa","team":""}]}'
 RESEED=$(shape "$RELEASE")
-expect "catalogPolicy off again: full"                  allowed "$(echo "$RESEED" | grep -q 'name: candidates' && echo '(server dry run)' || echo 'split')"
-expect "its releases re-seeded from the kernel's"       allowed "$(echo "$RESEED" | grep -q 'registry.example/db' && echo '(server dry run)' || echo 'not seeded')"
-expect "but not a platform entry"                       allowed "$(echo "$RESEED" | grep -q 'plat-sa' && echo 'seeded it' || echo '(server dry run)')"
+expect "catalogPolicy off again: full"                  full    "$(form "$RELEASE")"
+expect "its releases re-seeded from the kernel's"       allowed "$(grep -q 'registry.example/db' <<<"$RESEED" && echo '(server dry run)' || echo "not seeded: $RESEED")"
+expect "but not a platform entry"                       allowed "$(if grep -q '^not rendered' <<<"$RESEED"; then echo "$RESEED"; elif grep -q 'plat-sa' <<<"$RESEED"; then echo 'seeded it'; else echo '(server dry run)'; fi)"
 
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"
