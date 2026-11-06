@@ -1358,9 +1358,12 @@ type MyApiAccess struct {
 	// VIA_TEAM and VIA_CATALOG: the team the gateway counts calls against.
 	CallingTeam string `protobuf:"bytes,4,opt,name=calling_team,json=callingTeam,proto3" json:"calling_team,omitempty"`
 	// VIA_GROUP: the group; VIA_USER and VIA_GROUP: the grant.
-	Group         string `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"`
-	GrantId       string `protobuf:"bytes,6,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
-	PerMinute     int32  `protobuf:"varint,7,opt,name=per_minute,json=perMinute,proto3" json:"per_minute,omitempty"`
+	Group     string `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"`
+	GrantId   string `protobuf:"bytes,6,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	PerMinute int32  `protobuf:"varint,7,opt,name=per_minute,json=perMinute,proto3" json:"per_minute,omitempty"`
+	// VIA_USER and VIA_GROUP: the grant's last call, to within a few minutes
+	// (anyone's in the group, for a group's); unset if none yet.
+	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_used_at,json=lastUsedAt,proto3" json:"last_used_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1442,6 +1445,13 @@ func (x *MyApiAccess) GetPerMinute() int32 {
 		return x.PerMinute
 	}
 	return 0
+}
+
+func (x *MyApiAccess) GetLastUsedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastUsedAt
+	}
+	return nil
 }
 
 type ListMyApiAccessRequest struct {
@@ -3479,7 +3489,7 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\x06grants\x18\x01 \x03(\v2\x1b.vennir.console.v1.ApiGrantR\x06grants\x12?\n" +
 	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\x12!\n" +
 	"\n" +
-	"share_with\x18\x03 \x03(\tB\x02\x18\x01R\tshareWith\"\xdb\x01\n" +
+	"share_with\x18\x03 \x03(\tB\x02\x18\x01R\tshareWith\"\x99\x02\n" +
 	"\vMyApiAccess\x12\x12\n" +
 	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +
@@ -3488,7 +3498,9 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\x05group\x18\x05 \x01(\tR\x05group\x12\x19\n" +
 	"\bgrant_id\x18\x06 \x01(\tR\agrantId\x12\x1d\n" +
 	"\n" +
-	"per_minute\x18\a \x01(\x05R\tperMinute\"\x18\n" +
+	"per_minute\x18\a \x01(\x05R\tperMinute\x12<\n" +
+	"\flast_used_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastUsedAt\"\x18\n" +
 	"\x16ListMyApiAccessRequest\"\xaa\x01\n" +
 	"\x17ListMyApiAccessResponse\x126\n" +
 	"\x06access\x18\x01 \x03(\v2\x1e.vennir.console.v1.MyApiAccessR\x06access\x12?\n" +
@@ -3768,68 +3780,69 @@ var file_vennir_console_v1_api_proto_depIdxs = []int32{
 	3,  // 16: vennir.console.v1.ListApiAccessResponse.grants:type_name -> vennir.console.v1.ApiGrant
 	4,  // 17: vennir.console.v1.ListApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
 	0,  // 18: vennir.console.v1.MyApiAccess.via:type_name -> vennir.console.v1.ApiAccessVia
-	19, // 19: vennir.console.v1.ListMyApiAccessResponse.access:type_name -> vennir.console.v1.MyApiAccess
-	4,  // 20: vennir.console.v1.ListMyApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
-	3,  // 21: vennir.console.v1.ListTeamBotApiAccessResponse.grants:type_name -> vennir.console.v1.ApiGrant
-	4,  // 22: vennir.console.v1.ListTeamBotApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
-	2,  // 23: vennir.console.v1.ApiProduct.state:type_name -> vennir.console.v1.ApiState
-	26, // 24: vennir.console.v1.ApiProduct.endpoints:type_name -> vennir.console.v1.ApiEndpoint
-	49, // 25: vennir.console.v1.ApiProduct.problem_found_at:type_name -> google.protobuf.Timestamp
-	25, // 26: vennir.console.v1.ApiProduct.limits:type_name -> vennir.console.v1.TeamLimit
-	0,  // 27: vennir.console.v1.ApiProduct.access_via:type_name -> vennir.console.v1.ApiAccessVia
-	24, // 28: vennir.console.v1.ListApisResponse.apis:type_name -> vennir.console.v1.ApiProduct
-	24, // 29: vennir.console.v1.GetApiResponse.api:type_name -> vennir.console.v1.ApiProduct
-	37, // 30: vennir.console.v1.GetApiTrafficResponse.endpoints:type_name -> vennir.console.v1.EndpointTraffic
-	38, // 31: vennir.console.v1.GetApiTrafficResponse.blocked:type_name -> vennir.console.v1.BlockedRequests
-	39, // 32: vennir.console.v1.GetApiTrafficResponse.teams:type_name -> vennir.console.v1.TeamTraffic
-	49, // 33: vennir.console.v1.BlockedRequests.last:type_name -> google.protobuf.Timestamp
-	49, // 34: vennir.console.v1.GetGatewayResponse.closed_at:type_name -> google.protobuf.Timestamp
-	42, // 35: vennir.console.v1.GetGatewayResponse.refused:type_name -> vennir.console.v1.RefusedRequests
-	3,  // 36: vennir.console.v1.ListAwayApiAccessResponse.grants:type_name -> vennir.console.v1.ApiGrant
-	4,  // 37: vennir.console.v1.ListAwayApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
-	50, // 38: vennir.console.v1.ListAllApiGrantsRequest.page:type_name -> vennir.console.v1.PageRequest
-	3,  // 39: vennir.console.v1.ListAllApiGrantsResponse.grants:type_name -> vennir.console.v1.ApiGrant
-	27, // 40: vennir.console.v1.ApiService.ListApis:input_type -> vennir.console.v1.ListApisRequest
-	29, // 41: vennir.console.v1.ApiService.GetApi:input_type -> vennir.console.v1.GetApiRequest
-	31, // 42: vennir.console.v1.ApiService.PauseApi:input_type -> vennir.console.v1.PauseApiRequest
-	33, // 43: vennir.console.v1.ApiService.ResumeApi:input_type -> vennir.console.v1.ResumeApiRequest
-	35, // 44: vennir.console.v1.ApiService.GetApiTraffic:input_type -> vennir.console.v1.GetApiTrafficRequest
-	40, // 45: vennir.console.v1.ApiService.GetGateway:input_type -> vennir.console.v1.GetGatewayRequest
-	43, // 46: vennir.console.v1.ApiService.SetGatewayClosed:input_type -> vennir.console.v1.SetGatewayClosedRequest
-	5,  // 47: vennir.console.v1.ApiService.RequestApiAccess:input_type -> vennir.console.v1.RequestApiAccessRequest
-	7,  // 48: vennir.console.v1.ApiService.WithdrawApiAccessRequest:input_type -> vennir.console.v1.WithdrawApiAccessRequestRequest
-	9,  // 49: vennir.console.v1.ApiService.DecideApiAccessRequest:input_type -> vennir.console.v1.DecideApiAccessRequestRequest
-	11, // 50: vennir.console.v1.ApiService.AddApiGrant:input_type -> vennir.console.v1.AddApiGrantRequest
-	13, // 51: vennir.console.v1.ApiService.SetApiGrantRate:input_type -> vennir.console.v1.SetApiGrantRateRequest
-	15, // 52: vennir.console.v1.ApiService.RevokeApiGrant:input_type -> vennir.console.v1.RevokeApiGrantRequest
-	17, // 53: vennir.console.v1.ApiService.ListApiAccess:input_type -> vennir.console.v1.ListApiAccessRequest
-	20, // 54: vennir.console.v1.ApiService.ListMyApiAccess:input_type -> vennir.console.v1.ListMyApiAccessRequest
-	22, // 55: vennir.console.v1.ApiService.ListTeamBotApiAccess:input_type -> vennir.console.v1.ListTeamBotApiAccessRequest
-	45, // 56: vennir.console.v1.ApiService.ListAwayApiAccess:input_type -> vennir.console.v1.ListAwayApiAccessRequest
-	47, // 57: vennir.console.v1.ApiService.ListAllApiGrants:input_type -> vennir.console.v1.ListAllApiGrantsRequest
-	28, // 58: vennir.console.v1.ApiService.ListApis:output_type -> vennir.console.v1.ListApisResponse
-	30, // 59: vennir.console.v1.ApiService.GetApi:output_type -> vennir.console.v1.GetApiResponse
-	32, // 60: vennir.console.v1.ApiService.PauseApi:output_type -> vennir.console.v1.PauseApiResponse
-	34, // 61: vennir.console.v1.ApiService.ResumeApi:output_type -> vennir.console.v1.ResumeApiResponse
-	36, // 62: vennir.console.v1.ApiService.GetApiTraffic:output_type -> vennir.console.v1.GetApiTrafficResponse
-	41, // 63: vennir.console.v1.ApiService.GetGateway:output_type -> vennir.console.v1.GetGatewayResponse
-	44, // 64: vennir.console.v1.ApiService.SetGatewayClosed:output_type -> vennir.console.v1.SetGatewayClosedResponse
-	6,  // 65: vennir.console.v1.ApiService.RequestApiAccess:output_type -> vennir.console.v1.RequestApiAccessResponse
-	8,  // 66: vennir.console.v1.ApiService.WithdrawApiAccessRequest:output_type -> vennir.console.v1.WithdrawApiAccessRequestResponse
-	10, // 67: vennir.console.v1.ApiService.DecideApiAccessRequest:output_type -> vennir.console.v1.DecideApiAccessRequestResponse
-	12, // 68: vennir.console.v1.ApiService.AddApiGrant:output_type -> vennir.console.v1.AddApiGrantResponse
-	14, // 69: vennir.console.v1.ApiService.SetApiGrantRate:output_type -> vennir.console.v1.SetApiGrantRateResponse
-	16, // 70: vennir.console.v1.ApiService.RevokeApiGrant:output_type -> vennir.console.v1.RevokeApiGrantResponse
-	18, // 71: vennir.console.v1.ApiService.ListApiAccess:output_type -> vennir.console.v1.ListApiAccessResponse
-	21, // 72: vennir.console.v1.ApiService.ListMyApiAccess:output_type -> vennir.console.v1.ListMyApiAccessResponse
-	23, // 73: vennir.console.v1.ApiService.ListTeamBotApiAccess:output_type -> vennir.console.v1.ListTeamBotApiAccessResponse
-	46, // 74: vennir.console.v1.ApiService.ListAwayApiAccess:output_type -> vennir.console.v1.ListAwayApiAccessResponse
-	48, // 75: vennir.console.v1.ApiService.ListAllApiGrants:output_type -> vennir.console.v1.ListAllApiGrantsResponse
-	58, // [58:76] is the sub-list for method output_type
-	40, // [40:58] is the sub-list for method input_type
-	40, // [40:40] is the sub-list for extension type_name
-	40, // [40:40] is the sub-list for extension extendee
-	0,  // [0:40] is the sub-list for field type_name
+	49, // 19: vennir.console.v1.MyApiAccess.last_used_at:type_name -> google.protobuf.Timestamp
+	19, // 20: vennir.console.v1.ListMyApiAccessResponse.access:type_name -> vennir.console.v1.MyApiAccess
+	4,  // 21: vennir.console.v1.ListMyApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
+	3,  // 22: vennir.console.v1.ListTeamBotApiAccessResponse.grants:type_name -> vennir.console.v1.ApiGrant
+	4,  // 23: vennir.console.v1.ListTeamBotApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
+	2,  // 24: vennir.console.v1.ApiProduct.state:type_name -> vennir.console.v1.ApiState
+	26, // 25: vennir.console.v1.ApiProduct.endpoints:type_name -> vennir.console.v1.ApiEndpoint
+	49, // 26: vennir.console.v1.ApiProduct.problem_found_at:type_name -> google.protobuf.Timestamp
+	25, // 27: vennir.console.v1.ApiProduct.limits:type_name -> vennir.console.v1.TeamLimit
+	0,  // 28: vennir.console.v1.ApiProduct.access_via:type_name -> vennir.console.v1.ApiAccessVia
+	24, // 29: vennir.console.v1.ListApisResponse.apis:type_name -> vennir.console.v1.ApiProduct
+	24, // 30: vennir.console.v1.GetApiResponse.api:type_name -> vennir.console.v1.ApiProduct
+	37, // 31: vennir.console.v1.GetApiTrafficResponse.endpoints:type_name -> vennir.console.v1.EndpointTraffic
+	38, // 32: vennir.console.v1.GetApiTrafficResponse.blocked:type_name -> vennir.console.v1.BlockedRequests
+	39, // 33: vennir.console.v1.GetApiTrafficResponse.teams:type_name -> vennir.console.v1.TeamTraffic
+	49, // 34: vennir.console.v1.BlockedRequests.last:type_name -> google.protobuf.Timestamp
+	49, // 35: vennir.console.v1.GetGatewayResponse.closed_at:type_name -> google.protobuf.Timestamp
+	42, // 36: vennir.console.v1.GetGatewayResponse.refused:type_name -> vennir.console.v1.RefusedRequests
+	3,  // 37: vennir.console.v1.ListAwayApiAccessResponse.grants:type_name -> vennir.console.v1.ApiGrant
+	4,  // 38: vennir.console.v1.ListAwayApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
+	50, // 39: vennir.console.v1.ListAllApiGrantsRequest.page:type_name -> vennir.console.v1.PageRequest
+	3,  // 40: vennir.console.v1.ListAllApiGrantsResponse.grants:type_name -> vennir.console.v1.ApiGrant
+	27, // 41: vennir.console.v1.ApiService.ListApis:input_type -> vennir.console.v1.ListApisRequest
+	29, // 42: vennir.console.v1.ApiService.GetApi:input_type -> vennir.console.v1.GetApiRequest
+	31, // 43: vennir.console.v1.ApiService.PauseApi:input_type -> vennir.console.v1.PauseApiRequest
+	33, // 44: vennir.console.v1.ApiService.ResumeApi:input_type -> vennir.console.v1.ResumeApiRequest
+	35, // 45: vennir.console.v1.ApiService.GetApiTraffic:input_type -> vennir.console.v1.GetApiTrafficRequest
+	40, // 46: vennir.console.v1.ApiService.GetGateway:input_type -> vennir.console.v1.GetGatewayRequest
+	43, // 47: vennir.console.v1.ApiService.SetGatewayClosed:input_type -> vennir.console.v1.SetGatewayClosedRequest
+	5,  // 48: vennir.console.v1.ApiService.RequestApiAccess:input_type -> vennir.console.v1.RequestApiAccessRequest
+	7,  // 49: vennir.console.v1.ApiService.WithdrawApiAccessRequest:input_type -> vennir.console.v1.WithdrawApiAccessRequestRequest
+	9,  // 50: vennir.console.v1.ApiService.DecideApiAccessRequest:input_type -> vennir.console.v1.DecideApiAccessRequestRequest
+	11, // 51: vennir.console.v1.ApiService.AddApiGrant:input_type -> vennir.console.v1.AddApiGrantRequest
+	13, // 52: vennir.console.v1.ApiService.SetApiGrantRate:input_type -> vennir.console.v1.SetApiGrantRateRequest
+	15, // 53: vennir.console.v1.ApiService.RevokeApiGrant:input_type -> vennir.console.v1.RevokeApiGrantRequest
+	17, // 54: vennir.console.v1.ApiService.ListApiAccess:input_type -> vennir.console.v1.ListApiAccessRequest
+	20, // 55: vennir.console.v1.ApiService.ListMyApiAccess:input_type -> vennir.console.v1.ListMyApiAccessRequest
+	22, // 56: vennir.console.v1.ApiService.ListTeamBotApiAccess:input_type -> vennir.console.v1.ListTeamBotApiAccessRequest
+	45, // 57: vennir.console.v1.ApiService.ListAwayApiAccess:input_type -> vennir.console.v1.ListAwayApiAccessRequest
+	47, // 58: vennir.console.v1.ApiService.ListAllApiGrants:input_type -> vennir.console.v1.ListAllApiGrantsRequest
+	28, // 59: vennir.console.v1.ApiService.ListApis:output_type -> vennir.console.v1.ListApisResponse
+	30, // 60: vennir.console.v1.ApiService.GetApi:output_type -> vennir.console.v1.GetApiResponse
+	32, // 61: vennir.console.v1.ApiService.PauseApi:output_type -> vennir.console.v1.PauseApiResponse
+	34, // 62: vennir.console.v1.ApiService.ResumeApi:output_type -> vennir.console.v1.ResumeApiResponse
+	36, // 63: vennir.console.v1.ApiService.GetApiTraffic:output_type -> vennir.console.v1.GetApiTrafficResponse
+	41, // 64: vennir.console.v1.ApiService.GetGateway:output_type -> vennir.console.v1.GetGatewayResponse
+	44, // 65: vennir.console.v1.ApiService.SetGatewayClosed:output_type -> vennir.console.v1.SetGatewayClosedResponse
+	6,  // 66: vennir.console.v1.ApiService.RequestApiAccess:output_type -> vennir.console.v1.RequestApiAccessResponse
+	8,  // 67: vennir.console.v1.ApiService.WithdrawApiAccessRequest:output_type -> vennir.console.v1.WithdrawApiAccessRequestResponse
+	10, // 68: vennir.console.v1.ApiService.DecideApiAccessRequest:output_type -> vennir.console.v1.DecideApiAccessRequestResponse
+	12, // 69: vennir.console.v1.ApiService.AddApiGrant:output_type -> vennir.console.v1.AddApiGrantResponse
+	14, // 70: vennir.console.v1.ApiService.SetApiGrantRate:output_type -> vennir.console.v1.SetApiGrantRateResponse
+	16, // 71: vennir.console.v1.ApiService.RevokeApiGrant:output_type -> vennir.console.v1.RevokeApiGrantResponse
+	18, // 72: vennir.console.v1.ApiService.ListApiAccess:output_type -> vennir.console.v1.ListApiAccessResponse
+	21, // 73: vennir.console.v1.ApiService.ListMyApiAccess:output_type -> vennir.console.v1.ListMyApiAccessResponse
+	23, // 74: vennir.console.v1.ApiService.ListTeamBotApiAccess:output_type -> vennir.console.v1.ListTeamBotApiAccessResponse
+	46, // 75: vennir.console.v1.ApiService.ListAwayApiAccess:output_type -> vennir.console.v1.ListAwayApiAccessResponse
+	48, // 76: vennir.console.v1.ApiService.ListAllApiGrants:output_type -> vennir.console.v1.ListAllApiGrantsResponse
+	59, // [59:77] is the sub-list for method output_type
+	41, // [41:59] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_vennir_console_v1_api_proto_init() }

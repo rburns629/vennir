@@ -1074,8 +1074,8 @@ the same grant on every install); a grant to a whole team as a group
 
 A grant doesn't expire: the gateway records its last call
 (`api_grants.last_used_at`, to within a few minutes, 2026-11-06), so the
-API's team sees which grants nobody uses and revokes them (the page that
-shows it: `TODO.md`, "A grant's last call"). `shareWith` went from
+API's team sees which grants nobody uses (each grant's **Last call** on the
+API's access list) and revokes them. `shareWith` went from
 `api.yaml` the release after the one with both (2026-11-06).
 
 **27. The cluster's policies from the catalog, written by the kernel**

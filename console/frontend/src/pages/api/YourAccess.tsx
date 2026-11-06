@@ -8,7 +8,7 @@ import type { ApiAccessRequest, ApiProduct, MyApiAccess } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
 import { Pill } from "../../components/Pill";
 import { when } from "../../time";
-import { botTeamsOf, giveUpAsk, rateText, RequestAccessDialog, useAccessAsk, withdrawAsk } from "./access";
+import { botTeamsOf, giveUpAsk, lastCallText, rateText, RequestAccessDialog, useAccessAsk, withdrawAsk } from "./access";
 
 /** Where the caller stands with one API: how they may call it, else their newest request for it (a waiting one first). */
 export interface Standing {
@@ -87,6 +87,10 @@ export function YourAccess({ api, standing, groups, onChanged }: { api: ApiProdu
           <Line label="Granted to">{group ? `A group you’re in: ${access.group}, as of your sign-in` : "You, by name · not through a group"}</Line>
           <Line label="Rate">
             {rateText(access.perMinute, group)} · {t} may change it without revoking
+          </Line>
+          <Line label="Last call">
+            {lastCallText(access.lastUsedAt)}
+            {group ? " · anyone in the group" : ""}
           </Line>
         </Box>
         {group ? (

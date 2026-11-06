@@ -298,6 +298,9 @@ message MyApiAccess {
   string group = 5;
   string grant_id = 6;
   int32 per_minute = 7;
+  // VIA_USER and VIA_GROUP: the grant's last call, to within a few minutes
+  // (anyone's in the group, for a group's); unset if none yet.
+  google.protobuf.Timestamp last_used_at = 8;
 }
 
 message ListMyApiAccessRequest {}

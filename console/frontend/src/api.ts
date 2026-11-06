@@ -2043,6 +2043,8 @@ export interface ApiGrant {
   revokeReason: string;
   /** When its API left the catalog's release; null while it's published. */
   awaySince: string | null;
+  /** The last call through it (to within a few minutes); null if none yet. */
+  lastUsedAt: string | null;
 }
 
 function apiGrant(g: ApiGrantMessage): ApiGrant {
@@ -2063,6 +2065,7 @@ function apiGrant(g: ApiGrantMessage): ApiGrant {
     revokedBy: g.revokedBy,
     revokeReason: g.revokeReason,
     awaySince: iso(g.awaySince),
+    lastUsedAt: iso(g.lastUsedAt),
   };
 }
 
@@ -2168,6 +2171,8 @@ export interface MyApiAccess {
   group: string;
   grantId: string;
   perMinute: number;
+  /** user and group: the grant's last call (anyone's in the group, for a group's); null if none yet. */
+  lastUsedAt: string | null;
 }
 
 /** What the caller may call, their requests, and their groups as last read while they count (the ones they may offer in a request). */
@@ -2181,7 +2186,7 @@ export interface MyAccessList {
 export async function listMyApiAccess(): Promise<MyAccessList> {
   const r = await call(() => apisApi.listMyApiAccess({}));
   return {
-    access: r.access.map((a) => ({ team: a.team, name: a.name, via: via(a.via) ?? "user", callingTeam: a.callingTeam, group: a.group, grantId: a.grantId, perMinute: a.perMinute })),
+    access: r.access.map((a) => ({ team: a.team, name: a.name, via: via(a.via) ?? "user", callingTeam: a.callingTeam, group: a.group, grantId: a.grantId, perMinute: a.perMinute, lastUsedAt: iso(a.lastUsedAt) })),
     requests: r.requests.map(accessRequest),
     groups: r.groups,
   };

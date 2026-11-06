@@ -179,6 +179,7 @@ export function apiService(): ServiceImpl<typeof ApiService> {
           group: a.group ?? "",
           grantId: a.grantId ?? "",
           perMinute: a.perMinute,
+          lastUsedAt: timestamp(a.lastUsedAt),
         })),
         requests: mine.requests.map(request),
         groups: mine.groups,
