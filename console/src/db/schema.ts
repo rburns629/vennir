@@ -26,6 +26,8 @@ import {
   bigint,
   integer,
   check,
+  uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -794,7 +796,8 @@ export type NotificationKind =
   | "catalog_failing"
   | "product_not_ready"
   | "step_refused"
-  | "platform_alert";
+  | "platform_alert"
+  | "api_access";
 
 /** A person's copy of an event, until they've read it. */
 export const userNotifications = pgTable(
@@ -1134,7 +1137,13 @@ export const apis = pgTable(
     // The Kubernetes ServiceAccount, in the team's namespace, its backend
     // credentials are minted for (the console creates it).
     serviceAccount: text("service_account").notNull(),
+    // The teams whose members and bots may call it, from the catalog
+    // (deprecated: api_grants replace it; kept for one release).
     shareWith: text("share_with").array().notNull().default(sql`'{}'::text[]`),
+    // api.yaml's access.requests: how a request for access is answered
+    // (core/apiAccess.ts). open: granted at once; approval: its team's
+    // maintainers decide; closed: none are taken.
+    accessRequests: text("access_requests").$type<AccessRequests>().notNull().default("approval"),
     hidden: boolean("hidden").notNull().default(false),
     deprecated: text("deprecated"),
     // reachable: internet, where the gateway's settings allow its team.
@@ -1194,6 +1203,99 @@ export const apiProblems = pgTable("api_problems", {
   problem: text("problem").notNull(),
   foundAt: timestamp("found_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export type AccessRequests = "open" | "approval" | "closed";
+
+/**
+ * Who may call an API besides its own team (decision 26): each grant names
+ * a single sign-on group (lowercased, as sso.ts groupsOf reads them: every
+ * person in it may call) or one user, a person or a bot. Its rate is
+ * requests a minute (a group's, each member's); null: the API's default
+ * limit. Made and changed by the API's team's maintainers, or by an
+ * approved request (from_request); revoked (soft: the history stays) by
+ * them, an admin, the person it names, or a bot's team's maintainers. The
+ * gateway reads the active ones (revoked_at null) every few seconds.
+ */
+export const apiGrants = pgTable(
+  "api_grants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    apiId: uuid("api_id")
+      .notNull()
+      .references(() => apis.id, { onDelete: "cascade" }),
+    groupName: text("group_name"),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    perMinute: integer("per_minute"),
+    grantedBy: uuid("granted_by").references(() => users.id, { onDelete: "set null" }),
+    fromRequest: uuid("from_request").references((): AnyPgColumn => apiAccessRequests.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedBy: uuid("revoked_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    check("api_grants_one_principal", sql`(${table.groupName} IS NULL) <> (${table.userId} IS NULL)`),
+    check("api_grants_group_lowercase", sql`${table.groupName} = lower(${table.groupName})`),
+    check("api_grants_per_minute", sql`${table.perMinute} IS NULL OR ${table.perMinute} > 0`),
+    uniqueIndex("api_grants_active_group").on(table.apiId, table.groupName).where(sql`revoked_at IS NULL AND group_name IS NOT NULL`),
+    uniqueIndex("api_grants_active_user").on(table.apiId, table.userId).where(sql`revoked_at IS NULL AND user_id IS NOT NULL`),
+    index("api_grants_user_idx").on(table.userId),
+  ],
+);
+
+export type AccessRequestState = "waiting" | "granted" | "declined" | "withdrawn";
+
+/**
+ * A request for access to an API (decision 26): for a person, by
+ * themselves, or for a bot, by a maintainer of the bot's team; with a
+ * reason. Waiting until the API's team's maintainers grant it (grant_id,
+ * the grant it made) or decline it (with a reason), or whoever asked
+ * withdraws it. At most one waits per API and user.
+ */
+export const apiAccessRequests = pgTable(
+  "api_access_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    apiId: uuid("api_id")
+      .notNull()
+      .references(() => apis.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
+    reason: text("reason").notNull(),
+    state: text("state").$type<AccessRequestState>().notNull().default("waiting"),
+    decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decisionReason: text("decision_reason"),
+    grantId: uuid("grant_id").references((): AnyPgColumn => apiGrants.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (table) => [
+    check("api_access_requests_state", sql`${table.state} IN ('waiting', 'granted', 'declined', 'withdrawn')`),
+    uniqueIndex("api_access_requests_one_waiting").on(table.apiId, table.userId).where(sql`state = 'waiting'`),
+    index("api_access_requests_user_idx").on(table.userId),
+  ],
+);
+
+/**
+ * A person's single sign-on groups as the console last read them
+ * (lowercased): every group an ID token's claim listed, and of Google
+ * Workspace groups, the ones it asks about (mapped to a team, or granted an
+ * API). Replaced whole at each sign-in and by the hourly Google resync; the
+ * gateway reads it for group grants (api_grants.group_name).
+ */
+export const userGroups = pgTable(
+  "user_groups",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    groupName: text("group_name").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.groupName] }), index("user_groups_group_idx").on(table.groupName)],
+);
 
 /** The gateway as a whole: one row. Closed, every API answers 503. */
 export const gatewayState = pgTable("gateway_state", {

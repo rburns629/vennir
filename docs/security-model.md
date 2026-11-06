@@ -506,13 +506,33 @@ way: a team requiring single sign-on refuses a password's session whether
 the install's settings or an admin in the console turned it on (if the
 saved client secret can't be unsealed, the console counts it off and the
 gateway, which never reads it, on), and a
-purged team counts for nobody), and may call an API only when it's shared
-with one of their teams. An ordering bot calls none (403 `ORDERS_ONLY`): it
-may only order its listed templates.
+purged team counts for nobody), and may call an API only when they may by
+its access list (decision 26; `gateway/internal/gateway` accessFor and the
+console's `core/apiAccess.ts`, kept in step): they're in its own team; a
+grant names them (a bot's counts while a team of its isn't retired); a grant
+names a single sign-on group they're in (people only, never a bot); or, for
+this release, its `api.yaml`'s `shareWith` names a team of theirs
+(deprecated). Admins are no exception: they call only what a grant lets them,
+and a grant to themselves is audited like any other. Everyone else gets 403
+`NOT_GRANTED` and nothing reaches the backend. A person's groups are those
+the console last read (`user_groups`: at each single sign-on, and hourly
+for Google Workspace groups); while groups come from an ID token's claim,
+they count only for a single sign-on session from the last hour, as
+group-given teams do, so a session whose only way in is a group's grant is
+refused (401) once older, and its person signs in again; a sign-in whose
+groups hold a grant gets a session no longer than that. Only the API's
+team's maintainers add grants, change their rates and decide requests (an
+admin may revoke one, never add or change it); every change is audited and
+told. The gateway reads the active grants with the APIs every few seconds,
+so a revoked one stops calls within that refresh; a grant's rate is counted
+per grant (a group's per member). `Vennir-Team` only picks the calling team
+among those that may call; it gives no access. An ordering bot calls none
+(403 `ORDERS_ONLY`): it may only order its listed templates.
 The caller's `Authorization` stops at the gateway; the backend gets its own
 credential instead, minted per request, and `Vennir-Caller`, an EdDSA JWT
 the gateway signs (its key at `/.vennir/jwks.json`) naming the caller,
-their team and the API. An API may only use an in-cluster backend in its
+how they may call (`via`, and the group for a group's grant), their team
+and the API. An API may only use an in-cluster backend in its
 own team's API backends' namespace (`<service>.<team>-apis.svc`), which the
 console makes beside each team's namespace, labelled `vennir/api-backends`
 and never `vennir/team`: no step is dispatched there, no product identity
@@ -623,7 +643,9 @@ the gateway keeps no failed credential, so the next request asks again. `-api` i
 such a ServiceAccount, and an API's must end in it. It reads the
 console's database as a role of its own (`vennir_gateway`,
 `console/src/db/gatewayAccess.ts`): it may read the columns it needs to
-sign callers in and find APIs (never a password hash, a sealed value, a
+sign callers in, find APIs and their active grants (each grant's
+principal and rate, never who granted it or why, and no request for
+access) and each person's groups (never a password hash, a sealed value, a
 secret's name or the audit log) and write only its traffic counts
 (`api_traffic`), why it can't serve an API (`api_problems`) and when an API
 token was last used (`api_tokens.last_used_at`, as the console keeps it).
@@ -646,7 +668,8 @@ refuses at startup a `DATABASE_URL` whose `sslmode` isn't `verify-full` or
 it), as the kernel does. Requests are logged and counted by
 API, team, caller and outcome, never with bodies, header values or
 credentials; the counts kept for each API's page (`api_traffic`, a week)
-hold only the calling team, never who. What it refused there is also in
+hold only the calling team, never who (a grant's callers as `grant:user`, or
+`grant:group:<group>` for a group's). What it refused there is also in
 Observe's refusals, seen by the API's team, the calling team and admins
 (by the API's team and admins alone when no calling team is known). Its egress excludes the cloud
 metadata server, so no backend URL can reach the node's credentials

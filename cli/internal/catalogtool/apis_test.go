@@ -19,7 +19,7 @@ backend:
   auth:
     googleIdToken:
       serviceAccount: orders-gateway@payments-prod.iam.gserviceaccount.com
-shareWith: [web]
+access: {requests: open}
 limits:
   default: 600/min
   web: 2/s
@@ -71,7 +71,7 @@ func TestAPIs(t *testing.T) {
 	if a.GetTeam() != "payments" || a.GetName() != "orders" || a.GetServiceAccount() != "orders-api" ||
 		a.GetPerMinute()["default"] != 600 || a.GetPerMinute()["web"] != 120 || a.GetTimeoutSeconds() != 20 ||
 		a.GetMaxRequestBytes() != 512<<10 || a.GetBackendAuth().GetGoogleIdToken().GetAudience() != "https://orders.example.com" ||
-		a.GetPath() != "teams/payments/apis/orders/api.yaml" {
+		a.GetPath() != "teams/payments/apis/orders/api.yaml" || a.GetAccessRequests() != "open" || len(a.GetShareWith()) != 0 {
 		t.Errorf("api = %v", a)
 	}
 	var doc map[string]any
@@ -91,7 +91,8 @@ func TestAPIs(t *testing.T) {
 		"no spec file":                   {strings.Replace(apiYAML, "spec: openapi.yaml", "spec: missing.yaml", 1), openapiYAML, "no such file"},
 		"another name":                   {strings.Replace(apiYAML, "name: orders", "name: billing", 1), openapiYAML, "isn't its folder's"},
 		"plain http outside the cluster": {strings.Replace(apiYAML, "https://orders.example.com", "http://orders.example.com", 1), strings.Replace(openapiYAML, "https://", "http://", 1), "http only to a Service"},
-		"hidden and shared":              {apiYAML + "visibility: hidden\n", openapiYAML, "api.yaml"},
+		"hidden and shared":              {apiYAML + "visibility: hidden\nshareWith: [web]\n", openapiYAML, "api.yaml"},
+		"requests nobody can answer":     {strings.Replace(apiYAML, "requests: open", "requests: sometimes", 1), openapiYAML, "api.yaml"},
 		"a limit it can't read":          {strings.Replace(apiYAML, "600/min", "lots", 1), openapiYAML, "api.yaml"},
 		"too long a timeout":             {strings.Replace(apiYAML, "timeout: 20s", "timeout: 900s", 1), openapiYAML, "api.yaml"},
 		"AWS's audience":                 {tokenFor("sts.amazonaws.com"), openapiYAML, "one a cloud federates"},
@@ -107,6 +108,33 @@ func TestAPIs(t *testing.T) {
 	}
 	if out := errorsOf(t, (*Catalog).ValidateAPIs, apiCatalog(t, tokenFor("https://orders.example.com"), openapiYAML)); out != "" {
 		t.Errorf("a backend's own audience was refused:\n%s", out)
+	}
+}
+
+// shareWith still works this release, deprecated (decision 26): the catalog
+// tool warns, but passes it, and the release still carries it. Without
+// access, requests wait for approval.
+func TestShareWithDeprecated(t *testing.T) {
+	shared := strings.Replace(apiYAML, "access: {requests: open}", "shareWith: [web]", 1)
+	c := apiCatalog(t, shared, openapiYAML)
+	var out strings.Builder
+	c.Stdout, c.Stderr = &out, &out
+	if !c.ValidateAPIs() {
+		t.Fatalf("shareWith was refused:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "WARNING: teams/payments/apis/orders/api.yaml: shareWith is deprecated") {
+		t.Errorf("no warning of shareWith:\n%s", out.String())
+	}
+	apis, err := c.releaseAPIs()
+	if err != nil || len(apis) != 1 {
+		t.Fatalf("apis = %v, %v", apis, err)
+	}
+	if got := apis[0]; strings.Join(got.GetShareWith(), ",") != "web" || got.GetAccessRequests() != "approval" {
+		t.Errorf("api = %v", got)
+	}
+	// Without shareWith, nothing to warn of.
+	if out := errorsOf(t, (*Catalog).ValidateAPIs, apiCatalog(t, apiYAML, openapiYAML)); strings.Contains(out, "WARNING") {
+		t.Errorf("warned without shareWith:\n%s", out)
 	}
 }
 

@@ -30,7 +30,7 @@ import fastifyCookie from "@fastify/cookie";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply } from "fastify";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { config } from "../config.js";
-import { currentSso, groupsOf, GroupsUnavailable, ssoSessionSeconds, syncMappedTeams, type Sso } from "../sso.js";
+import { currentSso, groupsOf, GroupsUnavailable, holdsGroupGrant, ssoSessionSeconds, storeUserGroups, syncMappedTeams, type Sso } from "../sso.js";
 import { bindOidcSubject, createSsoUser, findUserByEmail, findUserByOidcSubject, recordSignIn, teamRolesForUser } from "../db/queries.js";
 import { newSession } from "./plugin.js";
 import { writeAuditEntry } from "../audit.js";
@@ -219,7 +219,12 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
       }
       const user = await accountFor(email, subject, request.log);
       if (groups !== null) await syncMappedTeams(user.id, groups, request.log);
-      const expiresIn = ssoSessionSeconds(groups !== null && (await teamRolesForUser(user.id)).some((row) => row.fromGroups));
+      // Their groups for the gateway's group grants (none without a source).
+      await storeUserGroups(user.id, groups);
+      // An hour at most while a group gives them a team or an API's grant.
+      const expiresIn = ssoSessionSeconds(
+        groups !== null && ((await teamRolesForUser(user.id)).some((row) => row.fromGroups) || (await holdsGroupGrant(user.id))),
+      );
       await recordSignIn(user.id);
       request.log.info({ event: "sso_sign_in", userId: user.id, sessionSeconds: expiresIn }, "signed in with single sign-on");
       await writeAuditEntry(request.log, {

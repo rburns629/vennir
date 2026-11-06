@@ -13,9 +13,21 @@ import "google/protobuf/timestamp.proto";
 // from its team's catalog (apis/<name>/api.yaml); pausing one is the only
 // change made here.
 //
-// Everyone signed in sees the APIs that aren't hidden; those shared with
-// one of their teams they may call (may_call). The backend's address and
-// how the gateway signs in there are shown to the API's own team only.
+// Everyone signed in sees the APIs that aren't hidden; they may call one
+// (may_call) when it's their own team's, when it's granted to them or to a
+// single sign-on group they're in, or, for this release, when its
+// api.yaml's shareWith names one of their teams (decision 26). The
+// backend's address and how the gateway signs in there are shown to the
+// API's own team only.
+//
+// Access (decision 26): each API has grants, to a group (each person in it)
+// or to one user (a person or a bot), each with its rate. Only the API's
+// team's maintainers add grants or change their rates. A person asks for
+// access for themselves; a maintainer of a bot's team asks for the bot.
+// The API's maintainers approve (granting the person, or one of their
+// groups) or decline. Revoking: the API's maintainers, an admin, the
+// person a grant names, or the maintainers of the bot it names. Every
+// change is audited and told to whoever it's for and the API's maintainers.
 service ApiService {
   // Every API the caller may see, by team and name.
   rpc ListApis(ListApisRequest) returns (ListApisResponse) {
@@ -46,6 +58,228 @@ service ApiService {
   // Closes the gateway (a message: every API answers 503 with it, and
   // nothing is forwarded) or reopens it (empty). Admins; audited.
   rpc SetGatewayClosed(SetGatewayClosedRequest) returns (SetGatewayClosedResponse);
+
+  // Asks for access to an API, with a reason: a person for themselves, or a
+  // maintainer of a bot's team for that bot (bot_email). Refused when its
+  // api.yaml takes no requests (access.requests: closed), when whoever
+  // it's for may call it already, or while a request of theirs waits. An
+  // API whose requests are open grants it at once, at its default limit.
+  rpc RequestApiAccess(RequestApiAccessRequest) returns (RequestApiAccessResponse);
+  // Withdraws a request while it waits: whoever asked.
+  rpc WithdrawApiAccessRequest(WithdrawApiAccessRequestRequest) returns (WithdrawApiAccessRequestResponse);
+  // Grants (approve) or declines a waiting request: a maintainer of the
+  // API's team. Granting a person may grant one of their groups instead,
+  // as the console last read them; a bot is granted by name only.
+  rpc DecideApiAccessRequest(DecideApiAccessRequestRequest) returns (DecideApiAccessRequestResponse);
+  // Grants a group or a user (a person or a bot, by email) access: a
+  // maintainer of the API's team (not an admin, unless they maintain it).
+  rpc AddApiGrant(AddApiGrantRequest) returns (AddApiGrantResponse);
+  // Changes a grant's rate: a maintainer of the API's team.
+  rpc SetApiGrantRate(SetApiGrantRateRequest) returns (SetApiGrantRateResponse);
+  // Revokes a grant: a maintainer of the API's team, an admin, the person
+  // it names, or a maintainer of the bot's team it names. The gateway stops
+  // its calls within its refresh (well under a minute).
+  rpc RevokeApiGrant(RevokeApiGrantRequest) returns (RevokeApiGrantResponse);
+  // An API's grants (active and revoked) and requests: its own team, and
+  // admins.
+  rpc ListApiAccess(ListApiAccessRequest) returns (ListApiAccessResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // The APIs the caller may call, and how (their team's, granted to them,
+  // through a group, from the catalog), and their requests that wait or
+  // were declined.
+  rpc ListMyApiAccess(ListMyApiAccessRequest) returns (ListMyApiAccessResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // A team's bots' grants and requests: its members, and admins.
+  rpc ListTeamBotApiAccess(ListTeamBotApiAccessRequest) returns (ListTeamBotApiAccessResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// How a caller may call an API (the gateway's rule, in its order).
+enum ApiAccessVia {
+  API_ACCESS_VIA_UNSPECIFIED = 0;
+  // They're in its own team (a member or a bot).
+  API_ACCESS_VIA_TEAM = 1;
+  // A grant names them.
+  API_ACCESS_VIA_USER = 2;
+  // A grant names a single sign-on group they're in.
+  API_ACCESS_VIA_GROUP = 3;
+  // Its api.yaml's shareWith names a team of theirs: from the catalog, not
+  // revocable here. Deprecated: goes with shareWith.
+  API_ACCESS_VIA_CATALOG = 4;
+}
+
+enum ApiAccessRequestState {
+  API_ACCESS_REQUEST_STATE_UNSPECIFIED = 0;
+  API_ACCESS_REQUEST_STATE_WAITING = 1;
+  API_ACCESS_REQUEST_STATE_GRANTED = 2;
+  API_ACCESS_REQUEST_STATE_DECLINED = 3;
+  API_ACCESS_REQUEST_STATE_WITHDRAWN = 4;
+}
+
+message ApiGrant {
+  string id = 1;
+  // The API: <team>/<name>.
+  string team = 2;
+  string name = 3;
+  // Exactly one of: a single sign-on group (lowercased), or a user.
+  string group = 4;
+  string user_id = 5;
+  string user_email = 6;
+  bool bot = 7;
+  // Requests a minute: the user's, or each of the group's members'. With
+  // default_rate, it's the API's default limit, and follows it.
+  int32 per_minute = 8;
+  bool default_rate = 9;
+  // Who granted it (an email); empty for an open API's request.
+  string granted_by = 10;
+  // The request it answered, if any.
+  string access_request_id = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  // Set once revoked.
+  google.protobuf.Timestamp revoked_at = 14;
+  string revoked_by = 15;
+}
+
+message ApiAccessRequest {
+  string id = 1;
+  string team = 2;
+  string name = 3;
+  // Whom it's for: the person, or the bot.
+  string user_id = 4;
+  string user_email = 5;
+  bool bot = 6;
+  // Who asked (an email): the person, or the bot's team's maintainer.
+  string requested_by = 7;
+  string reason = 8;
+  ApiAccessRequestState state = 9;
+  // Who granted, declined or withdrew it, and a decline's reason.
+  string decided_by = 10;
+  string decision_reason = 11;
+  string grant_id = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp decided_at = 14;
+  // A person's single sign-on groups as the console last read them, one of
+  // which may be granted instead: shown to the API's team only.
+  repeated string groups = 15;
+}
+
+message RequestApiAccessRequest {
+  string team = 1;
+  string name = 2;
+  // Why: the API's maintainers read it. At most 1000 characters.
+  string reason = 3;
+  // For a bot of a team the caller maintains; empty: for the caller.
+  string bot_email = 4;
+}
+
+message RequestApiAccessResponse {
+  ApiAccessRequest request = 1;
+  // Set when its requests are open: the grant made at once.
+  ApiGrant grant = 2;
+}
+
+message WithdrawApiAccessRequestRequest {
+  string access_request_id = 1;
+}
+
+message WithdrawApiAccessRequestResponse {}
+
+message DecideApiAccessRequestRequest {
+  string access_request_id = 1;
+  bool approve = 2;
+  // Approving a person's: grant this group of theirs instead of the person.
+  string group = 3;
+  // Approving: requests a minute; 0, the API's default limit.
+  int32 per_minute = 4;
+  // Declining: why (required), which the person is told.
+  string reason = 5;
+}
+
+message DecideApiAccessRequestResponse {
+  ApiAccessRequest request = 1;
+  ApiGrant grant = 2;
+}
+
+message AddApiGrantRequest {
+  string team = 1;
+  string name = 2;
+  // Exactly one of: a single sign-on group, or a user by email.
+  string group = 3;
+  string email = 4;
+  // Requests a minute; 0, the API's default limit.
+  int32 per_minute = 5;
+}
+
+message AddApiGrantResponse {
+  ApiGrant grant = 1;
+}
+
+message SetApiGrantRateRequest {
+  string grant_id = 1;
+  // Requests a minute; 0, the API's default limit.
+  int32 per_minute = 2;
+}
+
+message SetApiGrantRateResponse {
+  ApiGrant grant = 1;
+}
+
+message RevokeApiGrantRequest {
+  string grant_id = 1;
+  // Why, for the audit log and whoever it named. Optional.
+  string reason = 2;
+}
+
+message RevokeApiGrantResponse {}
+
+message ListApiAccessRequest {
+  string team = 1;
+  string name = 2;
+}
+
+message ListApiAccessResponse {
+  // Active ones first, then revoked, newest first.
+  repeated ApiGrant grants = 1;
+  // Waiting ones first, then the rest, newest first.
+  repeated ApiAccessRequest requests = 2;
+  // From the catalog (shareWith, deprecated): teams whose members and bots
+  // may call it, not revocable here.
+  repeated string share_with = 3;
+}
+
+message MyApiAccess {
+  string team = 1;
+  string name = 2;
+  ApiAccessVia via = 3;
+  // VIA_TEAM and VIA_CATALOG: the team the gateway counts calls against.
+  string calling_team = 4;
+  // VIA_GROUP: the group; VIA_USER and VIA_GROUP: the grant.
+  string group = 5;
+  string grant_id = 6;
+  int32 per_minute = 7;
+}
+
+message ListMyApiAccessRequest {}
+
+message ListMyApiAccessResponse {
+  repeated MyApiAccess access = 1;
+  // Requests for the caller that wait, or were declined.
+  repeated ApiAccessRequest requests = 2;
+}
+
+message ListTeamBotApiAccessRequest {
+  string team = 1;
+}
+
+message ListTeamBotApiAccessResponse {
+  // The team's bots' active grants.
+  repeated ApiGrant grants = 1;
+  // The team's bots' requests that wait, or were declined.
+  repeated ApiAccessRequest requests = 2;
 }
 
 enum ApiState {
@@ -70,8 +304,8 @@ message ApiProduct {
   ApiState state = 5;
   string held_reason = 6;
   string paused_message = 7;
-  // Whether the caller may call it: shared with one of their teams, or
-  // their own team's.
+  // Whether the caller may call it: their own team's, granted to them or a
+  // group of theirs, or shared with one of their teams (access_via).
   bool may_call = 8;
   repeated string share_with = 9;
   bool hidden = 10;
@@ -86,8 +320,8 @@ message ApiProduct {
   string public_url = 14;
   // What its spec lets through.
   repeated ApiEndpoint endpoints = 15;
-  // Requests a minute the caller's team may send (its own limit, else the
-  // default); 0 when it may not call it.
+  // Requests a minute the caller may send (their grant's, or their team's
+  // own limit, else the default); 0 when they may not call it.
   int32 per_minute = 16;
   int32 timeout_seconds = 17;
   int32 max_request_bytes = 18;
@@ -113,6 +347,10 @@ message ApiProduct {
   repeated TeamLimit limits = 27;
   int32 default_per_minute = 28;
   bool default_from_gateway = 29;
+  // How the caller may call it (unspecified: they may not).
+  ApiAccessVia access_via = 30;
+  // api.yaml's access.requests: open, approval or closed.
+  string access_requests = 31;
 }
 
 message TeamLimit {
@@ -201,7 +439,9 @@ message BlockedRequests {
 }
 
 message TeamTraffic {
-  // "" for callers who weren't signed in.
+  // "" for callers who weren't signed in; "grant:user" for those a grant
+  // names, "grant:group:<group>" for those a group's grant lets in (no
+  // person is named; no team's name has a ":").
   string team = 1;
   int64 requests = 2;
   // Its busiest minute, against its limit.

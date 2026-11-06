@@ -11,160 +11,333 @@ import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
  * Describes the file vennir/console/v1/api.proto.
  */
 export const file_vennir_console_v1_api = /*@__PURE__*/
-  fileDesc("Cht2ZW5uaXIvY29uc29sZS92MS9hcGkucHJvdG8SEXZlbm5pci5jb25zb2xlLnYxItkFCgpBcGlQcm9kdWN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkSEwoLZGVzY3JpcHRpb24YBCABKAkSKgoFc3RhdGUYBSABKA4yGy52ZW5uaXIuY29uc29sZS52MS5BcGlTdGF0ZRITCgtoZWxkX3JlYXNvbhgGIAEoCRIWCg5wYXVzZWRfbWVzc2FnZRgHIAEoCRIQCghtYXlfY2FsbBgIIAEoCBISCgpzaGFyZV93aXRoGAkgAygJEg4KBmhpZGRlbhgKIAEoCBISCgpkZXByZWNhdGVkGAsgASgJEhAKCGludGVybmV0GAwgASgIEgsKA3VybBgNIAEoCRISCgpwdWJsaWNfdXJsGA4gASgJEjEKCWVuZHBvaW50cxgPIAMoCzIeLnZlbm5pci5jb25zb2xlLnYxLkFwaUVuZHBvaW50EhIKCnBlcl9taW51dGUYECABKAUSFwoPdGltZW91dF9zZWNvbmRzGBEgASgFEhkKEW1heF9yZXF1ZXN0X2J5dGVzGBIgASgFEhMKC3NvdXJjZV9wYXRoGBMgASgJEhMKC2JhY2tlbmRfdXJsGBQgASgJEhQKDGJhY2tlbmRfYXV0aBgVIAEoCRISCgpzcGVjX3RpdGxlGBYgASgJEhQKDHNwZWNfdmVyc2lvbhgXIAEoCRIaChJhc2tfZm9yX2FjY2Vzc191cmwYGCABKAkSDwoHcHJvYmxlbRgZIAEoCRI0ChBwcm9ibGVtX2ZvdW5kX2F0GBogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCgZsaW1pdHMYGyADKAsyHC52ZW5uaXIuY29uc29sZS52MS5UZWFtTGltaXQSGgoSZGVmYXVsdF9wZXJfbWludXRlGBwgASgFEhwKFGRlZmF1bHRfZnJvbV9nYXRld2F5GB0gASgIIi0KCVRlYW1MaW1pdBIMCgR0ZWFtGAEgASgJEhIKCnBlcl9taW51dGUYAiABKAUiPAoLQXBpRW5kcG9pbnQSDgoGbWV0aG9kGAEgASgJEgwKBHBhdGgYAiABKAkSDwoHc3VtbWFyeRgDIAEoCSIRCg9MaXN0QXBpc1JlcXVlc3QiPwoQTGlzdEFwaXNSZXNwb25zZRIrCgRhcGlzGAEgAygLMh0udmVubmlyLmNvbnNvbGUudjEuQXBpUHJvZHVjdCIrCg1HZXRBcGlSZXF1ZXN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCSJNCg5HZXRBcGlSZXNwb25zZRIqCgNhcGkYASABKAsyHS52ZW5uaXIuY29uc29sZS52MS5BcGlQcm9kdWN0Eg8KB29wZW5hcGkYAiABKAkiPgoPUGF1c2VBcGlSZXF1ZXN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCRIPCgdtZXNzYWdlGAMgASgJIhIKEFBhdXNlQXBpUmVzcG9uc2UiLgoQUmVzdW1lQXBpUmVxdWVzdBIMCgR0ZWFtGAEgASgJEgwKBG5hbWUYAiABKAkiEwoRUmVzdW1lQXBpUmVzcG9uc2UiQQoUR2V0QXBpVHJhZmZpY1JlcXVlc3QSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWhvdXJzGAMgASgFIoACChVHZXRBcGlUcmFmZmljUmVzcG9uc2USEAoIcmVxdWVzdHMYASABKAMSEQoJZm9yd2FyZGVkGAIgASgDEg8KB3N0b3BwZWQYAyABKAMSFgoOYmFja2VuZF9lcnJvcnMYBCABKAMSNQoJZW5kcG9pbnRzGAUgAygLMiIudmVubmlyLmNvbnNvbGUudjEuRW5kcG9pbnRUcmFmZmljEjMKB2Jsb2NrZWQYBiADKAsyIi52ZW5uaXIuY29uc29sZS52MS5CbG9ja2VkUmVxdWVzdHMSLQoFdGVhbXMYByADKAsyHi52ZW5uaXIuY29uc29sZS52MS5UZWFtVHJhZmZpYyKEAQoPRW5kcG9pbnRUcmFmZmljEhAKCGVuZHBvaW50GAEgASgJEhAKCHJlcXVlc3RzGAIgASgDEg8KB2ludmFsaWQYAyABKAMSEwoLYmFja2VuZF80eHgYBCABKAMSEwoLYmFja2VuZF81eHgYBSABKAMSEgoKYXZlcmFnZV9tcxgGIAEoAyJqCg9CbG9ja2VkUmVxdWVzdHMSDwoHcmVxdWVzdBgBIAEoCRINCgVjb3VudBgCIAEoAxINCgV0ZWFtcxgDIAMoCRIoCgRsYXN0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJgCgtUZWFtVHJhZmZpYxIMCgR0ZWFtGAEgASgJEhAKCHJlcXVlc3RzGAIgASgDEhcKD3BlYWtfcGVyX21pbnV0ZRgDIAEoAxIYChBsaW1pdF9wZXJfbWludXRlGAQgASgFIhMKEUdldEdhdGV3YXlSZXF1ZXN0IqgCChJHZXRHYXRld2F5UmVzcG9uc2USDwoHZW5hYmxlZBgBIAEoCBIVCg1iYWNrZW5kX2hvc3RzGAIgAygJEhYKDmludGVybmV0X3RlYW1zGAMgAygJEgsKA3VybBgEIAEoCRISCgpwdWJsaWNfdXJsGAUgASgJEhYKDmNsb3NlZF9tZXNzYWdlGAYgASgJEhEKCWNsb3NlZF9ieRgHIAEoCRItCgljbG9zZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEgwKBGFwaXMYCSABKAUSFAoMcmVxdWVzdHNfMjRoGAogASgDEjMKB3JlZnVzZWQYCyADKAsyIi52ZW5uaXIuY29uc29sZS52MS5SZWZ1c2VkUmVxdWVzdHMiQQoPUmVmdXNlZFJlcXVlc3RzEg8KB291dGNvbWUYASABKAkSDQoFY291bnQYAiABKAMSDgoGbW9zdGx5GAMgASgJIioKF1NldEdhdGV3YXlDbG9zZWRSZXF1ZXN0Eg8KB21lc3NhZ2UYASABKAkiGgoYU2V0R2F0ZXdheUNsb3NlZFJlc3BvbnNlKn4KCEFwaVN0YXRlEhkKFUFQSV9TVEFURV9VTlNQRUNJRklFRBAAEhIKDkFQSV9TVEFURV9MSVZFEAESEgoOQVBJX1NUQVRFX0hFTEQQAhIUChBBUElfU1RBVEVfUEFVU0VEEAMSGQoVQVBJX1NUQVRFX1VOQVZBSUxBQkxFEAQynQUKCkFwaVNlcnZpY2USWAoITGlzdEFwaXMSIi52ZW5uaXIuY29uc29sZS52MS5MaXN0QXBpc1JlcXVlc3QaIy52ZW5uaXIuY29uc29sZS52MS5MaXN0QXBpc1Jlc3BvbnNlIgOQAgESUgoGR2V0QXBpEiAudmVubmlyLmNvbnNvbGUudjEuR2V0QXBpUmVxdWVzdBohLnZlbm5pci5jb25zb2xlLnYxLkdldEFwaVJlc3BvbnNlIgOQAgESUwoIUGF1c2VBcGkSIi52ZW5uaXIuY29uc29sZS52MS5QYXVzZUFwaVJlcXVlc3QaIy52ZW5uaXIuY29uc29sZS52MS5QYXVzZUFwaVJlc3BvbnNlElYKCVJlc3VtZUFwaRIjLnZlbm5pci5jb25zb2xlLnYxLlJlc3VtZUFwaVJlcXVlc3QaJC52ZW5uaXIuY29uc29sZS52MS5SZXN1bWVBcGlSZXNwb25zZRJnCg1HZXRBcGlUcmFmZmljEicudmVubmlyLmNvbnNvbGUudjEuR2V0QXBpVHJhZmZpY1JlcXVlc3QaKC52ZW5uaXIuY29uc29sZS52MS5HZXRBcGlUcmFmZmljUmVzcG9uc2UiA5ACARJeCgpHZXRHYXRld2F5EiQudmVubmlyLmNvbnNvbGUudjEuR2V0R2F0ZXdheVJlcXVlc3QaJS52ZW5uaXIuY29uc29sZS52MS5HZXRHYXRld2F5UmVzcG9uc2UiA5ACARJrChBTZXRHYXRld2F5Q2xvc2VkEioudmVubmlyLmNvbnNvbGUudjEuU2V0R2F0ZXdheUNsb3NlZFJlcXVlc3QaKy52ZW5uaXIuY29uc29sZS52MS5TZXRHYXRld2F5Q2xvc2VkUmVzcG9uc2ViBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("Cht2ZW5uaXIvY29uc29sZS92MS9hcGkucHJvdG8SEXZlbm5pci5jb25zb2xlLnYxIvACCghBcGlHcmFudBIKCgJpZBgBIAEoCRIMCgR0ZWFtGAIgASgJEgwKBG5hbWUYAyABKAkSDQoFZ3JvdXAYBCABKAkSDwoHdXNlcl9pZBgFIAEoCRISCgp1c2VyX2VtYWlsGAYgASgJEgsKA2JvdBgHIAEoCBISCgpwZXJfbWludXRlGAggASgFEhQKDGRlZmF1bHRfcmF0ZRgJIAEoCBISCgpncmFudGVkX2J5GAogASgJEhkKEWFjY2Vzc19yZXF1ZXN0X2lkGAsgASgJEi4KCmNyZWF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnJldm9rZWRfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCnJldm9rZWRfYnkYDyABKAki+gIKEEFwaUFjY2Vzc1JlcXVlc3QSCgoCaWQYASABKAkSDAoEdGVhbRgCIAEoCRIMCgRuYW1lGAMgASgJEg8KB3VzZXJfaWQYBCABKAkSEgoKdXNlcl9lbWFpbBgFIAEoCRILCgNib3QYBiABKAgSFAoMcmVxdWVzdGVkX2J5GAcgASgJEg4KBnJlYXNvbhgIIAEoCRI3CgVzdGF0ZRgJIAEoDjIoLnZlbm5pci5jb25zb2xlLnYxLkFwaUFjY2Vzc1JlcXVlc3RTdGF0ZRISCgpkZWNpZGVkX2J5GAogASgJEhcKD2RlY2lzaW9uX3JlYXNvbhgLIAEoCRIQCghncmFudF9pZBgMIAEoCRIuCgpjcmVhdGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpkZWNpZGVkX2F0GA4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIOCgZncm91cHMYDyADKAkiWAoXUmVxdWVzdEFwaUFjY2Vzc1JlcXVlc3QSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEg4KBnJlYXNvbhgDIAEoCRIRCglib3RfZW1haWwYBCABKAkifAoYUmVxdWVzdEFwaUFjY2Vzc1Jlc3BvbnNlEjQKB3JlcXVlc3QYASABKAsyIy52ZW5uaXIuY29uc29sZS52MS5BcGlBY2Nlc3NSZXF1ZXN0EioKBWdyYW50GAIgASgLMhsudmVubmlyLmNvbnNvbGUudjEuQXBpR3JhbnQiPAofV2l0aGRyYXdBcGlBY2Nlc3NSZXF1ZXN0UmVxdWVzdBIZChFhY2Nlc3NfcmVxdWVzdF9pZBgBIAEoCSIiCiBXaXRoZHJhd0FwaUFjY2Vzc1JlcXVlc3RSZXNwb25zZSJ+Ch1EZWNpZGVBcGlBY2Nlc3NSZXF1ZXN0UmVxdWVzdBIZChFhY2Nlc3NfcmVxdWVzdF9pZBgBIAEoCRIPCgdhcHByb3ZlGAIgASgIEg0KBWdyb3VwGAMgASgJEhIKCnBlcl9taW51dGUYBCABKAUSDgoGcmVhc29uGAUgASgJIoIBCh5EZWNpZGVBcGlBY2Nlc3NSZXF1ZXN0UmVzcG9uc2USNAoHcmVxdWVzdBgBIAEoCzIjLnZlbm5pci5jb25zb2xlLnYxLkFwaUFjY2Vzc1JlcXVlc3QSKgoFZ3JhbnQYAiABKAsyGy52ZW5uaXIuY29uc29sZS52MS5BcGlHcmFudCJiChJBZGRBcGlHcmFudFJlcXVlc3QSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWdyb3VwGAMgASgJEg0KBWVtYWlsGAQgASgJEhIKCnBlcl9taW51dGUYBSABKAUiQQoTQWRkQXBpR3JhbnRSZXNwb25zZRIqCgVncmFudBgBIAEoCzIbLnZlbm5pci5jb25zb2xlLnYxLkFwaUdyYW50Ij4KFlNldEFwaUdyYW50UmF0ZVJlcXVlc3QSEAoIZ3JhbnRfaWQYASABKAkSEgoKcGVyX21pbnV0ZRgCIAEoBSJFChdTZXRBcGlHcmFudFJhdGVSZXNwb25zZRIqCgVncmFudBgBIAEoCzIbLnZlbm5pci5jb25zb2xlLnYxLkFwaUdyYW50IjkKFVJldm9rZUFwaUdyYW50UmVxdWVzdBIQCghncmFudF9pZBgBIAEoCRIOCgZyZWFzb24YAiABKAkiGAoWUmV2b2tlQXBpR3JhbnRSZXNwb25zZSIyChRMaXN0QXBpQWNjZXNzUmVxdWVzdBIMCgR0ZWFtGAEgASgJEgwKBG5hbWUYAiABKAkijwEKFUxpc3RBcGlBY2Nlc3NSZXNwb25zZRIrCgZncmFudHMYASADKAsyGy52ZW5uaXIuY29uc29sZS52MS5BcGlHcmFudBI1CghyZXF1ZXN0cxgCIAMoCzIjLnZlbm5pci5jb25zb2xlLnYxLkFwaUFjY2Vzc1JlcXVlc3QSEgoKc2hhcmVfd2l0aBgDIAMoCSKiAQoLTXlBcGlBY2Nlc3MSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEiwKA3ZpYRgDIAEoDjIfLnZlbm5pci5jb25zb2xlLnYxLkFwaUFjY2Vzc1ZpYRIUCgxjYWxsaW5nX3RlYW0YBCABKAkSDQoFZ3JvdXAYBSABKAkSEAoIZ3JhbnRfaWQYBiABKAkSEgoKcGVyX21pbnV0ZRgHIAEoBSIYChZMaXN0TXlBcGlBY2Nlc3NSZXF1ZXN0IoABChdMaXN0TXlBcGlBY2Nlc3NSZXNwb25zZRIuCgZhY2Nlc3MYASADKAsyHi52ZW5uaXIuY29uc29sZS52MS5NeUFwaUFjY2VzcxI1CghyZXF1ZXN0cxgCIAMoCzIjLnZlbm5pci5jb25zb2xlLnYxLkFwaUFjY2Vzc1JlcXVlc3QiKwobTGlzdFRlYW1Cb3RBcGlBY2Nlc3NSZXF1ZXN0EgwKBHRlYW0YASABKAkiggEKHExpc3RUZWFtQm90QXBpQWNjZXNzUmVzcG9uc2USKwoGZ3JhbnRzGAEgAygLMhsudmVubmlyLmNvbnNvbGUudjEuQXBpR3JhbnQSNQoIcmVxdWVzdHMYAiADKAsyIy52ZW5uaXIuY29uc29sZS52MS5BcGlBY2Nlc3NSZXF1ZXN0IqcGCgpBcGlQcm9kdWN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkSEwoLZGVzY3JpcHRpb24YBCABKAkSKgoFc3RhdGUYBSABKA4yGy52ZW5uaXIuY29uc29sZS52MS5BcGlTdGF0ZRITCgtoZWxkX3JlYXNvbhgGIAEoCRIWCg5wYXVzZWRfbWVzc2FnZRgHIAEoCRIQCghtYXlfY2FsbBgIIAEoCBISCgpzaGFyZV93aXRoGAkgAygJEg4KBmhpZGRlbhgKIAEoCBISCgpkZXByZWNhdGVkGAsgASgJEhAKCGludGVybmV0GAwgASgIEgsKA3VybBgNIAEoCRISCgpwdWJsaWNfdXJsGA4gASgJEjEKCWVuZHBvaW50cxgPIAMoCzIeLnZlbm5pci5jb25zb2xlLnYxLkFwaUVuZHBvaW50EhIKCnBlcl9taW51dGUYECABKAUSFwoPdGltZW91dF9zZWNvbmRzGBEgASgFEhkKEW1heF9yZXF1ZXN0X2J5dGVzGBIgASgFEhMKC3NvdXJjZV9wYXRoGBMgASgJEhMKC2JhY2tlbmRfdXJsGBQgASgJEhQKDGJhY2tlbmRfYXV0aBgVIAEoCRISCgpzcGVjX3RpdGxlGBYgASgJEhQKDHNwZWNfdmVyc2lvbhgXIAEoCRIaChJhc2tfZm9yX2FjY2Vzc191cmwYGCABKAkSDwoHcHJvYmxlbRgZIAEoCRI0ChBwcm9ibGVtX2ZvdW5kX2F0GBogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCgZsaW1pdHMYGyADKAsyHC52ZW5uaXIuY29uc29sZS52MS5UZWFtTGltaXQSGgoSZGVmYXVsdF9wZXJfbWludXRlGBwgASgFEhwKFGRlZmF1bHRfZnJvbV9nYXRld2F5GB0gASgIEjMKCmFjY2Vzc192aWEYHiABKA4yHy52ZW5uaXIuY29uc29sZS52MS5BcGlBY2Nlc3NWaWESFwoPYWNjZXNzX3JlcXVlc3RzGB8gASgJIi0KCVRlYW1MaW1pdBIMCgR0ZWFtGAEgASgJEhIKCnBlcl9taW51dGUYAiABKAUiPAoLQXBpRW5kcG9pbnQSDgoGbWV0aG9kGAEgASgJEgwKBHBhdGgYAiABKAkSDwoHc3VtbWFyeRgDIAEoCSIRCg9MaXN0QXBpc1JlcXVlc3QiPwoQTGlzdEFwaXNSZXNwb25zZRIrCgRhcGlzGAEgAygLMh0udmVubmlyLmNvbnNvbGUudjEuQXBpUHJvZHVjdCIrCg1HZXRBcGlSZXF1ZXN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCSJNCg5HZXRBcGlSZXNwb25zZRIqCgNhcGkYASABKAsyHS52ZW5uaXIuY29uc29sZS52MS5BcGlQcm9kdWN0Eg8KB29wZW5hcGkYAiABKAkiPgoPUGF1c2VBcGlSZXF1ZXN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCRIPCgdtZXNzYWdlGAMgASgJIhIKEFBhdXNlQXBpUmVzcG9uc2UiLgoQUmVzdW1lQXBpUmVxdWVzdBIMCgR0ZWFtGAEgASgJEgwKBG5hbWUYAiABKAkiEwoRUmVzdW1lQXBpUmVzcG9uc2UiQQoUR2V0QXBpVHJhZmZpY1JlcXVlc3QSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWhvdXJzGAMgASgFIoACChVHZXRBcGlUcmFmZmljUmVzcG9uc2USEAoIcmVxdWVzdHMYASABKAMSEQoJZm9yd2FyZGVkGAIgASgDEg8KB3N0b3BwZWQYAyABKAMSFgoOYmFja2VuZF9lcnJvcnMYBCABKAMSNQoJZW5kcG9pbnRzGAUgAygLMiIudmVubmlyLmNvbnNvbGUudjEuRW5kcG9pbnRUcmFmZmljEjMKB2Jsb2NrZWQYBiADKAsyIi52ZW5uaXIuY29uc29sZS52MS5CbG9ja2VkUmVxdWVzdHMSLQoFdGVhbXMYByADKAsyHi52ZW5uaXIuY29uc29sZS52MS5UZWFtVHJhZmZpYyKEAQoPRW5kcG9pbnRUcmFmZmljEhAKCGVuZHBvaW50GAEgASgJEhAKCHJlcXVlc3RzGAIgASgDEg8KB2ludmFsaWQYAyABKAMSEwoLYmFja2VuZF80eHgYBCABKAMSEwoLYmFja2VuZF81eHgYBSABKAMSEgoKYXZlcmFnZV9tcxgGIAEoAyJqCg9CbG9ja2VkUmVxdWVzdHMSDwoHcmVxdWVzdBgBIAEoCRINCgVjb3VudBgCIAEoAxINCgV0ZWFtcxgDIAMoCRIoCgRsYXN0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJgCgtUZWFtVHJhZmZpYxIMCgR0ZWFtGAEgASgJEhAKCHJlcXVlc3RzGAIgASgDEhcKD3BlYWtfcGVyX21pbnV0ZRgDIAEoAxIYChBsaW1pdF9wZXJfbWludXRlGAQgASgFIhMKEUdldEdhdGV3YXlSZXF1ZXN0IqgCChJHZXRHYXRld2F5UmVzcG9uc2USDwoHZW5hYmxlZBgBIAEoCBIVCg1iYWNrZW5kX2hvc3RzGAIgAygJEhYKDmludGVybmV0X3RlYW1zGAMgAygJEgsKA3VybBgEIAEoCRISCgpwdWJsaWNfdXJsGAUgASgJEhYKDmNsb3NlZF9tZXNzYWdlGAYgASgJEhEKCWNsb3NlZF9ieRgHIAEoCRItCgljbG9zZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEgwKBGFwaXMYCSABKAUSFAoMcmVxdWVzdHNfMjRoGAogASgDEjMKB3JlZnVzZWQYCyADKAsyIi52ZW5uaXIuY29uc29sZS52MS5SZWZ1c2VkUmVxdWVzdHMiQQoPUmVmdXNlZFJlcXVlc3RzEg8KB291dGNvbWUYASABKAkSDQoFY291bnQYAiABKAMSDgoGbW9zdGx5GAMgASgJIioKF1NldEdhdGV3YXlDbG9zZWRSZXF1ZXN0Eg8KB21lc3NhZ2UYASABKAkiGgoYU2V0R2F0ZXdheUNsb3NlZFJlc3BvbnNlKpYBCgxBcGlBY2Nlc3NWaWESHgoaQVBJX0FDQ0VTU19WSUFfVU5TUEVDSUZJRUQQABIXChNBUElfQUNDRVNTX1ZJQV9URUFNEAESFwoTQVBJX0FDQ0VTU19WSUFfVVNFUhACEhgKFEFQSV9BQ0NFU1NfVklBX0dST1VQEAMSGgoWQVBJX0FDQ0VTU19WSUFfQ0FUQUxPRxAEKtwBChVBcGlBY2Nlc3NSZXF1ZXN0U3RhdGUSKAokQVBJX0FDQ0VTU19SRVFVRVNUX1NUQVRFX1VOU1BFQ0lGSUVEEAASJAogQVBJX0FDQ0VTU19SRVFVRVNUX1NUQVRFX1dBSVRJTkcQARIkCiBBUElfQUNDRVNTX1JFUVVFU1RfU1RBVEVfR1JBTlRFRBACEiUKIUFQSV9BQ0NFU1NfUkVRVUVTVF9TVEFURV9ERUNMSU5FRBADEiYKIkFQSV9BQ0NFU1NfUkVRVUVTVF9TVEFURV9XSVRIRFJBV04QBCp+CghBcGlTdGF0ZRIZChVBUElfU1RBVEVfVU5TUEVDSUZJRUQQABISCg5BUElfU1RBVEVfTElWRRABEhIKDkFQSV9TVEFURV9IRUxEEAISFAoQQVBJX1NUQVRFX1BBVVNFRBADEhkKFUFQSV9TVEFURV9VTkFWQUlMQUJMRRAEMpQNCgpBcGlTZXJ2aWNlElgKCExpc3RBcGlzEiIudmVubmlyLmNvbnNvbGUudjEuTGlzdEFwaXNSZXF1ZXN0GiMudmVubmlyLmNvbnNvbGUudjEuTGlzdEFwaXNSZXNwb25zZSIDkAIBElIKBkdldEFwaRIgLnZlbm5pci5jb25zb2xlLnYxLkdldEFwaVJlcXVlc3QaIS52ZW5uaXIuY29uc29sZS52MS5HZXRBcGlSZXNwb25zZSIDkAIBElMKCFBhdXNlQXBpEiIudmVubmlyLmNvbnNvbGUudjEuUGF1c2VBcGlSZXF1ZXN0GiMudmVubmlyLmNvbnNvbGUudjEuUGF1c2VBcGlSZXNwb25zZRJWCglSZXN1bWVBcGkSIy52ZW5uaXIuY29uc29sZS52MS5SZXN1bWVBcGlSZXF1ZXN0GiQudmVubmlyLmNvbnNvbGUudjEuUmVzdW1lQXBpUmVzcG9uc2USZwoNR2V0QXBpVHJhZmZpYxInLnZlbm5pci5jb25zb2xlLnYxLkdldEFwaVRyYWZmaWNSZXF1ZXN0GigudmVubmlyLmNvbnNvbGUudjEuR2V0QXBpVHJhZmZpY1Jlc3BvbnNlIgOQAgESXgoKR2V0R2F0ZXdheRIkLnZlbm5pci5jb25zb2xlLnYxLkdldEdhdGV3YXlSZXF1ZXN0GiUudmVubmlyLmNvbnNvbGUudjEuR2V0R2F0ZXdheVJlc3BvbnNlIgOQAgESawoQU2V0R2F0ZXdheUNsb3NlZBIqLnZlbm5pci5jb25zb2xlLnYxLlNldEdhdGV3YXlDbG9zZWRSZXF1ZXN0GisudmVubmlyLmNvbnNvbGUudjEuU2V0R2F0ZXdheUNsb3NlZFJlc3BvbnNlEmsKEFJlcXVlc3RBcGlBY2Nlc3MSKi52ZW5uaXIuY29uc29sZS52MS5SZXF1ZXN0QXBpQWNjZXNzUmVxdWVzdBorLnZlbm5pci5jb25zb2xlLnYxLlJlcXVlc3RBcGlBY2Nlc3NSZXNwb25zZRKDAQoYV2l0aGRyYXdBcGlBY2Nlc3NSZXF1ZXN0EjIudmVubmlyLmNvbnNvbGUudjEuV2l0aGRyYXdBcGlBY2Nlc3NSZXF1ZXN0UmVxdWVzdBozLnZlbm5pci5jb25zb2xlLnYxLldpdGhkcmF3QXBpQWNjZXNzUmVxdWVzdFJlc3BvbnNlEn0KFkRlY2lkZUFwaUFjY2Vzc1JlcXVlc3QSMC52ZW5uaXIuY29uc29sZS52MS5EZWNpZGVBcGlBY2Nlc3NSZXF1ZXN0UmVxdWVzdBoxLnZlbm5pci5jb25zb2xlLnYxLkRlY2lkZUFwaUFjY2Vzc1JlcXVlc3RSZXNwb25zZRJcCgtBZGRBcGlHcmFudBIlLnZlbm5pci5jb25zb2xlLnYxLkFkZEFwaUdyYW50UmVxdWVzdBomLnZlbm5pci5jb25zb2xlLnYxLkFkZEFwaUdyYW50UmVzcG9uc2USaAoPU2V0QXBpR3JhbnRSYXRlEikudmVubmlyLmNvbnNvbGUudjEuU2V0QXBpR3JhbnRSYXRlUmVxdWVzdBoqLnZlbm5pci5jb25zb2xlLnYxLlNldEFwaUdyYW50UmF0ZVJlc3BvbnNlEmUKDlJldm9rZUFwaUdyYW50EigudmVubmlyLmNvbnNvbGUudjEuUmV2b2tlQXBpR3JhbnRSZXF1ZXN0GikudmVubmlyLmNvbnNvbGUudjEuUmV2b2tlQXBpR3JhbnRSZXNwb25zZRJnCg1MaXN0QXBpQWNjZXNzEicudmVubmlyLmNvbnNvbGUudjEuTGlzdEFwaUFjY2Vzc1JlcXVlc3QaKC52ZW5uaXIuY29uc29sZS52MS5MaXN0QXBpQWNjZXNzUmVzcG9uc2UiA5ACARJtCg9MaXN0TXlBcGlBY2Nlc3MSKS52ZW5uaXIuY29uc29sZS52MS5MaXN0TXlBcGlBY2Nlc3NSZXF1ZXN0GioudmVubmlyLmNvbnNvbGUudjEuTGlzdE15QXBpQWNjZXNzUmVzcG9uc2UiA5ACARJ8ChRMaXN0VGVhbUJvdEFwaUFjY2VzcxIuLnZlbm5pci5jb25zb2xlLnYxLkxpc3RUZWFtQm90QXBpQWNjZXNzUmVxdWVzdBovLnZlbm5pci5jb25zb2xlLnYxLkxpc3RUZWFtQm90QXBpQWNjZXNzUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_google_protobuf_timestamp]);
+
+/**
+ * Describes the message vennir.console.v1.ApiGrant.
+ * Use `create(ApiGrantSchema)` to create a new message.
+ */
+export const ApiGrantSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 0);
+
+/**
+ * Describes the message vennir.console.v1.ApiAccessRequest.
+ * Use `create(ApiAccessRequestSchema)` to create a new message.
+ */
+export const ApiAccessRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 1);
+
+/**
+ * Describes the message vennir.console.v1.RequestApiAccessRequest.
+ * Use `create(RequestApiAccessRequestSchema)` to create a new message.
+ */
+export const RequestApiAccessRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 2);
+
+/**
+ * Describes the message vennir.console.v1.RequestApiAccessResponse.
+ * Use `create(RequestApiAccessResponseSchema)` to create a new message.
+ */
+export const RequestApiAccessResponseSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 3);
+
+/**
+ * Describes the message vennir.console.v1.WithdrawApiAccessRequestRequest.
+ * Use `create(WithdrawApiAccessRequestRequestSchema)` to create a new message.
+ */
+export const WithdrawApiAccessRequestRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 4);
+
+/**
+ * Describes the message vennir.console.v1.WithdrawApiAccessRequestResponse.
+ * Use `create(WithdrawApiAccessRequestResponseSchema)` to create a new message.
+ */
+export const WithdrawApiAccessRequestResponseSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 5);
+
+/**
+ * Describes the message vennir.console.v1.DecideApiAccessRequestRequest.
+ * Use `create(DecideApiAccessRequestRequestSchema)` to create a new message.
+ */
+export const DecideApiAccessRequestRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 6);
+
+/**
+ * Describes the message vennir.console.v1.DecideApiAccessRequestResponse.
+ * Use `create(DecideApiAccessRequestResponseSchema)` to create a new message.
+ */
+export const DecideApiAccessRequestResponseSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 7);
+
+/**
+ * Describes the message vennir.console.v1.AddApiGrantRequest.
+ * Use `create(AddApiGrantRequestSchema)` to create a new message.
+ */
+export const AddApiGrantRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 8);
+
+/**
+ * Describes the message vennir.console.v1.AddApiGrantResponse.
+ * Use `create(AddApiGrantResponseSchema)` to create a new message.
+ */
+export const AddApiGrantResponseSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 9);
+
+/**
+ * Describes the message vennir.console.v1.SetApiGrantRateRequest.
+ * Use `create(SetApiGrantRateRequestSchema)` to create a new message.
+ */
+export const SetApiGrantRateRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 10);
+
+/**
+ * Describes the message vennir.console.v1.SetApiGrantRateResponse.
+ * Use `create(SetApiGrantRateResponseSchema)` to create a new message.
+ */
+export const SetApiGrantRateResponseSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 11);
+
+/**
+ * Describes the message vennir.console.v1.RevokeApiGrantRequest.
+ * Use `create(RevokeApiGrantRequestSchema)` to create a new message.
+ */
+export const RevokeApiGrantRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 12);
+
+/**
+ * Describes the message vennir.console.v1.RevokeApiGrantResponse.
+ * Use `create(RevokeApiGrantResponseSchema)` to create a new message.
+ */
+export const RevokeApiGrantResponseSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 13);
+
+/**
+ * Describes the message vennir.console.v1.ListApiAccessRequest.
+ * Use `create(ListApiAccessRequestSchema)` to create a new message.
+ */
+export const ListApiAccessRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 14);
+
+/**
+ * Describes the message vennir.console.v1.ListApiAccessResponse.
+ * Use `create(ListApiAccessResponseSchema)` to create a new message.
+ */
+export const ListApiAccessResponseSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 15);
+
+/**
+ * Describes the message vennir.console.v1.MyApiAccess.
+ * Use `create(MyApiAccessSchema)` to create a new message.
+ */
+export const MyApiAccessSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 16);
+
+/**
+ * Describes the message vennir.console.v1.ListMyApiAccessRequest.
+ * Use `create(ListMyApiAccessRequestSchema)` to create a new message.
+ */
+export const ListMyApiAccessRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 17);
+
+/**
+ * Describes the message vennir.console.v1.ListMyApiAccessResponse.
+ * Use `create(ListMyApiAccessResponseSchema)` to create a new message.
+ */
+export const ListMyApiAccessResponseSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 18);
+
+/**
+ * Describes the message vennir.console.v1.ListTeamBotApiAccessRequest.
+ * Use `create(ListTeamBotApiAccessRequestSchema)` to create a new message.
+ */
+export const ListTeamBotApiAccessRequestSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 19);
+
+/**
+ * Describes the message vennir.console.v1.ListTeamBotApiAccessResponse.
+ * Use `create(ListTeamBotApiAccessResponseSchema)` to create a new message.
+ */
+export const ListTeamBotApiAccessResponseSchema = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 20);
 
 /**
  * Describes the message vennir.console.v1.ApiProduct.
  * Use `create(ApiProductSchema)` to create a new message.
  */
 export const ApiProductSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 0);
+  messageDesc(file_vennir_console_v1_api, 21);
 
 /**
  * Describes the message vennir.console.v1.TeamLimit.
  * Use `create(TeamLimitSchema)` to create a new message.
  */
 export const TeamLimitSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 1);
+  messageDesc(file_vennir_console_v1_api, 22);
 
 /**
  * Describes the message vennir.console.v1.ApiEndpoint.
  * Use `create(ApiEndpointSchema)` to create a new message.
  */
 export const ApiEndpointSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 2);
+  messageDesc(file_vennir_console_v1_api, 23);
 
 /**
  * Describes the message vennir.console.v1.ListApisRequest.
  * Use `create(ListApisRequestSchema)` to create a new message.
  */
 export const ListApisRequestSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 3);
+  messageDesc(file_vennir_console_v1_api, 24);
 
 /**
  * Describes the message vennir.console.v1.ListApisResponse.
  * Use `create(ListApisResponseSchema)` to create a new message.
  */
 export const ListApisResponseSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 4);
+  messageDesc(file_vennir_console_v1_api, 25);
 
 /**
  * Describes the message vennir.console.v1.GetApiRequest.
  * Use `create(GetApiRequestSchema)` to create a new message.
  */
 export const GetApiRequestSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 5);
+  messageDesc(file_vennir_console_v1_api, 26);
 
 /**
  * Describes the message vennir.console.v1.GetApiResponse.
  * Use `create(GetApiResponseSchema)` to create a new message.
  */
 export const GetApiResponseSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 6);
+  messageDesc(file_vennir_console_v1_api, 27);
 
 /**
  * Describes the message vennir.console.v1.PauseApiRequest.
  * Use `create(PauseApiRequestSchema)` to create a new message.
  */
 export const PauseApiRequestSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 7);
+  messageDesc(file_vennir_console_v1_api, 28);
 
 /**
  * Describes the message vennir.console.v1.PauseApiResponse.
  * Use `create(PauseApiResponseSchema)` to create a new message.
  */
 export const PauseApiResponseSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 8);
+  messageDesc(file_vennir_console_v1_api, 29);
 
 /**
  * Describes the message vennir.console.v1.ResumeApiRequest.
  * Use `create(ResumeApiRequestSchema)` to create a new message.
  */
 export const ResumeApiRequestSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 9);
+  messageDesc(file_vennir_console_v1_api, 30);
 
 /**
  * Describes the message vennir.console.v1.ResumeApiResponse.
  * Use `create(ResumeApiResponseSchema)` to create a new message.
  */
 export const ResumeApiResponseSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 10);
+  messageDesc(file_vennir_console_v1_api, 31);
 
 /**
  * Describes the message vennir.console.v1.GetApiTrafficRequest.
  * Use `create(GetApiTrafficRequestSchema)` to create a new message.
  */
 export const GetApiTrafficRequestSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 11);
+  messageDesc(file_vennir_console_v1_api, 32);
 
 /**
  * Describes the message vennir.console.v1.GetApiTrafficResponse.
  * Use `create(GetApiTrafficResponseSchema)` to create a new message.
  */
 export const GetApiTrafficResponseSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 12);
+  messageDesc(file_vennir_console_v1_api, 33);
 
 /**
  * Describes the message vennir.console.v1.EndpointTraffic.
  * Use `create(EndpointTrafficSchema)` to create a new message.
  */
 export const EndpointTrafficSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 13);
+  messageDesc(file_vennir_console_v1_api, 34);
 
 /**
  * Describes the message vennir.console.v1.BlockedRequests.
  * Use `create(BlockedRequestsSchema)` to create a new message.
  */
 export const BlockedRequestsSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 14);
+  messageDesc(file_vennir_console_v1_api, 35);
 
 /**
  * Describes the message vennir.console.v1.TeamTraffic.
  * Use `create(TeamTrafficSchema)` to create a new message.
  */
 export const TeamTrafficSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 15);
+  messageDesc(file_vennir_console_v1_api, 36);
 
 /**
  * Describes the message vennir.console.v1.GetGatewayRequest.
  * Use `create(GetGatewayRequestSchema)` to create a new message.
  */
 export const GetGatewayRequestSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 16);
+  messageDesc(file_vennir_console_v1_api, 37);
 
 /**
  * Describes the message vennir.console.v1.GetGatewayResponse.
  * Use `create(GetGatewayResponseSchema)` to create a new message.
  */
 export const GetGatewayResponseSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 17);
+  messageDesc(file_vennir_console_v1_api, 38);
 
 /**
  * Describes the message vennir.console.v1.RefusedRequests.
  * Use `create(RefusedRequestsSchema)` to create a new message.
  */
 export const RefusedRequestsSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 18);
+  messageDesc(file_vennir_console_v1_api, 39);
 
 /**
  * Describes the message vennir.console.v1.SetGatewayClosedRequest.
  * Use `create(SetGatewayClosedRequestSchema)` to create a new message.
  */
 export const SetGatewayClosedRequestSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 19);
+  messageDesc(file_vennir_console_v1_api, 40);
 
 /**
  * Describes the message vennir.console.v1.SetGatewayClosedResponse.
  * Use `create(SetGatewayClosedResponseSchema)` to create a new message.
  */
 export const SetGatewayClosedResponseSchema = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 20);
+  messageDesc(file_vennir_console_v1_api, 41);
+
+/**
+ * Describes the enum vennir.console.v1.ApiAccessVia.
+ */
+export const ApiAccessViaSchema = /*@__PURE__*/
+  enumDesc(file_vennir_console_v1_api, 0);
+
+/**
+ * How a caller may call an API (the gateway's rule, in its order).
+ *
+ * @generated from enum vennir.console.v1.ApiAccessVia
+ */
+export const ApiAccessVia = /*@__PURE__*/
+  tsEnum(ApiAccessViaSchema);
+
+/**
+ * Describes the enum vennir.console.v1.ApiAccessRequestState.
+ */
+export const ApiAccessRequestStateSchema = /*@__PURE__*/
+  enumDesc(file_vennir_console_v1_api, 1);
+
+/**
+ * @generated from enum vennir.console.v1.ApiAccessRequestState
+ */
+export const ApiAccessRequestState = /*@__PURE__*/
+  tsEnum(ApiAccessRequestStateSchema);
 
 /**
  * Describes the enum vennir.console.v1.ApiState.
  */
 export const ApiStateSchema = /*@__PURE__*/
-  enumDesc(file_vennir_console_v1_api, 0);
+  enumDesc(file_vennir_console_v1_api, 2);
 
 /**
  * @generated from enum vennir.console.v1.ApiState
@@ -180,9 +353,21 @@ export const ApiState = /*@__PURE__*/
  * from its team's catalog (apis/<name>/api.yaml); pausing one is the only
  * change made here.
  *
- * Everyone signed in sees the APIs that aren't hidden; those shared with
- * one of their teams they may call (may_call). The backend's address and
- * how the gateway signs in there are shown to the API's own team only.
+ * Everyone signed in sees the APIs that aren't hidden; they may call one
+ * (may_call) when it's their own team's, when it's granted to them or to a
+ * single sign-on group they're in, or, for this release, when its
+ * api.yaml's shareWith names one of their teams (decision 26). The
+ * backend's address and how the gateway signs in there are shown to the
+ * API's own team only.
+ *
+ * Access (decision 26): each API has grants, to a group (each person in it)
+ * or to one user (a person or a bot), each with its rate. Only the API's
+ * team's maintainers add grants or change their rates. A person asks for
+ * access for themselves; a maintainer of a bot's team asks for the bot.
+ * The API's maintainers approve (granting the person, or one of their
+ * groups) or decline. Revoking: the API's maintainers, an admin, the
+ * person a grant names, or the maintainers of the bot it names. Every
+ * change is audited and told to whoever it's for and the API's maintainers.
  *
  * @generated from service vennir.console.v1.ApiService
  */

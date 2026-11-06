@@ -54,8 +54,16 @@ func (c *Catalog) AllAPIs() []*API {
 	return apis
 }
 
+// ShareWithDeprecated is the warning for an api.yaml with shareWith, which
+// each install's grants replace (decision 26): this release still lets its
+// teams call, and the next drops it.
+const ShareWithDeprecated = "shareWith is deprecated and goes in the next release: " +
+	"each install's API grants replace it. Its teams still call this release; " +
+	"grant the people and bots that call it in the console, then remove shareWith " +
+	"(access.requests says how requests for access are answered)"
+
 // ValidateAPIs checks every API: api.yaml against its schema and its
-// folder, and its OpenAPI file (openapiProblems).
+// folder, and its OpenAPI file (openapiProblems), and warns of shareWith.
 func (c *Catalog) ValidateAPIs() bool {
 	ok := true
 	for _, a := range c.AllAPIs() {
@@ -65,6 +73,9 @@ func (c *Catalog) ValidateAPIs() bool {
 			c.errorAt(path, p)
 		}
 		ok = ok && len(problems) == 0
+		if _, shared := a.Spec["shareWith"]; shared {
+			c.warnAt(path, ShareWithDeprecated)
+		}
 	}
 	return ok
 }
@@ -326,6 +337,10 @@ func (c *Catalog) releaseAPIs() ([]*catalogv1.Api, error) {
 			TimeoutSeconds:  30,
 			MaxRequestBytes: 1 << 20,
 			Path:            c.rel(filepath.Join(a.Dir, "api.yaml")),
+			AccessRequests:  "approval",
+		}
+		if access, ok := a.Spec["access"].(map[string]any); ok {
+			api.AccessRequests = or(text(access, "requests"), "approval")
 		}
 		if t := text(a.Spec, "timeout"); t != "" {
 			n, _ := strconv.Atoi(strings.TrimSuffix(t, "s"))

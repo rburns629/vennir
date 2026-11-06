@@ -16,9 +16,13 @@
 //     for a hidden or paused API: before sign-in it's as one that isn't
 //     there, and nothing of its state is told
 //  3. the caller may see it: it isn't hidden, or it's their team's, or
-//     they're an admin; else 404, as the console's sees()
+//     they're an admin, or they may call it; else 404, as the console's sees()
 //  4. it isn't closed, paused or held, and its spec could be read; else 503
-//  5. it's shared with one of the caller's teams; else 403
+//  5. the caller may call it (accessFor: their own team's, a grant to them
+//     or to a group of theirs, or shared with one of their teams); else 403
+//     NOT_GRANTED, or 401 for an older single sign-on session whose only way
+//     in is a group's grant while groups come from a claim (it signs in
+//     again, and its groups are read)
 //  6. its body is within the API's size, and arrives within
 //     BodyReadTimeout; else 413, or 408
 //  7. its method and path are an operation in the spec; else 404, blocked:
@@ -26,7 +30,8 @@
 //  8. its parameters, headers and body fit that operation's schemas, with
 //     no query parameter or body it doesn't declare, and a body only with a
 //     Content-Type; else 400
-//  9. the calling team is within the API's rate; else 429 with Retry-After
+//  9. the caller is within their rate: their calling team's, or their
+//     grant's (a group's, each member's); else 429 with Retry-After
 //  10. forwarded, with the backend's credential minted for it, and
 //     X-Forwarded-For the gateway's own peer, or on the public listener
 //     behind a trusted proxy the address it saw (never what the caller said);
@@ -74,7 +79,8 @@ import (
 // AnsweredBy says who answered: gateway or backend.
 const AnsweredBy = "Vennir-Answered-By"
 
-// TeamHeader picks the team a caller in several calls as.
+// TeamHeader picks the team a caller in several calls as: their own or a
+// shareWith team's, for its limit. It never gives access a grant doesn't.
 const TeamHeader = "Vennir-Team"
 
 // RequestIDHeader is the gateway's id for a request, on both sides.
@@ -302,9 +308,11 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	if o.endpoint == "" {
 		o.endpoint = r.Method + " " + rest
 	}
-	if api.Hidden && !who.IsAdmin && !slices.Contains(who.Teams, api.Team) {
+	way, staleGroup := g.accessFor(who, api, r.Header.Get(TeamHeader))
+	if api.Hidden && !who.IsAdmin && !slices.Contains(who.Teams, api.Team) && (way == nil || way.grant == nil) {
 		// As the console's sees(): a hidden API is its own team's (and
-		// admins'), whatever it's shared with, and no one else hears of it.
+		// admins', and whoever a grant lets in), whatever it's shared with,
+		// and no one else hears of it.
 		return g.refuse(w, o.as("not_found"), http.StatusNotFound, "NOT_FOUND", "No such API here.")
 	}
 
@@ -328,12 +336,22 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 	}
 
 	result := o
-	callingTeam, ok := g.callingTeam(who, api, r.Header.Get(TeamHeader))
-	if !ok {
+	switch {
+	case way == nil && staleGroup && who.SSOSession:
+		// As for a team a group gave: an older single sign-on session signs
+		// in again, so its groups are read, rather than counting stale ones.
+		w.Header().Set("WWW-Authenticate", `Bearer realm="vennir"`)
+		return g.refuse(w, o.as("unauthenticated"), http.StatusUnauthorized, "UNAUTHENTICATED",
+			"Your access to this API is through a single sign-on group, and your groups were read over an hour ago: sign in again.")
+	case way == nil:
 		result.name = "forbidden"
-		return g.refuse(w, result, http.StatusForbidden, "NOT_SHARED", "This API isn't shared with your team (or not with the team in "+TeamHeader+").")
+		message := "You may not call this API: ask its team for access on its page in the console (APIs → " + api.Key() + ")."
+		if asked := r.Header.Get(TeamHeader); asked != "" {
+			message = "You may not call this API as " + asked + " (" + TeamHeader + "): it isn't your team, or not one it's shared with."
+		}
+		return g.refuse(w, result, http.StatusForbidden, "NOT_GRANTED", message)
 	}
-	result.team = callingTeam
+	result.team = way.trafficTeam()
 
 	// The validator reads the query as Go parses it, which leaves out what it
 	// can't read (a pair with a ";", a bad escape, and all of it past 10,000
@@ -411,21 +429,19 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuseWith(w, result, http.StatusBadRequest, "INVALID_REQUEST", "The request doesn't fit this API's OpenAPI document; nothing was forwarded.", describe(problems))
 	}
 
-	perMinute := api.PerMinute[callingTeam]
-	if perMinute == 0 {
-		perMinute = api.PerMinute["default"]
-	}
-	if perMinute == 0 {
-		perMinute = g.Settings.DefaultPerMinute
-	}
-	if allowed, wait := g.Limiter.Allow(api.Key()+"|"+callingTeam, perMinute, g.now()); !allowed {
+	perMinute := g.rate(api, way)
+	if allowed, wait := g.Limiter.Allow(api.Key()+"|"+way.bucket(who), perMinute, g.now()); !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds()+0.999)))
 		result.name = "limited"
-		return g.refuse(w, result, http.StatusTooManyRequests, "RATE_LIMITED", "Your team has used this API's "+strconv.Itoa(perMinute)+" requests a minute.")
+		whose := "Your team has"
+		if way.grant != nil {
+			whose = "You have"
+		}
+		return g.refuse(w, result, http.StatusTooManyRequests, "RATE_LIMITED", whose+" used this API's "+strconv.Itoa(perMinute)+" requests a minute.")
 	}
 
-	signed, err := g.Signer.Sign(caller.Claims{Subject: "user:" + who.UserID, Email: who.Email, Bot: who.IsBot, Team: callingTeam,
-		API: api.Key(), Audience: api.BackendURL.Scheme + "://" + api.BackendURL.Host, RequestID: requestID}, g.now())
+	signed, err := g.Signer.Sign(caller.Claims{Subject: "user:" + who.UserID, Email: who.Email, Bot: who.IsBot, Team: way.team,
+		Via: way.via, Group: way.group(), API: api.Key(), Audience: api.BackendURL.Scheme + "://" + api.BackendURL.Host, RequestID: requestID}, g.now())
 	if err != nil {
 		result.name = "backend_error"
 		return g.refuse(w, result, http.StatusInternalServerError, "INTERNAL", "")
@@ -509,25 +525,128 @@ func peerKey(client string) string {
 	return netip.PrefixFrom(a, 64).Masked().String()
 }
 
-// callingTeam is the team the caller calls as: the one in Vennir-Team if
-// they're in it and it may call; else their own team that owns the API;
-// else the first of theirs it's shared with.
-func (g *Gateway) callingTeam(who *auth.Caller, api *store.API, asked string) (string, bool) {
-	may := func(team string) bool {
-		return team == api.Team || slices.Contains(api.ShareWith, "*") || slices.Contains(api.ShareWith, team)
+// access is how a caller may call an API (accessFor), as Vennir-Caller's
+// via says it: "team" (its own team's), "user" (a grant names them),
+// "group" (a grant names a group of theirs) or "catalog" (shareWith names
+// a team of theirs; deprecated).
+type access struct {
+	via string
+	// team: the calling team, for "team" and "catalog".
+	team string
+	// grant: the grant, for "user" and "group".
+	grant *store.Grant
+}
+
+func (a *access) group() string {
+	if a.grant == nil {
+		return ""
+	}
+	return a.grant.Group
+}
+
+// trafficTeam is what the API's traffic counts it under: the calling team,
+// or for a grant "grant:user" (a user's) or "grant:group:<group>", never a
+// person: never a team's name either (a team's has no ":").
+func (a *access) trafficTeam() string {
+	switch {
+	case a.grant == nil:
+		return a.team
+	case a.grant.Group != "":
+		return "grant:group:" + a.grant.Group
+	}
+	return "grant:user"
+}
+
+// bucket is the rate limit's key within the API: a calling team's, a user
+// grant's, or a group grant's for each of its members.
+func (a *access) bucket(who *auth.Caller) string {
+	switch {
+	case a.grant == nil:
+		return a.team
+	case a.grant.Group != "":
+		return "grant:" + a.grant.ID + "|" + who.UserID
+	}
+	return "grant:" + a.grant.ID
+}
+
+// rate is a way's requests a minute: a calling team's limit (api.yaml's for
+// it, else its default), or a grant's own (else the API's default); the
+// gateway's default when neither says.
+func (g *Gateway) rate(api *store.API, a *access) int {
+	n := 0
+	if a.grant != nil {
+		n = a.grant.PerMinute
+	} else {
+		n = api.PerMinute[a.team]
+	}
+	if n == 0 {
+		n = api.PerMinute["default"]
+	}
+	if n == 0 {
+		n = g.Settings.DefaultPerMinute
+	}
+	return n
+}
+
+// accessFor is how the caller may call the API, or nil (decision 26; the
+// console's core/apiAccess.ts accessFor, kept in step), in this order:
+// their own team's; a grant to them (a bot's, while it's in a team that
+// isn't retired); a grant to a single sign-on group of theirs (a person's,
+// while their groups count: the best rate of them); a team of theirs
+// shareWith names. Admins are no exception. Vennir-Team (asked) picks the
+// calling team of the first and last: one of theirs that's the API's own or
+// shared with, else nil; it gives no access by itself. staleGroup: a group
+// grant would let them in, but their groups don't count now.
+func (g *Gateway) accessFor(who *auth.Caller, api *store.API, asked string) (way *access, staleGroup bool) {
+	shared := func(team string) bool {
+		return slices.Contains(api.ShareWith, "*") || slices.Contains(api.ShareWith, team)
 	}
 	if asked != "" {
-		return asked, slices.Contains(who.Teams, asked) && may(asked)
+		if !slices.Contains(who.Teams, asked) {
+			return nil, false
+		}
+		if asked == api.Team {
+			return &access{via: "team", team: asked}, false
+		}
+		if shared(asked) {
+			return &access{via: "catalog", team: asked}, false
+		}
+		return nil, false
 	}
 	if slices.Contains(who.Teams, api.Team) {
-		return api.Team, true
+		return &access{via: "team", team: api.Team}, false
 	}
-	for _, team := range who.Teams {
-		if may(team) {
-			return team, true
+	grants := g.Store.Grants(api.ID)
+	for i := range grants {
+		if grants[i].UserID != "" && grants[i].UserID == who.UserID && (!who.IsBot || len(who.Teams) > 0) {
+			return &access{via: "user", grant: &grants[i]}, false
 		}
 	}
-	return "", false
+	if !who.IsBot {
+		var best *store.Grant
+		for i := range grants {
+			gr := &grants[i]
+			if gr.Group == "" || !slices.Contains(who.Groups, gr.Group) {
+				continue
+			}
+			if best == nil || g.rate(api, &access{grant: gr}) > g.rate(api, &access{grant: best}) ||
+				g.rate(api, &access{grant: gr}) == g.rate(api, &access{grant: best}) && gr.Group < best.Group {
+				best = gr
+			}
+		}
+		if best != nil {
+			if who.GroupsCurrent {
+				return &access{via: "group", grant: best}, false
+			}
+			staleGroup = true
+		}
+	}
+	for _, team := range who.Teams {
+		if shared(team) {
+			return &access{via: "catalog", team: team}, false
+		}
+	}
+	return nil, staleGroup
 }
 
 // notInSpec: the method and path match no operation, as against a request

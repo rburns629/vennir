@@ -56,14 +56,15 @@ service NotificationService {
   }
   // Chooses which kinds are emailed to you (any of run_failed,
   // run_succeeded, approval_waiting, product_not_ready, catalog_failing,
-  // step_refused, platform_alert).
+  // step_refused, platform_alert, api_access).
   rpc SetEmailPreferences(SetEmailPreferencesRequest) returns (SetEmailPreferencesResponse);
 }
 
 message Notification {
   string id = 1;
   // run_failed, run_succeeded, approval_waiting, catalog_failing,
-  // product_not_ready, step_refused or platform_alert.
+  // product_not_ready, step_refused, platform_alert or api_access (a
+  // request for access to an API, or a grant, changed).
   string kind = 2;
   string title = 3;
   string body = 4;

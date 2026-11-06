@@ -106,6 +106,65 @@ func TestWhyAnAPICantBeServedIsRecordedUntilItCan(t *testing.T) {
 	}
 }
 
+// Each API's active grants are read whole at every refresh, so one revoked
+// stops counting at the next (decision 26), its API's row unchanged.
+func TestGrantsAreReadEachRefresh(t *testing.T) {
+	dbURL := os.Getenv("TEST_DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "postgresql://postgres@localhost/execution_console_test"
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	var teamID, apiID, userID string
+	if err := pool.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-grants-' || substr(md5(random()::text), 1, 6)) RETURNING id::text`).Scan(&teamID); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO users (email) VALUES ('gw-grants-' || gen_random_uuid() || '@example.com') RETURNING id::text`).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM teams WHERE id = $1::uuid`, teamID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE id = $1::uuid`, userID)
+	})
+	if err := pool.QueryRow(ctx, `INSERT INTO apis (team_id, name, display_name, openapi, backend_url, service_account)
+		VALUES ($1::uuid, 'orders', 'Orders', '{"openapi": "3.1.0", "info": {"title": "O", "version": "1"}, "paths": {}}', 'https://x', 'orders-api')
+		RETURNING id::text`, teamID).Scan(&apiID); err != nil {
+		t.Fatal(err)
+	}
+	var userGrant string
+	if err := pool.QueryRow(ctx, `INSERT INTO api_grants (api_id, user_id, per_minute) VALUES ($1::uuid, $2::uuid, 7) RETURNING id::text`, apiID, userID).Scan(&userGrant); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO api_grants (api_id, group_name) VALUES ($1::uuid, 'eng@example.com')`, apiID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO api_grants (api_id, group_name, revoked_at) VALUES ($1::uuid, 'gone@example.com', now())`, apiID); err != nil {
+		t.Fatal(err)
+	}
+	s := &Store{DB: pool, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	if err := s.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	got := s.Grants(apiID)
+	slices.SortFunc(got, func(a, b Grant) int { return strings.Compare(a.Group, b.Group) })
+	if len(got) != 2 || got[0] != (Grant{ID: userGrant, UserID: userID, PerMinute: 7}) || got[1].Group != "eng@example.com" || got[1].PerMinute != 0 {
+		t.Fatalf("grants = %+v", got)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE api_grants SET revoked_at = now() WHERE id = $1::uuid`, userGrant); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Grants(apiID); len(got) != 1 || got[0].Group != "eng@example.com" {
+		t.Errorf("after revoking, grants = %+v", got)
+	}
+}
+
 // Backend credential settings or limits that don't decode are a problem,
 // never "none": forwarding without the backend's credential, or the API's
 // limits, isn't what its team set up.

@@ -24,7 +24,7 @@ import { db } from "../src/db/client.js";
 import { hashPassword } from "../src/auth/password.js";
 import { newSession } from "../src/auth/plugin.js";
 import { addTeamMember, createTeam, createUser, purgeTeam, setUserPassword, teamRolesForUser } from "../src/db/queries.js";
-import { auditLog, ssoGroupMappings, ssoSettings, teamMemberships, teams, users } from "../src/db/schema.js";
+import { apiGrants, apis, auditLog, ssoGroupMappings, ssoSettings, teamMemberships, teams, userGroups, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { CLAIM_GROUPS_SESSION_SECONDS, refreshSso, resyncGoogleGroups } from "../src/sso.js";
 import { CLIENT_ID, CLIENT_SECRET, startProvider } from "./oidcProvider.js";
@@ -313,6 +313,38 @@ describe("Google Workspace groups", () => {
     spy.mockRestore();
   });
 
+  it("asks about the groups granted an API too, and keeps the person's for the gateway", async () => {
+    const [api] = await db
+      .insert(apis)
+      .values({ teamId: ids[teamA] ?? "", name: "gws-granted", displayName: "G", openapi: { openapi: "3.1.0", paths: {} }, backendUrl: "https://x.example", serviceAccount: "gws-granted-api" })
+      .returning();
+    await db.insert(apiGrants).values({ apiId: api?.id ?? "", groupName: `callers@${domain}` });
+    const asked: string[] = [];
+    const real = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith("http://metadata.google.internal/")) return Promise.resolve(Response.json({ access_token: "t" }));
+      if (url.startsWith("https://cloudidentity.googleapis.com/v1/groups:lookup")) {
+        const group = new URL(url).searchParams.get("groupKey.id") ?? "";
+        asked.push(group);
+        if (group === `ops@${domain}`) return Promise.resolve(Response.json({ name: "groups/ops1" }));
+        return Promise.resolve(group === `callers@${domain}` ? Response.json({ name: "groups/callers1" }) : new Response("{}", { status: 404 }));
+      }
+      if (url.includes("/memberships:checkTransitiveMembership")) {
+        return Promise.resolve(Response.json({ hasMembership: ours(url) && url.includes("groups/callers1") }));
+      }
+      return real(input, init);
+    });
+    await resyncGoogleGroups(app.log);
+    expect(asked).toEqual(expect.arrayContaining([`ops@${domain}`, `callers@${domain}`]));
+    const [gws] = await db.select().from(users).where(eq(users.email, `gws@${domain}`));
+    const kept = await db.select({ g: userGroups.groupName }).from(userGroups).where(eq(userGroups.userId, gws?.id ?? ""));
+    expect(kept.map((r) => r.g)).toEqual([`callers@${domain}`]);
+    // Out of ops now: out of its team, as before.
+    expect(await teamsOf(`gws@${domain}`)).toEqual({});
+    await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
+  });
+
   it("skip someone deleted while their groups are read, and carry on with everyone else", async () => {
     const gone = await createUser(`gone@${domain}`, null);
     await db.update(users).set({ oidcSubject: `sub-gone-${prefix}` }).where(eq(users.id, gone.id));
@@ -409,6 +441,45 @@ describe("a session that groups from a claim gave a team", () => {
     // A password an admin set: its session never counts the group's team.
     await setUserPassword(id, await hashPassword(PASSWORD), false);
     expect(await teamsSeen(await people.signIn(`hourly@${domain}`))).toEqual([teamC]);
+  });
+
+  it("keeps the person's groups at each sign-in, and a group's grant to call an API counts as a group's team does", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const ttl = sessionTtlSeconds(config.jwtTtl);
+    // An API of team A's, granted to a group (decision 26).
+    const [api] = await db
+      .insert(apis)
+      .values({ teamId: ids[teamA] ?? "", name: "granted", displayName: "Granted", openapi: { openapi: "3.1.0", paths: {} }, backendUrl: "https://x.example", serviceAccount: "granted-api" })
+      .returning();
+    await db.insert(apiGrants).values({ apiId: api?.id ?? "", groupName: "g-callers" });
+    const mayCall = async (token: string) => {
+      const listed = await call<{ apis?: { team: string; name: string; mayCall?: boolean; accessVia?: string }[] }>(token, "ApiService/ListApis");
+      if (listed.code !== "ok") return listed.code;
+      const via = (listed.body.apis ?? []).find((a) => a.team === teamA && a.name === "granted")?.accessVia;
+      return via && via !== "API_ACCESS_VIA_UNSPECIFIED" ? via : "none";
+    };
+    // Every group the claim lists is kept, lowercased; replaced at the next sign-in.
+    const first = await provider.signIn(app, person("caller", { groups: ["G-Callers", "g-other"] }));
+    const [row] = await db.select().from(users).where(eq(users.email, `caller@${domain}`));
+    const kept = async () => (await db.select({ g: userGroups.groupName }).from(userGroups).where(eq(userGroups.userId, row?.id ?? "")).orderBy(asc(userGroups.groupName))).map((r) => r.g);
+    expect(await kept()).toEqual(["g-callers", "g-other"]);
+    // A group's grant: an hour's session at most, as a group's team.
+    expect(lifetime(first.token)).toBe(Math.min(ttl, CLAIM_GROUPS_SESSION_SECONDS));
+    expect(await mayCall(first.token)).toBe("API_ACCESS_VIA_GROUP");
+    // An older single sign-on: its groups don't count (the gateway asks it to sign in again).
+    expect(await mayCall(signedInAgo(row?.id ?? "", CLAIM_GROUPS_SESSION_SECONDS + 60))).toBe("none");
+    // Groups not from a claim (Google's, read every hour): they count.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "" }));
+    expect(await mayCall(signedInAgo(row?.id ?? "", CLAIM_GROUPS_SESSION_SECONDS + 60))).toBe("API_ACCESS_VIA_GROUP");
+    // Without a source, none is kept.
+    await provider.signIn(app, person("caller"));
+    expect(await kept()).toEqual([]);
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const later = await provider.signIn(app, person("caller", { groups: ["g-other"] }));
+    expect(await kept()).toEqual(["g-other"]);
+    // In no granted group: the whole session.
+    expect(lifetime(later.token)).toBe(ttl);
+    expect(await mayCall(later.token)).toBe("none");
   });
 
   it("keeps the rule for a retired team: listed while recent, and an older session still ends", async () => {

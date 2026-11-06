@@ -206,6 +206,9 @@ erDiagram
   teams ||--o{ apis : "publishes"
   apis ||--o{ api_traffic : "counted in"
   apis ||--o| api_problems : "can't be served for"
+  apis ||--o{ api_grants : "may be called by"
+  apis ||--o{ api_access_requests : "asked for in"
+  users ||--o{ user_groups : "is in"
   users ||--o{ submitted_executions : "submitted"
   teams {
     uuid id PK
@@ -635,7 +638,8 @@ API products (decision 20): a backend a team runs, published through the gateway
 | `backend_url` | text | no | Where the gateway forwards. Its host must be one of the gateway's `backendHosts`, or the API is held. |
 | `backend_auth` | jsonb | yes | How the gateway signs in there: `{"serviceAccountToken": {audience}}`, `{"googleIdToken": {serviceAccount, audience}}` or `{"awsSigV4": {roleArn, region, service}}`, each minted per request from the API's ServiceAccount. Null: it doesn't. |
 | `service_account` | text | no | The ServiceAccount, in the team's namespace, its backend credentials are minted for; the console creates it. |
-| `share_with` | text[] | no | The other teams that may call it, or `*` for every team; empty, only its own. |
+| `share_with` | text[] | no | The other teams whose members and bots may call it, or `*` for every team; empty, only its own. Deprecated: `api_grants` replace it, and it goes in the next release. |
+| `access_requests` | text | no | `api.yaml`'s `access.requests`: `open` (a request is granted at once, at the default limit), `approval` (the default: its team's maintainers decide) or `closed` (none are taken; grants already made stay). |
 | `hidden` | boolean | no | Only its own team (and admins) see it; it then has no `share_with`. |
 | `deprecated` | text | yes | What to use instead; it still answers. |
 | `internet` | boolean | no | Asked to be reachable from the internet; published there only if the gateway's `internetTeams` includes its team. |
@@ -670,6 +674,52 @@ Why the gateway can't serve an API: its OpenAPI document can't be read or used, 
 | `api_id` | uuid | no | The API (`apis.id`). The key. |
 | `problem` | text | no | What the gateway found, such as `its OpenAPI document can't be used: …`. |
 | `found_at` | timestamptz | no | When the gateway found it. |
+
+### api_grants
+
+Who may call an API besides its own team (decision 26): a single sign-on group (each person in it) or one user (a person or a bot). Made and changed by the API's team's maintainers, directly or by approving a request; revoked by them, an admin, the person it names (their own), or a maintainer of the bot's team (their bot's). Revoked grants stay, for the history. The gateway reads the active ones every few seconds, so a revoked one stops calls within its refresh (well under a minute). Grants are this install's own: the catalog doesn't carry them. Deleted with its API.
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `id` | uuid | no | |
+| `api_id` | uuid | no | The API (`apis.id`). |
+| `group_name` | text | yes | A group, lowercased, as `user_groups` and the provider name it (a groups claim value, or a Google group's email). Exactly one of this and `user_id`. Among active grants, unique with `api_id`. |
+| `user_id` | uuid | yes | A person or a bot (`users.id`). Among active grants, unique with `api_id`. Deleted with the user. |
+| `per_minute` | integer | yes | Requests a minute: a user's, or each member's of a group. Null: the API's default limit (`per_minute`'s `default`, else the gateway's). |
+| `granted_by` | uuid | yes | The maintainer who made it, or approved the request (`users.id`); null for an `open` API's request, granted at once, or if since deleted. |
+| `from_request` | uuid | yes | The request it answered (`api_access_requests.id`), approved or, for an API whose requests are `open`, granted at once (then `granted_by` is null); null for one a maintainer added directly. |
+| `created_at` | timestamptz | no | |
+| `updated_at` | timestamptz | no | When its rate last changed. |
+| `revoked_at` | timestamptz | yes | When it was revoked; null while it's active. |
+| `revoked_by` | uuid | yes | Who revoked it. |
+
+### api_access_requests
+
+A request for access to an API: a person's for themselves, or a maintainer's for one of their team's bots, with a reason. At most one waits per API and user; after a decline, the next may be asked at once. Deleted with its API or its user.
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `id` | uuid | no | |
+| `api_id` | uuid | no | The API (`apis.id`). |
+| `user_id` | uuid | no | Whom it's for: the person, or the bot. With `api_id`, unique while `waiting`. |
+| `requested_by` | uuid | yes | Who asked: the person themselves, or the bot's team's maintainer. |
+| `reason` | text | no | Why, as they said it. |
+| `state` | text | no | `waiting`, `granted`, `declined` or `withdrawn`. |
+| `decided_by` | uuid | yes | The maintainer who granted or declined it, or who withdrew it. |
+| `decision_reason` | text | yes | A decline's reason. |
+| `grant_id` | uuid | yes | The grant it made (`api_grants.id`), when granted. |
+| `created_at` | timestamptz | no | |
+| `decided_at` | timestamptz | yes | When it was granted, declined or withdrawn. |
+
+### user_groups
+
+Each person's single sign-on groups as the console last read them, for group grants: every group an ID token's groups claim listed, and of Google Workspace groups, the ones it asks about (those mapped to a team or granted an API). Replaced whole at each sign-in and by the hourly Google resync. The gateway reads it; while groups come from a claim, they count only for a single sign-on session signed in within the hour. Deleted with the user.
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `user_id` | uuid | no | The person (`users.id`). With `group_name`, the key. |
+| `group_name` | text | no | Lowercased. |
+| `read_at` | timestamptz | no | When it was read. |
 
 ### gateway_state
 
@@ -877,7 +927,7 @@ Something worth telling people: a run that failed or finished, a step waiting fo
 | --- | --- | --- | --- |
 | `id` | uuid | no | |
 | `key` | text | no | What makes it the same event (`run:<id>:<state>:<finished at>`, `approval:<run>:<step>:<since>`, `catalog:<last applied>`). Unique, so it's only ever made once. |
-| `kind` | text | no | `run_failed`, `run_succeeded`, `approval_waiting`, `catalog_failing`, `product_not_ready`, `step_refused` (a step the cluster refused) or `platform_alert` (a team purged, the allowed image sources changed, a policy not syncing, a run's image gone, the audit log's copy not copying for half an hour (or never yet), its chain broken or an entry differing from its copy). |
+| `kind` | text | no | `run_failed`, `run_succeeded`, `approval_waiting`, `catalog_failing`, `product_not_ready`, `step_refused` (a step the cluster refused), `api_access` (a request for access to an API asked, granted, declined or withdrawn, or a grant added, changed or revoked: to whom it's for, who asked, and the API's team's maintainers) or `platform_alert` (a team purged, the allowed image sources changed, a policy not syncing, a run's image gone, the audit log's copy not copying for half an hour (or never yet), its chain broken or an entry differing from its copy). |
 | `title` | text | no | |
 | `body` | text | no | |
 | `link` | text | yes | The console page it's about, such as `/runs/<id>`. |

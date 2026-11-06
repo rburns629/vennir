@@ -27,6 +27,11 @@ const GRANTS = [
   "GRANT SELECT (team_id) ON sso_group_mappings TO %I",
   "GRANT SELECT (id, name, require_sso, retired_at, deleted_at) ON teams TO %I",
   "GRANT SELECT ON apis, gateway_state, revoked_sessions TO %I",
+  // Who else may call each API (decision 26): the active grants' principals
+  // and rates, never who granted or why; and each person's groups, for a
+  // group's grant. Nothing of the requests for access.
+  "GRANT SELECT (id, api_id, group_name, user_id, per_minute, revoked_at) ON api_grants TO %I",
+  "GRANT SELECT (user_id, group_name) ON user_groups TO %I",
   // Whether an admin turned single sign-on on, and whether groups come from
   // a claim: never its client secret.
   "GRANT SELECT (id, enabled, issuer, client_id, redirect_url, groups_claim) ON sso_settings TO %I",

@@ -51,6 +51,32 @@ const (
 	// ApiServiceSetGatewayClosedProcedure is the fully-qualified name of the ApiService's
 	// SetGatewayClosed RPC.
 	ApiServiceSetGatewayClosedProcedure = "/vennir.console.v1.ApiService/SetGatewayClosed"
+	// ApiServiceRequestApiAccessProcedure is the fully-qualified name of the ApiService's
+	// RequestApiAccess RPC.
+	ApiServiceRequestApiAccessProcedure = "/vennir.console.v1.ApiService/RequestApiAccess"
+	// ApiServiceWithdrawApiAccessRequestProcedure is the fully-qualified name of the ApiService's
+	// WithdrawApiAccessRequest RPC.
+	ApiServiceWithdrawApiAccessRequestProcedure = "/vennir.console.v1.ApiService/WithdrawApiAccessRequest"
+	// ApiServiceDecideApiAccessRequestProcedure is the fully-qualified name of the ApiService's
+	// DecideApiAccessRequest RPC.
+	ApiServiceDecideApiAccessRequestProcedure = "/vennir.console.v1.ApiService/DecideApiAccessRequest"
+	// ApiServiceAddApiGrantProcedure is the fully-qualified name of the ApiService's AddApiGrant RPC.
+	ApiServiceAddApiGrantProcedure = "/vennir.console.v1.ApiService/AddApiGrant"
+	// ApiServiceSetApiGrantRateProcedure is the fully-qualified name of the ApiService's
+	// SetApiGrantRate RPC.
+	ApiServiceSetApiGrantRateProcedure = "/vennir.console.v1.ApiService/SetApiGrantRate"
+	// ApiServiceRevokeApiGrantProcedure is the fully-qualified name of the ApiService's RevokeApiGrant
+	// RPC.
+	ApiServiceRevokeApiGrantProcedure = "/vennir.console.v1.ApiService/RevokeApiGrant"
+	// ApiServiceListApiAccessProcedure is the fully-qualified name of the ApiService's ListApiAccess
+	// RPC.
+	ApiServiceListApiAccessProcedure = "/vennir.console.v1.ApiService/ListApiAccess"
+	// ApiServiceListMyApiAccessProcedure is the fully-qualified name of the ApiService's
+	// ListMyApiAccess RPC.
+	ApiServiceListMyApiAccessProcedure = "/vennir.console.v1.ApiService/ListMyApiAccess"
+	// ApiServiceListTeamBotApiAccessProcedure is the fully-qualified name of the ApiService's
+	// ListTeamBotApiAccess RPC.
+	ApiServiceListTeamBotApiAccessProcedure = "/vennir.console.v1.ApiService/ListTeamBotApiAccess"
 )
 
 // ApiServiceClient is a client for the vennir.console.v1.ApiService service.
@@ -76,6 +102,36 @@ type ApiServiceClient interface {
 	// Closes the gateway (a message: every API answers 503 with it, and
 	// nothing is forwarded) or reopens it (empty). Admins; audited.
 	SetGatewayClosed(context.Context, *connect.Request[v1.SetGatewayClosedRequest]) (*connect.Response[v1.SetGatewayClosedResponse], error)
+	// Asks for access to an API, with a reason: a person for themselves, or a
+	// maintainer of a bot's team for that bot (bot_email). Refused when its
+	// api.yaml takes no requests (access.requests: closed), when whoever
+	// it's for may call it already, or while a request of theirs waits. An
+	// API whose requests are open grants it at once, at its default limit.
+	RequestApiAccess(context.Context, *connect.Request[v1.RequestApiAccessRequest]) (*connect.Response[v1.RequestApiAccessResponse], error)
+	// Withdraws a request while it waits: whoever asked.
+	WithdrawApiAccessRequest(context.Context, *connect.Request[v1.WithdrawApiAccessRequestRequest]) (*connect.Response[v1.WithdrawApiAccessRequestResponse], error)
+	// Grants (approve) or declines a waiting request: a maintainer of the
+	// API's team. Granting a person may grant one of their groups instead,
+	// as the console last read them; a bot is granted by name only.
+	DecideApiAccessRequest(context.Context, *connect.Request[v1.DecideApiAccessRequestRequest]) (*connect.Response[v1.DecideApiAccessRequestResponse], error)
+	// Grants a group or a user (a person or a bot, by email) access: a
+	// maintainer of the API's team (not an admin, unless they maintain it).
+	AddApiGrant(context.Context, *connect.Request[v1.AddApiGrantRequest]) (*connect.Response[v1.AddApiGrantResponse], error)
+	// Changes a grant's rate: a maintainer of the API's team.
+	SetApiGrantRate(context.Context, *connect.Request[v1.SetApiGrantRateRequest]) (*connect.Response[v1.SetApiGrantRateResponse], error)
+	// Revokes a grant: a maintainer of the API's team, an admin, the person
+	// it names, or a maintainer of the bot's team it names. The gateway stops
+	// its calls within its refresh (well under a minute).
+	RevokeApiGrant(context.Context, *connect.Request[v1.RevokeApiGrantRequest]) (*connect.Response[v1.RevokeApiGrantResponse], error)
+	// An API's grants (active and revoked) and requests: its own team, and
+	// admins.
+	ListApiAccess(context.Context, *connect.Request[v1.ListApiAccessRequest]) (*connect.Response[v1.ListApiAccessResponse], error)
+	// The APIs the caller may call, and how (their team's, granted to them,
+	// through a group, from the catalog), and their requests that wait or
+	// were declined.
+	ListMyApiAccess(context.Context, *connect.Request[v1.ListMyApiAccessRequest]) (*connect.Response[v1.ListMyApiAccessResponse], error)
+	// A team's bots' grants and requests: its members, and admins.
+	ListTeamBotApiAccess(context.Context, *connect.Request[v1.ListTeamBotApiAccessRequest]) (*connect.Response[v1.ListTeamBotApiAccessResponse], error)
 }
 
 // NewApiServiceClient constructs a client for the vennir.console.v1.ApiService service. By default,
@@ -135,18 +191,84 @@ func NewApiServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(apiServiceMethods.ByName("SetGatewayClosed")),
 			connect.WithClientOptions(opts...),
 		),
+		requestApiAccess: connect.NewClient[v1.RequestApiAccessRequest, v1.RequestApiAccessResponse](
+			httpClient,
+			baseURL+ApiServiceRequestApiAccessProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("RequestApiAccess")),
+			connect.WithClientOptions(opts...),
+		),
+		withdrawApiAccessRequest: connect.NewClient[v1.WithdrawApiAccessRequestRequest, v1.WithdrawApiAccessRequestResponse](
+			httpClient,
+			baseURL+ApiServiceWithdrawApiAccessRequestProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("WithdrawApiAccessRequest")),
+			connect.WithClientOptions(opts...),
+		),
+		decideApiAccessRequest: connect.NewClient[v1.DecideApiAccessRequestRequest, v1.DecideApiAccessRequestResponse](
+			httpClient,
+			baseURL+ApiServiceDecideApiAccessRequestProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("DecideApiAccessRequest")),
+			connect.WithClientOptions(opts...),
+		),
+		addApiGrant: connect.NewClient[v1.AddApiGrantRequest, v1.AddApiGrantResponse](
+			httpClient,
+			baseURL+ApiServiceAddApiGrantProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("AddApiGrant")),
+			connect.WithClientOptions(opts...),
+		),
+		setApiGrantRate: connect.NewClient[v1.SetApiGrantRateRequest, v1.SetApiGrantRateResponse](
+			httpClient,
+			baseURL+ApiServiceSetApiGrantRateProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("SetApiGrantRate")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeApiGrant: connect.NewClient[v1.RevokeApiGrantRequest, v1.RevokeApiGrantResponse](
+			httpClient,
+			baseURL+ApiServiceRevokeApiGrantProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("RevokeApiGrant")),
+			connect.WithClientOptions(opts...),
+		),
+		listApiAccess: connect.NewClient[v1.ListApiAccessRequest, v1.ListApiAccessResponse](
+			httpClient,
+			baseURL+ApiServiceListApiAccessProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("ListApiAccess")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listMyApiAccess: connect.NewClient[v1.ListMyApiAccessRequest, v1.ListMyApiAccessResponse](
+			httpClient,
+			baseURL+ApiServiceListMyApiAccessProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("ListMyApiAccess")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listTeamBotApiAccess: connect.NewClient[v1.ListTeamBotApiAccessRequest, v1.ListTeamBotApiAccessResponse](
+			httpClient,
+			baseURL+ApiServiceListTeamBotApiAccessProcedure,
+			connect.WithSchema(apiServiceMethods.ByName("ListTeamBotApiAccess")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // apiServiceClient implements ApiServiceClient.
 type apiServiceClient struct {
-	listApis         *connect.Client[v1.ListApisRequest, v1.ListApisResponse]
-	getApi           *connect.Client[v1.GetApiRequest, v1.GetApiResponse]
-	pauseApi         *connect.Client[v1.PauseApiRequest, v1.PauseApiResponse]
-	resumeApi        *connect.Client[v1.ResumeApiRequest, v1.ResumeApiResponse]
-	getApiTraffic    *connect.Client[v1.GetApiTrafficRequest, v1.GetApiTrafficResponse]
-	getGateway       *connect.Client[v1.GetGatewayRequest, v1.GetGatewayResponse]
-	setGatewayClosed *connect.Client[v1.SetGatewayClosedRequest, v1.SetGatewayClosedResponse]
+	listApis                 *connect.Client[v1.ListApisRequest, v1.ListApisResponse]
+	getApi                   *connect.Client[v1.GetApiRequest, v1.GetApiResponse]
+	pauseApi                 *connect.Client[v1.PauseApiRequest, v1.PauseApiResponse]
+	resumeApi                *connect.Client[v1.ResumeApiRequest, v1.ResumeApiResponse]
+	getApiTraffic            *connect.Client[v1.GetApiTrafficRequest, v1.GetApiTrafficResponse]
+	getGateway               *connect.Client[v1.GetGatewayRequest, v1.GetGatewayResponse]
+	setGatewayClosed         *connect.Client[v1.SetGatewayClosedRequest, v1.SetGatewayClosedResponse]
+	requestApiAccess         *connect.Client[v1.RequestApiAccessRequest, v1.RequestApiAccessResponse]
+	withdrawApiAccessRequest *connect.Client[v1.WithdrawApiAccessRequestRequest, v1.WithdrawApiAccessRequestResponse]
+	decideApiAccessRequest   *connect.Client[v1.DecideApiAccessRequestRequest, v1.DecideApiAccessRequestResponse]
+	addApiGrant              *connect.Client[v1.AddApiGrantRequest, v1.AddApiGrantResponse]
+	setApiGrantRate          *connect.Client[v1.SetApiGrantRateRequest, v1.SetApiGrantRateResponse]
+	revokeApiGrant           *connect.Client[v1.RevokeApiGrantRequest, v1.RevokeApiGrantResponse]
+	listApiAccess            *connect.Client[v1.ListApiAccessRequest, v1.ListApiAccessResponse]
+	listMyApiAccess          *connect.Client[v1.ListMyApiAccessRequest, v1.ListMyApiAccessResponse]
+	listTeamBotApiAccess     *connect.Client[v1.ListTeamBotApiAccessRequest, v1.ListTeamBotApiAccessResponse]
 }
 
 // ListApis calls vennir.console.v1.ApiService.ListApis.
@@ -184,6 +306,51 @@ func (c *apiServiceClient) SetGatewayClosed(ctx context.Context, req *connect.Re
 	return c.setGatewayClosed.CallUnary(ctx, req)
 }
 
+// RequestApiAccess calls vennir.console.v1.ApiService.RequestApiAccess.
+func (c *apiServiceClient) RequestApiAccess(ctx context.Context, req *connect.Request[v1.RequestApiAccessRequest]) (*connect.Response[v1.RequestApiAccessResponse], error) {
+	return c.requestApiAccess.CallUnary(ctx, req)
+}
+
+// WithdrawApiAccessRequest calls vennir.console.v1.ApiService.WithdrawApiAccessRequest.
+func (c *apiServiceClient) WithdrawApiAccessRequest(ctx context.Context, req *connect.Request[v1.WithdrawApiAccessRequestRequest]) (*connect.Response[v1.WithdrawApiAccessRequestResponse], error) {
+	return c.withdrawApiAccessRequest.CallUnary(ctx, req)
+}
+
+// DecideApiAccessRequest calls vennir.console.v1.ApiService.DecideApiAccessRequest.
+func (c *apiServiceClient) DecideApiAccessRequest(ctx context.Context, req *connect.Request[v1.DecideApiAccessRequestRequest]) (*connect.Response[v1.DecideApiAccessRequestResponse], error) {
+	return c.decideApiAccessRequest.CallUnary(ctx, req)
+}
+
+// AddApiGrant calls vennir.console.v1.ApiService.AddApiGrant.
+func (c *apiServiceClient) AddApiGrant(ctx context.Context, req *connect.Request[v1.AddApiGrantRequest]) (*connect.Response[v1.AddApiGrantResponse], error) {
+	return c.addApiGrant.CallUnary(ctx, req)
+}
+
+// SetApiGrantRate calls vennir.console.v1.ApiService.SetApiGrantRate.
+func (c *apiServiceClient) SetApiGrantRate(ctx context.Context, req *connect.Request[v1.SetApiGrantRateRequest]) (*connect.Response[v1.SetApiGrantRateResponse], error) {
+	return c.setApiGrantRate.CallUnary(ctx, req)
+}
+
+// RevokeApiGrant calls vennir.console.v1.ApiService.RevokeApiGrant.
+func (c *apiServiceClient) RevokeApiGrant(ctx context.Context, req *connect.Request[v1.RevokeApiGrantRequest]) (*connect.Response[v1.RevokeApiGrantResponse], error) {
+	return c.revokeApiGrant.CallUnary(ctx, req)
+}
+
+// ListApiAccess calls vennir.console.v1.ApiService.ListApiAccess.
+func (c *apiServiceClient) ListApiAccess(ctx context.Context, req *connect.Request[v1.ListApiAccessRequest]) (*connect.Response[v1.ListApiAccessResponse], error) {
+	return c.listApiAccess.CallUnary(ctx, req)
+}
+
+// ListMyApiAccess calls vennir.console.v1.ApiService.ListMyApiAccess.
+func (c *apiServiceClient) ListMyApiAccess(ctx context.Context, req *connect.Request[v1.ListMyApiAccessRequest]) (*connect.Response[v1.ListMyApiAccessResponse], error) {
+	return c.listMyApiAccess.CallUnary(ctx, req)
+}
+
+// ListTeamBotApiAccess calls vennir.console.v1.ApiService.ListTeamBotApiAccess.
+func (c *apiServiceClient) ListTeamBotApiAccess(ctx context.Context, req *connect.Request[v1.ListTeamBotApiAccessRequest]) (*connect.Response[v1.ListTeamBotApiAccessResponse], error) {
+	return c.listTeamBotApiAccess.CallUnary(ctx, req)
+}
+
 // ApiServiceHandler is an implementation of the vennir.console.v1.ApiService service.
 type ApiServiceHandler interface {
 	// Every API the caller may see, by team and name.
@@ -207,6 +374,36 @@ type ApiServiceHandler interface {
 	// Closes the gateway (a message: every API answers 503 with it, and
 	// nothing is forwarded) or reopens it (empty). Admins; audited.
 	SetGatewayClosed(context.Context, *connect.Request[v1.SetGatewayClosedRequest]) (*connect.Response[v1.SetGatewayClosedResponse], error)
+	// Asks for access to an API, with a reason: a person for themselves, or a
+	// maintainer of a bot's team for that bot (bot_email). Refused when its
+	// api.yaml takes no requests (access.requests: closed), when whoever
+	// it's for may call it already, or while a request of theirs waits. An
+	// API whose requests are open grants it at once, at its default limit.
+	RequestApiAccess(context.Context, *connect.Request[v1.RequestApiAccessRequest]) (*connect.Response[v1.RequestApiAccessResponse], error)
+	// Withdraws a request while it waits: whoever asked.
+	WithdrawApiAccessRequest(context.Context, *connect.Request[v1.WithdrawApiAccessRequestRequest]) (*connect.Response[v1.WithdrawApiAccessRequestResponse], error)
+	// Grants (approve) or declines a waiting request: a maintainer of the
+	// API's team. Granting a person may grant one of their groups instead,
+	// as the console last read them; a bot is granted by name only.
+	DecideApiAccessRequest(context.Context, *connect.Request[v1.DecideApiAccessRequestRequest]) (*connect.Response[v1.DecideApiAccessRequestResponse], error)
+	// Grants a group or a user (a person or a bot, by email) access: a
+	// maintainer of the API's team (not an admin, unless they maintain it).
+	AddApiGrant(context.Context, *connect.Request[v1.AddApiGrantRequest]) (*connect.Response[v1.AddApiGrantResponse], error)
+	// Changes a grant's rate: a maintainer of the API's team.
+	SetApiGrantRate(context.Context, *connect.Request[v1.SetApiGrantRateRequest]) (*connect.Response[v1.SetApiGrantRateResponse], error)
+	// Revokes a grant: a maintainer of the API's team, an admin, the person
+	// it names, or a maintainer of the bot's team it names. The gateway stops
+	// its calls within its refresh (well under a minute).
+	RevokeApiGrant(context.Context, *connect.Request[v1.RevokeApiGrantRequest]) (*connect.Response[v1.RevokeApiGrantResponse], error)
+	// An API's grants (active and revoked) and requests: its own team, and
+	// admins.
+	ListApiAccess(context.Context, *connect.Request[v1.ListApiAccessRequest]) (*connect.Response[v1.ListApiAccessResponse], error)
+	// The APIs the caller may call, and how (their team's, granted to them,
+	// through a group, from the catalog), and their requests that wait or
+	// were declined.
+	ListMyApiAccess(context.Context, *connect.Request[v1.ListMyApiAccessRequest]) (*connect.Response[v1.ListMyApiAccessResponse], error)
+	// A team's bots' grants and requests: its members, and admins.
+	ListTeamBotApiAccess(context.Context, *connect.Request[v1.ListTeamBotApiAccessRequest]) (*connect.Response[v1.ListTeamBotApiAccessResponse], error)
 }
 
 // NewApiServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -262,6 +459,63 @@ func NewApiServiceHandler(svc ApiServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(apiServiceMethods.ByName("SetGatewayClosed")),
 		connect.WithHandlerOptions(opts...),
 	)
+	apiServiceRequestApiAccessHandler := connect.NewUnaryHandler(
+		ApiServiceRequestApiAccessProcedure,
+		svc.RequestApiAccess,
+		connect.WithSchema(apiServiceMethods.ByName("RequestApiAccess")),
+		connect.WithHandlerOptions(opts...),
+	)
+	apiServiceWithdrawApiAccessRequestHandler := connect.NewUnaryHandler(
+		ApiServiceWithdrawApiAccessRequestProcedure,
+		svc.WithdrawApiAccessRequest,
+		connect.WithSchema(apiServiceMethods.ByName("WithdrawApiAccessRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
+	apiServiceDecideApiAccessRequestHandler := connect.NewUnaryHandler(
+		ApiServiceDecideApiAccessRequestProcedure,
+		svc.DecideApiAccessRequest,
+		connect.WithSchema(apiServiceMethods.ByName("DecideApiAccessRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
+	apiServiceAddApiGrantHandler := connect.NewUnaryHandler(
+		ApiServiceAddApiGrantProcedure,
+		svc.AddApiGrant,
+		connect.WithSchema(apiServiceMethods.ByName("AddApiGrant")),
+		connect.WithHandlerOptions(opts...),
+	)
+	apiServiceSetApiGrantRateHandler := connect.NewUnaryHandler(
+		ApiServiceSetApiGrantRateProcedure,
+		svc.SetApiGrantRate,
+		connect.WithSchema(apiServiceMethods.ByName("SetApiGrantRate")),
+		connect.WithHandlerOptions(opts...),
+	)
+	apiServiceRevokeApiGrantHandler := connect.NewUnaryHandler(
+		ApiServiceRevokeApiGrantProcedure,
+		svc.RevokeApiGrant,
+		connect.WithSchema(apiServiceMethods.ByName("RevokeApiGrant")),
+		connect.WithHandlerOptions(opts...),
+	)
+	apiServiceListApiAccessHandler := connect.NewUnaryHandler(
+		ApiServiceListApiAccessProcedure,
+		svc.ListApiAccess,
+		connect.WithSchema(apiServiceMethods.ByName("ListApiAccess")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	apiServiceListMyApiAccessHandler := connect.NewUnaryHandler(
+		ApiServiceListMyApiAccessProcedure,
+		svc.ListMyApiAccess,
+		connect.WithSchema(apiServiceMethods.ByName("ListMyApiAccess")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	apiServiceListTeamBotApiAccessHandler := connect.NewUnaryHandler(
+		ApiServiceListTeamBotApiAccessProcedure,
+		svc.ListTeamBotApiAccess,
+		connect.WithSchema(apiServiceMethods.ByName("ListTeamBotApiAccess")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/vennir.console.v1.ApiService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ApiServiceListApisProcedure:
@@ -278,6 +532,24 @@ func NewApiServiceHandler(svc ApiServiceHandler, opts ...connect.HandlerOption) 
 			apiServiceGetGatewayHandler.ServeHTTP(w, r)
 		case ApiServiceSetGatewayClosedProcedure:
 			apiServiceSetGatewayClosedHandler.ServeHTTP(w, r)
+		case ApiServiceRequestApiAccessProcedure:
+			apiServiceRequestApiAccessHandler.ServeHTTP(w, r)
+		case ApiServiceWithdrawApiAccessRequestProcedure:
+			apiServiceWithdrawApiAccessRequestHandler.ServeHTTP(w, r)
+		case ApiServiceDecideApiAccessRequestProcedure:
+			apiServiceDecideApiAccessRequestHandler.ServeHTTP(w, r)
+		case ApiServiceAddApiGrantProcedure:
+			apiServiceAddApiGrantHandler.ServeHTTP(w, r)
+		case ApiServiceSetApiGrantRateProcedure:
+			apiServiceSetApiGrantRateHandler.ServeHTTP(w, r)
+		case ApiServiceRevokeApiGrantProcedure:
+			apiServiceRevokeApiGrantHandler.ServeHTTP(w, r)
+		case ApiServiceListApiAccessProcedure:
+			apiServiceListApiAccessHandler.ServeHTTP(w, r)
+		case ApiServiceListMyApiAccessProcedure:
+			apiServiceListMyApiAccessHandler.ServeHTTP(w, r)
+		case ApiServiceListTeamBotApiAccessProcedure:
+			apiServiceListTeamBotApiAccessHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -313,4 +585,40 @@ func (UnimplementedApiServiceHandler) GetGateway(context.Context, *connect.Reque
 
 func (UnimplementedApiServiceHandler) SetGatewayClosed(context.Context, *connect.Request[v1.SetGatewayClosedRequest]) (*connect.Response[v1.SetGatewayClosedResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.SetGatewayClosed is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) RequestApiAccess(context.Context, *connect.Request[v1.RequestApiAccessRequest]) (*connect.Response[v1.RequestApiAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.RequestApiAccess is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) WithdrawApiAccessRequest(context.Context, *connect.Request[v1.WithdrawApiAccessRequestRequest]) (*connect.Response[v1.WithdrawApiAccessRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.WithdrawApiAccessRequest is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) DecideApiAccessRequest(context.Context, *connect.Request[v1.DecideApiAccessRequestRequest]) (*connect.Response[v1.DecideApiAccessRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.DecideApiAccessRequest is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) AddApiGrant(context.Context, *connect.Request[v1.AddApiGrantRequest]) (*connect.Response[v1.AddApiGrantResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.AddApiGrant is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) SetApiGrantRate(context.Context, *connect.Request[v1.SetApiGrantRateRequest]) (*connect.Response[v1.SetApiGrantRateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.SetApiGrantRate is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) RevokeApiGrant(context.Context, *connect.Request[v1.RevokeApiGrantRequest]) (*connect.Response[v1.RevokeApiGrantResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.RevokeApiGrant is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) ListApiAccess(context.Context, *connect.Request[v1.ListApiAccessRequest]) (*connect.Response[v1.ListApiAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.ListApiAccess is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) ListMyApiAccess(context.Context, *connect.Request[v1.ListMyApiAccessRequest]) (*connect.Response[v1.ListMyApiAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.ListMyApiAccess is not implemented"))
+}
+
+func (UnimplementedApiServiceHandler) ListTeamBotApiAccess(context.Context, *connect.Request[v1.ListTeamBotApiAccessRequest]) (*connect.Response[v1.ListTeamBotApiAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("vennir.console.v1.ApiService.ListTeamBotApiAccess is not implemented"))
 }

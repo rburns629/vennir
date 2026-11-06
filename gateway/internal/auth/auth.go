@@ -11,7 +11,8 @@
 // counts at once; a retired team (read-only in the console) calls as
 // nobody. While single sign-on groups come from an ID token's claim, a
 // membership a group gave counts only for a single sign-on session signed in
-// within the hour (claimGroupsSession). A token is never logged or kept.
+// within the hour (claimGroupsSession), and so do a person's groups for an
+// API's group grants (Caller.GroupsCurrent). A token is never logged or kept.
 package auth
 
 import (
@@ -41,6 +42,16 @@ type Caller struct {
 	IsBot   bool
 	// Teams are the teams the caller is in that may call: not retired ones.
 	Teams []string
+	// Groups are a person's single sign-on groups as the console last read
+	// them (user_groups), for an API's group grants; none for a bot.
+	Groups []string
+	// GroupsCurrent: Groups count now. Not while they come from an ID
+	// token's claim and this isn't a single sign-on session signed in within
+	// claimGroupsSession (the console's plugin.ts groupsCurrent, the same).
+	GroupsCurrent bool
+	// SSOSession: signed in with single sign-on (so it can sign in again to
+	// have its groups read), not a password or an API token.
+	SSOSession bool
 }
 
 // ErrUnauthenticated is a missing, malformed, expired or revoked credential.
@@ -226,6 +237,21 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	}
 	if passwordSession && ssoRequired && !c.IsAdmin && ssoOn {
 		return nil, ErrUnauthenticated
+	}
+	c.SSOSession = ssoSession
+	// A person's groups, for an API's group grants: counting, as group-given
+	// teams do, only while they can't be stale (with groups from a claim,
+	// for a recent single sign-on). Whether a group grant is the caller's
+	// only way in is the API's question (the gateway's accessFor).
+	if !c.IsBot {
+		var groupsSSOOn, groupsClaimSet bool
+		if err := r.DB.QueryRow(ctx, `SELECT ARRAY(SELECT group_name FROM user_groups WHERE user_id = $1::uuid ORDER BY group_name COLLATE "C"),
+			COALESCE((SELECT s.enabled AND s.issuer <> '' AND s.client_id <> '' AND s.redirect_url <> '' FROM sso_settings s WHERE s.id = 1), false),
+			COALESCE((SELECT s.groups_claim <> '' FROM sso_settings s WHERE s.id = 1), false)`, c.UserID).
+			Scan(&c.Groups, &groupsSSOOn, &groupsClaimSet); err != nil {
+			return nil, err
+		}
+		c.GroupsCurrent = !(r.ssoOn(groupsSSOOn) && groupsClaimSet && !recentSSO)
 	}
 	return &c, nil
 }

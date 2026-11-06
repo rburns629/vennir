@@ -27,7 +27,8 @@ export type Notification = Message<"vennir.console.v1.Notification"> & {
 
   /**
    * run_failed, run_succeeded, approval_waiting, catalog_failing,
-   * product_not_ready, step_refused or platform_alert.
+   * product_not_ready, step_refused, platform_alert or api_access (a
+   * request for access to an API, or a grant, changed).
    *
    * @generated from field: string kind = 2;
    */
@@ -769,7 +770,7 @@ export const NotificationService: GenService<{
   /**
    * Chooses which kinds are emailed to you (any of run_failed,
    * run_succeeded, approval_waiting, product_not_ready, catalog_failing,
-   * step_refused, platform_alert).
+   * step_refused, platform_alert, api_access).
    *
    * @generated from rpc vennir.console.v1.NotificationService.SetEmailPreferences
    */

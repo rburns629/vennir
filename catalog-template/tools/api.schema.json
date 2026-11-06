@@ -147,7 +147,8 @@
       "pattern": "^[a-z0-9]([-a-z0-9]{0,57}[a-z0-9])?-api$"
     },
     "shareWith": {
-      "description": "The other teams that may call it, or [\"*\"] for every team. Left out, only its own team.",
+      "description": "Deprecated: access's grants replace it, made per install in the console, and it goes in the next release (vennir catalog validate warns). The other teams whose members and bots may call it, or [\"*\"] for every team. Left out, only its own team.",
+      "deprecated": true,
       "type": "array",
       "uniqueItems": true,
       "maxItems": 200,
@@ -160,6 +161,21 @@
             "$ref": "#/$defs/dnsLabel"
           }
         ]
+      }
+    },
+    "access": {
+      "description": "Who else may call it: each install's grants, to single sign-on groups and to users (people and bots), each with its rate, which the API's team's maintainers add in the console. This says how a request for access is answered.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests": {
+          "description": "open: granted at once, at the default limit; approval (the default): the team's maintainers grant or decline it; closed: none are taken (grants already made stay until revoked).",
+          "enum": [
+            "open",
+            "approval",
+            "closed"
+          ]
+        }
       }
     },
     "visibility": {
@@ -183,7 +199,7 @@
       ]
     },
     "limits": {
-      "description": "Requests per calling team, per minute or second: default for every team, and any team by name.",
+      "description": "Requests per minute or second: default for every caller (its own team, a grant without a rate of its own, and each person in a group a grant names), and any calling team by name (its own, or a shareWith team).",
       "type": "object",
       "maxProperties": 100,
       "propertyNames": {

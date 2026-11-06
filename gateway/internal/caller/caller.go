@@ -37,8 +37,14 @@ type Claims struct {
 	Subject string `json:"sub"`
 	Email   string `json:"email,omitempty"`
 	Bot     bool   `json:"bot,omitempty"`
-	// Team is the team it calls as; API is <team>/<name>.
-	Team      string `json:"team"`
+	// Team is the team it calls as (empty for a grant's caller); API is
+	// <team>/<name>.
+	Team string `json:"team"`
+	// Via is how it may call: team (its own team's), user (a grant names
+	// it), group (a grant names Group, a single sign-on group it's in) or
+	// catalog (shareWith names Team; deprecated).
+	Via       string `json:"via"`
+	Group     string `json:"group,omitempty"`
 	API       string `json:"api"`
 	Audience  string `json:"aud"`
 	IssuedAt  int64  `json:"iat"`

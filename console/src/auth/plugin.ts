@@ -53,6 +53,11 @@ declare module "fastify" {
       // A session's (not an API token's): its id and when it expires
       // (seconds), for signing it out (AuthService.SignOut).
       session?: { sid: string; exp: number };
+      // A person whose single sign-on groups (user_groups) count now, for
+      // an API's group grants: always, unless groups come from an ID
+      // token's claim and this isn't a single sign-on session signed in
+      // within the hour (the gateway's auth.go, the same). Never a bot's.
+      groupsCurrent?: boolean;
     };
   }
 }
@@ -172,6 +177,10 @@ export async function resolveCaller(request: FastifyRequest): Promise<CallerReso
       mustChangePassword,
       ...(user.orderTemplates ? { orderTemplates: user.orderTemplates } : {}),
       ...(session ? { session } : {}),
+      // As for group-given teams: an older session's groups don't count
+      // for an API's group grant (the gateway refuses an older single
+      // sign-on session whose only way in is one, so it signs in again).
+      groupsCurrent: !user.isBot && !stale,
     },
   };
 }

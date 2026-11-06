@@ -18,6 +18,7 @@ import { db } from "../db/client.js";
 import { catalogRepository, findApi, findUserById, listLiveTeamApis, setApiPaused, type ApiRow } from "../db/queries.js";
 import { apiProblems, apiTraffic, gatewayState, teams, type BackendAuth } from "../db/schema.js";
 import { apiNamespace, hasApiNamespace } from "../k8s.js";
+import { accessFor, callerContext, type Access } from "./apiAccess.js";
 import { catalogLinks, githubBase } from "./catalogLinks.js";
 
 type Api = ApiRow & { teamName: string };
@@ -213,30 +214,13 @@ export function endpoints(openapi: unknown): { method: string; path: string; sum
   return out;
 }
 
-/** The team a call is made as, as the gateway's callingTeam picks it: the API's own, else the first of the caller's it's shared with (by name, byte for byte); none, no call. The gateway also passes over a retired team of the caller's, which this doesn't know of. */
-function callingTeam(caller: AuthUser, api: Api): string | undefined {
-  if (caller.teamNames.includes(api.teamName)) return api.teamName;
-  return caller.teamNames.find((t) => api.shareWith.includes("*") || api.shareWith.includes(t));
-}
-
-function mayCall(caller: AuthUser, api: Api): boolean {
-  return callingTeam(caller, api) !== undefined;
-}
-
-/** Whether the caller may see the API at all: it isn't hidden, or it's their team's (or they're an admin). */
-export function sees(caller: AuthUser, api: Pick<Api, "hidden" | "teamName">): boolean {
-  return !api.hidden || caller.isAdmin || caller.teamNames.includes(api.teamName);
-}
-
 /**
- * The requests a minute the caller may send it, as the gateway counts them
- * (without Vennir-Team): the calling team's own limit, else the API's
- * default, else the gateway's (0 in either means unset there too).
+ * Whether the caller may see the API at all: it isn't hidden, or it's their
+ * team's (or they're an admin), or a grant lets them call it, whatever it's
+ * shared with (the gateway's own check, the same).
  */
-function perMinuteFor(caller: AuthUser, api: Api): number {
-  const team = callingTeam(caller, api);
-  if (team === undefined) return 0;
-  return api.perMinute[team] || api.perMinute["default"] || config.gateway.defaultPerMinute;
+export function sees(caller: AuthUser, api: Pick<Api, "hidden" | "teamName">, access: Access | null = null): boolean {
+  return !api.hidden || caller.isAdmin || caller.teamNames.includes(api.teamName) || access?.via === "user" || access?.via === "group";
 }
 
 /** Its limits as the gateway counts them: each team api.yaml names, and everyone else's default. */
@@ -263,9 +247,13 @@ function joinUrl(base: string, api: Api): string {
   return base ? `${base.replace(/\/$/, "")}/${api.teamName}/${api.name}` : "";
 }
 
-/** One API as the caller sees it; `base` is the catalog repository's GitHub page, for its links. */
-function view(caller: AuthUser, api: Api, base: string | null, problem: Problem | null, apiNamespaceTaken: boolean) {
+/**
+ * One API as the caller sees it; `base` is the catalog repository's GitHub
+ * page, for its links; `access`, how they may call it (apiAccess.ts).
+ */
+function view(caller: AuthUser, api: Api, base: string | null, problem: Problem | null, apiNamespaceTaken: boolean, access: Access | null) {
   const own = caller.isAdmin || caller.teamNames.includes(api.teamName);
+  const mayCall = access !== null;
   const internet = api.internet && config.gateway.internetTeams.includes(api.teamName);
   const info = isRecord(api.openapi) && isRecord(api.openapi["info"]) ? api.openapi["info"] : {};
   return {
@@ -275,7 +263,9 @@ function view(caller: AuthUser, api: Api, base: string | null, problem: Problem 
     description: api.description,
     ...apiState(api, problem, apiNamespaceTaken),
     pausedMessage: api.pausedMessage ?? "",
-    mayCall: mayCall(caller, api),
+    mayCall,
+    accessVia: access?.via ?? null,
+    accessRequests: api.accessRequests,
     shareWith: api.shareWith,
     hidden: api.hidden,
     deprecated: api.deprecated ?? "",
@@ -283,13 +273,13 @@ function view(caller: AuthUser, api: Api, base: string | null, problem: Problem 
     url: joinUrl(config.gateway.url, api),
     publicUrl: internet ? joinUrl(config.gateway.publicUrl, api) : "",
     endpoints: endpoints(api.openapi),
-    perMinute: perMinuteFor(caller, api),
+    perMinute: access?.perMinute ?? 0,
     timeoutSeconds: api.timeoutSeconds,
     maxRequestBytes: api.maxRequestBytes,
     sourcePath: api.sourcePath ?? "",
     ...limitsOf(api),
     // Shared with everyone, asking for it can't help: a caller without a team needs one.
-    askForAccessUrl: catalogLinks(base, api.sourcePath ?? null, "the API", `${api.teamName}/${api.name}`, caller, mayCall(caller, api) || api.shareWith.includes("*")).askForAccessUrl ?? "",
+    askForAccessUrl: catalogLinks(base, api.sourcePath ?? null, "the API", `${api.teamName}/${api.name}`, caller, mayCall || api.shareWith.includes("*")).askForAccessUrl ?? "",
     backendUrl: own ? api.backendUrl : "",
     backendAuth: own ? authKind(api.backendAuth) : "",
     specTitle: typeof info["title"] === "string" ? info["title"] : "",
@@ -302,30 +292,36 @@ export type ApiView = ReturnType<typeof view>;
 export async function listApis(caller: AuthUser | undefined): Promise<ApiView[]> {
   const who = signedIn(caller);
   const base = githubBase(await catalogRepository());
-  const seen = (await listLiveTeamApis()).filter((api) => sees(who, api));
-  const problems = await problemsOf(seen.map((api) => api.id));
-  const taken = await apiNamespacesTaken(seen.map((api) => api.teamName));
-  return seen.map((api) => view(who, api, base, problems.get(api.id) ?? null, taken.has(api.teamName)));
+  const ctx = await callerContext(who);
+  const seen = (await listLiveTeamApis()).flatMap((api) => {
+    const access = accessFor(who, api, ctx);
+    return sees(who, api, access) ? [{ api, access }] : [];
+  });
+  const problems = await problemsOf(seen.map(({ api }) => api.id));
+  const taken = await apiNamespacesTaken(seen.map(({ api }) => api.teamName));
+  return seen.map(({ api, access }) => view(who, api, base, problems.get(api.id) ?? null, taken.has(api.teamName), access));
 }
 
-async function visibleApi(who: AuthUser, team: string, name: string): Promise<Api> {
+/** An API the caller may see, and how they may call it. */
+async function visibleApi(who: AuthUser, team: string, name: string): Promise<{ api: Api; access: Access | null }> {
   const api = await findApi(team, name);
-  if (!api || !sees(who, api)) throw new ApiError(404, "NOT_FOUND", `No API "${team}/${name}".`);
-  return api;
+  const access = api ? accessFor(who, api, await callerContext(who)) : null;
+  if (!api || !sees(who, api, access)) throw new ApiError(404, "NOT_FOUND", `No API "${team}/${name}".`);
+  return { api, access };
 }
 
 export async function getApi(caller: AuthUser | undefined, team: string, name: string) {
   const who = signedIn(caller);
-  const api = await visibleApi(who, team, name);
+  const { api, access } = await visibleApi(who, team, name);
   const problem = (await problemsOf([api.id])).get(api.id) ?? null;
   const taken = (await apiNamespacesTaken([api.teamName])).has(api.teamName);
-  return { api: view(who, api, githubBase(await catalogRepository()), problem, taken), openapi: JSON.stringify(api.openapi) };
+  return { api: view(who, api, githubBase(await catalogRepository()), problem, taken, access), openapi: JSON.stringify(api.openapi) };
 }
 
 /** Pauses (a message) or resumes (null) an API; a maintainer of its team or an admin. */
 export async function pauseApi(caller: AuthUser | undefined, team: string, name: string, message: string | null): Promise<void> {
   const who = signedIn(caller);
-  const api = await visibleApi(who, team, name);
+  const { api } = await visibleApi(who, team, name);
   if (!canMaintainTeam(who, api.teamName)) {
     throw new ApiError(403, "FORBIDDEN", `Only a maintainer of ${api.teamName} may pause or resume its APIs.`);
   }
@@ -341,7 +337,7 @@ const STOPPED = ["blocked", "invalid", "limited", "unauthenticated", "forbidden"
 /** An API's traffic over the last `hours`: its own team, and admins. */
 export async function getApiTraffic(caller: AuthUser | undefined, team: string, name: string, hours: number) {
   const who = signedIn(caller);
-  const api = await visibleApi(who, team, name);
+  const { api } = await visibleApi(who, team, name);
   if (!who.isAdmin && !who.teamNames.includes(api.teamName)) {
     throw new ApiError(403, "FORBIDDEN", `Only ${api.teamName} sees its API's traffic.`);
   }
@@ -415,7 +411,8 @@ export async function getApiTraffic(caller: AuthUser | undefined, team: string, 
         team: name,
         requests: t.requests,
         peakPerMinute: Math.max(0, ...t.minutes.values()),
-        limitPerMinute: name ? api.perMinute[name] || fallback : 0,
+        // A grant's callers ("grant:user", "grant:group:<group>") have each their own rate.
+        limitPerMinute: name && !name.startsWith("grant:") ? api.perMinute[name] || fallback : 0,
       }))
       .sort((a, b) => b.requests - a.requests),
   };

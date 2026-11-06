@@ -28,7 +28,8 @@ type Notification struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// run_failed, run_succeeded, approval_waiting, catalog_failing,
-	// product_not_ready, step_refused or platform_alert.
+	// product_not_ready, step_refused, platform_alert or api_access (a
+	// request for access to an API, or a grant, changed).
 	Kind  string `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
 	Title string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
 	Body  string `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`

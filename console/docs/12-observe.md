@@ -47,7 +47,7 @@ The text under each one is read from this install's own settings, so it names th
 
 - **Cluster**: steps the cluster wouldn't start, as `<team> · step <id>` with its image under it, and the code and what it means. These are the same codes a run shows when a step fails ([failure codes](09-runs-explained.md#what-does-each-failure-code-mean)).
 - **Catalog**: the catalog's release, with its version (or digest) under it, when the console couldn't apply it (`CATALOG_NOT_APPLIED`, with the error).
-- **Gateway**: calls the gateway answered itself instead of forwarding, as `<calling team> → <team>/<api>, N calls` with the endpoint under it, and the reason (`NOT_IN_SPEC`, `NOT_SHARED`, `RATE_LIMITED` and so on; [gateway errors](11-apis.md#what-does-each-gateway-error-mean)). A call from no known team shows as `a caller with no team`.
+- **Gateway**: calls the gateway answered itself instead of forwarding, as `<calling team> → <team>/<api>, N calls` with the endpoint under it, and the reason (`NOT_IN_SPEC`, `NOT_GRANTED`, `RATE_LIMITED` and so on; [gateway errors](11-apis.md#what-does-each-gateway-error-mean)). A call from no known team shows as `a caller with no team`.
 
 The **Refused, 7 days** card at the top counts the rows. A gateway row stands for many calls, so the card counts rows, not calls.
 

@@ -174,10 +174,33 @@ it was seen.
   would answer it. The gateway takes only a bearer token, which a browser
   never sends on a navigation or a frame, so no browser can load an API's
   page there as a signed-in person; check this holds, then close the item.
-  Decision 26 (`docs/assessment.md`, proposed 2026-11-05): the paths stay,
+  Decision 26 (`docs/assessment.md`, approved 2026-11-05): the paths stay,
   the gateway passes everything through, and each API has an access list
-  of grants to groups or users; its console pages go on the mockups canvas
-  first.
+  of grants to groups or users (built: `console/src/core/apiAccess.ts`, the
+  gateway's `accessFor`); its console pages are below, under Console.
+
+- [ ] **Next release: drop `shareWith` from `api.yaml`** (decision 26; the
+  access list was built 2026-11-05): for one release a `shareWith` team's
+  members and bots still call, "from the catalog", and `vennir catalog
+  validate` warns (`cli/internal/catalogtool/apis.go`,
+  `ShareWithDeprecated`). Then remove it from both `api.schema.json`
+  copies, the release's `Api.share_with`, `apis.share_with` (a migration),
+  `catalogSync.ts`, the gateway's `store.API.ShareWith` and `accessFor`'s
+  last step, the console's `accessFor` and its `catalog` way, and the docs
+  (`console/docs/11-apis.md`, `21-api-gateway.md`, the catalog guide).
+  Before, tell each API's team that still has it to grant its callers. The
+  template's samples (`samples/{local,gcp,aws}/apis/*/api.yaml`) still say
+  `shareWith`, because the vennir the template pins (0.11.0) refuses
+  `access`: once a release with it is pinned, give them `access.requests`
+  instead (`open` for the hello-world ones, `approval` for orders).
+
+- [ ] **A grant's last call** (decision 26's open question, 2026-11-05):
+  grants don't expire; the proposal is that the API's team sees each
+  grant's last call and revokes unused ones. The gateway would need to
+  write a `last_used_at` per grant (as for API tokens, at a few minutes'
+  resolution; a grant to `vennir_gateway` of that one column). Also: a
+  grant goes with its API when a release drops the API (`api_grants`
+  cascades), so a renamed API starts with none.
 
 - [ ] **The console can loosen the cluster's policies** (a known gap since
   the security review of 2026-11-04): it writes the admission policies'
@@ -226,6 +249,18 @@ it was seen.
   member). Decide: have these readers apply the same rule (by the person's
   last sign-in, `users.last_signed_in_at`), or drop group-given rows of
   people who haven't signed in for an hour.
+
+- [ ] **The API access list's pages** (decision 26, backend built
+  2026-11-05): the APIs list and an API's page show only `may_call` and
+  `access_via` so far, and **Ask for access ↗** still opens an issue on the
+  catalog repository. Build the pages in chapter 15 of the mockups canvas:
+  asking for access (for yourself, and for a team's bot), an API's grants
+  and requests for its maintainers (approve with a person's group, decline,
+  rates, revoke), "APIs I may call", a team's bots' grants, and the email
+  option for `api_access` notifications (`EmailSection.tsx`; the bell shows
+  them already). The methods are `ApiService`'s access rpcs
+  (`proto/vennir/console/v1/api.proto`). Then drop the issue link
+  (`catalogLinks.ts`'s `askForAccessUrl` for APIs).
 
 - [ ] **A page for who read what** (built 2026-11-05, backend only):
   `audit_reads` and `AdminService/ListAuditReads` record and list who was

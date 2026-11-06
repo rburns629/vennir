@@ -484,6 +484,13 @@
       "when": 1793926116483,
       "tag": "0068_audit_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793931273580,
+      "tag": "0069_api_grants",
+      "breakpoints": true
     }
   ]
 }

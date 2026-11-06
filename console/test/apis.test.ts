@@ -123,7 +123,9 @@ const listFor = async (who: keyof typeof tokens) =>
 
 describe("from the release", () => {
   it("stores each API with its spec, and makes its ServiceAccount", async () => {
-    const rows = await db.select().from(apis).where(inArray(apis.name, ["orders", "ledger", "legacy"]));
+    // This file's team's only: other files publish APIs of the same names.
+    const ownerId = (await findTeamByName(owner))?.id ?? "";
+    const rows = await db.select().from(apis).where(and(eq(apis.teamId, ownerId), inArray(apis.name, ["orders", "ledger", "legacy"])));
     const orders = rows.find((r) => r.name === "orders" && r.backendUrl.includes("orders"));
     expect(orders).toMatchObject({ timeoutSeconds: 20, maxRequestBytes: 1024, internet: true, serviceAccount: "orders-api" });
     expect(orders?.backendAuth).toEqual({ googleIdToken: { serviceAccount: "gw@p.iam.gserviceaccount.com", audience: "https://orders.example.run.app" } });
