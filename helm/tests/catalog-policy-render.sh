@@ -55,6 +55,31 @@ short=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --set sched
 if echo "$short" | grep -q "must be at least scheduler.approvalTimeoutSeconds"; then ok "in use: refused under the approval timeout"
 else fail "in use under the approval timeout" "rendered"; fi
 
+# kernel policy signs in as its own database role (catalogPolicy.database):
+# with the bundled Postgres, the chart's, from a Secret of its own, which
+# the migration Job makes and kernel migrate grants; never the kernel's.
+deployment=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --show-only templates/catalog-policy.yaml | python3 -c '
+import re, sys
+for d in re.split(r"^---$", sys.stdin.read(), flags=re.M):
+    if re.search(r"^kind: Deployment$", d, re.M):
+        m = re.search(r"- name: DATABASE_URL\n\s+valueFrom:\n\s+secretKeyRef:\n\s+name: (\S+)\n\s+key: (\S+)", d)
+        print(m.group(1) + "/" + m.group(2) if m else "none")')
+[ "$deployment" = "kernel-execution-kernel-policy-db/database-url" ] && ok "its own role: the policy Pod reads its own Secret" || fail "the policy Pod's database Secret" "$deployment"
+job=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --show-only templates/migration-job.yaml)
+if echo "$job" | grep -q 'CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT' \
+  && echo "$job" | grep -A1 'name: CATALOG_POLICY_DATABASE_ROLE' | grep -q '"vennir_kernel_policy"'; then
+  ok "its own role: made by the migration Job, and granted by kernel migrate"
+else fail "the migration Job and kernel policy's role" "rendered"; fi
+secrets=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --show-only templates/secret.yaml)
+echo "$secrets" | grep -q '^  name: kernel-execution-kernel-policy-db$' && echo "$secrets" | grep -q 'postgresql://vennir_kernel_policy:' \
+  && ok "its own role: a Secret of its own signing in as it" || fail "kernel policy's Secret" "rendered"
+off=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --set postgres.auth.policyUsername= --show-only templates/catalog-policy.yaml | grep -A3 'name: DATABASE_URL' | grep -o 'name: kernel-execution-kernel-db[^ ]*\|name: kernel-execution-kernel\b' | head -1)
+[ -n "$off" ] && ok "no policyUsername: it signs in as the kernel's, as before" || fail "no policyUsername" "$off"
+noSecret=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --set postgres.enabled=false --set externalDatabaseUrl=postgresql://k@db/k \
+  --set catalogPolicy.database.role=policy 2>&1)
+echo "$noSecret" | grep -q "catalogPolicy.database.role needs catalogPolicy.database.existingSecret" \
+  && ok "a role named without its Secret: refused" || fail "a role without its Secret" "rendered"
+
 # The console's identity policy splits only once lookup finds the kernel's
 # policy and binding: never without a cluster (admission-policies.sh
 # covers the split).

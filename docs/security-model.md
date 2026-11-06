@@ -215,7 +215,14 @@ Whatever its executions do, nothing keeps it past
 `catalogPolicy.inUseLimitSeconds` (a week by default) after the release
 dropped it: a retry makes a step ready again, and the console asks for
 retries, so a compromised console could otherwise keep one moving, and the
-policy lists the digest for every execution, not only that one. A digest a newer release names as another ServiceAccount or
+policy lists the digest for every execution, not only that one. It signs
+in to the kernel's database as a role of its own, which `kernel migrate`
+gives only what it uses (`migrate.GrantPolicy`: it reads
+`schema_migrations`, `executions` and `execution_tasks`, and changes only
+`catalog_policy_*`), so a flaw in what parses a registry's or Sigstore's
+answers reaches no other table; with the bundled Postgres the chart makes
+it (`postgres.auth.policyUsername`, its password in a Secret its Pod alone
+mounts), and with a managed one it's still the kernel's (`TODO.md`). A digest a newer release names as another ServiceAccount or
 other audiences loses the old ones at once. Each release records which of
 the trusted signers (each key, the keyless identity) verified it, and is
 listed only while one of them is still trusted: removing a key takes the

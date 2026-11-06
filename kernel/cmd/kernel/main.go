@@ -327,6 +327,12 @@ func runMigrate(ctx context.Context, s config.Settings, log *slog.Logger) error 
 		return err
 	}
 	log.Info("database is current", "version", migrate.Latest(), "applied", len(applied))
+	if role := s.CatalogPolicyDatabaseRole; role != "" {
+		if err := migrate.GrantPolicy(ctx, conn, role); err != nil {
+			return fmt.Errorf("kernel policy's database role %s: %w", role, err)
+		}
+		log.Info("kernel policy's database role holds what it uses alone", "role", role)
+	}
 	return nil
 }
 

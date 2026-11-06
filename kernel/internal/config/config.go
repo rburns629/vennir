@@ -149,6 +149,10 @@ type Settings struct {
 	CatalogPolicyRegistryMirrors  map[string]string
 	CatalogPolicyRegistryGCPToken bool
 	CatalogPolicyRegistryECRToken bool
+	// CatalogPolicyDatabaseRole: `kernel policy`'s own database role, which
+	// `kernel migrate` gives what it uses alone (migrate.GrantPolicy).
+	// Empty: it signs in as the kernel's.
+	CatalogPolicyDatabaseRole string
 
 	// kernel-scheduler, below.
 
@@ -360,6 +364,7 @@ func Load(getenv func(string) string) (Settings, error) {
 		SleeperWakeCronJob:              r.str("SLEEPER_WAKE_CRONJOB", ""),
 		SleeperWakeLead:                 r.seconds("SLEEPER_WAKE_LEAD_SECONDS", 300, true),
 		CatalogPolicyRelease:            r.str("CATALOG_POLICY_RELEASE", ""),
+		CatalogPolicyDatabaseRole:       r.str("CATALOG_POLICY_DATABASE_ROLE", ""),
 		CatalogPolicyNewestVersion:      r.boolean("CATALOG_POLICY_NEWEST_VERSION", false),
 		CatalogPolicyPoll:               r.seconds("CATALOG_POLICY_POLL_SECONDS", 60, true),
 		CatalogPolicyKeylessIssuer:      r.str("CATALOG_POLICY_KEYLESS_ISSUER", ""),

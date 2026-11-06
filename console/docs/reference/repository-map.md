@@ -117,6 +117,7 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | `internal/scheduler/stranded.go` | Every few minutes too, cancels tasks left waiting in a cancelled execution (by a writer that raced the cancel), which nothing would claim. |
 | **`internal/migrate/`** | **The schema.** |
 | `internal/migrate/sql/` | One SQL file per change, applied in order, each once: `0001_initial_schema.sql` (every table at the first public release), then one file per later change. A released file never changes. |
+| `internal/migrate/grants.go` | What `kernel policy`'s own database role holds (`GrantPolicy`, after the migrations): it reads `schema_migrations`, `executions` and `execution_tasks`, and changes only `catalog_policy_*`; tested in `grants_test.go`. |
 | `internal/migrate/migrate.go` | Applies them under an advisory lock, recorded in `schema_migrations`; takes over an install Alembic migrated; what kernel-api and the scheduler wait for. |
 | `internal/sleeper/sleeper.go` | The sleeper: one look, and if the platform is idle, the counts to wake to recorded and every Deployment scaled to zero (the databases last), the wake CronJob armed for the console's next schedule; and `Wake` (`kernel wake`), which brings it back. |
 | **`internal/policy/`** | **`kernel policy`: what a signed catalog decides, written into the cluster by the kernel (decision 27).** |
