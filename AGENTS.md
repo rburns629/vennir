@@ -63,12 +63,13 @@ its own directory.
     it), releases dependents. A failed pass is logged and retried from
     durable state on the next one.
   - `kernel policy` (kernel-policy, `internal/policy`; the kernel chart's
-    `catalogPolicy`, decision 27): with a signed catalog, verifies the
-    catalog's release itself (cosign's Go library, against signers set in
-    the kernel chart) and writes what it decides (each product's released
-    digests as its ServiceAccount and token audiences, each API's
-    audiences) into two admission policies only it may update, beside the
-    console's. Off with an unsigned catalog: the console writes them all.
+    `catalogPolicy`, decision 27, off by default): with a signed catalog,
+    verifies the catalog's release itself (cosign's Go library, against
+    signers set in the kernel chart) and writes what it decides (each
+    product's released digests as its ServiceAccount and token audiences;
+    with `catalogPolicy.gateway` set, each API's audiences too) into
+    admission policies only it may update, beside the console's. Off, or
+    with an unsigned catalog: the console writes them all.
   - `kernel migrate` (`internal/migrate`) owns the schema: `sql/NNNN_*.sql`,
     applied in order by the chart's hook Job; a released file never
     changes. kernel-api and the scheduler wait until the database is at
@@ -123,12 +124,12 @@ its own directory.
   ServiceAccount tokens only for `*-api` ServiceAccounts in team namespaces,
   and only for the audiences each API's `backend.auth` needs (admission
   policies: the console's gateway token policy,
-  `console/src/gatewayTokenPolicy.ts`, and with `catalogPolicy` the
-  kernel's too). Its tests read the console's migrated test
+  `console/src/gatewayTokenPolicy.ts`, and with `catalogPolicy` and
+  `catalogPolicy.gateway` the kernel's too). Its tests read the console's migrated test
   database (`TEST_DATABASE_URL`).
 - **`helm/`**: everything Helm. `helm/charts/` holds the two charts,
   `execution-kernel` (api + scheduler + Postgres, and `kernel policy` with
-  `catalogPolicy`) and `execution-console`
+  `catalogPolicy`, off by default) and `execution-console`
   (+ its own Postgres), with neutral defaults; `helm/values/{kind,gke,eks}/` holds
   each cluster's settings for them and for the third-party charts (ESO,
   policy-controller; on kind, cert-manager and Traefik for `make kind-tls`). The Helm release names are

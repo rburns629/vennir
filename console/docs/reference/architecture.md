@@ -54,8 +54,8 @@ kernel and module in the console, a run call by call, and the state machines.
     them.
   - **kernel policy** (optional, with a signed catalog: `catalogPolicy`)
     verifies the catalog's release itself and writes what it decides
-    (which digests are a product's releases, as which identity; each API's
-    token audiences) into admission policies only it may update, beside
+    (which digests are a product's releases, as which identity; with
+    `catalogPolicy.gateway`, each API's token audiences) into admission policies only it may update, beside
     the console's (decision 27).
 - **gateway** (`gateway/`, Go; optional, `gateway.enabled` in the console
   chart): serves API products (decision 20), forwarding to each one's

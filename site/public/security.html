@@ -165,7 +165,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
               <li>Only allowed image sources, pinned, with a passing scan</li>
               <li>Only the product's own ServiceAccount, and its team's registered Secrets, as volumes</li>
               <li>Signed images, with policy-controller installed</li>
-              <li>Only hardened Jobs</li>
+              <li>Only hardened Jobs, while hardening is on (always, from the next release)</li>
             </ul>
             <span class="mono" style="margin-top: auto; font-size: 12px; line-height: 1.6; color: #F2C08A">DISPATCH_REJECTED · IMAGE_NOT_ALLOWED · IMAGE_NOT_PINNED · IMAGE_SCAN_FAILED · IDENTITY_NOT_ALLOWED · IMAGE_NOT_SIGNED</span>
           </li>
@@ -239,7 +239,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <span class="eyebrow">The second check</span>
           <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Admission policies the API server applies.</h2>
         </div>
-        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">ValidatingAdmissionPolicies installed by the charts, plus Sigstore's policy-controller where you want signatures. The console keeps their lists of products, secrets and digests current; with a signed catalog, the kernel writes what the catalog decides into policies only it may update.</p>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">ValidatingAdmissionPolicies installed by the charts, plus Sigstore's policy-controller where you want signatures. The console keeps their lists of products, secrets and digests current. In the next release (on main now), with a signed catalog and the kernel chart's <span class="mono" style="font-size: 16px; color: #E8EAEE">catalogPolicy</span> on (off by default), the kernel also writes what the catalog decides into policies only it may update.</p>
       </div>
       <div class="card" style="overflow-x: auto">
         <table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 15px; line-height: 1.55">
@@ -253,7 +253,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <tbody>
             <tr>
               <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/dispatch-policy.yaml" class="mono" style="font-size: 13px">dispatch-policy.yaml</a></th>
-              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">A Job outside a namespace labelled <span class="mono" style="font-size: 13px; color: #E8EAEE">vennir/team=true</span>, or in the platform's own; a Job that isn't hardened</td>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">A Job outside a namespace labelled <span class="mono" style="font-size: 13px; color: #E8EAEE">vennir/team=true</span>, or in the platform's own; a Job that isn't hardened while <span class="mono" style="font-size: 13px; color: #E8EAEE">taskPodHardening</span> is on (in 0.11.0; always from the next release, which removes the setting)</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">DISPATCH_REJECTED</td>
             </tr>
             <tr>
@@ -272,8 +272,8 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IDENTITY_NOT_ALLOWED</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/catalog-policy.yaml" class="mono" style="font-size: 13px">catalog-policy.yaml</a></th>
-              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">With a signed catalog and <span class="mono" style="font-size: 13px; color: #E8EAEE">catalogPolicy</span>: an image run as a product, or with tokens, that the catalog release the kernel verified itself doesn't name as that product's, with that ServiceAccount and those audiences; a gateway token for an audience an API's api.yaml doesn't need</td>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/catalog-policy.yaml" class="mono" style="font-size: 13px">catalog-policy.yaml</a> <span class="chip" style="border-color: #6B4A1F; color: #F2C08A">next release</span></th>
+              <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">With a signed catalog and <span class="mono" style="font-size: 13px; color: #E8EAEE">catalogPolicy.enabled</span> on (off by default): an image run as a product, or with tokens, that the catalog release the kernel verified itself doesn't name as that product's, with that ServiceAccount and those audiences. With <span class="mono" style="font-size: 13px; color: #E8EAEE">catalogPolicy.gateway</span> set too, the gateway minting an API's ServiceAccount a token for an audience its api.yaml doesn't need: refused, the caller gets the gateway's 502 <span class="mono" style="font-size: 13px; color: #E8EAEE">BACKEND_CREDENTIAL</span></td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IDENTITY_NOT_ALLOWED</td>
             </tr>
             <tr>
@@ -349,7 +349,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <dl style="margin: 0; display: flex; flex-direction: column">
           <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
             <dt class="mono" style="font-size: 14px; color: #F2C08A">console</dt>
-            <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Could rewrite the image, identity and scan policies and run a step with any team's secrets: Kubernetes doesn't apply admission policies to admission policies. With a signed catalog and the kernel's catalog policies, it still can't run an image no release names as a product, or give an unreviewed image a team's Secret. Still holding: steps only in team namespaces, no writes outside them, no reading Secrets, policy-controller's signatures.</dd>
+            <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Could rewrite the image, identity and scan policies and run a step with any team's secrets: Kubernetes doesn't apply admission policies to admission policies. In the next release, with a signed catalog and the kernel chart's catalogPolicy on (off by default), it can't run an image no release names as a product, or give an unreviewed image a team's Secret. Still holding: steps only in team namespaces, no writes outside them, no reading Secrets, policy-controller's signatures.</dd>
           </div>
           <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
             <dt class="mono" style="font-size: 14px; color: #C9CED8">kernel-api</dt>
@@ -361,7 +361,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           </div>
           <div style="padding: 16px 20px; border-bottom: 1px solid #171B24; display: flex; flex-direction: column; gap: 6px">
             <dt class="mono" style="font-size: 14px; color: #C9CED8">gateway</dt>
-            <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Mints tokens only for <span class="mono" style="color: #E8EAEE">*-api</span> ServiceAccounts in team namespaces, each only for the audiences its API's backend sign-in needs; reads the database as its own role, and verifies sessions with a public key it can't sign with.</dd>
+            <dd style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Mints tokens only for <span class="mono" style="color: #E8EAEE">*-api</span> ServiceAccounts in team namespaces (from the next release, each only for the audiences its API's backend sign-in needs); reads the database as its own role, and verifies sessions with a public key it can't sign with.</dd>
           </div>
           <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 6px">
             <dt class="mono" style="font-size: 14px; color: #C9CED8">sleeper</dt>
@@ -382,7 +382,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
     <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
       <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
         <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Sessions</h3>
-        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">EdDSA-signed tokens lasting 8 hours by default (an hour when a single sign-on groups claim gave the person a team), sent as a bearer header, never a cookie. Signing out revokes that session at the console and the gateway; a password change ends all of them.</p>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">EdDSA-signed tokens lasting 8 hours by default (from the next release, an hour when a single sign-on groups claim gave the person a team), sent as a bearer header, never a cookie. Signing out revokes that session at the console and the gateway; a password change ends all of them.</p>
       </li>
       <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
         <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Single sign-on</h3>
@@ -405,8 +405,8 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A storefront's bot orders only the templates its team lists for it, at a capped rate, and its callbacks are signed with HMAC-SHA256 so the receiver can refuse forgeries.</p>
       </li>
       <li style="background: #11141B; padding: 28px; display: flex; flex-direction: column; gap: 12px">
-        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Who may call an API</h3>
-        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The gateway lets through an API's own team and whoever its access list grants: a single sign-on group, or one person or bot, each at its own rate. Only its team's maintainers grant; everyone else, admins included, gets 403 before the backend.</p>
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Who may call an API <span class="chip" style="border-color: #6B4A1F; color: #F2C08A">next release</span></h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">In 0.11.0, the API's own team and the teams its api.yaml's <span class="mono" style="font-size: 14px; color: #E8EAEE">shareWith</span> names. From the next release, the API's own team and whoever its access list grants: a single sign-on group, or one person or bot, each at its own rate. Its team's maintainers grant; with <span class="mono" style="font-size: 14px; color: #E8EAEE">access.requests: open</span>, asking grants at once. For that release the <span class="mono" style="font-size: 14px; color: #E8EAEE">shareWith</span> teams still call. Everyone else, admins included, gets 403 before the backend.</p>
       </li>
     </ul>
   </section>
@@ -419,7 +419,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Every change on file, and no credential in the logs.</h2>
         <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 18px">
           <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">A hash-chained audit log.</b> Every call that can change something, allowed or refused, and every sign-in: who, what it named, the outcome. Never a value, password or token.</span></li>
-          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Who read what.</b> Who was shown a run's outputs or logs, or a team's secret names, kept apart from the audit log so its chain doesn't grow with every read.</span></li>
+          <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Who read what (next release).</b> Who was shown a run's outputs or logs, or a team's secret names, kept apart from the audit log so its chain doesn't grow with every read.</span></li>
           <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">A write-once copy.</b> With <span class="mono" style="font-size: 15px; color: #E8EAEE">audit.export</span>, entries go to a bucket that refuses deletes and overwrites (GCS retention, S3 Object Lock), compared with the database entry by entry, a few at a time, round and round.</span></li>
           <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Credentials redacted.</b> PEM keys, cloud keys, GitHub, Slack and Stripe tokens, bearer tokens and JWTs are redacted from logs before anything is stored, by the kernel and by the log collector.</span></li>
           <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 9px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 17px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Signed releases.</b> Each version's kernel, console and gateway images are scanned, then signed keyless by the release workflow, as are the charts and the <span class="mono" style="font-size: 15px; color: #E8EAEE">vennir</span> binaries.</span></li>
@@ -505,16 +505,29 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       </div>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 20px">
         <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">A compromised console can loosen some policies</h3>
-          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Kubernetes can't guard an admission policy from its editor. With a signed catalog, the kernel writes which images run as each product, so the console can't loosen that; it can still loosen the image sources, the scan list and each team's secret names, and run a reviewed product with any of its team's secrets. Without a signed catalog it could allow any image, ServiceAccount or Secret. Treat the console as the most privileged component.</p>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">A compromised console can loosen three policies</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Kubernetes can't guard an admission policy from its editor, so the console could allow any image, ServiceAccount or Secret. Accepted for now: treat the console as the most privileged component.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2"><b style="color: #F2C08A; font-weight: 600">Next release (on main):</b> With a signed catalog and the kernel chart's <span class="mono" style="font-size: 14px; color: #E8EAEE">catalogPolicy</span> on (off by default), the kernel writes which images run as each product, so the console can't loosen that. It can still loosen the image sources, the scan list and each team's secret names, and run a reviewed product with any of its team's secrets.</p>
         </div>
         <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
           <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Token groups are read at sign-in only</h3>
-          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A team that a group in the provider's token gave someone counts only for a sign-in from the last hour, so leaving the group takes them out of it within the hour. Approval and failure notifications, and the team's Members tab, still count them until their next single sign-on.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Someone who leaves a group the provider reports in its token stays in its team until the session ends. Google Workspace groups are read again every hour. Shorten <span class="mono" style="font-size: 14px; color: #E8EAEE">JWT_TTL</span> where that matters.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2"><b style="color: #F2C08A; font-weight: 600">Next release (on main):</b> A team such a group gave someone counts only for a sign-in from the last hour, so leaving the group takes them out of it within the hour. Approval and failure notifications, and the team's Members tab, still count them until their next single sign-on.</p>
         </div>
         <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Reads are recorded, but not chained</h3>
-          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Who was shown a run's outputs or logs, or a team's secrets' names, is recorded apart from the audit log, without its hash chain or write-once copy, and admins read it through the API only for now. Ship the <span class="mono" style="font-size: 14px; color: #E8EAEE">audit_read</span> log lines to a SIEM where that matters.</p>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Reads aren't audited</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Who looked at a run's outputs or logs, or a team's secrets' names, isn't recorded.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2"><b style="color: #F2C08A; font-weight: 600">Next release (on main):</b> Fixed: they're recorded, apart from the audit log, without its hash chain or write-once copy, and admins read them through the API only for now. Ship the <span class="mono" style="font-size: 14px; color: #E8EAEE">audit_read</span> log lines to a SIEM where that matters.</p>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">A raw DAG shows every step's outputs</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Every team named in a raw DAG sees all its steps' outputs. A template run's providers see only their own steps in full.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2"><b style="color: #F2C08A; font-weight: 600">Next release (on main):</b> Fixed: a member of one of its teams sees that team's steps in full, and of the others only their state, timing and failure code.</p>
+        </div>
+        <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Step hardening is a chart setting</h3>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">With <span class="mono" style="font-size: 14px; color: #E8EAEE">taskPodHardening: false</span>, only Pod Security holds a step, and only in namespaces the console created; in an adopted one it runs as root with an API token.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2"><b style="color: #F2C08A; font-weight: 600">Next release (on main):</b> Fixed: the setting is gone, and every step is hardened.</p>
         </div>
         <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
           <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Without the copy, the audit log can be rewritten</h3>
