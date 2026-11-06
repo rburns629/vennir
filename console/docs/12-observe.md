@@ -166,7 +166,7 @@ A step's lines count as `info` only when it logs them as JSON with `"level": "in
 
 ## Reading the audit log
 
-**Audit log** (headed **Who changed what**) lists every change anyone asked the console for, allowed or refused: secrets added, runs submitted, cancelled or retried, people added, APIs paused, images accepted, sign-ins, and so on. Secrets' values, passwords and tokens are never recorded. Reads aren't recorded either: who looked at a run or its logs isn't here.
+**Audit log** (headed **Who changed what**) lists every change anyone asked the console for, allowed or refused: secrets added, runs submitted, cancelled or retried, people added, APIs paused, images accepted, sign-ins, and so on. Secrets' values, passwords and tokens are never recorded. Reads aren't here: who was shown a run's outputs, failure messages or logs, or a team's secret names, is recorded apart, for admins (see [who read what](#who-read-what)).
 
 | Column | Shows |
 | --- | --- |
@@ -179,6 +179,12 @@ A step's lines count as `info` only when it logs them as JSON with `"level": "in
 Filter with **Team**, **Only mine** and **Only refused or failed**, and press **Load older entries** for more. Each entry shows its number in the chain (**Entry**).
 
 Admins see every entry. Anyone else sees their own, and what anyone (admins included) did to their teams or to runs in them. Entries about no team, such as users, the catalog, the gateway or policies, are for admins only.
+
+## Who read what
+
+The console also records who was shown sensitive content: a run's outputs or failure messages, its steps' logs (on the run or in log search), what its resources provided (listed, or filled into an order's plan), and a team's secret and secret store names. The chat agent's reads count as the person's it answered. Each record names what was read (the run, the teams, the steps seen in full, the secrets' names), never the content, with the reader's address. A step you weren't shown in full isn't recorded as read by you; opening a page that showed nothing sensitive isn't recorded, and a page that refreshes gets one record every 10 minutes for what it keeps showing, not one at each refresh: anything new it shows, or the same read from another address, is recorded at once.
+
+These records are kept apart from the audit log, for 90 days by default (the console chart's `retention.auditReadsDays`), and only admins can read them, through the API (`AdminService/ListAuditReads`, by reader, team or run); reading them is recorded too. They have no page in the console yet.
 
 ## Is the audit log intact? Its write-once copy
 

@@ -14,7 +14,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file vennir/console/v1/admin.proto.
  */
 export const file_vennir_console_v1_admin: GenFile = /*@__PURE__*/
-  fileDesc("Ch12ZW5uaXIvY29uc29sZS92MS9hZG1pbi5wcm90bxIRdmVubmlyLmNvbnNvbGUudjEiEwoRR2V0SW5zdGFsbFJlcXVlc3QizwUKEkdldEluc3RhbGxSZXNwb25zZRIPCgd2ZXJzaW9uGAEgASgJEhkKEWVudmlyb25tZW50X2xhYmVsGAIgASgJEhQKDHNzb19wcm92aWRlchgDIAEoCRIMCgRsb2dzGAQgASgIEhcKD2xvZ19zZWFyY2hfZGF5cxgFIAEoBRISCgphdWRpdF9jb3B5GAYgASgIEg8KB2dhdGV3YXkYByABKAgSDwoHY2F0YWxvZxgIIAEoCBIWCg5jYXRhbG9nX3NpZ25lZBgJIAEoCBIQCghzY2FubmluZxgKIAEoCBIaChJydW5fcmV0ZW50aW9uX2RheXMYCyABKAUSFwoPY2F0YWxvZ192ZXJzaW9uGAwgASgJEhwKFGNhdGFsb2dfcG9sbF9zZWNvbmRzGA0gASgFEhsKE2NhdGFsb2dfc2lnbmVyX2tleXMYDiABKAUSHgoWY2F0YWxvZ19rZXlsZXNzX2lzc3VlchgPIAEoCRIfChdjYXRhbG9nX2tleWxlc3Nfc3ViamVjdBgQIAEoCRIYChBleHRlcm5hbF9jYXRhbG9nGBEgASgJEg0KBWVtYWlsGBIgASgIEhIKCmVtYWlsX2hvc3QYEyABKAkSEgoKZW1haWxfZnJvbRgUIAEoCRIbChNtb25pdG9yaW5nX3Byb3ZpZGVyGBUgASgJEhMKC2dyYWZhbmFfdXJsGBYgASgJEhYKDnNlc3Npb25fbGVuZ3RoGBcgASgJEhcKD2F1ZGl0X2tlZXBfZGF5cxgYIAEoBRISCgphdWRpdF9sb2NrGBkgASgIEhsKE3BvbGljeV9zeW5jX3NlY29uZHMYGiABKAUSJgoZaW1hZ2Vfc2lnbmF0dXJlc19yZXF1aXJlZBgbIAEoCEgAiAEBEhQKDHJlc2Nhbl9ob3VycxgcIAEoBUIcChpfaW1hZ2Vfc2lnbmF0dXJlc19yZXF1aXJlZCIZChdHZXRDYXRhbG9nU3RhdHVzUmVxdWVzdCJMChhHZXRDYXRhbG9nU3RhdHVzUmVzcG9uc2USMAoGc3RhdHVzGAEgASgLMiAudmVubmlyLmNvbnNvbGUudjEuQ2F0YWxvZ1N0YXR1cyIUChJTeW5jQ2F0YWxvZ1JlcXVlc3QiRwoTU3luY0NhdGFsb2dSZXNwb25zZRIwCgZzdGF0dXMYASABKAsyIC52ZW5uaXIuY29uc29sZS52MS5DYXRhbG9nU3RhdHVzIicKF0Fkb3B0Q2F0YWxvZ1RlYW1SZXF1ZXN0EgwKBG5hbWUYASABKAkiTAoYQWRvcHRDYXRhbG9nVGVhbVJlc3BvbnNlEjAKBnN0YXR1cxgBIAEoCzIgLnZlbm5pci5jb25zb2xlLnYxLkNhdGFsb2dTdGF0dXMi1AIKDUNhdGFsb2dTdGF0dXMSDwoHcmVsZWFzZRgBIAEoCRIOCgZkaWdlc3QYAiABKAkSDgoGY29tbWl0GAMgASgJEhIKCnJlcG9zaXRvcnkYBCABKAkSLgoKYXBwbGllZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMwoIcHJvYmxlbXMYBiADKAsyIS52ZW5uaXIuY29uc29sZS52MS5DYXRhbG9nUHJvYmxlbRIuCgpjaGVja2VkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBINCgVlcnJvchgIIAEoCRIWCg5uZXdlc3RfdmVyc2lvbhgJIAEoCBIPCgd2ZXJzaW9uGAogASgJEjEKB2FwcGxpZWQYCyABKAsyIC52ZW5uaXIuY29uc29sZS52MS5DYXRhbG9nQ291bnRzInkKDUNhdGFsb2dDb3VudHMSDQoFdGVhbXMYASABKAUSEAoIcHJvZHVjdHMYAiABKAUSDwoHYWN0aW9ucxgDIAEoBRIRCgl0ZW1wbGF0ZXMYBCABKAUSDAoEYXBpcxgFIAEoBRIVCg1zZWNyZXRfc3RvcmVzGAYgASgFIkcKDkNhdGFsb2dQcm9ibGVtEgwKBGl0ZW0YASABKAkSDwoHbWVzc2FnZRgCIAEoCRIWCg5hZG9wdGFibGVfdGVhbRgDIAEoCSIRCg9HZXRTdGF0c1JlcXVlc3QiVgoQR2V0U3RhdHNSZXNwb25zZRINCgV0ZWFtcxgBIAEoAxINCgV1c2VycxgCIAEoAxIQCghwcm9kdWN0cxgDIAEoAxISCgpleGVjdXRpb25zGAQgASgDIqQCCgpBdWRpdEVudHJ5EgoKAmlkGAEgASgDEiYKAmF0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIVCghhY3Rvcl9pZBgDIAEoCUgAiAEBEhgKC2FjdG9yX2VtYWlsGAQgASgJSAGIAQESFAoMYWN0b3JfaXNfYm90GAUgASgIEg4KBm1ldGhvZBgGIAEoCRINCgVyb3V0ZRgHIAEoCRInCgZ0YXJnZXQYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0Eg4KBnN0YXR1cxgJIAEoBRIXCgpyZXF1ZXN0X2lkGAogASgJSAKIAQFCCwoJX2FjdG9yX2lkQg4KDF9hY3Rvcl9lbWFpbEINCgtfcmVxdWVzdF9pZCJKChdMaXN0QXVkaXRFbnRyaWVzUmVxdWVzdBIOCgZiZWZvcmUYASABKAMSEAoIYWN0b3JfaWQYAiABKAkSDQoFbGltaXQYAyABKAUiXwoYTGlzdEF1ZGl0RW50cmllc1Jlc3BvbnNlEi4KB2VudHJpZXMYASADKAsyHS52ZW5uaXIuY29uc29sZS52MS5BdWRpdEVudHJ5EhMKC25leHRfYmVmb3JlGAIgASgDInYKEVBvbGljeVN5bmNPdXRjb21lEg8KB2FwcGxpZXMYASABKAgSCgoCb2sYAiABKAgSJgoCYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKBWVycm9yGAQgASgJSACIAQFCCAoGX2Vycm9yIhYKFEdldFBvbGljeVN5bmNSZXF1ZXN0IrgBChVHZXRQb2xpY3lTeW5jUmVzcG9uc2USSAoIb3V0Y29tZXMYASADKAsyNi52ZW5uaXIuY29uc29sZS52MS5HZXRQb2xpY3lTeW5jUmVzcG9uc2UuT3V0Y29tZXNFbnRyeRpVCg1PdXRjb21lc0VudHJ5EgsKA2tleRgBIAEoCRIzCgV2YWx1ZRgCIAEoCzIkLnZlbm5pci5jb25zb2xlLnYxLlBvbGljeVN5bmNPdXRjb21lOgI4ASIVChNTeW5jUG9saWNpZXNSZXF1ZXN0IrYBChRTeW5jUG9saWNpZXNSZXNwb25zZRJHCghvdXRjb21lcxgBIAMoCzI1LnZlbm5pci5jb25zb2xlLnYxLlN5bmNQb2xpY2llc1Jlc3BvbnNlLk91dGNvbWVzRW50cnkaVQoNT3V0Y29tZXNFbnRyeRILCgNrZXkYASABKAkSMwoFdmFsdWUYAiABKAsyJC52ZW5uaXIuY29uc29sZS52MS5Qb2xpY3lTeW5jT3V0Y29tZToCOAEy0AYKDEFkbWluU2VydmljZRJYCghHZXRTdGF0cxIiLnZlbm5pci5jb25zb2xlLnYxLkdldFN0YXRzUmVxdWVzdBojLnZlbm5pci5jb25zb2xlLnYxLkdldFN0YXRzUmVzcG9uc2UiA5ACARJwChBMaXN0QXVkaXRFbnRyaWVzEioudmVubmlyLmNvbnNvbGUudjEuTGlzdEF1ZGl0RW50cmllc1JlcXVlc3QaKy52ZW5uaXIuY29uc29sZS52MS5MaXN0QXVkaXRFbnRyaWVzUmVzcG9uc2UiA5ACARJnCg1HZXRQb2xpY3lTeW5jEicudmVubmlyLmNvbnNvbGUudjEuR2V0UG9saWN5U3luY1JlcXVlc3QaKC52ZW5uaXIuY29uc29sZS52MS5HZXRQb2xpY3lTeW5jUmVzcG9uc2UiA5ACARJkCgxTeW5jUG9saWNpZXMSJi52ZW5uaXIuY29uc29sZS52MS5TeW5jUG9saWNpZXNSZXF1ZXN0GicudmVubmlyLmNvbnNvbGUudjEuU3luY1BvbGljaWVzUmVzcG9uc2UiA5ACAhJwChBHZXRDYXRhbG9nU3RhdHVzEioudmVubmlyLmNvbnNvbGUudjEuR2V0Q2F0YWxvZ1N0YXR1c1JlcXVlc3QaKy52ZW5uaXIuY29uc29sZS52MS5HZXRDYXRhbG9nU3RhdHVzUmVzcG9uc2UiA5ACARJhCgtTeW5jQ2F0YWxvZxIlLnZlbm5pci5jb25zb2xlLnYxLlN5bmNDYXRhbG9nUmVxdWVzdBomLnZlbm5pci5jb25zb2xlLnYxLlN5bmNDYXRhbG9nUmVzcG9uc2UiA5ACAhJwChBBZG9wdENhdGFsb2dUZWFtEioudmVubmlyLmNvbnNvbGUudjEuQWRvcHRDYXRhbG9nVGVhbVJlcXVlc3QaKy52ZW5uaXIuY29uc29sZS52MS5BZG9wdENhdGFsb2dUZWFtUmVzcG9uc2UiA5ACAhJeCgpHZXRJbnN0YWxsEiQudmVubmlyLmNvbnNvbGUudjEuR2V0SW5zdGFsbFJlcXVlc3QaJS52ZW5uaXIuY29uc29sZS52MS5HZXRJbnN0YWxsUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("Ch12ZW5uaXIvY29uc29sZS92MS9hZG1pbi5wcm90bxIRdmVubmlyLmNvbnNvbGUudjEiEwoRR2V0SW5zdGFsbFJlcXVlc3QizwUKEkdldEluc3RhbGxSZXNwb25zZRIPCgd2ZXJzaW9uGAEgASgJEhkKEWVudmlyb25tZW50X2xhYmVsGAIgASgJEhQKDHNzb19wcm92aWRlchgDIAEoCRIMCgRsb2dzGAQgASgIEhcKD2xvZ19zZWFyY2hfZGF5cxgFIAEoBRISCgphdWRpdF9jb3B5GAYgASgIEg8KB2dhdGV3YXkYByABKAgSDwoHY2F0YWxvZxgIIAEoCBIWCg5jYXRhbG9nX3NpZ25lZBgJIAEoCBIQCghzY2FubmluZxgKIAEoCBIaChJydW5fcmV0ZW50aW9uX2RheXMYCyABKAUSFwoPY2F0YWxvZ192ZXJzaW9uGAwgASgJEhwKFGNhdGFsb2dfcG9sbF9zZWNvbmRzGA0gASgFEhsKE2NhdGFsb2dfc2lnbmVyX2tleXMYDiABKAUSHgoWY2F0YWxvZ19rZXlsZXNzX2lzc3VlchgPIAEoCRIfChdjYXRhbG9nX2tleWxlc3Nfc3ViamVjdBgQIAEoCRIYChBleHRlcm5hbF9jYXRhbG9nGBEgASgJEg0KBWVtYWlsGBIgASgIEhIKCmVtYWlsX2hvc3QYEyABKAkSEgoKZW1haWxfZnJvbRgUIAEoCRIbChNtb25pdG9yaW5nX3Byb3ZpZGVyGBUgASgJEhMKC2dyYWZhbmFfdXJsGBYgASgJEhYKDnNlc3Npb25fbGVuZ3RoGBcgASgJEhcKD2F1ZGl0X2tlZXBfZGF5cxgYIAEoBRISCgphdWRpdF9sb2NrGBkgASgIEhsKE3BvbGljeV9zeW5jX3NlY29uZHMYGiABKAUSJgoZaW1hZ2Vfc2lnbmF0dXJlc19yZXF1aXJlZBgbIAEoCEgAiAEBEhQKDHJlc2Nhbl9ob3VycxgcIAEoBUIcChpfaW1hZ2Vfc2lnbmF0dXJlc19yZXF1aXJlZCIZChdHZXRDYXRhbG9nU3RhdHVzUmVxdWVzdCJMChhHZXRDYXRhbG9nU3RhdHVzUmVzcG9uc2USMAoGc3RhdHVzGAEgASgLMiAudmVubmlyLmNvbnNvbGUudjEuQ2F0YWxvZ1N0YXR1cyIUChJTeW5jQ2F0YWxvZ1JlcXVlc3QiRwoTU3luY0NhdGFsb2dSZXNwb25zZRIwCgZzdGF0dXMYASABKAsyIC52ZW5uaXIuY29uc29sZS52MS5DYXRhbG9nU3RhdHVzIicKF0Fkb3B0Q2F0YWxvZ1RlYW1SZXF1ZXN0EgwKBG5hbWUYASABKAkiTAoYQWRvcHRDYXRhbG9nVGVhbVJlc3BvbnNlEjAKBnN0YXR1cxgBIAEoCzIgLnZlbm5pci5jb25zb2xlLnYxLkNhdGFsb2dTdGF0dXMi1AIKDUNhdGFsb2dTdGF0dXMSDwoHcmVsZWFzZRgBIAEoCRIOCgZkaWdlc3QYAiABKAkSDgoGY29tbWl0GAMgASgJEhIKCnJlcG9zaXRvcnkYBCABKAkSLgoKYXBwbGllZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMwoIcHJvYmxlbXMYBiADKAsyIS52ZW5uaXIuY29uc29sZS52MS5DYXRhbG9nUHJvYmxlbRIuCgpjaGVja2VkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBINCgVlcnJvchgIIAEoCRIWCg5uZXdlc3RfdmVyc2lvbhgJIAEoCBIPCgd2ZXJzaW9uGAogASgJEjEKB2FwcGxpZWQYCyABKAsyIC52ZW5uaXIuY29uc29sZS52MS5DYXRhbG9nQ291bnRzInkKDUNhdGFsb2dDb3VudHMSDQoFdGVhbXMYASABKAUSEAoIcHJvZHVjdHMYAiABKAUSDwoHYWN0aW9ucxgDIAEoBRIRCgl0ZW1wbGF0ZXMYBCABKAUSDAoEYXBpcxgFIAEoBRIVCg1zZWNyZXRfc3RvcmVzGAYgASgFIkcKDkNhdGFsb2dQcm9ibGVtEgwKBGl0ZW0YASABKAkSDwoHbWVzc2FnZRgCIAEoCRIWCg5hZG9wdGFibGVfdGVhbRgDIAEoCSIRCg9HZXRTdGF0c1JlcXVlc3QiVgoQR2V0U3RhdHNSZXNwb25zZRINCgV0ZWFtcxgBIAEoAxINCgV1c2VycxgCIAEoAxIQCghwcm9kdWN0cxgDIAEoAxISCgpleGVjdXRpb25zGAQgASgDIqQCCgpBdWRpdEVudHJ5EgoKAmlkGAEgASgDEiYKAmF0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIVCghhY3Rvcl9pZBgDIAEoCUgAiAEBEhgKC2FjdG9yX2VtYWlsGAQgASgJSAGIAQESFAoMYWN0b3JfaXNfYm90GAUgASgIEg4KBm1ldGhvZBgGIAEoCRINCgVyb3V0ZRgHIAEoCRInCgZ0YXJnZXQYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0Eg4KBnN0YXR1cxgJIAEoBRIXCgpyZXF1ZXN0X2lkGAogASgJSAKIAQFCCwoJX2FjdG9yX2lkQg4KDF9hY3Rvcl9lbWFpbEINCgtfcmVxdWVzdF9pZCJKChdMaXN0QXVkaXRFbnRyaWVzUmVxdWVzdBIOCgZiZWZvcmUYASABKAMSEAoIYWN0b3JfaWQYAiABKAkSDQoFbGltaXQYAyABKAUiXwoYTGlzdEF1ZGl0RW50cmllc1Jlc3BvbnNlEi4KB2VudHJpZXMYASADKAsyHS52ZW5uaXIuY29uc29sZS52MS5BdWRpdEVudHJ5EhMKC25leHRfYmVmb3JlGAIgASgDIs8CCglBdWRpdFJlYWQSCgoCaWQYASABKAMSJgoCYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKCGFjdG9yX2lkGAMgASgJSACIAQESGAoLYWN0b3JfZW1haWwYBCABKAlIAYgBARIUCgxhY3Rvcl9pc19ib3QYBSABKAgSDQoFcm91dGUYBiABKAkSFQoNZXhlY3V0aW9uX2lkcxgHIAMoCRINCgV0ZWFtcxgIIAMoCRInCgZ0YXJnZXQYCSABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhYKCWNsaWVudF9pcBgKIAEoCUgCiAEBEhcKCnJlcXVlc3RfaWQYCyABKAlIA4gBAUILCglfYWN0b3JfaWRCDgoMX2FjdG9yX2VtYWlsQgwKCl9jbGllbnRfaXBCDQoLX3JlcXVlc3RfaWQibAoVTGlzdEF1ZGl0UmVhZHNSZXF1ZXN0Eg4KBmJlZm9yZRgBIAEoAxIQCghhY3Rvcl9pZBgCIAEoCRIMCgR0ZWFtGAMgASgJEhQKDGV4ZWN1dGlvbl9pZBgEIAEoCRINCgVsaW1pdBgFIAEoBSJaChZMaXN0QXVkaXRSZWFkc1Jlc3BvbnNlEisKBXJlYWRzGAEgAygLMhwudmVubmlyLmNvbnNvbGUudjEuQXVkaXRSZWFkEhMKC25leHRfYmVmb3JlGAIgASgDInYKEVBvbGljeVN5bmNPdXRjb21lEg8KB2FwcGxpZXMYASABKAgSCgoCb2sYAiABKAgSJgoCYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKBWVycm9yGAQgASgJSACIAQFCCAoGX2Vycm9yIhYKFEdldFBvbGljeVN5bmNSZXF1ZXN0IrgBChVHZXRQb2xpY3lTeW5jUmVzcG9uc2USSAoIb3V0Y29tZXMYASADKAsyNi52ZW5uaXIuY29uc29sZS52MS5HZXRQb2xpY3lTeW5jUmVzcG9uc2UuT3V0Y29tZXNFbnRyeRpVCg1PdXRjb21lc0VudHJ5EgsKA2tleRgBIAEoCRIzCgV2YWx1ZRgCIAEoCzIkLnZlbm5pci5jb25zb2xlLnYxLlBvbGljeVN5bmNPdXRjb21lOgI4ASIVChNTeW5jUG9saWNpZXNSZXF1ZXN0IrYBChRTeW5jUG9saWNpZXNSZXNwb25zZRJHCghvdXRjb21lcxgBIAMoCzI1LnZlbm5pci5jb25zb2xlLnYxLlN5bmNQb2xpY2llc1Jlc3BvbnNlLk91dGNvbWVzRW50cnkaVQoNT3V0Y29tZXNFbnRyeRILCgNrZXkYASABKAkSMwoFdmFsdWUYAiABKAsyJC52ZW5uaXIuY29uc29sZS52MS5Qb2xpY3lTeW5jT3V0Y29tZToCOAEyvAcKDEFkbWluU2VydmljZRJYCghHZXRTdGF0cxIiLnZlbm5pci5jb25zb2xlLnYxLkdldFN0YXRzUmVxdWVzdBojLnZlbm5pci5jb25zb2xlLnYxLkdldFN0YXRzUmVzcG9uc2UiA5ACARJwChBMaXN0QXVkaXRFbnRyaWVzEioudmVubmlyLmNvbnNvbGUudjEuTGlzdEF1ZGl0RW50cmllc1JlcXVlc3QaKy52ZW5uaXIuY29uc29sZS52MS5MaXN0QXVkaXRFbnRyaWVzUmVzcG9uc2UiA5ACARJqCg5MaXN0QXVkaXRSZWFkcxIoLnZlbm5pci5jb25zb2xlLnYxLkxpc3RBdWRpdFJlYWRzUmVxdWVzdBopLnZlbm5pci5jb25zb2xlLnYxLkxpc3RBdWRpdFJlYWRzUmVzcG9uc2UiA5ACARJnCg1HZXRQb2xpY3lTeW5jEicudmVubmlyLmNvbnNvbGUudjEuR2V0UG9saWN5U3luY1JlcXVlc3QaKC52ZW5uaXIuY29uc29sZS52MS5HZXRQb2xpY3lTeW5jUmVzcG9uc2UiA5ACARJkCgxTeW5jUG9saWNpZXMSJi52ZW5uaXIuY29uc29sZS52MS5TeW5jUG9saWNpZXNSZXF1ZXN0GicudmVubmlyLmNvbnNvbGUudjEuU3luY1BvbGljaWVzUmVzcG9uc2UiA5ACAhJwChBHZXRDYXRhbG9nU3RhdHVzEioudmVubmlyLmNvbnNvbGUudjEuR2V0Q2F0YWxvZ1N0YXR1c1JlcXVlc3QaKy52ZW5uaXIuY29uc29sZS52MS5HZXRDYXRhbG9nU3RhdHVzUmVzcG9uc2UiA5ACARJhCgtTeW5jQ2F0YWxvZxIlLnZlbm5pci5jb25zb2xlLnYxLlN5bmNDYXRhbG9nUmVxdWVzdBomLnZlbm5pci5jb25zb2xlLnYxLlN5bmNDYXRhbG9nUmVzcG9uc2UiA5ACAhJwChBBZG9wdENhdGFsb2dUZWFtEioudmVubmlyLmNvbnNvbGUudjEuQWRvcHRDYXRhbG9nVGVhbVJlcXVlc3QaKy52ZW5uaXIuY29uc29sZS52MS5BZG9wdENhdGFsb2dUZWFtUmVzcG9uc2UiA5ACAhJeCgpHZXRJbnN0YWxsEiQudmVubmlyLmNvbnNvbGUudjEuR2V0SW5zdGFsbFJlcXVlc3QaJS52ZW5uaXIuY29uc29sZS52MS5HZXRJbnN0YWxsUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message vennir.console.v1.GetInstallRequest
@@ -658,6 +658,154 @@ export const ListAuditEntriesResponseSchema: GenMessage<ListAuditEntriesResponse
   messageDesc(file_vennir_console_v1_admin, 15);
 
 /**
+ * @generated from message vennir.console.v1.AuditRead
+ */
+export type AuditRead = Message<"vennir.console.v1.AuditRead"> & {
+  /**
+   * @generated from field: int64 id = 1;
+   */
+  id: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp at = 2;
+   */
+  at?: Timestamp | undefined;
+
+  /**
+   * @generated from field: optional string actor_id = 3;
+   */
+  actorId?: string | undefined;
+
+  /**
+   * @generated from field: optional string actor_email = 4;
+   */
+  actorEmail?: string | undefined;
+
+  /**
+   * @generated from field: bool actor_is_bot = 5;
+   */
+  actorIsBot: boolean;
+
+  /**
+   * The RPC's procedure, such as vennir.console.v1.ExecutionService/GetExecution.
+   *
+   * @generated from field: string route = 6;
+   */
+  route: string;
+
+  /**
+   * The runs read: one for a run's page, several for a list (resources,
+   * a log search).
+   *
+   * @generated from field: repeated string execution_ids = 7;
+   */
+  executionIds: string[];
+
+  /**
+   * The teams whose data it was.
+   *
+   * @generated from field: repeated string teams = 8;
+   */
+  teams: string[];
+
+  /**
+   * What was read, by name: step keys (tasks), secret or store names, a
+   * chat tool. Never the content.
+   *
+   * @generated from field: google.protobuf.Struct target = 9;
+   */
+  target?: JsonObject | undefined;
+
+  /**
+   * @generated from field: optional string client_ip = 10;
+   */
+  clientIp?: string | undefined;
+
+  /**
+   * @generated from field: optional string request_id = 11;
+   */
+  requestId?: string | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.AuditRead.
+ * Use `create(AuditReadSchema)` to create a new message.
+ */
+export const AuditReadSchema: GenMessage<AuditRead> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_admin, 16);
+
+/**
+ * @generated from message vennir.console.v1.ListAuditReadsRequest
+ */
+export type ListAuditReadsRequest = Message<"vennir.console.v1.ListAuditReadsRequest"> & {
+  /**
+   * Older than this read's id; the newest when unset.
+   *
+   * @generated from field: int64 before = 1;
+   */
+  before: bigint;
+
+  /**
+   * Only this account's.
+   *
+   * @generated from field: string actor_id = 2;
+   */
+  actorId: string;
+
+  /**
+   * Only reads of this team's data.
+   *
+   * @generated from field: string team = 3;
+   */
+  team: string;
+
+  /**
+   * Only reads that included this run.
+   *
+   * @generated from field: string execution_id = 4;
+   */
+  executionId: string;
+
+  /**
+   * 100 when unset, at most 500.
+   *
+   * @generated from field: int32 limit = 5;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAuditReadsRequest.
+ * Use `create(ListAuditReadsRequestSchema)` to create a new message.
+ */
+export const ListAuditReadsRequestSchema: GenMessage<ListAuditReadsRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_admin, 17);
+
+/**
+ * @generated from message vennir.console.v1.ListAuditReadsResponse
+ */
+export type ListAuditReadsResponse = Message<"vennir.console.v1.ListAuditReadsResponse"> & {
+  /**
+   * @generated from field: repeated vennir.console.v1.AuditRead reads = 1;
+   */
+  reads: AuditRead[];
+
+  /**
+   * Pass as `before` for the next page; 0 on the last.
+   *
+   * @generated from field: int64 next_before = 2;
+   */
+  nextBefore: bigint;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAuditReadsResponse.
+ * Use `create(ListAuditReadsResponseSchema)` to create a new message.
+ */
+export const ListAuditReadsResponseSchema: GenMessage<ListAuditReadsResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_admin, 18);
+
+/**
  * @generated from message vennir.console.v1.PolicySyncOutcome
  */
 export type PolicySyncOutcome = Message<"vennir.console.v1.PolicySyncOutcome"> & {
@@ -689,7 +837,7 @@ export type PolicySyncOutcome = Message<"vennir.console.v1.PolicySyncOutcome"> &
  * Use `create(PolicySyncOutcomeSchema)` to create a new message.
  */
 export const PolicySyncOutcomeSchema: GenMessage<PolicySyncOutcome> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_admin, 16);
+  messageDesc(file_vennir_console_v1_admin, 19);
 
 /**
  * @generated from message vennir.console.v1.GetPolicySyncRequest
@@ -702,7 +850,7 @@ export type GetPolicySyncRequest = Message<"vennir.console.v1.GetPolicySyncReque
  * Use `create(GetPolicySyncRequestSchema)` to create a new message.
  */
 export const GetPolicySyncRequestSchema: GenMessage<GetPolicySyncRequest> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_admin, 17);
+  messageDesc(file_vennir_console_v1_admin, 20);
 
 /**
  * @generated from message vennir.console.v1.GetPolicySyncResponse
@@ -722,7 +870,7 @@ export type GetPolicySyncResponse = Message<"vennir.console.v1.GetPolicySyncResp
  * Use `create(GetPolicySyncResponseSchema)` to create a new message.
  */
 export const GetPolicySyncResponseSchema: GenMessage<GetPolicySyncResponse> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_admin, 18);
+  messageDesc(file_vennir_console_v1_admin, 21);
 
 /**
  * @generated from message vennir.console.v1.SyncPoliciesRequest
@@ -735,7 +883,7 @@ export type SyncPoliciesRequest = Message<"vennir.console.v1.SyncPoliciesRequest
  * Use `create(SyncPoliciesRequestSchema)` to create a new message.
  */
 export const SyncPoliciesRequestSchema: GenMessage<SyncPoliciesRequest> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_admin, 19);
+  messageDesc(file_vennir_console_v1_admin, 22);
 
 /**
  * @generated from message vennir.console.v1.SyncPoliciesResponse
@@ -752,7 +900,7 @@ export type SyncPoliciesResponse = Message<"vennir.console.v1.SyncPoliciesRespon
  * Use `create(SyncPoliciesResponseSchema)` to create a new message.
  */
 export const SyncPoliciesResponseSchema: GenMessage<SyncPoliciesResponse> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_admin, 20);
+  messageDesc(file_vennir_console_v1_admin, 23);
 
 /**
  * Running the platform: counts, the audit log, the cluster policies the
@@ -782,6 +930,18 @@ export const AdminService: GenService<{
     methodKind: "unary";
     input: typeof ListAuditEntriesRequestSchema;
     output: typeof ListAuditEntriesResponseSchema;
+  },
+  /**
+   * Who read a run's outputs, failure messages or logs, or a team's secret
+   * names, newest first: who, by which method, and what they read, by name
+   * only (never the content). Reading it is itself recorded.
+   *
+   * @generated from rpc vennir.console.v1.AdminService.ListAuditReads
+   */
+  listAuditReads: {
+    methodKind: "unary";
+    input: typeof ListAuditReadsRequestSchema;
+    output: typeof ListAuditReadsResponseSchema;
   },
   /**
    * Whether the cluster's policies are current: the last outcome of

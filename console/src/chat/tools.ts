@@ -8,6 +8,7 @@
  */
 import type { FastifyBaseLogger } from "fastify";
 import { ApiError } from "../apiError.js";
+import { executionRead, orderPlanRead, recordReads, resourcesRead, type Read } from "../auditReads.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { executionDetail } from "../core/executions.js";
 import { previewOrder, type OrderChoice } from "../core/orders.js";
@@ -28,6 +29,24 @@ export interface TurnState {
   sources: Source[];
   /** The cart the agent proposes, for the person to open. */
   cart: ProposedCart | null;
+  /** The call the person asked through, for what the tools read (auditReads.ts). */
+  via: ChatCall;
+}
+
+/** The ChatService call a turn came in through. */
+export interface ChatCall {
+  route: string;
+  clientIp: string;
+  requestId: string;
+}
+
+/** Records what a tool returned, as read by the person the agent acts for. */
+function recordToolReads(state: TurnState, tool: string, reads: Read[]): void {
+  recordReads(
+    state.log,
+    { actorId: state.caller.id, ...state.via },
+    reads.map((read) => ({ ...read, target: { ...read.target, tool } })),
+  );
 }
 
 /** A cart for the person to open: its actions, and the choices and values they gave, for them to check and place. */
@@ -224,10 +243,11 @@ const TOOLS: Tool[] = [
     },
     async run(state, args) {
       const team = teamFor(state, args["team"]);
-      const found = await listResources(state.caller, { team, query: text(args["search"], 200) || undefined });
+      const found = (await listResources(state.caller, { team, query: text(args["search"], 200) || undefined })).slice(0, 40);
+      recordToolReads(state, "list_team_resources", resourcesRead(found.map((r) => ({ ...r, ownerTeam: r.ownerTeam ?? "" }))));
       return {
         team,
-        resources: found.slice(0, 40).map((r) => ({
+        resources: found.map((r) => ({
           type: r.type,
           id: r.externalId,
           name: r.name,
@@ -251,6 +271,7 @@ const TOOLS: Tool[] = [
       const id = text(args["executionId"], 64);
       if (!/^[0-9a-f-]{36}$/.test(id)) return { error: "A run's id is a UUID." };
       const run = await executionDetail(state.caller, id, state.log);
+      recordToolReads(state, "get_run", executionRead(id, run.tasks, run.payload));
       return {
         state: run.state,
         name: run.name,
@@ -281,6 +302,9 @@ const TOOLS: Tool[] = [
       const team = teamFor(state, args["team"]);
       const actions = Array.isArray(args["actions"]) ? args["actions"].map((a) => text(a, 253)).filter(Boolean).slice(0, 20) : [];
       const plan = await previewOrder(state.caller, { team, actions, choices: choicesOf(args["choices"]) });
+      // Its steps' inputs carry the provided values of resources it chose.
+      // (propose_cart plans too, but returns only the person's choices and values.)
+      recordToolReads(state, "plan_order", orderPlanRead(team, plan.steps));
       return {
         team,
         steps: plan.steps.map((s) => ({ id: s.id, action: s.product, addedBecauseNeeded: s.added, inputs: s.inputs })),

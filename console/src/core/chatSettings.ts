@@ -16,6 +16,7 @@ import { ApiError, forbiddenUnlessAdmin } from "../apiError.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { ask } from "../chat/agent.js";
 import { ModelUnavailable, modelFor, type ChatModel } from "../chat/model.js";
+import type { ChatCall } from "../chat/tools.js";
 import { chatSource, currentChat, installKeyFor, KEY_PURPOSE, keyless, refreshChatSettings, sameEndpoint } from "../chat/settings.js";
 import { CHAT_PROVIDERS, chatFrom, config, type ChatConfig } from "../config.js";
 import { db } from "../db/client.js";
@@ -211,7 +212,12 @@ export interface ChatTestResult {
 }
 
 /** Settings tried before they're saved: one real question through the agent, as the admin. */
-export async function testChatConfig(caller: AuthUser | undefined, input: ChatConfigInput, log: FastifyBaseLogger): Promise<ChatTestResult> {
+export async function testChatConfig(
+  caller: AuthUser | undefined,
+  input: ChatConfigInput,
+  log: FastifyBaseLogger,
+  via?: ChatCall,
+): Promise<ChatTestResult> {
   forbiddenUnlessAdmin(caller, REQUIRES_ADMIN);
   const [stored] = await db.select().from(chatSettings).where(eq(chatSettings.id, 1));
   const settings = checked({ ...input, enabled: true }, keyFor(input, stored));
@@ -228,7 +234,7 @@ export async function testChatConfig(caller: AuthUser | undefined, input: ChatCo
   const started = Date.now();
   const seconds = () => Math.round((Date.now() - started) / 100) / 10;
   try {
-    const answer = await ask(caller, { team: null, messages: [{ role: "user", content: TEST_QUESTION }] }, log, watched);
+    const answer = await ask(caller, { team: null, messages: [{ role: "user", content: TEST_QUESTION }] }, log, watched, via ? { via } : {});
     return { ok: true, problem: "", seconds: seconds(), model: answer.model, answer: answer.text.slice(0, 600), citations: answer.citations.length };
   } catch (error) {
     if (!(error instanceof ApiError) || error.code !== "MODEL_UNAVAILABLE") throw error;

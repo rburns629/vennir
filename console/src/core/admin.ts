@@ -6,7 +6,7 @@
  * (catalogSync.ts). The logic behind AdminService.
  */
 import { currentSso } from "../sso.js";
-import { and, desc, eq, lt, type SQL } from "drizzle-orm";
+import { and, arrayContains, desc, eq, lt, type SQL } from "drizzle-orm";
 import { Type } from "@sinclair/typebox";
 import type { FastifyBaseLogger } from "fastify";
 import { Code } from "@connectrpc/connect";
@@ -15,7 +15,7 @@ import { config } from "../config.js";
 import type { AuthUser } from "../auth/plugin.js";
 import { db } from "../db/client.js";
 import { countProducts, countSubmittedExecutions, countTeams, countUsers } from "../db/queries.js";
-import { auditLog, users } from "../db/schema.js";
+import { auditLog, auditReads, users } from "../db/schema.js";
 import { adoptTeam, catalogStatus, syncCatalog } from "../catalogSync.js";
 import { policySyncOutcomes, syncPolicies } from "../policySync.js";
 import { clusterImagePolicyExists } from "../k8s.js";
@@ -145,6 +145,54 @@ export async function auditPage(conditions: (SQL | undefined)[], before: number 
     .orderBy(desc(auditLog.id))
     .limit(limit);
   return { entries: rows, nextBefore: rows.length === limit ? (rows.at(-1)?.id ?? null) : null };
+}
+
+export const AuditReadsQuery = Type.Object({
+  // The id of the last read already seen: older ones come next.
+  before: Type.Optional(Type.Integer({ minimum: 1 })),
+  actor: Type.Optional(Type.String({ format: "uuid" })),
+  team: Type.Optional(Type.String({ pattern: "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$" })),
+  executionId: Type.Optional(Type.String({ format: "uuid" })),
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+});
+
+/**
+ * Who read what (auditReads.ts), newest first, a page at a time: by
+ * reader, by the team whose data it was, by run. Admins only; reading it
+ * is recorded too (READERS).
+ */
+export async function auditReadEntries(
+  caller: AuthUser | undefined,
+  query: { before?: number | undefined; actor?: string | undefined; team?: string | undefined; executionId?: string | undefined; limit?: number | undefined },
+) {
+  forbiddenUnlessAdmin(caller, REQUIRES_ADMIN);
+  const { before, actor, team, executionId, limit = 100 } = query;
+  const where = [
+    actor !== undefined ? eq(auditReads.actorId, actor) : undefined,
+    team !== undefined ? arrayContains(auditReads.teams, [team]) : undefined,
+    executionId !== undefined ? arrayContains(auditReads.executionIds, [executionId]) : undefined,
+    before !== undefined ? lt(auditReads.id, before) : undefined,
+  ].filter((c) => c !== undefined);
+  const rows = await db
+    .select({
+      id: auditReads.id,
+      at: auditReads.at,
+      actorId: auditReads.actorId,
+      actorEmail: users.email,
+      actorIsBot: users.isBot,
+      route: auditReads.route,
+      executionIds: auditReads.executionIds,
+      teams: auditReads.teams,
+      target: auditReads.target,
+      clientIp: auditReads.clientIp,
+      requestId: auditReads.requestId,
+    })
+    .from(auditReads)
+    .leftJoin(users, eq(users.id, auditReads.actorId))
+    .where(where.length > 0 ? and(...where) : undefined)
+    .orderBy(desc(auditReads.id))
+    .limit(limit);
+  return { reads: rows, nextBefore: rows.length === limit ? (rows.at(-1)?.id ?? null) : null };
 }
 
 /** The last outcome of each policy sync. */

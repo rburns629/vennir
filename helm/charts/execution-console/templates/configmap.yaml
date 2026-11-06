@@ -139,6 +139,7 @@ data:
   POLICY_SYNC_INTERVAL_SECONDS: {{ .Values.policySyncIntervalSeconds | quote }}
   EXECUTION_RETENTION_DAYS: {{ .Values.retention.executionDays | quote }}
   AUDIT_RETENTION_DAYS: {{ .Values.retention.auditDays | quote }}
+  AUDIT_READS_RETENTION_DAYS: {{ .Values.retention.auditReadsDays | quote }}
   SCAN_RETENTION_DAYS: {{ .Values.retention.scanDays | quote }}
   # Image scanning (values.yaml's scanning).
   SCANNING_ENABLED: {{ .Values.scanning.enabled | quote }}

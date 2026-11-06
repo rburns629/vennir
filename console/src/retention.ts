@@ -2,7 +2,7 @@
 /**
  * Deleting what's past its retention, hourly: submitted-execution records
  * (the kernel deletes the executions themselves after the same period),
- * audit entries, and scan verdicts of images nobody has used in a while
+ * audit entries, who read what (audit_reads), and scan verdicts of images nobody has used in a while
  * (scanned again if they're used again), and sign-in's bookkeeping. 0 keeps
  * a kind forever.
  */
@@ -15,6 +15,7 @@ import {
   apiTraffic,
   auditExport,
   auditLog,
+  auditReads,
   callbackDeliveries,
   chatFeedback,
   imageScans,
@@ -27,8 +28,8 @@ import {
 
 const daysAgo = (days: number) => sql`now() - make_interval(days => ${days})`;
 
-export async function deleteExpired(): Promise<{ executions: number; audit: number; scans: number }> {
-  const { executionDays, auditDays, scanDays } = config.retention;
+export async function deleteExpired(): Promise<{ executions: number; audit: number; reads: number; scans: number }> {
+  const { executionDays, auditDays, auditReadsDays, scanDays } = config.retention;
   const executions = executionDays
     ? (
         await db
@@ -49,6 +50,10 @@ export async function deleteExpired(): Promise<{ executions: number; audit: numb
           .where(copied === null ? lt(auditLog.at, daysAgo(auditDays)) : and(lt(auditLog.at, daysAgo(auditDays)), lte(auditLog.id, copied)))
           .returning({ id: auditLog.id })
       ).length
+    : 0;
+  // Reads aren't chained or copied: what's past its days just goes.
+  const reads = auditReadsDays
+    ? ((await db.delete(auditReads).where(lt(auditReads.at, daysAgo(auditReadsDays)))).rowCount ?? 0)
     : 0;
   const scans = scanDays
     ? (
@@ -80,14 +85,14 @@ export async function deleteExpired(): Promise<{ executions: number; audit: numb
   await db.delete(revokedSessions).where(lt(revokedSessions.expiresAt, sql`now()`));
   await db.delete(rateLimitWindows).where(lt(rateLimitWindows.resetsAt, sql`now()`));
   await db.delete(signInFailures).where(lt(signInFailures.windowStart, sql`now() - interval '1 hour'`));
-  return { executions, audit, scans };
+  return { executions, audit, reads, scans };
 }
 
 export function startRetention(log: FastifyBaseLogger): void {
   const run = () =>
     deleteExpired()
       .then((deleted) => {
-        if (deleted.executions + deleted.audit + deleted.scans > 0) {
+        if (deleted.executions + deleted.audit + deleted.reads + deleted.scans > 0) {
           log.info({ event: "retention", ...deleted }, "deleted what's past retention");
         }
       })

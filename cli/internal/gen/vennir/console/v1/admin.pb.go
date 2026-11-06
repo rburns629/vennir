@@ -1221,6 +1221,270 @@ func (x *ListAuditEntriesResponse) GetNextBefore() int64 {
 	return 0
 }
 
+type AuditRead struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Id         int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	At         *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=at,proto3" json:"at,omitempty"`
+	ActorId    *string                `protobuf:"bytes,3,opt,name=actor_id,json=actorId,proto3,oneof" json:"actor_id,omitempty"`
+	ActorEmail *string                `protobuf:"bytes,4,opt,name=actor_email,json=actorEmail,proto3,oneof" json:"actor_email,omitempty"`
+	ActorIsBot bool                   `protobuf:"varint,5,opt,name=actor_is_bot,json=actorIsBot,proto3" json:"actor_is_bot,omitempty"`
+	// The RPC's procedure, such as vennir.console.v1.ExecutionService/GetExecution.
+	Route string `protobuf:"bytes,6,opt,name=route,proto3" json:"route,omitempty"`
+	// The runs read: one for a run's page, several for a list (resources,
+	// a log search).
+	ExecutionIds []string `protobuf:"bytes,7,rep,name=execution_ids,json=executionIds,proto3" json:"execution_ids,omitempty"`
+	// The teams whose data it was.
+	Teams []string `protobuf:"bytes,8,rep,name=teams,proto3" json:"teams,omitempty"`
+	// What was read, by name: step keys (tasks), secret or store names, a
+	// chat tool. Never the content.
+	Target        *structpb.Struct `protobuf:"bytes,9,opt,name=target,proto3" json:"target,omitempty"`
+	ClientIp      *string          `protobuf:"bytes,10,opt,name=client_ip,json=clientIp,proto3,oneof" json:"client_ip,omitempty"`
+	RequestId     *string          `protobuf:"bytes,11,opt,name=request_id,json=requestId,proto3,oneof" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuditRead) Reset() {
+	*x = AuditRead{}
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuditRead) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuditRead) ProtoMessage() {}
+
+func (x *AuditRead) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuditRead.ProtoReflect.Descriptor instead.
+func (*AuditRead) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *AuditRead) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AuditRead) GetAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.At
+	}
+	return nil
+}
+
+func (x *AuditRead) GetActorId() string {
+	if x != nil && x.ActorId != nil {
+		return *x.ActorId
+	}
+	return ""
+}
+
+func (x *AuditRead) GetActorEmail() string {
+	if x != nil && x.ActorEmail != nil {
+		return *x.ActorEmail
+	}
+	return ""
+}
+
+func (x *AuditRead) GetActorIsBot() bool {
+	if x != nil {
+		return x.ActorIsBot
+	}
+	return false
+}
+
+func (x *AuditRead) GetRoute() string {
+	if x != nil {
+		return x.Route
+	}
+	return ""
+}
+
+func (x *AuditRead) GetExecutionIds() []string {
+	if x != nil {
+		return x.ExecutionIds
+	}
+	return nil
+}
+
+func (x *AuditRead) GetTeams() []string {
+	if x != nil {
+		return x.Teams
+	}
+	return nil
+}
+
+func (x *AuditRead) GetTarget() *structpb.Struct {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *AuditRead) GetClientIp() string {
+	if x != nil && x.ClientIp != nil {
+		return *x.ClientIp
+	}
+	return ""
+}
+
+func (x *AuditRead) GetRequestId() string {
+	if x != nil && x.RequestId != nil {
+		return *x.RequestId
+	}
+	return ""
+}
+
+type ListAuditReadsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Older than this read's id; the newest when unset.
+	Before int64 `protobuf:"varint,1,opt,name=before,proto3" json:"before,omitempty"`
+	// Only this account's.
+	ActorId string `protobuf:"bytes,2,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
+	// Only reads of this team's data.
+	Team string `protobuf:"bytes,3,opt,name=team,proto3" json:"team,omitempty"`
+	// Only reads that included this run.
+	ExecutionId string `protobuf:"bytes,4,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	// 100 when unset, at most 500.
+	Limit         int32 `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuditReadsRequest) Reset() {
+	*x = ListAuditReadsRequest{}
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuditReadsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuditReadsRequest) ProtoMessage() {}
+
+func (x *ListAuditReadsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuditReadsRequest.ProtoReflect.Descriptor instead.
+func (*ListAuditReadsRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ListAuditReadsRequest) GetBefore() int64 {
+	if x != nil {
+		return x.Before
+	}
+	return 0
+}
+
+func (x *ListAuditReadsRequest) GetActorId() string {
+	if x != nil {
+		return x.ActorId
+	}
+	return ""
+}
+
+func (x *ListAuditReadsRequest) GetTeam() string {
+	if x != nil {
+		return x.Team
+	}
+	return ""
+}
+
+func (x *ListAuditReadsRequest) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *ListAuditReadsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ListAuditReadsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Reads []*AuditRead           `protobuf:"bytes,1,rep,name=reads,proto3" json:"reads,omitempty"`
+	// Pass as `before` for the next page; 0 on the last.
+	NextBefore    int64 `protobuf:"varint,2,opt,name=next_before,json=nextBefore,proto3" json:"next_before,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuditReadsResponse) Reset() {
+	*x = ListAuditReadsResponse{}
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuditReadsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuditReadsResponse) ProtoMessage() {}
+
+func (x *ListAuditReadsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuditReadsResponse.ProtoReflect.Descriptor instead.
+func (*ListAuditReadsResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ListAuditReadsResponse) GetReads() []*AuditRead {
+	if x != nil {
+		return x.Reads
+	}
+	return nil
+}
+
+func (x *ListAuditReadsResponse) GetNextBefore() int64 {
+	if x != nil {
+		return x.NextBefore
+	}
+	return 0
+}
+
 type PolicySyncOutcome struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// False: there's nothing to write to (not configured, or not installed).
@@ -1234,7 +1498,7 @@ type PolicySyncOutcome struct {
 
 func (x *PolicySyncOutcome) Reset() {
 	*x = PolicySyncOutcome{}
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[16]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1246,7 +1510,7 @@ func (x *PolicySyncOutcome) String() string {
 func (*PolicySyncOutcome) ProtoMessage() {}
 
 func (x *PolicySyncOutcome) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[16]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1259,7 +1523,7 @@ func (x *PolicySyncOutcome) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolicySyncOutcome.ProtoReflect.Descriptor instead.
 func (*PolicySyncOutcome) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{16}
+	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PolicySyncOutcome) GetApplies() bool {
@@ -1298,7 +1562,7 @@ type GetPolicySyncRequest struct {
 
 func (x *GetPolicySyncRequest) Reset() {
 	*x = GetPolicySyncRequest{}
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[17]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1310,7 +1574,7 @@ func (x *GetPolicySyncRequest) String() string {
 func (*GetPolicySyncRequest) ProtoMessage() {}
 
 func (x *GetPolicySyncRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[17]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1323,7 +1587,7 @@ func (x *GetPolicySyncRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPolicySyncRequest.ProtoReflect.Descriptor instead.
 func (*GetPolicySyncRequest) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{17}
+	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{20}
 }
 
 type GetPolicySyncResponse struct {
@@ -1337,7 +1601,7 @@ type GetPolicySyncResponse struct {
 
 func (x *GetPolicySyncResponse) Reset() {
 	*x = GetPolicySyncResponse{}
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[18]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1349,7 +1613,7 @@ func (x *GetPolicySyncResponse) String() string {
 func (*GetPolicySyncResponse) ProtoMessage() {}
 
 func (x *GetPolicySyncResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[18]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1362,7 +1626,7 @@ func (x *GetPolicySyncResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPolicySyncResponse.ProtoReflect.Descriptor instead.
 func (*GetPolicySyncResponse) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{18}
+	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetPolicySyncResponse) GetOutcomes() map[string]*PolicySyncOutcome {
@@ -1380,7 +1644,7 @@ type SyncPoliciesRequest struct {
 
 func (x *SyncPoliciesRequest) Reset() {
 	*x = SyncPoliciesRequest{}
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[19]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1392,7 +1656,7 @@ func (x *SyncPoliciesRequest) String() string {
 func (*SyncPoliciesRequest) ProtoMessage() {}
 
 func (x *SyncPoliciesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[19]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1405,7 +1669,7 @@ func (x *SyncPoliciesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncPoliciesRequest.ProtoReflect.Descriptor instead.
 func (*SyncPoliciesRequest) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{19}
+	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{22}
 }
 
 type SyncPoliciesResponse struct {
@@ -1417,7 +1681,7 @@ type SyncPoliciesResponse struct {
 
 func (x *SyncPoliciesResponse) Reset() {
 	*x = SyncPoliciesResponse{}
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[20]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1429,7 +1693,7 @@ func (x *SyncPoliciesResponse) String() string {
 func (*SyncPoliciesResponse) ProtoMessage() {}
 
 func (x *SyncPoliciesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_admin_proto_msgTypes[20]
+	mi := &file_vennir_console_v1_admin_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1442,7 +1706,7 @@ func (x *SyncPoliciesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncPoliciesResponse.ProtoReflect.Descriptor instead.
 func (*SyncPoliciesResponse) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{20}
+	return file_vennir_console_v1_admin_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SyncPoliciesResponse) GetOutcomes() map[string]*PolicySyncOutcome {
@@ -1566,6 +1830,37 @@ const file_vennir_console_v1_admin_proto_rawDesc = "" +
 	"\x18ListAuditEntriesResponse\x127\n" +
 	"\aentries\x18\x01 \x03(\v2\x1d.vennir.console.v1.AuditEntryR\aentries\x12\x1f\n" +
 	"\vnext_before\x18\x02 \x01(\x03R\n" +
+	"nextBefore\"\xb1\x03\n" +
+	"\tAuditRead\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12*\n" +
+	"\x02at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12\x1e\n" +
+	"\bactor_id\x18\x03 \x01(\tH\x00R\aactorId\x88\x01\x01\x12$\n" +
+	"\vactor_email\x18\x04 \x01(\tH\x01R\n" +
+	"actorEmail\x88\x01\x01\x12 \n" +
+	"\factor_is_bot\x18\x05 \x01(\bR\n" +
+	"actorIsBot\x12\x14\n" +
+	"\x05route\x18\x06 \x01(\tR\x05route\x12#\n" +
+	"\rexecution_ids\x18\a \x03(\tR\fexecutionIds\x12\x14\n" +
+	"\x05teams\x18\b \x03(\tR\x05teams\x12/\n" +
+	"\x06target\x18\t \x01(\v2\x17.google.protobuf.StructR\x06target\x12 \n" +
+	"\tclient_ip\x18\n" +
+	" \x01(\tH\x02R\bclientIp\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"request_id\x18\v \x01(\tH\x03R\trequestId\x88\x01\x01B\v\n" +
+	"\t_actor_idB\x0e\n" +
+	"\f_actor_emailB\f\n" +
+	"\n" +
+	"_client_ipB\r\n" +
+	"\v_request_id\"\x97\x01\n" +
+	"\x15ListAuditReadsRequest\x12\x16\n" +
+	"\x06before\x18\x01 \x01(\x03R\x06before\x12\x19\n" +
+	"\bactor_id\x18\x02 \x01(\tR\aactorId\x12\x12\n" +
+	"\x04team\x18\x03 \x01(\tR\x04team\x12!\n" +
+	"\fexecution_id\x18\x04 \x01(\tR\vexecutionId\x12\x14\n" +
+	"\x05limit\x18\x05 \x01(\x05R\x05limit\"m\n" +
+	"\x16ListAuditReadsResponse\x122\n" +
+	"\x05reads\x18\x01 \x03(\v2\x1c.vennir.console.v1.AuditReadR\x05reads\x12\x1f\n" +
+	"\vnext_before\x18\x02 \x01(\x03R\n" +
 	"nextBefore\"\x8e\x01\n" +
 	"\x11PolicySyncOutcome\x12\x18\n" +
 	"\aapplies\x18\x01 \x01(\bR\aapplies\x12\x0e\n" +
@@ -1584,10 +1879,11 @@ const file_vennir_console_v1_admin_proto_rawDesc = "" +
 	"\boutcomes\x18\x01 \x03(\v25.vennir.console.v1.SyncPoliciesResponse.OutcomesEntryR\boutcomes\x1aa\n" +
 	"\rOutcomesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12:\n" +
-	"\x05value\x18\x02 \x01(\v2$.vennir.console.v1.PolicySyncOutcomeR\x05value:\x028\x012\xd0\x06\n" +
+	"\x05value\x18\x02 \x01(\v2$.vennir.console.v1.PolicySyncOutcomeR\x05value:\x028\x012\xbc\a\n" +
 	"\fAdminService\x12X\n" +
 	"\bGetStats\x12\".vennir.console.v1.GetStatsRequest\x1a#.vennir.console.v1.GetStatsResponse\"\x03\x90\x02\x01\x12p\n" +
-	"\x10ListAuditEntries\x12*.vennir.console.v1.ListAuditEntriesRequest\x1a+.vennir.console.v1.ListAuditEntriesResponse\"\x03\x90\x02\x01\x12g\n" +
+	"\x10ListAuditEntries\x12*.vennir.console.v1.ListAuditEntriesRequest\x1a+.vennir.console.v1.ListAuditEntriesResponse\"\x03\x90\x02\x01\x12j\n" +
+	"\x0eListAuditReads\x12(.vennir.console.v1.ListAuditReadsRequest\x1a).vennir.console.v1.ListAuditReadsResponse\"\x03\x90\x02\x01\x12g\n" +
 	"\rGetPolicySync\x12'.vennir.console.v1.GetPolicySyncRequest\x1a(.vennir.console.v1.GetPolicySyncResponse\"\x03\x90\x02\x01\x12d\n" +
 	"\fSyncPolicies\x12&.vennir.console.v1.SyncPoliciesRequest\x1a'.vennir.console.v1.SyncPoliciesResponse\"\x03\x90\x02\x02\x12p\n" +
 	"\x10GetCatalogStatus\x12*.vennir.console.v1.GetCatalogStatusRequest\x1a+.vennir.console.v1.GetCatalogStatusResponse\"\x03\x90\x02\x01\x12a\n" +
@@ -1610,7 +1906,7 @@ func file_vennir_console_v1_admin_proto_rawDescGZIP() []byte {
 	return file_vennir_console_v1_admin_proto_rawDescData
 }
 
-var file_vennir_console_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_vennir_console_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_vennir_console_v1_admin_proto_goTypes = []any{
 	(*GetInstallRequest)(nil),        // 0: vennir.console.v1.GetInstallRequest
 	(*GetInstallResponse)(nil),       // 1: vennir.console.v1.GetInstallResponse
@@ -1628,53 +1924,61 @@ var file_vennir_console_v1_admin_proto_goTypes = []any{
 	(*AuditEntry)(nil),               // 13: vennir.console.v1.AuditEntry
 	(*ListAuditEntriesRequest)(nil),  // 14: vennir.console.v1.ListAuditEntriesRequest
 	(*ListAuditEntriesResponse)(nil), // 15: vennir.console.v1.ListAuditEntriesResponse
-	(*PolicySyncOutcome)(nil),        // 16: vennir.console.v1.PolicySyncOutcome
-	(*GetPolicySyncRequest)(nil),     // 17: vennir.console.v1.GetPolicySyncRequest
-	(*GetPolicySyncResponse)(nil),    // 18: vennir.console.v1.GetPolicySyncResponse
-	(*SyncPoliciesRequest)(nil),      // 19: vennir.console.v1.SyncPoliciesRequest
-	(*SyncPoliciesResponse)(nil),     // 20: vennir.console.v1.SyncPoliciesResponse
-	nil,                              // 21: vennir.console.v1.GetPolicySyncResponse.OutcomesEntry
-	nil,                              // 22: vennir.console.v1.SyncPoliciesResponse.OutcomesEntry
-	(*timestamppb.Timestamp)(nil),    // 23: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),          // 24: google.protobuf.Struct
+	(*AuditRead)(nil),                // 16: vennir.console.v1.AuditRead
+	(*ListAuditReadsRequest)(nil),    // 17: vennir.console.v1.ListAuditReadsRequest
+	(*ListAuditReadsResponse)(nil),   // 18: vennir.console.v1.ListAuditReadsResponse
+	(*PolicySyncOutcome)(nil),        // 19: vennir.console.v1.PolicySyncOutcome
+	(*GetPolicySyncRequest)(nil),     // 20: vennir.console.v1.GetPolicySyncRequest
+	(*GetPolicySyncResponse)(nil),    // 21: vennir.console.v1.GetPolicySyncResponse
+	(*SyncPoliciesRequest)(nil),      // 22: vennir.console.v1.SyncPoliciesRequest
+	(*SyncPoliciesResponse)(nil),     // 23: vennir.console.v1.SyncPoliciesResponse
+	nil,                              // 24: vennir.console.v1.GetPolicySyncResponse.OutcomesEntry
+	nil,                              // 25: vennir.console.v1.SyncPoliciesResponse.OutcomesEntry
+	(*timestamppb.Timestamp)(nil),    // 26: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),          // 27: google.protobuf.Struct
 }
 var file_vennir_console_v1_admin_proto_depIdxs = []int32{
 	8,  // 0: vennir.console.v1.GetCatalogStatusResponse.status:type_name -> vennir.console.v1.CatalogStatus
 	8,  // 1: vennir.console.v1.SyncCatalogResponse.status:type_name -> vennir.console.v1.CatalogStatus
 	8,  // 2: vennir.console.v1.AdoptCatalogTeamResponse.status:type_name -> vennir.console.v1.CatalogStatus
-	23, // 3: vennir.console.v1.CatalogStatus.applied_at:type_name -> google.protobuf.Timestamp
+	26, // 3: vennir.console.v1.CatalogStatus.applied_at:type_name -> google.protobuf.Timestamp
 	10, // 4: vennir.console.v1.CatalogStatus.problems:type_name -> vennir.console.v1.CatalogProblem
-	23, // 5: vennir.console.v1.CatalogStatus.checked_at:type_name -> google.protobuf.Timestamp
+	26, // 5: vennir.console.v1.CatalogStatus.checked_at:type_name -> google.protobuf.Timestamp
 	9,  // 6: vennir.console.v1.CatalogStatus.applied:type_name -> vennir.console.v1.CatalogCounts
-	23, // 7: vennir.console.v1.AuditEntry.at:type_name -> google.protobuf.Timestamp
-	24, // 8: vennir.console.v1.AuditEntry.target:type_name -> google.protobuf.Struct
+	26, // 7: vennir.console.v1.AuditEntry.at:type_name -> google.protobuf.Timestamp
+	27, // 8: vennir.console.v1.AuditEntry.target:type_name -> google.protobuf.Struct
 	13, // 9: vennir.console.v1.ListAuditEntriesResponse.entries:type_name -> vennir.console.v1.AuditEntry
-	23, // 10: vennir.console.v1.PolicySyncOutcome.at:type_name -> google.protobuf.Timestamp
-	21, // 11: vennir.console.v1.GetPolicySyncResponse.outcomes:type_name -> vennir.console.v1.GetPolicySyncResponse.OutcomesEntry
-	22, // 12: vennir.console.v1.SyncPoliciesResponse.outcomes:type_name -> vennir.console.v1.SyncPoliciesResponse.OutcomesEntry
-	16, // 13: vennir.console.v1.GetPolicySyncResponse.OutcomesEntry.value:type_name -> vennir.console.v1.PolicySyncOutcome
-	16, // 14: vennir.console.v1.SyncPoliciesResponse.OutcomesEntry.value:type_name -> vennir.console.v1.PolicySyncOutcome
-	11, // 15: vennir.console.v1.AdminService.GetStats:input_type -> vennir.console.v1.GetStatsRequest
-	14, // 16: vennir.console.v1.AdminService.ListAuditEntries:input_type -> vennir.console.v1.ListAuditEntriesRequest
-	17, // 17: vennir.console.v1.AdminService.GetPolicySync:input_type -> vennir.console.v1.GetPolicySyncRequest
-	19, // 18: vennir.console.v1.AdminService.SyncPolicies:input_type -> vennir.console.v1.SyncPoliciesRequest
-	2,  // 19: vennir.console.v1.AdminService.GetCatalogStatus:input_type -> vennir.console.v1.GetCatalogStatusRequest
-	4,  // 20: vennir.console.v1.AdminService.SyncCatalog:input_type -> vennir.console.v1.SyncCatalogRequest
-	6,  // 21: vennir.console.v1.AdminService.AdoptCatalogTeam:input_type -> vennir.console.v1.AdoptCatalogTeamRequest
-	0,  // 22: vennir.console.v1.AdminService.GetInstall:input_type -> vennir.console.v1.GetInstallRequest
-	12, // 23: vennir.console.v1.AdminService.GetStats:output_type -> vennir.console.v1.GetStatsResponse
-	15, // 24: vennir.console.v1.AdminService.ListAuditEntries:output_type -> vennir.console.v1.ListAuditEntriesResponse
-	18, // 25: vennir.console.v1.AdminService.GetPolicySync:output_type -> vennir.console.v1.GetPolicySyncResponse
-	20, // 26: vennir.console.v1.AdminService.SyncPolicies:output_type -> vennir.console.v1.SyncPoliciesResponse
-	3,  // 27: vennir.console.v1.AdminService.GetCatalogStatus:output_type -> vennir.console.v1.GetCatalogStatusResponse
-	5,  // 28: vennir.console.v1.AdminService.SyncCatalog:output_type -> vennir.console.v1.SyncCatalogResponse
-	7,  // 29: vennir.console.v1.AdminService.AdoptCatalogTeam:output_type -> vennir.console.v1.AdoptCatalogTeamResponse
-	1,  // 30: vennir.console.v1.AdminService.GetInstall:output_type -> vennir.console.v1.GetInstallResponse
-	23, // [23:31] is the sub-list for method output_type
-	15, // [15:23] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	26, // 10: vennir.console.v1.AuditRead.at:type_name -> google.protobuf.Timestamp
+	27, // 11: vennir.console.v1.AuditRead.target:type_name -> google.protobuf.Struct
+	16, // 12: vennir.console.v1.ListAuditReadsResponse.reads:type_name -> vennir.console.v1.AuditRead
+	26, // 13: vennir.console.v1.PolicySyncOutcome.at:type_name -> google.protobuf.Timestamp
+	24, // 14: vennir.console.v1.GetPolicySyncResponse.outcomes:type_name -> vennir.console.v1.GetPolicySyncResponse.OutcomesEntry
+	25, // 15: vennir.console.v1.SyncPoliciesResponse.outcomes:type_name -> vennir.console.v1.SyncPoliciesResponse.OutcomesEntry
+	19, // 16: vennir.console.v1.GetPolicySyncResponse.OutcomesEntry.value:type_name -> vennir.console.v1.PolicySyncOutcome
+	19, // 17: vennir.console.v1.SyncPoliciesResponse.OutcomesEntry.value:type_name -> vennir.console.v1.PolicySyncOutcome
+	11, // 18: vennir.console.v1.AdminService.GetStats:input_type -> vennir.console.v1.GetStatsRequest
+	14, // 19: vennir.console.v1.AdminService.ListAuditEntries:input_type -> vennir.console.v1.ListAuditEntriesRequest
+	17, // 20: vennir.console.v1.AdminService.ListAuditReads:input_type -> vennir.console.v1.ListAuditReadsRequest
+	20, // 21: vennir.console.v1.AdminService.GetPolicySync:input_type -> vennir.console.v1.GetPolicySyncRequest
+	22, // 22: vennir.console.v1.AdminService.SyncPolicies:input_type -> vennir.console.v1.SyncPoliciesRequest
+	2,  // 23: vennir.console.v1.AdminService.GetCatalogStatus:input_type -> vennir.console.v1.GetCatalogStatusRequest
+	4,  // 24: vennir.console.v1.AdminService.SyncCatalog:input_type -> vennir.console.v1.SyncCatalogRequest
+	6,  // 25: vennir.console.v1.AdminService.AdoptCatalogTeam:input_type -> vennir.console.v1.AdoptCatalogTeamRequest
+	0,  // 26: vennir.console.v1.AdminService.GetInstall:input_type -> vennir.console.v1.GetInstallRequest
+	12, // 27: vennir.console.v1.AdminService.GetStats:output_type -> vennir.console.v1.GetStatsResponse
+	15, // 28: vennir.console.v1.AdminService.ListAuditEntries:output_type -> vennir.console.v1.ListAuditEntriesResponse
+	18, // 29: vennir.console.v1.AdminService.ListAuditReads:output_type -> vennir.console.v1.ListAuditReadsResponse
+	21, // 30: vennir.console.v1.AdminService.GetPolicySync:output_type -> vennir.console.v1.GetPolicySyncResponse
+	23, // 31: vennir.console.v1.AdminService.SyncPolicies:output_type -> vennir.console.v1.SyncPoliciesResponse
+	3,  // 32: vennir.console.v1.AdminService.GetCatalogStatus:output_type -> vennir.console.v1.GetCatalogStatusResponse
+	5,  // 33: vennir.console.v1.AdminService.SyncCatalog:output_type -> vennir.console.v1.SyncCatalogResponse
+	7,  // 34: vennir.console.v1.AdminService.AdoptCatalogTeam:output_type -> vennir.console.v1.AdoptCatalogTeamResponse
+	1,  // 35: vennir.console.v1.AdminService.GetInstall:output_type -> vennir.console.v1.GetInstallResponse
+	27, // [27:36] is the sub-list for method output_type
+	18, // [18:27] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_vennir_console_v1_admin_proto_init() }
@@ -1685,13 +1989,14 @@ func file_vennir_console_v1_admin_proto_init() {
 	file_vennir_console_v1_admin_proto_msgTypes[1].OneofWrappers = []any{}
 	file_vennir_console_v1_admin_proto_msgTypes[13].OneofWrappers = []any{}
 	file_vennir_console_v1_admin_proto_msgTypes[16].OneofWrappers = []any{}
+	file_vennir_console_v1_admin_proto_msgTypes[19].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vennir_console_v1_admin_proto_rawDesc), len(file_vennir_console_v1_admin_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   23,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

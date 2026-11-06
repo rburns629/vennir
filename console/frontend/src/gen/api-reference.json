@@ -24,6 +24,15 @@
      "public": false
     },
     {
+     "name": "ListAuditReads",
+     "comment": "Who read a run's outputs, failure messages or logs, or a team's secret\nnames, newest first: who, by which method, and what they read, by name\nonly (never the content). Reading it is itself recorded.",
+     "input": "vennir.console.v1.ListAuditReadsRequest",
+     "output": "vennir.console.v1.ListAuditReadsResponse",
+     "streaming": false,
+     "idempotency": "read",
+     "public": false
+    },
+    {
      "name": "GetPolicySync",
      "comment": "Whether the cluster's policies are current: the last outcome of\nrewriting each from the console's database.",
      "input": "vennir.console.v1.GetPolicySyncRequest",
@@ -2038,6 +2047,151 @@
      "name": "entries",
      "type": "AuditEntry",
      "ref": "vennir.console.v1.AuditEntry",
+     "repeated": true,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "nextBefore",
+     "type": "integer (as a string)",
+     "repeated": false,
+     "optional": false,
+     "comment": "Pass as `before` for the next page; 0 on the last."
+    }
+   ]
+  },
+  "vennir.console.v1.AuditRead": {
+   "name": "AuditRead",
+   "comment": "",
+   "fields": [
+    {
+     "name": "id",
+     "type": "integer (as a string)",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "at",
+     "type": "timestamp (RFC 3339 string)",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "actorId",
+     "type": "string",
+     "repeated": false,
+     "optional": true,
+     "comment": ""
+    },
+    {
+     "name": "actorEmail",
+     "type": "string",
+     "repeated": false,
+     "optional": true,
+     "comment": ""
+    },
+    {
+     "name": "actorIsBot",
+     "type": "boolean",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "route",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "The RPC's procedure, such as vennir.console.v1.ExecutionService/GetExecution."
+    },
+    {
+     "name": "executionIds",
+     "type": "string",
+     "repeated": true,
+     "optional": false,
+     "comment": "The runs read: one for a run's page, several for a list (resources,\na log search)."
+    },
+    {
+     "name": "teams",
+     "type": "string",
+     "repeated": true,
+     "optional": false,
+     "comment": "The teams whose data it was."
+    },
+    {
+     "name": "target",
+     "type": "object",
+     "repeated": false,
+     "optional": false,
+     "comment": "What was read, by name: step keys (tasks), secret or store names, a\nchat tool. Never the content."
+    },
+    {
+     "name": "clientIp",
+     "type": "string",
+     "repeated": false,
+     "optional": true,
+     "comment": ""
+    },
+    {
+     "name": "requestId",
+     "type": "string",
+     "repeated": false,
+     "optional": true,
+     "comment": ""
+    }
+   ]
+  },
+  "vennir.console.v1.ListAuditReadsRequest": {
+   "name": "ListAuditReadsRequest",
+   "comment": "",
+   "fields": [
+    {
+     "name": "before",
+     "type": "integer (as a string)",
+     "repeated": false,
+     "optional": false,
+     "comment": "Older than this read's id; the newest when unset."
+    },
+    {
+     "name": "actorId",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Only this account's."
+    },
+    {
+     "name": "team",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Only reads of this team's data."
+    },
+    {
+     "name": "executionId",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Only reads that included this run."
+    },
+    {
+     "name": "limit",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": "100 when unset, at most 500."
+    }
+   ]
+  },
+  "vennir.console.v1.ListAuditReadsResponse": {
+   "name": "ListAuditReadsResponse",
+   "comment": "",
+   "fields": [
+    {
+     "name": "reads",
+     "type": "AuditRead",
+     "ref": "vennir.console.v1.AuditRead",
      "repeated": true,
      "optional": false,
      "comment": ""

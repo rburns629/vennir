@@ -639,6 +639,151 @@ export declare type ListAuditEntriesResponse = Message<"vennir.console.v1.ListAu
 export declare const ListAuditEntriesResponseSchema: GenMessage<ListAuditEntriesResponse>;
 
 /**
+ * @generated from message vennir.console.v1.AuditRead
+ */
+export declare type AuditRead = Message<"vennir.console.v1.AuditRead"> & {
+  /**
+   * @generated from field: int64 id = 1;
+   */
+  id: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp at = 2;
+   */
+  at?: Timestamp | undefined;
+
+  /**
+   * @generated from field: optional string actor_id = 3;
+   */
+  actorId?: string | undefined;
+
+  /**
+   * @generated from field: optional string actor_email = 4;
+   */
+  actorEmail?: string | undefined;
+
+  /**
+   * @generated from field: bool actor_is_bot = 5;
+   */
+  actorIsBot: boolean;
+
+  /**
+   * The RPC's procedure, such as vennir.console.v1.ExecutionService/GetExecution.
+   *
+   * @generated from field: string route = 6;
+   */
+  route: string;
+
+  /**
+   * The runs read: one for a run's page, several for a list (resources,
+   * a log search).
+   *
+   * @generated from field: repeated string execution_ids = 7;
+   */
+  executionIds: string[];
+
+  /**
+   * The teams whose data it was.
+   *
+   * @generated from field: repeated string teams = 8;
+   */
+  teams: string[];
+
+  /**
+   * What was read, by name: step keys (tasks), secret or store names, a
+   * chat tool. Never the content.
+   *
+   * @generated from field: google.protobuf.Struct target = 9;
+   */
+  target?: JsonObject | undefined;
+
+  /**
+   * @generated from field: optional string client_ip = 10;
+   */
+  clientIp?: string | undefined;
+
+  /**
+   * @generated from field: optional string request_id = 11;
+   */
+  requestId?: string | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.AuditRead.
+ * Use `create(AuditReadSchema)` to create a new message.
+ */
+export declare const AuditReadSchema: GenMessage<AuditRead>;
+
+/**
+ * @generated from message vennir.console.v1.ListAuditReadsRequest
+ */
+export declare type ListAuditReadsRequest = Message<"vennir.console.v1.ListAuditReadsRequest"> & {
+  /**
+   * Older than this read's id; the newest when unset.
+   *
+   * @generated from field: int64 before = 1;
+   */
+  before: bigint;
+
+  /**
+   * Only this account's.
+   *
+   * @generated from field: string actor_id = 2;
+   */
+  actorId: string;
+
+  /**
+   * Only reads of this team's data.
+   *
+   * @generated from field: string team = 3;
+   */
+  team: string;
+
+  /**
+   * Only reads that included this run.
+   *
+   * @generated from field: string execution_id = 4;
+   */
+  executionId: string;
+
+  /**
+   * 100 when unset, at most 500.
+   *
+   * @generated from field: int32 limit = 5;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAuditReadsRequest.
+ * Use `create(ListAuditReadsRequestSchema)` to create a new message.
+ */
+export declare const ListAuditReadsRequestSchema: GenMessage<ListAuditReadsRequest>;
+
+/**
+ * @generated from message vennir.console.v1.ListAuditReadsResponse
+ */
+export declare type ListAuditReadsResponse = Message<"vennir.console.v1.ListAuditReadsResponse"> & {
+  /**
+   * @generated from field: repeated vennir.console.v1.AuditRead reads = 1;
+   */
+  reads: AuditRead[];
+
+  /**
+   * Pass as `before` for the next page; 0 on the last.
+   *
+   * @generated from field: int64 next_before = 2;
+   */
+  nextBefore: bigint;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAuditReadsResponse.
+ * Use `create(ListAuditReadsResponseSchema)` to create a new message.
+ */
+export declare const ListAuditReadsResponseSchema: GenMessage<ListAuditReadsResponse>;
+
+/**
  * @generated from message vennir.console.v1.PolicySyncOutcome
  */
 export declare type PolicySyncOutcome = Message<"vennir.console.v1.PolicySyncOutcome"> & {
@@ -758,6 +903,18 @@ export declare const AdminService: GenService<{
     methodKind: "unary";
     input: typeof ListAuditEntriesRequestSchema;
     output: typeof ListAuditEntriesResponseSchema;
+  },
+  /**
+   * Who read a run's outputs, failure messages or logs, or a team's secret
+   * names, newest first: who, by which method, and what they read, by name
+   * only (never the content). Reading it is itself recorded.
+   *
+   * @generated from rpc vennir.console.v1.AdminService.ListAuditReads
+   */
+  listAuditReads: {
+    methodKind: "unary";
+    input: typeof ListAuditReadsRequestSchema;
+    output: typeof ListAuditReadsResponseSchema;
   },
   /**
    * Whether the cluster's policies are current: the last outcome of

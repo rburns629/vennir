@@ -52,6 +52,7 @@ describe("the gateway's database role", () => {
         "SELECT label FROM api_tokens LIMIT 1",
         "SELECT * FROM secret_grants LIMIT 1",
         "SELECT * FROM audit_log LIMIT 1",
+        "SELECT * FROM audit_reads LIMIT 1",
         "SELECT * FROM sso_settings LIMIT 1",
         "SELECT client_secret_encrypted FROM sso_settings LIMIT 1",
         "SELECT group_name FROM sso_group_mappings LIMIT 1",

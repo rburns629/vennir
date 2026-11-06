@@ -20,6 +20,12 @@ service AdminService {
   rpc ListAuditEntries(ListAuditEntriesRequest) returns (ListAuditEntriesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  // Who read a run's outputs, failure messages or logs, or a team's secret
+  // names, newest first: who, by which method, and what they read, by name
+  // only (never the content). Reading it is itself recorded.
+  rpc ListAuditReads(ListAuditReadsRequest) returns (ListAuditReadsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
   // Whether the cluster's policies are current: the last outcome of
   // rewriting each from the console's database.
   rpc GetPolicySync(GetPolicySyncRequest) returns (GetPolicySyncResponse) {
@@ -217,6 +223,45 @@ message ListAuditEntriesRequest {
 
 message ListAuditEntriesResponse {
   repeated AuditEntry entries = 1;
+  // Pass as `before` for the next page; 0 on the last.
+  int64 next_before = 2;
+}
+
+message AuditRead {
+  int64 id = 1;
+  google.protobuf.Timestamp at = 2;
+  optional string actor_id = 3;
+  optional string actor_email = 4;
+  bool actor_is_bot = 5;
+  // The RPC's procedure, such as vennir.console.v1.ExecutionService/GetExecution.
+  string route = 6;
+  // The runs read: one for a run's page, several for a list (resources,
+  // a log search).
+  repeated string execution_ids = 7;
+  // The teams whose data it was.
+  repeated string teams = 8;
+  // What was read, by name: step keys (tasks), secret or store names, a
+  // chat tool. Never the content.
+  google.protobuf.Struct target = 9;
+  optional string client_ip = 10;
+  optional string request_id = 11;
+}
+
+message ListAuditReadsRequest {
+  // Older than this read's id; the newest when unset.
+  int64 before = 1;
+  // Only this account's.
+  string actor_id = 2;
+  // Only reads of this team's data.
+  string team = 3;
+  // Only reads that included this run.
+  string execution_id = 4;
+  // 100 when unset, at most 500.
+  int32 limit = 5;
+}
+
+message ListAuditReadsResponse {
+  repeated AuditRead reads = 1;
   // Pass as `before` for the next page; 0 on the last.
   int64 next_before = 2;
 }
