@@ -670,9 +670,15 @@ overwrite another's on the gateway's shared origin. A path isn't a
 boundary within an origin, though: script on a page one backend serves can
 read another API's cookies that aren't HttpOnly, and send requests to it
 with its cookies attached. So a backend that serves browsers keeps its
-cookies HttpOnly and doesn't take a cookie alone as sign-in (the gateway
-itself signs callers in by a bearer header only); a host for each API is in
-`TODO.md`.
+cookies HttpOnly and doesn't take a cookie alone as sign-in. The gateway
+itself signs callers in by the `Authorization: Bearer` header alone (no
+cookie, query parameter or Basic sign-in), which a browser never sends on a
+navigation or a frame, and it answers no CORS: no page on its origin can
+act as a signed-in person there. Nor can it be the console's origin, where
+a backend's script could read the console's session (in its origin's
+`localStorage`): the console chart refuses a gateway host (`gateway.ingress.host`,
+`gateway.publicUrl`) that's the console's. A host per API was weighed and
+rejected (decision 26).
 Paths with encoded slashes, backslashes or dot segments (`..;` too) are
 refused, so what's checked is what's forwarded, and so is a `;` in a path,
 as is or `%3B` (400 `INVALID_REQUEST`), unless the API's document has a
