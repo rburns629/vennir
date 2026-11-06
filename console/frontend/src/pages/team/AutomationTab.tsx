@@ -8,6 +8,7 @@ import CartIcon from "@mui/icons-material/ShoppingCartOutlined";
 import KeyIcon from "@mui/icons-material/VpnKeyOutlined";
 import LinkIcon from "@mui/icons-material/LinkOutlined";
 import { errorMessage, createBot, createKeylessBot, listBotIdentities, listBots, revokeToken, setBotCallback, setBotOrders, type Bot, type BotIdentity } from "../../api";
+import { BotApiAccess } from "./BotApiAccess";
 import { CI, KeylessSection } from "./KeylessSection";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { CodeBlock } from "../../components/CodeBlock";
@@ -437,6 +438,8 @@ export function AutomationTab({
           </Card>
         </Stack>
       </Box>
+
+      {bots && <BotApiAccess teamName={teamName} bots={bots} readOnly={readOnly} />}
 
       <ConfirmDialog
         open={revoking !== null}

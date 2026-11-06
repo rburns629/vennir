@@ -245,6 +245,15 @@
      "streaming": false,
      "idempotency": "read",
      "public": false
+    },
+    {
+     "name": "ListAllApiGrants",
+     "comment": "Every active grant on this install, newest first, a page at a time:\npublished APIs' and away ones' (away_since), for an incident (an admin\nrevokes; the APIs' teams add and change them). With how many there are\nof each kind, and the requests waiting. Admins.",
+     "input": "vennir.console.v1.ListAllApiGrantsRequest",
+     "output": "vennir.console.v1.ListAllApiGrantsResponse",
+     "streaming": false,
+     "idempotency": "read",
+     "public": false
     }
    ]
   },
@@ -2367,6 +2376,114 @@
     }
    ]
   },
+  "vennir.console.v1.Failure": {
+   "name": "Failure",
+   "comment": "Why something went wrong, in a form a caller can act on: a stable code,\na message for a person, and whether trying again may work. A task's\nfailure, a product's error, and the details of an error response all\ntake this shape.",
+   "fields": [
+    {
+     "name": "code",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "A stable code, such as TASK_TIMEOUT, IDENTITY_NOT_ALLOWED or TEAM_RETIRED."
+    },
+    {
+     "name": "message",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "What went wrong, for a person to read."
+    },
+    {
+     "name": "retryable",
+     "type": "boolean",
+     "repeated": false,
+     "optional": false,
+     "comment": "Whether the same request may succeed if tried again."
+    },
+    {
+     "name": "detail",
+     "type": "object",
+     "repeated": false,
+     "optional": false,
+     "comment": "More about it, when there is more: the images refused and the sources\nallowed (IMAGE_NOT_ALLOWED), a failed scan's findings, the executions\nstill running (EXECUTIONS_RUNNING)."
+    }
+   ]
+  },
+  "vennir.console.v1.Problem": {
+   "name": "Problem",
+   "comment": "Every problem found with a request, attached to an invalid_argument\nerror so a caller can fix them all at once. `field` says where, as a\npath such as \"tasks[2].inputs.region\".",
+   "fields": [
+    {
+     "name": "field",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "code",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "message",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    }
+   ]
+  },
+  "vennir.console.v1.PageRequest": {
+   "name": "PageRequest",
+   "comment": "One page of a list, and how to ask for the next.",
+   "fields": [
+    {
+     "name": "limit",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": "At most this many items; the method's own default when unset."
+    },
+    {
+     "name": "cursor",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "A previous response's next_cursor, to continue from there."
+    }
+   ]
+  },
+  "vennir.console.v1.TaskResources": {
+   "name": "TaskResources",
+   "comment": "CPU and memory for a task's Pod, as Kubernetes quantities (\"250m\",\n\"512Mi\"). A product's are its tasks' defaults; a task's own win.",
+   "fields": [
+    {
+     "name": "cpu",
+     "type": "string",
+     "repeated": false,
+     "optional": true,
+     "comment": ""
+    },
+    {
+     "name": "memory",
+     "type": "string",
+     "repeated": false,
+     "optional": true,
+     "comment": ""
+    },
+    {
+     "name": "memoryLimit",
+     "type": "string",
+     "repeated": false,
+     "optional": true,
+     "comment": ""
+    }
+   ]
+  },
   "vennir.console.v1.ApiGrant": {
    "name": "ApiGrant",
    "comment": "",
@@ -3797,6 +3914,83 @@
     }
    ]
   },
+  "vennir.console.v1.ListAllApiGrantsRequest": {
+   "name": "ListAllApiGrantsRequest",
+   "comment": "",
+   "fields": [
+    {
+     "name": "page",
+     "type": "PageRequest",
+     "ref": "vennir.console.v1.PageRequest",
+     "repeated": false,
+     "optional": false,
+     "comment": "100 when unset, at most 500."
+    }
+   ]
+  },
+  "vennir.console.v1.ListAllApiGrantsResponse": {
+   "name": "ListAllApiGrantsResponse",
+   "comment": "",
+   "fields": [
+    {
+     "name": "grants",
+     "type": "ApiGrant",
+     "ref": "vennir.console.v1.ApiGrant",
+     "repeated": true,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "nextCursor",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Empty on the last page."
+    },
+    {
+     "name": "total",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": "Every active grant, whatever the page: in all, and to groups, people\nand bots."
+    },
+    {
+     "name": "groups",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "people",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "bots",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "waitingRequests",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": "Requests waiting for their APIs' teams, and on how many APIs."
+    },
+    {
+     "name": "waitingApis",
+     "type": "integer",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    }
+   ]
+  },
   "vennir.console.v1.GetEnvironmentRequest": {
    "name": "GetEnvironmentRequest",
    "comment": "",
@@ -3983,6 +4177,13 @@
      "repeated": false,
      "optional": false,
      "comment": ""
+    },
+    {
+     "name": "retiredTeams",
+     "type": "string",
+     "repeated": true,
+     "optional": false,
+     "comment": "The teams in team_names that are retired: read-only, so nothing new is\nasked or changed for them (not even for their bots)."
     }
    ]
   },
@@ -4055,114 +4256,6 @@
      "type": "timestamp (RFC 3339 string)",
      "repeated": false,
      "optional": false,
-     "comment": ""
-    }
-   ]
-  },
-  "vennir.console.v1.Failure": {
-   "name": "Failure",
-   "comment": "Why something went wrong, in a form a caller can act on: a stable code,\na message for a person, and whether trying again may work. A task's\nfailure, a product's error, and the details of an error response all\ntake this shape.",
-   "fields": [
-    {
-     "name": "code",
-     "type": "string",
-     "repeated": false,
-     "optional": false,
-     "comment": "A stable code, such as TASK_TIMEOUT, IDENTITY_NOT_ALLOWED or TEAM_RETIRED."
-    },
-    {
-     "name": "message",
-     "type": "string",
-     "repeated": false,
-     "optional": false,
-     "comment": "What went wrong, for a person to read."
-    },
-    {
-     "name": "retryable",
-     "type": "boolean",
-     "repeated": false,
-     "optional": false,
-     "comment": "Whether the same request may succeed if tried again."
-    },
-    {
-     "name": "detail",
-     "type": "object",
-     "repeated": false,
-     "optional": false,
-     "comment": "More about it, when there is more: the images refused and the sources\nallowed (IMAGE_NOT_ALLOWED), a failed scan's findings, the executions\nstill running (EXECUTIONS_RUNNING)."
-    }
-   ]
-  },
-  "vennir.console.v1.Problem": {
-   "name": "Problem",
-   "comment": "Every problem found with a request, attached to an invalid_argument\nerror so a caller can fix them all at once. `field` says where, as a\npath such as \"tasks[2].inputs.region\".",
-   "fields": [
-    {
-     "name": "field",
-     "type": "string",
-     "repeated": false,
-     "optional": false,
-     "comment": ""
-    },
-    {
-     "name": "code",
-     "type": "string",
-     "repeated": false,
-     "optional": false,
-     "comment": ""
-    },
-    {
-     "name": "message",
-     "type": "string",
-     "repeated": false,
-     "optional": false,
-     "comment": ""
-    }
-   ]
-  },
-  "vennir.console.v1.PageRequest": {
-   "name": "PageRequest",
-   "comment": "One page of a list, and how to ask for the next.",
-   "fields": [
-    {
-     "name": "limit",
-     "type": "integer",
-     "repeated": false,
-     "optional": false,
-     "comment": "At most this many items; the method's own default when unset."
-    },
-    {
-     "name": "cursor",
-     "type": "string",
-     "repeated": false,
-     "optional": false,
-     "comment": "A previous response's next_cursor, to continue from there."
-    }
-   ]
-  },
-  "vennir.console.v1.TaskResources": {
-   "name": "TaskResources",
-   "comment": "CPU and memory for a task's Pod, as Kubernetes quantities (\"250m\",\n\"512Mi\"). A product's are its tasks' defaults; a task's own win.",
-   "fields": [
-    {
-     "name": "cpu",
-     "type": "string",
-     "repeated": false,
-     "optional": true,
-     "comment": ""
-    },
-    {
-     "name": "memory",
-     "type": "string",
-     "repeated": false,
-     "optional": true,
-     "comment": ""
-    },
-    {
-     "name": "memoryLimit",
-     "type": "string",
-     "repeated": false,
-     "optional": true,
      "comment": ""
     }
    ]

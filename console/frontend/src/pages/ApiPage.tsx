@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link as RouterLink, useParams, useSearchParams } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -9,7 +9,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import DownloadIcon from "@mui/icons-material/FileDownloadOutlined";
-import { errorMessage, getApi, pauseApi, resumeApi, type ApiProduct } from "../api";
+import { errorMessage, getApi, listApiAccess, listMyApiAccess, pauseApi, resumeApi, type ApiAccessRequest, type ApiProduct, type MyApiAccess } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { HelpLink } from "../components/HelpLink";
 import { Mono } from "../components/Mono";
@@ -18,16 +18,19 @@ import { Pill } from "../components/Pill";
 import { ApiBackend, ApiPause, RequestSteps } from "./api/ApiDefinition";
 import { ApiLogs } from "./api/ApiLogs";
 import { ApiEndpoints, Fact, sharedWith, size } from "./api/ApiOverview";
+import { WhoMayCall, type ApiAccessList } from "./api/WhoMayCall";
+import { StandingPill, standingFor, YourAccess } from "./api/YourAccess";
 import { ApiStatePill } from "./api/ApiStatePill";
 import { BlockedRequests, CallingTeams, PeriodToggle, TrafficTiles, useApiTraffic } from "./api/ApiTraffic";
 
 /** The page's parts, for its own team: what "On this page" links to. Old ?tab= links land on theirs. */
 const SECTIONS: [string, string][] = [
   ["endpoints", "Endpoints and traffic"],
+  ["access", "Who may call"],
   ["backend", "Backend and pausing"],
   ["logs", "Backend logs"],
 ];
-const OLD_TABS: Record<string, string> = { traffic: "endpoints", definition: "backend" };
+const OLD_TABS: Record<string, string> = { traffic: "endpoints", definition: "backend", access: "access" };
 
 /**
  * One API product (ApiService.GetApi), on one page. Anyone who may see it
@@ -35,9 +38,18 @@ const OLD_TABS: Record<string, string> = { traffic: "endpoints", definition: "ba
  * and admins, the only ones the console shows its backend to, also get each
  * endpoint's traffic, who calls it, what the gateway blocked, its backend as
  * the catalog says, pausing it (maintainers), and its backend's logs.
+ *
+ * Who may call it (decision 26): anyone else sees their own access to it
+ * (YourAccess: request, withdraw, give up); its own team and admins see its
+ * requests and access list (WhoMayCall).
  */
 export function ApiPage() {
   const { team = "", name = "" } = useParams();
+  // Another API is another page: nothing of the last one's state, or its late answers, carries over.
+  return <ApiView key={`${team}/${name}`} team={team} name={name} />;
+}
+
+function ApiView({ team, name }: { team: string; name: string }) {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const [api, setApi] = useState<ApiProduct | null>(null);
@@ -45,23 +57,78 @@ export function ApiPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [hours, setHours] = useState(24);
+  const [mine, setMine] = useState<{ access: MyApiAccess[]; requests: ApiAccessRequest[] } | null>(null);
+  const [mineError, setMineError] = useState<string | null>(null);
+  const [accessList, setAccessList] = useState<ApiAccessList | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  // Bumped to read again: the API after a change, its access after an access change.
+  const [apiVersion, setApiVersion] = useState(0);
+  const [accessVersion, setAccessVersion] = useState(0);
+  const load = () => {
+    setApiVersion((v) => v + 1);
+  };
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
     getApi(team, name)
       .then((result) => {
+        if (cancelled) return;
         setApi(result.api);
         setOpenapi(result.openapi);
       })
       .catch((err: unknown) => {
-        setError(errorMessage(err, "Couldn't load the API."));
+        if (!cancelled) setError(errorMessage(err, "Couldn't load the API."));
       });
-  }, [team, name]);
-
-  useEffect(load, [load]);
+    return () => {
+      cancelled = true;
+    };
+  }, [team, name, apiVersion]);
 
   const ownTeam = Boolean(api?.backendUrl);
   const maintains = !!user && (user.isAdmin || user.maintainerOf.includes(team));
   const inTeam = user?.teamNames.includes(team) ?? false;
+  const grants = !!user && user.maintainerOf.includes(team);
+
+  // Your own access, when it isn't your team's; its access list, for its team and admins: each its own error.
+  const loaded = api !== null;
+  useEffect(() => {
+    if (!loaded || inTeam) return;
+    let cancelled = false;
+    listMyApiAccess()
+      .then((m) => {
+        if (cancelled) return;
+        setMine(m);
+        setMineError(null);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setMineError(errorMessage(err, "Couldn't load your access."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, inTeam, accessVersion]);
+  useEffect(() => {
+    if (!loaded || !ownTeam) return;
+    let cancelled = false;
+    listApiAccess(team, name)
+      .then((list) => {
+        if (cancelled) return;
+        setAccessList(list);
+        setListError(null);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setListError(errorMessage(err, "Couldn't load who may call it."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, ownTeam, team, name, accessVersion]);
+  const accessChanged = () => {
+    load();
+    setAccessVersion((v) => v + 1);
+  };
+  const standing = standingFor(team, name, mine);
+  const waiting = accessList?.requests.filter((r) => r.state === "waiting").length ?? 0;
   const { traffic, error: trafficError } = useApiTraffic(team, name, hours, ownTeam);
 
   // A link to an old tab scrolls to its part, once the page is there.
@@ -97,7 +164,6 @@ export function ApiPage() {
   }
 
   const owner = !inTeam ? "Viewing as admin" : user?.maintainerOf.includes(team) ? "You maintain it" : "Your team's";
-  const sharedNote = api && !api.shareWith.includes("*") && api.shareWith.length > 0 ? `and ${api.team}, its own team` : undefined;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
@@ -124,6 +190,7 @@ export function ApiPage() {
                 <ApiStatePill state={api.state} />
                 <Pill tone={api.internet ? "info" : "neutral"}>{api.internet ? "Internet" : "In the cluster"}</Pill>
                 {ownTeam && <Pill tone="neutral">{owner}</Pill>}
+                {!inTeam && mine && <StandingPill standing={standing} />}
               </Box>
               {api.description && (
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: 14, lineHeight: 1.5 }}>
@@ -139,7 +206,7 @@ export function ApiPage() {
             </Button>
           </Box>
 
-          {(api.state !== "LIVE" || api.deprecated || !api.mayCall) && (
+          {(api.state !== "LIVE" || api.deprecated) && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
               {api.state === "PAUSED" && (
                 <Alert severity="warning">Paused by its team: every signed-in caller gets 503 with “{api.pausedMessage}” (anyone else, 404), and nothing reaches the backend.</Alert>
@@ -165,22 +232,6 @@ export function ApiPage() {
                 </Alert>
               )}
               {api.deprecated && <Alert severity="info">Deprecated: {api.deprecated}</Alert>}
-              {!api.mayCall && (
-                <Alert
-                  severity="info"
-                  action={
-                    api.askForAccessUrl && (
-                      <Button color="inherit" size="small" href={api.askForAccessUrl} target="_blank" rel="noopener noreferrer">
-                        Ask for access ↗
-                      </Button>
-                    )
-                  }
-                >
-                  {(user?.teamNames.length ?? 0) === 0
-                    ? "You're in no team, and calls are made as one of your teams: the gateway refuses yours (403). An admin can add you to one."
-                    : "It isn't shared with your teams: the gateway refuses your calls (403). Its team decides who may call it, in its api.yaml."}
-                </Alert>
-              )}
             </Box>
           )}
 
@@ -196,34 +247,39 @@ export function ApiPage() {
               <Mono sx={{ fontSize: 12.5 }}>{api.publicUrl || api.url || `<the gateway>/${api.team}/${api.name}`}</Mono>
             </Fact>
             <Fact label="Spec">{`${api.specTitle} ${api.specVersion} · ${String(api.endpoints.length)} endpoint${api.endpoints.length === 1 ? "" : "s"}`}</Fact>
-            <Fact label="Your team's limit">
-              {api.mayCall
-                ? `${String(api.perMinute)} a minute · ${size(api.maxRequestBytes)} a request · ${String(api.timeoutSeconds)} s`
-                : "None: it isn't shared with your teams"}
+            <Fact label="Who may call" note={<>Requests: <Mono sx={{ fontSize: 12 }}>access: {`{ requests: ${api.accessRequests} }`}</Mono></>}>
+              Whoever {api.team} grants a group, or a person or bot by name; {api.team}’s own members and bots always.
             </Fact>
-            <Fact label="Shared with" note={sharedNote}>
-              {sharedWith(api)}
+            <Fact label="A grant’s rate" note={`${api.team} may set each grant’s own`}>
+              {api.defaultPerMinute.toLocaleString()} a minute by default
             </Fact>
-            <Box sx={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 0.75, borderTop: 1, borderColor: "divider", pt: 1.5 }}>
-              <Typography variant="body2" color="text.secondary">
-                Each calling team&apos;s limit, as the gateway counts it
-              </Typography>
-              <Box component="ul" sx={{ display: "flex", flexWrap: "wrap", gap: 1, m: 0, p: 0, listStyle: "none" }}>
-                {api.limits.map((l) => (
-                  <Box component="li" key={l.team} sx={{ px: 1.25, py: 0.5, borderRadius: 999, bgcolor: "background.default", fontSize: 12.5 }}>
-                    {l.team} · {l.perMinute.toLocaleString()} a minute
+            {api.mayCall && (
+              <Fact label={inTeam ? "Your team’s limit" : "Your rate"}>
+                {`${String(api.perMinute)} a minute · ${size(api.maxRequestBytes)} a request · ${String(api.timeoutSeconds)} s`}
+              </Fact>
+            )}
+            {api.shareWith.length > 0 && (
+              <Box sx={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 0.75, borderTop: 1, borderColor: "divider", pt: 1.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  From the catalog: its api.yaml’s shareWith names {sharedWith(api)}, whose members and bots may call it at these limits. Going away: {api.team} grants
+                  them instead.
+                </Typography>
+                <Box component="ul" sx={{ display: "flex", flexWrap: "wrap", gap: 1, m: 0, p: 0, listStyle: "none" }}>
+                  {api.limits.map((l) => (
+                    <Box component="li" key={l.team} sx={{ px: 1.25, py: 0.5, borderRadius: 999, bgcolor: "background.default", fontSize: 12.5 }}>
+                      {l.team} · {l.perMinute.toLocaleString()} a minute
+                    </Box>
+                  ))}
+                  <Box component="li" sx={{ px: 1.25, py: 0.5, borderRadius: 999, bgcolor: "background.default", fontSize: 12.5 }}>
+                    {api.limits.length > 0 ? "Every other team" : "Every team"} · {api.defaultPerMinute.toLocaleString()} a minute
                   </Box>
-                ))}
-                <Box component="li" sx={{ px: 1.25, py: 0.5, borderRadius: 999, bgcolor: "background.default", fontSize: 12.5 }}>
-                  {api.limits.length > 0 ? "Every other team" : "Every team"} · {api.defaultPerMinute.toLocaleString()} a minute
                 </Box>
               </Box>
-              <Typography variant="caption" color="text.secondary">
-                {api.limits.length > 0 ? "Named in its api.yaml; the rest get " : "Its api.yaml names no team, so each gets "}
-                {api.defaultFromGateway ? "the gateway's own default on this install." : "its api.yaml's default."} Only teams it&apos;s shared with may call it at all.
-              </Typography>
-            </Box>
+            )}
           </Card>
+
+          {!inTeam && mine && <YourAccess api={api} standing={standing} onChanged={accessChanged} />}
+          {!inTeam && mineError && <Alert severity="error">{mineError}</Alert>}
 
           {ownTeam && (
             <Box component="nav" aria-label="On this page" sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.5, borderBottom: 1, borderColor: "divider" }}>
@@ -239,10 +295,11 @@ export function ApiPage() {
                   sx={{ display: "inline-flex", alignItems: "center", minHeight: 44, px: 1.75, fontSize: 14, color: "text.secondary", borderBottom: 2, borderColor: "transparent", "&:hover": { color: "text.primary", borderColor: "divider" } }}
                 >
                   {label}
+                  {id === "access" && waiting > 0 ? ` · ${String(waiting)} waiting` : ""}
                 </Link>
               ))}
               <Typography variant="caption" color="text.secondary" sx={{ ml: { sm: "auto" }, py: 1 }}>
-                Traffic, backend and logs: {api.team}’s members and admins only. Callers see the endpoints.
+                Traffic, who may call, backend and logs: {api.team}’s members and admins only. Callers see the endpoints.
               </Typography>
             </Box>
           )}
@@ -269,6 +326,10 @@ export function ApiPage() {
               </Box>
             )}
           </Box>
+
+          {ownTeam && (
+            <WhoMayCall api={api} list={accessList} error={listError} maintains={grants} isAdmin={user?.isAdmin ?? false} onChanged={accessChanged} />
+          )}
 
           {ownTeam && (
             <Box id="backend" sx={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "stretch", scrollMarginTop: 16 }}>

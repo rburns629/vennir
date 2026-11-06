@@ -141,6 +141,7 @@ The bell (in the sidebar, next to your name) shows your own notifications, with 
 | A step waits for approval | The maintainers of the step's team (not whoever ran it, who can't decide) |
 | A product isn't ready here | Its team's maintainers, and admins |
 | The cluster refused a step | Whoever ran it, and admins |
+| Access to an API asked for, granted, declined, withdrawn or revoked, or a grant changed | Whom it's for, whoever asked (for a bot, its team's maintainers), and the API's team's maintainers |
 | The catalog isn't being pulled; a team purged, image sources changed, a policy not syncing, the audit log's copy stopped or its chain broken | Admins |
 
 Nobody sees anyone else's notifications.
@@ -179,8 +180,15 @@ On **Admin → Automation tokens**, give a **Label**, tick its scopes, pick **Ex
 
 Whatever it's given, it can't read a secret, submit a run, or create other tokens. **Revoke** stops it at once.
 
+## Calling other teams' APIs
+
+A bot calls its own team's APIs without asking. For another team's API it needs a grant of its own, by name: bots are in no single sign-on group, and a person's grants don't pass to the bots they run (`Vennir-Team` doesn't decide access either).
+
+On your team's **Automation** tab, **Bots calling other teams’ APIs** lists each bot's grants (the API, its rate, who granted it when) and its requests that wait or were declined, with why. A maintainer clicks **Request access for a bot…** on a bot, picks **Which API** (another team's that takes requests) and says **Why you need it**; the API's team approves or declines it as it does a person's. A maintainer may **Withdraw** a request they made, and **Revoke…** a bot's grant; the API's team sets its rate, and may revoke it too. You can also ask for one of your bots from the API's own page (**Request access for a bot…**). How access works: [APIs and the gateway](11-apis.md#how-do-i-get-access-to-an-api).
+
 ## Where to look next
 
+- [APIs and the gateway](11-apis.md#how-do-i-get-access-to-an-api): who may call an API, and how access is asked for.
 - [Calling the API](05-calling-the-api.md): every call a bot makes, waiting for a run, reading logs, and the errors.
 - [Finding and running things from the catalog](10-ordering-and-the-cart.md): what a bot runs, seen from the console.
 - [Runs, explained](09-runs-explained.md): what a run's states and failure codes mean.

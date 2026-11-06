@@ -97,6 +97,9 @@ message GetMeResponse {
   // its first), or both.
   bool has_password = 7;
   bool uses_sso = 8;
+  // The teams in team_names that are retired: read-only, so nothing new is
+  // asked or changed for them (not even for their bots).
+  repeated string retired_teams = 9;
 }
 
 message ChangePasswordRequest {

@@ -177,7 +177,8 @@ it was seen.
   Decision 26 (`docs/assessment.md`, approved 2026-11-05): the paths stay,
   the gateway passes everything through, and each API has an access list
   of grants to groups or users (built: `console/src/core/apiAccess.ts`, the
-  gateway's `accessFor`); its console pages are below, under Console.
+  gateway's `accessFor`) with its console pages (what they can't show yet
+  is below, under Console).
 
 - [ ] **Next release: drop `shareWith` from `api.yaml`** (decision 26; the
   access list was built 2026-11-05): for one release a `shareWith` team's
@@ -250,17 +251,21 @@ it was seen.
   last sign-in, `users.last_signed_in_at`), or drop group-given rows of
   people who haven't signed in for an hour.
 
-- [ ] **The API access list's pages** (decision 26, backend built
-  2026-11-05): the APIs list and an API's page show only `may_call` and
-  `access_via` so far, and **Ask for access ↗** still opens an issue on the
-  catalog repository. Build the pages in chapter 15 of the mockups canvas:
-  asking for access (for yourself, and for a team's bot), an API's grants
-  and requests for its maintainers (approve with a person's group, decline,
-  rates, revoke), "APIs I may call", a team's bots' grants, and the email
-  option for `api_access` notifications (`EmailSection.tsx`; the bell shows
-  them already). The methods are `ApiService`'s access rpcs
-  (`proto/vennir/console/v1/api.proto`). Then drop the issue link
-  (`catalogLinks.ts`'s `askForAccessUrl` for APIs).
+- [ ] **What the API access pages couldn't show** (decision 26; the pages
+  were built 2026-11-05 from chapter 15 of the mockups canvas): the boards
+  show data no rpc returns yet. Each grant's 7-day calls (the gateway counts
+  traffic by `grant:user` and `grant:group:<group>`, not per grant);
+  someone else's API's group grants and whether the viewer is in them (15a:
+  `ListApiAccess` is the API's team's and admins'; `GetMe` doesn't carry a
+  person's groups); who granted the caller's own grant, when, and from which
+  request (15d: `MyApiAccess` has the grant's id and rate only); a request's
+  person's team and a group's size (15f); the gateway's certificate (15h);
+  a picker of people and bots for Add a grant (it takes an email). The
+  boards cap a grant's rate at the API's limit; the backend allows up to
+  1,000,000 a minute, so the pages say "by default" instead of "up to".
+  Also drop the backend's issue link for APIs (`catalogLinks.ts`'s
+  `askForAccessUrl`, `ApiProduct.ask_for_access_url`), which no page uses
+  any more. A grant's last call is the item above.
 
 - [ ] **A page for who read what** (built 2026-11-05, backend only):
   `audit_reads` and `AdminService/ListAuditReads` record and list who was

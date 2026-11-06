@@ -16,6 +16,7 @@ const KINDS = [
   { kind: "catalog_failing", label: "The catalog isn't being pulled (admins)" },
   { kind: "step_refused", label: "The cluster refused a step (mine, or anyone's for admins)" },
   { kind: "platform_alert", label: "A team purged, the image sources changed, a policy not syncing (admins)" },
+  { kind: "api_access", label: "Access to an API: asked for, granted, declined or revoked (mine, my bots', or my team's APIs)" },
 ];
 
 /** Which of your notifications are emailed to you too; hidden when the install sends no email. */

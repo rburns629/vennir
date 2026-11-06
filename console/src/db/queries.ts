@@ -383,6 +383,17 @@ export async function teamRolesForUser(userId: string, exec: Db = db): Promise<{
     .orderBy(sql`${teams.name} COLLATE "C"`);
 }
 
+/** Which of these teams are retired (read-only): GetMe says so, so the pages offer nothing new for them. */
+export async function retiredTeamNames(names: string[]): Promise<string[]> {
+  if (names.length === 0) return [];
+  const rows = await db
+    .select({ name: teams.name })
+    .from(teams)
+    .where(and(inArray(teams.name, names), isNull(teams.deletedAt), sql`${teams.retiredAt} IS NOT NULL`))
+    .orderBy(sql`${teams.name} COLLATE "C"`);
+  return rows.map((r) => r.name);
+}
+
 /** Whether a bot has ever had a credential: a token (revoked or not) or a keyless identity. */
 export async function botHasCredentials(userId: string, exec: Db = db): Promise<boolean> {
   const [token] = await exec.select({ id: apiTokens.id }).from(apiTokens).where(eq(apiTokens.userId, userId)).limit(1);

@@ -234,6 +234,14 @@ export declare type GetMeResponse = Message<"vennir.console.v1.GetMeResponse"> &
    * @generated from field: bool uses_sso = 8;
    */
   usesSso: boolean;
+
+  /**
+   * The teams in team_names that are retired: read-only, so nothing new is
+   * asked or changed for them (not even for their bots).
+   *
+   * @generated from field: repeated string retired_teams = 9;
+   */
+  retiredTeams: string[];
 };
 
 /**

@@ -5,6 +5,7 @@ import { Type } from "@sinclair/typebox";
 import {
   addGrant,
   decideRequest,
+  listAllGrants,
   listApiAccess,
   listAwayAccess,
   listMyAccess,
@@ -183,6 +184,12 @@ export function apiService(): ServiceImpl<typeof ApiService> {
       const { team } = check({ team: Name }, req);
       const a = await listAwayAccess(callerOf(ctx), team);
       return { grants: a.grants.map(grant), requests: a.requests.map(request) };
+    },
+
+    async listAllApiGrants(req, ctx) {
+      const { limit, cursor } = check({ limit: Type.Integer({ minimum: 0, maximum: 100_000 }), cursor: Type.String({ maxLength: 20 }) }, { limit: req.page?.limit ?? 0, cursor: req.page?.cursor ?? "" });
+      const page = await listAllGrants(callerOf(ctx), limit, cursor);
+      return { ...page, grants: page.grants.map(grant) };
     },
 
     async listTeamBotApiAccess(req, ctx) {
