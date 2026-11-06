@@ -39,9 +39,12 @@ releases and its legacy `products` list, the console chart's gateway token
 policy), re-encoded as JSON so they can only ever be literals, and held to
 the kernel's rules (no platform product, no API's or ESO's ServiceAccount,
 no audience of this cluster's own). The legacy list, matched by repository
-at any digest as identity-policy.yaml's, is there only for that: an upgrade
-from a console that wrote nothing else (v0.11 and older) keeps its products
-running until the kernel's first write, which empties it. The kernel writes them only once it has
+at any digest as identity-policy.yaml's, is seeded only on the upgrade from
+a console that wrote nothing else (a v0.11-shaped identity policy: no
+candidates, no release maps), and only keeps steps already submitted
+dispatching until the kernel's first write, which empties it: the console
+lists only the release maps, so it refuses to submit a product listed by the
+legacy list alone (IDENTITY_PENDING). The kernel writes them only once it has
 applied a verified release, so they stand as seeded until then. Without
 lookup (helm template, GitOps) they start empty: a product's step is refused
 (IDENTITY_NOT_ALLOWED) until the kernel writes them, and the console refuses
@@ -82,12 +85,25 @@ to submit one the kernel hasn't listed (IDENTITY_PENDING).
      and kept until the kernel first writes, which empties it. */}}
 {{- $products := list }}
 {{- $seed := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $identity }}
+{{- /* Its own list, kept as it is (the kernel writes it []); or, only on
+     the upgrade from v0.11 and older, the console's: a policy of that shape
+     (no candidates, no release maps), so a newer console's legacy list,
+     which only a console from before writes during a rollout, never seeds
+     one whenever this policy is missing at render. */}}
+{{- $legacySeed := true }}
 {{- if not $seed }}
 {{- $seed = lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" (printf "%s-identity" $fullname) }}
+{{- if $seed }}
+{{- range $seed.spec.variables }}
+{{- if or (eq .name "candidates") (hasPrefix "releases" .name) }}
+{{- $legacySeed = false }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- if $seed }}
 {{- range $seed.spec.variables }}
-{{- if eq .name "products" }}
+{{- if and $legacySeed (eq .name "products") }}
 {{- range fromJsonArray .expression }}
 {{- $entry := . }}
 {{- if or (not (kindIs "map" $entry)) (not (and (kindIs "string" (get $entry "team")) (kindIs "string" (get $entry "repository")) (kindIs "string" (get $entry "action")) (kindIs "string" (get $entry "serviceAccount")))) (and (hasKey $entry "audiences") (not (kindIs "string" (get $entry "audiences")))) }}

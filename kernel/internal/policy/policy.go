@@ -37,6 +37,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -163,11 +164,30 @@ func (e *ErrRefused) Unwrap() error { return e.Err }
 
 func refuse(reason string, err error) error { return &ErrRefused{Reason: reason, Err: err} }
 
+// MaxRefusalBytes bounds the refusal's annotation and log line: cosign's
+// failure says something for every signature it found, and whoever can push
+// to the registry chooses those. An annotation too big would fail every
+// write of the policies, freezing what they list.
+const MaxRefusalBytes = 1024
+
+// truncate is s cut to at most max bytes, on a rune boundary, marked "…".
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	const mark = "…"
+	cut := max - len(mark)
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + mark
+}
+
 // noteRefused records why the newest release was refused (nil: it wasn't).
 func (c *Controller) noteRefused(refused *ErrRefused) {
 	reason, message := "", ""
 	if refused != nil {
-		reason, message = refused.Reason, refused.Error()
+		reason, message = refused.Reason, truncate(refused.Error(), MaxRefusalBytes)
 	}
 	for _, r := range refusalReasons {
 		value := 0.0

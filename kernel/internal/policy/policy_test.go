@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -720,5 +721,18 @@ func TestARefusalBeforeAnyReleaseIsAppliedIsSaid(t *testing.T) {
 	}
 	if got := testutil.ToFloat64(metrics.CatalogPolicyNewestRefused.WithLabelValues("unsigned")); got != 1 {
 		t.Fatalf("metric: %v", got)
+	}
+}
+
+// cosign's failure says something for each signature found, which whoever
+// pushes to the registry chooses: the annotation and log are bounded.
+func TestARefusalIsBounded(t *testing.T) {
+	c, _, _ := newController(t, &fakeSource{})
+	c.noteRefused(&ErrRefused{Reason: "unsigned", Err: errors.New(strings.Repeat("no matching signatures: é ", 5000))})
+	if len(c.refused) > MaxRefusalBytes || !strings.HasSuffix(c.refused, "…") || !utf8.ValidString(c.refused) {
+		t.Fatalf("%d bytes, valid %v", len(c.refused), utf8.ValidString(c.refused))
+	}
+	if got := truncate("short", MaxRefusalBytes); got != "short" {
+		t.Fatal(got)
 	}
 }
