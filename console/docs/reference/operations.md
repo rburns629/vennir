@@ -376,7 +376,8 @@ release) and nothing else, to exactly the reader's identity:
 
 | Owner | Reader | Granted to | `vennir catalog grant` makes |
 | --- | --- | --- | --- |
-| gcp | gcp, another project | its console, scanner, nodes and (verifying) policy-controller service accounts (`--service-account`) | `roles/artifactregistry.reader` on the repository for each |
+| gcp | gcp, another project | its console, scanner, nodes, (verifying) policy-controller and (signed) kernel policy service accounts (`--service-account`) | `roles/artifactregistry.reader` on the repository for each |
+| gcp | gcp, the same project | nothing: the reader names the owner's repository as its own task registry (`taskImages.name`, `taskImages.create: false`, `taskImages.registry`), which its module grants its own identities read on; `vennir` refuses anything else | — |
 | gcp | aws, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`) | in the pool `vennir-installs`, a provider `vennir-<reader>` trusting that issuer for that subject alone, mapped to the subject `<reader>:<subject>`; `roles/artifactregistry.reader` on the repository for that principal |
 | aws | gcp, another AWS account, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`) | an IAM OIDC provider for the issuer (audience `sts.amazonaws.com`), and a role `vennir-reader-<reader>` only that subject may assume by web identity, whose one policy may `ecr:GetAuthorizationToken` and pull and list tags in `<prefix>/*` |
 

@@ -216,13 +216,15 @@ it was seen.
   clouds on 2026-11-06: on GKE end to end with `vennir catalog create`
   (keyless-signed release from catalog CI, its starter run), on EKS with a
   by-hand signed release (ECR read and RDS sign-in as its own role). Next:
-  - **Another install's catalog, beyond another GCP project's**:
-    `kernel policy` reads another project's Artifact Registry as its own
-    service account (the owner's `vennir catalog grant` names it), but is
-    off for a catalog read by federation (the console's identity, which it
-    doesn't borrow), from AWS, or in the reader's own project (no grant
-    names it there). Each needs its own read: federation of its own, or
-    the module granting it the repository.
+  - **Another install's catalog, by federation**: `kernel policy` reads
+    another install's Artifact Registry as its own service account, in
+    another project (the owner's `vennir catalog grant` names it) or in
+    this one (as the reader's task registry), but is off for a catalog read
+    by federation: a reader on AWS or another cloud, or of another
+    account's ECR. Those need its own federation: the owner's grant
+    trusting its ServiceAccount too, and `kernel policy` exchanging its
+    projected token (Google's STS, or `AssumeRoleWithWebIdentity`) as the
+    console's `registryFederation.ts` does.
 
 ## Console
 

@@ -569,7 +569,8 @@ func TestMonitoringValues(t *testing.T) {
 // own Google identity, signing in as its own database user with a managed
 // one, and the gateway's token audience as the console chart has it.
 // Off when unsigned, from a module before its identity, or with another
-// install's catalog it can't read as its own. On EKS, as its role.
+// install's catalog it can't read as its own (by federation). On EKS, as its
+// role.
 func TestKernelPolicyRunsOnACloudInstallWhoseCatalogIsSigned(t *testing.T) {
 	c := kindConfig()
 	c.Target = "gcp"
@@ -630,6 +631,15 @@ func TestKernelPolicyRunsOnACloudInstallWhoseCatalogIsSigned(t *testing.T) {
 	if g := CatalogGrant(&reader, cloud); g == nil || !strings.Contains(g.Command, "--service-account dev-policy@acme.iam.gserviceaccount.com") {
 		t.Errorf("the owner's grant leaves out kernel policy: %+v", g)
 	}
+	// In this project, as its task registry (its module grants kernel
+	// policy read there): on, with no owner's grant.
+	reader.ExternalCatalog.Registry = "us-docker.pkg.dev/acme/catalog"
+	if p, _ := KernelValues(&reader, Images{}, "", cloud)["catalogPolicy"].(map[string]any); p["release"] != "us-docker.pkg.dev/acme/catalog/catalog-release:latest" {
+		t.Errorf("this project's: %v", p)
+	}
+	if g := CatalogGrant(&reader, cloud); g != nil {
+		t.Errorf("this project's: no grant, %+v", g)
+	}
 
 	for name, change := range map[string]func(*Cloud, *config.Config){
 		"EKS, a module from before": func(cl *Cloud, _ *config.Config) { cl.Provider = "aws" },
@@ -637,7 +647,6 @@ func TestKernelPolicyRunsOnACloudInstallWhoseCatalogIsSigned(t *testing.T) {
 		"another install's, by federation": func(_ *Cloud, cfg *config.Config) {
 			cfg.ExternalCatalog.Registry, cfg.ExternalCatalog.GCPWorkloadIdentityProvider = "us-docker.pkg.dev/other/catalog", "projects/1/locations/global/workloadIdentityPools/p/providers/q"
 		},
-		"another install's, in this project": func(_ *Cloud, cfg *config.Config) { cfg.ExternalCatalog.Registry = "us-docker.pkg.dev/acme/catalog" },
 	} {
 		cl, cfg := *cloud, *c
 		change(&cl, &cfg)
