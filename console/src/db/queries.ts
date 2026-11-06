@@ -1443,14 +1443,21 @@ export async function deleteApisExcept(teamIds: string[], keep: Set<string>): Pr
     .from(apis)
     .where(inArray(apis.teamId, teamIds));
   const gone = all.filter((a) => !keep.has(`${a.teamId}/${a.name}`)).map((a) => a.id);
-  if (gone.length > 0) {
-    await db.transaction(async (tx) => {
-      const now = new Date();
+  await db.transaction(async (tx) => {
+    const now = new Date();
+    if (gone.length > 0) {
+      // The rows locked first (as a grant's or request's writer locks its
+      // API, core/apiAccess.ts lockApi): one committed meanwhile is marked
+      // away with the rest, not left linked to nothing and never pruned.
+      await tx.select({ id: apis.id }).from(apis).where(inArray(apis.id, gone)).for("update");
       await tx.update(apiGrants).set({ awaySince: now }).where(inArray(apiGrants.apiId, gone));
       await tx.update(apiAccessRequests).set({ awaySince: now }).where(inArray(apiAccessRequests.apiId, gone));
       await tx.delete(apis).where(inArray(apis.id, gone));
-    });
-  }
+    }
+    // A guard: anything linked to no API and not marked away is away from now.
+    await tx.update(apiGrants).set({ awaySince: now }).where(and(isNull(apiGrants.apiId), isNull(apiGrants.awaySince)));
+    await tx.update(apiAccessRequests).set({ awaySince: now }).where(and(isNull(apiAccessRequests.apiId), isNull(apiAccessRequests.awaySince)));
+  });
   return gone.length;
 }
 

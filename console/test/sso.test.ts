@@ -598,6 +598,30 @@ describe("kept groups and the settings they're read under", () => {
     await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
   });
 
+  it("are emptied in the same transaction as the settings saved: a failed emptying keeps the old settings, and groups", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const [someone] = await db.insert(users).values({ email: `atomic@${domain}`, ssoGroups: ["g-kept"], ssoGroupsReadAt: new Date() }).returning();
+    // A waiting request whose emptying fails (a trigger on this row alone).
+    const marker = `fail-clear-${prefix}`;
+    await db.insert(apiAccessRequests).values({ teamId: ids[teamA] ?? "", apiName: "atomic", userId: someone?.id ?? "", reason: marker, requesterGroups: ["g-kept"] });
+    const fn = `fail_clear_${prefix.replace(/-/g, "_")}`;
+    await db.execute(sql.raw(`CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'emptying fails'; END $$`));
+    await db.execute(sql.raw(`CREATE TRIGGER ${fn} BEFORE UPDATE ON api_access_requests FOR EACH ROW WHEN (OLD.reason = '${marker}') EXECUTE FUNCTION ${fn}()`));
+    try {
+      const saved = await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "roles" }));
+      expect(saved.code).toBe("internal");
+      expect((await db.select().from(ssoSettings).where(eq(ssoSettings.id, 1)))[0]?.groupsClaim).toBe("groups");
+      expect((await db.select({ g: users.ssoGroups }).from(users).where(eq(users.id, someone?.id ?? "")))[0]?.g).toEqual(["g-kept"]);
+    } finally {
+      await db.execute(sql.raw(`DROP TRIGGER ${fn} ON api_access_requests`));
+      await db.execute(sql.raw(`DROP FUNCTION ${fn}()`));
+    }
+    // Saved again, it empties them: the change wasn't lost half done.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "roles" }));
+    expect((await db.select({ g: users.ssoGroups }).from(users).where(eq(users.id, someone?.id ?? "")))[0]?.g).toBeNull();
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+  });
+
   it("from Google aren't read again while single sign-on isn't in effect here", async () => {
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "", googleGroups: true, enabled: false }));
     const spy = vi.spyOn(globalThis, "fetch");

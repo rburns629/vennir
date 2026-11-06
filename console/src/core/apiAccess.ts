@@ -441,7 +441,7 @@ async function maintainersOf(teamNames: string[]): Promise<string[]> {
  * its teams' maintainers), what happened. The change is made and audited
  * already: a notification that can't be made is logged, never a failure.
  */
-async function tell(api: Api, title: string, body: string, about: (string | null)[]): Promise<void> {
+async function tell(api: Pick<Api, "teamName" | "name">, title: string, body: string, about: (string | null)[]): Promise<void> {
   try {
     const people = await emailsOf(about);
     const bots = [...people].filter(([, u]) => u.isBot).map(([id]) => id);
@@ -494,10 +494,6 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
     target = who;
     targetEmail = (await findUserById(who.id))?.email ?? "";
   }
-  // A person's groups as last read, for the API's maintainers to grant one of them.
-  const [read] = botEmail ? [] : await db.select({ groups: users.ssoGroups, readAt: users.ssoGroupsReadAt }).from(users).where(eq(users.id, who.id));
-  const requesterGroups = read?.groups ?? [];
-  const requesterGroupsReadAt = read?.groups ? read.readAt : null;
   if (api.accessRequests === "closed") {
     throw new ApiError(409, "REQUESTS_CLOSED", `${api.teamName}/${api.name} takes no requests for access: ask its team directly.`);
   }
@@ -516,6 +512,15 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
         .from(apiGrants)
         .where(and(eq(apiGrants.apiId, api.id), eq(apiGrants.userId, target.id), isNull(apiGrants.revokedAt)));
       if (granted) throw new ApiError(409, "ALREADY_ALLOWED", `${targetEmail} may call ${api.teamName}/${api.name} already.`);
+      // A person's groups as last read, for the API's maintainers to grant
+      // one of them: read here, their row share-locked, so emptying them
+      // (clearKeptGroups) waits for this request, and empties its copy too,
+      // or this sees them emptied.
+      const [read] = botEmail
+        ? []
+        : await tx.select({ groups: users.ssoGroups, readAt: users.ssoGroupsReadAt }).from(users).where(eq(users.id, who.id)).for("share");
+      const requesterGroups = read?.groups ?? [];
+      const requesterGroupsReadAt = read?.groups ? read.readAt : null;
       const key = { apiId: api.id, teamId: api.teamId, apiName: api.name };
       const [request] = await tx.insert(apiAccessRequests).values({ ...key, userId: target.id, requestedBy: who.id, reason: why, requesterGroups, requesterGroupsReadAt }).returning();
       if (!request) throw new Error("no request was made");
@@ -555,10 +560,23 @@ async function waitingRequest(id: string): Promise<{ request: AccessRequest; api
   return { request, api };
 }
 
-/** Withdraws a waiting request: whoever asked. */
+/**
+ * A waiting request, of a published API or of one away from the release
+ * (to withdraw: its requester sees it listed meanwhile).
+ */
+async function waitingOrAwayRequest(id: string): Promise<{ request: AccessRequest; api: Pick<Api, "teamName" | "name"> }> {
+  const [away] = await db.select().from(apiAccessRequests).where(and(eq(apiAccessRequests.id, id), isNull(apiAccessRequests.apiId)));
+  if (!away) return waitingRequest(id);
+  const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, away.teamId));
+  if (!team) throw new ApiError(404, "NOT_FOUND", "No such request for access.");
+  if (away.state !== "waiting") throw new ApiError(409, "NOT_WAITING", `That request was ${away.state} already.`);
+  return { request: away, api: { teamName: team.name, name: away.apiName } };
+}
+
+/** Withdraws a waiting request (its API published or away): whoever asked. */
 export async function withdrawRequest(caller: AuthUser | undefined, id: string): Promise<void> {
   const who = signedIn(caller);
-  const { request, api } = await waitingRequest(id);
+  const { request, api } = await waitingOrAwayRequest(id);
   if (request.requestedBy !== who.id) throw new ApiError(403, "FORBIDDEN", "Only whoever asked may withdraw a request.");
   const [done] = await db
     .update(apiAccessRequests)
@@ -802,7 +820,7 @@ async function revokeAwayGrant(who: AuthUser, grant: Grant, reason: string): Pro
   const why = reason.trim().slice(0, MAX_REASON);
   const subject = grant.userId ? await findUserById(grant.userId) : undefined;
   await tell(
-    { teamName: team.name, name: grant.apiName } as Api,
+    { teamName: team.name, name: grant.apiName },
     `${principal(grant, subject?.email ?? "")} won't call ${team.name}/${grant.apiName} if it's back`,
     `Revoked while the API is out of the catalog's release, by ${(await findUserById(who.id))?.email ?? ""}${why ? `: ${why}` : "."}`,
     [grant.userId],
@@ -930,5 +948,5 @@ export async function listTeamBotAccess(caller: AuthUser | undefined, team: stri
     .from(apiAccessRequests)
     .where(and(inArray(apiAccessRequests.userId, bots), inArray(apiAccessRequests.state, ["waiting", "declined"])))
     .orderBy(desc(apiAccessRequests.createdAt));
-  return { grants: await grantViews(grants, all), requests: await requestViews(requests, all) };
+  return { grants: await grantViews(grants, all), requests: await requestViews(requests, all, false, await awayTeamsOf(requests)) };
 }

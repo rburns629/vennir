@@ -64,6 +64,9 @@ const release = () => [
   api("secret", { hidden: true, perMinute: {} }),
   // From a vennir before access.requests: approval.
   api("older", { accessRequests: "" }),
+  // For what happens while an API is away from the release.
+  api("spare"),
+  api("spare2"),
 ];
 const problems: string[] = [];
 async function apply(list: ReturnType<typeof api>[]) {
@@ -149,7 +152,7 @@ afterAll(async () => {
 describe("from the catalog", () => {
   it("records each API's access.requests, approval when a release doesn't say, and refuses one it can't read", async () => {
     const rows = await db.select({ name: apis.name, accessRequests: apis.accessRequests }).from(apis).innerJoin(teams, eq(teams.id, apis.teamId)).where(eq(teams.name, owner));
-    expect(Object.fromEntries(rows.map((r) => [r.name, r.accessRequests]))).toEqual({ orders: "approval", open: "open", closed: "closed", secret: "approval", older: "approval" });
+    expect(Object.fromEntries(rows.map((r) => [r.name, r.accessRequests]))).toEqual({ orders: "approval", open: "open", closed: "closed", secret: "approval", older: "approval", spare: "approval", spare2: "approval" });
     expect(problems).toEqual([]);
     await apply([...release(), api("odd", { accessRequests: "sometimes" })]);
     expect(problems.some((p) => p.includes("api ") && p.includes("odd") && p.includes("open, approval or closed"))).toBe(true);
@@ -456,6 +459,103 @@ describe("grants", () => {
   });
 });
 
+describe("while an API is away from the release", () => {
+  const withoutSpare = () => release().filter((a) => a.name !== "spare");
+  type AwayList = { grants?: Grant[]; requests?: (Request & { awaySince?: string })[] };
+
+  it("its requests are listed without groups, withdrawable by whoever asked, and a bot's listed for its team", async () => {
+    await db
+      .update(users_)
+      .set({ ssoGroups: [`eng@${prefix}.example.com`], ssoGroupsReadAt: new Date() })
+      .where(eq(users_.id, ids.bob));
+    const bobs = await ask("bob", "spare", "spare work");
+    const bots = await ask("toolsMaintainer", "spare", "spare bot", botEmail);
+    await apply(withoutSpare());
+    const away = await call<AwayList>(tokens.maintainer, "ApiService/ListAwayApiAccess", { team: owner });
+    const listedBob = away.body.requests?.find((r) => r.id === bobs.body.request.id);
+    expect(listedBob).toMatchObject({ name: "spare", state: "API_ACCESS_REQUEST_STATE_WAITING" });
+    expect(listedBob?.awaySince).toBeTruthy();
+    expect(listedBob?.groups ?? []).toEqual([]);
+    const teamBots = await call<AwayList>(tokens.toolsMember, "ApiService/ListTeamBotApiAccess", { team: tools });
+    expect(teamBots.body.requests?.some((r) => r.id === bots.body.request.id && r.name === "spare")).toBe(true);
+    expect((await call(tokens.maintainer, "ApiService/WithdrawApiAccessRequest", { accessRequestId: bobs.body.request.id })).failure).toBe("FORBIDDEN");
+    expect((await call(tokens.bob, "ApiService/WithdrawApiAccessRequest", { accessRequestId: bobs.body.request.id })).code).toBe("ok");
+    const [withdrawn] = await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, bobs.body.request.id));
+    expect(withdrawn?.state).toBe("withdrawn");
+    await apply(release());
+  });
+
+  it("a waiting request that would duplicate one made meanwhile is declined as superseded, not an error", async () => {
+    const asked = await ask("bob", "spare", "again");
+    await apply(withoutSpare());
+    const team = (await findTeamByName(owner))?.id ?? "";
+    const [row] = await db
+      .insert(apis)
+      .values({ teamId: team, name: "spare", displayName: "spare", openapi, backendUrl: "https://orders.example.run.app", serviceAccount: "spare-api" })
+      .returning();
+    await db.insert(apiAccessRequests).values({ apiId: row?.id ?? "", teamId: team, apiName: "spare", userId: ids.bob, reason: "meanwhile" });
+    await apply(release());
+    expect(problems).toEqual([]);
+    const [superseded] = await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, asked.body.request.id));
+    expect(superseded).toMatchObject({ apiId: row?.id, state: "declined", decisionReason: expect.stringContaining("superseded") as unknown });
+  });
+
+  it("its grants are revocable by an admin, not by a retired team's maintainer", async () => {
+    const grant = await add("maintainer", "spare", { email: emails.toolsMember });
+    await apply(withoutSpare());
+    await db.update(teams).set({ retiredAt: new Date() }).where(eq(teams.name, owner));
+    try {
+      expect((await revoke("maintainer", grant.body.grant.id)).failure).toBe("TEAM_RETIRED");
+      expect((await revoke("member", grant.body.grant.id)).failure).toBe("FORBIDDEN");
+      expect((await revoke("admin", grant.body.grant.id, "incident")).code).toBe("ok");
+    } finally {
+      await db.update(teams).set({ retiredAt: null }).where(eq(teams.name, owner));
+    }
+    await apply(release());
+  });
+
+  it("a row linked to no API and not marked away is marked by the next release (a guard)", async () => {
+    const team = (await findTeamByName(owner))?.id ?? "";
+    const [lost] = await db.insert(apiGrants).values({ teamId: team, apiName: "never", userId: ids.bob }).returning();
+    expect(lost?.awaySince).toBeNull();
+    await apply(release());
+    const [marked] = await db.select().from(apiGrants).where(eq(apiGrants.id, lost?.id ?? ""));
+    expect(marked?.awaySince).not.toBeNull();
+  });
+
+  it("is pruned 30 days after: only rows away that long, ended requests deleted, and a second run finds nothing", async () => {
+    const team = (await findTeamByName(owner))?.id ?? "";
+    const old = new Date(Date.now() - 31 * 24 * 3_600_000);
+    const recent = new Date(Date.now() - 29 * 24 * 3_600_000);
+    const live = await add("maintainer", "spare2", { email: emails.bob });
+    const [awayOld] = await db.insert(apiGrants).values({ teamId: team, apiName: "gone", userId: ids.bob, awaySince: old }).returning();
+    const [awayRecent] = await db.insert(apiGrants).values({ teamId: team, apiName: "gone", userId: ids.ada, awaySince: recent }).returning();
+    const [ended] = await db
+      .insert(apiAccessRequests)
+      .values({ teamId: team, apiName: "gone", userId: ids.bob, reason: "x", state: "declined", decidedAt: old, awaySince: old })
+      .returning();
+    const [endedRecently] = await db
+      .insert(apiAccessRequests)
+      .values({ teamId: team, apiName: "gone", userId: ids.ada, reason: "x", state: "withdrawn", decidedAt: recent, awaySince: old })
+      .returning();
+    const [waiting] = await db.insert(apiAccessRequests).values({ teamId: team, apiName: "gone", userId: ids.toolsMember, reason: "x", awaySince: old }).returning();
+    expect(await pruneAwayAccess()).toBeGreaterThanOrEqual(2);
+    const left = async (table: typeof apiGrants | typeof apiAccessRequests, id: string) => (await db.select({ id: table.id }).from(table).where(eq(table.id, id))).length;
+    expect(await left(apiGrants, live.body.grant.id)).toBe(1);
+    expect(await left(apiGrants, awayOld?.id ?? "")).toBe(0);
+    expect(await left(apiGrants, awayRecent?.id ?? "")).toBe(1);
+    expect(await left(apiAccessRequests, ended?.id ?? "")).toBe(0);
+    expect(await left(apiAccessRequests, endedRecently?.id ?? "")).toBe(1);
+    const [declined] = await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, waiting?.id ?? ""));
+    expect(declined?.state).toBe("declined");
+    // Ours are pruned; another run finds nothing more of ours (a declined one stays its 30 days).
+    await pruneAwayAccess();
+    expect(await left(apiAccessRequests, waiting?.id ?? "")).toBe(1);
+    expect(await left(apiGrants, awayRecent?.id ?? "")).toBe(1);
+    expect(await left(apiAccessRequests, endedRecently?.id ?? "")).toBe(1);
+  });
+});
+
 describe("the lists", () => {
   it("of an API's access are its team's and admins'", async () => {
     expect((await call(tokens.member, "ApiService/ListApiAccess", { team: owner, name: "orders" })).code).toBe("ok");
@@ -482,7 +582,7 @@ describe("the lists", () => {
   it("of a team's bots' are its members' and admins'", async () => {
     await ask("toolsMaintainer", "orders", "again", botEmail);
     const bots = await call<{ requests?: Request[] }>(tokens.toolsMember, "ApiService/ListTeamBotApiAccess", { team: tools });
-    expect(bots.body.requests?.map((r) => r.userEmail)).toEqual([botEmail]);
+    expect([...new Set(bots.body.requests?.map((r) => r.userEmail))]).toEqual([botEmail]);
     expect((await call(tokens.admin, "ApiService/ListTeamBotApiAccess", { team: tools })).code).toBe("ok");
     expect((await call(tokens.ada, "ApiService/ListTeamBotApiAccess", { team: tools })).failure).toBe("FORBIDDEN");
   });

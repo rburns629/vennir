@@ -357,16 +357,17 @@ export async function keepConfirmedGroup(userId: string, group: string): Promise
  * count any more, so none are kept; each person's next sign-in (or the
  * Google resync) reads them again.
  */
-export async function clearKeptGroups(): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx.delete(userGroups);
-    await tx.update(users).set({ ssoGroups: null, ssoGroupsReadAt: null }).where(isNotNull(users.ssoGroups));
-    // Waiting requests' copies too: a maintainer can't grant a group read under the old settings.
-    await tx
-      .update(apiAccessRequests)
-      .set({ requesterGroups: [], requesterGroupsReadAt: null })
-      .where(eq(apiAccessRequests.state, "waiting"));
-  });
+export async function clearKeptGroups(tx: Pick<typeof db, "update" | "delete">): Promise<void> {
+  // In the order every writer of kept groups locks (storeUserGroups,
+  // keepGrantedGroup): sso_settings (the caller's), then users, then
+  // user_groups; so none of them deadlocks with another.
+  await tx.update(users).set({ ssoGroups: null, ssoGroupsReadAt: null }).where(isNotNull(users.ssoGroups));
+  await tx.delete(userGroups);
+  // Waiting requests' copies too: a maintainer can't grant a group read under the old settings.
+  await tx
+    .update(apiAccessRequests)
+    .set({ requesterGroups: [], requesterGroupsReadAt: null })
+    .where(eq(apiAccessRequests.state, "waiting"));
 }
 
 /** Whether one of the person's groups (as kept) has an active grant to a live team's API. */
