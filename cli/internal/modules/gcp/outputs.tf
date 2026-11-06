@@ -2,9 +2,13 @@
 # What vennir turns into Helm values and kubectl access.
 
 locals {
-  # The toleration GKE Autopilot adds to a Pod that asks for Spot capacity
-  # (its workload defaulter), as the chart's placements give it.
-  spot_toleration = [{ key = "cloud.google.com/gke-spot", operator = "Equal", value = "true", effect = "NoSchedule" }]
+  # The tolerations GKE Autopilot's workload defaulter adds to a step's
+  # Job, as the chart's placements give them: its architecture's, to every
+  # one, and Spot's, to one asking for Spot capacity. Named in the
+  # placements, so the dispatch policy, which allows only the install's own,
+  # sees the Job as the scheduler made it.
+  autopilot_tolerations = [{ key = "kubernetes.io/arch", operator = "Equal", value = "amd64", effect = "NoSchedule" }]
+  spot_tolerations      = concat(local.autopilot_tolerations, [{ key = "cloud.google.com/gke-spot", operator = "Equal", value = "true", effect = "NoSchedule" }])
 }
 
 output "cluster" {
@@ -64,11 +68,9 @@ output "step_placement" {
     tolerations  = [{ key = "vennir.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
     } : {
     # Autopilot: Spot Pods, except at `scaled` (on-demand), with the
-    # toleration Autopilot adds to a Job asking for Spot: named here, so
-    # the dispatch policy, which allows only the install's placements,
-    # sees the Job as the scheduler made it.
+    # tolerations Autopilot adds (above).
     nodeSelector = local.pools.spot ? { "cloud.google.com/gke-spot" = "true" } : {}
-    tolerations  = local.pools.spot ? local.spot_toleration : []
+    tolerations  = local.pools.spot ? local.spot_tolerations : local.autopilot_tolerations
   }
 }
 
@@ -77,8 +79,8 @@ output "step_placement" {
 # steps pool has one kind, so none.
 output "capacity_placements" {
   value = local.standard ? {} : {
-    spot     = { nodeSelector = { "cloud.google.com/gke-spot" = "true" }, tolerations = local.spot_toleration }
-    onDemand = { nodeSelector = {}, tolerations = [] }
+    spot     = { nodeSelector = { "cloud.google.com/gke-spot" = "true" }, tolerations = local.spot_tolerations }
+    onDemand = { nodeSelector = {}, tolerations = local.autopilot_tolerations }
   }
 }
 
