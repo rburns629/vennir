@@ -381,6 +381,12 @@ scheduler:
   # be reclaimed at any moment; a reclaimed step fails as retryable, so give
   # steps a maxAttempts of 2 or more. Examples (check your node pools' labels):
   #   GKE (Autopilot or Standard): nodeSelector: {cloud.google.com/gke-spot: "true"}
+  #     plus, on Autopilot, the tolerations it adds to every step's Job
+  #     (its architecture's) and to a Spot one's, which the dispatch policy
+  #     otherwise refuses:
+  #     tolerations: [{key: kubernetes.io/arch, operator: Equal, value: amd64,
+  #                    effect: NoSchedule}, {key: cloud.google.com/gke-spot,
+  #                    operator: Equal, value: "true", effect: NoSchedule}]
   #   EKS with Karpenter:          nodeSelector: {karpenter.sh/capacity-type: spot}
   #   EKS managed node groups:     nodeSelector: {eks.amazonaws.com/capacityType: SPOT}
   #   AKS Spot node pools:         nodeSelector: {kubernetes.azure.com/scalesetpriority: spot}
@@ -407,8 +413,9 @@ scheduler:
   # (product.yaml's capacity: spot or onDemand) runs instead of
   # taskPlacement: each its own nodeSelector and tolerations, which replace
   # taskPlacement's. A kind with none here runs where any step does. GKE
-  # Autopilot: {spot: {nodeSelector: {cloud.google.com/gke-spot: "true"}},
-  # onDemand: {nodeSelector: {}}}. vennir sets these per cloud.
+  # Autopilot: {spot: {nodeSelector: {cloud.google.com/gke-spot: "true"},
+  # tolerations: [both tolerations above]}, onDemand: {nodeSelector: {},
+  # tolerations: [the kubernetes.io/arch one]}}. vennir sets these per cloud.
   capacityPlacements: {}
   resources:
     requests:
