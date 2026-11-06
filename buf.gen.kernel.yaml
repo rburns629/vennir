@@ -1,10 +1,11 @@
-# Go for the kernel (`make proto`): kernel-api's own API, from the plugins
-# pinned as tools in cli/go.mod. Output is committed.
+# Go for the kernel (`make proto`): kernel-api's own API, and the catalog
+# release format `kernel policy` reads, from the plugins pinned as tools in
+# cli/go.mod. Output is committed.
 version: v2
 clean: true
 inputs:
   - directory: proto
-    paths: [proto/vennir/kernel]
+    paths: [proto/vennir/kernel, proto/vennir/catalog]
 managed:
   enabled: true
   override:

@@ -320,7 +320,7 @@ export interface ReleaseUse {
   serviceAccount: string;
 }
 
-function useKey(use: ReleaseUse): string {
+export function useKey(use: ReleaseUse): string {
   return JSON.stringify([use.digest, use.team, use.repository, use.action, use.serviceAccount]);
 }
 
@@ -330,7 +330,7 @@ function isListed(listed: Set<string>, use: ReleaseUse): boolean {
 }
 
 /** Every (digest, entry) the policy's releases maps list; a literal that can't be read counts as empty. */
-function listedUses(variables: Record<string, string>): Set<string> {
+export function listedUses(variables: Record<string, string>): Set<string> {
   const listed = new Set<string>();
   for (const digit of DIGITS) {
     let parsed: unknown;

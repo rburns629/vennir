@@ -1111,6 +1111,59 @@ Rejected: a policy engine (Kyverno, Gatekeeper) beside the admission
 policies (a second policy language, and the same question of who writes
 its rules); signing each policy edit (the console would hold the key).
 
+*How it's built* (2026-11-06):
+
+- *Verifying:* `kernel policy` (`kernel/internal/policy`) verifies the
+  release with cosign's Go library (`github.com/sigstore/cosign/v3`,
+  v3.1.3, `pkg/cosign.VerifyImageSignatures`), the code the console's
+  cosign Job runs, with the same checks: each trusted public key with no
+  transparency log (catalog CI's key signing), then keyless (Fulcio's chain
+  from Sigstore's TUF root, the embedded SCT, the Rekor entry the signature
+  carries, checked offline, and the issuer and subject). Not sigstore-go:
+  it verifies only Sigstore bundles, and catalog CI signs in cosign's older
+  format (`--new-bundle-format=false`, a `.sig` tag), which only cosign
+  reads. A release older than the one applied is refused, as the console
+  refuses one. It needs rekor 1.5.5 or later (and sigstore-go 1.4.0):
+  rekor's PGP entry type, which cosign's verifier reaches, used the
+  deprecated `golang.org/x/crypto/openpgp` before, with a vulnerability that
+  won't be fixed (govulncheck GO-2026-5932), and ProtonMail's maintained
+  `go-crypto` since. The binary grows by about 25 MB.
+- *What moved:* two policies in the kernel chart that only its
+  ServiceAccount may update (RBAC by name; admission policies don't apply
+  to admission policy objects, so the write fence can't help): `-catalog-
+  identity` (a step runs a released digest as its product's ServiceAccount
+  and token audiences, or as `default` with no Secrets and no tokens; and,
+  as the console's says too, one container, Secrets only as volumes, never
+  ESO's ServiceAccounts) and `-catalog-tokens` (the audiences each API's
+  ServiceAccount may be minted, as the release's `api.yaml`s need them,
+  with `gateway.gcp.tokenAudience` given to the kernel chart too). The
+  kernel computes them as `productPolicy.ts` and `gatewayTokenPolicy.ts`
+  do, its earlier releases kept while an unfinished `execution_tasks` row
+  runs one or for an hour after a release dropped it (its own tables).
+  Both are seeded on upgrade from the console's current ones (lookup), and
+  written only once it has applied a verified release, so an install
+  doesn't refuse every step while it first reads the catalog.
+- *What stayed:* the console's own policies, ANDed with the kernel's: team
+  secret names, image sources, the scan allowlist, and its gateway token
+  policy, which also narrows an API's audiences to none when an admin's
+  backend rules hold it or its team is retired (an admin's decision, not
+  the catalog's). Products registered by hand, and platform products, run
+  as products only with an unsigned catalog: with a signed one, the
+  console refuses to submit a step the kernel's policy doesn't list
+  (`IDENTITY_PENDING`, also while the kernel hasn't read a new release
+  yet).
+- *Upgrading:* this release, both write: the kernel its policies, the
+  console its identity policy whole (releases too) and its gateway token
+  policy. The next drops the releases from the console's identity policy
+  when the kernel writes them, leaving it the secret names. An install
+  whose catalog trusts no signer runs no `kernel policy` and keeps the
+  console writing them, and the Admin page says which.
+- *Reading the registry:* anonymously, with a Docker config Secret by name,
+  or as its own ServiceAccount's cloud identity (GKE's metadata server,
+  ECR), with the console's mirrors; never as the console. GKE and EKS
+  installs keep it off until that identity may read the catalog's registry
+  (`TODO.md`).
+
 ## 18. Roadmap
 
 None of these needs a new service. All contract changes are additive.

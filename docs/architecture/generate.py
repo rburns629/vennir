@@ -304,6 +304,7 @@ KERNEL_LAYERS = [
     ("migrate", "internal/migrate/  (the schema)", YELLOW),
     ("database", "internal/dbauth/, internal/dbsetup/  (signing in to a managed database; opening it to each process)", YELLOW),
     ("sleeper", "internal/sleeper/  (sleeping an idle platform, a CronJob)", ORANGE),
+    ("policy", "internal/policy/  (kernel policy: the signed catalog's admission policies)", RED),
     ("observability", "internal/logging/, internal/metrics/", GREY),
     ("cmd", "cmd/kernel/  (the binary: a subcommand per process)", BLUE),
 ]

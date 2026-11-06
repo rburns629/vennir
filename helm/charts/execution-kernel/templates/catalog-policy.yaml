@@ -1,0 +1,492 @@
+{{/*
+What the catalog decides, written by the kernel (decision 27,
+docs/assessment.md): `kernel policy` (kernel/internal/policy) reads the
+catalog release, verifies its signature itself against catalogPolicy.
+signature, and writes these two admission policies, which only its own
+ServiceAccount may update (RBAC by name below; Kubernetes doesn't apply
+admission policies to admission policy objects). The console's own policies
+(identity-policy.yaml: each team's secret names; the console chart's gateway
+token policy) apply beside them, and a request must pass both.
+
+<release>-execution-kernel-catalog-identity, on every Job the scheduler
+makes: a step runs a released digest (one the verified release names, an
+earlier one for an hour after a release dropped it, or while an unfinished
+task runs it) as its product's ServiceAccount, with tokens only for the
+audiences its product.yaml declares, lasting an hour at most; anything else
+runs as "default" with no Secrets and no tokens. And, as identity-policy.yaml
+says too: one container, Secrets only as volumes, never as one of the
+ServiceAccounts ESO reads a team's vault as. The literals: `releases0` to
+`releasesf`, JSON maps of a digest to its products ({action, audiences,
+repository, serviceAccount, team}), by the digest's first hex digit (the API
+server compiles at most 100,000 characters a CEL expression; the kernel
+writes at most 95,000 a map and 400,000 in all, 300,000 for the token
+policy: Helm's release Secret keeps these beside the console's identity
+policy, internal/policy's MaxIdentityChars).
+
+<release>-execution-kernel-catalog-tokens, with catalogPolicy.gateway, on
+the gateway's token requests: each API ServiceAccount gets only the
+audiences the release's api.yaml needs (a serviceAccountToken backend's own,
+AWS STS's for awsSigV4, gateway.gcp.tokenAudience for googleIdToken), for an
+hour at most, and only *-api ServiceAccounts in active team namespaces, never
+the cluster's audiences. `apiAudiences0` to `apiAudiencesf`, maps of
+"<namespace>/<serviceAccount>" to its audiences, by the key's length modulo
+16; and `apiAudiencesWritten`, until the kernel has written them the exact
+audience check waits (as the console chart's).
+
+Both are seeded on install and upgrade: from what they say (lookup), else,
+on the upgrade that adds them, from the console's (identity-policy.yaml's
+releases, the console chart's gateway token policy), re-encoded as JSON so
+they can only ever be literals. The kernel writes them only once it has
+applied a verified release, so they stand as seeded until then. Without
+lookup (helm template, GitOps) they start empty: a product's step is refused
+(IDENTITY_NOT_ALLOWED) until the kernel writes them, and the console refuses
+to submit one the kernel hasn't listed (IDENTITY_PENDING).
+*/}}
+{{- if .Values.catalogPolicy.enabled }}
+{{- $c := .Values.catalogPolicy }}
+{{- if not .Values.identityPolicy.enabled }}
+{{- fail "catalogPolicy needs identityPolicy.enabled: the console's identity policy holds each team's secret names, which this one doesn't check." }}
+{{- end }}
+{{- if not $c.release }}
+{{- fail "catalogPolicy.release: the catalog release the kernel reads (the console chart's catalog.release)." }}
+{{- end }}
+{{- if and (not $c.signature.publicKeys) (not (and $c.signature.keyless.issuer $c.signature.keyless.subjectRegExp)) }}
+{{- fail "catalogPolicy.signature: a public key or a keyless identity (issuer and subjectRegExp) to trust; an unsigned catalog keeps the console writing these policies (catalogPolicy.enabled: false)." }}
+{{- end }}
+{{- $fullname := include "execution-kernel.fullname" . }}
+{{- $name := printf "%s-policy" $fullname }}
+{{- $identity := printf "%s-catalog-identity" $fullname }}
+{{- $tokens := printf "%s-catalog-tokens" $fullname }}
+{{- $scheduler := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-kernel.serviceAccountName" .) }}
+{{- $digits := splitList "" "0123456789abcdef" }}
+{{- /* The identity policy's maps: its own, else the console's (identity-policy.yaml). */}}
+{{- $shards := dict }}
+{{- range $digits }}
+{{- $_ := set $shards . dict }}
+{{- end }}
+{{- $seed := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $identity }}
+{{- if not $seed }}
+{{- $seed = lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" (printf "%s-identity" $fullname) }}
+{{- end }}
+{{- if $seed }}
+{{- range $seed.spec.variables }}
+{{- $digit := trimPrefix "releases" .name }}
+{{- if and (ne $digit .name) (hasKey $shards $digit) }}
+{{- range $digest, $entries := fromJson .expression }}
+{{- if not (and (regexMatch "^sha256:[a-f0-9]{64}$" $digest) (eq (substr 7 8 $digest) $digit) (kindIs "slice" $entries)) }}
+{{- fail (printf "%s's releases%s isn't a JSON map of sha256 digests starting %s to lists of products; set that variable's expression to {} (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $seed.metadata.name $digit $digit) }}
+{{- end }}
+{{- $kept := list }}
+{{- range $entries }}
+{{- $entry := . }}
+{{- if or (not (kindIs "map" $entry)) (not (and (kindIs "string" (get $entry "team")) (kindIs "string" (get $entry "repository")) (kindIs "string" (get $entry "action")) (kindIs "string" (get $entry "serviceAccount")) (kindIs "string" (get $entry "audiences")))) }}
+{{- fail (printf "%s's releases%s has a product that isn't {team, repository, action, serviceAccount, audiences} strings; set that variable's expression to {} (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $seed.metadata.name $digit) }}
+{{- end }}
+{{- /* Only what the kernel would list itself (internal/policy's
+     Releases): a team's (none of the platform's), not as an API's or
+     ESO's ServiceAccount, and with no audience of this cluster's own:
+     the console's copy, seeded until a verified release is applied, is
+     held to the kernel's rules. (Its issuer's audience isn't known here;
+     the kernel drops it at its first write.) */}}
+{{- $reserved := list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" $.Values.api.auth.audience "" }}
+{{- $audiencesOk := true }}
+{{- range splitList "," $entry.audiences }}
+{{- if and (has . $reserved) (ne $entry.audiences "") }}
+{{- $audiencesOk = false }}
+{{- end }}
+{{- end }}
+{{- if and (ne $entry.team "") (not (hasSuffix "-api" $entry.serviceAccount)) (not (has $entry.serviceAccount (list "eso-gcp" "eso-aws" "eso-azure"))) $audiencesOk }}
+{{- $kept = append $kept (dict "team" $entry.team "repository" $entry.repository "action" $entry.action "serviceAccount" $entry.serviceAccount "audiences" $entry.audiences) }}
+{{- end }}
+{{- end }}
+{{- if $kept }}
+{{- $_ := set (index $shards $digit) $digest $kept }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+  {{- with (merge (dict) $c.serviceAccountAnnotations .Values.serviceAccount.annotations) }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+# Its policies by name, and nothing else in the cluster: reading and
+# rewriting them. No Jobs, no Secrets (but the registry's, below), no
+# other policy.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["validatingadmissionpolicies"]
+    resourceNames:
+      - {{ $identity | quote }}
+      {{- if $c.gateway.serviceAccount }}
+      - {{ $tokens | quote }}
+      {{- end }}
+    verbs: ["get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: policy
+spec:
+  # One: a second would only wait for the first's lock.
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels:
+      {{- include "execution-kernel.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: policy
+  template:
+    metadata:
+      labels:
+        {{- include "execution-kernel.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: policy
+      annotations:
+        kubectl.kubernetes.io/default-container: policy
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.scheduler.metricsPort | quote }}
+        prometheus.io/path: "/metrics"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if and .Values.postgres.enabled (not .Values.existingSecret) }}
+        checksum/database-role: {{ .Values.postgres.auth.kernelUsername | default .Values.postgres.auth.username | sha256sum }}
+        {{- end }}
+    spec:
+      securityContext:
+        {{- include "execution-kernel.podSecurityContext" . | nindent 8 }}
+      serviceAccountName: {{ $name }}
+      volumes:
+        - {name: tmp, emptyDir: {}}
+        {{- include "execution-kernel.tlsCaVolume" . | nindent 8 }}
+        {{- with $c.registry.authSecret }}
+        - name: registry-auth
+          secret:
+            secretName: {{ . | quote }}
+            items: [{key: .dockerconfigjson, path: config.json}]
+        {{- end }}
+      {{- if .Values.postgres.enabled }}
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ include "execution-kernel.appImage" . | quote }}
+          securityContext:
+            {{- include "execution-kernel.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/local/bin/kernel", "wait-for-postgres", "{{ $fullname }}-postgres:5432"]
+      {{- end }}
+      containers:
+        - name: policy
+          image: {{ include "execution-kernel.appImage" . | quote }}
+          securityContext:
+            {{- include "execution-kernel.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            # Sigstore's TUF cache (keyless signers) lives in /tmp.
+            - {name: tmp, mountPath: /tmp}
+            {{- include "execution-kernel.tlsCaMount" . | nindent 12 }}
+            {{- if $c.registry.authSecret }}
+            - {name: registry-auth, mountPath: /etc/vennir/registry, readOnly: true}
+            {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/local/bin/kernel", "policy"]
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.scheduler.metricsPort }}
+          envFrom:
+            - configMapRef:
+                name: {{ $fullname }}-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "execution-kernel.databaseSecretName" . }}
+                  key: {{ include "execution-kernel.databaseSecretKey" . }}
+            {{- if $c.registry.authSecret }}
+            # The registry's Docker config (go-containerregistry's default keychain).
+            - {name: DOCKER_CONFIG, value: /etc/vennir/registry}
+            {{- end }}
+          resources:
+            {{- toYaml $c.resources | nindent 12 }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $identity }}
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["jobs"]
+  matchConditions:
+    - name: from-kernel-scheduler
+      expression: request.userInfo.username == {{ $scheduler | quote }}
+  variables:
+    # The ones the kernel writes: the sixteen releases maps.
+    {{- range $digits }}
+    - name: releases{{ . }}
+      expression: {{ toJson (index $shards .) | toJson }}
+    {{- end }}
+    - name: releases
+      expression: >-
+        { {{- range $i, $digit := $digits }}{{ if $i }}, {{ end }}{{ $digit | quote }}: dyn(variables.releases{{ $digit }}){{ end -}} }
+    - name: pod
+      expression: object.spec.template.spec
+    - name: serviceAccount
+      expression: >-
+        has(variables.pod.serviceAccountName) && variables.pod.serviceAccountName != "" ?
+          variables.pod.serviceAccountName : "default"
+    - name: secrets
+      expression: >-
+        has(variables.pod.volumes) ?
+          variables.pod.volumes.filter(v, has(v.secret)).map(v, v.secret.secretName) : []
+    - name: otherSecretRefs
+      expression: >-
+        (has(variables.pod.volumes) && variables.pod.volumes.exists(v,
+          has(v.projected) && has(v.projected.sources) && v.projected.sources.exists(s, has(s.secret)))) ||
+        variables.pod.containers.exists(c,
+          (has(c.envFrom) && c.envFrom.exists(e, has(e.secretRef))) ||
+          (has(c.env) && c.env.exists(e, has(e.valueFrom) && has(e.valueFrom.secretKeyRef))))
+    - name: image
+      expression: variables.pod.containers[0].image
+    - name: normalizedImage
+      expression: >-
+        (variables.image.contains("/") && (variables.image.split("/")[0].contains(".") ||
+          variables.image.split("/")[0].contains(":") || variables.image.split("/")[0] == "localhost" ||
+          variables.image.split("/")[0].matches("[A-Z]"))) ?
+          variables.image :
+          (variables.image.contains("/") ? "docker.io/" + variables.image : "docker.io/library/" + variables.image)
+    - name: unpinnedImage
+      expression: >-
+        variables.normalizedImage.contains("@") ? variables.normalizedImage.split("@")[0] :
+          variables.normalizedImage
+    - name: repository
+      expression: >-
+        variables.unpinnedImage.lastIndexOf(":") > variables.unpinnedImage.lastIndexOf("/") ?
+          variables.unpinnedImage.substring(0, variables.unpinnedImage.lastIndexOf(":")) :
+          variables.unpinnedImage
+    - name: action
+      expression: >-
+        has(variables.pod.containers[0].args) && size(variables.pod.containers[0].args) > 0 ?
+          variables.pod.containers[0].args[0] : ""
+    - name: digest
+      expression: >-
+        variables.normalizedImage.contains("@") &&
+          variables.normalizedImage.split("@")[1].matches("^sha256:[a-f0-9]{64}$") ?
+          variables.normalizedImage.split("@")[1] : ""
+    # The catalog's products this step is a release of, as it runs.
+    - name: matched
+      expression: >-
+        (variables.digest != "" && variables.digest in variables.releases[variables.digest.substring(7, 8)] ?
+          variables.releases[variables.digest.substring(7, 8)][variables.digest] : []).filter(p,
+          p.team == request.namespace && p.repository == variables.repository &&
+          p.action == variables.action && p.serviceAccount == variables.serviceAccount)
+    - name: tokens
+      expression: >-
+        has(variables.pod.volumes) ?
+          variables.pod.volumes.filter(v, has(v.projected) && has(v.projected.sources) &&
+            v.projected.sources.exists(s, has(s.serviceAccountToken) &&
+              has(s.serviceAccountToken.audience) && s.serviceAccountToken.audience != "")) : []
+  validations:
+    - expression: >-
+        size(variables.pod.containers) == 1 && !has(variables.pod.initContainers) &&
+        !variables.otherSecretRefs
+      message: >-
+        IDENTITY_NOT_ALLOWED: a step's Job must have exactly one container and
+        mount Secrets only as volumes.
+      reason: Forbidden
+    - expression: >-
+        !(variables.serviceAccount in ["eso-gcp", "eso-aws", "eso-azure"])
+      messageExpression: >-
+        "IDENTITY_NOT_ALLOWED: no step runs as " + variables.serviceAccount + ", the ServiceAccount " +
+        "ESO reads team " + request.namespace + "'s vault as."
+      reason: Forbidden
+    - expression: >-
+        (variables.serviceAccount == "default" && size(variables.secrets) == 0 && size(variables.tokens) == 0) ||
+        size(variables.matched) > 0
+      messageExpression: >-
+        "IDENTITY_NOT_ALLOWED: " + variables.image + " (action \"" + variables.action +
+        "\") may not run as ServiceAccount \"" + variables.serviceAccount + "\"" +
+        (size(variables.secrets) > 0 ? " with Secrets" : "") +
+        (size(variables.tokens) > 0 ? " with tokens" : "") +
+        " in " + request.namespace + ": the catalog's verified release doesn't name it as a product's " +
+        "release there (one of the digests it released, while in use), as that ServiceAccount; " +
+        "anything else runs as \"default\" with no Secrets."
+      reason: Forbidden
+    - expression: >-
+        variables.tokens.all(v, v.projected.sources.all(s, !has(s.serviceAccountToken) ||
+          !has(s.serviceAccountToken.audience) || s.serviceAccountToken.audience == "" ||
+          ((!has(s.serviceAccountToken.expirationSeconds) || s.serviceAccountToken.expirationSeconds <= 3600) &&
+            variables.matched.exists(p, s.serviceAccountToken.audience in p.audiences.split(",")))))
+      messageExpression: >-
+        "IDENTITY_NOT_ALLOWED: " + variables.repository + " (action \"" + variables.action +
+        "\") may not have a ServiceAccount token for an audience its product didn't declare " +
+        "(product.yaml's tokenAudiences, in the catalog's verified release), or one lasting over an hour, in " +
+        request.namespace + "."
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $identity }}
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  policyName: {{ $identity }}
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - key: {{ .Values.dispatchPolicy.teamNamespaceLabel | quote }}
+          operator: Exists
+  validationActions: [Deny]
+{{- with $c.gateway.serviceAccount }}
+{{- $gateway := printf "system:serviceaccount:%s:%s" $.Release.Namespace . }}
+{{- /* The token policy's maps: its own, else the console chart's (<gateway>-tokens). */}}
+{{- $audiences := dict }}
+{{- range $digits }}
+{{- $_ := set $audiences . dict }}
+{{- end }}
+{{- $shardIndex := dict }}
+{{- range $i, $digit := $digits }}
+{{- $_ := set $shardIndex $digit $i }}
+{{- end }}
+{{- $written := "false" }}
+{{- $existing := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $tokens }}
+{{- if not $existing }}
+{{- $existing = lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" (printf "%s-tokens" .) }}
+{{- end }}
+{{- if $existing }}
+{{- range $existing.spec.variables }}
+{{- if eq .name "apiAudiencesWritten" }}
+{{- if not (has .expression (list "true" "false")) }}
+{{- fail (printf "%s's apiAudiencesWritten isn't true or false; set its expression to \"false\" (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $existing.metadata.name) }}
+{{- end }}
+{{- $written = .expression }}
+{{- end }}
+{{- $digit := trimPrefix "apiAudiences" .name }}
+{{- if and (ne $digit .name) (hasKey $audiences $digit) }}
+{{- range $key, $list := fromJson .expression }}
+{{- if not (and (regexMatch "^[a-z0-9-]+/[a-z0-9.-]+$" $key) (kindIs "slice" $list) (eq (mod (len $key) 16) (index $shardIndex $digit))) }}
+{{- fail (printf "%s's apiAudiences%s isn't a JSON map of <namespace>/<serviceAccount> keys whose length modulo 16 is %d to lists of audiences; set that variable's expression to {} (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $existing.metadata.name $digit (index $shardIndex $digit)) }}
+{{- end }}
+{{- range $list }}
+{{- if not (kindIs "string" .) }}
+{{- fail (printf "%s's apiAudiences%s has an audience that isn't a string; set that variable's expression to {} (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $existing.metadata.name $digit) }}
+{{- end }}
+{{- end }}
+{{- $_ := set (index $audiences $digit) $key $list }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $tokens }}
+  labels:
+    {{- include "execution-kernel.labels" $ | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["serviceaccounts/token"]
+  matchConditions:
+    - name: from-the-gateway
+      expression: request.userInfo.username == {{ $gateway | quote }}
+  variables:
+    # The ones the kernel writes: whether it has yet, and the sixteen maps.
+    - name: apiAudiencesWritten
+      expression: {{ $written | quote }}
+    {{- range $digits }}
+    - name: apiAudiences{{ . }}
+      expression: {{ toJson (index $audiences .) | toJson }}
+    {{- end }}
+    - name: apiAudiences
+      expression: >-
+        { {{- range $i, $digit := $digits }}{{ if $i }}, {{ end }}{{ $i }}: dyn(variables.apiAudiences{{ $digit }}){{ end -}} }
+    - name: key
+      expression: request.namespace + "/" + request.name
+    - name: shard
+      expression: variables.apiAudiences[size(variables.key) % 16]
+    - name: allowedAudiences
+      expression: >-
+        variables.key in variables.shard ? variables.shard[variables.key] : []
+  validations:
+    - expression: >-
+        request.name.endsWith("-api") && has(namespaceObject.metadata.labels) &&
+        {{ $.Values.dispatchPolicy.teamNamespaceLabel | quote }} in namespaceObject.metadata.labels &&
+        namespaceObject.metadata.labels[{{ $.Values.dispatchPolicy.teamNamespaceLabel | quote }}] == "true"
+      messageExpression: >-
+        "The gateway may only mint tokens for API ServiceAccounts (*-api) in active team namespaces, not " +
+        request.namespace + "/" + request.name + "."
+      reason: Forbidden
+    - expression: >-
+        has(object.spec.audiences) && object.spec.audiences.size() > 0 &&
+        object.spec.audiences.all(a, !(a in {{ list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" $.Values.api.auth.audience | toJson }}) &&
+          !a.startsWith("https://container.googleapis.com/") &&
+          a.lowerAscii() != "api://azureadtokenexchange" && !a.lowerAscii().startsWith("identitynamespace:"))
+      message: "The gateway mints tokens only for a backend's own audience: never the Kubernetes API's or kernel-api's, nor one a cloud federates that it doesn't use itself."
+      reason: Forbidden
+    - expression: has(object.spec.expirationSeconds) && object.spec.expirationSeconds <= 3600
+      message: "The gateway mints tokens lasting an hour at most."
+      reason: Forbidden
+    - expression: >-
+        !variables.apiAudiencesWritten ||
+        (has(object.spec.audiences) && object.spec.audiences.all(a, a in variables.allowedAudiences))
+      messageExpression: >-
+        "The gateway mints tokens for " + variables.key + " only for the audiences the catalog's verified release says its API needs (" +
+        (size(variables.allowedAudiences) == 0 ? "none: no API in it runs as it" : variables.allowedAudiences.join(", ")) +
+        "), not " + (has(object.spec.audiences) ? object.spec.audiences.join(", ") : "none") + "."
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $tokens }}
+  labels:
+    {{- include "execution-kernel.labels" $ | nindent 4 }}
+spec:
+  policyName: {{ $tokens }}
+  validationActions: [Deny]
+{{- end }}
+{{- end }}

@@ -203,12 +203,35 @@ it was seen.
   API starts with no grants (the old name's are kept 30 days, away, and come
   back only under the old name).
 
-- [ ] **The console can loosen the cluster's policies** (a known gap since
-  the security review of 2026-11-04): it writes the admission policies'
-  literals, so a compromised console could let an unreviewed image run as
-  a product's identity. Proposed 2026-11-05 as decision 27
-  (`docs/assessment.md`): `kernel policy` verifies the catalog release
-  itself and alone writes what the catalog decides.
+- [ ] **The console can still loosen some of the cluster's policies**
+  (narrowed 2026-11-06 by decision 27, `docs/assessment.md`): with a signed
+  catalog and the kernel chart's `catalogPolicy`, `kernel policy` verifies
+  the release itself and alone writes which digests are a product's
+  releases and each API's audiences. What's left: the image sources, the
+  scan allowlist and each team's secret names stay the console's (so a
+  compromised console can run a reviewed product with any of its team's
+  Secrets, or an image that failed its scan as `default`), and an unsigned
+  catalog leaves all of it to the console. Also: `kernel policy` signs in
+  as the kernel's database role, which owns the whole database; it needs
+  only read on `executions` and `execution_tasks` and write on
+  `catalog_policy_*`. A role of its own means the migration Job making it
+  (bundled Postgres), `database-setup` and the cloud modules' IAM users
+  (managed), and its own Secret: not done with decision 27. Next, in order:
+  1. **Drop the released digests from the console's identity policy** (the
+     release after `kernel policy` ships, as decision 27's upgrade path
+     says): with `catalogPolicy` on, it keeps each team's secret names
+     only, and the console stops computing releases; an unsigned catalog
+     keeps them.
+  2. **`kernel policy` on GKE and EKS**: its ServiceAccount
+     (`kernel-execution-kernel-policy`) needs read on the catalog's
+     registry (with a managed database it signs in as the kernel's
+     database identity, which both clouds' modules now bind it to, so that
+     identity, or another one bound for it, needs the read), and `vennir`
+     should set `catalogPolicy` from vennir.yaml as it sets
+     the console's `catalog` (`cli/internal/install`); then turn it on in
+     `helm/values/{gke,eks}/kernel.yaml` and prove it on a cloud. An
+     install reading another's catalog by federation needs its own grant
+     for it too (`vennir catalog grant`).
 
 ## Console
 

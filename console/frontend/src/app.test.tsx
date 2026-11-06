@@ -1879,6 +1879,7 @@ describe("admin", () => {
           schedulerLogs: { applies: true, ok: true },
           teamQuotas: { applies: true, ok: false, error: "quota refused" },
         },
+        catalog: { writer: "console", catalogSigned: false },
       },
     });
     expect(await screen.findByText("Registry sign-in for each team")).toBeTruthy();
@@ -1887,6 +1888,46 @@ describe("admin", () => {
     expect(screen.getByText("quota refused")).toBeTruthy();
     const main = screen.getByRole("main");
     expect(main.textContent).not.toMatch(/pullSecrets|schedulerLogs|teamQuotas/);
+    // An unsigned catalog: the console alone writes the catalog's policies.
+    expect(screen.getByText(/The catalog isn't signed, so the console alone writes/)).toBeTruthy();
+  });
+
+  it("says the kernel writes the catalog's policies from the release it verified", async () => {
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": {
+        outcomes: { identityPolicy: { applies: true, ok: true } },
+        catalog: { writer: "kernel", release: "r.example/catalog-release@sha256:abc", commit: "0123456789abcdef" },
+      },
+    });
+    expect(await screen.findByText(/the kernel also writes, from the catalog release it verified \(commit 0123456789ab\)/)).toBeTruthy();
+    expect(screen.queryByText(/The catalog isn't signed/)).toBeNull();
+    cleanup();
+    // Before it has verified one, it says so, not that it already holds.
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": { outcomes: {}, catalog: { writer: "kernel", release: "", commit: "" } },
+    });
+    expect(await screen.findByText(/once it has verified a catalog release/)).toBeTruthy();
+    cleanup();
+    // The gateway on, but no kernel token policy: said, not claimed.
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": {
+        outcomes: {},
+        catalog: { writer: "kernel", release: "r@sha256:abc", commit: "c", gateway: true, tokens: false },
+      },
+    });
+    expect(await screen.findByText(/catalogPolicy.gateway isn't set/)).toBeTruthy();
+    cleanup();
+    // A signed catalog the kernel doesn't write for; and a read that failed.
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": { outcomes: {}, catalog: { writer: "console", catalogSigned: true } },
+    });
+    expect(await screen.findByText(/The catalog is signed, but the kernel doesn't write/)).toBeTruthy();
+    cleanup();
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": { outcomes: {}, catalog: { writer: "unknown" } },
+    });
+    expect(await screen.findByText(/couldn't be read from the cluster/)).toBeTruthy();
+    expect(screen.queryByText(/The catalog isn't signed/)).toBeNull();
   });
 
   it("sets the chat agent's model in place of the install's, keeps its key unshown, and tries it first", async () => {

@@ -7,7 +7,9 @@
 # step, which reports only its SHA-256; and a step not of a registered
 # product, or of another team, naming the same Secret is refused before it
 # runs (IDENTITY_NOT_ALLOWED). Everything it makes is retired and purged at
-# the end.
+# the end. With a signed catalog, whose policies the kernel writes (decision
+# 27), the product, registered by hand, is refused instead, and a product of
+# the catalog's verified release (the local sample's) runs.
 #
 #   CONSOLE_URL      the console (default http://localhost:18080, make up's)
 #   ADMIN_EMAIL      default admin@example.com
@@ -45,6 +47,7 @@ TOKEN=$(jq -nc --arg e "$ADMIN_EMAIL" --arg p "$ADMIN_PASSWORD" '{email: $e, pas
 # Undoes it all: the product, its image repository's claim, the teams, and
 # their namespaces (which purging leaves, labelled retired).
 cleanup() {
+  [ -n "${CATALOG_SECRET:-}" ] && rpc SecretService/RevokeSecret "$(jq -nc --arg n "$CATALOG_SECRET" '{team: "local", secretName: $n}')" > /dev/null || true
   rpc ProductService/DeleteProduct "$(jq -nc --arg n "$TEAM-digest" '{name: $n}')" > /dev/null || true
   rpc ProductService/ReleaseImageRepository "$(jq -nc --arg r "$REGISTRY/vennir-e2e/secret-digest" '{repository: $r}')" > /dev/null || true
   for team in "$TEAM" "$OTHER"; do
@@ -111,8 +114,59 @@ run_step() {  # team image
   echo "$execution"
 }
 
-got=$(run_step "$TEAM" "$PRODUCT_IMAGE" | jq -r '.execution.tasks[0].outputs.digests["e2e-token/token"] // empty')
-if [ "$got" = "$WANT" ]; then pass "the product's step read the synced value (its SHA-256 matches)"; else fail "the product's step read ${got:-nothing}, not the value's SHA-256"; fi
+# Who writes the cluster's policies of what the catalog decides (decision
+# 27): with a signed catalog, the kernel, from the release it verified; then
+# a product registered by hand, as this one is, doesn't run as its product,
+# and the console says so before submitting it.
+WRITER=$(rpc AdminService/GetPolicySync '{}' | jq -r '.catalog.writer // "console"')
+if [ "$WRITER" = kernel ]; then
+  answer=$(run_step "$TEAM" "$PRODUCT_IMAGE")
+  if jq -e '.code == "failed_precondition" and (.message | test("policy doesn.t list"))' <<< "$answer" > /dev/null; then
+    pass "with a signed catalog, a product registered by hand doesn't run as its product (IDENTITY_PENDING)"
+  else
+    fail "a product no signed release names: $(jq -c '{code, message, state: .execution.state}' <<< "$answer")"
+  fi
+  # A product of the verified release does: its Job passes the kernel's
+  # catalog policy and the console's.
+  # catalog policy and the console's, mounting a Secret its team (local, the
+  # catalog's) registered; revoked again at the end. (No catalog sample
+  # reports what a Secret holds: the mount is what's proven here.)
+  catalog_image=$(rpc ProductService/ListProducts '{}' | jq -r '.products[] | select(.name == "local-upper-case-transform") | .image')
+  CATALOG_SECRET="e2e-cat-$suffix"
+  rpc SecretService/PutSecret "$(jq -nc --arg n "$CATALOG_SECRET" --arg v "$VALUE" '{team: "local", secretName: $n, data: {token: $v}}')" > /dev/null
+  # Until the cluster's copy of the team's secret names has it (the console
+  # rewrites its identity policy; the API server takes a moment more).
+  for _ in $(seq 1 30); do
+    kubectl --context "$KUBE_CONTEXT" get validatingadmissionpolicy kernel-execution-kernel-identity \
+      -o jsonpath='{.spec.variables[?(@.name=="teamSecrets")].expression}' 2>/dev/null | grep -q "$CATALOG_SECRET" && break
+    sleep 1
+  done
+  sleep 3
+  catalog_step() {  # secretRefs as JSON; prints the execution's state, or the refusal's code
+    local submitted id state=none
+    submitted=$(rpc ExecutionService/SubmitExecution "$(jq -nc --arg i "$catalog_image" --arg r "e2e-$suffix-catalog-$RANDOM" --argjson s "$1" \
+      '{dag: {name: "secrets e2e: a catalog product", requestId: $r, tasks: [{id: "up", image: $i, action: "transform", team: "local", secretRefs: $s, inputs: {text: "vennir"}}]}}')")
+    id=$(jq -r '.executionId // empty' <<< "$submitted")
+    [ -n "$id" ] || { jq -r '.code // "nothing"' <<< "$submitted"; return; }
+    for _ in $(seq 1 90); do
+      state=$(rpc ExecutionService/GetExecution "$(jq -nc --arg id "$id" '{executionId: $id}')" | jq -r '.execution.state')
+      case "$state" in *SUCCEEDED|*FAILED|*CANCELLED) break ;; esac
+      sleep 2
+    done
+    echo "$state"
+  }
+  state=$(catalog_step "[\"$CATALOG_SECRET\"]")
+  case "$state" in *SUCCEEDED) pass "a product of the catalog's verified release runs as its product, mounting its team's Secret" ;;
+    *) fail "the local sample's upper-case product with a team Secret: $state (local must be published: make catalog-publish)" ;;
+  esac
+  case "$(catalog_step '["e2e-never-registered"]')" in permission_denied|*FAILED) pass "the same product can't mount a Secret its team never registered" ;;
+    *) fail "a catalog product mounted a Secret its team never registered" ;;
+  esac
+  rpc SecretService/RevokeSecret "$(jq -nc --arg n "$CATALOG_SECRET" '{team: "local", secretName: $n}')" > /dev/null
+else
+  got=$(run_step "$TEAM" "$PRODUCT_IMAGE" | jq -r '.execution.tasks[0].outputs.digests["e2e-token/token"] // empty')
+  if [ "$got" = "$WANT" ]; then pass "the product's step read the synced value (its SHA-256 matches)"; else fail "the product's step read ${got:-nothing}, not the value's SHA-256"; fi
+fi
 
 # The code a step was refused with: the console's, before it's submitted
 # (its copy of the identity policy's rule), or the cluster's, as it starts.

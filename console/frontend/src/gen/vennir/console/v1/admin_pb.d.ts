@@ -839,6 +839,11 @@ export declare type GetPolicySyncResponse = Message<"vennir.console.v1.GetPolicy
    * @generated from field: map<string, vennir.console.v1.PolicySyncOutcome> outcomes = 1;
    */
   outcomes: { [key: string]: PolicySyncOutcome };
+
+  /**
+   * @generated from field: vennir.console.v1.CatalogPolicies catalog = 2;
+   */
+  catalog?: CatalogPolicies | undefined;
 };
 
 /**
@@ -846,6 +851,65 @@ export declare type GetPolicySyncResponse = Message<"vennir.console.v1.GetPolicy
  * Use `create(GetPolicySyncResponseSchema)` to create a new message.
  */
 export declare const GetPolicySyncResponseSchema: GenMessage<GetPolicySyncResponse>;
+
+/**
+ * Who writes the cluster's policies of what the catalog decides: which
+ * digests are a product's releases (as which ServiceAccount, with which
+ * token audiences) and each API ServiceAccount's audiences.
+ *
+ * @generated from message vennir.console.v1.CatalogPolicies
+ */
+export declare type CatalogPolicies = Message<"vennir.console.v1.CatalogPolicies"> & {
+  /**
+   * "kernel": kernel policy, from the catalog release it verified itself,
+   * into policies this console may only read (beside this console's own);
+   * "console": this console (the kernel's catalog policy isn't installed);
+   * "unknown": it couldn't be read.
+   *
+   * @generated from field: string writer = 1;
+   */
+  writer: string;
+
+  /**
+   * With the kernel: the release it last wrote them from
+   * (<repository>@<digest>), and that release's commit; empty until it has
+   * applied one it trusts.
+   *
+   * @generated from field: string release = 2;
+   */
+  release: string;
+
+  /**
+   * @generated from field: string commit = 3;
+   */
+  commit: string;
+
+  /**
+   * Whether this console's catalog trusts a signer (catalog.signature).
+   *
+   * @generated from field: bool catalog_signed = 4;
+   */
+  catalogSigned: boolean;
+
+  /**
+   * Whether the gateway is on, and whether the kernel writes its API
+   * ServiceAccounts' audiences too (the kernel chart's catalogPolicy.gateway).
+   *
+   * @generated from field: bool gateway = 5;
+   */
+  gateway: boolean;
+
+  /**
+   * @generated from field: bool tokens = 6;
+   */
+  tokens: boolean;
+};
+
+/**
+ * Describes the message vennir.console.v1.CatalogPolicies.
+ * Use `create(CatalogPoliciesSchema)` to create a new message.
+ */
+export declare const CatalogPoliciesSchema: GenMessage<CatalogPolicies>;
 
 /**
  * @generated from message vennir.console.v1.SyncPoliciesRequest
@@ -867,6 +931,11 @@ export declare type SyncPoliciesResponse = Message<"vennir.console.v1.SyncPolici
    * @generated from field: map<string, vennir.console.v1.PolicySyncOutcome> outcomes = 1;
    */
   outcomes: { [key: string]: PolicySyncOutcome };
+
+  /**
+   * @generated from field: vennir.console.v1.CatalogPolicies catalog = 2;
+   */
+  catalog?: CatalogPolicies | undefined;
 };
 
 /**

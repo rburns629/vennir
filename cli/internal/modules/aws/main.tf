@@ -1136,13 +1136,15 @@ resource "aws_iam_role_policy" "database_admin" {
 }
 
 # Which ServiceAccounts sign in as which role: every kernel Pod that
-# connects (the scheduler, kernel-api and its migration, the sleeper), the
+# connects (the scheduler, kernel-api and its migration, the sleeper, kernel
+# policy with the chart's catalogPolicy), the
 # gateway, and database-setup's Job. The console's is bound above.
 resource "aws_eks_pod_identity_association" "database" {
   for_each = var.managed_database ? {
     "kernel-execution-kernel"           = aws_iam_role.kernel_db[0].arn
     "kernel-execution-kernel-api"       = aws_iam_role.kernel_db[0].arn
     "kernel-execution-kernel-sleeper"   = aws_iam_role.kernel_db[0].arn
+    "kernel-execution-kernel-policy"    = aws_iam_role.kernel_db[0].arn
     "console-execution-console-gateway" = aws_iam_role.gateway_db[0].arn
     "vennir-db-admin"                   = aws_iam_role.database_admin[0].arn
   } : {}

@@ -26,14 +26,17 @@ processes that never talk to each other directly: `kernel api`
 writes rows; `kernel scheduler` (kernel-scheduler) polls those same rows,
 claims work, dispatches it as a Kubernetes Job (behind the `Executor`
 interface), and writes the outcome back. `kernel migrate` owns the schema;
-`kernel sleep` scales an idle platform to zero. Postgres is the only
+`kernel sleep` scales an idle platform to zero; `kernel policy` writes what
+a signed catalog decides (which digests are a product's releases, and each
+API's token audiences) into admission policies only it may update, from the
+catalog release it verifies itself (decision 27 in `docs/assessment.md`). Postgres is the only
 thing they have in common: that's deliberate, not an oversight. The kernel
 was Python until 2026-10-20 (decision 17 in `docs/assessment.md`).
 
 ## Repository layout
 
 ```
-cmd/kernel/        The binary: a subcommand per process (api, scheduler, migrate,
+cmd/kernel/        The binary: a subcommand per process (api, scheduler, policy, migrate,
                    sleep, database-setup), plus wait-for-postgres and check-heartbeat
                    for the chart, and database-token (a managed database's sign-in,
                    written to a file for pg_restore, when vennir moves data in).
@@ -50,6 +53,7 @@ internal/          Its packages (one Go module: go.mod here).
 ├── dbauth/        A managed database's sign-in: the workload's own token as the password.
 ├── dbsetup/       database-setup: each database opened to its own service alone.
 ├── sleeper/       Putting an idle platform to sleep (a CronJob).
+├── policy/        kernel policy: verifying the catalog's release and writing its policies.
 ├── logging/       JSON logs.
 ├── metrics/       Prometheus metrics.
 ├── gen/           KernelService's generated code (`make proto`, from proto/vennir/kernel/v1).
@@ -67,7 +71,7 @@ Dependencies only point one direction:
 ```
 domain  →  executor  →  scheduler  ─┐
 domain  →  api  ────────────────────┼→  cmd/kernel
-migrate, sleeper, config, logging, metrics ─┘
+migrate, sleeper, policy, config, logging, metrics ─┘
 ```
 
 - **domain** depends on nothing: no database, no Kubernetes. Everything in
@@ -80,6 +84,11 @@ migrate, sleeper, config, logging, metrics ─┘
 - **api** depends on `domain`, its generated code and pgx; never on
   `scheduler` or `executor`. kernel-api and the scheduler meet only in
   the database.
+- **policy** depends on `domain` (task states), the catalog release's
+  generated code, pgx, client-go and cosign's library; on nothing else of
+  the kernel's, and nothing imports it but `cmd/kernel`. It reads
+  `execution_tasks` (which releases are in use) and owns its own two
+  tables.
 
 ## End-to-end order of operations
 
@@ -530,6 +539,31 @@ kernel-scheduler, at the start of every pass, in its own transaction : ExpireApp
   the one state ConfigMap (what the chart's Role allows).
 - `ShouldSleep`, `LastActivity` — the decision, pure.
 
+#### `internal/policy/`
+`kernel policy`, one replica, every `CATALOG_POLICY_POLL_SECONDS`:
+- `Controller.Pass` — `look`: the release's reference (its newest version
+  with `CATALOG_POLICY_NEWEST_VERSION`), its manifest's digest; if new,
+  `Signers.Verify` (cosign's `VerifyImageSignatures`: each trusted key with
+  no transparency log, then keyless against Sigstore's TUF root, the Rekor
+  entry the signature carries checked offline), the release read by that
+  digest, refused when older than the one applied, then `Store.Apply`
+  (under an advisory lock). Then `write`, once any release is applied:
+  `Listed` (the applied release's products, an earlier one for
+  `CATALOG_POLICY_RELEASE_GRACE_SECONDS` after a release dropped it or
+  while an unfinished task runs it) into the identity policy, and
+  `Audiences` into the gateway token policy, by `Kubernetes.Write`
+  (conditional on the version read, only when something changed); then
+  `Store.Prune`.
+- `Releases`, `APIs`, `Audiences`, `IdentityVariables`,
+  `AudienceVariables` — pure: what the console would register from a
+  release, and the sixteen maps' literals (the same sharding and size
+  limits as `console/src/productPolicy.ts` and `gatewayTokenPolicy.ts`).
+- `Registry` — reading the registry as this Pod's own identity (a Docker
+  config, GKE's metadata token, ECR's), through the console's mirrors.
+- `Store` — `catalog_policy_state` (the release applied, its APIs) and
+  `catalog_policy_releases` (each product release it named, and until
+  when).
+
 #### `internal/logging/`, `internal/metrics/`
 - JSON logs with `timestamp`, `severity`, `logger`, `message`, `service`;
   `kernel_events_total`, `kernel_http_requests_total`,
@@ -537,7 +571,7 @@ kernel-scheduler, at the start of every pass, in its own transaction : ExpireApp
   `kernel_scheduler_tick_duration_seconds`,
   `kernel_scheduler_status_read_errors_total`,
   `kernel_scheduler_tick_errors_total`, `kernel_tasks`,
-  `kernel_oldest_ready_task_age_seconds`, and
+  `kernel_oldest_ready_task_age_seconds`, `kernel_catalog_policy_passes_total`, and
   `kernel_unschedulable_steps` (from the scheduler's
   watch of its steps' Pods: `executor.Unschedulable`). Each process serves
   its own.
@@ -574,6 +608,15 @@ fails rather than skips.
   every table and column.
 - **`internal/sleeper`** — the decision, a run against a fake cluster, and
   what it reads from the database.
+- **`internal/policy`** — the literals computed from a release fixture
+  (what's left out, and why), the in-use rule, the maps' sharding and
+  limits; signatures verified against an in-memory registry with a test
+  key (refused: unsigned, another key, another digest's signature) and a
+  real keyless signature with Sigstore's trusted root (testdata/keyless;
+  refused: another subject, issuer or digest); passes against the test
+  database with a fake catalog and cluster (nothing written before a
+  verified release, an older release refused, an earlier one kept while
+  in use, then pruned).
 - **`TestKind*`** — against a real kind cluster (`internal/kindtest`, which
   builds `internal/kindtest/fixture` and the `examples/` products and gets
   them to the cluster): the executor's mechanics, and whole executions
@@ -589,7 +632,9 @@ fails rather than skips.
   the project root, beside `../helm/charts/execution-console`).
   `values.yaml` documents every option inline; `templates/` has one file
   per resource: kernel-api, kernel-scheduler, the migration hook Job
-  (`kernel migrate`), the sleeper's CronJobs (`kernel sleep`).
+  (`kernel migrate`), the sleeper's CronJobs (`kernel sleep`), and with
+  `catalogPolicy` kernel policy and its two admission policies
+  (`catalog-policy.yaml`).
 - **`../proto/vennir/kernel/v1/kernel.proto`** — KernelService; `make
   proto` writes `internal/gen` and the console's client.
 - **`../examples/project-product/`**, **`../examples/application-product/`**

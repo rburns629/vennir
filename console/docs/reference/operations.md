@@ -433,6 +433,107 @@ a release, and the registry of another install's catalog it reads
 (`catalog.external`, which vennir sets with `externalCatalog`; display only,
 labelled "as configured": nothing the console reads confirms it).
 
+### The catalog's policies
+
+With a signed catalog, the kernel can write what the catalog decides into
+the cluster itself (decision 27 in `assessment.md`): which digests are a
+product's releases, as which ServiceAccount and token audiences, and each
+API ServiceAccount's audiences. Then a console that's wrong, or taken
+over, can't loosen them: `kernel policy` reads the release the console
+reads, verifies its signature against signers set in the kernel chart, and
+writes two admission policies only its own ServiceAccount may update
+(`<kernel>-execution-kernel-catalog-identity` and `-catalog-tokens`), which
+apply beside the console's. Turn it on in the kernel chart's values, with
+the console chart's settings repeated:
+
+```yaml
+catalogPolicy:
+  enabled: true
+  release: us-central1-docker.pkg.dev/<project>/catalog-products/catalog-release:latest  # catalog.release
+  newestVersion: false                                   # catalog.newestVersion
+  signature:                                             # catalog.signature
+    publicKeys: ["<PEM>"]
+    keyless: {issuer: "", subjectRegExp: ""}
+  registry:
+    gcpMetadataToken: true    # or ecrToken (EKS), authSecret (a dockerconfigjson Secret), mirrors
+  gateway:                    # with the console chart's gateway on
+    serviceAccount: console-execution-console-gateway
+    gcpTokenAudience: ""      # gateway.gcp.tokenAudience
+```
+
+It reads the registry as its own ServiceAccount (`kernel-execution-kernel-policy`),
+never as the console: on GKE and EKS that identity needs read on the
+catalog's registry, which `vennir` doesn't grant yet (`TODO.md`), so the
+cloud values leave it off for now. Without a trusted signer it can't be on:
+an unsigned catalog keeps the console writing these policies, and the Admin
+page's policies card says which. A release it can't verify, or one older
+than the one it applied, isn't applied (it logs why, and
+`kernel_catalog_policy_passes_total{outcome="failed"}` counts it); what it
+wrote stands. A release too big for the policies (over 400,000 characters
+of product releases, 300,000 of API audiences: less than the console's
+600,000, for Helm's release Secret, which keeps both) isn't applied; with
+too many earlier releases kept beside the current one, they go first, then
+everything, rather than what's written standing.
+
+Keep the kernel chart's settings the console chart's: `release`,
+`newestVersion` and `signature` as its `catalog`, `gateway.gcpTokenAudience`
+as its `gateway.gcp.tokenAudience`, and `gateway.serviceAccount` set
+whenever the console chart's gateway is on (otherwise only the console's
+token policy holds each API's audiences, and the Admin page says so). The
+chart refuses `catalogPolicy` without `identityPolicy` (the console's,
+which holds each team's secret names). An earlier release stays listed for
+`catalogPolicy.releaseGraceSeconds` (an hour) after a release dropped it,
+or while an unfinished execution runs it that was submitted before then and
+is still moving: a step of it running, or one that became ready or began
+awaiting its approval within `catalogPolicy.inUseMaxSeconds`. That bounds
+each step's wait, not the execution's age, and defaults to the scheduler's
+`approvalTimeoutSeconds`, or three days if that's longer or off; the chart
+(and kernel policy at startup) refuses less than the approval timeout. An
+execution whose steps all wait longer (an approval with no timeout) is
+refused its product's identity when the next one starts. However its
+executions keep moving (retries make a step ready again), nothing keeps an
+earlier release past `catalogPolicy.inUseLimitSeconds` after a release
+dropped it: a week, or twice the in-use bound if longer, by default, and
+never less than it. The grace is per
+digest: when two products share a digest and action and a release drops
+one of them (keeping the digest for the other), the dropped one is revoked
+at once, with no grace and not while in use.
+
+**Rotating its signers.** Add the new key (or identity) to
+`catalogPolicy.signature` beside the old, publish a release signed by it,
+and only then remove the old. Replacing it in one step leaves the release
+applied unverified by the signers trusted now: both policies then list
+nothing until a release they signed is applied, and every product step is
+refused meanwhile. Earlier releases only the old signers signed go when
+the signers change.
+
+**GitOps.** kernel policy owns `spec.variables` and two annotations of both
+policies, as the console owns its policies' lists: a tool that applies the
+rendered manifests should ignore differences there (Argo CD's
+`ignoreDifferences` on `/spec/variables` and the `vennir.dev/catalog-*`
+annotations of `ValidatingAdmissionPolicy` `<kernel>-execution-kernel-catalog-*`).
+Without lookup the chart renders them empty, and `apiAudiencesWritten`
+false: product steps are refused until kernel policy's next write (a
+minute), and the API audience check waits for it.
+
+**Repairing them.** When an upgrade refuses one of these policies' literals
+(it says which), set that variable's expression to `{}` (`false` for
+`apiAudiencesWritten`) with `kubectl edit`: kernel policy rewrites it from
+its database within a pass. Don't delete the policy: the next upgrade then
+renders it empty, and the console's identity policy (holding no releases
+once split) with it, so every product step is refused until kernel policy
+writes again.
+
+On kind, whose local catalog isn't signed, try it with a key of your own,
+kept out of git (`_local/` is ignored): generate one with `cosign
+generate-key-pair`, sign the release `make catalog-publish` printed (`cosign
+sign --key cosign.key --tlog-upload=false
+localhost:5001/catalog-release@sha256:<digest>`, from inside kind's network
+as `kind-registry:5000/...`), put `catalogPolicy` in a values file under
+`_local/` with the public key and `registry.mirrors: {localhost:5001:
+http://kind-registry:5000}`, and `make kind-deploy-kernel
+KIND_KERNEL_VALUES=_local/<file>.yaml`.
+
 ### Sizes, sleeping and headroom
 
 Each chart ships four presets in `sizes/` (`minimal`, `resilient`,
@@ -632,6 +733,7 @@ The metrics, for alerts and dashboards of your own:
 | `kernel_unschedulable_steps` | | Step Pods no node has room for now (the cluster full, or unable to grow), from the scheduler's watch; the chart's unschedulable alert fires on it |
 | `kernel_scheduler_tick_duration_seconds` | | One scheduler pass |
 | `kernel_scheduler_tick_errors_total` | | Passes that failed (logged, retried next pass) |
+| `kernel_catalog_policy_passes_total` | `outcome` | `kernel policy`'s passes (`ok`, `failed`: logged, tried again next pass) |
 | `kernel_scheduler_status_read_errors_total` | | Failed reads of a running step's status (read again) |
 | `kernel_events_total` | `event_type` | Step and execution events |
 | `kernel_http_requests_total`, `kernel_http_request_duration_seconds` | `method`, `path` (and `status`) | kernel-api's requests |
@@ -785,8 +887,9 @@ to know:
 - **Upgrade both charts with `--force-conflicts`.** The console edits
   the kernel's image, identity and scan policies, and (with the gateway on)
   its own chart's gateway token policy, so Helm's server-side apply sees it
-  as their owner; without the flag the upgrade fails with a conflict. Each
-  chart writes back what the console last set, so nothing is lost.
+  as their owner (and `kernel policy`, with `catalogPolicy`, its catalog
+  policies); without the flag the upgrade fails with a conflict. Each
+  chart writes back what they last set, so nothing is lost.
 - **The gateway's exact-audience check waits for the console.** The
   gateway token policy holds each API's ServiceAccount to its API's own
   audiences only once the console has written them (`apiAudiencesWritten`).
@@ -860,6 +963,37 @@ to know:
   0.9.0 has, and a sign-in step in `.github/actions/`. Take the template's
   `.github/workflows/`, `.github/actions/` and the pin in one pull request
   (the catalog guide, "Updating your catalog").
+
+**The catalog's policies, written by the kernel** (unreleased, on main
+since 2026-11-06; decision 27 in `assessment.md`). With the kernel chart's
+`catalogPolicy` on ([The catalog's policies](#the-catalogs-policies)):
+
+- **This release, both write.** The kernel chart adds two policies,
+  `<kernel>-execution-kernel-catalog-identity` and `-catalog-tokens`, seeded
+  on the upgrade from the console's identity and gateway token policies
+  (lookup), so nothing is refused while `kernel policy` first reads the
+  catalog; it writes them once it has applied a verified release. The
+  console keeps writing its own policies whole, releases included. Upgrade
+  the kernel chart first, as always.
+- **What stops running as a product.** A product the signed catalog's
+  release doesn't name: one registered by hand (ProductService/
+  RegisterProduct) and platform products (no team). The console refuses
+  to submit their steps as their products (`IDENTITY_PENDING`); run them
+  as `default` with no Secrets, or release them through the catalog. So
+  does a new release's product until `kernel policy` has read it
+  (`catalogPolicy.pollSeconds`, a minute by default): try again then.
+- **Let unfinished executions finish first.** A step the kernel starts
+  after the upgrade (a later step of a DAG, a retry, one awaiting an
+  approval) must pass the kernel's policy too: one of a platform product,
+  or of a product registered by hand, or one still running an older chart's
+  legacy list (by repository, which the kernel's seed doesn't carry), is
+  refused, not retried (`IDENTITY_NOT_ALLOWED`). Wait for such executions to
+  finish (Observe's runs list the unfinished ones), or turn `catalogPolicy` on
+  when none run.
+- **The next release** drops the released digests from the console's
+  identity policy when `catalogPolicy` is on, leaving it each team's secret
+  names; the console stops computing them. An install whose catalog isn't
+  signed keeps the console writing them, as now.
 
 **Images reused under the same tag.** With `pullPolicy: IfNotPresent` (the
 default) and a reused tag such as `:latest`, a node that already has the old

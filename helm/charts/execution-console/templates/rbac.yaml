@@ -130,7 +130,10 @@ subjects:
 # team's Secrets, or let the gateway mint any audience for an API's
 # ServiceAccount: an accepted trade-off (docs/security-model.md, "If a
 # component is compromised"). The dispatch policy, the namespace policy and
-# the write fence still hold.
+# the write fence still hold, and with a signed catalog so do the kernel's
+# catalog policies (its catalogPolicy), which only kernel policy may update:
+# no unreviewed image runs as a product, no API ServiceAccount gets an
+# audience its api.yaml doesn't need, whatever the console writes here.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -154,6 +157,15 @@ rules:
       - {{ printf "%s-gateway-tokens" (include "execution-console.fullname" .) | quote }}
       {{- end }}
     verbs: ["get", "update"]
+  {{- with compact (list .Values.catalogPolicy.identityPolicyName .Values.catalogPolicy.tokensPolicyName) }}
+  # The kernel's catalog policies (decision 27), which only kernel policy
+  # may update: read, to say who writes them and to refuse a submission
+  # its identity policy doesn't list yet; never changed.
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["validatingadmissionpolicies"]
+    resourceNames: {{ toJson . }}
+    verbs: ["get"]
+  {{- end }}
   {{- with .Values.imageSignature.policyName }}
   # The kernel's signature policy (policy-controller's), read to say on the
   # Admin page whether catalog images must be signed; never changed.

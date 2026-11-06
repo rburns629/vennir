@@ -626,9 +626,46 @@ export async function getPolicySync(): Promise<PolicySync[]> {
   return policySync((await call(() => admin.getPolicySync({}))).outcomes);
 }
 
-/** Admins: writes every policy again now. */
-export async function syncPolicies(): Promise<PolicySync[]> {
-  return policySync((await call(() => admin.syncPolicies({}))).outcomes);
+/**
+ * Who writes the cluster's policies of what the catalog decides (products'
+ * identities, APIs' audiences): "kernel", from the catalog release it
+ * verified (with that release), or "console" (the catalog isn't signed).
+ */
+export interface CatalogPolicies {
+  /** "unknown": it couldn't be read (the console's log says why). */
+  writer: "kernel" | "console" | "unknown";
+  release: string;
+  commit: string;
+  catalogSigned: boolean;
+  /** The gateway is on; the kernel writes its API audiences too. */
+  gateway: boolean;
+  tokens: boolean;
+}
+
+function catalogPolicies(
+  c: { writer: string; release: string; commit: string; catalogSigned: boolean; gateway: boolean; tokens: boolean } | undefined,
+): CatalogPolicies {
+  const writer = c?.writer === "kernel" || c?.writer === "console" ? c.writer : "unknown";
+  return {
+    writer,
+    release: c?.release ?? "",
+    commit: c?.commit ?? "",
+    catalogSigned: c?.catalogSigned ?? false,
+    gateway: c?.gateway ?? false,
+    tokens: c?.tokens ?? false,
+  };
+}
+
+/** Admins: getPolicySync's outcomes, and who writes the catalog's policies. */
+export async function getPolicyState(): Promise<{ policies: PolicySync[]; catalog: CatalogPolicies }> {
+  const response = await call(() => admin.getPolicySync({}));
+  return { policies: policySync(response.outcomes), catalog: catalogPolicies(response.catalog) };
+}
+
+/** Admins: syncPolicies, and who writes the catalog's policies. */
+export async function syncPolicyState(): Promise<{ policies: PolicySync[]; catalog: CatalogPolicies }> {
+  const response = await call(() => admin.syncPolicies({}));
+  return { policies: policySync(response.outcomes), catalog: catalogPolicies(response.catalog) };
 }
 
 /** The audit log's write-once copy (ObserveService.GetAuditCopy). */

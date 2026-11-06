@@ -115,8 +115,50 @@ print("---".join(d for d in docs if re.search(r"^kind: ValidatingAdmissionPolicy
   }
 }
 
+# The kernel chart's catalog policies (kernel policy's, decision 27) as an
+# upgrade renders them (lookup), their RBAC, and the console chart's
+# ClusterRole for the policies it may write: not the Deployment, nor
+# anything else either chart makes.
+render_catalog() {
+  {
+    ht "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" ${HELM_CONTEXT_ARGS[@]+"${HELM_CONTEXT_ARGS[@]}"} \
+      --dry-run=server --take-ownership \
+      --set catalogPolicy.enabled=true --set catalogPolicy.release=$SOURCE/catalog-release:latest \
+      --set 'catalogPolicy.signature.publicKeys[0]=unused' \
+      --set catalogPolicy.gateway.serviceAccount=$RELEASE-execution-console-gateway \
+      --show-only templates/catalog-policy.yaml
+    echo "---"
+    ht "$RELEASE" helm/charts/execution-console -n "$PLATFORM_NS" \
+      --set kernelApiUrl=http://unused --set gateway.enabled=true \
+      --set imagePolicy.policyName=$RELEASE-execution-kernel-image \
+      --set identityPolicy.policyName=$RELEASE-execution-kernel-identity \
+      --set catalogPolicy.identityPolicyName=$RELEASE-execution-kernel-catalog-identity \
+      --show-only templates/rbac.yaml
+  } | python3 -c '
+import re, sys
+keep = ("ValidatingAdmissionPolicy", "ValidatingAdmissionPolicyBinding", "ServiceAccount", "ClusterRole", "ClusterRoleBinding")
+docs = re.split(r"^---$", sys.stdin.read(), flags=re.M)
+out = []
+for d in docs:
+    kind = re.search(r"^kind: (\w+)$", d, re.M)
+    name = re.search(r"^  name: (\S+)$", d, re.M)
+    if not kind or kind.group(1) not in keep:
+        continue
+    # Of the console chart, only the ClusterRole of the policies it writes.
+    if kind.group(1).startswith("ClusterRole") and not re.search(r"-(execution-kernel-policy|execution-console-image-policy)$", name.group(1) if name else ""):
+        continue
+    if kind.group(1) == "ServiceAccount" and not (name and name.group(1).endswith("-execution-kernel-policy")):
+        continue
+    out.append(d)
+print("---".join(out))'
+}
+
 cleanup() {
   render | k delete -f - --ignore-not-found > /dev/null 2>&1
+  k delete validatingadmissionpolicybinding,validatingadmissionpolicy \
+    $RELEASE-execution-kernel-catalog-identity $RELEASE-execution-kernel-catalog-tokens --ignore-not-found > /dev/null 2>&1
+  k delete clusterrolebinding,clusterrole $RELEASE-execution-kernel-policy $RELEASE-execution-console-image-policy \
+    --ignore-not-found > /dev/null 2>&1
   k delete clusterrolebinding,clusterrole $RELEASE-dry-run --ignore-not-found > /dev/null 2>&1
   [ -n "${ESO_CRD_STUB:-}" ] && k delete crd externalsecrets.external-secrets.io --ignore-not-found > /dev/null 2>&1
   k delete namespace "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS" "$APIS_NS" "$RETIRED_APIS_NS" "$NOT_APIS_NS" --ignore-not-found --wait=false > /dev/null 2>&1
@@ -127,7 +169,7 @@ echo "Setting up on $(k config current-context)"
 # A previous run's namespaces may still be terminating; creating them again
 # would fail until they're gone.
 for _ in $(seq 1 90); do
-  k get namespaces --field-selector status.phase=Terminating -o name | grep -q "namespace/$RELEASE-" || break
+  grep -q "namespace/$RELEASE-" <<<"$(k get namespaces --field-selector status.phase=Terminating -o name)" || break
   sleep 2
 done
 for ns in "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS" "$APIS_NS" "$RETIRED_APIS_NS" "$NOT_APIS_NS"; do
@@ -337,6 +379,30 @@ for variable in policy["spec"]["variables"]:
 print(json.dumps(policy))' "$1" "${2:-}" \
     | k replace -f - > /dev/null || { echo "  FAIL  writing the gateway token policy's literals"; FAILURES=$((FAILURES + 1)); }
 }
+# The kernel's catalog policies' literals as kernel policy writes them
+# (kernel/internal/policy): releases (digest to products, by the digest's
+# first hex digit) or apiAudiences (key to audiences, by the key's length
+# modulo 16, and apiAudiencesWritten "true").
+catalog_literal() {  # policy, releases | apiAudiences, the map as JSON
+  k get validatingadmissionpolicy "$1" -o json \
+    | python3 -c '
+import json, sys
+policy = json.load(sys.stdin)
+policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+prefix, digits = sys.argv[1], "0123456789abcdef"
+maps = {d: {} for d in digits}
+for key, value in json.loads(sys.argv[2]).items():
+    maps[key[7] if prefix == "releases" else digits[len(key) % 16]][key] = value
+for variable in policy["spec"]["variables"]:
+    name = variable["name"]
+    if name == "apiAudiencesWritten":
+        variable["expression"] = "true"
+    elif name.startswith(prefix) and name[len(prefix):] in maps:
+        variable["expression"] = json.dumps(maps[name[len(prefix):]], separators=(",", ":"))
+print(json.dumps(policy))' "$2" "$3" \
+    | k replace -f - > /dev/null || { echo "  FAIL  writing $1's literals"; FAILURES=$((FAILURES + 1)); }
+}
+
 # The console chart rendered as an upgrade would (lookup reads this run's
 # policy), only the gateway token policy's variables.
 gateway_seed() {
@@ -466,7 +532,7 @@ expect() {  # label, "allowed" | text the refusal must contain, output
 
 # Policies take a few seconds to reach the API server's admission chain.
 for _ in $(seq 1 30); do
-  job "$OTHER_NS" $SOURCE/app:1 run default "" | grep -q "not a Vennir team namespace" && break
+  grep -q "not a Vennir team namespace" <<<"$(job "$OTHER_NS" $SOURCE/app:1 run default "")" && break
   sleep 1
 done
 
@@ -615,7 +681,7 @@ expect "a token for another digest in its repository" IDENTITY_NOT_ALLOWED "$(jo
 # digest) until the console, its rollout over, empties it.
 identity_literal "$LEGACY_PRODUCTS" "$TEAM_SECRETS" "$RELEASES"
 for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/db:1 create db-sa db-key | grep -q "(server dry run)" && break
+  grep -q "(server dry run)" <<<"$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)" && break
   sleep 1
 done
 expect "upgraded: the legacy list, by repository" allowed              "$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)"
@@ -623,7 +689,7 @@ expect "upgraded: and another digest of it"      allowed               "$(job "$
 expect "upgraded: still not another repository" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run db-sa "")"
 identity_literal '[]' "$TEAM_SECRETS" "$RELEASES"
 for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/db:1 create db-sa db-key | grep -q "IDENTITY_NOT_ALLOWED" && break
+  grep -q "IDENTITY_NOT_ALLOWED" <<<"$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)" && break
   sleep 1
 done
 expect "emptied: its tag again refused"          IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)"
@@ -640,7 +706,7 @@ expect "a digest that isn't sha256"              IMAGE_SCAN_FAILED     "$(job "$
 # (scanning.ts's MAX_PER_MAP), near the API server's limit on an expression.
 scan_literal '{"'$PASSED_DIGEST'":true}' false 1200 c
 for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/app:1@$ACCEPTED_DIGEST run default "" | grep -q IMAGE_SCAN_FAILED && break
+  grep -q IMAGE_SCAN_FAILED <<<"$(job "$TEAM_A" $SOURCE/app:1@$ACCEPTED_DIGEST run default "")" && break
   sleep 1
 done
 expect "a full map: a digest in it"              allowed               "$(job "$TEAM_A" $SOURCE/app:1@$PASSED_DIGEST run default "")"
@@ -649,7 +715,7 @@ expect "a full map: one that isn't"              IMAGE_SCAN_FAILED     "$(job "$
 # admitted, what's listed false isn't (until the console writes its list).
 scan_literal '{"'$FAILED_DIGEST'":false}' true
 for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "" | grep -q "(server dry run)" && break
+  grep -q "(server dry run)" <<<"$(job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "")" && break
   sleep 1
 done
 expect "upgrade seed: a digest not listed"       allowed               "$(job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "")"
@@ -755,7 +821,7 @@ expect "still never a ServiceAccount not an API's" "only mint tokens for API" "$
 gateway_literal "$API_AUDIENCES"
 API_ONLY="only for the audiences its published API needs"
 for _ in $(seq 1 30); do
-  token "$TEAM_A" orders-api sts.amazonaws.com | grep -q "$API_ONLY" && break
+  grep -q "$API_ONLY" <<<"$(token "$TEAM_A" orders-api sts.amazonaws.com)" && break
   sleep 1
 done
 echo "Gateway tokens:"
@@ -829,6 +895,71 @@ expect "another name"                            "only RBAC write"      "$(bindi
 expect "in kube-system"                          "may only write in team" "$(binding kube-system vennir-scheduler-logs "$LOGS_ROLE")"
 # (RBAC's own escalation check, or the fence: refused either way.)
 expect "a Role"                                  "forbidden"            "$(as_console -n "$TEAM_A" create role r --verb=get --resource=pods )"
+
+echo "Catalog policies (decision 27: what the catalog decides, written by kernel policy):"
+# The kernel chart's, as an upgrade renders them (lookup: seeded from the
+# console's identity and gateway token policies, as they are now), and its
+# RBAC beside the console chart's (who may update which policy, by name).
+# Not the Deployment: no kernel runs here.
+render_catalog | k apply -f - > /dev/null
+CATALOG_IDENTITY=$RELEASE-execution-kernel-catalog-identity
+CATALOG_TOKENS=$RELEASE-execution-kernel-catalog-tokens
+POLICY_SA=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-kernel-policy
+seeded() { k get validatingadmissionpolicy "$1" -o jsonpath="{.spec.variables[?(@.name==\"$2\")].expression}"; }
+expect "upgrade seed: the console's releases kept" allowed "$(grep -q "$TEAM_A" <<<"$(seeded "$CATALOG_IDENTITY" releases0)" && echo '(server dry run)' || seeded "$CATALOG_IDENTITY" releases0)"
+expect "upgrade seed: the console's API audiences kept" allowed "$(grep -q true <<<"$(seeded "$CATALOG_TOKENS" apiAudiencesWritten)" && echo '(server dry run)' || echo 'not seeded')"
+# Held to the kernel's rules: no platform product (team ""), no ESO
+# ServiceAccount, though the console's lists them.
+expect "upgrade seed: no platform product"       allowed "$(grep -q 'plat-sa' <<<"$(seeded "$CATALOG_IDENTITY" releases1)" && echo 'seeded it' || echo '(server dry run)')"
+expect "upgrade seed: no ESO ServiceAccount"     allowed "$(grep -q 'eso-gcp' <<<"$(seeded "$CATALOG_IDENTITY" releases0)" && echo 'seeded it' || echo '(server dry run)')"
+# What kernel policy writes from the verified release: db's release and
+# big's, with their audiences; no platform product (no release names one);
+# orders-api's backend audience only.
+catalog_literal "$CATALOG_IDENTITY" releases '{"'$ZERO_DIGEST'":[{"action":"create","audiences":"sts.amazonaws.com","repository":"registry.example/db","serviceAccount":"db-sa","team":"'$TEAM_A'"}],"'$PASSED_DIGEST'":[{"action":"run","audiences":"","repository":"registry.example/big","serviceAccount":"db-sa","team":"'$TEAM_A'"}]}'
+catalog_literal "$CATALOG_TOKENS" apiAudiences '{"'$TEAM_A'/orders-api":["https://orders.example"]}'
+# The console, taken over, loosens its own: another digest of db's
+# repository as db's release, and AWS's STS for orders-api.
+identity_literal '[]' "$TEAM_SECRETS" '{"'$ZERO_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}],"'$UNRELEASED_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}],"'$PLATFORM_DIGEST'":[{"team":"","repository":"registry.example/platform","action":"run","serviceAccount":"plat-sa","audiences":""}]}'
+gateway_literal '{"'$TEAM_A'/orders-api":["https://orders.example","sts.amazonaws.com"]}'
+for _ in $(seq 1 30); do
+  grep -q "catalog's verified release" <<<"$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "")" && break
+  sleep 1
+done
+CATALOG_ONLY="the catalog's verified release doesn't name it"
+expect "a release both list, as its SA, its secret" allowed             "$(job "$TEAM_A" $DB create db-sa db-key)"
+expect "an unreleased digest the console lists"  "$CATALOG_ONLY"        "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "")"
+expect "the same, with its team's secret"        "$CATALOG_ONLY"        "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa db-key)"
+expect "a platform product no release names"     "$CATALOG_ONLY"        "$(job "$TEAM_B" $SOURCE/platform:2@$PLATFORM_DIGEST run plat-sa "")"
+expect "an unregistered image as default"        allowed                "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create default "")"
+expect "default with a secret, still"            IDENTITY_NOT_ALLOWED   "$(job "$TEAM_A" $SOURCE/app:1 run default db-key)"
+# The console's own rule, which the kernel's doesn't have, still holds.
+expect "the console's: a Secret its team never registered" "aren't all registered" "$(job "$TEAM_A" $DB create db-sa eso-auth)"
+expect "a token for its product's audience"      allowed                "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
+expect "a token for another digest, the console's listing it" IDENTITY_NOT_ALLOWED "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
+for _ in $(seq 1 30); do
+  grep -q "catalog's verified release" <<<"$(token "$TEAM_A" orders-api sts.amazonaws.com)" && break
+  sleep 1
+done
+expect "an API's backend audience, both list it" allowed                "$(token "$TEAM_A" orders-api https://orders.example)"
+expect "an audience only the console lists"      "catalog's verified release says its API needs" "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
+# Who may write which: RBAC by name (admission policies don't apply to
+# admission policy objects). The console's own ClusterRole, as its chart
+# grants it, and kernel policy's.
+can() { k auth can-i "$2" "validatingadmissionpolicies/$3" --as="$1" 2>/dev/null; }
+expect "the console updating the kernel's identity policy" "no"  "$(can "$CONSOLE" update "$CATALOG_IDENTITY")"
+expect "the console updating the kernel's token policy"    "no"  "$(can "$CONSOLE" update "$CATALOG_TOKENS")"
+expect "the console reading the kernel's identity policy"  allowed "$(can "$CONSOLE" get "$CATALOG_IDENTITY" | sed 's/^yes$/(server dry run)/')"
+expect "the console updating its own identity policy"      allowed "$(can "$CONSOLE" update "$RELEASE-execution-kernel-identity" | sed 's/^yes$/(server dry run)/')"
+expect "kernel policy updating its own"                    allowed "$(can "$POLICY_SA" update "$CATALOG_IDENTITY" | sed 's/^yes$/(server dry run)/')"
+expect "kernel policy updating the console's"              "no"  "$(can "$POLICY_SA" update "$RELEASE-execution-kernel-identity")"
+# And a write tried for real (dry run), as the console.
+expect "the console replacing the kernel's identity policy" "forbidden" "$(k get validatingadmissionpolicy "$CATALOG_IDENTITY" -o json | k --as="$CONSOLE" replace --dry-run=server -f - 2>&1)"
+# The next upgrade: the chart seeds from the kernel's own policy (as
+# written), not the console's (loosened above).
+render_catalog | k apply -f - > /dev/null
+expect "second upgrade: the kernel's literals kept" allowed "$(grep -q 'registry.example/big' <<<"$(seeded "$CATALOG_IDENTITY" releasesc)" && echo '(server dry run)' || echo 'lost')"
+expect "second upgrade: not the console's"       allowed "$(grep -q "$UNRELEASED_DIGEST" <<<"$(seeded "$CATALOG_IDENTITY" "releases$(printf %s "$UNRELEASED_DIGEST" | cut -c8)")" && echo 'seeded the console'"'"'s' || echo '(server dry run)')"
+expect "second upgrade: still written"           allowed "$(grep -q true <<<"$(seeded "$CATALOG_TOKENS" apiAudiencesWritten)" && echo '(server dry run)' || echo 'reset')"
 
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"

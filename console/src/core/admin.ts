@@ -18,6 +18,7 @@ import { countProducts, countSubmittedExecutions, countTeams, countUsers } from 
 import { auditLog, auditReads, users } from "../db/schema.js";
 import { adoptTeam, catalogStatus, syncCatalog } from "../catalogSync.js";
 import { policySyncOutcomes, syncPolicies } from "../policySync.js";
+import { catalogPolicies } from "../catalogPolicy.js";
 import { clusterImagePolicyExists } from "../k8s.js";
 
 const REQUIRES_ADMIN = "Requires admin access.";
@@ -195,17 +196,20 @@ export async function auditReadEntries(
   return { reads: rows, nextBefore: rows.length === limit ? (rows.at(-1)?.id ?? null) : null };
 }
 
-/** The last outcome of each policy sync. */
-export function policySync(caller: AuthUser | undefined) {
+/**
+ * The last outcome of each policy sync, and who writes the catalog's
+ * (catalogPolicy.ts: "unknown" when it can't be read, never guessed).
+ */
+export async function policySync(caller: AuthUser | undefined, log: FastifyBaseLogger) {
   forbiddenUnlessAdmin(caller, REQUIRES_ADMIN);
-  return policySyncOutcomes();
+  return { outcomes: policySyncOutcomes(), catalog: await catalogPolicies(log) };
 }
 
 /** Runs every policy sync now, then returns their outcomes. */
 export async function syncPoliciesNow(caller: AuthUser | undefined, log: FastifyBaseLogger) {
   forbiddenUnlessAdmin(caller, REQUIRES_ADMIN);
   await syncPolicies(log);
-  return policySyncOutcomes();
+  return { outcomes: policySyncOutcomes(), catalog: await catalogPolicies(log) };
 }
 
 /** The catalog release last applied, and how the last look went. */

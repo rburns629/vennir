@@ -19,7 +19,7 @@ gaps in [Not yet enforced](#not-yet-enforced) are why.
 | Can one product reach another product's secret in the same team? | By design, yes: a team's secrets are the team's, and the team chooses per step which ones it gets (`secretRefs`). What a team can't do is give one to an image that isn't its registered product's release (it runs with no secrets), or mount a Secret it never registered. A product's release is a digest it was registered at, so another image pushed to the product's repository, at any tag or digest, isn't one. The console checks this at submit time, and an admission policy makes the cluster enforce it on every step's Job. A product's own cloud identity (its declared ServiceAccount) is still its own: another product can't run as it, since the console refuses a second image repository declaring it in the same namespace, and no product may declare `eso-gcp`, `eso-aws` or `eso-azure`, the ServiceAccounts ESO reads the team's vault as (the identity admission policy refuses a step running as those, too). |
 | Can a team register another team's product, or its image, as its own? | No. A team doesn't register products at all: the catalog's release does (`products:register`), or an admin, so what code runs, and as what, is decided by the catalog's review. A product name and an image repository belong to the first team that registers them, the repository even after its products are deleted (an admin can release an unused one). Catalog CI also derives each image's path from its team's folder, so one team can't publish under another's name. A product's name is its team's, product's and action's (`<team>-<product>-<action>`), so two teams' folders could make the same one (team `a`'s `b-c`, team `a-b`'s `c`): `vennir catalog check` and the release refuse that, naming both, and a console applying a release that has it registers neither. |
 | Can anything but the console submit work? | No. kernel-api accepts only the console's ServiceAccount token, issued for kernel-api alone and checked with a TokenReview. See [How kernel-api knows its caller](#how-kernel-api-knows-its-caller). |
-| Is anything enforced if the console is bypassed? | Yes: which namespaces steps may run in, which image sources they may use, that images are pinned and passed their scan, which ServiceAccount and Secrets a step may have, image signatures (with Sigstore's policy-controller installed) and who may delete a team namespace. These are admission policies the Kubernetes API server applies to the scheduler's Jobs. They don't hold if the console itself is compromised: it can rewrite three of them. See [If a component is compromised](#if-a-component-is-compromised). |
+| Is anything enforced if the console is bypassed? | Yes: which namespaces steps may run in, which image sources they may use, that images are pinned and passed their scan, which ServiceAccount and Secrets a step may have, image signatures (with Sigstore's policy-controller installed) and who may delete a team namespace. These are admission policies the Kubernetes API server applies to the scheduler's Jobs. They don't all hold if the console itself is compromised: it can rewrite three of them, though with a signed catalog the kernel's catalog policies (which products may run as which identity) still hold. See [If a component is compromised](#if-a-component-is-compromised). |
 | Are secrets encrypted at rest? | That depends on the cluster. Enabling encryption of Secrets at rest in etcd, ideally with a KMS provider, is the cluster operator's responsibility and a prerequisite for production. |
 | Is Vennir's own data encrypted at rest? | Only the few credentials the console keeps itself. Step inputs, outputs and logs, and the audit log, are plain in Postgres; encrypting its disks and backups is the operator's. See [What Vennir stores](#what-vennir-stores). |
 | Is traffic inside the cluster encrypted? | Yes, with each chart's `tls` (on by default): kernel-api serves HTTPS and the bundled Postgres instances accept only TLS, each with a certificate from its chart's own CA, which every client checks (`verify-full`). Metrics ports and the scanner's are plain; NetworkPolicies limit who reaches them. See [What Vennir stores](#what-vennir-stores). |
@@ -189,6 +189,66 @@ ServiceAccount or Secrets. A submission marks the releases it runs used
 and writes any the cluster doesn't list yet before kernel-api has it
 (`console/src/productPolicy.ts`). With image pinning off, a product
 registered by tag never gets its identity.
+
+With a signed catalog and the kernel chart's `catalogPolicy` (decision 27
+in `assessment.md`), the kernel holds the same rule a second time, from the
+catalog alone: `kernel policy` (`kernel/internal/policy`) reads the
+catalog's release, verifies its signature itself (cosign's Go library;
+each trusted public key with no transparency log, or a keyless identity:
+Fulcio's chain from Sigstore's TUF root, the embedded SCT and the Rekor
+entry the signature carries, checked offline) against signers set in the
+kernel chart, refuses a release older than the one it applied, and writes
+`<kernel>-execution-kernel-catalog-identity`, which only its own
+ServiceAccount may update. It lists what the console would register from
+that release (an action pinned, of a team the release names, not as an
+API's or ESO's ServiceAccount, with token audiences the console accepts;
+no repository two teams claim, no ServiceAccount two of a team's products
+share), and an earlier release for an hour after a release stopped naming
+it, or while an unfinished task runs it as that product (`execution_tasks`)
+in an execution submitted before the release dropped it that's still
+moving: a step of it running, or one that became ready or began awaiting
+its approval within the scheduler's approval timeout or three days,
+whichever is longer. Each step's wait is bounded, not the execution's age,
+so a long DAG or several approval gates keep it; one submitted during the
+hour, or stalled longer (say never to be approved), doesn't hold it open.
+Whatever its executions do, nothing keeps it past
+`catalogPolicy.inUseLimitSeconds` (a week by default) after the release
+dropped it: a retry makes a step ready again, and the console asks for
+retries, so a compromised console could otherwise keep one moving, and the
+policy lists the digest for every execution, not only that one. A digest a newer release names as another ServiceAccount or
+other audiences loses the old ones at once. Each release records which of
+the trusted signers (each key, the keyless identity) verified it, and is
+listed only while one of them is still trusted: removing a key takes the
+releases only it signed with it, at once, in their grace or in use, and
+keeps those another trusted signer signed too (so the two-step rotation in
+`operations.md` drops nothing). When none of the signers that verified the
+release applied is trusted any more, it's verified again, and until a
+release a trusted signer verified is applied, both policies list nothing;
+meanwhile the older-release check is skipped (an untrusted release's date
+mustn't hold back a trusted one), so whoever controls the registry could
+serve any older release the new signers signed. The two-step rotation
+avoids that window. Only a definite answer opens it (the signatures read,
+none from a trusted signer): when the check itself fails (the registry or
+Sigstore's TUF repository out of reach), nothing is applied that pass and
+it's tried again on the next. Until the first verified release, the policies
+hold the chart's seed from the console's, held to the kernel's own rules
+(no platform product, no API's or ESO's ServiceAccount, no audience of the
+cluster's). Both policies apply, so a step runs as a product only if both
+list it, and mounts only its team's registered Secrets (the console's
+policy). Products registered by hand, and platform products, aren't in any
+release: with `catalogPolicy` on they run only as `default`, and the
+console refuses to submit one as its product (`IDENTITY_PENDING`, as for a
+new release the kernel hasn't read yet, or one listed with other token
+audiences).
+
+What it can't know is freshness: it applies the newest release the
+registry serves at the reference it follows, and refuses older ones than
+it applied, but whoever controls the registry (not its signers) can
+withhold newer releases, so a release that revokes a product may never
+arrive. A signed release names when it was made; nothing bounds how old
+the one applied may be. That's the same for the console's pull of the
+catalog; watch the Admin page's Catalog card (the version applied, its
+age).
 
 ## Consumers and templates
 
@@ -634,6 +694,13 @@ catalog's APIs or a team's retirement change, every few minutes and at
 startup (`console/src/gatewayTokenPolicy.ts`, the identity policy's
 pattern; its RBAC may update that one policy by name), and the chart keeps
 on upgrade (so upgrade the console chart with `--force-conflicts` too).
+With `catalogPolicy.gateway` in the kernel chart, `kernel policy` holds the
+same audiences again, from the catalog's verified release
+(`<kernel>-execution-kernel-catalog-tokens`, the same rules, which only it
+may update): the console's policy still narrows them to none for an API
+that's held or whose team is retired (an admin's decision, not the
+catalog's), and the kernel's keeps a console taken over from widening
+them.
 The exact-audience check holds only once a console has written the lists
 (`apiAudiencesWritten`): on a fresh install, on the upgrade from a chart
 without them, and whenever the chart is rendered without looking the
@@ -1109,7 +1176,18 @@ taken, and what would still hold.
   which trusts it, a step that mounts any team's Secret (or let the gateway
   mint any audience but the cluster's own for an API's ServiceAccount;
   the gateway still asks only for what each API needs). This is a known,
-  deliberate trade-off (the comment in that file). It also holds its
+  deliberate trade-off (the comment in that file), narrowed with a signed
+  catalog and the kernel chart's `catalogPolicy` (decision 27): then the
+  kernel's catalog policies, which only `kernel policy` may update (RBAC by
+  name; the console may only read them), still hold whatever the console
+  writes in its own: a step runs a digest the catalog's verified release
+  names, as its product's ServiceAccount and token audiences, or as
+  `default` with no Secrets and no tokens, and an API's ServiceAccount gets
+  only the audiences its `api.yaml` needs. So a compromised console can
+  still run a reviewed product with any of its team's Secrets and inputs it
+  chooses, or write a value into a team's Secret, but not run an image no
+  release names as a product, or give an image no product's identity a
+  team's Secret. It also holds its
   database (every account, and the values it seals) and `JWT_SECRET`, so it
   can make a session as anyone. Still holding: steps run only in team
   namespaces, never the platform's (the dispatch policy, which it can't
@@ -1338,7 +1416,7 @@ Vennir isn't production-ready yet.
 
 | Gap | Impact | Plan |
 | --- | --- | --- |
-| A compromised console can loosen the image, identity and scan policies, and write any team's Secrets | It could run a step of its choosing with any team's secrets ([If a component is compromised](#if-a-component-is-compromised)) | Accepted for now: Kubernetes can't guard admission policies from their editor; treat the console as the most privileged component |
+| A compromised console can loosen the image, identity and scan policies, and write any team's Secrets | It could run a step of its choosing with any team's secrets ([If a component is compromised](#if-a-component-is-compromised)) | Narrowed with a signed catalog (the kernel chart's `catalogPolicy`, decision 27): the kernel's catalog policies, which only `kernel policy` may update, keep it from running an image no release names as a product, or giving an unreviewed image a team's Secret. It can still loosen the image and scan policies and its own identity policy's secret names, run a reviewed product with any of its team's Secrets, and write any team's Secrets; without a signed catalog, as before |
 | Reads are recorded apart from the audit log, unchained and uncopied ([Audit](#audit)) | Someone who can write the console's database could remove a record of who read what; a row that failed to write is only in the logs | Ship the `event: "audit_read"` log lines to a SIEM where that matters |
 | The audit log lives in the console's own database unless `audit.export` copies it to write-once storage (its entries are hash-chained, and with the copy compared with the database entry by entry; Observe shows the log as each caller may see it) | Without the copy, someone who can write that database could change it, rewriting the chain after it | Turn on `audit.export`, or ship the `event: "audit"` log lines to a SIEM |
 

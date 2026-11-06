@@ -479,13 +479,15 @@ resource "google_project_iam_member" "database" {
 }
 
 # Which Kubernetes ServiceAccounts sign in as which: every kernel Pod that
-# connects (the scheduler, kernel-api and its migration, the sleeper), the
+# connects (the scheduler, kernel-api and its migration, the sleeper, kernel
+# policy with the chart's catalogPolicy), the
 # gateway, and database-setup's Job. The console's is bound above.
 resource "google_service_account_iam_member" "database_workload_identity" {
   for_each = var.managed_database ? {
     "kernel-execution-kernel"           = google_service_account.kernel_db[0].name
     "kernel-execution-kernel-api"       = google_service_account.kernel_db[0].name
     "kernel-execution-kernel-sleeper"   = google_service_account.kernel_db[0].name
+    "kernel-execution-kernel-policy"    = google_service_account.kernel_db[0].name
     "console-execution-console-gateway" = google_service_account.gateway_db[0].name
     "vennir-db-admin"                   = google_service_account.database_admin[0].name
   } : {}

@@ -1266,6 +1266,29 @@ export async function updateIdentityPolicy(
   );
 }
 
+/**
+ * An admission policy's variables (their expressions, by name) and
+ * annotations, read only: the kernel's catalog policies, which only `kernel
+ * policy` writes (the console chart's RBAC gives this console get on them,
+ * never update). Null when it isn't installed.
+ */
+export async function readPolicyVariables(
+  name: string,
+): Promise<{ variables: Record<string, string>; annotations: Record<string, string> } | null> {
+  const { admission } = getApis();
+  let policy: k8s.V1ValidatingAdmissionPolicy;
+  try {
+    policy = await admission.readValidatingAdmissionPolicy({ name });
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
+  }
+  return {
+    variables: Object.fromEntries((policy.spec?.variables ?? []).map((v) => [v.name, v.expression])),
+    annotations: policy.metadata?.annotations ?? {},
+  };
+}
+
 /** Rewrites only the policy's `source` and `additional` literals, and only
  * if it's still at `version` (the one the admin was looking at): the API
  * server refuses a stale resourceVersion with 409, so two admins saving at

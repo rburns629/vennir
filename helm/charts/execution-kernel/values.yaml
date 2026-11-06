@@ -78,6 +78,73 @@ dispatchPolicy:
 identityPolicy:
   enabled: true
 
+# -- What the catalog decides, written by the kernel (decision 27,
+# docs/assessment.md; templates/catalog-policy.yaml): `kernel policy` reads
+# the catalog release the console reads, verifies its signature itself
+# against `signature` (set here, never by the console), and writes two
+# admission policies only its own ServiceAccount may update: which digests
+# are a product's releases, as which ServiceAccount and token audiences
+# (<release>-execution-kernel-catalog-identity), and, with `gateway`, each
+# API ServiceAccount's audiences (-catalog-tokens). They apply beside the
+# console's (identityPolicy, the console chart's gateway token policy): a
+# step must pass both. Off, or with no signer trusted: the console writes
+# them all, and its Admin page says so.
+catalogPolicy:
+  enabled: false
+  # -- The catalog's release: the console chart's catalog.release, and
+  # newestVersion as it has it.
+  release: ""
+  newestVersion: false
+  pollSeconds: 60
+  # -- How long an earlier release stays listed after a release dropped it
+  # (the console's release grace, an hour).
+  releaseGraceSeconds: 3600
+  # -- An unfinished execution, submitted before a release dropped an
+  # earlier one, keeps it listed while it runs it and is moving: a step of
+  # it running, or one that became ready (or began awaiting its approval)
+  # within this long. Each step's wait is bounded, not the execution's age.
+  # 0: the scheduler's approvalTimeoutSeconds, or three days if that's
+  # longer (or off); never less than that timeout. One whose steps all
+  # wait longer (an approval with no timeout) is refused its product's
+  # identity when it starts.
+  inUseMaxSeconds: 0
+  # -- The most an earlier release stays listed after a release dropped it,
+  # however its executions keep moving (a retry makes a step ready again,
+  # and the console asks for retries): the bound holds whatever the console
+  # does. 0: a week, or twice the in-use bound if that's longer; never
+  # less than the in-use bound.
+  inUseLimitSeconds: 0
+  # -- Who may sign a release: any of these cosign public keys (PEM), and/or
+  # a keyless identity (both issuer and subjectRegExp), as the console
+  # chart's catalog.signature. One is needed.
+  signature:
+    publicKeys: []
+    keyless:
+      issuer: ""
+      subjectRegExp: ""
+  # -- How it reads the registry, as its own ServiceAccount
+  # (serviceAccountAnnotations), never as the console: a Docker config
+  # Secret in this namespace (authSecret, a kubernetes.io/dockerconfigjson),
+  # GKE's metadata server token for Artifact Registry (gcpMetadataToken:
+  # its Workload Identity), ECR's (ecrToken: its Pod Identity), anonymously
+  # otherwise; and mirrors, as the console chart's registryCheck.mirrors.
+  registry:
+    authSecret: ""
+    gcpMetadataToken: false
+    ecrToken: false
+    mirrors: {}
+  serviceAccountAnnotations: {}
+  # -- With the console chart's gateway: its ServiceAccount (the console
+  # release's <release>-execution-console-gateway, in this namespace),
+  # whose token mints the catalog-tokens policy checks, and its
+  # gateway.gcp.tokenAudience. Empty name: no gateway policy.
+  gateway:
+    serviceAccount: ""
+    gcpTokenAudience: ""
+  resources:
+    requests: {cpu: 10m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
 imagePolicy:
   enabled: true
   # -- e.g. us-central1-docker.pkg.dev/<project>/catalog-products, or

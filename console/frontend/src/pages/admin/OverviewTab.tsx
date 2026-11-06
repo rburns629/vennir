@@ -8,7 +8,7 @@ import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import SyncIcon from "@mui/icons-material/Sync";
 import LinkIcon from "@mui/icons-material/LinkOutlined";
-import { errorMessage, getAuditCopy, getPolicySync, getSecurity, syncPolicies, type AuditCopy, type PolicySync } from "../../api";
+import { errorMessage, getAuditCopy, getPolicyState, getSecurity, syncPolicyState, type AuditCopy, type CatalogPolicies, type PolicySync } from "../../api";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
 import { when } from "../../time";
@@ -57,6 +57,22 @@ const KERNEL_POLICIES: { label: string; about: ReactNode; code?: string }[] = [
   { label: "Who may delete a team's namespace", about: "Only a retired team's (or its API backends' namespace), and only by the purger the install names." },
 ];
 
+/** Who writes the cluster's policies of what the catalog decides, in a line (decision 27). */
+function catalogLine(c: CatalogPolicies): string {
+  if (c.writer === "unknown") return "Who writes which images run as each product couldn't be read from the cluster just now; the console's log says why.";
+  if (c.writer === "console") {
+    return c.catalogSigned
+      ? "The catalog is signed, but the kernel doesn't write which images run as each product (its chart's catalogPolicy is off, or this console's catalogPolicy.identityPolicyName doesn't name its policy): the console alone does, and a console that's taken over could loosen it."
+      : "The catalog isn't signed, so the console alone writes which images run as each product, and each API's token audiences: a console that's taken over could loosen them.";
+  }
+  const apis = c.gateway && !c.tokens ? " Each API's token audiences the console alone writes: the kernel chart's catalogPolicy.gateway isn't set." : "";
+  const what = c.gateway && c.tokens ? "Which images run as each product, and each API's token audiences," : "Which images run as each product";
+  if (!c.release) {
+    return `${what} the kernel will also write once it has verified a catalog release its signers signed; until then its copies are what the chart seeded, or nothing after its signers changed.${apis}`;
+  }
+  return `${what} the kernel also writes, from the catalog release it verified${c.commit ? ` (commit ${c.commit.slice(0, 12)})` : ""}: a step must pass both, so the console can't loosen them.${apis}`;
+}
+
 /** Steps the cluster refused in the last day, from Observe's Security view. */
 function RefusedToday() {
   const [refused, setRefused] = useState<{ code: string; team: string }[] | null>(null);
@@ -89,12 +105,16 @@ function RefusedToday() {
 /** The cluster's admission policies: the ones the console writes, the ones the kernel chart installs, and what they refused. */
 export function PoliciesCard() {
   const [policies, setPolicies] = useState<PolicySync[] | null>(null);
+  const [catalog, setCatalog] = useState<CatalogPolicies | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    getPolicySync()
-      .then(setPolicies)
+    getPolicyState()
+      .then((s) => {
+        setPolicies(s.policies);
+        setCatalog(s.catalog);
+      })
       .catch((err: unknown) => { setError(errorMessage(err, "Couldn't read the policies.")); });
   }, []);
 
@@ -103,7 +123,9 @@ export function PoliciesCard() {
     setBusy(true);
     setError(null);
     try {
-      setPolicies(await syncPolicies());
+      const s = await syncPolicyState();
+      setPolicies(s.policies);
+      setCatalog(s.catalog);
       changed();
     } catch (err) {
       setError(errorMessage(err, "Couldn't write them."));
@@ -196,6 +218,11 @@ export function PoliciesCard() {
           </Link>{" "}
           are saved.
         </Typography>
+        {catalog && (
+          <Typography variant="caption" color="text.secondary">
+            {catalogLine(catalog)}
+          </Typography>
+        )}
       </AdminCard>
 
       <AdminCard title="Installed with the kernel" status={<Aside>Changed by an upgrade, not here</Aside>}>

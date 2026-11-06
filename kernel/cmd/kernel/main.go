@@ -8,6 +8,7 @@
 //	kernel scheduler                kernel-scheduler: claim, dispatch, poll, settle, forever
 //	kernel migrate                  apply the database migrations it doesn't have yet
 //	kernel sleep [--now]            the sleeper: put an idle platform to sleep (a CronJob)
+//	kernel policy                   write the catalog's policies from its verified release (decision 27)
 //	kernel wait-for-postgres ADDR   exit once ADDR (host:port) accepts connections
 //	kernel check-heartbeat SECONDS  exit 0 if the scheduler's loop came round that recently
 package main
@@ -43,11 +44,12 @@ import (
 	"github.com/rburns629/vennir/kernel/internal/logging"
 	"github.com/rburns629/vennir/kernel/internal/metrics"
 	"github.com/rburns629/vennir/kernel/internal/migrate"
+	"github.com/rburns629/vennir/kernel/internal/policy"
 	"github.com/rburns629/vennir/kernel/internal/scheduler"
 	"github.com/rburns629/vennir/kernel/internal/sleeper"
 )
 
-const usage = `usage: kernel api | scheduler | migrate | database-setup | database-token FILE | sleep [--now] | wake | wait-for-postgres HOST:PORT | check-heartbeat SECONDS`
+const usage = `usage: kernel api | scheduler | policy | migrate | database-setup | database-token FILE | sleep [--now] | wake | wait-for-postgres HOST:PORT | check-heartbeat SECONDS`
 
 func main() {
 	if len(os.Args) < 2 {
@@ -75,6 +77,7 @@ func main() {
 		// Its sign-in for pg_dump and pg_restore (moving into a managed server).
 		"database-token": {"kernel-database-token", "app.database_token"},
 		"sleep":          {"kernel-sleeper", "app.sleeper"},
+		"policy":         {"kernel-policy", "app.policy"},
 		"wake":           {"kernel-sleeper", "app.sleeper"},
 	}[command]
 	if !ok {
@@ -102,6 +105,8 @@ func main() {
 			err = runDatabaseToken(ctx, settings, args[0])
 		case "sleep":
 			err = runSleep(ctx, settings, len(args) == 1 && args[0] == "--now", log)
+		case "policy":
+			err = runPolicy(ctx, settings, log)
 		case "wake":
 			err = runWake(ctx, settings, log)
 		}
@@ -373,13 +378,7 @@ func runAPI(ctx context.Context, s config.Settings, log *slog.Logger) error {
 func runScheduler(ctx context.Context, s config.Settings, log *slog.Logger) error {
 	serveProfiler(s, log)
 	// The scheduler has no other HTTP server: /metrics on its own port.
-	go func() {
-		server := &http.Server{Addr: fmt.Sprintf(":%d", s.MetricsPort), Handler: metrics.Handler(), ReadHeaderTimeout: 10 * time.Second}
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error("metrics server failed", "error", err.Error())
-		}
-	}()
-	log.Info("metrics server listening", "metricsPort", s.MetricsPort)
+	serveMetrics(s, log)
 	pool, err := poolFor(ctx, s)
 	if err != nil {
 		return err
@@ -426,6 +425,71 @@ func runScheduler(ctx context.Context, s config.Settings, log *slog.Logger) erro
 	loop := &scheduler.Loop{Pool: pool, Executor: exec, Options: opts, PollInterval: s.PollInterval,
 		ReleaseAfter: s.ReleaseFinishedAfter, RetentionDays: s.ExecutionRetentionDays, HeartbeatFile: s.HeartbeatFile, Log: log}
 	return loop.Run(ctx)
+}
+
+// runPolicy is `kernel policy`: the catalog's policies, from its release,
+// verified here against the signers the kernel chart trusts.
+func runPolicy(ctx context.Context, s config.Settings, log *slog.Logger) error {
+	if s.CatalogPolicyRelease == "" {
+		return errors.New("CATALOG_POLICY_RELEASE: no catalog release to read (catalogPolicy in the kernel chart)")
+	}
+	signers := &policy.Signers{PublicKeys: s.CatalogPolicyPublicKeys, KeylessIssuer: s.CatalogPolicyKeylessIssuer,
+		KeylessSubjectRegExp: s.CatalogPolicyKeylessSubject, TUFCache: s.CatalogPolicyTUFCache}
+	if err := signers.Check(); err != nil {
+		return fmt.Errorf("catalogPolicy.signature: %w", err)
+	}
+	serveMetrics(s, log)
+	pool, err := poolFor(ctx, s)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	// Its tables come with the migration, which on an install runs after
+	// the Pods start.
+	migrate.Wait(ctx, pool, func() {}, log)
+	client, err := kubeClient(s)
+	if err != nil {
+		return err
+	}
+	// This cluster's own audiences, which no step's or API's token may
+	// carry: its ServiceAccount issuer's (read from this Pod's own token)
+	// and kernel-api's.
+	own, err := policy.TokenAudiences(serviceAccountTokenFile)
+	if err != nil {
+		return err
+	}
+	controller := &policy.Controller{
+		Source: &policy.Catalog{Reference: s.CatalogPolicyRelease, NewestVersion: s.CatalogPolicyNewestVersion, Signers: signers,
+			Registry: &policy.Registry{Mirrors: s.CatalogPolicyRegistryMirrors, GCPMetadataToken: s.CatalogPolicyRegistryGCPToken,
+				ECRToken: s.CatalogPolicyRegistryECRToken, Timeout: s.KubernetesTimeout}},
+		Store:          &policy.Store{DB: pool},
+		Writer:         &policy.Kubernetes{Client: client},
+		IdentityPolicy: s.CatalogPolicyIdentityPolicy,
+		GatewayPolicy:  s.CatalogPolicyGatewayPolicy,
+		GCPAudience:    s.CatalogPolicyGatewayAudience,
+		Reserved:       policy.ReservedAudiences(append(own, s.APITokenAudience)...),
+		ReleaseGrace:   s.CatalogPolicyReleaseGrace,
+		InUseMax:       s.CatalogPolicyInUseMax,
+		InUseLimit:     s.CatalogPolicyInUseLimit,
+		PollInterval:   s.CatalogPolicyPoll,
+		PassTimeout:    5 * time.Minute,
+		Log:            log,
+	}
+	return controller.Run(ctx)
+}
+
+// serviceAccountTokenFile is where a Pod's own ServiceAccount token is.
+const serviceAccountTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+// serveMetrics serves /metrics on the settings' METRICS_PORT, apart.
+func serveMetrics(s config.Settings, log *slog.Logger) {
+	go func() {
+		server := &http.Server{Addr: fmt.Sprintf(":%d", s.MetricsPort), Handler: metrics.Handler(), ReadHeaderTimeout: 10 * time.Second}
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("metrics server failed", "error", err.Error())
+		}
+	}()
+	log.Info("metrics server listening", "metricsPort", s.MetricsPort)
 }
 
 // runWake wakes a sleeping install for its next schedule (the wake CronJob).

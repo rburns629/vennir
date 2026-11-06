@@ -280,10 +280,34 @@ message GetPolicySyncResponse {
   // By policy (identityPolicy, scanPolicy, ...); a policy missing here
   // hasn't been synced since the console started.
   map<string, PolicySyncOutcome> outcomes = 1;
+  CatalogPolicies catalog = 2;
+}
+
+// Who writes the cluster's policies of what the catalog decides: which
+// digests are a product's releases (as which ServiceAccount, with which
+// token audiences) and each API ServiceAccount's audiences.
+message CatalogPolicies {
+  // "kernel": kernel policy, from the catalog release it verified itself,
+  // into policies this console may only read (beside this console's own);
+  // "console": this console (the kernel's catalog policy isn't installed);
+  // "unknown": it couldn't be read.
+  string writer = 1;
+  // With the kernel: the release it last wrote them from
+  // (<repository>@<digest>), and that release's commit; empty until it has
+  // applied one it trusts.
+  string release = 2;
+  string commit = 3;
+  // Whether this console's catalog trusts a signer (catalog.signature).
+  bool catalog_signed = 4;
+  // Whether the gateway is on, and whether the kernel writes its API
+  // ServiceAccounts' audiences too (the kernel chart's catalogPolicy.gateway).
+  bool gateway = 5;
+  bool tokens = 6;
 }
 
 message SyncPoliciesRequest {}
 
 message SyncPoliciesResponse {
   map<string, PolicySyncOutcome> outcomes = 1;
+  CatalogPolicies catalog = 2;
 }

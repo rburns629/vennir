@@ -37,6 +37,13 @@ var (
 		Help: "Scheduler ticks that raised and were skipped rather than crashing the process.",
 	})
 
+	// CatalogPolicyPasses counts kernel policy's passes (internal/policy):
+	// ok, or failed (logged, tried again next pass).
+	CatalogPolicyPasses = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "kernel_catalog_policy_passes_total",
+		Help: "kernel policy's passes over the catalog release and the policies it writes, by outcome.",
+	}, []string{"outcome"})
+
 	// Tasks and OldestReady are sampled from the database by every
 	// scheduler replica (take the max across them).
 	Tasks = promauto.NewGaugeVec(prometheus.GaugeOpts{

@@ -117,12 +117,14 @@ export function adminService(): ServiceImpl<typeof AdminService> {
       };
     },
 
-    getPolicySync(_req, ctx) {
-      return { outcomes: outcomes(policySync(callerOf(ctx))) };
+    async getPolicySync(_req, ctx) {
+      const state = await policySync(callerOf(ctx), logOf(ctx));
+      return { outcomes: outcomes(state.outcomes), catalog: state.catalog };
     },
 
     async syncPolicies(_req, ctx) {
-      return { outcomes: outcomes(await syncPoliciesNow(callerOf(ctx), logOf(ctx))) };
+      const state = await syncPoliciesNow(callerOf(ctx), logOf(ctx));
+      return { outcomes: outcomes(state.outcomes), catalog: state.catalog };
     },
 
     async getCatalogStatus(_req, ctx) {

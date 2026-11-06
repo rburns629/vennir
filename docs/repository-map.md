@@ -41,7 +41,7 @@ Around them: `helm/` packages both for Kubernetes, with each cluster's settings,
 | `Makefile` | Everyday commands: `make quickstart` (a local install from nothing), `make up`/`down`/`logs` for the kind cluster, `make kind-deploy*` and `make gke-deploy*`, building the demo products, and `make test`/`test-db`/`test-db-down` (a throwaway test Postgres, separate from any install), and `make proto` (lint the API's protos and generate their code). |
 | `.gitignore` | Keeps `_local/`, build output and dependencies out of git. |
 | `buf.yaml` | buf's module (`proto/`) and lint rules for the APIs. |
-| `buf.gen.es.yaml`, `buf.gen.frontend.yaml`, `buf.gen.go.yaml`, `buf.gen.kernel.yaml` | What `make proto` generates: TypeScript for the console (`console/src/gen/`: its API and kernel-api's, which it calls) and for the frontend (`console/frontend/src/gen/`, the console's API only, JavaScript with type declarations), Go for the CLI (`cli/internal/gen/`, the console's API and the catalog release) and for the kernel (`kernel/internal/gen/`, its own), each from plugins pinned in that project. |
+| `buf.gen.es.yaml`, `buf.gen.frontend.yaml`, `buf.gen.go.yaml`, `buf.gen.kernel.yaml` | What `make proto` generates: TypeScript for the console (`console/src/gen/`: its API and kernel-api's, which it calls) and for the frontend (`console/frontend/src/gen/`, the console's API only, JavaScript with type declarations), Go for the CLI (`cli/internal/gen/`, the console's API and the catalog release) and for the kernel (`kernel/internal/gen/`, its own and the catalog release, which `kernel policy` reads), each from plugins pinned in that project. |
 | `proto/vennir/console/v1/` | The console's API as Connect services: one file per service (`execution.proto`'s `ExecutionService` streams `WatchExecution`), and `common.proto` (failures, problems, paging). The API reference page is built from these. |
 | `proto/vennir/catalog/v1/release.proto` | A catalog release: every team (with its SecretStore files) and product action of a catalog's `main`, which `vennir catalog release` pushes as an OCI artifact and each console pulls. |
 | `proto/vennir/kernel/v1/kernel.proto` | kernel-api's `KernelService`, internal: only the console calls it. |
@@ -119,8 +119,17 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | `internal/migrate/sql/` | One SQL file per change, applied in order, each once: `0001_initial_schema.sql` (every table at the first public release), then one file per later change. A released file never changes. |
 | `internal/migrate/migrate.go` | Applies them under an advisory lock, recorded in `schema_migrations`; takes over an install Alembic migrated; what kernel-api and the scheduler wait for. |
 | `internal/sleeper/sleeper.go` | The sleeper: one look, and if the platform is idle, the counts to wake to recorded and every Deployment scaled to zero (the databases last), the wake CronJob armed for the console's next schedule; and `Wake` (`kernel wake`), which brings it back. |
+| **`internal/policy/`** | **`kernel policy`: what a signed catalog decides, written into the cluster by the kernel (decision 27).** |
+| `internal/policy/policy.go` | The pass: look at the catalog's release, verify and apply a new one (never an older one), then write the catalog identity and token policies from what's applied, pruning earlier releases no longer in use. |
+| `internal/policy/compute.go` | Pure: what the console would register from a release (product releases, APIs' sign-ins), which releases are in use, the audiences each API ServiceAccount needs, and the sixteen maps' literals with their size limits. |
+| `internal/policy/verify.go` | Verifying a release's signature with cosign's Go library: each trusted public key (no transparency log), then a keyless identity against Sigstore's trusted root, its Rekor entry checked offline. |
+| `internal/policy/registry.go` | Reading the release from the registry as this Pod's own identity (a Docker config, GKE's metadata token, ECR's), through mirrors; following the newest version. |
+| `internal/policy/store.go` | The release applied and the product releases it named, in the kernel's database; which releases unfinished tasks run. |
+| `internal/policy/writer.go` | Rewriting an admission policy's literals through the API server, conditionally on the version read. |
+| `internal/policy/cel_test.go` | The policies' literals compiled by cel-go as the API server compiles them, whatever strings a catalog release carries. |
+| `internal/policy/testdata/keyless/` | A real keyless cosign signature (of cosign's own release image) and Sigstore's trusted root, for the verification tests. |
 | `internal/logging/`, `internal/metrics/` | JSON logs; the Prometheus metrics. |
-| `internal/gen/` | `KernelService`'s generated Go (`make proto`). |
+| `internal/gen/` | `KernelService`'s generated Go, and the catalog release's (`make proto`). |
 | `internal/scheduler/perf_test.go` | The scheduler and Postgres alone, with the fake executor and 1, 2 and 4 schedulers: steps a second, and that no step starts twice. Only with `VENNIR_PERF=1` (`perf/README.md`). |
 | `internal/dbtest/`, `internal/kindtest/` | For tests: the test database and throwaway ones; the current kind cluster and test images (`kindtest/fixture/`: a test-only product that crashes, sleeps or fails on demand). |
 | `*_test.go` | Beside each package: against the real, migrated test database (`TEST_DATABASE_URL`), client-go's fake clientset, or (`TestKind*`) a real kind cluster, skipping without one or failing when `KERNEL_TESTS_REQUIRE_KUBERNETES=1` (CI). |
@@ -167,6 +176,7 @@ TypeScript, Fastify 5, Drizzle (Postgres), `@kubernetes/client-node`. One proces
 | `auditExport.ts` | The audit log's write-once copy: every few minutes, new entries, their hash chain checked, to a GCS or S3 bucket that refuses deletes and overwrites; and every hour a few copies compared with the database, entry by entry. |
 | `catalogSync.ts` | Pulls the catalog's release (its tag, or the newest version) every few minutes (and on Sync now), verifies its signature with a cosign Job, and applies it: teams, products, SecretStores; unregisters and retires what it drops; leaves teams it didn't make alone until an admin adopts them. |
 | `jsonSchema.ts` | Checking values against the JSON Schemas teams write (ajv, draft 2020-12, nothing fetched): template parameters and products' inputs. |
+| `catalogPolicy.ts` | Reads the kernel's catalog identity policy (never writes it): who writes the catalog's policies, for the Admin page, and which of a submission's releases it doesn't list yet, which the console refuses to submit. |
 | `tokenAudiences.ts` | Which audiences a product's steps may get a projected token for: refuses the Kubernetes API's (from the console's own token) and kernel-api's, and names each token's file. |
 | `policySync.ts` | Rewrites the identity, scan and gateway token policies and the teams' pull Secrets every few minutes, so drift doesn't last; keeps each sync's outcome for admins. |
 | `logLevels.ts` | Who sees which of a step's log lines: INFO to everyone who can see the run, the rest to the step's team. |
@@ -454,6 +464,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `templates/purge-policy.yaml` | Admission policy: only the purge identity may delete a team's namespace, or its API backends' namespace, and only a retired one. |
 | `templates/networkpolicy.yaml` | Only the release's Pods (and the console) may reach Postgres; only the console may reach kernel-api. |
 | `templates/identity-policy.yaml` | Admission policy: a step runs as `default` with no Secrets, or, running one of its registered product's released digests, as the product's ServiceAccount with only its team's Secrets. The console keeps its released digests current. |
+| `templates/catalog-policy.yaml` | With `catalogPolicy` (a signed catalog): `kernel policy`'s Deployment, ServiceAccount and RBAC (update on its two policies, by name, only), and those policies: a step runs a digest the catalog's verified release names as its product's ServiceAccount and token audiences, or as `default` with no Secrets and no tokens; the gateway mints an API's ServiceAccount only the audiences its `api.yaml` needs. Seeded on upgrade from the console's. |
 | `templates/scan-policy.yaml` | Admission policy: a step's image must be pinned by digest, and a digest that passed its security scan (the console keeps that list, pruned to the digests in use). |
 | `templates/console-database.yaml` | With `postgres.consoleDatabase` on: the console's database and login role on the kernel's Postgres, the gateway's own role, their connection Secrets, and the Job that creates them, so one instance serves both. |
 | `templates/_helpers.tpl`, `NOTES.txt` | Shared template snippets; the message shown after install. |
@@ -488,10 +499,11 @@ Run against a real, migrated Postgres (`execution_console_test`).
 
 | Path | What it's for |
 | --- | --- |
-| `secrets-e2e.sh` | A team's secret end to end on a kind install (`make kind-e2e-secrets`): a SecretStore (ESO's fake provider) syncs it, a registered product's step reads it (its SHA-256, never the value), and a step that isn't one, or another team's, is refused. |
+| `secrets-e2e.sh` | A team's secret end to end on a kind install (`make kind-e2e-secrets`): a SecretStore (ESO's fake provider) syncs it, a registered product's step reads it (its SHA-256, never the value), and a step that isn't one, or another team's, is refused; with the kernel writing the catalog's policies, that product (registered by hand) is refused and a product of the verified release runs. |
 | `prometheus-rules.sh`, `prometheus/alerts.test.yaml` | Both charts' alerts rendered and evaluated by promtool (the bundled Prometheus's image) against made-up series: what fires and what doesn't. Run by CI's helm job. |
 | `step-job.json` | A step's Job exactly as the kernel's executor makes it (a kernel test keeps it equal), which `admission-policies.sh` dry-runs as the scheduler and as anyone else. |
-| `admission-policies.sh` | Proves the charts' admission policies on a real cluster (dispatch and a step's Job shape, step Jobs, image sources, step identity, scans, purging, the console's write fence, namespaces and Jobs, the gateway's tokens), case by case with server-side dry runs. Run by CI's kubernetes job. |
+| `admission-policies.sh` | Proves the charts' admission policies on a real cluster (dispatch and a step's Job shape, step Jobs, image sources, step identity, scans, purging, the console's write fence, namespaces and Jobs, the gateway's tokens), case by case with server-side dry runs; and the kernel's catalog policies beside the console's (both apply), and who may update which. Run by CI's kubernetes job. |
+| `catalog-policy-render.sh` | The kernel chart's catalog policies rendered with no cluster (no lookup): their maps empty, `apiAudiencesWritten` false, and the settings the chart refuses. Run by CI's helm job. |
 
 ### `helm/values/`: each cluster's settings
 

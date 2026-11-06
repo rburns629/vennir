@@ -229,3 +229,40 @@ func caFile(t *testing.T) string {
 	}
 	return path
 }
+
+// kernel policy's settings: a release needs the policy it writes and a
+// signer to trust (without one, the console writes them: it doesn't run).
+func TestTheCatalogPolicyNeedsASignerAndItsPolicy(t *testing.T) {
+	with := func(extra map[string]string) map[string]string {
+		env := map[string]string{"CATALOG_POLICY_RELEASE": "r.example/catalog-release:latest",
+			"CATALOG_POLICY_IDENTITY_POLICY": "kernel-execution-kernel-catalog-identity"}
+		for k, v := range extra {
+			env[k] = v
+		}
+		return env
+	}
+	s, err := load(t, with(map[string]string{"CATALOG_POLICY_PUBLIC_KEYS": `["-----BEGIN PUBLIC KEY-----"]`,
+		"CATALOG_POLICY_REGISTRY_MIRRORS": `{"localhost:5001": "http://kind-registry:5000"}`, "CATALOG_POLICY_NEWEST_VERSION": "true"}))
+	if err != nil || len(s.CatalogPolicyPublicKeys) != 1 || s.CatalogPolicyRegistryMirrors["localhost:5001"] != "http://kind-registry:5000" ||
+		!s.CatalogPolicyNewestVersion || s.CatalogPolicyPoll != time.Minute || s.CatalogPolicyReleaseGrace != time.Hour {
+		t.Fatalf("%+v, %v", s, err)
+	}
+	for name, env := range map[string]map[string]string{
+		"no signer":                   with(nil),
+		"keyless without its subject": with(map[string]string{"CATALOG_POLICY_KEYLESS_ISSUER": "https://token.actions.githubusercontent.com"}),
+		"no policy":                   {"CATALOG_POLICY_RELEASE": "r", "CATALOG_POLICY_PUBLIC_KEYS": `["k"]`},
+		"a flag that isn't one":       with(map[string]string{"CATALOG_POLICY_PUBLIC_KEYS": `["k"]`, "CATALOG_POLICY_REGISTRY_ECR_TOKEN": "yes"}),
+		"in use under the approval timeout": with(map[string]string{"CATALOG_POLICY_PUBLIC_KEYS": `["k"]`,
+			"SCHEDULER_APPROVAL_TIMEOUT_SECONDS": "604800", "CATALOG_POLICY_IN_USE_MAX_SECONDS": "259200"}),
+		"a limit under in use": with(map[string]string{"CATALOG_POLICY_PUBLIC_KEYS": `["k"]`,
+			"CATALOG_POLICY_IN_USE_MAX_SECONDS": "604800", "CATALOG_POLICY_IN_USE_LIMIT_SECONDS": "259200"}),
+	} {
+		if _, err := load(t, env); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	// Without a release, none of it is needed (it doesn't run).
+	if _, err := load(t, nil); err != nil {
+		t.Error(err)
+	}
+}

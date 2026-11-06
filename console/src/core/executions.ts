@@ -54,6 +54,7 @@ import {
   type ExecutionStateEntry,
 } from "../kernel/client.js";
 import { admitReleases, markReleasesUsed, releasedImageKey, releasedImages, UNREGISTERED_SERVICE_ACCOUNT } from "../productPolicy.js";
+import { unlistedByKernel, type KernelUse } from "../catalogPolicy.js";
 import { ensureStillRunnable, rerunTemplate } from "./templates.js";
 import { mayDecide, notDeciders, notDecidersOf, taskTeams } from "./approvals.js";
 import { visibleLines } from "../logLevels.js";
@@ -870,17 +871,42 @@ async function authorizeIdentities(tasksInfo: TaskAuthInfo[]): Promise<void> {
  * in use), and written into the policy if it isn't yet. Run after
  * authorizeIdentities.
  */
-async function admitIdentities(tasksInfo: TaskAuthInfo[]): Promise<void> {
+async function admitIdentities(tasksInfo: TaskAuthInfo[], log: FastifyBaseLogger): Promise<void> {
   const products = productLookup();
   const uses: { productId: string; digest: string; team: string; repository: string; action: string; serviceAccount: string }[] = [];
+  // The ones the cluster would refuse unless they're listed: as another
+  // ServiceAccount than default, or with Secrets or tokens (default with
+  // none runs as any image may), with the token audiences its product
+  // declares (the kernel's entry must carry them).
+  const needed: KernelUse[] = [];
   for (const task of tasksInfo) {
     const digest = task.image === undefined ? null : digestOf(task.image);
     if (!digest || task.image === undefined) continue;
     const serviceAccount = task.serviceAccount ?? UNREGISTERED_SERVICE_ACCOUNT;
     const product = (await products.matching(task.team, task.image, task.action)).find((p) => runsAs(p) === serviceAccount);
-    if (product) uses.push({ productId: product.id, digest, team: task.team, repository: imageRepository(task.image), action: product.action, serviceAccount });
+    if (!product) continue;
+    const use = { productId: product.id, digest, team: task.team, repository: imageRepository(task.image), action: product.action, serviceAccount };
+    uses.push(use);
+    if (serviceAccount !== UNREGISTERED_SERVICE_ACCOUNT || task.secretRefs.length > 0 || product.tokenAudiences.length > 0) {
+      needed.push({ ...use, audiences: product.tokenAudiences });
+    }
   }
   if (uses.length === 0) return;
+  // With a signed catalog, the kernel's policy decides too (catalogPolicy.ts):
+  // a release it doesn't list would be refused at dispatch. First, so a
+  // refused submission marks nothing used.
+  const pending = await unlistedByKernel(needed, log);
+  if (pending.length > 0) {
+    throw new ApiError(
+      409,
+      "IDENTITY_PENDING",
+      `The kernel's policy doesn't list ${pending.join(", ")} as its product's release, from the catalog's signed release. ` +
+        "If that release is new, the kernel reads the catalog every minute or so: try again shortly. An earlier " +
+        "release stays listed only for an hour after a newer one replaced it, or while a step runs it: run the " +
+        "current one. A product registered by hand, not released through the catalog, runs as its product only " +
+        "with an unsigned catalog (or as default, with no Secrets).",
+    );
+  }
   await markReleasesUsed(uses);
   const unlisted = await admitReleases(uses);
   if (unlisted.length > 0) {
@@ -1080,7 +1106,7 @@ export async function submitChecked(
   await authorizeIdentities(tasksInfo);
   await ensureServiceAccounts(tasksInfo);
   await refuseUnscanned(taskImages(pinnedBody), context);
-  await admitIdentities(tasksInfo);
+  await admitIdentities(tasksInfo, context.log);
   const submission = withForTeam(
     await withProductContract(await withProductResources(pinnedBody), {
       teamNames: caller?.teamNames ?? [],
@@ -1265,7 +1291,7 @@ export async function retry(caller: AuthUser | undefined, executionId: string, t
   await refuseBlockedImages(images, context);
   await refuseUnscanned(images, context);
   await ensureServiceAccounts(tasksInfo);
-  await admitIdentities(tasksInfo.filter((task) => task.id !== undefined && runAgain.has(task.id)));
+  await admitIdentities(tasksInfo.filter((task) => task.id !== undefined && runAgain.has(task.id)), context.log);
   const retried = await retryTask(executionId, taskId, requester(caller));
   // Live again: what it makes, or deletes, is recorded once it finishes again.
   await markResourcesUnrecorded(executionId);
@@ -1343,7 +1369,7 @@ export async function rerun(caller: AuthUser | undefined, executionId: string, l
   await authorizeIdentities(tasksInfo);
   await ensureServiceAccounts(tasksInfo);
   await refuseUnscanned(taskImages(pinnedReplay), context);
-  await admitIdentities(tasksInfo);
+  await admitIdentities(tasksInfo, context.log);
   // A team's own DAG again: each step for its team, whatever the stored one says.
   const rerunPayload = withForTeam(
     await withProductContract(await withProductResources({ ...pinnedReplay, requestId: randomUUID() }), {

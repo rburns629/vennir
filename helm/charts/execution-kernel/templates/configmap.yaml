@@ -63,3 +63,39 @@ data:
   TASK_LOG_MAX_BYTES: {{ .Values.scheduler.taskLogs.maxBytes | int | quote }}
   TASK_LOG_REFRESH_SECONDS: {{ .Values.scheduler.taskLogs.refreshSeconds | quote }}
   EXECUTION_RETENTION_DAYS: {{ .Values.executionRetentionDays | quote }}
+  {{- with .Values.catalogPolicy }}
+  {{- if .enabled }}
+  # kernel policy (templates/catalog-policy.yaml): the catalog release it
+  # verifies, who may sign it, and the policies it writes.
+  CATALOG_POLICY_RELEASE: {{ .release | quote }}
+  CATALOG_POLICY_NEWEST_VERSION: {{ .newestVersion | toString | quote }}
+  CATALOG_POLICY_POLL_SECONDS: {{ .pollSeconds | quote }}
+  {{- /* How long an unfinished execution keeps an earlier release listed:
+       at least as long as a step may await its approval. */}}
+  {{- $approval := int $.Values.scheduler.approvalTimeoutSeconds }}
+  {{- $inUse := int (.inUseMaxSeconds | default (max $approval 259200)) }}
+  {{- if and (gt $approval 0) (lt $inUse $approval) }}
+  {{- fail (printf "catalogPolicy.inUseMaxSeconds (%d) must be at least scheduler.approvalTimeoutSeconds (%d): a step approved later would be refused its product's identity." $inUse $approval) }}
+  {{- end }}
+  CATALOG_POLICY_IN_USE_MAX_SECONDS: {{ $inUse | quote }}
+  {{- /* The most any use keeps it, after a release dropped it: retries keep
+       an execution moving, this doesn't move. */}}
+  {{- $limit := int (.inUseLimitSeconds | default (max 604800 (mul 2 $inUse))) }}
+  {{- if lt $limit $inUse }}
+  {{- fail (printf "catalogPolicy.inUseLimitSeconds (%d) must be at least the in-use bound (%d)." $limit $inUse) }}
+  {{- end }}
+  CATALOG_POLICY_IN_USE_LIMIT_SECONDS: {{ $limit | quote }}
+  CATALOG_POLICY_RELEASE_GRACE_SECONDS: {{ .releaseGraceSeconds | default 3600 | quote }}
+  CATALOG_POLICY_PUBLIC_KEYS: {{ .signature.publicKeys | toJson | quote }}
+  CATALOG_POLICY_KEYLESS_ISSUER: {{ .signature.keyless.issuer | quote }}
+  CATALOG_POLICY_KEYLESS_SUBJECT_REGEXP: {{ .signature.keyless.subjectRegExp | quote }}
+  CATALOG_POLICY_IDENTITY_POLICY: {{ printf "%s-catalog-identity" (include "execution-kernel.fullname" $) | quote }}
+  {{- if .gateway.serviceAccount }}
+  CATALOG_POLICY_GATEWAY_POLICY: {{ printf "%s-catalog-tokens" (include "execution-kernel.fullname" $) | quote }}
+  CATALOG_POLICY_GATEWAY_GCP_AUDIENCE: {{ .gateway.gcpTokenAudience | quote }}
+  {{- end }}
+  CATALOG_POLICY_REGISTRY_MIRRORS: {{ .registry.mirrors | toJson | quote }}
+  CATALOG_POLICY_REGISTRY_GCP_METADATA_TOKEN: {{ .registry.gcpMetadataToken | toString | quote }}
+  CATALOG_POLICY_REGISTRY_ECR_TOKEN: {{ .registry.ecrToken | toString | quote }}
+  {{- end }}
+  {{- end }}
