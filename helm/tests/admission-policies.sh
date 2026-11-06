@@ -1031,10 +1031,13 @@ expect "second upgrade: still written"           allowed "$(grep -q true <<<"$(s
 
 echo "The console's identity policy beside the kernel's (catalogPolicy: each team's secret names alone):"
 # The kernel chart's identity policy as it renders with catalogPolicy on,
-# in place of the full one; the console writes its teamSecrets.
+# in place of the full one (split: an upgrade after the one that made the
+# kernel's policy and binding, which lookup finds); the console writes its
+# teamSecrets. Before it, catalogPolicy on, the chart still renders it full.
 ht "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
   --set catalogPolicy.enabled=true --set catalogPolicy.release=$SOURCE/catalog-release:latest \
   --set 'catalogPolicy.signature.publicKeys[0]=unused' \
+  ${HELM_CONTEXT_ARGS[@]+"${HELM_CONTEXT_ARGS[@]}"} --dry-run=server --take-ownership \
   --show-only templates/identity-policy.yaml | python3 -c '
 import re, sys
 print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M)))' \
@@ -1060,6 +1063,23 @@ expect "its tag, by the inert legacy list (the kernel's)" "$CATALOG_ONLY"     "$
 expect "an unregistered image with a Secret (the kernel's)" "$CATALOG_ONLY"   "$(job "$TEAM_A" $SOURCE/app:1 run default db-key)"
 expect "ESO's SA (both)"                                 IDENTITY_NOT_ALLOWED "$(job "$TEAM_A" $SOURCE/vault:1@$ZERO_DIGEST run eso-gcp "")"
 expect "an unregistered image as default"                allowed            "$(job "$TEAM_A" $SOURCE/app:1 run default "")"
+
+echo "The identity policy's shape, rendered (candidates: it matches releases):"
+shape() {  # release, extra helm arguments: prints whether it renders candidates
+  local release=$1; shift
+  ht "$release" helm/charts/execution-kernel -n "$PLATFORM_NS" ${HELM_CONTEXT_ARGS[@]+"${HELM_CONTEXT_ARGS[@]}"} \
+    --dry-run=server --take-ownership --show-only templates/identity-policy.yaml "$@" 2>&1
+}
+CATALOG_ON=(--set catalogPolicy.enabled=true --set catalogPolicy.release=$SOURCE/catalog-release:latest --set 'catalogPolicy.signature.publicKeys[0]=unused')
+expect "catalogPolicy on, the kernel's policy there: split" allowed "$(shape "$RELEASE" "${CATALOG_ON[@]}" | grep -q 'name: candidates' && echo 'full' || echo '(server dry run)')"
+expect "catalogPolicy on, no kernel policy yet: full"      allowed "$(shape "$RELEASE-none" "${CATALOG_ON[@]}" | grep -q 'name: candidates' && echo '(server dry run)' || echo 'split')"
+# Turning catalogPolicy off again: the releases back from the kernel's
+# policy, but never a platform product's (team "": every namespace here).
+catalog_literal "$CATALOG_IDENTITY" releases '{"'$ZERO_DIGEST'":[{"action":"create","audiences":"sts.amazonaws.com","repository":"registry.example/db","serviceAccount":"db-sa","team":"'$TEAM_A'"}],"'$PLATFORM_DIGEST'":[{"action":"run","audiences":"","repository":"registry.example/platform","serviceAccount":"plat-sa","team":""}]}'
+RESEED=$(shape "$RELEASE")
+expect "catalogPolicy off again: full"                  allowed "$(echo "$RESEED" | grep -q 'name: candidates' && echo '(server dry run)' || echo 'split')"
+expect "its releases re-seeded from the kernel's"       allowed "$(echo "$RESEED" | grep -q 'registry.example/db' && echo '(server dry run)' || echo 'not seeded')"
+expect "but not a platform entry"                       allowed "$(echo "$RESEED" | grep -q 'plat-sa' && echo 'seeded it' || echo '(server dry run)')"
 
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"

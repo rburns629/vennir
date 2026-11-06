@@ -21,7 +21,7 @@ import { KernelApiError, cancelExecution, getExecution, retryTask, submitExecuti
 import { scanBlocker } from "../src/scanning.js";
 import { ensureServiceAccount, readPolicyVariables } from "../src/k8s.js";
 import { forgetKernelPolicy } from "../src/catalogPolicy.js";
-import { forgetIdentityShape } from "../src/productPolicy.js";
+import { forgetIdentityShape, identityPolicyHoldsReleases } from "../src/productPolicy.js";
 import { missingImages, pinImages } from "../src/registry.js";
 import { config } from "../src/config.js";
 import { caller, failureDetail, problemFields, type RpcError } from "./rpc.js";
@@ -33,6 +33,8 @@ vi.mock("../src/k8s.js", async (importOriginal) => ({
   ensureServiceAccount: vi.fn(() => Promise.resolve()),
   // The kernel's catalog identity policy (catalogPolicy.ts): none, unless a test says.
   readPolicyVariables: vi.fn(() => Promise.resolve(null)),
+  // The console's own identity policy, when a test names one: written, as asked.
+  updateIdentityPolicy: vi.fn(() => Promise.resolve(true)),
 }));
 
 // The registry is asked about every submission; test/registry.test.ts
@@ -297,6 +299,29 @@ describe("SubmitExecution: a product runs as its ServiceAccount, with its team's
         const response = await submit({ serviceAccount: GRANTEE, secretRefs: ["product-a-secret"] });
         expect(response.code).toBe("internal");
         expect(submitExecution).not.toHaveBeenCalled();
+      } finally {
+        config.identityPolicyName = savedName;
+        vi.mocked(readPolicyVariables).mockReset();
+        forgetIdentityShape();
+      }
+    });
+
+    it("reads its own policy's shape again before refusing: catalogPolicy just turned off isn't a misconfiguration", async () => {
+      const savedName = config.identityPolicyName;
+      config.identityPolicyName = "kernel-execution-kernel-identity";
+      config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
+      forgetIdentityShape();
+      // Split, as last read (cached)...
+      vi.mocked(readPolicyVariables).mockImplementation((name: string) =>
+        Promise.resolve(name === "kernel-execution-kernel-identity" ? { variables: { teamSecrets: "{}" }, annotations: {} } : null),
+      );
+      expect(await identityPolicyHoldsReleases()).toBe(false);
+      // ...full again now, and the kernel's policy gone with catalogPolicy.
+      vi.mocked(readPolicyVariables).mockImplementation((name: string) =>
+        Promise.resolve(name === "kernel-execution-kernel-identity" ? { variables: { teamSecrets: "{}", candidates: "[]" }, annotations: {} } : null),
+      );
+      try {
+        expect((await submit({ serviceAccount: GRANTEE, secretRefs: ["product-a-secret"] })).code).toBe("ok");
       } finally {
         config.identityPolicyName = savedName;
         vi.mocked(readPolicyVariables).mockReset();

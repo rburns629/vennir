@@ -55,6 +55,15 @@ short=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --set sched
 if echo "$short" | grep -q "must be at least scheduler.approvalTimeoutSeconds"; then ok "in use: refused under the approval timeout"
 else fail "in use under the approval timeout" "rendered"; fi
 
+# The console's identity policy splits only once lookup finds the kernel's
+# policy and binding: never without a cluster (admission-policies.sh
+# covers the split).
+identity=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --show-only templates/identity-policy.yaml)
+if echo "$identity" | grep -q "name: candidates"; then ok "no lookup, catalogPolicy on: the console's policy full (candidates)"
+else fail "no lookup, catalogPolicy on" "rendered split"; fi
+identity=$(helm template kernel helm/charts/execution-kernel --show-only templates/identity-policy.yaml)
+if echo "$identity" | grep -q "name: candidates"; then ok "catalogPolicy off: full (candidates)"; else fail "catalogPolicy off" "rendered split"; fi
+
 refused() {  # label, the error it must say, helm arguments
   local label=$1 want=$2; shift 2
   local out

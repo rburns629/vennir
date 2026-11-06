@@ -1016,7 +1016,10 @@ in `assessment.md`). With the kernel chart's
   finish (Observe's runs list the unfinished ones), or turn `catalogPolicy` on
   when none run.
 - **The release after drops the console's copy** (decision 27's second
-  step, unreleased). With `catalogPolicy` on, the kernel chart renders the
+  step, unreleased). With `catalogPolicy` on, and once the kernel's policy and
+  its binding are in the cluster (an upgrade after the one that made them:
+  should that one fail, the console's release rules are still there; a
+  render without lookup never splits), the kernel chart renders the
   console's identity policy without the released digests and the two rules
   that read them: it holds each team's secret names alone (and, as the
   kernel's does too, one container, Secrets only as volumes, never ESO's

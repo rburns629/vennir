@@ -64,7 +64,9 @@ This chart seeds the literals empty on install and keeps whatever is there
 on upgrade (lookup), re-encoded as JSON so they can only ever be literals.
 Same reasoning as image-policy.yaml for a literal rather than a ConfigMap.
 
-With catalogPolicy (a signed catalog; decision 27), which digests are a
+With catalogPolicy (a signed catalog; decision 27), once the kernel's
+catalog-identity policy and its binding exist (lookup: from the upgrade
+after the one that made them; never without lookup), which digests are a
 product's releases, as which ServiceAccount and token audiences, is the
 kernel's to write, from the release it verified, into catalog-policy.yaml's
 <release>-execution-kernel-catalog-identity, which the console can't
@@ -89,7 +91,15 @@ imageRepository) read them.
 {{- /* With catalogPolicy, the kernel's catalog-identity policy holds which
      digests are a product's releases (this file's comment above); this
      one keeps what the console decides: each team's secret names. */}}
-{{- $split := .Values.catalogPolicy.enabled }}
+{{- /* Only once the kernel's policy and its binding are in the cluster (an
+     upgrade after the one that made them): the upgrade that turns
+     catalogPolicy on, should it fail, never leaves no release rule. Without
+     lookup (helm template), never. */}}
+{{- $catalogIdentity := printf "%s-catalog-identity" (include "execution-kernel.fullname" .) }}
+{{- $split := false }}
+{{- if and .Values.catalogPolicy.enabled (lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $catalogIdentity) (lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $catalogIdentity) }}
+{{- $split = true }}
+{{- end }}
 {{- $scheduler := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-kernel.serviceAccountName" .) }}
 {{- $name := printf "%s-identity" (include "execution-kernel.fullname" .) }}
 {{- $productsExpr := "[]" }}
@@ -170,7 +180,8 @@ imageRepository) read them.
 {{- if and (regexMatch "^sha256:[a-f0-9]{64}$" $digest) (eq (substr 7 8 $digest) $digit) (kindIs "slice" $entries) }}
 {{- $kept := list }}
 {{- range $entries }}
-{{- if and (kindIs "map" .) (kindIs "string" (get . "team")) (kindIs "string" (get . "repository")) (kindIs "string" (get . "action")) (kindIs "string" (get . "serviceAccount")) (kindIs "string" (get . "audiences")) }}
+{{- /* Not a platform product's (team ""): this policy matches it in every namespace. */}}
+{{- if and (kindIs "map" .) (kindIs "string" (get . "team")) (ne (get . "team") "") (kindIs "string" (get . "repository")) (kindIs "string" (get . "action")) (kindIs "string" (get . "serviceAccount")) (kindIs "string" (get . "audiences")) }}
 {{- $kept = append $kept (dict "team" .team "repository" .repository "action" .action "serviceAccount" .serviceAccount "audiences" .audiences) }}
 {{- end }}
 {{- end }}
