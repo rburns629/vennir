@@ -296,10 +296,13 @@ the step's events; a declined or expired step fails (`APPROVAL_DECLINED`,
 `APPROVAL_EXPIRED`), and retrying it asks again. The check is the console's:
 kernel-api trusts its caller, as it does for everything else.
 
-A raw DAG needs a maintainer of every team it names. Whoever ran it and
-its steps' teams may see, cancel, retry and rerun it (each team seeing its
-own steps in full, [below](#who-sees-a-run-that-spans-teams)) (a rerun runs the template again, as it is now; a retry is
-refused once it, or a step's action, is no longer shared).
+A raw DAG needs a maintainer of every team it names. Its steps' teams'
+members may see it, each team seeing its own steps in full
+([below](#who-sees-a-run-that-spans-teams)); cancelling, retrying or
+rerunning it takes a maintainer of every one of its teams (or an admin).
+Whoever ran a template may see, cancel, retry and rerun that run: a rerun
+runs the template again, as it is now, and a retry is refused once it, or a
+step's action, is no longer shared.
 
 ## Who sees a run that spans teams
 
