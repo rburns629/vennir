@@ -20,11 +20,14 @@ const GRANTS = [
   "GRANT SELECT (id, user_id, token_hash, revoked_at, expires_at, last_used_at) ON api_tokens TO %I",
   // A token used at the gateway is used: its last_used_at, and nothing else of it.
   "GRANT UPDATE (last_used_at) ON api_tokens TO %I",
-  "GRANT SELECT (user_id, team_id) ON team_memberships TO %I",
+  "GRANT SELECT (user_id, team_id, via_groups) ON team_memberships TO %I",
+  // Which teams follow single sign-on groups: their ids, nothing of the groups.
+  "GRANT SELECT (team_id) ON sso_group_mappings TO %I",
   "GRANT SELECT (id, name, require_sso, retired_at, deleted_at) ON teams TO %I",
   "GRANT SELECT ON apis, gateway_state, revoked_sessions TO %I",
-  // Whether an admin turned single sign-on on: never its client secret.
-  "GRANT SELECT (id, enabled, issuer, client_id, redirect_url) ON sso_settings TO %I",
+  // Whether an admin turned single sign-on on, and whether groups come from
+  // a claim: never its client secret.
+  "GRANT SELECT (id, enabled, issuer, client_id, redirect_url, groups_claim) ON sso_settings TO %I",
   "GRANT SELECT, INSERT, UPDATE ON api_traffic TO %I",
   "GRANT SELECT, INSERT, UPDATE, DELETE ON api_problems TO %I",
 ];

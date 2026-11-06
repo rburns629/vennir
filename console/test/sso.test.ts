@@ -9,20 +9,24 @@
  * leave unmapped teams alone, and, when they can't be read, refuse the
  * sign-in without touching anyone's teams. A mapped team's single sign-on
  * members can't be changed by hand. The settings and each membership
- * change are audited. Against a stand-in provider.
+ * change are audited. While groups come from a claim, a session in which a
+ * group gave someone a team lasts an hour at most, and such a team counts
+ * only for a single sign-on from the last hour. Against a stand-in provider.
  */
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, like, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { config } from "../src/config.js";
+import { config, sessionTtlSeconds } from "../src/config.js";
 import { db } from "../src/db/client.js";
-import { addTeamMember, createTeam, createUser, purgeTeam, teamRolesForUser } from "../src/db/queries.js";
+import { hashPassword } from "../src/auth/password.js";
+import { newSession } from "../src/auth/plugin.js";
+import { addTeamMember, createTeam, createUser, purgeTeam, setUserPassword, teamRolesForUser } from "../src/db/queries.js";
 import { auditLog, ssoGroupMappings, ssoSettings, teamMemberships, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
-import { refreshSso, resyncGoogleGroups } from "../src/sso.js";
+import { CLAIM_GROUPS_SESSION_SECONDS, refreshSso, resyncGoogleGroups } from "../src/sso.js";
 import { CLIENT_ID, CLIENT_SECRET, startProvider } from "./oidcProvider.js";
-import { caller, rpcClient } from "./rpc.js";
+import { caller, PASSWORD, rpcClient } from "./rpc.js";
 
 const prefix = `ssoa-${randomUUID().slice(0, 6)}`;
 const domain = `${prefix}.example.com`;
@@ -327,5 +331,66 @@ describe("Google Workspace groups", () => {
     });
     await expect(resyncGoogleGroups(app.log)).resolves.toBeTypeOf("number");
     expect(await teamsOf(`gws@${domain}`)).toEqual({ [teamB]: "member" });
+  });
+});
+
+describe("a session that groups from a claim gave a team", () => {
+  const teamD = `${prefix}-d`;
+  const lifetime = (token: string) => {
+    const claims = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString()) as { iat: number; exp: number };
+    return claims.exp - claims.iat;
+  };
+  const teamsSeen = async (token: string) => {
+    const me = await call<{ teamNames?: string[] }>(token, "AuthService/GetMe");
+    return me.code === "ok" ? (me.body.teamNames ?? []).filter((t) => t.startsWith(prefix)).sort() : me.code;
+  };
+  /** A single sign-on session of this person's, signed in `ago` seconds ago and not yet expired. */
+  const signedInAgo = (userId: string, ago: number) =>
+    app.jwt.sign({ ...newSession(userId, true), iat: Math.floor(Date.now() / 1000) - ago } as ReturnType<typeof newSession>, { expiresIn: 8 * 3600 });
+
+  it("lasts an hour at most; without one, or without a claim, the install's jwtTtl", async () => {
+    const ttl = sessionTtlSeconds(config.jwtTtl);
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    ids[teamD] = (await createTeam(teamD)).id;
+    await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-fresh", team: teamD });
+
+    const fresh = await provider.signIn(app, person("fresh", { groups: ["g-fresh"] }));
+    expect(fresh.error).toBe("");
+    expect(lifetime(fresh.token)).toBe(Math.min(ttl, CLAIM_GROUPS_SESSION_SECONDS));
+    expect(CLAIM_GROUPS_SESSION_SECONDS).toBe(3600);
+    expect(await teamsSeen(fresh.token)).toEqual([teamD]);
+    // Groups that give no team: nothing to read again, so the whole session.
+    const none = await provider.signIn(app, person("fresh-none", { groups: ["unmapped"] }));
+    expect(lifetime(none.token)).toBe(ttl);
+    // No groups claim (no group source at all): the whole session too, the team kept.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "" }));
+    const unread = await provider.signIn(app, person("fresh"));
+    expect(lifetime(unread.token)).toBe(ttl);
+    expect(await teamsSeen(unread.token)).toEqual([teamD]);
+    // A password's session too.
+    const password = await people.makeUser();
+    expect(lifetime(await people.signIn(password.email))).toBe(ttl);
+  });
+
+  it("counts that team only for a single sign-on from the last hour: an older one ends, a password's goes on without it", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const [fresh] = await db.select().from(users).where(eq(users.email, `fresh@${domain}`));
+    const id = fresh?.id ?? "";
+    await addTeamMember(id, ids[teamC] ?? "", "member"); // unmapped: by hand
+    expect(await teamsSeen(signedInAgo(id, CLAIM_GROUPS_SESSION_SECONDS - 60))).toEqual([teamC, teamD].sort());
+    const old = signedInAgo(id, CLAIM_GROUPS_SESSION_SECONDS + 60);
+    expect(await teamsSeen(old)).toBe("unauthenticated");
+    // Groups read another way (Google's, every hour) or not at all: as before.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "" }));
+    expect(await teamsSeen(old)).toEqual([teamC, teamD].sort());
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    // A team unmapped since is managed by hand: it counts as one.
+    await db.delete(ssoGroupMappings).where(eq(ssoGroupMappings.teamId, ids[teamD] ?? ""));
+    expect(await teamsSeen(old)).toEqual([teamC, teamD].sort());
+    await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-fresh", team: teamD });
+    // A password an admin set: its session never counts the group's team.
+    await setUserPassword(id, await hashPassword(PASSWORD), false);
+    const password = await people.signIn(`fresh@${domain}`);
+    expect(await teamsSeen(password)).toEqual([teamC]);
   });
 });

@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -345,5 +346,81 @@ func TestABotIsNeverAnAdmin(t *testing.T) {
 	must(err)
 	if who.IsAdmin || !who.IsBot {
 		t.Errorf("its keyless session: %+v", who)
+	}
+}
+
+// While single sign-on groups come from an ID token's claim, a team a group
+// gave counts only for a single sign-on session signed in within the hour,
+// as the console's resolveCaller has it: an older one is refused, a
+// password's session calls without it, and a team managed by hand (or
+// unmapped since) counts as ever. Without a claim, nothing changes.
+func TestClaimGroupsCountOnlyForARecentSignIn(t *testing.T) {
+	db := tx(t)
+	ctx := context.Background()
+	var userID, groupTeam, handTeam string
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(db.QueryRow(ctx, `INSERT INTO users (email) VALUES ('gw-groups@example.com') RETURNING id::text`).Scan(&userID))
+	must(db.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-groups-a') RETURNING id::text`).Scan(&groupTeam))
+	must(db.QueryRow(ctx, `INSERT INTO teams (name) VALUES ('gw-groups-b') RETURNING id::text`).Scan(&handTeam))
+	_, err := db.Exec(ctx, `INSERT INTO sso_group_mappings (group_name, team_id, role) VALUES ('g-a', $1, 'member')`, groupTeam)
+	must(err)
+	_, err = db.Exec(ctx, `INSERT INTO team_memberships (user_id, team_id, role, via_groups) VALUES ($1, $2, 'member', '{g-a}'), ($1, $3, 'member', NULL)`, userID, groupTeam, handTeam)
+	must(err)
+	setClaim := func(claim string) {
+		t.Helper()
+		_, err := db.Exec(ctx, `INSERT INTO sso_settings (id, groups_claim) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET groups_claim = $1`, claim)
+		must(err)
+	}
+	now := time.Now()
+	r := &Resolver{DB: db, Keys: keys, Now: func() time.Time { return now }}
+	session := func(sso bool, ago time.Duration) string {
+		claims := map[string]any{"userId": userID, "iat": now.Add(-ago).Unix(), "exp": now.Add(8 * time.Hour).Unix()}
+		if sso {
+			claims["sso"] = true
+		}
+		return "Bearer " + jwt(t, secret, "EdDSA", claims)
+	}
+	teams := func(header string) string {
+		t.Helper()
+		who, err := r.Resolve(ctx, header)
+		if errors.Is(err, ErrUnauthenticated) {
+			return "refused"
+		}
+		must(err)
+		return strings.Join(who.Teams, ",")
+	}
+
+	setClaim("groups")
+	for name, c := range map[string]struct {
+		header, want string
+	}{
+		"a single sign-on from the last hour": {session(true, time.Hour-time.Minute), "gw-groups-a,gw-groups-b"},
+		"an older single sign-on":             {session(true, time.Hour+time.Minute), "refused"},
+		"a password's session":                {session(false, time.Minute), "gw-groups-b"},
+	} {
+		if got := teams(c.header); got != c.want {
+			t.Errorf("%s: %s, want %s", name, got, c.want)
+		}
+	}
+	// Unmapped since, the team is managed by hand: it counts as one.
+	_, err = db.Exec(ctx, `DELETE FROM sso_group_mappings WHERE team_id = $1`, groupTeam)
+	must(err)
+	if got := teams(session(true, 2*time.Hour)); got != "gw-groups-a,gw-groups-b" {
+		t.Errorf("a team unmapped since: %s", got)
+	}
+	_, err = db.Exec(ctx, `INSERT INTO sso_group_mappings (group_name, team_id, role) VALUES ('g-a', $1, 'member')`, groupTeam)
+	must(err)
+	// Groups not from a claim: as before.
+	setClaim("")
+	if got := teams(session(true, 2*time.Hour)); got != "gw-groups-a,gw-groups-b" {
+		t.Errorf("without a claim, an older single sign-on: %s", got)
+	}
+	if got := teams(session(false, time.Minute)); got != "gw-groups-a,gw-groups-b" {
+		t.Errorf("without a claim, a password's session: %s", got)
 	}
 }

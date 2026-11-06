@@ -17,7 +17,7 @@ import type { FastifyInstance } from "fastify";
 import { exportJWK, generateKeyPair, SignJWT, type JWK } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hashPassword } from "../src/auth/password.js";
-import { config } from "../src/config.js";
+import { config, sessionTtlSeconds } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createUser, setUserAdmin } from "../src/db/queries.js";
 import { teams, users } from "../src/db/schema.js";
@@ -152,6 +152,18 @@ describe("single sign-on", () => {
     expect((await me(token)).teamNames ?? []).toEqual([]);
     // And says how it signs in.
     expect(await me(token)).toMatchObject({ hasPassword: false, usesSso: true });
+  });
+
+  it("lasts as long as a password's session when no groups are read (the install's jwtTtl)", async () => {
+    const lifetime = (token: string) => {
+      const claims = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString()) as { iat: number; exp: number };
+      return claims.exp - claims.iat;
+    };
+    const { token } = await signInWith(person("lasting"));
+    expect(lifetime(token)).toBe(sessionTtlSeconds(config.jwtTtl));
+    await createUser(emailOf("lasting-password"), await hashPassword(PASSWORD));
+    const login = await rpc("AuthService", "Login", { email: emailOf("lasting-password"), password: PASSWORD }, { ip: "10.7.1.1" });
+    expect(lifetime(login.json<{ token: string }>().token)).toBe(sessionTtlSeconds(config.jwtTtl));
   });
 
   it("binds an existing account to its identity once, and never to another", async () => {

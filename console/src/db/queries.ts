@@ -358,14 +358,22 @@ export async function teamNamesForUser(userId: string, exec: Db = db): Promise<s
   return (await teamRolesForUser(userId, exec)).map((row) => row.name);
 }
 
-/** Every team a user belongs to, and as what: the same live source. */
 export async function setTeamRequireSso(teamId: string, requireSso: boolean): Promise<void> {
   await db.update(teams).set({ requireSso }).where(eq(teams.id, teamId));
 }
 
-export async function teamRolesForUser(userId: string, exec: Db = db): Promise<{ name: string; role: TeamRole; requireSso: boolean }[]> {
+/** Every team a user belongs to, and as what: the same live source.
+ * fromGroups: single sign-on groups gave it, and the team is still mapped,
+ * so it follows them (sso.ts; auth/plugin.ts counts it only for a recent
+ * sign-in while groups come from a claim). */
+export async function teamRolesForUser(userId: string, exec: Db = db): Promise<{ name: string; role: TeamRole; requireSso: boolean; fromGroups: boolean }[]> {
   return exec
-    .select({ name: teams.name, role: teamMemberships.role, requireSso: teams.requireSso })
+    .select({
+      name: teams.name,
+      role: teamMemberships.role,
+      requireSso: teams.requireSso,
+      fromGroups: sql<boolean>`(${teamMemberships.viaGroups} is not null and exists (select 1 from ${ssoGroupMappings} where ${ssoGroupMappings.teamId} = ${teams.id}))`,
+    })
     .from(teamMemberships)
     .innerJoin(teams, eq(teams.id, teamMemberships.teamId))
     .where(and(eq(teamMemberships.userId, userId), isNull(teams.deletedAt)))

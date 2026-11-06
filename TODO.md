@@ -201,6 +201,18 @@ it was seen.
   Try again (`components/LoadFailed`, as the Runs page does). Design it on
   the mockups canvas first.
 
+- [ ] **The hourly sign-in that claim groups bring** (found 2026-11-05):
+  a session in which a groups claim gave someone a team
+  lasts an hour (`console/src/sso.ts`, `CLAIM_GROUPS_SESSION_SECONDS`).
+  Two things make that hour cost more than it should: the session ending
+  forgets the browser's cart (`AuthContext.tsx`'s `forgetKept`, there for
+  the next person to sign in on a shared browser), and single sign-on
+  always sends `prompt=select_account` (`auth/oidc.ts`), so the provider
+  asks which account even when it could sign the person straight back in.
+  Decide: keep the cart for the same person signing back in, and whether
+  to drop the prompt (or send it only from the sign-in button). Also not
+  yet seen against a real provider: the hour on Entra ID or Okta.
+
 ## Products and catalog
 
 - [ ] **`vennir catalog create` applies `main`'s ruleset** (found

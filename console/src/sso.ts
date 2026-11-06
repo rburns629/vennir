@@ -15,12 +15,19 @@
  * person: added with the best role their groups give, changed, or removed.
  * A lookup that fails refuses the sign-in rather than counting as no
  * groups, which would take people out of their teams.
+ *
+ * Google groups are read again every hour between sign-ins
+ * (resyncGoogleGroups). A claim can't be: only a sign-in reads it. So while
+ * a claim is a source, a membership a group gave counts only for a single
+ * sign-on session signed in within CLAIM_GROUPS_SESSION_SECONDS
+ * (auth/plugin.ts, and the gateway the same), and a sign-in that leaves
+ * someone such a membership gets a session no longer than that.
  */
 import { randomUUID } from "node:crypto";
 import type { FastifyBaseLogger } from "fastify";
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { writeAuditEntry } from "./audit.js";
-import { config } from "./config.js";
+import { config, sessionTtlSeconds } from "./config.js";
 import { db } from "./db/client.js";
 import { ssoGroupMappings, ssoSettings, teamMemberships, teams, users, type TeamRole } from "./db/schema.js";
 import { gcpMetadataToken } from "./gcpMetadata.js";
@@ -56,6 +63,32 @@ export function currentSso(): Sso | null {
 
 export function groupSources(): GroupSources {
   return saved.groups;
+}
+
+/**
+ * How long after its sign-in a session counts the memberships groups gave,
+ * while groups come from an ID token's claim: an hour, so someone the
+ * provider takes out of a group is out of its team within the hour (the
+ * console signs them out, and their next sign-in reads their groups again).
+ * The owner's decision, not a setting: shorter than that signs people in
+ * too often; longer is what this closes. The gateway's auth.go keeps the
+ * same figure.
+ */
+export const CLAIM_GROUPS_SESSION_SECONDS = 60 * 60;
+
+/** Whether memberships from groups need a recent sign-in to count: groups come from a claim, which only a sign-in reads. */
+export function claimGroupsInUse(): boolean {
+  return groupSources().claim !== "";
+}
+
+/**
+ * How long a single sign-on session lasts, in seconds: config.jwtTtl, or no
+ * more than CLAIM_GROUPS_SESSION_SECONDS when groups come from a claim and
+ * the person holds a membership a group gave.
+ */
+export function ssoSessionSeconds(holdsGroupMembership: boolean): number {
+  const ttl = sessionTtlSeconds(config.jwtTtl);
+  return claimGroupsInUse() && holdsGroupMembership ? Math.min(ttl, CLAIM_GROUPS_SESSION_SECONDS) : ttl;
 }
 
 /** Reads the saved settings again: every few seconds, and after a save. */
@@ -244,7 +277,7 @@ const GROUP_RESYNC_MS = 60 * 60_000;
  * makes their mapped teams follow them, so leaving a group takes someone out
  * of its team within the hour, not at their next sign-in. Only when Google's
  * Groups API is the only source: groups from an ID token's claim can't be
- * read without a sign-in (the session's length bounds those). A person whose
+ * read without a sign-in (CLAIM_GROUPS_SESSION_SECONDS bounds those). A person whose
  * groups can't be read now keeps their teams (failing never removes
  * anyone); the next pass tries again. Returns how many people changed.
  */

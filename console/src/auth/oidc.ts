@@ -18,7 +18,10 @@
  *   them, as for anyone). Then, when groups are set up, every team a group
  *   is mapped to follows the person's groups (sso.ts); groups that can't be
  *   read refuse the sign-in. It answers with a redirect to /login carrying
- *   the session in the URL's fragment, which browsers never send to a server.
+ *   the session in the URL's fragment, which browsers never send to a server:
+ *   config.jwtTtl long, or at most an hour when groups from the ID token's
+ *   claim gave the person a team (sso.ts's CLAIM_GROUPS_SESSION_SECONDS), so
+ *   they come back through the provider and their groups are read again.
  *
  * Every failure redirects to /login#error=<CODE> and is logged in full.
  */
@@ -27,8 +30,8 @@ import fastifyCookie from "@fastify/cookie";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply } from "fastify";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { config } from "../config.js";
-import { currentSso, groupsOf, GroupsUnavailable, syncMappedTeams, type Sso } from "../sso.js";
-import { bindOidcSubject, createSsoUser, findUserByEmail, findUserByOidcSubject, recordSignIn } from "../db/queries.js";
+import { currentSso, groupsOf, GroupsUnavailable, ssoSessionSeconds, syncMappedTeams, type Sso } from "../sso.js";
+import { bindOidcSubject, createSsoUser, findUserByEmail, findUserByOidcSubject, recordSignIn, teamRolesForUser } from "../db/queries.js";
 import { newSession } from "./plugin.js";
 import { writeAuditEntry } from "../audit.js";
 
@@ -216,8 +219,9 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
       }
       const user = await accountFor(email, subject, request.log);
       if (groups !== null) await syncMappedTeams(user.id, groups, request.log);
+      const expiresIn = ssoSessionSeconds(groups !== null && (await teamRolesForUser(user.id)).some((row) => row.fromGroups));
       await recordSignIn(user.id);
-      request.log.info({ event: "sso_sign_in", userId: user.id }, "signed in with single sign-on");
+      request.log.info({ event: "sso_sign_in", userId: user.id, sessionSeconds: expiresIn }, "signed in with single sign-on");
       await writeAuditEntry(request.log, {
         actorId: user.id,
         method: "GET",
@@ -226,7 +230,7 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
         status: 200,
         requestId: request.id,
       });
-      return await reply.redirect(`/login#token=${encodeURIComponent(api.jwt.sign(newSession(user.id, true)))}&tab=${encodeURIComponent(flow.tab ?? "")}`);
+      return await reply.redirect(`/login#token=${encodeURIComponent(api.jwt.sign(newSession(user.id, true), { expiresIn }))}&tab=${encodeURIComponent(flow.tab ?? "")}`);
     } catch (error) {
       await writeAuditEntry(request.log, {
         actorId: null,

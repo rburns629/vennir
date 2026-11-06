@@ -736,7 +736,17 @@ added with the best role their groups give, changed, or removed. Teams
 nothing maps to are left alone. Google Workspace groups are also read again
 every hour for everyone who signs in with single sign-on, so leaving one
 takes someone out of its team within the hour (a person whose groups can't
-be read then keeps their teams until the next try). Groups that can't be read (a missing claim,
+be read then keeps their teams until the next try); this runs only while
+Google Workspace is the only source. A groups claim can be read only at a
+sign-in, so while one is set, a membership a group gave (on a team that's
+still mapped, `team_memberships.via_groups`) counts only for a single
+sign-on session signed in within the hour, at the console and the gateway
+alike: an older single sign-on session is refused, so its person signs in
+again and their groups are read, and a password's session (say, after an
+admin's reset) or an API token goes on without those teams. A sign-in that
+leaves someone such a membership gets a session of an hour at most
+(`CLAIM_GROUPS_SESSION_SECONDS`, `console/src/sso.ts`), so someone the
+provider takes out of a group is out of its team within the hour. Groups that can't be read (a missing claim,
 too many groups for the token, Google's API failing) refuse the sign-in
 (`GROUPS_UNAVAILABLE`) rather than count as none, which would take people
 out of their teams. On a mapped team, a single sign-on member's membership
@@ -774,7 +784,10 @@ address is the connection's unless `trustProxy` names the load balancer.
 
 **Sessions** are JWTs signed with an Ed25519 key derived from `JWT_SECRET`
 (`console/src/sessionKeys.ts`; EdDSA, any other algorithm refused), lasting `JWT_TTL`
-(8 hours by default; single sign-on's too, a keyless bot's an hour). The
+(8 hours by default; single sign-on's too, unless groups from a claim gave
+the person a team, then an hour at most; a keyless bot's an hour). Nothing
+extends a session: there's no refresh, so an expired one means signing in
+again. The
 browser keeps one in `localStorage` and sends it as a bearer header, never
 a cookie, so there's no cross-site request forgery to defend, save one:
 single sign-on hands the session back in `/login`'s fragment, and the page
@@ -1243,7 +1256,6 @@ Vennir isn't production-ready yet.
 | Gap | Impact | Plan |
 | --- | --- | --- |
 | A compromised console can loosen the image, identity and scan policies, and write any team's Secrets | It could run a step of its choosing with any team's secrets ([If a component is compromised](#if-a-component-is-compromised)) | Accepted for now: Kubernetes can't guard admission policies from their editor; treat the console as the most privileged component |
-| Groups from an ID token's claim are read at sign-in only | Someone who leaves a group the provider reports in its token stays in its team until their session ends (8 hours by default) or they sign in again; Google Workspace groups are read again every hour | Shorter sessions where that matters (`JWT_TTL`) |
 | Reads aren't audited ([Audit](#audit)) | Who looked at a run's outputs or logs isn't recorded | Not decided |
 | The audit log lives in the console's own database unless `audit.export` copies it to write-once storage (its entries are hash-chained, and with the copy compared with the database entry by entry; Observe shows the log as each caller may see it) | Without the copy, someone who can write that database could change it, rewriting the chain after it | Turn on `audit.export`, or ship the `event: "audit"` log lines to a SIEM |
 
