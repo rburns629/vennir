@@ -14,7 +14,713 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file vennir/console/v1/api.proto.
  */
 export const file_vennir_console_v1_api: GenFile = /*@__PURE__*/
-  fileDesc("Cht2ZW5uaXIvY29uc29sZS92MS9hcGkucHJvdG8SEXZlbm5pci5jb25zb2xlLnYxItkFCgpBcGlQcm9kdWN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkSEwoLZGVzY3JpcHRpb24YBCABKAkSKgoFc3RhdGUYBSABKA4yGy52ZW5uaXIuY29uc29sZS52MS5BcGlTdGF0ZRITCgtoZWxkX3JlYXNvbhgGIAEoCRIWCg5wYXVzZWRfbWVzc2FnZRgHIAEoCRIQCghtYXlfY2FsbBgIIAEoCBISCgpzaGFyZV93aXRoGAkgAygJEg4KBmhpZGRlbhgKIAEoCBISCgpkZXByZWNhdGVkGAsgASgJEhAKCGludGVybmV0GAwgASgIEgsKA3VybBgNIAEoCRISCgpwdWJsaWNfdXJsGA4gASgJEjEKCWVuZHBvaW50cxgPIAMoCzIeLnZlbm5pci5jb25zb2xlLnYxLkFwaUVuZHBvaW50EhIKCnBlcl9taW51dGUYECABKAUSFwoPdGltZW91dF9zZWNvbmRzGBEgASgFEhkKEW1heF9yZXF1ZXN0X2J5dGVzGBIgASgFEhMKC3NvdXJjZV9wYXRoGBMgASgJEhMKC2JhY2tlbmRfdXJsGBQgASgJEhQKDGJhY2tlbmRfYXV0aBgVIAEoCRISCgpzcGVjX3RpdGxlGBYgASgJEhQKDHNwZWNfdmVyc2lvbhgXIAEoCRIaChJhc2tfZm9yX2FjY2Vzc191cmwYGCABKAkSDwoHcHJvYmxlbRgZIAEoCRI0ChBwcm9ibGVtX2ZvdW5kX2F0GBogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCgZsaW1pdHMYGyADKAsyHC52ZW5uaXIuY29uc29sZS52MS5UZWFtTGltaXQSGgoSZGVmYXVsdF9wZXJfbWludXRlGBwgASgFEhwKFGRlZmF1bHRfZnJvbV9nYXRld2F5GB0gASgIIi0KCVRlYW1MaW1pdBIMCgR0ZWFtGAEgASgJEhIKCnBlcl9taW51dGUYAiABKAUiPAoLQXBpRW5kcG9pbnQSDgoGbWV0aG9kGAEgASgJEgwKBHBhdGgYAiABKAkSDwoHc3VtbWFyeRgDIAEoCSIRCg9MaXN0QXBpc1JlcXVlc3QiPwoQTGlzdEFwaXNSZXNwb25zZRIrCgRhcGlzGAEgAygLMh0udmVubmlyLmNvbnNvbGUudjEuQXBpUHJvZHVjdCIrCg1HZXRBcGlSZXF1ZXN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCSJNCg5HZXRBcGlSZXNwb25zZRIqCgNhcGkYASABKAsyHS52ZW5uaXIuY29uc29sZS52MS5BcGlQcm9kdWN0Eg8KB29wZW5hcGkYAiABKAkiPgoPUGF1c2VBcGlSZXF1ZXN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCRIPCgdtZXNzYWdlGAMgASgJIhIKEFBhdXNlQXBpUmVzcG9uc2UiLgoQUmVzdW1lQXBpUmVxdWVzdBIMCgR0ZWFtGAEgASgJEgwKBG5hbWUYAiABKAkiEwoRUmVzdW1lQXBpUmVzcG9uc2UiQQoUR2V0QXBpVHJhZmZpY1JlcXVlc3QSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWhvdXJzGAMgASgFIoACChVHZXRBcGlUcmFmZmljUmVzcG9uc2USEAoIcmVxdWVzdHMYASABKAMSEQoJZm9yd2FyZGVkGAIgASgDEg8KB3N0b3BwZWQYAyABKAMSFgoOYmFja2VuZF9lcnJvcnMYBCABKAMSNQoJZW5kcG9pbnRzGAUgAygLMiIudmVubmlyLmNvbnNvbGUudjEuRW5kcG9pbnRUcmFmZmljEjMKB2Jsb2NrZWQYBiADKAsyIi52ZW5uaXIuY29uc29sZS52MS5CbG9ja2VkUmVxdWVzdHMSLQoFdGVhbXMYByADKAsyHi52ZW5uaXIuY29uc29sZS52MS5UZWFtVHJhZmZpYyKEAQoPRW5kcG9pbnRUcmFmZmljEhAKCGVuZHBvaW50GAEgASgJEhAKCHJlcXVlc3RzGAIgASgDEg8KB2ludmFsaWQYAyABKAMSEwoLYmFja2VuZF80eHgYBCABKAMSEwoLYmFja2VuZF81eHgYBSABKAMSEgoKYXZlcmFnZV9tcxgGIAEoAyJqCg9CbG9ja2VkUmVxdWVzdHMSDwoHcmVxdWVzdBgBIAEoCRINCgVjb3VudBgCIAEoAxINCgV0ZWFtcxgDIAMoCRIoCgRsYXN0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJgCgtUZWFtVHJhZmZpYxIMCgR0ZWFtGAEgASgJEhAKCHJlcXVlc3RzGAIgASgDEhcKD3BlYWtfcGVyX21pbnV0ZRgDIAEoAxIYChBsaW1pdF9wZXJfbWludXRlGAQgASgFIhMKEUdldEdhdGV3YXlSZXF1ZXN0IqgCChJHZXRHYXRld2F5UmVzcG9uc2USDwoHZW5hYmxlZBgBIAEoCBIVCg1iYWNrZW5kX2hvc3RzGAIgAygJEhYKDmludGVybmV0X3RlYW1zGAMgAygJEgsKA3VybBgEIAEoCRISCgpwdWJsaWNfdXJsGAUgASgJEhYKDmNsb3NlZF9tZXNzYWdlGAYgASgJEhEKCWNsb3NlZF9ieRgHIAEoCRItCgljbG9zZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEgwKBGFwaXMYCSABKAUSFAoMcmVxdWVzdHNfMjRoGAogASgDEjMKB3JlZnVzZWQYCyADKAsyIi52ZW5uaXIuY29uc29sZS52MS5SZWZ1c2VkUmVxdWVzdHMiQQoPUmVmdXNlZFJlcXVlc3RzEg8KB291dGNvbWUYASABKAkSDQoFY291bnQYAiABKAMSDgoGbW9zdGx5GAMgASgJIioKF1NldEdhdGV3YXlDbG9zZWRSZXF1ZXN0Eg8KB21lc3NhZ2UYASABKAkiGgoYU2V0R2F0ZXdheUNsb3NlZFJlc3BvbnNlKn4KCEFwaVN0YXRlEhkKFUFQSV9TVEFURV9VTlNQRUNJRklFRBAAEhIKDkFQSV9TVEFURV9MSVZFEAESEgoOQVBJX1NUQVRFX0hFTEQQAhIUChBBUElfU1RBVEVfUEFVU0VEEAMSGQoVQVBJX1NUQVRFX1VOQVZBSUxBQkxFEAQynQUKCkFwaVNlcnZpY2USWAoITGlzdEFwaXMSIi52ZW5uaXIuY29uc29sZS52MS5MaXN0QXBpc1JlcXVlc3QaIy52ZW5uaXIuY29uc29sZS52MS5MaXN0QXBpc1Jlc3BvbnNlIgOQAgESUgoGR2V0QXBpEiAudmVubmlyLmNvbnNvbGUudjEuR2V0QXBpUmVxdWVzdBohLnZlbm5pci5jb25zb2xlLnYxLkdldEFwaVJlc3BvbnNlIgOQAgESUwoIUGF1c2VBcGkSIi52ZW5uaXIuY29uc29sZS52MS5QYXVzZUFwaVJlcXVlc3QaIy52ZW5uaXIuY29uc29sZS52MS5QYXVzZUFwaVJlc3BvbnNlElYKCVJlc3VtZUFwaRIjLnZlbm5pci5jb25zb2xlLnYxLlJlc3VtZUFwaVJlcXVlc3QaJC52ZW5uaXIuY29uc29sZS52MS5SZXN1bWVBcGlSZXNwb25zZRJnCg1HZXRBcGlUcmFmZmljEicudmVubmlyLmNvbnNvbGUudjEuR2V0QXBpVHJhZmZpY1JlcXVlc3QaKC52ZW5uaXIuY29uc29sZS52MS5HZXRBcGlUcmFmZmljUmVzcG9uc2UiA5ACARJeCgpHZXRHYXRld2F5EiQudmVubmlyLmNvbnNvbGUudjEuR2V0R2F0ZXdheVJlcXVlc3QaJS52ZW5uaXIuY29uc29sZS52MS5HZXRHYXRld2F5UmVzcG9uc2UiA5ACARJrChBTZXRHYXRld2F5Q2xvc2VkEioudmVubmlyLmNvbnNvbGUudjEuU2V0R2F0ZXdheUNsb3NlZFJlcXVlc3QaKy52ZW5uaXIuY29uc29sZS52MS5TZXRHYXRld2F5Q2xvc2VkUmVzcG9uc2ViBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("Cht2ZW5uaXIvY29uc29sZS92MS9hcGkucHJvdG8SEXZlbm5pci5jb25zb2xlLnYxIrcDCghBcGlHcmFudBIKCgJpZBgBIAEoCRIMCgR0ZWFtGAIgASgJEgwKBG5hbWUYAyABKAkSDQoFZ3JvdXAYBCABKAkSDwoHdXNlcl9pZBgFIAEoCRISCgp1c2VyX2VtYWlsGAYgASgJEgsKA2JvdBgHIAEoCBISCgpwZXJfbWludXRlGAggASgFEhQKDGRlZmF1bHRfcmF0ZRgJIAEoCBISCgpncmFudGVkX2J5GAogASgJEhkKEWFjY2Vzc19yZXF1ZXN0X2lkGAsgASgJEi4KCmNyZWF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnJldm9rZWRfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCnJldm9rZWRfYnkYDyABKAkSFQoNcmV2b2tlX3JlYXNvbhgQIAEoCRIuCgphd2F5X3NpbmNlGBEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLeAwoQQXBpQWNjZXNzUmVxdWVzdBIKCgJpZBgBIAEoCRIMCgR0ZWFtGAIgASgJEgwKBG5hbWUYAyABKAkSDwoHdXNlcl9pZBgEIAEoCRISCgp1c2VyX2VtYWlsGAUgASgJEgsKA2JvdBgGIAEoCBIUCgxyZXF1ZXN0ZWRfYnkYByABKAkSDgoGcmVhc29uGAggASgJEjcKBXN0YXRlGAkgASgOMigudmVubmlyLmNvbnNvbGUudjEuQXBpQWNjZXNzUmVxdWVzdFN0YXRlEhIKCmRlY2lkZWRfYnkYCiABKAkSFwoPZGVjaXNpb25fcmVhc29uGAsgASgJEhAKCGdyYW50X2lkGAwgASgJEi4KCmNyZWF0ZWRfYXQYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmRlY2lkZWRfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg4KBmdyb3VwcxgPIAMoCRIyCg5ncm91cHNfcmVhZF9hdBgQIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKYXdheV9zaW5jZRgRIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiWAoXUmVxdWVzdEFwaUFjY2Vzc1JlcXVlc3QSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEg4KBnJlYXNvbhgDIAEoCRIRCglib3RfZW1haWwYBCABKAkifAoYUmVxdWVzdEFwaUFjY2Vzc1Jlc3BvbnNlEjQKB3JlcXVlc3QYASABKAsyIy52ZW5uaXIuY29uc29sZS52MS5BcGlBY2Nlc3NSZXF1ZXN0EioKBWdyYW50GAIgASgLMhsudmVubmlyLmNvbnNvbGUudjEuQXBpR3JhbnQiPAofV2l0aGRyYXdBcGlBY2Nlc3NSZXF1ZXN0UmVxdWVzdBIZChFhY2Nlc3NfcmVxdWVzdF9pZBgBIAEoCSIiCiBXaXRoZHJhd0FwaUFjY2Vzc1JlcXVlc3RSZXNwb25zZSJ+Ch1EZWNpZGVBcGlBY2Nlc3NSZXF1ZXN0UmVxdWVzdBIZChFhY2Nlc3NfcmVxdWVzdF9pZBgBIAEoCRIPCgdhcHByb3ZlGAIgASgIEg0KBWdyb3VwGAMgASgJEhIKCnBlcl9taW51dGUYBCABKAUSDgoGcmVhc29uGAUgASgJIoIBCh5EZWNpZGVBcGlBY2Nlc3NSZXF1ZXN0UmVzcG9uc2USNAoHcmVxdWVzdBgBIAEoCzIjLnZlbm5pci5jb25zb2xlLnYxLkFwaUFjY2Vzc1JlcXVlc3QSKgoFZ3JhbnQYAiABKAsyGy52ZW5uaXIuY29uc29sZS52MS5BcGlHcmFudCJiChJBZGRBcGlHcmFudFJlcXVlc3QSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWdyb3VwGAMgASgJEg0KBWVtYWlsGAQgASgJEhIKCnBlcl9taW51dGUYBSABKAUiQQoTQWRkQXBpR3JhbnRSZXNwb25zZRIqCgVncmFudBgBIAEoCzIbLnZlbm5pci5jb25zb2xlLnYxLkFwaUdyYW50Ij4KFlNldEFwaUdyYW50UmF0ZVJlcXVlc3QSEAoIZ3JhbnRfaWQYASABKAkSEgoKcGVyX21pbnV0ZRgCIAEoBSJFChdTZXRBcGlHcmFudFJhdGVSZXNwb25zZRIqCgVncmFudBgBIAEoCzIbLnZlbm5pci5jb25zb2xlLnYxLkFwaUdyYW50IjkKFVJldm9rZUFwaUdyYW50UmVxdWVzdBIQCghncmFudF9pZBgBIAEoCRIOCgZyZWFzb24YAiABKAkiGAoWUmV2b2tlQXBpR3JhbnRSZXNwb25zZSIyChRMaXN0QXBpQWNjZXNzUmVxdWVzdBIMCgR0ZWFtGAEgASgJEgwKBG5hbWUYAiABKAkijwEKFUxpc3RBcGlBY2Nlc3NSZXNwb25zZRIrCgZncmFudHMYASADKAsyGy52ZW5uaXIuY29uc29sZS52MS5BcGlHcmFudBI1CghyZXF1ZXN0cxgCIAMoCzIjLnZlbm5pci5jb25zb2xlLnYxLkFwaUFjY2Vzc1JlcXVlc3QSEgoKc2hhcmVfd2l0aBgDIAMoCSKiAQoLTXlBcGlBY2Nlc3MSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEiwKA3ZpYRgDIAEoDjIfLnZlbm5pci5jb25zb2xlLnYxLkFwaUFjY2Vzc1ZpYRIUCgxjYWxsaW5nX3RlYW0YBCABKAkSDQoFZ3JvdXAYBSABKAkSEAoIZ3JhbnRfaWQYBiABKAkSEgoKcGVyX21pbnV0ZRgHIAEoBSIYChZMaXN0TXlBcGlBY2Nlc3NSZXF1ZXN0IoABChdMaXN0TXlBcGlBY2Nlc3NSZXNwb25zZRIuCgZhY2Nlc3MYASADKAsyHi52ZW5uaXIuY29uc29sZS52MS5NeUFwaUFjY2VzcxI1CghyZXF1ZXN0cxgCIAMoCzIjLnZlbm5pci5jb25zb2xlLnYxLkFwaUFjY2Vzc1JlcXVlc3QiKwobTGlzdFRlYW1Cb3RBcGlBY2Nlc3NSZXF1ZXN0EgwKBHRlYW0YASABKAkiggEKHExpc3RUZWFtQm90QXBpQWNjZXNzUmVzcG9uc2USKwoGZ3JhbnRzGAEgAygLMhsudmVubmlyLmNvbnNvbGUudjEuQXBpR3JhbnQSNQoIcmVxdWVzdHMYAiADKAsyIy52ZW5uaXIuY29uc29sZS52MS5BcGlBY2Nlc3NSZXF1ZXN0IqcGCgpBcGlQcm9kdWN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkSEwoLZGVzY3JpcHRpb24YBCABKAkSKgoFc3RhdGUYBSABKA4yGy52ZW5uaXIuY29uc29sZS52MS5BcGlTdGF0ZRITCgtoZWxkX3JlYXNvbhgGIAEoCRIWCg5wYXVzZWRfbWVzc2FnZRgHIAEoCRIQCghtYXlfY2FsbBgIIAEoCBISCgpzaGFyZV93aXRoGAkgAygJEg4KBmhpZGRlbhgKIAEoCBISCgpkZXByZWNhdGVkGAsgASgJEhAKCGludGVybmV0GAwgASgIEgsKA3VybBgNIAEoCRISCgpwdWJsaWNfdXJsGA4gASgJEjEKCWVuZHBvaW50cxgPIAMoCzIeLnZlbm5pci5jb25zb2xlLnYxLkFwaUVuZHBvaW50EhIKCnBlcl9taW51dGUYECABKAUSFwoPdGltZW91dF9zZWNvbmRzGBEgASgFEhkKEW1heF9yZXF1ZXN0X2J5dGVzGBIgASgFEhMKC3NvdXJjZV9wYXRoGBMgASgJEhMKC2JhY2tlbmRfdXJsGBQgASgJEhQKDGJhY2tlbmRfYXV0aBgVIAEoCRISCgpzcGVjX3RpdGxlGBYgASgJEhQKDHNwZWNfdmVyc2lvbhgXIAEoCRIaChJhc2tfZm9yX2FjY2Vzc191cmwYGCABKAkSDwoHcHJvYmxlbRgZIAEoCRI0ChBwcm9ibGVtX2ZvdW5kX2F0GBogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCgZsaW1pdHMYGyADKAsyHC52ZW5uaXIuY29uc29sZS52MS5UZWFtTGltaXQSGgoSZGVmYXVsdF9wZXJfbWludXRlGBwgASgFEhwKFGRlZmF1bHRfZnJvbV9nYXRld2F5GB0gASgIEjMKCmFjY2Vzc192aWEYHiABKA4yHy52ZW5uaXIuY29uc29sZS52MS5BcGlBY2Nlc3NWaWESFwoPYWNjZXNzX3JlcXVlc3RzGB8gASgJIi0KCVRlYW1MaW1pdBIMCgR0ZWFtGAEgASgJEhIKCnBlcl9taW51dGUYAiABKAUiPAoLQXBpRW5kcG9pbnQSDgoGbWV0aG9kGAEgASgJEgwKBHBhdGgYAiABKAkSDwoHc3VtbWFyeRgDIAEoCSIRCg9MaXN0QXBpc1JlcXVlc3QiPwoQTGlzdEFwaXNSZXNwb25zZRIrCgRhcGlzGAEgAygLMh0udmVubmlyLmNvbnNvbGUudjEuQXBpUHJvZHVjdCIrCg1HZXRBcGlSZXF1ZXN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCSJNCg5HZXRBcGlSZXNwb25zZRIqCgNhcGkYASABKAsyHS52ZW5uaXIuY29uc29sZS52MS5BcGlQcm9kdWN0Eg8KB29wZW5hcGkYAiABKAkiPgoPUGF1c2VBcGlSZXF1ZXN0EgwKBHRlYW0YASABKAkSDAoEbmFtZRgCIAEoCRIPCgdtZXNzYWdlGAMgASgJIhIKEFBhdXNlQXBpUmVzcG9uc2UiLgoQUmVzdW1lQXBpUmVxdWVzdBIMCgR0ZWFtGAEgASgJEgwKBG5hbWUYAiABKAkiEwoRUmVzdW1lQXBpUmVzcG9uc2UiQQoUR2V0QXBpVHJhZmZpY1JlcXVlc3QSDAoEdGVhbRgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWhvdXJzGAMgASgFIoACChVHZXRBcGlUcmFmZmljUmVzcG9uc2USEAoIcmVxdWVzdHMYASABKAMSEQoJZm9yd2FyZGVkGAIgASgDEg8KB3N0b3BwZWQYAyABKAMSFgoOYmFja2VuZF9lcnJvcnMYBCABKAMSNQoJZW5kcG9pbnRzGAUgAygLMiIudmVubmlyLmNvbnNvbGUudjEuRW5kcG9pbnRUcmFmZmljEjMKB2Jsb2NrZWQYBiADKAsyIi52ZW5uaXIuY29uc29sZS52MS5CbG9ja2VkUmVxdWVzdHMSLQoFdGVhbXMYByADKAsyHi52ZW5uaXIuY29uc29sZS52MS5UZWFtVHJhZmZpYyKEAQoPRW5kcG9pbnRUcmFmZmljEhAKCGVuZHBvaW50GAEgASgJEhAKCHJlcXVlc3RzGAIgASgDEg8KB2ludmFsaWQYAyABKAMSEwoLYmFja2VuZF80eHgYBCABKAMSEwoLYmFja2VuZF81eHgYBSABKAMSEgoKYXZlcmFnZV9tcxgGIAEoAyJqCg9CbG9ja2VkUmVxdWVzdHMSDwoHcmVxdWVzdBgBIAEoCRINCgVjb3VudBgCIAEoAxINCgV0ZWFtcxgDIAMoCRIoCgRsYXN0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJgCgtUZWFtVHJhZmZpYxIMCgR0ZWFtGAEgASgJEhAKCHJlcXVlc3RzGAIgASgDEhcKD3BlYWtfcGVyX21pbnV0ZRgDIAEoAxIYChBsaW1pdF9wZXJfbWludXRlGAQgASgFIhMKEUdldEdhdGV3YXlSZXF1ZXN0IqgCChJHZXRHYXRld2F5UmVzcG9uc2USDwoHZW5hYmxlZBgBIAEoCBIVCg1iYWNrZW5kX2hvc3RzGAIgAygJEhYKDmludGVybmV0X3RlYW1zGAMgAygJEgsKA3VybBgEIAEoCRISCgpwdWJsaWNfdXJsGAUgASgJEhYKDmNsb3NlZF9tZXNzYWdlGAYgASgJEhEKCWNsb3NlZF9ieRgHIAEoCRItCgljbG9zZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEgwKBGFwaXMYCSABKAUSFAoMcmVxdWVzdHNfMjRoGAogASgDEjMKB3JlZnVzZWQYCyADKAsyIi52ZW5uaXIuY29uc29sZS52MS5SZWZ1c2VkUmVxdWVzdHMiQQoPUmVmdXNlZFJlcXVlc3RzEg8KB291dGNvbWUYASABKAkSDQoFY291bnQYAiABKAMSDgoGbW9zdGx5GAMgASgJIioKF1NldEdhdGV3YXlDbG9zZWRSZXF1ZXN0Eg8KB21lc3NhZ2UYASABKAkiGgoYU2V0R2F0ZXdheUNsb3NlZFJlc3BvbnNlIigKGExpc3RBd2F5QXBpQWNjZXNzUmVxdWVzdBIMCgR0ZWFtGAEgASgJIn8KGUxpc3RBd2F5QXBpQWNjZXNzUmVzcG9uc2USKwoGZ3JhbnRzGAEgAygLMhsudmVubmlyLmNvbnNvbGUudjEuQXBpR3JhbnQSNQoIcmVxdWVzdHMYAiADKAsyIy52ZW5uaXIuY29uc29sZS52MS5BcGlBY2Nlc3NSZXF1ZXN0KpYBCgxBcGlBY2Nlc3NWaWESHgoaQVBJX0FDQ0VTU19WSUFfVU5TUEVDSUZJRUQQABIXChNBUElfQUNDRVNTX1ZJQV9URUFNEAESFwoTQVBJX0FDQ0VTU19WSUFfVVNFUhACEhgKFEFQSV9BQ0NFU1NfVklBX0dST1VQEAMSGgoWQVBJX0FDQ0VTU19WSUFfQ0FUQUxPRxAEKtwBChVBcGlBY2Nlc3NSZXF1ZXN0U3RhdGUSKAokQVBJX0FDQ0VTU19SRVFVRVNUX1NUQVRFX1VOU1BFQ0lGSUVEEAASJAogQVBJX0FDQ0VTU19SRVFVRVNUX1NUQVRFX1dBSVRJTkcQARIkCiBBUElfQUNDRVNTX1JFUVVFU1RfU1RBVEVfR1JBTlRFRBACEiUKIUFQSV9BQ0NFU1NfUkVRVUVTVF9TVEFURV9ERUNMSU5FRBADEiYKIkFQSV9BQ0NFU1NfUkVRVUVTVF9TVEFURV9XSVRIRFJBV04QBCp+CghBcGlTdGF0ZRIZChVBUElfU1RBVEVfVU5TUEVDSUZJRUQQABISCg5BUElfU1RBVEVfTElWRRABEhIKDkFQSV9TVEFURV9IRUxEEAISFAoQQVBJX1NUQVRFX1BBVVNFRBADEhkKFUFQSV9TVEFURV9VTkFWQUlMQUJMRRAEMokOCgpBcGlTZXJ2aWNlElgKCExpc3RBcGlzEiIudmVubmlyLmNvbnNvbGUudjEuTGlzdEFwaXNSZXF1ZXN0GiMudmVubmlyLmNvbnNvbGUudjEuTGlzdEFwaXNSZXNwb25zZSIDkAIBElIKBkdldEFwaRIgLnZlbm5pci5jb25zb2xlLnYxLkdldEFwaVJlcXVlc3QaIS52ZW5uaXIuY29uc29sZS52MS5HZXRBcGlSZXNwb25zZSIDkAIBElMKCFBhdXNlQXBpEiIudmVubmlyLmNvbnNvbGUudjEuUGF1c2VBcGlSZXF1ZXN0GiMudmVubmlyLmNvbnNvbGUudjEuUGF1c2VBcGlSZXNwb25zZRJWCglSZXN1bWVBcGkSIy52ZW5uaXIuY29uc29sZS52MS5SZXN1bWVBcGlSZXF1ZXN0GiQudmVubmlyLmNvbnNvbGUudjEuUmVzdW1lQXBpUmVzcG9uc2USZwoNR2V0QXBpVHJhZmZpYxInLnZlbm5pci5jb25zb2xlLnYxLkdldEFwaVRyYWZmaWNSZXF1ZXN0GigudmVubmlyLmNvbnNvbGUudjEuR2V0QXBpVHJhZmZpY1Jlc3BvbnNlIgOQAgESXgoKR2V0R2F0ZXdheRIkLnZlbm5pci5jb25zb2xlLnYxLkdldEdhdGV3YXlSZXF1ZXN0GiUudmVubmlyLmNvbnNvbGUudjEuR2V0R2F0ZXdheVJlc3BvbnNlIgOQAgESawoQU2V0R2F0ZXdheUNsb3NlZBIqLnZlbm5pci5jb25zb2xlLnYxLlNldEdhdGV3YXlDbG9zZWRSZXF1ZXN0GisudmVubmlyLmNvbnNvbGUudjEuU2V0R2F0ZXdheUNsb3NlZFJlc3BvbnNlEmsKEFJlcXVlc3RBcGlBY2Nlc3MSKi52ZW5uaXIuY29uc29sZS52MS5SZXF1ZXN0QXBpQWNjZXNzUmVxdWVzdBorLnZlbm5pci5jb25zb2xlLnYxLlJlcXVlc3RBcGlBY2Nlc3NSZXNwb25zZRKDAQoYV2l0aGRyYXdBcGlBY2Nlc3NSZXF1ZXN0EjIudmVubmlyLmNvbnNvbGUudjEuV2l0aGRyYXdBcGlBY2Nlc3NSZXF1ZXN0UmVxdWVzdBozLnZlbm5pci5jb25zb2xlLnYxLldpdGhkcmF3QXBpQWNjZXNzUmVxdWVzdFJlc3BvbnNlEn0KFkRlY2lkZUFwaUFjY2Vzc1JlcXVlc3QSMC52ZW5uaXIuY29uc29sZS52MS5EZWNpZGVBcGlBY2Nlc3NSZXF1ZXN0UmVxdWVzdBoxLnZlbm5pci5jb25zb2xlLnYxLkRlY2lkZUFwaUFjY2Vzc1JlcXVlc3RSZXNwb25zZRJcCgtBZGRBcGlHcmFudBIlLnZlbm5pci5jb25zb2xlLnYxLkFkZEFwaUdyYW50UmVxdWVzdBomLnZlbm5pci5jb25zb2xlLnYxLkFkZEFwaUdyYW50UmVzcG9uc2USaAoPU2V0QXBpR3JhbnRSYXRlEikudmVubmlyLmNvbnNvbGUudjEuU2V0QXBpR3JhbnRSYXRlUmVxdWVzdBoqLnZlbm5pci5jb25zb2xlLnYxLlNldEFwaUdyYW50UmF0ZVJlc3BvbnNlEmUKDlJldm9rZUFwaUdyYW50EigudmVubmlyLmNvbnNvbGUudjEuUmV2b2tlQXBpR3JhbnRSZXF1ZXN0GikudmVubmlyLmNvbnNvbGUudjEuUmV2b2tlQXBpR3JhbnRSZXNwb25zZRJnCg1MaXN0QXBpQWNjZXNzEicudmVubmlyLmNvbnNvbGUudjEuTGlzdEFwaUFjY2Vzc1JlcXVlc3QaKC52ZW5uaXIuY29uc29sZS52MS5MaXN0QXBpQWNjZXNzUmVzcG9uc2UiA5ACARJtCg9MaXN0TXlBcGlBY2Nlc3MSKS52ZW5uaXIuY29uc29sZS52MS5MaXN0TXlBcGlBY2Nlc3NSZXF1ZXN0GioudmVubmlyLmNvbnNvbGUudjEuTGlzdE15QXBpQWNjZXNzUmVzcG9uc2UiA5ACARJ8ChRMaXN0VGVhbUJvdEFwaUFjY2VzcxIuLnZlbm5pci5jb25zb2xlLnYxLkxpc3RUZWFtQm90QXBpQWNjZXNzUmVxdWVzdBovLnZlbm5pci5jb25zb2xlLnYxLkxpc3RUZWFtQm90QXBpQWNjZXNzUmVzcG9uc2UiA5ACARJzChFMaXN0QXdheUFwaUFjY2VzcxIrLnZlbm5pci5jb25zb2xlLnYxLkxpc3RBd2F5QXBpQWNjZXNzUmVxdWVzdBosLnZlbm5pci5jb25zb2xlLnYxLkxpc3RBd2F5QXBpQWNjZXNzUmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_google_protobuf_timestamp]);
+
+/**
+ * @generated from message vennir.console.v1.ApiGrant
+ */
+export type ApiGrant = Message<"vennir.console.v1.ApiGrant"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * The API: <team>/<name>.
+   *
+   * @generated from field: string team = 2;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * Exactly one of: a single sign-on group (lowercased), or a user.
+   *
+   * @generated from field: string group = 4;
+   */
+  group: string;
+
+  /**
+   * @generated from field: string user_id = 5;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: string user_email = 6;
+   */
+  userEmail: string;
+
+  /**
+   * @generated from field: bool bot = 7;
+   */
+  bot: boolean;
+
+  /**
+   * Requests a minute: the user's, or each of the group's members'. With
+   * default_rate, it's the API's default limit, and follows it.
+   *
+   * @generated from field: int32 per_minute = 8;
+   */
+  perMinute: number;
+
+  /**
+   * @generated from field: bool default_rate = 9;
+   */
+  defaultRate: boolean;
+
+  /**
+   * Who granted it (an email); empty for an open API's request.
+   *
+   * @generated from field: string granted_by = 10;
+   */
+  grantedBy: string;
+
+  /**
+   * The request it answered, if any.
+   *
+   * @generated from field: string access_request_id = 11;
+   */
+  accessRequestId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 12;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 13;
+   */
+  updatedAt?: Timestamp | undefined;
+
+  /**
+   * Set once revoked.
+   *
+   * @generated from field: google.protobuf.Timestamp revoked_at = 14;
+   */
+  revokedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string revoked_by = 15;
+   */
+  revokedBy: string;
+
+  /**
+   * Why the platform revoked it (superseded by a grant made while its API
+   * was away), when it did.
+   *
+   * @generated from field: string revoke_reason = 16;
+   */
+  revokeReason: string;
+
+  /**
+   * When its API left the catalog's release; unset while it's published.
+   * Removed 30 days after.
+   *
+   * @generated from field: google.protobuf.Timestamp away_since = 17;
+   */
+  awaySince?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.ApiGrant.
+ * Use `create(ApiGrantSchema)` to create a new message.
+ */
+export const ApiGrantSchema: GenMessage<ApiGrant> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 0);
+
+/**
+ * @generated from message vennir.console.v1.ApiAccessRequest
+ */
+export type ApiAccessRequest = Message<"vennir.console.v1.ApiAccessRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string team = 2;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * Whom it's for: the person, or the bot.
+   *
+   * @generated from field: string user_id = 4;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: string user_email = 5;
+   */
+  userEmail: string;
+
+  /**
+   * @generated from field: bool bot = 6;
+   */
+  bot: boolean;
+
+  /**
+   * Who asked (an email): the person, or the bot's team's maintainer.
+   *
+   * @generated from field: string requested_by = 7;
+   */
+  requestedBy: string;
+
+  /**
+   * @generated from field: string reason = 8;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: vennir.console.v1.ApiAccessRequestState state = 9;
+   */
+  state: ApiAccessRequestState;
+
+  /**
+   * Who granted, declined or withdrew it, and a decline's reason.
+   *
+   * @generated from field: string decided_by = 10;
+   */
+  decidedBy: string;
+
+  /**
+   * @generated from field: string decision_reason = 11;
+   */
+  decisionReason: string;
+
+  /**
+   * @generated from field: string grant_id = 12;
+   */
+  grantId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 13;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp decided_at = 14;
+   */
+  decidedAt?: Timestamp | undefined;
+
+  /**
+   * A person's single sign-on groups (when they asked, or as read since),
+   * one of which may be granted instead: shown to the API's maintainers
+   * only, and only while it waits.
+   *
+   * @generated from field: repeated string groups = 15;
+   */
+  groups: string[];
+
+  /**
+   * When those groups were read: older than 24 hours, a group can't be
+   * granted from them (GROUPS_STALE) unless Google Workspace confirms it.
+   *
+   * @generated from field: google.protobuf.Timestamp groups_read_at = 16;
+   */
+  groupsReadAt?: Timestamp | undefined;
+
+  /**
+   * When its API left the catalog's release; unset while it's published.
+   *
+   * @generated from field: google.protobuf.Timestamp away_since = 17;
+   */
+  awaySince?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.ApiAccessRequest.
+ * Use `create(ApiAccessRequestSchema)` to create a new message.
+ */
+export const ApiAccessRequestSchema: GenMessage<ApiAccessRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 1);
+
+/**
+ * @generated from message vennir.console.v1.RequestApiAccessRequest
+ */
+export type RequestApiAccessRequest = Message<"vennir.console.v1.RequestApiAccessRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * Why: the API's maintainers read it. At most 1000 characters.
+   *
+   * @generated from field: string reason = 3;
+   */
+  reason: string;
+
+  /**
+   * For a bot of a team the caller maintains; empty: for the caller.
+   *
+   * @generated from field: string bot_email = 4;
+   */
+  botEmail: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.RequestApiAccessRequest.
+ * Use `create(RequestApiAccessRequestSchema)` to create a new message.
+ */
+export const RequestApiAccessRequestSchema: GenMessage<RequestApiAccessRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 2);
+
+/**
+ * @generated from message vennir.console.v1.RequestApiAccessResponse
+ */
+export type RequestApiAccessResponse = Message<"vennir.console.v1.RequestApiAccessResponse"> & {
+  /**
+   * @generated from field: vennir.console.v1.ApiAccessRequest request = 1;
+   */
+  request?: ApiAccessRequest | undefined;
+
+  /**
+   * Set when its requests are open: the grant made at once.
+   *
+   * @generated from field: vennir.console.v1.ApiGrant grant = 2;
+   */
+  grant?: ApiGrant | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.RequestApiAccessResponse.
+ * Use `create(RequestApiAccessResponseSchema)` to create a new message.
+ */
+export const RequestApiAccessResponseSchema: GenMessage<RequestApiAccessResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 3);
+
+/**
+ * @generated from message vennir.console.v1.WithdrawApiAccessRequestRequest
+ */
+export type WithdrawApiAccessRequestRequest = Message<"vennir.console.v1.WithdrawApiAccessRequestRequest"> & {
+  /**
+   * @generated from field: string access_request_id = 1;
+   */
+  accessRequestId: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.WithdrawApiAccessRequestRequest.
+ * Use `create(WithdrawApiAccessRequestRequestSchema)` to create a new message.
+ */
+export const WithdrawApiAccessRequestRequestSchema: GenMessage<WithdrawApiAccessRequestRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 4);
+
+/**
+ * @generated from message vennir.console.v1.WithdrawApiAccessRequestResponse
+ */
+export type WithdrawApiAccessRequestResponse = Message<"vennir.console.v1.WithdrawApiAccessRequestResponse"> & {
+};
+
+/**
+ * Describes the message vennir.console.v1.WithdrawApiAccessRequestResponse.
+ * Use `create(WithdrawApiAccessRequestResponseSchema)` to create a new message.
+ */
+export const WithdrawApiAccessRequestResponseSchema: GenMessage<WithdrawApiAccessRequestResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 5);
+
+/**
+ * @generated from message vennir.console.v1.DecideApiAccessRequestRequest
+ */
+export type DecideApiAccessRequestRequest = Message<"vennir.console.v1.DecideApiAccessRequestRequest"> & {
+  /**
+   * @generated from field: string access_request_id = 1;
+   */
+  accessRequestId: string;
+
+  /**
+   * @generated from field: bool approve = 2;
+   */
+  approve: boolean;
+
+  /**
+   * Approving a person's: grant this group of theirs instead of the person.
+   *
+   * @generated from field: string group = 3;
+   */
+  group: string;
+
+  /**
+   * Approving: requests a minute; 0, the API's default limit.
+   *
+   * @generated from field: int32 per_minute = 4;
+   */
+  perMinute: number;
+
+  /**
+   * Declining: why (required), which the person is told.
+   *
+   * @generated from field: string reason = 5;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.DecideApiAccessRequestRequest.
+ * Use `create(DecideApiAccessRequestRequestSchema)` to create a new message.
+ */
+export const DecideApiAccessRequestRequestSchema: GenMessage<DecideApiAccessRequestRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 6);
+
+/**
+ * @generated from message vennir.console.v1.DecideApiAccessRequestResponse
+ */
+export type DecideApiAccessRequestResponse = Message<"vennir.console.v1.DecideApiAccessRequestResponse"> & {
+  /**
+   * @generated from field: vennir.console.v1.ApiAccessRequest request = 1;
+   */
+  request?: ApiAccessRequest | undefined;
+
+  /**
+   * @generated from field: vennir.console.v1.ApiGrant grant = 2;
+   */
+  grant?: ApiGrant | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.DecideApiAccessRequestResponse.
+ * Use `create(DecideApiAccessRequestResponseSchema)` to create a new message.
+ */
+export const DecideApiAccessRequestResponseSchema: GenMessage<DecideApiAccessRequestResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 7);
+
+/**
+ * @generated from message vennir.console.v1.AddApiGrantRequest
+ */
+export type AddApiGrantRequest = Message<"vennir.console.v1.AddApiGrantRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * Exactly one of: a single sign-on group, or a user by email.
+   *
+   * @generated from field: string group = 3;
+   */
+  group: string;
+
+  /**
+   * @generated from field: string email = 4;
+   */
+  email: string;
+
+  /**
+   * Requests a minute; 0, the API's default limit.
+   *
+   * @generated from field: int32 per_minute = 5;
+   */
+  perMinute: number;
+};
+
+/**
+ * Describes the message vennir.console.v1.AddApiGrantRequest.
+ * Use `create(AddApiGrantRequestSchema)` to create a new message.
+ */
+export const AddApiGrantRequestSchema: GenMessage<AddApiGrantRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 8);
+
+/**
+ * @generated from message vennir.console.v1.AddApiGrantResponse
+ */
+export type AddApiGrantResponse = Message<"vennir.console.v1.AddApiGrantResponse"> & {
+  /**
+   * @generated from field: vennir.console.v1.ApiGrant grant = 1;
+   */
+  grant?: ApiGrant | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.AddApiGrantResponse.
+ * Use `create(AddApiGrantResponseSchema)` to create a new message.
+ */
+export const AddApiGrantResponseSchema: GenMessage<AddApiGrantResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 9);
+
+/**
+ * @generated from message vennir.console.v1.SetApiGrantRateRequest
+ */
+export type SetApiGrantRateRequest = Message<"vennir.console.v1.SetApiGrantRateRequest"> & {
+  /**
+   * @generated from field: string grant_id = 1;
+   */
+  grantId: string;
+
+  /**
+   * Requests a minute; 0, the API's default limit.
+   *
+   * @generated from field: int32 per_minute = 2;
+   */
+  perMinute: number;
+};
+
+/**
+ * Describes the message vennir.console.v1.SetApiGrantRateRequest.
+ * Use `create(SetApiGrantRateRequestSchema)` to create a new message.
+ */
+export const SetApiGrantRateRequestSchema: GenMessage<SetApiGrantRateRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 10);
+
+/**
+ * @generated from message vennir.console.v1.SetApiGrantRateResponse
+ */
+export type SetApiGrantRateResponse = Message<"vennir.console.v1.SetApiGrantRateResponse"> & {
+  /**
+   * @generated from field: vennir.console.v1.ApiGrant grant = 1;
+   */
+  grant?: ApiGrant | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.SetApiGrantRateResponse.
+ * Use `create(SetApiGrantRateResponseSchema)` to create a new message.
+ */
+export const SetApiGrantRateResponseSchema: GenMessage<SetApiGrantRateResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 11);
+
+/**
+ * @generated from message vennir.console.v1.RevokeApiGrantRequest
+ */
+export type RevokeApiGrantRequest = Message<"vennir.console.v1.RevokeApiGrantRequest"> & {
+  /**
+   * @generated from field: string grant_id = 1;
+   */
+  grantId: string;
+
+  /**
+   * Why, for the audit log and whoever it named. Optional.
+   *
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.RevokeApiGrantRequest.
+ * Use `create(RevokeApiGrantRequestSchema)` to create a new message.
+ */
+export const RevokeApiGrantRequestSchema: GenMessage<RevokeApiGrantRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 12);
+
+/**
+ * @generated from message vennir.console.v1.RevokeApiGrantResponse
+ */
+export type RevokeApiGrantResponse = Message<"vennir.console.v1.RevokeApiGrantResponse"> & {
+};
+
+/**
+ * Describes the message vennir.console.v1.RevokeApiGrantResponse.
+ * Use `create(RevokeApiGrantResponseSchema)` to create a new message.
+ */
+export const RevokeApiGrantResponseSchema: GenMessage<RevokeApiGrantResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 13);
+
+/**
+ * @generated from message vennir.console.v1.ListApiAccessRequest
+ */
+export type ListApiAccessRequest = Message<"vennir.console.v1.ListApiAccessRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListApiAccessRequest.
+ * Use `create(ListApiAccessRequestSchema)` to create a new message.
+ */
+export const ListApiAccessRequestSchema: GenMessage<ListApiAccessRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 14);
+
+/**
+ * @generated from message vennir.console.v1.ListApiAccessResponse
+ */
+export type ListApiAccessResponse = Message<"vennir.console.v1.ListApiAccessResponse"> & {
+  /**
+   * Active ones first, then revoked, newest first.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiGrant grants = 1;
+   */
+  grants: ApiGrant[];
+
+  /**
+   * Waiting ones first, then the rest, newest first.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
+   */
+  requests: ApiAccessRequest[];
+
+  /**
+   * From the catalog (shareWith, deprecated): teams whose members and bots
+   * may call it, not revocable here.
+   *
+   * @generated from field: repeated string share_with = 3;
+   */
+  shareWith: string[];
+};
+
+/**
+ * Describes the message vennir.console.v1.ListApiAccessResponse.
+ * Use `create(ListApiAccessResponseSchema)` to create a new message.
+ */
+export const ListApiAccessResponseSchema: GenMessage<ListApiAccessResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 15);
+
+/**
+ * @generated from message vennir.console.v1.MyApiAccess
+ */
+export type MyApiAccess = Message<"vennir.console.v1.MyApiAccess"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: vennir.console.v1.ApiAccessVia via = 3;
+   */
+  via: ApiAccessVia;
+
+  /**
+   * VIA_TEAM and VIA_CATALOG: the team the gateway counts calls against.
+   *
+   * @generated from field: string calling_team = 4;
+   */
+  callingTeam: string;
+
+  /**
+   * VIA_GROUP: the group; VIA_USER and VIA_GROUP: the grant.
+   *
+   * @generated from field: string group = 5;
+   */
+  group: string;
+
+  /**
+   * @generated from field: string grant_id = 6;
+   */
+  grantId: string;
+
+  /**
+   * @generated from field: int32 per_minute = 7;
+   */
+  perMinute: number;
+};
+
+/**
+ * Describes the message vennir.console.v1.MyApiAccess.
+ * Use `create(MyApiAccessSchema)` to create a new message.
+ */
+export const MyApiAccessSchema: GenMessage<MyApiAccess> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 16);
+
+/**
+ * @generated from message vennir.console.v1.ListMyApiAccessRequest
+ */
+export type ListMyApiAccessRequest = Message<"vennir.console.v1.ListMyApiAccessRequest"> & {
+};
+
+/**
+ * Describes the message vennir.console.v1.ListMyApiAccessRequest.
+ * Use `create(ListMyApiAccessRequestSchema)` to create a new message.
+ */
+export const ListMyApiAccessRequestSchema: GenMessage<ListMyApiAccessRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 17);
+
+/**
+ * @generated from message vennir.console.v1.ListMyApiAccessResponse
+ */
+export type ListMyApiAccessResponse = Message<"vennir.console.v1.ListMyApiAccessResponse"> & {
+  /**
+   * @generated from field: repeated vennir.console.v1.MyApiAccess access = 1;
+   */
+  access: MyApiAccess[];
+
+  /**
+   * Requests for the caller that wait, or were declined.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
+   */
+  requests: ApiAccessRequest[];
+};
+
+/**
+ * Describes the message vennir.console.v1.ListMyApiAccessResponse.
+ * Use `create(ListMyApiAccessResponseSchema)` to create a new message.
+ */
+export const ListMyApiAccessResponseSchema: GenMessage<ListMyApiAccessResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 18);
+
+/**
+ * @generated from message vennir.console.v1.ListTeamBotApiAccessRequest
+ */
+export type ListTeamBotApiAccessRequest = Message<"vennir.console.v1.ListTeamBotApiAccessRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListTeamBotApiAccessRequest.
+ * Use `create(ListTeamBotApiAccessRequestSchema)` to create a new message.
+ */
+export const ListTeamBotApiAccessRequestSchema: GenMessage<ListTeamBotApiAccessRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 19);
+
+/**
+ * @generated from message vennir.console.v1.ListTeamBotApiAccessResponse
+ */
+export type ListTeamBotApiAccessResponse = Message<"vennir.console.v1.ListTeamBotApiAccessResponse"> & {
+  /**
+   * The team's bots' active grants.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiGrant grants = 1;
+   */
+  grants: ApiGrant[];
+
+  /**
+   * The team's bots' requests that wait, or were declined.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
+   */
+  requests: ApiAccessRequest[];
+};
+
+/**
+ * Describes the message vennir.console.v1.ListTeamBotApiAccessResponse.
+ * Use `create(ListTeamBotApiAccessResponseSchema)` to create a new message.
+ */
+export const ListTeamBotApiAccessResponseSchema: GenMessage<ListTeamBotApiAccessResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 20);
 
 /**
  * @generated from message vennir.console.v1.ApiProduct
@@ -56,8 +762,8 @@ export type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
   pausedMessage: string;
 
   /**
-   * Whether the caller may call it: shared with one of their teams, or
-   * their own team's.
+   * Whether the caller may call it: their own team's, granted to them or a
+   * group of theirs, or shared with one of their teams (access_via).
    *
    * @generated from field: bool may_call = 8;
    */
@@ -109,8 +815,8 @@ export type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
   endpoints: ApiEndpoint[];
 
   /**
-   * Requests a minute the caller's team may send (its own limit, else the
-   * default); 0 when it may not call it.
+   * Requests a minute the caller may send (their grant's, or their team's
+   * own limit, else the default); 0 when they may not call it.
    *
    * @generated from field: int32 per_minute = 16;
    */
@@ -197,6 +903,20 @@ export type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
    * @generated from field: bool default_from_gateway = 29;
    */
   defaultFromGateway: boolean;
+
+  /**
+   * How the caller may call it (unspecified: they may not).
+   *
+   * @generated from field: vennir.console.v1.ApiAccessVia access_via = 30;
+   */
+  accessVia: ApiAccessVia;
+
+  /**
+   * api.yaml's access.requests: open, approval or closed.
+   *
+   * @generated from field: string access_requests = 31;
+   */
+  accessRequests: string;
 };
 
 /**
@@ -204,7 +924,7 @@ export type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
  * Use `create(ApiProductSchema)` to create a new message.
  */
 export const ApiProductSchema: GenMessage<ApiProduct> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 0);
+  messageDesc(file_vennir_console_v1_api, 21);
 
 /**
  * @generated from message vennir.console.v1.TeamLimit
@@ -226,7 +946,7 @@ export type TeamLimit = Message<"vennir.console.v1.TeamLimit"> & {
  * Use `create(TeamLimitSchema)` to create a new message.
  */
 export const TeamLimitSchema: GenMessage<TeamLimit> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 1);
+  messageDesc(file_vennir_console_v1_api, 22);
 
 /**
  * @generated from message vennir.console.v1.ApiEndpoint
@@ -257,7 +977,7 @@ export type ApiEndpoint = Message<"vennir.console.v1.ApiEndpoint"> & {
  * Use `create(ApiEndpointSchema)` to create a new message.
  */
 export const ApiEndpointSchema: GenMessage<ApiEndpoint> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 2);
+  messageDesc(file_vennir_console_v1_api, 23);
 
 /**
  * @generated from message vennir.console.v1.ListApisRequest
@@ -270,7 +990,7 @@ export type ListApisRequest = Message<"vennir.console.v1.ListApisRequest"> & {
  * Use `create(ListApisRequestSchema)` to create a new message.
  */
 export const ListApisRequestSchema: GenMessage<ListApisRequest> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 3);
+  messageDesc(file_vennir_console_v1_api, 24);
 
 /**
  * @generated from message vennir.console.v1.ListApisResponse
@@ -287,7 +1007,7 @@ export type ListApisResponse = Message<"vennir.console.v1.ListApisResponse"> & {
  * Use `create(ListApisResponseSchema)` to create a new message.
  */
 export const ListApisResponseSchema: GenMessage<ListApisResponse> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 4);
+  messageDesc(file_vennir_console_v1_api, 25);
 
 /**
  * @generated from message vennir.console.v1.GetApiRequest
@@ -309,7 +1029,7 @@ export type GetApiRequest = Message<"vennir.console.v1.GetApiRequest"> & {
  * Use `create(GetApiRequestSchema)` to create a new message.
  */
 export const GetApiRequestSchema: GenMessage<GetApiRequest> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 5);
+  messageDesc(file_vennir_console_v1_api, 26);
 
 /**
  * @generated from message vennir.console.v1.GetApiResponse
@@ -333,7 +1053,7 @@ export type GetApiResponse = Message<"vennir.console.v1.GetApiResponse"> & {
  * Use `create(GetApiResponseSchema)` to create a new message.
  */
 export const GetApiResponseSchema: GenMessage<GetApiResponse> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 6);
+  messageDesc(file_vennir_console_v1_api, 27);
 
 /**
  * @generated from message vennir.console.v1.PauseApiRequest
@@ -362,7 +1082,7 @@ export type PauseApiRequest = Message<"vennir.console.v1.PauseApiRequest"> & {
  * Use `create(PauseApiRequestSchema)` to create a new message.
  */
 export const PauseApiRequestSchema: GenMessage<PauseApiRequest> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 7);
+  messageDesc(file_vennir_console_v1_api, 28);
 
 /**
  * @generated from message vennir.console.v1.PauseApiResponse
@@ -375,7 +1095,7 @@ export type PauseApiResponse = Message<"vennir.console.v1.PauseApiResponse"> & {
  * Use `create(PauseApiResponseSchema)` to create a new message.
  */
 export const PauseApiResponseSchema: GenMessage<PauseApiResponse> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 8);
+  messageDesc(file_vennir_console_v1_api, 29);
 
 /**
  * @generated from message vennir.console.v1.ResumeApiRequest
@@ -397,7 +1117,7 @@ export type ResumeApiRequest = Message<"vennir.console.v1.ResumeApiRequest"> & {
  * Use `create(ResumeApiRequestSchema)` to create a new message.
  */
 export const ResumeApiRequestSchema: GenMessage<ResumeApiRequest> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 9);
+  messageDesc(file_vennir_console_v1_api, 30);
 
 /**
  * @generated from message vennir.console.v1.ResumeApiResponse
@@ -410,7 +1130,7 @@ export type ResumeApiResponse = Message<"vennir.console.v1.ResumeApiResponse"> &
  * Use `create(ResumeApiResponseSchema)` to create a new message.
  */
 export const ResumeApiResponseSchema: GenMessage<ResumeApiResponse> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 10);
+  messageDesc(file_vennir_console_v1_api, 31);
 
 /**
  * @generated from message vennir.console.v1.GetApiTrafficRequest
@@ -439,7 +1159,7 @@ export type GetApiTrafficRequest = Message<"vennir.console.v1.GetApiTrafficReque
  * Use `create(GetApiTrafficRequestSchema)` to create a new message.
  */
 export const GetApiTrafficRequestSchema: GenMessage<GetApiTrafficRequest> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 11);
+  messageDesc(file_vennir_console_v1_api, 32);
 
 /**
  * @generated from message vennir.console.v1.GetApiTrafficResponse
@@ -489,7 +1209,7 @@ export type GetApiTrafficResponse = Message<"vennir.console.v1.GetApiTrafficResp
  * Use `create(GetApiTrafficResponseSchema)` to create a new message.
  */
 export const GetApiTrafficResponseSchema: GenMessage<GetApiTrafficResponse> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 12);
+  messageDesc(file_vennir_console_v1_api, 33);
 
 /**
  * @generated from message vennir.console.v1.EndpointTraffic
@@ -537,7 +1257,7 @@ export type EndpointTraffic = Message<"vennir.console.v1.EndpointTraffic"> & {
  * Use `create(EndpointTrafficSchema)` to create a new message.
  */
 export const EndpointTrafficSchema: GenMessage<EndpointTraffic> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 13);
+  messageDesc(file_vennir_console_v1_api, 34);
 
 /**
  * @generated from message vennir.console.v1.BlockedRequests
@@ -571,14 +1291,16 @@ export type BlockedRequests = Message<"vennir.console.v1.BlockedRequests"> & {
  * Use `create(BlockedRequestsSchema)` to create a new message.
  */
 export const BlockedRequestsSchema: GenMessage<BlockedRequests> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 14);
+  messageDesc(file_vennir_console_v1_api, 35);
 
 /**
  * @generated from message vennir.console.v1.TeamTraffic
  */
 export type TeamTraffic = Message<"vennir.console.v1.TeamTraffic"> & {
   /**
-   * "" for callers who weren't signed in.
+   * "" for callers who weren't signed in; "grant:user" for those a grant
+   * names, "grant:group:<group>" for those a group's grant lets in (no
+   * person is named; no team's name has a ":").
    *
    * @generated from field: string team = 1;
    */
@@ -607,7 +1329,7 @@ export type TeamTraffic = Message<"vennir.console.v1.TeamTraffic"> & {
  * Use `create(TeamTrafficSchema)` to create a new message.
  */
 export const TeamTrafficSchema: GenMessage<TeamTraffic> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 15);
+  messageDesc(file_vennir_console_v1_api, 36);
 
 /**
  * @generated from message vennir.console.v1.GetGatewayRequest
@@ -620,7 +1342,7 @@ export type GetGatewayRequest = Message<"vennir.console.v1.GetGatewayRequest"> &
  * Use `create(GetGatewayRequestSchema)` to create a new message.
  */
 export const GetGatewayRequestSchema: GenMessage<GetGatewayRequest> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 16);
+  messageDesc(file_vennir_console_v1_api, 37);
 
 /**
  * @generated from message vennir.console.v1.GetGatewayResponse
@@ -691,7 +1413,7 @@ export type GetGatewayResponse = Message<"vennir.console.v1.GetGatewayResponse">
  * Use `create(GetGatewayResponseSchema)` to create a new message.
  */
 export const GetGatewayResponseSchema: GenMessage<GetGatewayResponse> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 17);
+  messageDesc(file_vennir_console_v1_api, 38);
 
 /**
  * @generated from message vennir.console.v1.RefusedRequests
@@ -723,7 +1445,7 @@ export type RefusedRequests = Message<"vennir.console.v1.RefusedRequests"> & {
  * Use `create(RefusedRequestsSchema)` to create a new message.
  */
 export const RefusedRequestsSchema: GenMessage<RefusedRequests> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 18);
+  messageDesc(file_vennir_console_v1_api, 39);
 
 /**
  * @generated from message vennir.console.v1.SetGatewayClosedRequest
@@ -742,7 +1464,7 @@ export type SetGatewayClosedRequest = Message<"vennir.console.v1.SetGatewayClose
  * Use `create(SetGatewayClosedRequestSchema)` to create a new message.
  */
 export const SetGatewayClosedRequestSchema: GenMessage<SetGatewayClosedRequest> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 19);
+  messageDesc(file_vennir_console_v1_api, 40);
 
 /**
  * @generated from message vennir.console.v1.SetGatewayClosedResponse
@@ -755,7 +1477,129 @@ export type SetGatewayClosedResponse = Message<"vennir.console.v1.SetGatewayClos
  * Use `create(SetGatewayClosedResponseSchema)` to create a new message.
  */
 export const SetGatewayClosedResponseSchema: GenMessage<SetGatewayClosedResponse> = /*@__PURE__*/
-  messageDesc(file_vennir_console_v1_api, 20);
+  messageDesc(file_vennir_console_v1_api, 41);
+
+/**
+ * @generated from message vennir.console.v1.ListAwayApiAccessRequest
+ */
+export type ListAwayApiAccessRequest = Message<"vennir.console.v1.ListAwayApiAccessRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAwayApiAccessRequest.
+ * Use `create(ListAwayApiAccessRequestSchema)` to create a new message.
+ */
+export const ListAwayApiAccessRequestSchema: GenMessage<ListAwayApiAccessRequest> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 42);
+
+/**
+ * @generated from message vennir.console.v1.ListAwayApiAccessResponse
+ */
+export type ListAwayApiAccessResponse = Message<"vennir.console.v1.ListAwayApiAccessResponse"> & {
+  /**
+   * @generated from field: repeated vennir.console.v1.ApiGrant grants = 1;
+   */
+  grants: ApiGrant[];
+
+  /**
+   * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
+   */
+  requests: ApiAccessRequest[];
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAwayApiAccessResponse.
+ * Use `create(ListAwayApiAccessResponseSchema)` to create a new message.
+ */
+export const ListAwayApiAccessResponseSchema: GenMessage<ListAwayApiAccessResponse> = /*@__PURE__*/
+  messageDesc(file_vennir_console_v1_api, 43);
+
+/**
+ * How a caller may call an API (the gateway's rule, in its order).
+ *
+ * @generated from enum vennir.console.v1.ApiAccessVia
+ */
+export enum ApiAccessVia {
+  /**
+   * @generated from enum value: API_ACCESS_VIA_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * They're in its own team (a member or a bot).
+   *
+   * @generated from enum value: API_ACCESS_VIA_TEAM = 1;
+   */
+  TEAM = 1,
+
+  /**
+   * A grant names them.
+   *
+   * @generated from enum value: API_ACCESS_VIA_USER = 2;
+   */
+  USER = 2,
+
+  /**
+   * A grant names a single sign-on group they're in.
+   *
+   * @generated from enum value: API_ACCESS_VIA_GROUP = 3;
+   */
+  GROUP = 3,
+
+  /**
+   * Its api.yaml's shareWith names a team of theirs: from the catalog, not
+   * revocable here. Deprecated: goes with shareWith.
+   *
+   * @generated from enum value: API_ACCESS_VIA_CATALOG = 4;
+   */
+  CATALOG = 4,
+}
+
+/**
+ * Describes the enum vennir.console.v1.ApiAccessVia.
+ */
+export const ApiAccessViaSchema: GenEnum<ApiAccessVia> = /*@__PURE__*/
+  enumDesc(file_vennir_console_v1_api, 0);
+
+/**
+ * @generated from enum vennir.console.v1.ApiAccessRequestState
+ */
+export enum ApiAccessRequestState {
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_WAITING = 1;
+   */
+  WAITING = 1,
+
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_GRANTED = 2;
+   */
+  GRANTED = 2,
+
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_DECLINED = 3;
+   */
+  DECLINED = 3,
+
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_WITHDRAWN = 4;
+   */
+  WITHDRAWN = 4,
+}
+
+/**
+ * Describes the enum vennir.console.v1.ApiAccessRequestState.
+ */
+export const ApiAccessRequestStateSchema: GenEnum<ApiAccessRequestState> = /*@__PURE__*/
+  enumDesc(file_vennir_console_v1_api, 1);
 
 /**
  * @generated from enum vennir.console.v1.ApiState
@@ -801,7 +1645,7 @@ export enum ApiState {
  * Describes the enum vennir.console.v1.ApiState.
  */
 export const ApiStateSchema: GenEnum<ApiState> = /*@__PURE__*/
-  enumDesc(file_vennir_console_v1_api, 0);
+  enumDesc(file_vennir_console_v1_api, 2);
 
 /**
  * API products (decision 20): a backend a team already runs, published
@@ -811,9 +1655,21 @@ export const ApiStateSchema: GenEnum<ApiState> = /*@__PURE__*/
  * from its team's catalog (apis/<name>/api.yaml); pausing one is the only
  * change made here.
  *
- * Everyone signed in sees the APIs that aren't hidden; those shared with
- * one of their teams they may call (may_call). The backend's address and
- * how the gateway signs in there are shown to the API's own team only.
+ * Everyone signed in sees the APIs that aren't hidden; they may call one
+ * (may_call) when it's their own team's, when it's granted to them or to a
+ * single sign-on group they're in, or, for this release, when its
+ * api.yaml's shareWith names one of their teams (decision 26). The
+ * backend's address and how the gateway signs in there are shown to the
+ * API's own team only.
+ *
+ * Access (decision 26): each API has grants, to a group (each person in it)
+ * or to one user (a person or a bot), each with its rate. Only the API's
+ * team's maintainers add grants or change their rates. A person asks for
+ * access for themselves; a maintainer of a bot's team asks for the bot.
+ * The API's maintainers approve (granting the person, or one of their
+ * groups) or decline. Revoking: the API's maintainers, an admin, the
+ * person a grant names, or the maintainers of the bot it names. Every
+ * change is audited and told to whoever it's for and the API's maintainers.
  *
  * @generated from service vennir.console.v1.ApiService
  */
@@ -894,6 +1750,121 @@ export const ApiService: GenService<{
     methodKind: "unary";
     input: typeof SetGatewayClosedRequestSchema;
     output: typeof SetGatewayClosedResponseSchema;
+  },
+  /**
+   * Asks for access to an API, with a reason: a person for themselves, or a
+   * maintainer of a bot's team for that bot (bot_email). Refused when its
+   * api.yaml takes no requests (access.requests: closed), when whoever
+   * it's for may call it already, or while a request of theirs waits. An
+   * API whose requests are open grants it at once, at its default limit.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.RequestApiAccess
+   */
+  requestApiAccess: {
+    methodKind: "unary";
+    input: typeof RequestApiAccessRequestSchema;
+    output: typeof RequestApiAccessResponseSchema;
+  },
+  /**
+   * Withdraws a request while it waits: whoever asked.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.WithdrawApiAccessRequest
+   */
+  withdrawApiAccessRequest: {
+    methodKind: "unary";
+    input: typeof WithdrawApiAccessRequestRequestSchema;
+    output: typeof WithdrawApiAccessRequestResponseSchema;
+  },
+  /**
+   * Grants (approve) or declines a waiting request: a maintainer of the
+   * API's team. Granting a person may grant one of their groups instead,
+   * as the console last read them; a bot is granted by name only.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.DecideApiAccessRequest
+   */
+  decideApiAccessRequest: {
+    methodKind: "unary";
+    input: typeof DecideApiAccessRequestRequestSchema;
+    output: typeof DecideApiAccessRequestResponseSchema;
+  },
+  /**
+   * Grants a group or a user (a person or a bot, by email) access: a
+   * maintainer of the API's team (not an admin, unless they maintain it).
+   *
+   * @generated from rpc vennir.console.v1.ApiService.AddApiGrant
+   */
+  addApiGrant: {
+    methodKind: "unary";
+    input: typeof AddApiGrantRequestSchema;
+    output: typeof AddApiGrantResponseSchema;
+  },
+  /**
+   * Changes a grant's rate: a maintainer of the API's team.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.SetApiGrantRate
+   */
+  setApiGrantRate: {
+    methodKind: "unary";
+    input: typeof SetApiGrantRateRequestSchema;
+    output: typeof SetApiGrantRateResponseSchema;
+  },
+  /**
+   * Revokes a grant: a maintainer of the API's team, an admin, the person
+   * it names, or a maintainer of the bot's team it names. The gateway stops
+   * its calls within its refresh (well under a minute).
+   *
+   * @generated from rpc vennir.console.v1.ApiService.RevokeApiGrant
+   */
+  revokeApiGrant: {
+    methodKind: "unary";
+    input: typeof RevokeApiGrantRequestSchema;
+    output: typeof RevokeApiGrantResponseSchema;
+  },
+  /**
+   * An API's grants (active and revoked) and requests: its own team, and
+   * admins.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListApiAccess
+   */
+  listApiAccess: {
+    methodKind: "unary";
+    input: typeof ListApiAccessRequestSchema;
+    output: typeof ListApiAccessResponseSchema;
+  },
+  /**
+   * The APIs the caller may call, and how (their team's, granted to them,
+   * through a group, from the catalog), and their requests that wait or
+   * were declined.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListMyApiAccess
+   */
+  listMyApiAccess: {
+    methodKind: "unary";
+    input: typeof ListMyApiAccessRequestSchema;
+    output: typeof ListMyApiAccessResponseSchema;
+  },
+  /**
+   * A team's bots' grants and requests: its members, and admins.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListTeamBotApiAccess
+   */
+  listTeamBotApiAccess: {
+    methodKind: "unary";
+    input: typeof ListTeamBotApiAccessRequestSchema;
+    output: typeof ListTeamBotApiAccessResponseSchema;
+  },
+  /**
+   * The grants and requests of a team's APIs that left the catalog's
+   * release (away_since): kept 30 days, to come back with an API of the
+   * same name, and revocable meanwhile by the team's maintainers and
+   * admins. Its members, and admins.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListAwayApiAccess
+   */
+  listAwayApiAccess: {
+    methodKind: "unary";
+    input: typeof ListAwayApiAccessRequestSchema;
+    output: typeof ListAwayApiAccessResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_vennir_console_v1_api, 0);

@@ -24,10 +24,12 @@ import { db } from "../src/db/client.js";
 import { hashPassword } from "../src/auth/password.js";
 import { newSession } from "../src/auth/plugin.js";
 import { addTeamMember, createTeam, createUser, purgeTeam, setUserPassword, teamRolesForUser } from "../src/db/queries.js";
-import { auditLog, ssoGroupMappings, ssoSettings, teamMemberships, teams, users } from "../src/db/schema.js";
+import { apiAccessRequests, apiGrants, apis, auditLog, ssoGroupMappings, ssoSettings, teamMemberships, teams, userGroups, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
-import { CLAIM_GROUPS_SESSION_SECONDS, refreshSso, resyncGoogleGroups } from "../src/sso.js";
+import { decideRequest, requestAccess } from "../src/core/apiAccess.js";
+import { CLAIM_GROUPS_SESSION_SECONDS, groupSettingsNow, keepGrantedGroup, refreshSso, resyncGoogleGroups, storeUserGroups } from "../src/sso.js";
 import { CLIENT_ID, CLIENT_SECRET, startProvider } from "./oidcProvider.js";
+import { holdGroupSettingsLock } from "./groupSettingsLock.js";
 import { caller, PASSWORD, rpcClient } from "./rpc.js";
 
 const prefix = `ssoa-${randomUUID().slice(0, 6)}`;
@@ -69,6 +71,9 @@ async function teamsOf(email: string): Promise<Record<string, string>> {
     .where(and(eq(users.email, email), like(teams.name, `${prefix}%`)));
   return Object.fromEntries(rows.map((r) => [r.team, r.role]));
 }
+
+// It changes the settings and empties kept groups: not while api-access.test.ts relies on them.
+holdGroupSettingsLock();
 
 beforeAll(async () => {
   provider = await startProvider();
@@ -313,6 +318,78 @@ describe("Google Workspace groups", () => {
     spy.mockRestore();
   });
 
+  it("asks about the groups granted an API too, and keeps the person's for the gateway", async () => {
+    const [api] = await db
+      .insert(apis)
+      .values({ teamId: ids[teamA] ?? "", name: "gws-granted", displayName: "G", openapi: { openapi: "3.1.0", paths: {} }, backendUrl: "https://x.example", serviceAccount: "gws-granted-api" })
+      .returning();
+    await db.insert(apiGrants).values({ apiId: api?.id ?? "", teamId: ids[teamA] ?? "", apiName: "gws-granted", groupName: `callers@${domain}` });
+    const asked: string[] = [];
+    const real = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith("http://metadata.google.internal/")) return Promise.resolve(Response.json({ access_token: "t" }));
+      if (url.startsWith("https://cloudidentity.googleapis.com/v1/groups:lookup")) {
+        const group = new URL(url).searchParams.get("groupKey.id") ?? "";
+        asked.push(group);
+        if (group === `ops@${domain}`) return Promise.resolve(Response.json({ name: "groups/ops1" }));
+        return Promise.resolve(group === `callers@${domain}` ? Response.json({ name: "groups/callers1" }) : new Response("{}", { status: 404 }));
+      }
+      if (url.includes("/memberships:checkTransitiveMembership")) {
+        return Promise.resolve(Response.json({ hasMembership: ours(url) && url.includes("groups/callers1") }));
+      }
+      return real(input, init);
+    });
+    await resyncGoogleGroups(app.log);
+    expect(asked).toEqual(expect.arrayContaining([`ops@${domain}`, `callers@${domain}`]));
+    const [gws] = await db.select().from(users).where(eq(users.email, `gws@${domain}`));
+    const kept = await db.select({ g: userGroups.groupName }).from(userGroups).where(eq(userGroups.userId, gws?.id ?? ""));
+    expect(kept.map((r) => r.g)).toEqual([`callers@${domain}`]);
+    // Out of ops now: out of its team, as before.
+    expect(await teamsOf(`gws@${domain}`)).toEqual({});
+    // Google's groups count for any session while fresh...
+    const session = app.jwt.sign({ ...newSession(gws?.id ?? "", true), iat: Math.floor(Date.now() / 1000) - 3 * 3600 } as ReturnType<typeof newSession>, { expiresIn: 8 * 3600 });
+    const via = async () =>
+      ((await call<{ apis?: { team: string; name: string; accessVia?: string }[] }>(session, "ApiService/ListApis")).body.apis ?? []).find((a) => a.team === teamA && a.name === "gws-granted")?.accessVia;
+    expect(await via()).toBe("API_ACCESS_VIA_GROUP");
+    // ...and the resync failing for over 90 minutes fails closed.
+    await db.update(userGroups).set({ readAt: new Date(Date.now() - 91 * 60_000) }).where(eq(userGroups.userId, gws?.id ?? ""));
+    expect(await via()).toBe("API_ACCESS_VIA_UNSPECIFIED");
+    await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
+  });
+
+  it("let a maintainer grant a requester's Google group, asked of Google as they decide", async () => {
+    const [api] = await db
+      .insert(apis)
+      .values({ teamId: ids[teamA] ?? "", name: "gws-decided", displayName: "G", openapi: { openapi: "3.1.0", paths: {} }, backendUrl: "https://x.example", serviceAccount: "gws-decided-api" })
+      .returning();
+    const [gws] = await db.select().from(users).where(eq(users.email, `gws@${domain}`));
+    const maintainer = await people.makeUser();
+    await addTeamMember(maintainer.id, ids[teamA] ?? "", "maintainer");
+    const asMaintainer = { id: maintainer.id, teamNames: [teamA], maintainerOf: [teamA], isAdmin: false, scopes: [] };
+    const asGws = { id: gws?.id ?? "", teamNames: [], maintainerOf: [], isAdmin: false, scopes: [], groupsCurrent: true };
+    const real = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith("http://metadata.google.internal/")) return Promise.resolve(Response.json({ access_token: "t" }));
+      if (url.startsWith("https://cloudidentity.googleapis.com/v1/groups:lookup")) {
+        const group = new URL(url).searchParams.get("groupKey.id") ?? "";
+        return Promise.resolve(group === `readers@${domain}` ? Response.json({ name: "groups/readers1" }) : new Response("{}", { status: 404 }));
+      }
+      if (url.includes("/memberships:checkTransitiveMembership")) return Promise.resolve(Response.json({ hasMembership: ours(url) && url.includes("groups/readers1") }));
+      return real(input, init);
+    });
+    const asked = await requestAccess(asGws, teamA, "gws-decided", "reports", "");
+    // Not a group Google says they're in: refused.
+    await expect(decideRequest(asMaintainer, asked.request.id, true, `others@${domain}`, 0, "")).rejects.toMatchObject({ code: "NOT_THEIR_GROUP" });
+    const decided = await decideRequest(asMaintainer, asked.request.id, true, `Readers@${domain}`, 0, "");
+    expect(decided.grant?.group).toBe(`readers@${domain}`);
+    // Kept for them now, read now.
+    const kept = await db.select().from(userGroups).where(and(eq(userGroups.userId, gws?.id ?? ""), eq(userGroups.groupName, `readers@${domain}`)));
+    expect(kept.length).toBe(1);
+    await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
+  });
+
   it("skip someone deleted while their groups are read, and carry on with everyone else", async () => {
     const gone = await createUser(`gone@${domain}`, null);
     await db.update(users).set({ oidcSubject: `sub-gone-${prefix}` }).where(eq(users.id, gone.id));
@@ -411,6 +488,59 @@ describe("a session that groups from a claim gave a team", () => {
     expect(await teamsSeen(await people.signIn(`hourly@${domain}`))).toEqual([teamC]);
   });
 
+  it("keeps the person's groups at each sign-in, and a group's grant to call an API counts as a group's team does", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const ttl = sessionTtlSeconds(config.jwtTtl);
+    // An API of team A's, granted to a group (decision 26).
+    const [api] = await db
+      .insert(apis)
+      .values({ teamId: ids[teamA] ?? "", name: "granted", displayName: "Granted", openapi: { openapi: "3.1.0", paths: {} }, backendUrl: "https://x.example", serviceAccount: "granted-api" })
+      .returning();
+    await db.insert(apiGrants).values({ apiId: api?.id ?? "", teamId: ids[teamA] ?? "", apiName: "granted", groupName: "g-callers" });
+    const mayCall = async (token: string) => {
+      const listed = await call<{ apis?: { team: string; name: string; mayCall?: boolean; accessVia?: string }[] }>(token, "ApiService/ListApis");
+      if (listed.code !== "ok") return listed.code;
+      const via = (listed.body.apis ?? []).find((a) => a.team === teamA && a.name === "granted")?.accessVia;
+      return via && via !== "API_ACCESS_VIA_UNSPECIFIED" ? via : "none";
+    };
+    // Kept for the gateway: only the groups that matter (mapped, or granted).
+    // Every group the claim lists is the console's alone (users.sso_groups).
+    const first = await provider.signIn(app, person("caller", { groups: ["G-Callers", "g-other"] }));
+    const [row] = await db.select().from(users).where(eq(users.email, `caller@${domain}`));
+    const id = row?.id ?? "";
+    const kept = async () => (await db.select({ g: userGroups.groupName }).from(userGroups).where(eq(userGroups.userId, id)).orderBy(asc(userGroups.groupName))).map((r) => r.g);
+    const snapshot = async () => (await db.select({ g: users.ssoGroups }).from(users).where(eq(users.id, id)))[0]?.g;
+    expect(await kept()).toEqual(["g-callers"]);
+    expect(await snapshot()).toEqual(["g-callers", "g-other"]);
+    // A group's grant: an hour's session at most, as a group's team.
+    expect(lifetime(first.token)).toBe(Math.min(ttl, CLAIM_GROUPS_SESSION_SECONDS));
+    expect(await mayCall(first.token)).toBe("API_ACCESS_VIA_GROUP");
+    // An older single sign-on: its groups don't count (the gateway asks it to sign in again).
+    expect(await mayCall(signedInAgo(id, CLAIM_GROUPS_SESSION_SECONDS + 60))).toBe("none");
+    // A group granted after the sign-in (AddApiGrant calls this): kept from
+    // what that sign-in read, without signing in again.
+    await keepGrantedGroup("g-other");
+    expect(await kept()).toEqual(["g-callers", "g-other"]);
+    // The claim cleared (no source at all): nothing kept, nothing counts.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "" }));
+    expect(await kept()).toEqual([]);
+    expect(await snapshot()).toBeNull();
+    expect(await mayCall(signedInAgo(id, 60))).toBe("none");
+    // A claim again, and a sign-in: then single sign-on turned off clears them too.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const again = await provider.signIn(app, person("caller", { groups: ["g-callers"] }));
+    expect(await mayCall(again.token)).toBe("API_ACCESS_VIA_GROUP");
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", enabled: false }));
+    expect(await kept()).toEqual([]);
+    expect(await mayCall(again.token)).toBe("none");
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    // In no granted group: the whole session.
+    const later = await provider.signIn(app, person("caller", { groups: ["g-other"] }));
+    expect(await kept()).toEqual([]);
+    expect(lifetime(later.token)).toBe(ttl);
+    expect(await mayCall(later.token)).toBe("none");
+  });
+
   it("keeps the rule for a retired team: listed while recent, and an older session still ends", async () => {
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
     const { team, id } = await groupMember("retiring", "g-retiring");
@@ -431,6 +561,79 @@ describe("a session that groups from a claim gave a team", () => {
     await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-premapped", team });
     expect(await teamsSeen(old)).toBe("unauthenticated");
     expect(await teamsSeen(signedInAgo(early.id, 60))).toEqual([team]);
+  });
+});
+
+describe("kept groups and the settings they're read under", () => {
+  it("aren't written when the settings changed since they were read (another console changed them)", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const [row] = await db.insert(users).values({ email: `under@${domain}` }).returning();
+    const readUnder = groupSettingsNow();
+    expect(await storeUserGroups(row?.id ?? "", ["g-x"], { ...readUnder, claim: "roles" })).toBe(false);
+    expect(await storeUserGroups(row?.id ?? "", ["g-x"], { ...readUnder, issuer: "https://elsewhere.example" })).toBe(false);
+    expect((await db.select({ g: users.ssoGroups }).from(users).where(eq(users.id, row?.id ?? "")))[0]?.g).toBeNull();
+    expect(await storeUserGroups(row?.id ?? "", ["g-x"], readUnder)).toBe(true);
+    expect((await db.select({ g: users.ssoGroups }).from(users).where(eq(users.id, row?.id ?? "")))[0]?.g).toEqual(["g-x"]);
+  });
+
+  it("are emptied with waiting requests' copies when the sources change; an issuer change counts", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const [api] = await db
+      .insert(apis)
+      .values({ teamId: ids[teamA] ?? "", name: "copies", displayName: "C", openapi: { openapi: "3.1.0", paths: {} }, backendUrl: "https://x.example", serviceAccount: "copies-api" })
+      .returning();
+    const [someone] = await db.insert(users).values({ email: `copied@${domain}` }).returning();
+    const [request] = await db
+      .insert(apiAccessRequests)
+      .values({ apiId: api?.id ?? "", teamId: ids[teamA] ?? "", apiName: "copies", userId: someone?.id ?? "", reason: "r", requesterGroups: ["g-a"], requesterGroupsReadAt: new Date() })
+      .returning();
+    // The same settings again: nothing changes.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]?.requesterGroups).toEqual(["g-a"]);
+    // Another issuer: everyone's groups, and the copies, go.
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const url = String(input instanceof Request ? input.url : input);
+      return Promise.resolve(url.includes("openid-configuration") ? Response.json({ issuer: "https://other.example" }) : new Response("", { status: 404 }));
+    });
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", issuer: "https://other.example" }));
+    vi.restoreAllMocks();
+    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]).toMatchObject({ requesterGroups: [], requesterGroupsReadAt: null });
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
+  });
+
+  it("are emptied in the same transaction as the settings saved: a failed emptying keeps the old settings, and groups", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const [someone] = await db.insert(users).values({ email: `atomic@${domain}`, ssoGroups: ["g-kept"], ssoGroupsReadAt: new Date() }).returning();
+    // A waiting request whose emptying fails: a trigger on this row's emptying alone (it's marked
+    // away, so another file's release, marking rows away, doesn't touch it).
+    const marker = `fail-clear-${prefix}`;
+    await db.insert(apiAccessRequests).values({ teamId: ids[teamA] ?? "", apiName: "atomic", userId: someone?.id ?? "", reason: marker, requesterGroups: ["g-kept"], awaySince: new Date() });
+    const fn = `fail_clear_${prefix.replace(/-/g, "_")}`;
+    await db.execute(sql.raw(`CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'emptying fails'; END $$`));
+    await db.execute(sql.raw(`CREATE TRIGGER ${fn} BEFORE UPDATE ON api_access_requests FOR EACH ROW WHEN (OLD.reason = '${marker}' AND NEW.requester_groups IS DISTINCT FROM OLD.requester_groups) EXECUTE FUNCTION ${fn}()`));
+    try {
+      const saved = await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "roles" }));
+      expect(saved.code).toBe("internal");
+      expect((await db.select().from(ssoSettings).where(eq(ssoSettings.id, 1)))[0]?.groupsClaim).toBe("groups");
+      expect((await db.select({ g: users.ssoGroups }).from(users).where(eq(users.id, someone?.id ?? "")))[0]?.g).toEqual(["g-kept"]);
+    } finally {
+      await db.execute(sql.raw(`DROP TRIGGER ${fn} ON api_access_requests`));
+      await db.execute(sql.raw(`DROP FUNCTION ${fn}()`));
+    }
+    // Saved again, it empties them: the change wasn't lost half done.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "roles" }));
+    expect((await db.select({ g: users.ssoGroups }).from(users).where(eq(users.id, someone?.id ?? "")))[0]?.g).toBeNull();
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+  });
+
+  it("from Google aren't read again while single sign-on isn't in effect here", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "", googleGroups: true, enabled: false }));
+    const spy = vi.spyOn(globalThis, "fetch");
+    expect(await resyncGoogleGroups(app.log)).toBe(0);
+    expect(spy.mock.calls.filter(([input]) => String(input instanceof Request ? input.url : input).includes("cloudidentity"))).toEqual([]);
+    spy.mockRestore();
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
   });
 });
 

@@ -24,6 +24,122 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// How a caller may call an API (the gateway's rule, in its order).
+type ApiAccessVia int32
+
+const (
+	ApiAccessVia_API_ACCESS_VIA_UNSPECIFIED ApiAccessVia = 0
+	// They're in its own team (a member or a bot).
+	ApiAccessVia_API_ACCESS_VIA_TEAM ApiAccessVia = 1
+	// A grant names them.
+	ApiAccessVia_API_ACCESS_VIA_USER ApiAccessVia = 2
+	// A grant names a single sign-on group they're in.
+	ApiAccessVia_API_ACCESS_VIA_GROUP ApiAccessVia = 3
+	// Its api.yaml's shareWith names a team of theirs: from the catalog, not
+	// revocable here. Deprecated: goes with shareWith.
+	ApiAccessVia_API_ACCESS_VIA_CATALOG ApiAccessVia = 4
+)
+
+// Enum value maps for ApiAccessVia.
+var (
+	ApiAccessVia_name = map[int32]string{
+		0: "API_ACCESS_VIA_UNSPECIFIED",
+		1: "API_ACCESS_VIA_TEAM",
+		2: "API_ACCESS_VIA_USER",
+		3: "API_ACCESS_VIA_GROUP",
+		4: "API_ACCESS_VIA_CATALOG",
+	}
+	ApiAccessVia_value = map[string]int32{
+		"API_ACCESS_VIA_UNSPECIFIED": 0,
+		"API_ACCESS_VIA_TEAM":        1,
+		"API_ACCESS_VIA_USER":        2,
+		"API_ACCESS_VIA_GROUP":       3,
+		"API_ACCESS_VIA_CATALOG":     4,
+	}
+)
+
+func (x ApiAccessVia) Enum() *ApiAccessVia {
+	p := new(ApiAccessVia)
+	*p = x
+	return p
+}
+
+func (x ApiAccessVia) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ApiAccessVia) Descriptor() protoreflect.EnumDescriptor {
+	return file_vennir_console_v1_api_proto_enumTypes[0].Descriptor()
+}
+
+func (ApiAccessVia) Type() protoreflect.EnumType {
+	return &file_vennir_console_v1_api_proto_enumTypes[0]
+}
+
+func (x ApiAccessVia) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ApiAccessVia.Descriptor instead.
+func (ApiAccessVia) EnumDescriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{0}
+}
+
+type ApiAccessRequestState int32
+
+const (
+	ApiAccessRequestState_API_ACCESS_REQUEST_STATE_UNSPECIFIED ApiAccessRequestState = 0
+	ApiAccessRequestState_API_ACCESS_REQUEST_STATE_WAITING     ApiAccessRequestState = 1
+	ApiAccessRequestState_API_ACCESS_REQUEST_STATE_GRANTED     ApiAccessRequestState = 2
+	ApiAccessRequestState_API_ACCESS_REQUEST_STATE_DECLINED    ApiAccessRequestState = 3
+	ApiAccessRequestState_API_ACCESS_REQUEST_STATE_WITHDRAWN   ApiAccessRequestState = 4
+)
+
+// Enum value maps for ApiAccessRequestState.
+var (
+	ApiAccessRequestState_name = map[int32]string{
+		0: "API_ACCESS_REQUEST_STATE_UNSPECIFIED",
+		1: "API_ACCESS_REQUEST_STATE_WAITING",
+		2: "API_ACCESS_REQUEST_STATE_GRANTED",
+		3: "API_ACCESS_REQUEST_STATE_DECLINED",
+		4: "API_ACCESS_REQUEST_STATE_WITHDRAWN",
+	}
+	ApiAccessRequestState_value = map[string]int32{
+		"API_ACCESS_REQUEST_STATE_UNSPECIFIED": 0,
+		"API_ACCESS_REQUEST_STATE_WAITING":     1,
+		"API_ACCESS_REQUEST_STATE_GRANTED":     2,
+		"API_ACCESS_REQUEST_STATE_DECLINED":    3,
+		"API_ACCESS_REQUEST_STATE_WITHDRAWN":   4,
+	}
+)
+
+func (x ApiAccessRequestState) Enum() *ApiAccessRequestState {
+	p := new(ApiAccessRequestState)
+	*p = x
+	return p
+}
+
+func (x ApiAccessRequestState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ApiAccessRequestState) Descriptor() protoreflect.EnumDescriptor {
+	return file_vennir_console_v1_api_proto_enumTypes[1].Descriptor()
+}
+
+func (ApiAccessRequestState) Type() protoreflect.EnumType {
+	return &file_vennir_console_v1_api_proto_enumTypes[1]
+}
+
+func (x ApiAccessRequestState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ApiAccessRequestState.Descriptor instead.
+func (ApiAccessRequestState) EnumDescriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{1}
+}
+
 type ApiState int32
 
 const (
@@ -69,11 +185,11 @@ func (x ApiState) String() string {
 }
 
 func (ApiState) Descriptor() protoreflect.EnumDescriptor {
-	return file_vennir_console_v1_api_proto_enumTypes[0].Descriptor()
+	return file_vennir_console_v1_api_proto_enumTypes[2].Descriptor()
 }
 
 func (ApiState) Type() protoreflect.EnumType {
-	return &file_vennir_console_v1_api_proto_enumTypes[0]
+	return &file_vennir_console_v1_api_proto_enumTypes[2]
 }
 
 func (x ApiState) Number() protoreflect.EnumNumber {
@@ -82,7 +198,1410 @@ func (x ApiState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ApiState.Descriptor instead.
 func (ApiState) EnumDescriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{2}
+}
+
+type ApiGrant struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The API: <team>/<name>.
+	Team string `protobuf:"bytes,2,opt,name=team,proto3" json:"team,omitempty"`
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// Exactly one of: a single sign-on group (lowercased), or a user.
+	Group     string `protobuf:"bytes,4,opt,name=group,proto3" json:"group,omitempty"`
+	UserId    string `protobuf:"bytes,5,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	UserEmail string `protobuf:"bytes,6,opt,name=user_email,json=userEmail,proto3" json:"user_email,omitempty"`
+	Bot       bool   `protobuf:"varint,7,opt,name=bot,proto3" json:"bot,omitempty"`
+	// Requests a minute: the user's, or each of the group's members'. With
+	// default_rate, it's the API's default limit, and follows it.
+	PerMinute   int32 `protobuf:"varint,8,opt,name=per_minute,json=perMinute,proto3" json:"per_minute,omitempty"`
+	DefaultRate bool  `protobuf:"varint,9,opt,name=default_rate,json=defaultRate,proto3" json:"default_rate,omitempty"`
+	// Who granted it (an email); empty for an open API's request.
+	GrantedBy string `protobuf:"bytes,10,opt,name=granted_by,json=grantedBy,proto3" json:"granted_by,omitempty"`
+	// The request it answered, if any.
+	AccessRequestId string                 `protobuf:"bytes,11,opt,name=access_request_id,json=accessRequestId,proto3" json:"access_request_id,omitempty"`
+	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// Set once revoked.
+	RevokedAt *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
+	RevokedBy string                 `protobuf:"bytes,15,opt,name=revoked_by,json=revokedBy,proto3" json:"revoked_by,omitempty"`
+	// Why the platform revoked it (superseded by a grant made while its API
+	// was away), when it did.
+	RevokeReason string `protobuf:"bytes,16,opt,name=revoke_reason,json=revokeReason,proto3" json:"revoke_reason,omitempty"`
+	// When its API left the catalog's release; unset while it's published.
+	// Removed 30 days after.
+	AwaySince     *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=away_since,json=awaySince,proto3" json:"away_since,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApiGrant) Reset() {
+	*x = ApiGrant{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApiGrant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApiGrant) ProtoMessage() {}
+
+func (x *ApiGrant) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApiGrant.ProtoReflect.Descriptor instead.
+func (*ApiGrant) Descriptor() ([]byte, []int) {
 	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ApiGrant) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetTeam() string {
+	if x != nil {
+		return x.Team
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetUserEmail() string {
+	if x != nil {
+		return x.UserEmail
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetBot() bool {
+	if x != nil {
+		return x.Bot
+	}
+	return false
+}
+
+func (x *ApiGrant) GetPerMinute() int32 {
+	if x != nil {
+		return x.PerMinute
+	}
+	return 0
+}
+
+func (x *ApiGrant) GetDefaultRate() bool {
+	if x != nil {
+		return x.DefaultRate
+	}
+	return false
+}
+
+func (x *ApiGrant) GetGrantedBy() string {
+	if x != nil {
+		return x.GrantedBy
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetAccessRequestId() string {
+	if x != nil {
+		return x.AccessRequestId
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *ApiGrant) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *ApiGrant) GetRevokedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RevokedAt
+	}
+	return nil
+}
+
+func (x *ApiGrant) GetRevokedBy() string {
+	if x != nil {
+		return x.RevokedBy
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetRevokeReason() string {
+	if x != nil {
+		return x.RevokeReason
+	}
+	return ""
+}
+
+func (x *ApiGrant) GetAwaySince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AwaySince
+	}
+	return nil
+}
+
+type ApiAccessRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Team  string                 `protobuf:"bytes,2,opt,name=team,proto3" json:"team,omitempty"`
+	Name  string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// Whom it's for: the person, or the bot.
+	UserId    string `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	UserEmail string `protobuf:"bytes,5,opt,name=user_email,json=userEmail,proto3" json:"user_email,omitempty"`
+	Bot       bool   `protobuf:"varint,6,opt,name=bot,proto3" json:"bot,omitempty"`
+	// Who asked (an email): the person, or the bot's team's maintainer.
+	RequestedBy string                `protobuf:"bytes,7,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	Reason      string                `protobuf:"bytes,8,opt,name=reason,proto3" json:"reason,omitempty"`
+	State       ApiAccessRequestState `protobuf:"varint,9,opt,name=state,proto3,enum=vennir.console.v1.ApiAccessRequestState" json:"state,omitempty"`
+	// Who granted, declined or withdrew it, and a decline's reason.
+	DecidedBy      string                 `protobuf:"bytes,10,opt,name=decided_by,json=decidedBy,proto3" json:"decided_by,omitempty"`
+	DecisionReason string                 `protobuf:"bytes,11,opt,name=decision_reason,json=decisionReason,proto3" json:"decision_reason,omitempty"`
+	GrantId        string                 `protobuf:"bytes,12,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	DecidedAt      *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=decided_at,json=decidedAt,proto3" json:"decided_at,omitempty"`
+	// A person's single sign-on groups (when they asked, or as read since),
+	// one of which may be granted instead: shown to the API's maintainers
+	// only, and only while it waits.
+	Groups []string `protobuf:"bytes,15,rep,name=groups,proto3" json:"groups,omitempty"`
+	// When those groups were read: older than 24 hours, a group can't be
+	// granted from them (GROUPS_STALE) unless Google Workspace confirms it.
+	GroupsReadAt *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=groups_read_at,json=groupsReadAt,proto3" json:"groups_read_at,omitempty"`
+	// When its API left the catalog's release; unset while it's published.
+	AwaySince     *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=away_since,json=awaySince,proto3" json:"away_since,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApiAccessRequest) Reset() {
+	*x = ApiAccessRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApiAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApiAccessRequest) ProtoMessage() {}
+
+func (x *ApiAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApiAccessRequest.ProtoReflect.Descriptor instead.
+func (*ApiAccessRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ApiAccessRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetTeam() string {
+	if x != nil {
+		return x.Team
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetUserEmail() string {
+	if x != nil {
+		return x.UserEmail
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetBot() bool {
+	if x != nil {
+		return x.Bot
+	}
+	return false
+}
+
+func (x *ApiAccessRequest) GetRequestedBy() string {
+	if x != nil {
+		return x.RequestedBy
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetState() ApiAccessRequestState {
+	if x != nil {
+		return x.State
+	}
+	return ApiAccessRequestState_API_ACCESS_REQUEST_STATE_UNSPECIFIED
+}
+
+func (x *ApiAccessRequest) GetDecidedBy() string {
+	if x != nil {
+		return x.DecidedBy
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetDecisionReason() string {
+	if x != nil {
+		return x.DecisionReason
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetGrantId() string {
+	if x != nil {
+		return x.GrantId
+	}
+	return ""
+}
+
+func (x *ApiAccessRequest) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *ApiAccessRequest) GetDecidedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DecidedAt
+	}
+	return nil
+}
+
+func (x *ApiAccessRequest) GetGroups() []string {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+func (x *ApiAccessRequest) GetGroupsReadAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.GroupsReadAt
+	}
+	return nil
+}
+
+func (x *ApiAccessRequest) GetAwaySince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AwaySince
+	}
+	return nil
+}
+
+type RequestApiAccessRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Team  string                 `protobuf:"bytes,1,opt,name=team,proto3" json:"team,omitempty"`
+	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Why: the API's maintainers read it. At most 1000 characters.
+	Reason string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	// For a bot of a team the caller maintains; empty: for the caller.
+	BotEmail      string `protobuf:"bytes,4,opt,name=bot_email,json=botEmail,proto3" json:"bot_email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestApiAccessRequest) Reset() {
+	*x = RequestApiAccessRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestApiAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestApiAccessRequest) ProtoMessage() {}
+
+func (x *RequestApiAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestApiAccessRequest.ProtoReflect.Descriptor instead.
+func (*RequestApiAccessRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *RequestApiAccessRequest) GetTeam() string {
+	if x != nil {
+		return x.Team
+	}
+	return ""
+}
+
+func (x *RequestApiAccessRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RequestApiAccessRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RequestApiAccessRequest) GetBotEmail() string {
+	if x != nil {
+		return x.BotEmail
+	}
+	return ""
+}
+
+type RequestApiAccessResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Request *ApiAccessRequest      `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
+	// Set when its requests are open: the grant made at once.
+	Grant         *ApiGrant `protobuf:"bytes,2,opt,name=grant,proto3" json:"grant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestApiAccessResponse) Reset() {
+	*x = RequestApiAccessResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestApiAccessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestApiAccessResponse) ProtoMessage() {}
+
+func (x *RequestApiAccessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestApiAccessResponse.ProtoReflect.Descriptor instead.
+func (*RequestApiAccessResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RequestApiAccessResponse) GetRequest() *ApiAccessRequest {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
+func (x *RequestApiAccessResponse) GetGrant() *ApiGrant {
+	if x != nil {
+		return x.Grant
+	}
+	return nil
+}
+
+type WithdrawApiAccessRequestRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AccessRequestId string                 `protobuf:"bytes,1,opt,name=access_request_id,json=accessRequestId,proto3" json:"access_request_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *WithdrawApiAccessRequestRequest) Reset() {
+	*x = WithdrawApiAccessRequestRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WithdrawApiAccessRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WithdrawApiAccessRequestRequest) ProtoMessage() {}
+
+func (x *WithdrawApiAccessRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WithdrawApiAccessRequestRequest.ProtoReflect.Descriptor instead.
+func (*WithdrawApiAccessRequestRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *WithdrawApiAccessRequestRequest) GetAccessRequestId() string {
+	if x != nil {
+		return x.AccessRequestId
+	}
+	return ""
+}
+
+type WithdrawApiAccessRequestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WithdrawApiAccessRequestResponse) Reset() {
+	*x = WithdrawApiAccessRequestResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WithdrawApiAccessRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WithdrawApiAccessRequestResponse) ProtoMessage() {}
+
+func (x *WithdrawApiAccessRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WithdrawApiAccessRequestResponse.ProtoReflect.Descriptor instead.
+func (*WithdrawApiAccessRequestResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{5}
+}
+
+type DecideApiAccessRequestRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AccessRequestId string                 `protobuf:"bytes,1,opt,name=access_request_id,json=accessRequestId,proto3" json:"access_request_id,omitempty"`
+	Approve         bool                   `protobuf:"varint,2,opt,name=approve,proto3" json:"approve,omitempty"`
+	// Approving a person's: grant this group of theirs instead of the person.
+	Group string `protobuf:"bytes,3,opt,name=group,proto3" json:"group,omitempty"`
+	// Approving: requests a minute; 0, the API's default limit.
+	PerMinute int32 `protobuf:"varint,4,opt,name=per_minute,json=perMinute,proto3" json:"per_minute,omitempty"`
+	// Declining: why (required), which the person is told.
+	Reason        string `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DecideApiAccessRequestRequest) Reset() {
+	*x = DecideApiAccessRequestRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DecideApiAccessRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecideApiAccessRequestRequest) ProtoMessage() {}
+
+func (x *DecideApiAccessRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecideApiAccessRequestRequest.ProtoReflect.Descriptor instead.
+func (*DecideApiAccessRequestRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *DecideApiAccessRequestRequest) GetAccessRequestId() string {
+	if x != nil {
+		return x.AccessRequestId
+	}
+	return ""
+}
+
+func (x *DecideApiAccessRequestRequest) GetApprove() bool {
+	if x != nil {
+		return x.Approve
+	}
+	return false
+}
+
+func (x *DecideApiAccessRequestRequest) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *DecideApiAccessRequestRequest) GetPerMinute() int32 {
+	if x != nil {
+		return x.PerMinute
+	}
+	return 0
+}
+
+func (x *DecideApiAccessRequestRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type DecideApiAccessRequestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Request       *ApiAccessRequest      `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
+	Grant         *ApiGrant              `protobuf:"bytes,2,opt,name=grant,proto3" json:"grant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DecideApiAccessRequestResponse) Reset() {
+	*x = DecideApiAccessRequestResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DecideApiAccessRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecideApiAccessRequestResponse) ProtoMessage() {}
+
+func (x *DecideApiAccessRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecideApiAccessRequestResponse.ProtoReflect.Descriptor instead.
+func (*DecideApiAccessRequestResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DecideApiAccessRequestResponse) GetRequest() *ApiAccessRequest {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
+func (x *DecideApiAccessRequestResponse) GetGrant() *ApiGrant {
+	if x != nil {
+		return x.Grant
+	}
+	return nil
+}
+
+type AddApiGrantRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Team  string                 `protobuf:"bytes,1,opt,name=team,proto3" json:"team,omitempty"`
+	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Exactly one of: a single sign-on group, or a user by email.
+	Group string `protobuf:"bytes,3,opt,name=group,proto3" json:"group,omitempty"`
+	Email string `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
+	// Requests a minute; 0, the API's default limit.
+	PerMinute     int32 `protobuf:"varint,5,opt,name=per_minute,json=perMinute,proto3" json:"per_minute,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddApiGrantRequest) Reset() {
+	*x = AddApiGrantRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddApiGrantRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddApiGrantRequest) ProtoMessage() {}
+
+func (x *AddApiGrantRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddApiGrantRequest.ProtoReflect.Descriptor instead.
+func (*AddApiGrantRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AddApiGrantRequest) GetTeam() string {
+	if x != nil {
+		return x.Team
+	}
+	return ""
+}
+
+func (x *AddApiGrantRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AddApiGrantRequest) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *AddApiGrantRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *AddApiGrantRequest) GetPerMinute() int32 {
+	if x != nil {
+		return x.PerMinute
+	}
+	return 0
+}
+
+type AddApiGrantResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Grant         *ApiGrant              `protobuf:"bytes,1,opt,name=grant,proto3" json:"grant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddApiGrantResponse) Reset() {
+	*x = AddApiGrantResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddApiGrantResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddApiGrantResponse) ProtoMessage() {}
+
+func (x *AddApiGrantResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddApiGrantResponse.ProtoReflect.Descriptor instead.
+func (*AddApiGrantResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AddApiGrantResponse) GetGrant() *ApiGrant {
+	if x != nil {
+		return x.Grant
+	}
+	return nil
+}
+
+type SetApiGrantRateRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	GrantId string                 `protobuf:"bytes,1,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	// Requests a minute; 0, the API's default limit.
+	PerMinute     int32 `protobuf:"varint,2,opt,name=per_minute,json=perMinute,proto3" json:"per_minute,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetApiGrantRateRequest) Reset() {
+	*x = SetApiGrantRateRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetApiGrantRateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetApiGrantRateRequest) ProtoMessage() {}
+
+func (x *SetApiGrantRateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetApiGrantRateRequest.ProtoReflect.Descriptor instead.
+func (*SetApiGrantRateRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *SetApiGrantRateRequest) GetGrantId() string {
+	if x != nil {
+		return x.GrantId
+	}
+	return ""
+}
+
+func (x *SetApiGrantRateRequest) GetPerMinute() int32 {
+	if x != nil {
+		return x.PerMinute
+	}
+	return 0
+}
+
+type SetApiGrantRateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Grant         *ApiGrant              `protobuf:"bytes,1,opt,name=grant,proto3" json:"grant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetApiGrantRateResponse) Reset() {
+	*x = SetApiGrantRateResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetApiGrantRateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetApiGrantRateResponse) ProtoMessage() {}
+
+func (x *SetApiGrantRateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetApiGrantRateResponse.ProtoReflect.Descriptor instead.
+func (*SetApiGrantRateResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SetApiGrantRateResponse) GetGrant() *ApiGrant {
+	if x != nil {
+		return x.Grant
+	}
+	return nil
+}
+
+type RevokeApiGrantRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	GrantId string                 `protobuf:"bytes,1,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	// Why, for the audit log and whoever it named. Optional.
+	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeApiGrantRequest) Reset() {
+	*x = RevokeApiGrantRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeApiGrantRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeApiGrantRequest) ProtoMessage() {}
+
+func (x *RevokeApiGrantRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeApiGrantRequest.ProtoReflect.Descriptor instead.
+func (*RevokeApiGrantRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RevokeApiGrantRequest) GetGrantId() string {
+	if x != nil {
+		return x.GrantId
+	}
+	return ""
+}
+
+func (x *RevokeApiGrantRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type RevokeApiGrantResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeApiGrantResponse) Reset() {
+	*x = RevokeApiGrantResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeApiGrantResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeApiGrantResponse) ProtoMessage() {}
+
+func (x *RevokeApiGrantResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeApiGrantResponse.ProtoReflect.Descriptor instead.
+func (*RevokeApiGrantResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{13}
+}
+
+type ListApiAccessRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Team          string                 `protobuf:"bytes,1,opt,name=team,proto3" json:"team,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListApiAccessRequest) Reset() {
+	*x = ListApiAccessRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListApiAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListApiAccessRequest) ProtoMessage() {}
+
+func (x *ListApiAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListApiAccessRequest.ProtoReflect.Descriptor instead.
+func (*ListApiAccessRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ListApiAccessRequest) GetTeam() string {
+	if x != nil {
+		return x.Team
+	}
+	return ""
+}
+
+func (x *ListApiAccessRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type ListApiAccessResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Active ones first, then revoked, newest first.
+	Grants []*ApiGrant `protobuf:"bytes,1,rep,name=grants,proto3" json:"grants,omitempty"`
+	// Waiting ones first, then the rest, newest first.
+	Requests []*ApiAccessRequest `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty"`
+	// From the catalog (shareWith, deprecated): teams whose members and bots
+	// may call it, not revocable here.
+	ShareWith     []string `protobuf:"bytes,3,rep,name=share_with,json=shareWith,proto3" json:"share_with,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListApiAccessResponse) Reset() {
+	*x = ListApiAccessResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListApiAccessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListApiAccessResponse) ProtoMessage() {}
+
+func (x *ListApiAccessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListApiAccessResponse.ProtoReflect.Descriptor instead.
+func (*ListApiAccessResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ListApiAccessResponse) GetGrants() []*ApiGrant {
+	if x != nil {
+		return x.Grants
+	}
+	return nil
+}
+
+func (x *ListApiAccessResponse) GetRequests() []*ApiAccessRequest {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
+}
+
+func (x *ListApiAccessResponse) GetShareWith() []string {
+	if x != nil {
+		return x.ShareWith
+	}
+	return nil
+}
+
+type MyApiAccess struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Team  string                 `protobuf:"bytes,1,opt,name=team,proto3" json:"team,omitempty"`
+	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Via   ApiAccessVia           `protobuf:"varint,3,opt,name=via,proto3,enum=vennir.console.v1.ApiAccessVia" json:"via,omitempty"`
+	// VIA_TEAM and VIA_CATALOG: the team the gateway counts calls against.
+	CallingTeam string `protobuf:"bytes,4,opt,name=calling_team,json=callingTeam,proto3" json:"calling_team,omitempty"`
+	// VIA_GROUP: the group; VIA_USER and VIA_GROUP: the grant.
+	Group         string `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"`
+	GrantId       string `protobuf:"bytes,6,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	PerMinute     int32  `protobuf:"varint,7,opt,name=per_minute,json=perMinute,proto3" json:"per_minute,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MyApiAccess) Reset() {
+	*x = MyApiAccess{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MyApiAccess) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MyApiAccess) ProtoMessage() {}
+
+func (x *MyApiAccess) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MyApiAccess.ProtoReflect.Descriptor instead.
+func (*MyApiAccess) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *MyApiAccess) GetTeam() string {
+	if x != nil {
+		return x.Team
+	}
+	return ""
+}
+
+func (x *MyApiAccess) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *MyApiAccess) GetVia() ApiAccessVia {
+	if x != nil {
+		return x.Via
+	}
+	return ApiAccessVia_API_ACCESS_VIA_UNSPECIFIED
+}
+
+func (x *MyApiAccess) GetCallingTeam() string {
+	if x != nil {
+		return x.CallingTeam
+	}
+	return ""
+}
+
+func (x *MyApiAccess) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *MyApiAccess) GetGrantId() string {
+	if x != nil {
+		return x.GrantId
+	}
+	return ""
+}
+
+func (x *MyApiAccess) GetPerMinute() int32 {
+	if x != nil {
+		return x.PerMinute
+	}
+	return 0
+}
+
+type ListMyApiAccessRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyApiAccessRequest) Reset() {
+	*x = ListMyApiAccessRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyApiAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyApiAccessRequest) ProtoMessage() {}
+
+func (x *ListMyApiAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyApiAccessRequest.ProtoReflect.Descriptor instead.
+func (*ListMyApiAccessRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{17}
+}
+
+type ListMyApiAccessResponse struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Access []*MyApiAccess         `protobuf:"bytes,1,rep,name=access,proto3" json:"access,omitempty"`
+	// Requests for the caller that wait, or were declined.
+	Requests      []*ApiAccessRequest `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyApiAccessResponse) Reset() {
+	*x = ListMyApiAccessResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyApiAccessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyApiAccessResponse) ProtoMessage() {}
+
+func (x *ListMyApiAccessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyApiAccessResponse.ProtoReflect.Descriptor instead.
+func (*ListMyApiAccessResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ListMyApiAccessResponse) GetAccess() []*MyApiAccess {
+	if x != nil {
+		return x.Access
+	}
+	return nil
+}
+
+func (x *ListMyApiAccessResponse) GetRequests() []*ApiAccessRequest {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
+}
+
+type ListTeamBotApiAccessRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Team          string                 `protobuf:"bytes,1,opt,name=team,proto3" json:"team,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamBotApiAccessRequest) Reset() {
+	*x = ListTeamBotApiAccessRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamBotApiAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamBotApiAccessRequest) ProtoMessage() {}
+
+func (x *ListTeamBotApiAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamBotApiAccessRequest.ProtoReflect.Descriptor instead.
+func (*ListTeamBotApiAccessRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListTeamBotApiAccessRequest) GetTeam() string {
+	if x != nil {
+		return x.Team
+	}
+	return ""
+}
+
+type ListTeamBotApiAccessResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The team's bots' active grants.
+	Grants []*ApiGrant `protobuf:"bytes,1,rep,name=grants,proto3" json:"grants,omitempty"`
+	// The team's bots' requests that wait, or were declined.
+	Requests      []*ApiAccessRequest `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamBotApiAccessResponse) Reset() {
+	*x = ListTeamBotApiAccessResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamBotApiAccessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamBotApiAccessResponse) ProtoMessage() {}
+
+func (x *ListTeamBotApiAccessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamBotApiAccessResponse.ProtoReflect.Descriptor instead.
+func (*ListTeamBotApiAccessResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ListTeamBotApiAccessResponse) GetGrants() []*ApiGrant {
+	if x != nil {
+		return x.Grants
+	}
+	return nil
+}
+
+func (x *ListTeamBotApiAccessResponse) GetRequests() []*ApiAccessRequest {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
 }
 
 type ApiProduct struct {
@@ -94,8 +1613,8 @@ type ApiProduct struct {
 	State         ApiState               `protobuf:"varint,5,opt,name=state,proto3,enum=vennir.console.v1.ApiState" json:"state,omitempty"`
 	HeldReason    string                 `protobuf:"bytes,6,opt,name=held_reason,json=heldReason,proto3" json:"held_reason,omitempty"`
 	PausedMessage string                 `protobuf:"bytes,7,opt,name=paused_message,json=pausedMessage,proto3" json:"paused_message,omitempty"`
-	// Whether the caller may call it: shared with one of their teams, or
-	// their own team's.
+	// Whether the caller may call it: their own team's, granted to them or a
+	// group of theirs, or shared with one of their teams (access_via).
 	MayCall   bool     `protobuf:"varint,8,opt,name=may_call,json=mayCall,proto3" json:"may_call,omitempty"`
 	ShareWith []string `protobuf:"bytes,9,rep,name=share_with,json=shareWith,proto3" json:"share_with,omitempty"`
 	Hidden    bool     `protobuf:"varint,10,opt,name=hidden,proto3" json:"hidden,omitempty"`
@@ -110,8 +1629,8 @@ type ApiProduct struct {
 	PublicUrl string `protobuf:"bytes,14,opt,name=public_url,json=publicUrl,proto3" json:"public_url,omitempty"`
 	// What its spec lets through.
 	Endpoints []*ApiEndpoint `protobuf:"bytes,15,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
-	// Requests a minute the caller's team may send (its own limit, else the
-	// default); 0 when it may not call it.
+	// Requests a minute the caller may send (their grant's, or their team's
+	// own limit, else the default); 0 when they may not call it.
 	PerMinute       int32 `protobuf:"varint,16,opt,name=per_minute,json=perMinute,proto3" json:"per_minute,omitempty"`
 	TimeoutSeconds  int32 `protobuf:"varint,17,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
 	MaxRequestBytes int32 `protobuf:"varint,18,opt,name=max_request_bytes,json=maxRequestBytes,proto3" json:"max_request_bytes,omitempty"`
@@ -137,13 +1656,17 @@ type ApiProduct struct {
 	Limits             []*TeamLimit `protobuf:"bytes,27,rep,name=limits,proto3" json:"limits,omitempty"`
 	DefaultPerMinute   int32        `protobuf:"varint,28,opt,name=default_per_minute,json=defaultPerMinute,proto3" json:"default_per_minute,omitempty"`
 	DefaultFromGateway bool         `protobuf:"varint,29,opt,name=default_from_gateway,json=defaultFromGateway,proto3" json:"default_from_gateway,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// How the caller may call it (unspecified: they may not).
+	AccessVia ApiAccessVia `protobuf:"varint,30,opt,name=access_via,json=accessVia,proto3,enum=vennir.console.v1.ApiAccessVia" json:"access_via,omitempty"`
+	// api.yaml's access.requests: open, approval or closed.
+	AccessRequests string `protobuf:"bytes,31,opt,name=access_requests,json=accessRequests,proto3" json:"access_requests,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ApiProduct) Reset() {
 	*x = ApiProduct{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[0]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -155,7 +1678,7 @@ func (x *ApiProduct) String() string {
 func (*ApiProduct) ProtoMessage() {}
 
 func (x *ApiProduct) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[0]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -168,7 +1691,7 @@ func (x *ApiProduct) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApiProduct.ProtoReflect.Descriptor instead.
 func (*ApiProduct) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{0}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ApiProduct) GetTeam() string {
@@ -374,6 +1897,20 @@ func (x *ApiProduct) GetDefaultFromGateway() bool {
 	return false
 }
 
+func (x *ApiProduct) GetAccessVia() ApiAccessVia {
+	if x != nil {
+		return x.AccessVia
+	}
+	return ApiAccessVia_API_ACCESS_VIA_UNSPECIFIED
+}
+
+func (x *ApiProduct) GetAccessRequests() string {
+	if x != nil {
+		return x.AccessRequests
+	}
+	return ""
+}
+
 type TeamLimit struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Team          string                 `protobuf:"bytes,1,opt,name=team,proto3" json:"team,omitempty"`
@@ -384,7 +1921,7 @@ type TeamLimit struct {
 
 func (x *TeamLimit) Reset() {
 	*x = TeamLimit{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[1]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -396,7 +1933,7 @@ func (x *TeamLimit) String() string {
 func (*TeamLimit) ProtoMessage() {}
 
 func (x *TeamLimit) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[1]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -409,7 +1946,7 @@ func (x *TeamLimit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TeamLimit.ProtoReflect.Descriptor instead.
 func (*TeamLimit) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{1}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *TeamLimit) GetTeam() string {
@@ -439,7 +1976,7 @@ type ApiEndpoint struct {
 
 func (x *ApiEndpoint) Reset() {
 	*x = ApiEndpoint{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[2]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -451,7 +1988,7 @@ func (x *ApiEndpoint) String() string {
 func (*ApiEndpoint) ProtoMessage() {}
 
 func (x *ApiEndpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[2]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -464,7 +2001,7 @@ func (x *ApiEndpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApiEndpoint.ProtoReflect.Descriptor instead.
 func (*ApiEndpoint) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{2}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ApiEndpoint) GetMethod() string {
@@ -496,7 +2033,7 @@ type ListApisRequest struct {
 
 func (x *ListApisRequest) Reset() {
 	*x = ListApisRequest{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[3]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -508,7 +2045,7 @@ func (x *ListApisRequest) String() string {
 func (*ListApisRequest) ProtoMessage() {}
 
 func (x *ListApisRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[3]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -521,7 +2058,7 @@ func (x *ListApisRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApisRequest.ProtoReflect.Descriptor instead.
 func (*ListApisRequest) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{3}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{24}
 }
 
 type ListApisResponse struct {
@@ -533,7 +2070,7 @@ type ListApisResponse struct {
 
 func (x *ListApisResponse) Reset() {
 	*x = ListApisResponse{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[4]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -545,7 +2082,7 @@ func (x *ListApisResponse) String() string {
 func (*ListApisResponse) ProtoMessage() {}
 
 func (x *ListApisResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[4]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -558,7 +2095,7 @@ func (x *ListApisResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApisResponse.ProtoReflect.Descriptor instead.
 func (*ListApisResponse) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{4}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ListApisResponse) GetApis() []*ApiProduct {
@@ -578,7 +2115,7 @@ type GetApiRequest struct {
 
 func (x *GetApiRequest) Reset() {
 	*x = GetApiRequest{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[5]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -590,7 +2127,7 @@ func (x *GetApiRequest) String() string {
 func (*GetApiRequest) ProtoMessage() {}
 
 func (x *GetApiRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[5]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -603,7 +2140,7 @@ func (x *GetApiRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetApiRequest.ProtoReflect.Descriptor instead.
 func (*GetApiRequest) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{5}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetApiRequest) GetTeam() string {
@@ -631,7 +2168,7 @@ type GetApiResponse struct {
 
 func (x *GetApiResponse) Reset() {
 	*x = GetApiResponse{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[6]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -643,7 +2180,7 @@ func (x *GetApiResponse) String() string {
 func (*GetApiResponse) ProtoMessage() {}
 
 func (x *GetApiResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[6]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -656,7 +2193,7 @@ func (x *GetApiResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetApiResponse.ProtoReflect.Descriptor instead.
 func (*GetApiResponse) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{6}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetApiResponse) GetApi() *ApiProduct {
@@ -685,7 +2222,7 @@ type PauseApiRequest struct {
 
 func (x *PauseApiRequest) Reset() {
 	*x = PauseApiRequest{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[7]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -697,7 +2234,7 @@ func (x *PauseApiRequest) String() string {
 func (*PauseApiRequest) ProtoMessage() {}
 
 func (x *PauseApiRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[7]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -710,7 +2247,7 @@ func (x *PauseApiRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseApiRequest.ProtoReflect.Descriptor instead.
 func (*PauseApiRequest) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{7}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *PauseApiRequest) GetTeam() string {
@@ -742,7 +2279,7 @@ type PauseApiResponse struct {
 
 func (x *PauseApiResponse) Reset() {
 	*x = PauseApiResponse{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[8]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -754,7 +2291,7 @@ func (x *PauseApiResponse) String() string {
 func (*PauseApiResponse) ProtoMessage() {}
 
 func (x *PauseApiResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[8]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -767,7 +2304,7 @@ func (x *PauseApiResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseApiResponse.ProtoReflect.Descriptor instead.
 func (*PauseApiResponse) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{8}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{29}
 }
 
 type ResumeApiRequest struct {
@@ -780,7 +2317,7 @@ type ResumeApiRequest struct {
 
 func (x *ResumeApiRequest) Reset() {
 	*x = ResumeApiRequest{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[9]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -792,7 +2329,7 @@ func (x *ResumeApiRequest) String() string {
 func (*ResumeApiRequest) ProtoMessage() {}
 
 func (x *ResumeApiRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[9]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -805,7 +2342,7 @@ func (x *ResumeApiRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeApiRequest.ProtoReflect.Descriptor instead.
 func (*ResumeApiRequest) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{9}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ResumeApiRequest) GetTeam() string {
@@ -830,7 +2367,7 @@ type ResumeApiResponse struct {
 
 func (x *ResumeApiResponse) Reset() {
 	*x = ResumeApiResponse{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[10]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -842,7 +2379,7 @@ func (x *ResumeApiResponse) String() string {
 func (*ResumeApiResponse) ProtoMessage() {}
 
 func (x *ResumeApiResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[10]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -855,7 +2392,7 @@ func (x *ResumeApiResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeApiResponse.ProtoReflect.Descriptor instead.
 func (*ResumeApiResponse) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{10}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{31}
 }
 
 type GetApiTrafficRequest struct {
@@ -870,7 +2407,7 @@ type GetApiTrafficRequest struct {
 
 func (x *GetApiTrafficRequest) Reset() {
 	*x = GetApiTrafficRequest{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[11]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -882,7 +2419,7 @@ func (x *GetApiTrafficRequest) String() string {
 func (*GetApiTrafficRequest) ProtoMessage() {}
 
 func (x *GetApiTrafficRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[11]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -895,7 +2432,7 @@ func (x *GetApiTrafficRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetApiTrafficRequest.ProtoReflect.Descriptor instead.
 func (*GetApiTrafficRequest) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{11}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetApiTrafficRequest) GetTeam() string {
@@ -936,7 +2473,7 @@ type GetApiTrafficResponse struct {
 
 func (x *GetApiTrafficResponse) Reset() {
 	*x = GetApiTrafficResponse{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[12]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -948,7 +2485,7 @@ func (x *GetApiTrafficResponse) String() string {
 func (*GetApiTrafficResponse) ProtoMessage() {}
 
 func (x *GetApiTrafficResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[12]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -961,7 +2498,7 @@ func (x *GetApiTrafficResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetApiTrafficResponse.ProtoReflect.Descriptor instead.
 func (*GetApiTrafficResponse) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{12}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetApiTrafficResponse) GetRequests() int64 {
@@ -1030,7 +2567,7 @@ type EndpointTraffic struct {
 
 func (x *EndpointTraffic) Reset() {
 	*x = EndpointTraffic{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[13]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1042,7 +2579,7 @@ func (x *EndpointTraffic) String() string {
 func (*EndpointTraffic) ProtoMessage() {}
 
 func (x *EndpointTraffic) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[13]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1055,7 +2592,7 @@ func (x *EndpointTraffic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EndpointTraffic.ProtoReflect.Descriptor instead.
 func (*EndpointTraffic) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{13}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *EndpointTraffic) GetEndpoint() string {
@@ -1113,7 +2650,7 @@ type BlockedRequests struct {
 
 func (x *BlockedRequests) Reset() {
 	*x = BlockedRequests{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[14]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1125,7 +2662,7 @@ func (x *BlockedRequests) String() string {
 func (*BlockedRequests) ProtoMessage() {}
 
 func (x *BlockedRequests) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[14]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1138,7 +2675,7 @@ func (x *BlockedRequests) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockedRequests.ProtoReflect.Descriptor instead.
 func (*BlockedRequests) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{14}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *BlockedRequests) GetRequest() string {
@@ -1171,7 +2708,9 @@ func (x *BlockedRequests) GetLast() *timestamppb.Timestamp {
 
 type TeamTraffic struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// "" for callers who weren't signed in.
+	// "" for callers who weren't signed in; "grant:user" for those a grant
+	// names, "grant:group:<group>" for those a group's grant lets in (no
+	// person is named; no team's name has a ":").
 	Team     string `protobuf:"bytes,1,opt,name=team,proto3" json:"team,omitempty"`
 	Requests int64  `protobuf:"varint,2,opt,name=requests,proto3" json:"requests,omitempty"`
 	// Its busiest minute, against its limit.
@@ -1183,7 +2722,7 @@ type TeamTraffic struct {
 
 func (x *TeamTraffic) Reset() {
 	*x = TeamTraffic{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[15]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1195,7 +2734,7 @@ func (x *TeamTraffic) String() string {
 func (*TeamTraffic) ProtoMessage() {}
 
 func (x *TeamTraffic) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[15]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1208,7 +2747,7 @@ func (x *TeamTraffic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TeamTraffic.ProtoReflect.Descriptor instead.
 func (*TeamTraffic) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{15}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *TeamTraffic) GetTeam() string {
@@ -1247,7 +2786,7 @@ type GetGatewayRequest struct {
 
 func (x *GetGatewayRequest) Reset() {
 	*x = GetGatewayRequest{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[16]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1259,7 +2798,7 @@ func (x *GetGatewayRequest) String() string {
 func (*GetGatewayRequest) ProtoMessage() {}
 
 func (x *GetGatewayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[16]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1272,7 +2811,7 @@ func (x *GetGatewayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGatewayRequest.ProtoReflect.Descriptor instead.
 func (*GetGatewayRequest) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{16}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{37}
 }
 
 type GetGatewayResponse struct {
@@ -1296,7 +2835,7 @@ type GetGatewayResponse struct {
 
 func (x *GetGatewayResponse) Reset() {
 	*x = GetGatewayResponse{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[17]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1308,7 +2847,7 @@ func (x *GetGatewayResponse) String() string {
 func (*GetGatewayResponse) ProtoMessage() {}
 
 func (x *GetGatewayResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[17]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1321,7 +2860,7 @@ func (x *GetGatewayResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGatewayResponse.ProtoReflect.Descriptor instead.
 func (*GetGatewayResponse) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{17}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetGatewayResponse) GetEnabled() bool {
@@ -1415,7 +2954,7 @@ type RefusedRequests struct {
 
 func (x *RefusedRequests) Reset() {
 	*x = RefusedRequests{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[18]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1427,7 +2966,7 @@ func (x *RefusedRequests) String() string {
 func (*RefusedRequests) ProtoMessage() {}
 
 func (x *RefusedRequests) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[18]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1440,7 +2979,7 @@ func (x *RefusedRequests) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefusedRequests.ProtoReflect.Descriptor instead.
 func (*RefusedRequests) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{18}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *RefusedRequests) GetOutcome() string {
@@ -1474,7 +3013,7 @@ type SetGatewayClosedRequest struct {
 
 func (x *SetGatewayClosedRequest) Reset() {
 	*x = SetGatewayClosedRequest{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[19]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1486,7 +3025,7 @@ func (x *SetGatewayClosedRequest) String() string {
 func (*SetGatewayClosedRequest) ProtoMessage() {}
 
 func (x *SetGatewayClosedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[19]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1499,7 +3038,7 @@ func (x *SetGatewayClosedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGatewayClosedRequest.ProtoReflect.Descriptor instead.
 func (*SetGatewayClosedRequest) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{19}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *SetGatewayClosedRequest) GetMessage() string {
@@ -1517,7 +3056,7 @@ type SetGatewayClosedResponse struct {
 
 func (x *SetGatewayClosedResponse) Reset() {
 	*x = SetGatewayClosedResponse{}
-	mi := &file_vennir_console_v1_api_proto_msgTypes[20]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1529,7 +3068,7 @@ func (x *SetGatewayClosedResponse) String() string {
 func (*SetGatewayClosedResponse) ProtoMessage() {}
 
 func (x *SetGatewayClosedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_vennir_console_v1_api_proto_msgTypes[20]
+	mi := &file_vennir_console_v1_api_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1542,14 +3081,227 @@ func (x *SetGatewayClosedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGatewayClosedResponse.ProtoReflect.Descriptor instead.
 func (*SetGatewayClosedResponse) Descriptor() ([]byte, []int) {
-	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{20}
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{41}
+}
+
+type ListAwayApiAccessRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Team          string                 `protobuf:"bytes,1,opt,name=team,proto3" json:"team,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAwayApiAccessRequest) Reset() {
+	*x = ListAwayApiAccessRequest{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAwayApiAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAwayApiAccessRequest) ProtoMessage() {}
+
+func (x *ListAwayApiAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAwayApiAccessRequest.ProtoReflect.Descriptor instead.
+func (*ListAwayApiAccessRequest) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ListAwayApiAccessRequest) GetTeam() string {
+	if x != nil {
+		return x.Team
+	}
+	return ""
+}
+
+type ListAwayApiAccessResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Grants        []*ApiGrant            `protobuf:"bytes,1,rep,name=grants,proto3" json:"grants,omitempty"`
+	Requests      []*ApiAccessRequest    `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAwayApiAccessResponse) Reset() {
+	*x = ListAwayApiAccessResponse{}
+	mi := &file_vennir_console_v1_api_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAwayApiAccessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAwayApiAccessResponse) ProtoMessage() {}
+
+func (x *ListAwayApiAccessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_console_v1_api_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAwayApiAccessResponse.ProtoReflect.Descriptor instead.
+func (*ListAwayApiAccessResponse) Descriptor() ([]byte, []int) {
+	return file_vennir_console_v1_api_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *ListAwayApiAccessResponse) GetGrants() []*ApiGrant {
+	if x != nil {
+		return x.Grants
+	}
+	return nil
+}
+
+func (x *ListAwayApiAccessResponse) GetRequests() []*ApiAccessRequest {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
 }
 
 var File_vennir_console_v1_api_proto protoreflect.FileDescriptor
 
 const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\n" +
-	"\x1bvennir/console/v1/api.proto\x12\x11vennir.console.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaf\b\n" +
+	"\x1bvennir/console/v1/api.proto\x12\x11vennir.console.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdf\x04\n" +
+	"\bApiGrant\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04team\x18\x02 \x01(\tR\x04team\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
+	"\x05group\x18\x04 \x01(\tR\x05group\x12\x17\n" +
+	"\auser_id\x18\x05 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"user_email\x18\x06 \x01(\tR\tuserEmail\x12\x10\n" +
+	"\x03bot\x18\a \x01(\bR\x03bot\x12\x1d\n" +
+	"\n" +
+	"per_minute\x18\b \x01(\x05R\tperMinute\x12!\n" +
+	"\fdefault_rate\x18\t \x01(\bR\vdefaultRate\x12\x1d\n" +
+	"\n" +
+	"granted_by\x18\n" +
+	" \x01(\tR\tgrantedBy\x12*\n" +
+	"\x11access_request_id\x18\v \x01(\tR\x0faccessRequestId\x129\n" +
+	"\n" +
+	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
+	"\n" +
+	"revoked_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\trevokedAt\x12\x1d\n" +
+	"\n" +
+	"revoked_by\x18\x0f \x01(\tR\trevokedBy\x12#\n" +
+	"\rrevoke_reason\x18\x10 \x01(\tR\frevokeReason\x129\n" +
+	"\n" +
+	"away_since\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tawaySince\"\xfd\x04\n" +
+	"\x10ApiAccessRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04team\x18\x02 \x01(\tR\x04team\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x17\n" +
+	"\auser_id\x18\x04 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"user_email\x18\x05 \x01(\tR\tuserEmail\x12\x10\n" +
+	"\x03bot\x18\x06 \x01(\bR\x03bot\x12!\n" +
+	"\frequested_by\x18\a \x01(\tR\vrequestedBy\x12\x16\n" +
+	"\x06reason\x18\b \x01(\tR\x06reason\x12>\n" +
+	"\x05state\x18\t \x01(\x0e2(.vennir.console.v1.ApiAccessRequestStateR\x05state\x12\x1d\n" +
+	"\n" +
+	"decided_by\x18\n" +
+	" \x01(\tR\tdecidedBy\x12'\n" +
+	"\x0fdecision_reason\x18\v \x01(\tR\x0edecisionReason\x12\x19\n" +
+	"\bgrant_id\x18\f \x01(\tR\agrantId\x129\n" +
+	"\n" +
+	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"decided_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tdecidedAt\x12\x16\n" +
+	"\x06groups\x18\x0f \x03(\tR\x06groups\x12@\n" +
+	"\x0egroups_read_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\fgroupsReadAt\x129\n" +
+	"\n" +
+	"away_since\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tawaySince\"v\n" +
+	"\x17RequestApiAccessRequest\x12\x12\n" +
+	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x1b\n" +
+	"\tbot_email\x18\x04 \x01(\tR\bbotEmail\"\x8c\x01\n" +
+	"\x18RequestApiAccessResponse\x12=\n" +
+	"\arequest\x18\x01 \x01(\v2#.vennir.console.v1.ApiAccessRequestR\arequest\x121\n" +
+	"\x05grant\x18\x02 \x01(\v2\x1b.vennir.console.v1.ApiGrantR\x05grant\"M\n" +
+	"\x1fWithdrawApiAccessRequestRequest\x12*\n" +
+	"\x11access_request_id\x18\x01 \x01(\tR\x0faccessRequestId\"\"\n" +
+	" WithdrawApiAccessRequestResponse\"\xb2\x01\n" +
+	"\x1dDecideApiAccessRequestRequest\x12*\n" +
+	"\x11access_request_id\x18\x01 \x01(\tR\x0faccessRequestId\x12\x18\n" +
+	"\aapprove\x18\x02 \x01(\bR\aapprove\x12\x14\n" +
+	"\x05group\x18\x03 \x01(\tR\x05group\x12\x1d\n" +
+	"\n" +
+	"per_minute\x18\x04 \x01(\x05R\tperMinute\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"\x92\x01\n" +
+	"\x1eDecideApiAccessRequestResponse\x12=\n" +
+	"\arequest\x18\x01 \x01(\v2#.vennir.console.v1.ApiAccessRequestR\arequest\x121\n" +
+	"\x05grant\x18\x02 \x01(\v2\x1b.vennir.console.v1.ApiGrantR\x05grant\"\x87\x01\n" +
+	"\x12AddApiGrantRequest\x12\x12\n" +
+	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05group\x18\x03 \x01(\tR\x05group\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\x12\x1d\n" +
+	"\n" +
+	"per_minute\x18\x05 \x01(\x05R\tperMinute\"H\n" +
+	"\x13AddApiGrantResponse\x121\n" +
+	"\x05grant\x18\x01 \x01(\v2\x1b.vennir.console.v1.ApiGrantR\x05grant\"R\n" +
+	"\x16SetApiGrantRateRequest\x12\x19\n" +
+	"\bgrant_id\x18\x01 \x01(\tR\agrantId\x12\x1d\n" +
+	"\n" +
+	"per_minute\x18\x02 \x01(\x05R\tperMinute\"L\n" +
+	"\x17SetApiGrantRateResponse\x121\n" +
+	"\x05grant\x18\x01 \x01(\v2\x1b.vennir.console.v1.ApiGrantR\x05grant\"J\n" +
+	"\x15RevokeApiGrantRequest\x12\x19\n" +
+	"\bgrant_id\x18\x01 \x01(\tR\agrantId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x18\n" +
+	"\x16RevokeApiGrantResponse\">\n" +
+	"\x14ListApiAccessRequest\x12\x12\n" +
+	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xac\x01\n" +
+	"\x15ListApiAccessResponse\x123\n" +
+	"\x06grants\x18\x01 \x03(\v2\x1b.vennir.console.v1.ApiGrantR\x06grants\x12?\n" +
+	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\x12\x1d\n" +
+	"\n" +
+	"share_with\x18\x03 \x03(\tR\tshareWith\"\xdb\x01\n" +
+	"\vMyApiAccess\x12\x12\n" +
+	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +
+	"\x03via\x18\x03 \x01(\x0e2\x1f.vennir.console.v1.ApiAccessViaR\x03via\x12!\n" +
+	"\fcalling_team\x18\x04 \x01(\tR\vcallingTeam\x12\x14\n" +
+	"\x05group\x18\x05 \x01(\tR\x05group\x12\x19\n" +
+	"\bgrant_id\x18\x06 \x01(\tR\agrantId\x12\x1d\n" +
+	"\n" +
+	"per_minute\x18\a \x01(\x05R\tperMinute\"\x18\n" +
+	"\x16ListMyApiAccessRequest\"\x92\x01\n" +
+	"\x17ListMyApiAccessResponse\x126\n" +
+	"\x06access\x18\x01 \x03(\v2\x1e.vennir.console.v1.MyApiAccessR\x06access\x12?\n" +
+	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\"1\n" +
+	"\x1bListTeamBotApiAccessRequest\x12\x12\n" +
+	"\x04team\x18\x01 \x01(\tR\x04team\"\x94\x01\n" +
+	"\x1cListTeamBotApiAccessResponse\x123\n" +
+	"\x06grants\x18\x01 \x03(\v2\x1b.vennir.console.v1.ApiGrantR\x06grants\x12?\n" +
+	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\"\x98\t\n" +
 	"\n" +
 	"ApiProduct\x12\x12\n" +
 	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
@@ -1590,7 +3342,10 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\x10problem_found_at\x18\x1a \x01(\v2\x1a.google.protobuf.TimestampR\x0eproblemFoundAt\x124\n" +
 	"\x06limits\x18\x1b \x03(\v2\x1c.vennir.console.v1.TeamLimitR\x06limits\x12,\n" +
 	"\x12default_per_minute\x18\x1c \x01(\x05R\x10defaultPerMinute\x120\n" +
-	"\x14default_from_gateway\x18\x1d \x01(\bR\x12defaultFromGateway\">\n" +
+	"\x14default_from_gateway\x18\x1d \x01(\bR\x12defaultFromGateway\x12>\n" +
+	"\n" +
+	"access_via\x18\x1e \x01(\x0e2\x1f.vennir.console.v1.ApiAccessViaR\taccessVia\x12'\n" +
+	"\x0faccess_requests\x18\x1f \x01(\tR\x0eaccessRequests\">\n" +
 	"\tTeamLimit\x12\x12\n" +
 	"\x04team\x18\x01 \x01(\tR\x04team\x12\x1d\n" +
 	"\n" +
@@ -1670,13 +3425,30 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\x06mostly\x18\x03 \x01(\tR\x06mostly\"3\n" +
 	"\x17SetGatewayClosedRequest\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1a\n" +
-	"\x18SetGatewayClosedResponse*~\n" +
+	"\x18SetGatewayClosedResponse\".\n" +
+	"\x18ListAwayApiAccessRequest\x12\x12\n" +
+	"\x04team\x18\x01 \x01(\tR\x04team\"\x91\x01\n" +
+	"\x19ListAwayApiAccessResponse\x123\n" +
+	"\x06grants\x18\x01 \x03(\v2\x1b.vennir.console.v1.ApiGrantR\x06grants\x12?\n" +
+	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests*\x96\x01\n" +
+	"\fApiAccessVia\x12\x1e\n" +
+	"\x1aAPI_ACCESS_VIA_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13API_ACCESS_VIA_TEAM\x10\x01\x12\x17\n" +
+	"\x13API_ACCESS_VIA_USER\x10\x02\x12\x18\n" +
+	"\x14API_ACCESS_VIA_GROUP\x10\x03\x12\x1a\n" +
+	"\x16API_ACCESS_VIA_CATALOG\x10\x04*\xdc\x01\n" +
+	"\x15ApiAccessRequestState\x12(\n" +
+	"$API_ACCESS_REQUEST_STATE_UNSPECIFIED\x10\x00\x12$\n" +
+	" API_ACCESS_REQUEST_STATE_WAITING\x10\x01\x12$\n" +
+	" API_ACCESS_REQUEST_STATE_GRANTED\x10\x02\x12%\n" +
+	"!API_ACCESS_REQUEST_STATE_DECLINED\x10\x03\x12&\n" +
+	"\"API_ACCESS_REQUEST_STATE_WITHDRAWN\x10\x04*~\n" +
 	"\bApiState\x12\x19\n" +
 	"\x15API_STATE_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eAPI_STATE_LIVE\x10\x01\x12\x12\n" +
 	"\x0eAPI_STATE_HELD\x10\x02\x12\x14\n" +
 	"\x10API_STATE_PAUSED\x10\x03\x12\x19\n" +
-	"\x15API_STATE_UNAVAILABLE\x10\x042\x9d\x05\n" +
+	"\x15API_STATE_UNAVAILABLE\x10\x042\x89\x0e\n" +
 	"\n" +
 	"ApiService\x12X\n" +
 	"\bListApis\x12\".vennir.console.v1.ListApisRequest\x1a#.vennir.console.v1.ListApisResponse\"\x03\x90\x02\x01\x12R\n" +
@@ -1686,7 +3458,17 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\rGetApiTraffic\x12'.vennir.console.v1.GetApiTrafficRequest\x1a(.vennir.console.v1.GetApiTrafficResponse\"\x03\x90\x02\x01\x12^\n" +
 	"\n" +
 	"GetGateway\x12$.vennir.console.v1.GetGatewayRequest\x1a%.vennir.console.v1.GetGatewayResponse\"\x03\x90\x02\x01\x12k\n" +
-	"\x10SetGatewayClosed\x12*.vennir.console.v1.SetGatewayClosedRequest\x1a+.vennir.console.v1.SetGatewayClosedResponseB\xd1\x01\n" +
+	"\x10SetGatewayClosed\x12*.vennir.console.v1.SetGatewayClosedRequest\x1a+.vennir.console.v1.SetGatewayClosedResponse\x12k\n" +
+	"\x10RequestApiAccess\x12*.vennir.console.v1.RequestApiAccessRequest\x1a+.vennir.console.v1.RequestApiAccessResponse\x12\x83\x01\n" +
+	"\x18WithdrawApiAccessRequest\x122.vennir.console.v1.WithdrawApiAccessRequestRequest\x1a3.vennir.console.v1.WithdrawApiAccessRequestResponse\x12}\n" +
+	"\x16DecideApiAccessRequest\x120.vennir.console.v1.DecideApiAccessRequestRequest\x1a1.vennir.console.v1.DecideApiAccessRequestResponse\x12\\\n" +
+	"\vAddApiGrant\x12%.vennir.console.v1.AddApiGrantRequest\x1a&.vennir.console.v1.AddApiGrantResponse\x12h\n" +
+	"\x0fSetApiGrantRate\x12).vennir.console.v1.SetApiGrantRateRequest\x1a*.vennir.console.v1.SetApiGrantRateResponse\x12e\n" +
+	"\x0eRevokeApiGrant\x12(.vennir.console.v1.RevokeApiGrantRequest\x1a).vennir.console.v1.RevokeApiGrantResponse\x12g\n" +
+	"\rListApiAccess\x12'.vennir.console.v1.ListApiAccessRequest\x1a(.vennir.console.v1.ListApiAccessResponse\"\x03\x90\x02\x01\x12m\n" +
+	"\x0fListMyApiAccess\x12).vennir.console.v1.ListMyApiAccessRequest\x1a*.vennir.console.v1.ListMyApiAccessResponse\"\x03\x90\x02\x01\x12|\n" +
+	"\x14ListTeamBotApiAccess\x12..vennir.console.v1.ListTeamBotApiAccessRequest\x1a/.vennir.console.v1.ListTeamBotApiAccessResponse\"\x03\x90\x02\x01\x12s\n" +
+	"\x11ListAwayApiAccess\x12+.vennir.console.v1.ListAwayApiAccessRequest\x1a,.vennir.console.v1.ListAwayApiAccessResponse\"\x03\x90\x02\x01B\xd1\x01\n" +
 	"\x15com.vennir.console.v1B\bApiProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
@@ -1701,65 +3483,135 @@ func file_vennir_console_v1_api_proto_rawDescGZIP() []byte {
 	return file_vennir_console_v1_api_proto_rawDescData
 }
 
-var file_vennir_console_v1_api_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_vennir_console_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_vennir_console_v1_api_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_vennir_console_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_vennir_console_v1_api_proto_goTypes = []any{
-	(ApiState)(0),                    // 0: vennir.console.v1.ApiState
-	(*ApiProduct)(nil),               // 1: vennir.console.v1.ApiProduct
-	(*TeamLimit)(nil),                // 2: vennir.console.v1.TeamLimit
-	(*ApiEndpoint)(nil),              // 3: vennir.console.v1.ApiEndpoint
-	(*ListApisRequest)(nil),          // 4: vennir.console.v1.ListApisRequest
-	(*ListApisResponse)(nil),         // 5: vennir.console.v1.ListApisResponse
-	(*GetApiRequest)(nil),            // 6: vennir.console.v1.GetApiRequest
-	(*GetApiResponse)(nil),           // 7: vennir.console.v1.GetApiResponse
-	(*PauseApiRequest)(nil),          // 8: vennir.console.v1.PauseApiRequest
-	(*PauseApiResponse)(nil),         // 9: vennir.console.v1.PauseApiResponse
-	(*ResumeApiRequest)(nil),         // 10: vennir.console.v1.ResumeApiRequest
-	(*ResumeApiResponse)(nil),        // 11: vennir.console.v1.ResumeApiResponse
-	(*GetApiTrafficRequest)(nil),     // 12: vennir.console.v1.GetApiTrafficRequest
-	(*GetApiTrafficResponse)(nil),    // 13: vennir.console.v1.GetApiTrafficResponse
-	(*EndpointTraffic)(nil),          // 14: vennir.console.v1.EndpointTraffic
-	(*BlockedRequests)(nil),          // 15: vennir.console.v1.BlockedRequests
-	(*TeamTraffic)(nil),              // 16: vennir.console.v1.TeamTraffic
-	(*GetGatewayRequest)(nil),        // 17: vennir.console.v1.GetGatewayRequest
-	(*GetGatewayResponse)(nil),       // 18: vennir.console.v1.GetGatewayResponse
-	(*RefusedRequests)(nil),          // 19: vennir.console.v1.RefusedRequests
-	(*SetGatewayClosedRequest)(nil),  // 20: vennir.console.v1.SetGatewayClosedRequest
-	(*SetGatewayClosedResponse)(nil), // 21: vennir.console.v1.SetGatewayClosedResponse
-	(*timestamppb.Timestamp)(nil),    // 22: google.protobuf.Timestamp
+	(ApiAccessVia)(0),                        // 0: vennir.console.v1.ApiAccessVia
+	(ApiAccessRequestState)(0),               // 1: vennir.console.v1.ApiAccessRequestState
+	(ApiState)(0),                            // 2: vennir.console.v1.ApiState
+	(*ApiGrant)(nil),                         // 3: vennir.console.v1.ApiGrant
+	(*ApiAccessRequest)(nil),                 // 4: vennir.console.v1.ApiAccessRequest
+	(*RequestApiAccessRequest)(nil),          // 5: vennir.console.v1.RequestApiAccessRequest
+	(*RequestApiAccessResponse)(nil),         // 6: vennir.console.v1.RequestApiAccessResponse
+	(*WithdrawApiAccessRequestRequest)(nil),  // 7: vennir.console.v1.WithdrawApiAccessRequestRequest
+	(*WithdrawApiAccessRequestResponse)(nil), // 8: vennir.console.v1.WithdrawApiAccessRequestResponse
+	(*DecideApiAccessRequestRequest)(nil),    // 9: vennir.console.v1.DecideApiAccessRequestRequest
+	(*DecideApiAccessRequestResponse)(nil),   // 10: vennir.console.v1.DecideApiAccessRequestResponse
+	(*AddApiGrantRequest)(nil),               // 11: vennir.console.v1.AddApiGrantRequest
+	(*AddApiGrantResponse)(nil),              // 12: vennir.console.v1.AddApiGrantResponse
+	(*SetApiGrantRateRequest)(nil),           // 13: vennir.console.v1.SetApiGrantRateRequest
+	(*SetApiGrantRateResponse)(nil),          // 14: vennir.console.v1.SetApiGrantRateResponse
+	(*RevokeApiGrantRequest)(nil),            // 15: vennir.console.v1.RevokeApiGrantRequest
+	(*RevokeApiGrantResponse)(nil),           // 16: vennir.console.v1.RevokeApiGrantResponse
+	(*ListApiAccessRequest)(nil),             // 17: vennir.console.v1.ListApiAccessRequest
+	(*ListApiAccessResponse)(nil),            // 18: vennir.console.v1.ListApiAccessResponse
+	(*MyApiAccess)(nil),                      // 19: vennir.console.v1.MyApiAccess
+	(*ListMyApiAccessRequest)(nil),           // 20: vennir.console.v1.ListMyApiAccessRequest
+	(*ListMyApiAccessResponse)(nil),          // 21: vennir.console.v1.ListMyApiAccessResponse
+	(*ListTeamBotApiAccessRequest)(nil),      // 22: vennir.console.v1.ListTeamBotApiAccessRequest
+	(*ListTeamBotApiAccessResponse)(nil),     // 23: vennir.console.v1.ListTeamBotApiAccessResponse
+	(*ApiProduct)(nil),                       // 24: vennir.console.v1.ApiProduct
+	(*TeamLimit)(nil),                        // 25: vennir.console.v1.TeamLimit
+	(*ApiEndpoint)(nil),                      // 26: vennir.console.v1.ApiEndpoint
+	(*ListApisRequest)(nil),                  // 27: vennir.console.v1.ListApisRequest
+	(*ListApisResponse)(nil),                 // 28: vennir.console.v1.ListApisResponse
+	(*GetApiRequest)(nil),                    // 29: vennir.console.v1.GetApiRequest
+	(*GetApiResponse)(nil),                   // 30: vennir.console.v1.GetApiResponse
+	(*PauseApiRequest)(nil),                  // 31: vennir.console.v1.PauseApiRequest
+	(*PauseApiResponse)(nil),                 // 32: vennir.console.v1.PauseApiResponse
+	(*ResumeApiRequest)(nil),                 // 33: vennir.console.v1.ResumeApiRequest
+	(*ResumeApiResponse)(nil),                // 34: vennir.console.v1.ResumeApiResponse
+	(*GetApiTrafficRequest)(nil),             // 35: vennir.console.v1.GetApiTrafficRequest
+	(*GetApiTrafficResponse)(nil),            // 36: vennir.console.v1.GetApiTrafficResponse
+	(*EndpointTraffic)(nil),                  // 37: vennir.console.v1.EndpointTraffic
+	(*BlockedRequests)(nil),                  // 38: vennir.console.v1.BlockedRequests
+	(*TeamTraffic)(nil),                      // 39: vennir.console.v1.TeamTraffic
+	(*GetGatewayRequest)(nil),                // 40: vennir.console.v1.GetGatewayRequest
+	(*GetGatewayResponse)(nil),               // 41: vennir.console.v1.GetGatewayResponse
+	(*RefusedRequests)(nil),                  // 42: vennir.console.v1.RefusedRequests
+	(*SetGatewayClosedRequest)(nil),          // 43: vennir.console.v1.SetGatewayClosedRequest
+	(*SetGatewayClosedResponse)(nil),         // 44: vennir.console.v1.SetGatewayClosedResponse
+	(*ListAwayApiAccessRequest)(nil),         // 45: vennir.console.v1.ListAwayApiAccessRequest
+	(*ListAwayApiAccessResponse)(nil),        // 46: vennir.console.v1.ListAwayApiAccessResponse
+	(*timestamppb.Timestamp)(nil),            // 47: google.protobuf.Timestamp
 }
 var file_vennir_console_v1_api_proto_depIdxs = []int32{
-	0,  // 0: vennir.console.v1.ApiProduct.state:type_name -> vennir.console.v1.ApiState
-	3,  // 1: vennir.console.v1.ApiProduct.endpoints:type_name -> vennir.console.v1.ApiEndpoint
-	22, // 2: vennir.console.v1.ApiProduct.problem_found_at:type_name -> google.protobuf.Timestamp
-	2,  // 3: vennir.console.v1.ApiProduct.limits:type_name -> vennir.console.v1.TeamLimit
-	1,  // 4: vennir.console.v1.ListApisResponse.apis:type_name -> vennir.console.v1.ApiProduct
-	1,  // 5: vennir.console.v1.GetApiResponse.api:type_name -> vennir.console.v1.ApiProduct
-	14, // 6: vennir.console.v1.GetApiTrafficResponse.endpoints:type_name -> vennir.console.v1.EndpointTraffic
-	15, // 7: vennir.console.v1.GetApiTrafficResponse.blocked:type_name -> vennir.console.v1.BlockedRequests
-	16, // 8: vennir.console.v1.GetApiTrafficResponse.teams:type_name -> vennir.console.v1.TeamTraffic
-	22, // 9: vennir.console.v1.BlockedRequests.last:type_name -> google.protobuf.Timestamp
-	22, // 10: vennir.console.v1.GetGatewayResponse.closed_at:type_name -> google.protobuf.Timestamp
-	19, // 11: vennir.console.v1.GetGatewayResponse.refused:type_name -> vennir.console.v1.RefusedRequests
-	4,  // 12: vennir.console.v1.ApiService.ListApis:input_type -> vennir.console.v1.ListApisRequest
-	6,  // 13: vennir.console.v1.ApiService.GetApi:input_type -> vennir.console.v1.GetApiRequest
-	8,  // 14: vennir.console.v1.ApiService.PauseApi:input_type -> vennir.console.v1.PauseApiRequest
-	10, // 15: vennir.console.v1.ApiService.ResumeApi:input_type -> vennir.console.v1.ResumeApiRequest
-	12, // 16: vennir.console.v1.ApiService.GetApiTraffic:input_type -> vennir.console.v1.GetApiTrafficRequest
-	17, // 17: vennir.console.v1.ApiService.GetGateway:input_type -> vennir.console.v1.GetGatewayRequest
-	20, // 18: vennir.console.v1.ApiService.SetGatewayClosed:input_type -> vennir.console.v1.SetGatewayClosedRequest
-	5,  // 19: vennir.console.v1.ApiService.ListApis:output_type -> vennir.console.v1.ListApisResponse
-	7,  // 20: vennir.console.v1.ApiService.GetApi:output_type -> vennir.console.v1.GetApiResponse
-	9,  // 21: vennir.console.v1.ApiService.PauseApi:output_type -> vennir.console.v1.PauseApiResponse
-	11, // 22: vennir.console.v1.ApiService.ResumeApi:output_type -> vennir.console.v1.ResumeApiResponse
-	13, // 23: vennir.console.v1.ApiService.GetApiTraffic:output_type -> vennir.console.v1.GetApiTrafficResponse
-	18, // 24: vennir.console.v1.ApiService.GetGateway:output_type -> vennir.console.v1.GetGatewayResponse
-	21, // 25: vennir.console.v1.ApiService.SetGatewayClosed:output_type -> vennir.console.v1.SetGatewayClosedResponse
-	19, // [19:26] is the sub-list for method output_type
-	12, // [12:19] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	47, // 0: vennir.console.v1.ApiGrant.created_at:type_name -> google.protobuf.Timestamp
+	47, // 1: vennir.console.v1.ApiGrant.updated_at:type_name -> google.protobuf.Timestamp
+	47, // 2: vennir.console.v1.ApiGrant.revoked_at:type_name -> google.protobuf.Timestamp
+	47, // 3: vennir.console.v1.ApiGrant.away_since:type_name -> google.protobuf.Timestamp
+	1,  // 4: vennir.console.v1.ApiAccessRequest.state:type_name -> vennir.console.v1.ApiAccessRequestState
+	47, // 5: vennir.console.v1.ApiAccessRequest.created_at:type_name -> google.protobuf.Timestamp
+	47, // 6: vennir.console.v1.ApiAccessRequest.decided_at:type_name -> google.protobuf.Timestamp
+	47, // 7: vennir.console.v1.ApiAccessRequest.groups_read_at:type_name -> google.protobuf.Timestamp
+	47, // 8: vennir.console.v1.ApiAccessRequest.away_since:type_name -> google.protobuf.Timestamp
+	4,  // 9: vennir.console.v1.RequestApiAccessResponse.request:type_name -> vennir.console.v1.ApiAccessRequest
+	3,  // 10: vennir.console.v1.RequestApiAccessResponse.grant:type_name -> vennir.console.v1.ApiGrant
+	4,  // 11: vennir.console.v1.DecideApiAccessRequestResponse.request:type_name -> vennir.console.v1.ApiAccessRequest
+	3,  // 12: vennir.console.v1.DecideApiAccessRequestResponse.grant:type_name -> vennir.console.v1.ApiGrant
+	3,  // 13: vennir.console.v1.AddApiGrantResponse.grant:type_name -> vennir.console.v1.ApiGrant
+	3,  // 14: vennir.console.v1.SetApiGrantRateResponse.grant:type_name -> vennir.console.v1.ApiGrant
+	3,  // 15: vennir.console.v1.ListApiAccessResponse.grants:type_name -> vennir.console.v1.ApiGrant
+	4,  // 16: vennir.console.v1.ListApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
+	0,  // 17: vennir.console.v1.MyApiAccess.via:type_name -> vennir.console.v1.ApiAccessVia
+	19, // 18: vennir.console.v1.ListMyApiAccessResponse.access:type_name -> vennir.console.v1.MyApiAccess
+	4,  // 19: vennir.console.v1.ListMyApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
+	3,  // 20: vennir.console.v1.ListTeamBotApiAccessResponse.grants:type_name -> vennir.console.v1.ApiGrant
+	4,  // 21: vennir.console.v1.ListTeamBotApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
+	2,  // 22: vennir.console.v1.ApiProduct.state:type_name -> vennir.console.v1.ApiState
+	26, // 23: vennir.console.v1.ApiProduct.endpoints:type_name -> vennir.console.v1.ApiEndpoint
+	47, // 24: vennir.console.v1.ApiProduct.problem_found_at:type_name -> google.protobuf.Timestamp
+	25, // 25: vennir.console.v1.ApiProduct.limits:type_name -> vennir.console.v1.TeamLimit
+	0,  // 26: vennir.console.v1.ApiProduct.access_via:type_name -> vennir.console.v1.ApiAccessVia
+	24, // 27: vennir.console.v1.ListApisResponse.apis:type_name -> vennir.console.v1.ApiProduct
+	24, // 28: vennir.console.v1.GetApiResponse.api:type_name -> vennir.console.v1.ApiProduct
+	37, // 29: vennir.console.v1.GetApiTrafficResponse.endpoints:type_name -> vennir.console.v1.EndpointTraffic
+	38, // 30: vennir.console.v1.GetApiTrafficResponse.blocked:type_name -> vennir.console.v1.BlockedRequests
+	39, // 31: vennir.console.v1.GetApiTrafficResponse.teams:type_name -> vennir.console.v1.TeamTraffic
+	47, // 32: vennir.console.v1.BlockedRequests.last:type_name -> google.protobuf.Timestamp
+	47, // 33: vennir.console.v1.GetGatewayResponse.closed_at:type_name -> google.protobuf.Timestamp
+	42, // 34: vennir.console.v1.GetGatewayResponse.refused:type_name -> vennir.console.v1.RefusedRequests
+	3,  // 35: vennir.console.v1.ListAwayApiAccessResponse.grants:type_name -> vennir.console.v1.ApiGrant
+	4,  // 36: vennir.console.v1.ListAwayApiAccessResponse.requests:type_name -> vennir.console.v1.ApiAccessRequest
+	27, // 37: vennir.console.v1.ApiService.ListApis:input_type -> vennir.console.v1.ListApisRequest
+	29, // 38: vennir.console.v1.ApiService.GetApi:input_type -> vennir.console.v1.GetApiRequest
+	31, // 39: vennir.console.v1.ApiService.PauseApi:input_type -> vennir.console.v1.PauseApiRequest
+	33, // 40: vennir.console.v1.ApiService.ResumeApi:input_type -> vennir.console.v1.ResumeApiRequest
+	35, // 41: vennir.console.v1.ApiService.GetApiTraffic:input_type -> vennir.console.v1.GetApiTrafficRequest
+	40, // 42: vennir.console.v1.ApiService.GetGateway:input_type -> vennir.console.v1.GetGatewayRequest
+	43, // 43: vennir.console.v1.ApiService.SetGatewayClosed:input_type -> vennir.console.v1.SetGatewayClosedRequest
+	5,  // 44: vennir.console.v1.ApiService.RequestApiAccess:input_type -> vennir.console.v1.RequestApiAccessRequest
+	7,  // 45: vennir.console.v1.ApiService.WithdrawApiAccessRequest:input_type -> vennir.console.v1.WithdrawApiAccessRequestRequest
+	9,  // 46: vennir.console.v1.ApiService.DecideApiAccessRequest:input_type -> vennir.console.v1.DecideApiAccessRequestRequest
+	11, // 47: vennir.console.v1.ApiService.AddApiGrant:input_type -> vennir.console.v1.AddApiGrantRequest
+	13, // 48: vennir.console.v1.ApiService.SetApiGrantRate:input_type -> vennir.console.v1.SetApiGrantRateRequest
+	15, // 49: vennir.console.v1.ApiService.RevokeApiGrant:input_type -> vennir.console.v1.RevokeApiGrantRequest
+	17, // 50: vennir.console.v1.ApiService.ListApiAccess:input_type -> vennir.console.v1.ListApiAccessRequest
+	20, // 51: vennir.console.v1.ApiService.ListMyApiAccess:input_type -> vennir.console.v1.ListMyApiAccessRequest
+	22, // 52: vennir.console.v1.ApiService.ListTeamBotApiAccess:input_type -> vennir.console.v1.ListTeamBotApiAccessRequest
+	45, // 53: vennir.console.v1.ApiService.ListAwayApiAccess:input_type -> vennir.console.v1.ListAwayApiAccessRequest
+	28, // 54: vennir.console.v1.ApiService.ListApis:output_type -> vennir.console.v1.ListApisResponse
+	30, // 55: vennir.console.v1.ApiService.GetApi:output_type -> vennir.console.v1.GetApiResponse
+	32, // 56: vennir.console.v1.ApiService.PauseApi:output_type -> vennir.console.v1.PauseApiResponse
+	34, // 57: vennir.console.v1.ApiService.ResumeApi:output_type -> vennir.console.v1.ResumeApiResponse
+	36, // 58: vennir.console.v1.ApiService.GetApiTraffic:output_type -> vennir.console.v1.GetApiTrafficResponse
+	41, // 59: vennir.console.v1.ApiService.GetGateway:output_type -> vennir.console.v1.GetGatewayResponse
+	44, // 60: vennir.console.v1.ApiService.SetGatewayClosed:output_type -> vennir.console.v1.SetGatewayClosedResponse
+	6,  // 61: vennir.console.v1.ApiService.RequestApiAccess:output_type -> vennir.console.v1.RequestApiAccessResponse
+	8,  // 62: vennir.console.v1.ApiService.WithdrawApiAccessRequest:output_type -> vennir.console.v1.WithdrawApiAccessRequestResponse
+	10, // 63: vennir.console.v1.ApiService.DecideApiAccessRequest:output_type -> vennir.console.v1.DecideApiAccessRequestResponse
+	12, // 64: vennir.console.v1.ApiService.AddApiGrant:output_type -> vennir.console.v1.AddApiGrantResponse
+	14, // 65: vennir.console.v1.ApiService.SetApiGrantRate:output_type -> vennir.console.v1.SetApiGrantRateResponse
+	16, // 66: vennir.console.v1.ApiService.RevokeApiGrant:output_type -> vennir.console.v1.RevokeApiGrantResponse
+	18, // 67: vennir.console.v1.ApiService.ListApiAccess:output_type -> vennir.console.v1.ListApiAccessResponse
+	21, // 68: vennir.console.v1.ApiService.ListMyApiAccess:output_type -> vennir.console.v1.ListMyApiAccessResponse
+	23, // 69: vennir.console.v1.ApiService.ListTeamBotApiAccess:output_type -> vennir.console.v1.ListTeamBotApiAccessResponse
+	46, // 70: vennir.console.v1.ApiService.ListAwayApiAccess:output_type -> vennir.console.v1.ListAwayApiAccessResponse
+	54, // [54:71] is the sub-list for method output_type
+	37, // [37:54] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_vennir_console_v1_api_proto_init() }
@@ -1772,8 +3624,8 @@ func file_vennir_console_v1_api_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vennir_console_v1_api_proto_rawDesc), len(file_vennir_console_v1_api_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   21,
+			NumEnums:      3,
+			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

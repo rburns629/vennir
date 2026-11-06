@@ -3,7 +3,8 @@
  * Deleting what's past its retention, hourly: submitted-execution records
  * (the kernel deletes the executions themselves after the same period),
  * audit entries, who read what (audit_reads), and scan verdicts of images nobody has used in a while
- * (scanned again if they're used again), and sign-in's bookkeeping. 0 keeps
+ * (scanned again if they're used again), sign-in's bookkeeping, and the access
+ * lists of APIs gone from the release for 30 days. 0 keeps
  * a kind forever.
  */
 import type { FastifyBaseLogger } from "fastify";
@@ -11,6 +12,7 @@ import { and, eq, isNotNull, isNull, lt, lte, ne, not, or, sql } from "drizzle-o
 import { config } from "./config.js";
 import { db } from "./db/client.js";
 import { digestInUse } from "./scanning.js";
+import { pruneAwayAccess } from "./core/apiAccess.js";
 import {
   apiTraffic,
   auditExport,
@@ -76,6 +78,8 @@ export async function deleteExpired(): Promise<{ executions: number; audit: numb
     : 0;
   // The gateway's traffic counts: a week. Notifications, order callbacks and the chat's ratings: 90 days.
   await db.delete(apiTraffic).where(lt(apiTraffic.minute, daysAgo(7)));
+  // An API's grants and requests, 30 days after it left the catalog's release.
+  await pruneAwayAccess();
   await db.delete(notificationEvents).where(lt(notificationEvents.createdAt, daysAgo(90)));
   await db.delete(callbackDeliveries).where(lt(callbackDeliveries.createdAt, daysAgo(90)));
   await db.delete(chatFeedback).where(lt(chatFeedback.createdAt, daysAgo(90)));

@@ -11,7 +11,8 @@
 // counts at once; a retired team (read-only in the console) calls as
 // nobody. While single sign-on groups come from an ID token's claim, a
 // membership a group gave counts only for a single sign-on session signed in
-// within the hour (claimGroupsSession). A token is never logged or kept.
+// within the hour (claimGroupsSession), and so do a person's groups for an
+// API's group grants (Caller.GroupsCurrent). A token is never logged or kept.
 package auth
 
 import (
@@ -41,6 +42,16 @@ type Caller struct {
 	IsBot   bool
 	// Teams are the teams the caller is in that may call: not retired ones.
 	Teams []string
+	// Groups are a person's single sign-on groups as the console last read
+	// them (user_groups), for an API's group grants; none for a bot.
+	Groups []string
+	// GroupsCurrent: Groups count now. Not while they come from an ID
+	// token's claim and this isn't a single sign-on session signed in within
+	// claimGroupsSession (the console's plugin.ts groupsCurrent, the same).
+	GroupsCurrent bool
+	// SSOSession: signed in with single sign-on (so it can sign in again to
+	// have its groups read), not a password or an API token.
+	SSOSession bool
 }
 
 // ErrUnauthenticated is a missing, malformed, expired or revoked credential.
@@ -60,6 +71,11 @@ const tokenUseResolution = 5 * time.Minute
 // token's claim, which only a sign-in reads: the console's
 // CLAIM_GROUPS_SESSION_SECONDS (console/src/sso.ts), the same.
 const claimGroupsSession = time.Hour
+
+// googleGroupsFresh is how long Google Workspace groups, read hourly
+// between sign-ins, count for an API's group grant after they were read:
+// the console's GOOGLE_GROUPS_FRESH_SECONDS (console/src/sso.ts), the same.
+const googleGroupsFresh = 90 * time.Minute
 
 // uuidPattern is a user id as the console makes them: anything else in a
 // session names nobody.
@@ -227,6 +243,39 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	if passwordSession && ssoRequired && !c.IsAdmin && ssoOn {
 		return nil, ErrUnauthenticated
 	}
+	c.SSOSession = ssoSession
+	// A person's groups, for an API's group grants: counting, as group-given
+	// teams do, only while they can't be stale (with groups from a claim,
+	// for a recent single sign-on). Whether a group grant is the caller's
+	// only way in is the API's question (the gateway's accessFor).
+	if !c.IsBot {
+		// The groups, with the settings that say whether they count: the
+		// group rows read within googleGroupsFresh (only Google's are
+		// read between sign-ins; a claim's count by the session instead).
+		var ssoSaved, claimSet, googleSet bool
+		var all, fresh []string
+		if err := r.DB.QueryRow(ctx, `SELECT
+			ARRAY(SELECT group_name FROM user_groups WHERE user_id = $1::uuid ORDER BY group_name COLLATE "C"),
+			ARRAY(SELECT group_name FROM user_groups WHERE user_id = $1::uuid AND read_at > $2 ORDER BY group_name COLLATE "C"),
+			COALESCE((SELECT s.enabled AND s.issuer <> '' AND s.client_id <> '' AND s.redirect_url <> '' FROM sso_settings s WHERE s.id = 1), false),
+			COALESCE((SELECT s.groups_claim <> '' FROM sso_settings s WHERE s.id = 1), false),
+			COALESCE((SELECT s.google_groups FROM sso_settings s WHERE s.id = 1), false)`, c.UserID, r.now().Add(-googleGroupsFresh)).
+			Scan(&all, &fresh, &ssoSaved, &claimSet, &googleSet); err != nil {
+			return nil, err
+		}
+		// Groups count only while single sign-on is on and a source is set:
+		// with a claim, for a single sign-on from the last hour; with
+		// Google's alone, the rows read within googleGroupsFresh, so a
+		// resync that keeps failing fails closed (the console's plugin.ts
+		// groupsCurrent and apiAccess.ts groupsOf, the same).
+		sourceOn := r.ssoOn(ssoSaved) && (claimSet || googleSet)
+		switch {
+		case claimSet:
+			c.Groups, c.GroupsCurrent = all, sourceOn && recentSSO
+		default:
+			c.Groups, c.GroupsCurrent = fresh, sourceOn
+		}
+	}
 	return &c, nil
 }
 
@@ -241,7 +290,12 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 // meanwhile, with a groups claim saved, the gateway drops group-given teams
 // from API tokens and password sessions, and refuses older single sign-on
 // sessions holding one, where the console counts them. It errs on the
-// refusing side.
+// refusing side there. For an API's group grants, where on would be the
+// permissive side, the console stops reading groups while it treats single
+// sign-on as off (no sign-in reads them, and its Google resync runs only
+// while single sign-on is in effect), so Google's rows age out past
+// googleGroupsFresh and a claim's need a recent single sign-on, which can't
+// be had: groups stop counting here too.
 func (r *Resolver) ssoOn(saved bool) bool {
 	return r.SSO || saved
 }

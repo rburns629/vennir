@@ -14,7 +14,8 @@ The OpenAPI file is the allowlist. The gateway forwards a request only when its 
 | **Gateway** | The install's one front door for every API. It signs callers in, checks each request against the spec, and forwards it |
 | **Spec** | The API's OpenAPI file, reviewed in the catalog like any product |
 | **Backend** | Where the gateway forwards to. Only the API's own team (and admins) see its address |
-| **Shared with** | The teams that may call it (`shareWith` in `api.yaml`). Left out, only its own team |
+| **Grant** | Who else may call it: a single sign-on group (everyone in it) or one user (a person or a bot), each at its own rate, kept by this install's console ([access](#how-do-i-get-access-to-an-api)) |
+| **Shared with** | The teams that may call it from the catalog (`shareWith` in `api.yaml`; deprecated, goes in the next release). Left out, only its own team and its grants |
 
 ## Finding an API: the APIs page
 
@@ -25,7 +26,7 @@ The OpenAPI file is the allowlist. The gateway forwards a request only when its 
 | **API** | Its display name, `<team>/<name>`, what it does, and whether it's deprecated |
 | **State** | **Live**, **Held**, **Paused** or **Can’t serve** ([states](#what-do-live-held-paused-and-cant-serve-mean)), with why it's held or can't serve, or the pause message |
 | **Endpoints** | How many operations its spec describes |
-| **You** | **Your team’s** or **May call**, with your team's limit (requests a minute, request size, timeout); **Not shared** when the gateway refuses your calls, with a link to ask its team |
+| **You** | **Your team’s** or **May call**, with your limit (requests a minute, request size, timeout); **Not shared** when the gateway refuses your calls, with a link to ask its team. (Until the console's pages for grants arrive, **May call** covers a grant to you or to a group of yours too: [access](#how-do-i-get-access-to-an-api).) |
 | **Reachable** | **In the cluster**, or **Internet** when it's also on the gateway's public address |
 
 Beside the list, **Calling any of them** gives the gateway's addresses and how to sign in (and, for a team's maintainer, a link to its bots), and **Publishing one of yours** how an API gets here.
@@ -57,17 +58,39 @@ Click an API to open its page, one page from top to bottom. Everyone who can see
 - **What happens to a request**: the gateway's checks, in order.
 - **Download its OpenAPI file**: the spec as JSON, to generate a client or read the schemas.
 
-If the API isn't shared with your teams, the page says so: the gateway refuses your calls with 403. Calls are made as one of your teams, so an account in no team can't call any API, not even one shared with everyone.
+If you may not call the API, the page says so: the gateway refuses your calls with 403. Without a grant, calls are made as one of your teams, so an account in no team can call only what a grant lets it, not even one shared with everyone.
 
 Its own team and admins also get a pill saying **You maintain it**, **Your team's** or **Viewing as admin**, and the parts only they see, linked from **On this page**: **Endpoints and traffic** (each endpoint's traffic, [traffic](#watching-your-apis-traffic)), **Backend and pausing** ([pausing](#pausing-an-api-during-an-incident)) and **Backend logs** ([logs](#where-are-my-api-backends-logs)).
 
 ## How do I get access to an API?
 
-An API's team decides who may call it, in its `api.yaml` (`shareWith`, a list of teams, or `["*"]` for every team). On the **APIs** page, or the API's own page, **Ask for access ↗** opens a new issue on the catalog repository, filled in, in your own browser, asking the owning team to add yours. The console never changes the catalog itself: the team adds yours in a reviewed change like any other, and you may call the API once the release with it reaches this install. When the console can't build that issue (the catalog isn't on GitHub, or the API didn't come from a release), the link goes to the team's page, to ask them there.
+Each API has an access list, kept by this install's console (decision 26): **grants**, each naming a single sign-on group (everyone in it may call) or one user, a person or a bot (bots are in no group, so each service that calls is named). Who may call an API, as the gateway checks it on every request:
 
-Access is per team, not per person. Once your team is in `shareWith`, every member of your team, and your team's bots, may call it. Who's in a team is read on every request, so being added to or removed from a team counts at once.
+1. **Its own team's members and bots**, always, at the team's limit.
+2. **A user a grant names**, at the grant's rate. A bot's grant counts while one of the bot's teams isn't retired.
+3. **A person in a group a grant names**, at the grant's rate (each member's own), the best of their groups'. Bots never get in through a group. Groups count only while single sign-on is on and a group source is set, as the console last read them: at each single sign-on, and every hour for Google Workspace groups. While groups come from the ID token's claim, they count only for a single sign-on from the last hour: an older one is asked to sign in again (401), and a password's session or a bot token doesn't count them. With Google's groups alone, a group read over 90 minutes ago doesn't count, so a resync that keeps failing fails closed. When an admin changes where groups come from (or turns single sign-on off), nobody's groups count until they're read again.
+4. **For this release only, a team its `api.yaml`'s `shareWith` names** (deprecated): its members and bots, at that team's limit, shown as *from the catalog*. They can't be revoked in the console; the API's team grants the people and bots that call it, then removes `shareWith`, which goes in the next release.
 
-Each calling team has its own rate limit: the one `api.yaml` sets for your team by name, else its `default`, else the install's default. The API's page lists them for everyone who can see it: each team its `api.yaml` names, and what every other team gets.
+Anyone else is refused with 403 `NOT_GRANTED`, admins included: an admin may call only what a grant lets them, and a grant to themselves is audited like any other. A grant also lets its people see a hidden API.
+
+| To | Who | How (`ApiService`) |
+| --- | --- | --- |
+| Ask for access for yourself, with a reason | Any signed-in person | `RequestApiAccess` |
+| Ask for access for a bot | A maintainer of the bot's team | `RequestApiAccess` with `bot_email` |
+| Withdraw a request while it waits | Whoever asked | `WithdrawApiAccessRequest` |
+| Approve a request (the person; or one of their groups: one they were in when they asked, or, with Google Workspace groups, any group Google says they're in as you approve; a bot by name), at a rate, or decline it with a reason | The API's team's maintainers | `DecideApiAccessRequest` |
+| Grant a group or a user directly; change a grant's rate | The API's team's maintainers (not an admin, unless they maintain it) | `AddApiGrant`, `SetApiGrantRate` |
+| Revoke a grant | The API's team's maintainers; an admin (an incident); the person it names; a maintainer of the bot it names | `RevokeApiGrant` |
+| See an API's grants and requests, revoked and answered ones too | Its team, and admins | `ListApiAccess` |
+| See what you may call, and how, and your requests | Anyone | `ListMyApiAccess` |
+| See a team's bots' grants and requests | Its members, and admins | `ListTeamBotApiAccess` |
+| See the grants and requests of a team's APIs that left the release, each marked away since when; revoke one meanwhile | Its members see them; its maintainers (while the team isn't retired) and admins revoke | `ListAwayApiAccess`, `RevokeApiGrant` |
+
+How a request is answered is the API's `api.yaml` (`access.requests`): `open` grants it at once, at the API's default limit; `approval` (the default) waits for its maintainers; `closed` takes none (grants already made stay until revoked). A request is refused while you may call the API already, or while one of yours waits; after a decline you may ask again at once. A revoked grant stops calls within the gateway's refresh (a few seconds; well under a minute). Grants are this install's own: the catalog doesn't carry them, and another install reading the same catalog has its own. An API that leaves the catalog's release keeps its grants and requests for 30 days, listed as away since when it left (`ListAwayApiAccess`) and revocable meanwhile by its team's maintainers and admins; they let nobody call anything while it's gone. Back within those 30 days under the same team and name, it has them again (one that would duplicate a grant or request made meanwhile is superseded: revoked, or declined, saying so); after them, its grants are deleted, its waiting requests declined ("The API left the catalog's release over 30 days ago"), and a later API of that name starts with none. A group is named as single sign-on group mappings name it: trimmed and lowercased, spaces and all. A waiting request shows the API's maintainers, and only them, the person's groups (as they were when they asked, or as read since, whichever is later) and when they were read; a group read over 24 hours ago can't be granted from them (`GROUPS_STALE`: ask them to sign in again, then decide), unless Google Workspace confirms it as you approve. Changing where groups come from empties waiting requests' copies too; the gateway keeps only the groups that matter (mapped to a team, or granted an API), never everything a sign-in read. Nothing is granted to or for a retired team's API, nor to a bot whose teams are all retired. Every request, decision, grant, rate change and revocation is audited, and told in the console's inbox (kind `api_access`) to whom it's for, whoever asked (for a bot, its team's maintainers) and the API's team's maintainers.
+
+The console's pages for this come in the next release; until then, call these methods [as the API guide shows](05-calling-the-api.md). **Ask for access ↗** still opens an issue on the catalog repository, as for `shareWith`.
+
+**Rates.** A team that calls (its own, or a `shareWith` team) gets the limit `api.yaml` names for it, else its `default`, else the install's default. A grant gets its own rate, else (none set) the API's `default`, else the install's default: `api.yaml`'s per-team limits are for calling teams only. A group's rate is each member's. The API's page lists the teams' limits for everyone who can see it.
 
 ## How do I call an API through the gateway?
 
@@ -83,7 +106,7 @@ The gateway signs you in exactly as the console does. The token is one of:
 - **a bot's API token** (starts with `mp_`), the usual choice for a script or a service. A maintainer makes one on the team page's **Automation** tab ([Get a token](05-calling-the-api.md#1-get-a-token));
 - **a person's console session**. A session issued before your last password change, or one you signed out of, is refused. If one of your teams requires single sign-on, a password session is refused too (admins excepted).
 
-If you're in more than one team that may call the API, the gateway picks one: the API's own team if you're in it, else the first of yours it's shared with. To choose, send `Vennir-Team: <team>`. Your calls then count against that team's limit, and it's refused with 403 if you're not in that team or it may not call the API.
+If you may call the API more than one way, the gateway picks in [its order](#how-do-i-get-access-to-an-api): the API's own team if you're in it, else a grant to you, else a group's grant, else the first of your teams it's shared with. `Vennir-Team: <team>` chooses a team to call as, for its limit: your own team's, or one it's shared with. It gives no access a grant doesn't, and it's refused with 403 if you're not in that team or it may not call the API.
 
 Every answer carries two headers worth keeping:
 
@@ -99,13 +122,13 @@ For each request to `/<team>/<name>/<path>`:
 0. **Your address hasn't kept failing to sign in.** After 60 requests in a minute from one address that didn't sign in (an admin may change the number), every request from that address is refused with 429 and `Retry-After` until it's under again, whichever API it's for, signed in or not. Behind one shared address (an office's, a NAT's), one caller's bad token can hold up the rest: fix the token, and wait out `Retry-After`.
 1. **The API exists here.** On the public address, only APIs reachable from the internet are served. Else 404.
 2. **You're signed in.** Else 401; but 404 for a hidden or paused API, which before you sign in is answered as one that isn't there.
-3. **You may see it.** A hidden API is only for its own team and admins, whatever it's shared with. Else 404, as in the console.
+3. **You may see it.** A hidden API is only for its own team, admins, and those a grant lets in, whatever it's shared with. Else 404, as in the console.
 4. **It's open.** Not closed by an admin, not paused, not held, and its spec could be read. Else 503.
-5. **It's shared with your team.** Else 403.
+5. **You may call it**: your own team's, a grant to you or a group of yours, or shared with one of your teams ([access](#how-do-i-get-access-to-an-api)). Else 403 `NOT_GRANTED`, or 401 for an older single sign-on session whose only way in is a group's grant while groups come from a claim.
 6. **The body isn't too large** for this API (`maxRequest`, 1 MiB unless it says otherwise), and arrives within 30 seconds. Else 413, or 408 for a body that took too long. The answer has no such limit: it streams for as long as the backend sends.
 7. **The method and path are an operation in the spec.** Else 404, and the request is counted as blocked.
 8. **Parameters, headers and body fit that operation's schemas**, with no query parameter it doesn't declare, a body only where it declares one, and that body with a `Content-Type`. Else 400, with what didn't fit.
-9. **Your team is within its requests a minute.** Else 429, with `Retry-After`.
+9. **You're within your requests a minute**: your calling team's, or your grant's (a group's, your own share of it). Else 429, with `Retry-After`.
 10. **Forwarded** to the backend, with the backend's own credential. `X-Forwarded-For` is the address the gateway got the request from (on the public address, the ingress's); a caller's own `Forwarded`, `X-Forwarded-*` and `X-Real-Ip` are dropped. A cookie the backend sets is kept to the API's own path (`/<team>/<name>/`, its `Path` as callers see it, without the backend's base path), since every API shares the gateway's address; a `__Host-` cookie, which must cover the whole address, is dropped.
 
 A path with an encoded slash (`%2F`), a backslash (`%5C`), or a `.`, `..`, `.;…` or `..;…` segment is refused with 404 before any of this, so the path that's checked is the path that's forwarded.
@@ -118,14 +141,14 @@ The gateway's own answers are JSON, `{"error": "<code>", "message": "…"}`, and
 
 | Status | `error` | Means | What to do |
 | --- | --- | --- | --- |
-| 401 | `UNAUTHENTICATED` | No token, or it's invalid, expired or revoked | Send `Authorization: Bearer <token>`; make a new bot token if it expired |
-| 403 | `NOT_SHARED` | The API isn't shared with your team, or not with the team in `Vennir-Team` | [Ask for access](#how-do-i-get-access-to-an-api) |
+| 401 | `UNAUTHENTICATED` | No token, or it's invalid, expired or revoked; or your way in is a group's grant, and your single sign-on is over an hour old while groups come from a claim | Send `Authorization: Bearer <token>`; make a new bot token if it expired; sign in again |
+| 403 | `NOT_GRANTED` | You may not call it: it isn't your team's, and no grant names you or a group of yours (nor, this release, does `shareWith` name a team of yours); or you sent `Vennir-Team` for a team that may not call it. The message names the API's page | [Ask for access](#how-do-i-get-access-to-an-api) |
 | 404 | `NOT_IN_SPEC` | The spec has no such method and path. Nothing was forwarded | Check the endpoint list on its **Overview** |
 | 404 | `NOT_FOUND` | No such API here (or not on the public address, or one hidden from you, or one that's hidden or paused while you aren't signed in), or the path has an encoded slash, a backslash or a dot segment | Check the address on its **Overview**, and your token |
 | 400 | `INVALID_REQUEST` | The request doesn't fit the spec's schemas | Read `problems`; compare with the downloaded spec |
 | 408 | `REQUEST_TIMEOUT` | The body didn't arrive in time. Nothing was forwarded | Send it at once, not slowly; send less over a slow link |
 | 413 | `TOO_LARGE` | The body is larger than this API takes | Send less; the limit is on its **Overview** |
-| 429 | `RATE_LIMITED` | Your team used this API's requests for the minute, or your address failed to sign in too often | Wait for `Retry-After` seconds; if you weren't signed in, fix your token first |
+| 429 | `RATE_LIMITED` | Your team, or your grant, used this API's requests for the minute, or your address failed to sign in too often | Wait for `Retry-After` seconds; if you weren't signed in, fix your token first |
 | 503 | `API_PAUSED` | Its team paused it; the message says why | Wait, or ask its team |
 | 503 | `API_HELD` | Its backend isn't one this install allows yet | Its team asks an admin ([held](#why-is-my-api-held)) |
 | 503 | `GATEWAY_CLOSED` | An admin closed the gateway; the message says why | Wait, or ask an admin |
@@ -146,7 +169,7 @@ The request as you sent it: the same method, path (below `/<team>/<name>`), quer
 - headers that would make a backend run another method or path than the one checked against the OpenAPI document (`X-HTTP-Method-Override`, `X-HTTP-Method`, `X-Method-Override`, `X-Original-URL`, `X-Rewrite-URL`) are dropped, and so are your `X-Amz-*` headers when the backend is signed with SigV4. A request with a `_method` field, in its query or a form body, or with two `Content-Type` headers, is refused (`INVALID_REQUEST`), and so is one with a `;` in its path (or `%3B`), unless the API's OpenAPI document has a path parameter with `style: matrix`;
 - the gateway adds `Vennir-Caller` and `Vennir-Request-Id`.
 
-`Vennir-Caller` is a short-lived token (60 seconds) the gateway signs, naming who called (their user id and email, and whether it's a bot), the team they called as, and the API. A backend that cares checks it against the gateway's public key at `/.vennir/jwks.json` on the gateway; one that doesn't can ignore it.
+`Vennir-Caller` is a short-lived token (60 seconds) the gateway signs, naming who called (their user id and email, and whether it's a bot), how they may call (`via`: `team`, `user` for a grant to them, `group` with the `group` its grant names, or `catalog` for a `shareWith` team), the team they called as (empty for a grant), and the API. A backend that cares checks it against the gateway's public key at `/.vennir/jwks.json` on the gateway; one that doesn't can ignore it.
 
 The backend's answer goes back to you unchanged. A redirect from the backend goes back to you too; the gateway doesn't follow it.
 
@@ -154,7 +177,7 @@ The gateway never records a body, a header's value or a credential. Its logs and
 
 ## Watching your API's traffic
 
-On your API's page, **Endpoints and traffic** shows what callers sent, what the gateway stopped and what your backend answered, for **Last 24 hours** or **Last 7 days**. Bodies are never recorded, and callers only by team.
+On your API's page, **Endpoints and traffic** shows what callers sent, what the gateway stopped and what your backend answered, for **Last 24 hours** or **Last 7 days**. Bodies are never recorded, and callers only by team: those a grant lets in as `grant:user`, or `grant:group:<group>` for a group's, never by name.
 
 | Card or table | Shows |
 | --- | --- |

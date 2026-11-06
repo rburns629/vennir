@@ -14,6 +14,691 @@ import type { Timestamp } from "@bufbuild/protobuf/wkt";
 export declare const file_vennir_console_v1_api: GenFile;
 
 /**
+ * @generated from message vennir.console.v1.ApiGrant
+ */
+export declare type ApiGrant = Message<"vennir.console.v1.ApiGrant"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * The API: <team>/<name>.
+   *
+   * @generated from field: string team = 2;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * Exactly one of: a single sign-on group (lowercased), or a user.
+   *
+   * @generated from field: string group = 4;
+   */
+  group: string;
+
+  /**
+   * @generated from field: string user_id = 5;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: string user_email = 6;
+   */
+  userEmail: string;
+
+  /**
+   * @generated from field: bool bot = 7;
+   */
+  bot: boolean;
+
+  /**
+   * Requests a minute: the user's, or each of the group's members'. With
+   * default_rate, it's the API's default limit, and follows it.
+   *
+   * @generated from field: int32 per_minute = 8;
+   */
+  perMinute: number;
+
+  /**
+   * @generated from field: bool default_rate = 9;
+   */
+  defaultRate: boolean;
+
+  /**
+   * Who granted it (an email); empty for an open API's request.
+   *
+   * @generated from field: string granted_by = 10;
+   */
+  grantedBy: string;
+
+  /**
+   * The request it answered, if any.
+   *
+   * @generated from field: string access_request_id = 11;
+   */
+  accessRequestId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 12;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 13;
+   */
+  updatedAt?: Timestamp | undefined;
+
+  /**
+   * Set once revoked.
+   *
+   * @generated from field: google.protobuf.Timestamp revoked_at = 14;
+   */
+  revokedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string revoked_by = 15;
+   */
+  revokedBy: string;
+
+  /**
+   * Why the platform revoked it (superseded by a grant made while its API
+   * was away), when it did.
+   *
+   * @generated from field: string revoke_reason = 16;
+   */
+  revokeReason: string;
+
+  /**
+   * When its API left the catalog's release; unset while it's published.
+   * Removed 30 days after.
+   *
+   * @generated from field: google.protobuf.Timestamp away_since = 17;
+   */
+  awaySince?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.ApiGrant.
+ * Use `create(ApiGrantSchema)` to create a new message.
+ */
+export declare const ApiGrantSchema: GenMessage<ApiGrant>;
+
+/**
+ * @generated from message vennir.console.v1.ApiAccessRequest
+ */
+export declare type ApiAccessRequest = Message<"vennir.console.v1.ApiAccessRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string team = 2;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * Whom it's for: the person, or the bot.
+   *
+   * @generated from field: string user_id = 4;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: string user_email = 5;
+   */
+  userEmail: string;
+
+  /**
+   * @generated from field: bool bot = 6;
+   */
+  bot: boolean;
+
+  /**
+   * Who asked (an email): the person, or the bot's team's maintainer.
+   *
+   * @generated from field: string requested_by = 7;
+   */
+  requestedBy: string;
+
+  /**
+   * @generated from field: string reason = 8;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: vennir.console.v1.ApiAccessRequestState state = 9;
+   */
+  state: ApiAccessRequestState;
+
+  /**
+   * Who granted, declined or withdrew it, and a decline's reason.
+   *
+   * @generated from field: string decided_by = 10;
+   */
+  decidedBy: string;
+
+  /**
+   * @generated from field: string decision_reason = 11;
+   */
+  decisionReason: string;
+
+  /**
+   * @generated from field: string grant_id = 12;
+   */
+  grantId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 13;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp decided_at = 14;
+   */
+  decidedAt?: Timestamp | undefined;
+
+  /**
+   * A person's single sign-on groups (when they asked, or as read since),
+   * one of which may be granted instead: shown to the API's maintainers
+   * only, and only while it waits.
+   *
+   * @generated from field: repeated string groups = 15;
+   */
+  groups: string[];
+
+  /**
+   * When those groups were read: older than 24 hours, a group can't be
+   * granted from them (GROUPS_STALE) unless Google Workspace confirms it.
+   *
+   * @generated from field: google.protobuf.Timestamp groups_read_at = 16;
+   */
+  groupsReadAt?: Timestamp | undefined;
+
+  /**
+   * When its API left the catalog's release; unset while it's published.
+   *
+   * @generated from field: google.protobuf.Timestamp away_since = 17;
+   */
+  awaySince?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.ApiAccessRequest.
+ * Use `create(ApiAccessRequestSchema)` to create a new message.
+ */
+export declare const ApiAccessRequestSchema: GenMessage<ApiAccessRequest>;
+
+/**
+ * @generated from message vennir.console.v1.RequestApiAccessRequest
+ */
+export declare type RequestApiAccessRequest = Message<"vennir.console.v1.RequestApiAccessRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * Why: the API's maintainers read it. At most 1000 characters.
+   *
+   * @generated from field: string reason = 3;
+   */
+  reason: string;
+
+  /**
+   * For a bot of a team the caller maintains; empty: for the caller.
+   *
+   * @generated from field: string bot_email = 4;
+   */
+  botEmail: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.RequestApiAccessRequest.
+ * Use `create(RequestApiAccessRequestSchema)` to create a new message.
+ */
+export declare const RequestApiAccessRequestSchema: GenMessage<RequestApiAccessRequest>;
+
+/**
+ * @generated from message vennir.console.v1.RequestApiAccessResponse
+ */
+export declare type RequestApiAccessResponse = Message<"vennir.console.v1.RequestApiAccessResponse"> & {
+  /**
+   * @generated from field: vennir.console.v1.ApiAccessRequest request = 1;
+   */
+  request?: ApiAccessRequest | undefined;
+
+  /**
+   * Set when its requests are open: the grant made at once.
+   *
+   * @generated from field: vennir.console.v1.ApiGrant grant = 2;
+   */
+  grant?: ApiGrant | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.RequestApiAccessResponse.
+ * Use `create(RequestApiAccessResponseSchema)` to create a new message.
+ */
+export declare const RequestApiAccessResponseSchema: GenMessage<RequestApiAccessResponse>;
+
+/**
+ * @generated from message vennir.console.v1.WithdrawApiAccessRequestRequest
+ */
+export declare type WithdrawApiAccessRequestRequest = Message<"vennir.console.v1.WithdrawApiAccessRequestRequest"> & {
+  /**
+   * @generated from field: string access_request_id = 1;
+   */
+  accessRequestId: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.WithdrawApiAccessRequestRequest.
+ * Use `create(WithdrawApiAccessRequestRequestSchema)` to create a new message.
+ */
+export declare const WithdrawApiAccessRequestRequestSchema: GenMessage<WithdrawApiAccessRequestRequest>;
+
+/**
+ * @generated from message vennir.console.v1.WithdrawApiAccessRequestResponse
+ */
+export declare type WithdrawApiAccessRequestResponse = Message<"vennir.console.v1.WithdrawApiAccessRequestResponse"> & {
+};
+
+/**
+ * Describes the message vennir.console.v1.WithdrawApiAccessRequestResponse.
+ * Use `create(WithdrawApiAccessRequestResponseSchema)` to create a new message.
+ */
+export declare const WithdrawApiAccessRequestResponseSchema: GenMessage<WithdrawApiAccessRequestResponse>;
+
+/**
+ * @generated from message vennir.console.v1.DecideApiAccessRequestRequest
+ */
+export declare type DecideApiAccessRequestRequest = Message<"vennir.console.v1.DecideApiAccessRequestRequest"> & {
+  /**
+   * @generated from field: string access_request_id = 1;
+   */
+  accessRequestId: string;
+
+  /**
+   * @generated from field: bool approve = 2;
+   */
+  approve: boolean;
+
+  /**
+   * Approving a person's: grant this group of theirs instead of the person.
+   *
+   * @generated from field: string group = 3;
+   */
+  group: string;
+
+  /**
+   * Approving: requests a minute; 0, the API's default limit.
+   *
+   * @generated from field: int32 per_minute = 4;
+   */
+  perMinute: number;
+
+  /**
+   * Declining: why (required), which the person is told.
+   *
+   * @generated from field: string reason = 5;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.DecideApiAccessRequestRequest.
+ * Use `create(DecideApiAccessRequestRequestSchema)` to create a new message.
+ */
+export declare const DecideApiAccessRequestRequestSchema: GenMessage<DecideApiAccessRequestRequest>;
+
+/**
+ * @generated from message vennir.console.v1.DecideApiAccessRequestResponse
+ */
+export declare type DecideApiAccessRequestResponse = Message<"vennir.console.v1.DecideApiAccessRequestResponse"> & {
+  /**
+   * @generated from field: vennir.console.v1.ApiAccessRequest request = 1;
+   */
+  request?: ApiAccessRequest | undefined;
+
+  /**
+   * @generated from field: vennir.console.v1.ApiGrant grant = 2;
+   */
+  grant?: ApiGrant | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.DecideApiAccessRequestResponse.
+ * Use `create(DecideApiAccessRequestResponseSchema)` to create a new message.
+ */
+export declare const DecideApiAccessRequestResponseSchema: GenMessage<DecideApiAccessRequestResponse>;
+
+/**
+ * @generated from message vennir.console.v1.AddApiGrantRequest
+ */
+export declare type AddApiGrantRequest = Message<"vennir.console.v1.AddApiGrantRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * Exactly one of: a single sign-on group, or a user by email.
+   *
+   * @generated from field: string group = 3;
+   */
+  group: string;
+
+  /**
+   * @generated from field: string email = 4;
+   */
+  email: string;
+
+  /**
+   * Requests a minute; 0, the API's default limit.
+   *
+   * @generated from field: int32 per_minute = 5;
+   */
+  perMinute: number;
+};
+
+/**
+ * Describes the message vennir.console.v1.AddApiGrantRequest.
+ * Use `create(AddApiGrantRequestSchema)` to create a new message.
+ */
+export declare const AddApiGrantRequestSchema: GenMessage<AddApiGrantRequest>;
+
+/**
+ * @generated from message vennir.console.v1.AddApiGrantResponse
+ */
+export declare type AddApiGrantResponse = Message<"vennir.console.v1.AddApiGrantResponse"> & {
+  /**
+   * @generated from field: vennir.console.v1.ApiGrant grant = 1;
+   */
+  grant?: ApiGrant | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.AddApiGrantResponse.
+ * Use `create(AddApiGrantResponseSchema)` to create a new message.
+ */
+export declare const AddApiGrantResponseSchema: GenMessage<AddApiGrantResponse>;
+
+/**
+ * @generated from message vennir.console.v1.SetApiGrantRateRequest
+ */
+export declare type SetApiGrantRateRequest = Message<"vennir.console.v1.SetApiGrantRateRequest"> & {
+  /**
+   * @generated from field: string grant_id = 1;
+   */
+  grantId: string;
+
+  /**
+   * Requests a minute; 0, the API's default limit.
+   *
+   * @generated from field: int32 per_minute = 2;
+   */
+  perMinute: number;
+};
+
+/**
+ * Describes the message vennir.console.v1.SetApiGrantRateRequest.
+ * Use `create(SetApiGrantRateRequestSchema)` to create a new message.
+ */
+export declare const SetApiGrantRateRequestSchema: GenMessage<SetApiGrantRateRequest>;
+
+/**
+ * @generated from message vennir.console.v1.SetApiGrantRateResponse
+ */
+export declare type SetApiGrantRateResponse = Message<"vennir.console.v1.SetApiGrantRateResponse"> & {
+  /**
+   * @generated from field: vennir.console.v1.ApiGrant grant = 1;
+   */
+  grant?: ApiGrant | undefined;
+};
+
+/**
+ * Describes the message vennir.console.v1.SetApiGrantRateResponse.
+ * Use `create(SetApiGrantRateResponseSchema)` to create a new message.
+ */
+export declare const SetApiGrantRateResponseSchema: GenMessage<SetApiGrantRateResponse>;
+
+/**
+ * @generated from message vennir.console.v1.RevokeApiGrantRequest
+ */
+export declare type RevokeApiGrantRequest = Message<"vennir.console.v1.RevokeApiGrantRequest"> & {
+  /**
+   * @generated from field: string grant_id = 1;
+   */
+  grantId: string;
+
+  /**
+   * Why, for the audit log and whoever it named. Optional.
+   *
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.RevokeApiGrantRequest.
+ * Use `create(RevokeApiGrantRequestSchema)` to create a new message.
+ */
+export declare const RevokeApiGrantRequestSchema: GenMessage<RevokeApiGrantRequest>;
+
+/**
+ * @generated from message vennir.console.v1.RevokeApiGrantResponse
+ */
+export declare type RevokeApiGrantResponse = Message<"vennir.console.v1.RevokeApiGrantResponse"> & {
+};
+
+/**
+ * Describes the message vennir.console.v1.RevokeApiGrantResponse.
+ * Use `create(RevokeApiGrantResponseSchema)` to create a new message.
+ */
+export declare const RevokeApiGrantResponseSchema: GenMessage<RevokeApiGrantResponse>;
+
+/**
+ * @generated from message vennir.console.v1.ListApiAccessRequest
+ */
+export declare type ListApiAccessRequest = Message<"vennir.console.v1.ListApiAccessRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListApiAccessRequest.
+ * Use `create(ListApiAccessRequestSchema)` to create a new message.
+ */
+export declare const ListApiAccessRequestSchema: GenMessage<ListApiAccessRequest>;
+
+/**
+ * @generated from message vennir.console.v1.ListApiAccessResponse
+ */
+export declare type ListApiAccessResponse = Message<"vennir.console.v1.ListApiAccessResponse"> & {
+  /**
+   * Active ones first, then revoked, newest first.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiGrant grants = 1;
+   */
+  grants: ApiGrant[];
+
+  /**
+   * Waiting ones first, then the rest, newest first.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
+   */
+  requests: ApiAccessRequest[];
+
+  /**
+   * From the catalog (shareWith, deprecated): teams whose members and bots
+   * may call it, not revocable here.
+   *
+   * @generated from field: repeated string share_with = 3;
+   */
+  shareWith: string[];
+};
+
+/**
+ * Describes the message vennir.console.v1.ListApiAccessResponse.
+ * Use `create(ListApiAccessResponseSchema)` to create a new message.
+ */
+export declare const ListApiAccessResponseSchema: GenMessage<ListApiAccessResponse>;
+
+/**
+ * @generated from message vennir.console.v1.MyApiAccess
+ */
+export declare type MyApiAccess = Message<"vennir.console.v1.MyApiAccess"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: vennir.console.v1.ApiAccessVia via = 3;
+   */
+  via: ApiAccessVia;
+
+  /**
+   * VIA_TEAM and VIA_CATALOG: the team the gateway counts calls against.
+   *
+   * @generated from field: string calling_team = 4;
+   */
+  callingTeam: string;
+
+  /**
+   * VIA_GROUP: the group; VIA_USER and VIA_GROUP: the grant.
+   *
+   * @generated from field: string group = 5;
+   */
+  group: string;
+
+  /**
+   * @generated from field: string grant_id = 6;
+   */
+  grantId: string;
+
+  /**
+   * @generated from field: int32 per_minute = 7;
+   */
+  perMinute: number;
+};
+
+/**
+ * Describes the message vennir.console.v1.MyApiAccess.
+ * Use `create(MyApiAccessSchema)` to create a new message.
+ */
+export declare const MyApiAccessSchema: GenMessage<MyApiAccess>;
+
+/**
+ * @generated from message vennir.console.v1.ListMyApiAccessRequest
+ */
+export declare type ListMyApiAccessRequest = Message<"vennir.console.v1.ListMyApiAccessRequest"> & {
+};
+
+/**
+ * Describes the message vennir.console.v1.ListMyApiAccessRequest.
+ * Use `create(ListMyApiAccessRequestSchema)` to create a new message.
+ */
+export declare const ListMyApiAccessRequestSchema: GenMessage<ListMyApiAccessRequest>;
+
+/**
+ * @generated from message vennir.console.v1.ListMyApiAccessResponse
+ */
+export declare type ListMyApiAccessResponse = Message<"vennir.console.v1.ListMyApiAccessResponse"> & {
+  /**
+   * @generated from field: repeated vennir.console.v1.MyApiAccess access = 1;
+   */
+  access: MyApiAccess[];
+
+  /**
+   * Requests for the caller that wait, or were declined.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
+   */
+  requests: ApiAccessRequest[];
+};
+
+/**
+ * Describes the message vennir.console.v1.ListMyApiAccessResponse.
+ * Use `create(ListMyApiAccessResponseSchema)` to create a new message.
+ */
+export declare const ListMyApiAccessResponseSchema: GenMessage<ListMyApiAccessResponse>;
+
+/**
+ * @generated from message vennir.console.v1.ListTeamBotApiAccessRequest
+ */
+export declare type ListTeamBotApiAccessRequest = Message<"vennir.console.v1.ListTeamBotApiAccessRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListTeamBotApiAccessRequest.
+ * Use `create(ListTeamBotApiAccessRequestSchema)` to create a new message.
+ */
+export declare const ListTeamBotApiAccessRequestSchema: GenMessage<ListTeamBotApiAccessRequest>;
+
+/**
+ * @generated from message vennir.console.v1.ListTeamBotApiAccessResponse
+ */
+export declare type ListTeamBotApiAccessResponse = Message<"vennir.console.v1.ListTeamBotApiAccessResponse"> & {
+  /**
+   * The team's bots' active grants.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiGrant grants = 1;
+   */
+  grants: ApiGrant[];
+
+  /**
+   * The team's bots' requests that wait, or were declined.
+   *
+   * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
+   */
+  requests: ApiAccessRequest[];
+};
+
+/**
+ * Describes the message vennir.console.v1.ListTeamBotApiAccessResponse.
+ * Use `create(ListTeamBotApiAccessResponseSchema)` to create a new message.
+ */
+export declare const ListTeamBotApiAccessResponseSchema: GenMessage<ListTeamBotApiAccessResponse>;
+
+/**
  * @generated from message vennir.console.v1.ApiProduct
  */
 export declare type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
@@ -53,8 +738,8 @@ export declare type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
   pausedMessage: string;
 
   /**
-   * Whether the caller may call it: shared with one of their teams, or
-   * their own team's.
+   * Whether the caller may call it: their own team's, granted to them or a
+   * group of theirs, or shared with one of their teams (access_via).
    *
    * @generated from field: bool may_call = 8;
    */
@@ -106,8 +791,8 @@ export declare type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
   endpoints: ApiEndpoint[];
 
   /**
-   * Requests a minute the caller's team may send (its own limit, else the
-   * default); 0 when it may not call it.
+   * Requests a minute the caller may send (their grant's, or their team's
+   * own limit, else the default); 0 when they may not call it.
    *
    * @generated from field: int32 per_minute = 16;
    */
@@ -194,6 +879,20 @@ export declare type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
    * @generated from field: bool default_from_gateway = 29;
    */
   defaultFromGateway: boolean;
+
+  /**
+   * How the caller may call it (unspecified: they may not).
+   *
+   * @generated from field: vennir.console.v1.ApiAccessVia access_via = 30;
+   */
+  accessVia: ApiAccessVia;
+
+  /**
+   * api.yaml's access.requests: open, approval or closed.
+   *
+   * @generated from field: string access_requests = 31;
+   */
+  accessRequests: string;
 };
 
 /**
@@ -560,7 +1259,9 @@ export declare const BlockedRequestsSchema: GenMessage<BlockedRequests>;
  */
 export declare type TeamTraffic = Message<"vennir.console.v1.TeamTraffic"> & {
   /**
-   * "" for callers who weren't signed in.
+   * "" for callers who weren't signed in; "grant:user" for those a grant
+   * names, "grant:group:<group>" for those a group's grant lets in (no
+   * person is named; no team's name has a ":").
    *
    * @generated from field: string team = 1;
    */
@@ -734,6 +1435,124 @@ export declare type SetGatewayClosedResponse = Message<"vennir.console.v1.SetGat
 export declare const SetGatewayClosedResponseSchema: GenMessage<SetGatewayClosedResponse>;
 
 /**
+ * @generated from message vennir.console.v1.ListAwayApiAccessRequest
+ */
+export declare type ListAwayApiAccessRequest = Message<"vennir.console.v1.ListAwayApiAccessRequest"> & {
+  /**
+   * @generated from field: string team = 1;
+   */
+  team: string;
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAwayApiAccessRequest.
+ * Use `create(ListAwayApiAccessRequestSchema)` to create a new message.
+ */
+export declare const ListAwayApiAccessRequestSchema: GenMessage<ListAwayApiAccessRequest>;
+
+/**
+ * @generated from message vennir.console.v1.ListAwayApiAccessResponse
+ */
+export declare type ListAwayApiAccessResponse = Message<"vennir.console.v1.ListAwayApiAccessResponse"> & {
+  /**
+   * @generated from field: repeated vennir.console.v1.ApiGrant grants = 1;
+   */
+  grants: ApiGrant[];
+
+  /**
+   * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
+   */
+  requests: ApiAccessRequest[];
+};
+
+/**
+ * Describes the message vennir.console.v1.ListAwayApiAccessResponse.
+ * Use `create(ListAwayApiAccessResponseSchema)` to create a new message.
+ */
+export declare const ListAwayApiAccessResponseSchema: GenMessage<ListAwayApiAccessResponse>;
+
+/**
+ * How a caller may call an API (the gateway's rule, in its order).
+ *
+ * @generated from enum vennir.console.v1.ApiAccessVia
+ */
+export enum ApiAccessVia {
+  /**
+   * @generated from enum value: API_ACCESS_VIA_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * They're in its own team (a member or a bot).
+   *
+   * @generated from enum value: API_ACCESS_VIA_TEAM = 1;
+   */
+  TEAM = 1,
+
+  /**
+   * A grant names them.
+   *
+   * @generated from enum value: API_ACCESS_VIA_USER = 2;
+   */
+  USER = 2,
+
+  /**
+   * A grant names a single sign-on group they're in.
+   *
+   * @generated from enum value: API_ACCESS_VIA_GROUP = 3;
+   */
+  GROUP = 3,
+
+  /**
+   * Its api.yaml's shareWith names a team of theirs: from the catalog, not
+   * revocable here. Deprecated: goes with shareWith.
+   *
+   * @generated from enum value: API_ACCESS_VIA_CATALOG = 4;
+   */
+  CATALOG = 4,
+}
+
+/**
+ * Describes the enum vennir.console.v1.ApiAccessVia.
+ */
+export declare const ApiAccessViaSchema: GenEnum<ApiAccessVia>;
+
+/**
+ * @generated from enum vennir.console.v1.ApiAccessRequestState
+ */
+export enum ApiAccessRequestState {
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_WAITING = 1;
+   */
+  WAITING = 1,
+
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_GRANTED = 2;
+   */
+  GRANTED = 2,
+
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_DECLINED = 3;
+   */
+  DECLINED = 3,
+
+  /**
+   * @generated from enum value: API_ACCESS_REQUEST_STATE_WITHDRAWN = 4;
+   */
+  WITHDRAWN = 4,
+}
+
+/**
+ * Describes the enum vennir.console.v1.ApiAccessRequestState.
+ */
+export declare const ApiAccessRequestStateSchema: GenEnum<ApiAccessRequestState>;
+
+/**
  * @generated from enum vennir.console.v1.ApiState
  */
 export enum ApiState {
@@ -786,9 +1605,21 @@ export declare const ApiStateSchema: GenEnum<ApiState>;
  * from its team's catalog (apis/<name>/api.yaml); pausing one is the only
  * change made here.
  *
- * Everyone signed in sees the APIs that aren't hidden; those shared with
- * one of their teams they may call (may_call). The backend's address and
- * how the gateway signs in there are shown to the API's own team only.
+ * Everyone signed in sees the APIs that aren't hidden; they may call one
+ * (may_call) when it's their own team's, when it's granted to them or to a
+ * single sign-on group they're in, or, for this release, when its
+ * api.yaml's shareWith names one of their teams (decision 26). The
+ * backend's address and how the gateway signs in there are shown to the
+ * API's own team only.
+ *
+ * Access (decision 26): each API has grants, to a group (each person in it)
+ * or to one user (a person or a bot), each with its rate. Only the API's
+ * team's maintainers add grants or change their rates. A person asks for
+ * access for themselves; a maintainer of a bot's team asks for the bot.
+ * The API's maintainers approve (granting the person, or one of their
+ * groups) or decline. Revoking: the API's maintainers, an admin, the
+ * person a grant names, or the maintainers of the bot it names. Every
+ * change is audited and told to whoever it's for and the API's maintainers.
  *
  * @generated from service vennir.console.v1.ApiService
  */
@@ -869,6 +1700,121 @@ export declare const ApiService: GenService<{
     methodKind: "unary";
     input: typeof SetGatewayClosedRequestSchema;
     output: typeof SetGatewayClosedResponseSchema;
+  },
+  /**
+   * Asks for access to an API, with a reason: a person for themselves, or a
+   * maintainer of a bot's team for that bot (bot_email). Refused when its
+   * api.yaml takes no requests (access.requests: closed), when whoever
+   * it's for may call it already, or while a request of theirs waits. An
+   * API whose requests are open grants it at once, at its default limit.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.RequestApiAccess
+   */
+  requestApiAccess: {
+    methodKind: "unary";
+    input: typeof RequestApiAccessRequestSchema;
+    output: typeof RequestApiAccessResponseSchema;
+  },
+  /**
+   * Withdraws a request while it waits: whoever asked.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.WithdrawApiAccessRequest
+   */
+  withdrawApiAccessRequest: {
+    methodKind: "unary";
+    input: typeof WithdrawApiAccessRequestRequestSchema;
+    output: typeof WithdrawApiAccessRequestResponseSchema;
+  },
+  /**
+   * Grants (approve) or declines a waiting request: a maintainer of the
+   * API's team. Granting a person may grant one of their groups instead,
+   * as the console last read them; a bot is granted by name only.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.DecideApiAccessRequest
+   */
+  decideApiAccessRequest: {
+    methodKind: "unary";
+    input: typeof DecideApiAccessRequestRequestSchema;
+    output: typeof DecideApiAccessRequestResponseSchema;
+  },
+  /**
+   * Grants a group or a user (a person or a bot, by email) access: a
+   * maintainer of the API's team (not an admin, unless they maintain it).
+   *
+   * @generated from rpc vennir.console.v1.ApiService.AddApiGrant
+   */
+  addApiGrant: {
+    methodKind: "unary";
+    input: typeof AddApiGrantRequestSchema;
+    output: typeof AddApiGrantResponseSchema;
+  },
+  /**
+   * Changes a grant's rate: a maintainer of the API's team.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.SetApiGrantRate
+   */
+  setApiGrantRate: {
+    methodKind: "unary";
+    input: typeof SetApiGrantRateRequestSchema;
+    output: typeof SetApiGrantRateResponseSchema;
+  },
+  /**
+   * Revokes a grant: a maintainer of the API's team, an admin, the person
+   * it names, or a maintainer of the bot's team it names. The gateway stops
+   * its calls within its refresh (well under a minute).
+   *
+   * @generated from rpc vennir.console.v1.ApiService.RevokeApiGrant
+   */
+  revokeApiGrant: {
+    methodKind: "unary";
+    input: typeof RevokeApiGrantRequestSchema;
+    output: typeof RevokeApiGrantResponseSchema;
+  },
+  /**
+   * An API's grants (active and revoked) and requests: its own team, and
+   * admins.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListApiAccess
+   */
+  listApiAccess: {
+    methodKind: "unary";
+    input: typeof ListApiAccessRequestSchema;
+    output: typeof ListApiAccessResponseSchema;
+  },
+  /**
+   * The APIs the caller may call, and how (their team's, granted to them,
+   * through a group, from the catalog), and their requests that wait or
+   * were declined.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListMyApiAccess
+   */
+  listMyApiAccess: {
+    methodKind: "unary";
+    input: typeof ListMyApiAccessRequestSchema;
+    output: typeof ListMyApiAccessResponseSchema;
+  },
+  /**
+   * A team's bots' grants and requests: its members, and admins.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListTeamBotApiAccess
+   */
+  listTeamBotApiAccess: {
+    methodKind: "unary";
+    input: typeof ListTeamBotApiAccessRequestSchema;
+    output: typeof ListTeamBotApiAccessResponseSchema;
+  },
+  /**
+   * The grants and requests of a team's APIs that left the catalog's
+   * release (away_since): kept 30 days, to come back with an API of the
+   * same name, and revocable meanwhile by the team's maintainers and
+   * admins. Its members, and admins.
+   *
+   * @generated from rpc vennir.console.v1.ApiService.ListAwayApiAccess
+   */
+  listAwayApiAccess: {
+    methodKind: "unary";
+    input: typeof ListAwayApiAccessRequestSchema;
+    output: typeof ListAwayApiAccessResponseSchema;
   },
 }>;
 

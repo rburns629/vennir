@@ -22,6 +22,7 @@ const TONE: Record<Notification["kind"], string> = {
   product_not_ready: "warning.main",
   step_refused: "error.main",
   platform_alert: "warning.main",
+  api_access: "info.main",
 };
 
 /**

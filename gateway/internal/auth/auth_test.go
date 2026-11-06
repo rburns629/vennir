@@ -462,3 +462,86 @@ func TestClaimGroupsCountOnlyForARecentSignIn(t *testing.T) {
 		t.Errorf("without a claim, a password's session: %s", got)
 	}
 }
+
+// A person's groups (user_groups) come with them, for an API's group grants,
+// counting as group-given teams do: with groups from a claim, only for a
+// single sign-on session from the last hour; otherwise always. A bot has
+// none. A person in no team still gets them.
+func TestAPersonsGroupsCountAsTheirGroupGivenTeamsDo(t *testing.T) {
+	db := tx(t)
+	ctx := context.Background()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		_, err := db.Exec(ctx, sql, args...)
+		must(err)
+	}
+	var userID, botID string
+	must(db.QueryRow(ctx, `INSERT INTO users (email) VALUES ('gw-grouped@example.com') RETURNING id::text`).Scan(&userID))
+	must(db.QueryRow(ctx, `INSERT INTO users (email, is_bot) VALUES ('gw-grouped-bot@bots.vennir.local', true) RETURNING id::text`).Scan(&botID))
+	exec(`INSERT INTO user_groups (user_id, group_name) VALUES ($1, 'eng@example.com'), ($1, 'all@example.com'), ($2, 'eng@example.com')`, userID, botID)
+	token := APITokenPrefix + "grouped"
+	sum := sha256.Sum256([]byte(token))
+	exec(`INSERT INTO api_tokens (user_id, label, token_hash) VALUES ($1, 'ci', $2)`, botID, hex.EncodeToString(sum[:]))
+	now := time.Now()
+	r := &Resolver{DB: db, Keys: keys, SSO: true, Now: func() time.Time { return now }}
+	session := func(sso bool, ago time.Duration) string {
+		claims := map[string]any{"userId": userID, "iat": now.Add(-ago).Unix(), "exp": now.Add(8 * time.Hour).Unix()}
+		if sso {
+			claims["sso"] = true
+		}
+		return "Bearer " + jwt(t, secret, "EdDSA", claims)
+	}
+	resolve := func(header string) *Caller {
+		t.Helper()
+		who, err := r.Resolve(ctx, header)
+		must(err)
+		return who
+	}
+	exec(`INSERT INTO sso_settings (id, groups_claim) VALUES (1, 'groups') ON CONFLICT (id) DO UPDATE SET groups_claim = 'groups'`)
+	for name, c := range map[string]struct {
+		header       string
+		current, sso bool
+	}{
+		"a single sign-on from the last hour":       {session(true, time.Hour-time.Minute), true, true},
+		"a single sign-on an hour and a second ago": {session(true, time.Hour+time.Second), false, true},
+		"a password's session":                      {session(false, time.Minute), false, false},
+	} {
+		who := resolve(c.header)
+		if strings.Join(who.Groups, ",") != "all@example.com,eng@example.com" || who.GroupsCurrent != c.current || who.SSOSession != c.sso {
+			t.Errorf("%s, groups from a claim: %+v", name, who)
+		}
+	}
+	// Google's groups alone, read hourly: any session, while they're fresh.
+	exec(`UPDATE sso_settings SET groups_claim = '', google_groups = true WHERE id = 1`)
+	if who := resolve(session(true, 2*time.Hour)); !who.GroupsCurrent || len(who.Groups) != 2 {
+		t.Errorf("Google's groups, an older single sign-on: %+v", who)
+	}
+	if who := resolve(session(false, time.Minute)); !who.GroupsCurrent || len(who.Groups) != 2 {
+		t.Errorf("Google's groups, a password's session: %+v", who)
+	}
+	// The resync keeps failing: a row read over 90 minutes ago doesn't count.
+	exec(`UPDATE user_groups SET read_at = now() - interval '91 minutes' WHERE user_id = $1 AND group_name = 'all@example.com'`, userID)
+	if who := resolve(session(false, time.Minute)); strings.Join(who.Groups, ",") != "eng@example.com" {
+		t.Errorf("Google's groups, one read too long ago: %+v", who)
+	}
+	// No source set (the claim cleared, Google off): none count.
+	exec(`UPDATE sso_settings SET google_groups = false WHERE id = 1`)
+	if who := resolve(session(true, time.Minute)); who.GroupsCurrent {
+		t.Errorf("no group source: %+v", who)
+	}
+	// Single sign-on off (not the install's, and saved off): none count.
+	exec(`UPDATE sso_settings SET groups_claim = 'groups', enabled = false WHERE id = 1`)
+	off := &Resolver{DB: db, Keys: keys, Now: func() time.Time { return now }}
+	if who, err := off.Resolve(ctx, session(true, time.Minute)); err != nil || who.GroupsCurrent {
+		t.Errorf("single sign-on off: %+v, %v", who, err)
+	}
+	if bot := resolve("Bearer " + token); len(bot.Groups) != 0 || bot.GroupsCurrent || bot.SSOSession {
+		t.Errorf("a bot: %+v", bot)
+	}
+}

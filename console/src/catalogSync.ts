@@ -53,7 +53,7 @@ import { applySecretStore, CATALOG_RETIRER, ensureTeam, retireTeam } from "./cor
 import { parameterSchemaProblem, templateStepProblems } from "./core/templates.js";
 import { db } from "./db/client.js";
 import { deleteApisExcept, deleteTemplatesExcept, findTeamByName, replaceWiringTypes, upsertApi, upsertTemplate } from "./db/queries.js";
-import type { BackendAuth } from "./db/schema.js";
+import type { AccessRequests, BackendAuth } from "./db/schema.js";
 import { catalogSync, products, teams } from "./db/schema.js";
 import { ReleaseSchema, type BackendAuth as ReleaseBackendAuth, type Release } from "./gen/vennir/catalog/v1/release_pb.js";
 import { createVerifyJob, deleteScanJob, ensureServiceAccount, readScanJob } from "./k8s.js";
@@ -184,6 +184,9 @@ export async function applyApis(
       if (!a.serviceAccount.endsWith("-api")) throw new ReleaseProblem(`its serviceAccount ${a.serviceAccount} must end in -api`);
       const audienceProblem = a.backendAuth?.kind.case === "serviceAccountToken" ? apiTokenAudienceProblem(a.backendAuth.kind.value.audience) : "";
       if (audienceProblem) throw new ReleaseProblem(audienceProblem);
+      // access.requests: empty from a vennir before it, which meant approval.
+      const accessRequests = a.accessRequests || "approval";
+      if (!isAccessRequests(accessRequests)) throw new ReleaseProblem(`its access.requests ${accessRequests} isn't open, approval or closed`);
       // The identity its backend credentials are minted for (phase 4).
       await ensureServiceAccount(a.team, a.serviceAccount);
       await upsertApi({
@@ -196,6 +199,7 @@ export async function applyApis(
         backendAuth: backendAuth(a.backendAuth),
         serviceAccount: a.serviceAccount,
         shareWith: a.shareWith,
+        accessRequests,
         hidden: a.hidden,
         deprecated: a.deprecated || null,
         internet: a.internet,
@@ -214,6 +218,10 @@ export async function applyApis(
   // again on the next request). Each team the release retires resyncs it
   // again (retireTeam).
   await attempt("gateway token policy", () => syncGatewayTokenPolicy());
+}
+
+function isAccessRequests(value: string): value is AccessRequests {
+  return value === "open" || value === "approval" || value === "closed";
 }
 
 function backendAuth(auth: ReleaseBackendAuth | undefined): BackendAuth | null {

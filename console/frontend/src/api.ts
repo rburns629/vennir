@@ -2379,7 +2379,7 @@ export async function deleteRunResources(executionId: string): Promise<string> {
 /** Something you'd want to know (proto/vennir/console/v1/notification.proto). */
 export interface Notification {
   id: string;
-  kind: "run_failed" | "run_succeeded" | "approval_waiting" | "catalog_failing" | "product_not_ready" | "step_refused" | "platform_alert";
+  kind: "run_failed" | "run_succeeded" | "approval_waiting" | "catalog_failing" | "product_not_ready" | "step_refused" | "platform_alert" | "api_access";
   title: string;
   body: string;
   /** The console page it's about; null when it's about nothing in particular. */

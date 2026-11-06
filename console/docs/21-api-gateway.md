@@ -1,6 +1,6 @@
 # The API gateway, start to finish
 
-The API gateway publishes backends that teams already run (a Service in their API backends' namespace, a Cloud Run service, a Lambda function URL) as **API products**: reviewed in the catalog like any product, called at one address with a Vennir sign-in, checked request by request against the API's own OpenAPI file, and shared team by team. This guide takes it in order: turning it on, publishing an API (with each kind of backend), calling it, putting it on the internet, and running it day to day.
+The API gateway publishes backends that teams already run (a Service in their API backends' namespace, a Cloud Run service, a Lambda function URL) as **API products**: reviewed in the catalog like any product, called at one address with a Vennir sign-in, checked request by request against the API's own OpenAPI file, and called only by its own team and those its access list grants: single sign-on groups and users, people or bots. This guide takes it in order: turning it on, publishing an API (with each kind of backend), calling it, putting it on the internet, and running it day to day.
 
 The console's side of it, every state, error code and page, is in [APIs and the gateway](11-apis.md). Every field of `api.yaml` is in the catalog guide's [API products](catalog-guide.md#api-products-apis).
 
@@ -10,7 +10,7 @@ The console's side of it, every state, error code and page, is in [APIs and the 
 caller ──Bearer token──▶ gateway /<team>/<api>/<path> ──backend's own credential──▶ backend
                           │
                           ├─ signs the caller in, as the console does (a session or a bot token)
-                          ├─ checks the API is shared with the caller's team, and within its rate
+                          ├─ checks the caller may call it (its team, a grant to them or a group of theirs), and within their rate
                           ├─ checks the method, path, parameters and body against the API's OpenAPI file
                           └─ swaps the caller's token for the backend's, and adds Vennir-Caller
 ```
@@ -49,7 +49,7 @@ Callers outside the cluster need the internet listener: [Putting it on the inter
 A team publishes an API from its catalog folder: `teams/<team>/apis/<api>/api.yaml` and an OpenAPI file beside it. The flow is the same for every backend:
 
 1. **Write the OpenAPI file** (3.0 or 3.1): every operation callers may use, with a schema for every parameter and request body, and `servers` including the backend's URL. Anything not in it is refused.
-2. **Write `api.yaml`**: the backend's URL, how the gateway signs in to it, who it's shared with, and the limits.
+2. **Write `api.yaml`**: the backend's URL, how the gateway signs in to it, how requests for access are answered, and the limits.
 3. **Let the API's ServiceAccount in to the backend** (below, by kind of backend).
 4. **Check it**: `./vennir catalog validate` reads the OpenAPI file as the gateway will (every `$ref` resolves, no two paths overlap, `servers` includes the backend).
 5. **Open a pull request.** After merge, each install applies the release, creates the API's ServiceAccount (`<api>-api` in the team's namespace), and the gateway serves it within seconds.
@@ -67,11 +67,12 @@ backend:
     googleIdToken:
       serviceAccount: orders-invoker@web-prod.iam.gserviceaccount.com
       audience: https://orders-7xk2abcdq-uc.a.run.app
-shareWith: [mobile, data]     # who may call it; left out, only your team; ["*"]: every team
+access:
+  requests: approval          # open (granted at once) | approval (the default) | closed
 reachable: cluster            # or internet, if your team is in gateway.internetTeams
 limits:
-  default: 600/min            # per calling team
-  data: 60/min
+  default: 600/min            # your team's, and a grant's unless it has its own rate
+  data: 60/min                # a calling team by name (yours, or a shareWith team)
 timeout: 30s
 maxRequest: 1MiB
 visibility: listed            # or hidden: only your team and admins know it exists
@@ -132,8 +133,11 @@ curl -H "Authorization: Bearer $VENNIR_TOKEN" \
 ```
 
 - **A bot's token** (`mp_…`) for scripts and services: a maintainer makes one on their team's page → **Automation** ([Bots and automation](14-bots-and-automation.md)). Or a person's console session.
-- **Calling for a team.** If you're in several teams the API is shared with, send `Vennir-Team: <team>` to choose which one's limit you use.
-- **Asking for access.** An API that isn't shared with your team answers 403. **Ask for access ↗** on its page opens an issue on the catalog repository asking its team to add yours.
+- **Who may call.** The API's own team's members and bots; the people and bots a grant names; the people in a single sign-on group a grant names; and, for this release, the teams its `api.yaml`'s `shareWith` names (deprecated). Anyone else, admins included, gets 403 `NOT_GRANTED`. The order, the rates and who grants what: [How do I get access to an API?](11-apis.md#how-do-i-get-access-to-an-api)
+- **Asking for access.** Ask with a reason (`ApiService/RequestApiAccess`: for yourself, or as a maintainer of a bot's team, for the bot). The API's `access.requests` decides: `open` grants it at once, `approval` waits for its team's maintainers, who grant you or one of your groups, or decline; `closed` takes none. The console's pages for it come in the next release.
+- **Calling for a team.** If you're in several teams that may call it (its own, or a `shareWith` team), send `Vennir-Team: <team>` to choose which one's limit you use. With it, the gateway uses only that team: grants aren't, so a person who calls by a grant doesn't send it, and a team that may not call the API answers 403 naming it.
+- **Groups are at most an hour old.** A group's grant counts the groups the console last read, while single sign-on is on and a group source is set: at each single sign-on, and every hour for Google Workspace groups. While groups come from the ID token's claim, a single sign-on older than an hour whose only way in is a group's grant gets 401: sign in again. With Google's groups alone, a group read over 90 minutes ago doesn't count (a failing resync fails closed). A revoked grant stops calls within the gateway's refresh, well under a minute.
+- **An API that leaves the release** keeps its grants and requests for 30 days, listed as away (`ApiService/ListAwayApiAccess`) and revocable by its team's maintainers and admins, but calls nobody in; back within them under the same team and name, it has them again; after them, they're gone (a waiting request is declined saying why).
 - **Reporting a problem.** Every answer carries `Vennir-Request-Id`, and the backend gets the same id; `Vennir-Answered-By` says whether the gateway or the backend answered.
 - **Paths are taken as the OpenAPI file reads them.** A path with an encoded slash, a backslash or a dot segment is refused (404). So is one with a `;`, written as is or as `%3B` (400 `INVALID_REQUEST`), unless the API's OpenAPI file has a path parameter with `style: matrix`: some backends' frameworks read what follows a `;` as a parameter, or drop it, where the gateway would check it as part of the path.
 - **After the console's `jwtSecret` changes**, sessions signed with the old one stop working at the gateway within a minute, the time it keeps the console's keys before reading them again. While it can't read them (the console restarting), it keeps using the last ones for up to 10 minutes. Bot tokens are checked against the database on every request.
@@ -188,11 +192,13 @@ Leave `trustedProxies` empty if you can't narrow `publicListenerFrom` to the pro
 
 | To | Who | How |
 | --- | --- | --- |
-| Watch an API's traffic | Its team, admins | Its page → **Endpoints and traffic**: requests, what was stopped and why, backend errors, each calling team's busiest minute |
+| Watch an API's traffic | Its team, admins | Its page → **Endpoints and traffic**: requests, what was stopped and why, backend errors, each calling team's busiest minute (a grant's callers as `grant:user` or `grant:group:<group>`) |
 | Stop calls during an incident | A maintainer of its team, or an admin | Its page → **Backend and pausing → Pause it**, with a message every caller gets (503 `API_PAUSED`) |
 | Stop every API | An admin | **Admin → API gateway → Close the gateway**, with a message (503 `GATEWAY_CLOSED`). Runs and the console carry on |
 | Release a held API | An admin | Add its host to `gateway.backendHosts`, then `vennir apply` |
-| Change an API's backend, spec, sharing or limits | Its team | A catalog pull request: the console never changes an API itself |
+| Change an API's backend, spec, how its requests are answered, or limits | Its team | A catalog pull request: the console never changes an API itself |
+| Grant a group or a user, change a grant's rate, or decide a request | Its team's maintainers | `ApiService` (`AddApiGrant`, `SetApiGrantRate`, `DecideApiAccessRequest`): each install's own, audited and told |
+| Revoke a grant | Its team's maintainers, an admin, the person it names, or the bot's team's maintainers | `ApiService/RevokeApiGrant` |
 | See refusals across APIs | Teams, for their own APIs and calls; admins, all | **Observe → Refused**, filtered by **Gateway** |
 | Find a backend's logs | Its team | Its page → **Its backend's logs** (in-cluster backends with `vennir/api-backend` and `vennir/api` labels); Cloud Run or Lambda log where they run |
 

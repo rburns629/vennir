@@ -191,7 +191,7 @@ export async function setAdminChannel(caller: AuthUser | undefined, teamName: st
   return { team: teamName };
 }
 
-const EMAIL_KINDS: NotificationKind[] = ["run_failed", "run_succeeded", "approval_waiting", "product_not_ready", "catalog_failing", "step_refused", "platform_alert"];
+const EMAIL_KINDS: NotificationKind[] = ["run_failed", "run_succeeded", "approval_waiting", "product_not_ready", "catalog_failing", "step_refused", "platform_alert", "api_access"];
 
 export async function emailPreferences(caller: AuthUser | undefined) {
   const who = signedIn(caller);

@@ -262,7 +262,8 @@ message Api {
   // The Kubernetes ServiceAccount, in the team's namespace, its
   // credentials are minted for.
   string service_account = 8;
-  // The other teams that may call it, or "*".
+  // The other teams that may call it, or "*". Deprecated (decision 26):
+  // each install's grants replace it; kept for one release.
   repeated string share_with = 9;
   // visibility: hidden: only its own team sees it (it has no share_with).
   bool hidden = 10;
@@ -280,6 +281,10 @@ message Api {
   int64 max_request_bytes = 15;
   // Its api.yaml in the catalog repository: "teams/<team>/apis/<name>/api.yaml".
   string path = 16;
+  // access.requests: how a request for access is answered: "open"
+  // (granted at once), "approval" (its team's maintainers decide) or
+  // "closed" (none are taken). Empty, from an older vennir: approval.
+  string access_requests = 17;
 }
 
 message BackendAuth {

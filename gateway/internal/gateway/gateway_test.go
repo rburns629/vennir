@@ -232,7 +232,7 @@ func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 		t.Errorf("Set-Cookie = %q", cookies)
 	}
 	claims := verify(t, got.Header.Get(caller.Header), f.public)
-	if claims.Subject != "user:u1" || claims.Team != "web" || claims.API != "payments/orders" || claims.Email != "web@example.com" {
+	if claims.Subject != "user:u1" || claims.Team != "web" || claims.Via != "catalog" || claims.API != "payments/orders" || claims.Email != "web@example.com" {
 		t.Errorf("Vennir-Caller = %+v", claims)
 	}
 }
@@ -427,7 +427,7 @@ func TestWhoMayCall(t *testing.T) {
 	if w := f.do("GET", path, "forged", "", nil); w.Code != 401 {
 		t.Errorf("a bad credential: %d", w.Code)
 	}
-	if w := f.do("GET", path, "outsider", "", nil); w.Code != 403 || errorCode(t, w) != "NOT_SHARED" {
+	if w := f.do("GET", path, "outsider", "", nil); w.Code != 403 || errorCode(t, w) != "NOT_GRANTED" {
 		t.Errorf("not shared: %d", w.Code)
 	}
 	if w := f.do("GET", path, "two-teams", "", nil); w.Code != 201 {
@@ -436,7 +436,7 @@ func TestWhoMayCall(t *testing.T) {
 	if w := f.do("GET", path, "two-teams", "", map[string]string{TeamHeader: "data"}); w.Code != 403 {
 		t.Errorf("calling as a team it isn't shared with: %d", w.Code)
 	}
-	if w := f.do("GET", path, "web-person", "", map[string]string{TeamHeader: "payments"}); w.Code != 403 || errorCode(t, w) != "NOT_SHARED" {
+	if w := f.do("GET", path, "web-person", "", map[string]string{TeamHeader: "payments"}); w.Code != 403 || errorCode(t, w) != "NOT_GRANTED" {
 		t.Errorf("calling as a team the caller isn't in: %d", w.Code)
 	}
 	if len(f.backend.got) != 1 {
@@ -617,7 +617,7 @@ func TestWhatsToldBeforeSignIn(t *testing.T) {
 	if w := f.do("GET", path, "outsider", "", nil); w.Code != 404 || w.Body.String() != missing.Body.String() {
 		t.Errorf("hidden, from a team it isn't shared with: %d %s", w.Code, w.Body)
 	}
-	if w := f.do("GET", path, "admin", "", nil); w.Code != 403 || errorCode(t, w) != "NOT_SHARED" {
+	if w := f.do("GET", path, "admin", "", nil); w.Code != 403 || errorCode(t, w) != "NOT_GRANTED" {
 		t.Errorf("hidden, an admin: %d %s", w.Code, w.Body)
 	}
 	if w := f.do("GET", path, "web-person", "", nil); w.Code != 404 || w.Body.String() != missing.Body.String() {

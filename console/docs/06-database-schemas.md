@@ -206,6 +206,9 @@ erDiagram
   teams ||--o{ apis : "publishes"
   apis ||--o{ api_traffic : "counted in"
   apis ||--o| api_problems : "can't be served for"
+  apis ||--o{ api_grants : "may be called by"
+  apis ||--o{ api_access_requests : "asked for in"
+  users ||--o{ user_groups : "is in"
   users ||--o{ submitted_executions : "submitted"
   teams {
     uuid id PK
@@ -326,6 +329,8 @@ People and bots alike.
 | `must_change_password` | boolean | no | Its password was set by someone else (an admin's new account or reset, `vennir admin reset-password`): a session it signs in may only change it. |
 | `oidc_subject` | text, unique | yes | The single sign-on account bound at the first sign-in through it (`<issuer> <sub>`): from then on only that account signs in as this person. |
 | `last_signed_in_at` | timestamptz | yes | Its last sign-in, with a password or single sign-on; empty if it never has. Shown on the Admin page's list of people. |
+| `sso_groups` | text[] | yes | Every single sign-on group the person's last sign-in read (a groups claim's values, or of Google Workspace groups the ones asked about), lowercased, at most 1000; null without a group source, or once the sources change. The console's alone: the gateway's role can't read it. A request for access copies it (`api_access_requests.requester_groups`). |
+| `sso_groups_read_at` | timestamptz | yes | When `sso_groups` was read. |
 | `self_registered` | boolean | no | Made by its own sign-up (self-registration), which checks nothing about the email. Until single sign-on binds it (`oidc_subject`), nobody has verified the address is theirs, so a maintainer adding it to a team by email is refused, saying so (an admin may add it). Set, for accounts made before the column, from the audit log's successful registrations (as far back as it goes, and only since registrations were audited), unless that email's account was deleted or made by an admin after. |
 | `email_kinds` | text[] | no | Which of their notifications are emailed to them too, when the install sends email: `run_failed`, `approval_waiting`, `product_not_ready`, `catalog_failing`, `step_refused` and `platform_alert` by default. |
 | `created_at` | timestamptz | no | |
@@ -635,7 +640,8 @@ API products (decision 20): a backend a team runs, published through the gateway
 | `backend_url` | text | no | Where the gateway forwards. Its host must be one of the gateway's `backendHosts`, or the API is held. |
 | `backend_auth` | jsonb | yes | How the gateway signs in there: `{"serviceAccountToken": {audience}}`, `{"googleIdToken": {serviceAccount, audience}}` or `{"awsSigV4": {roleArn, region, service}}`, each minted per request from the API's ServiceAccount. Null: it doesn't. |
 | `service_account` | text | no | The ServiceAccount, in the team's namespace, its backend credentials are minted for; the console creates it. |
-| `share_with` | text[] | no | The other teams that may call it, or `*` for every team; empty, only its own. |
+| `share_with` | text[] | no | The other teams whose members and bots may call it, or `*` for every team; empty, only its own. Deprecated: `api_grants` replace it, and it goes in the next release. |
+| `access_requests` | text | no | `api.yaml`'s `access.requests`: `open` (a request is granted at once, at the default limit), `approval` (the default: its team's maintainers decide) or `closed` (none are taken; grants already made stay). |
 | `hidden` | boolean | no | Only its own team (and admins) see it; it then has no `share_with`. |
 | `deprecated` | text | yes | What to use instead; it still answers. |
 | `internet` | boolean | no | Asked to be reachable from the internet; published there only if the gateway's `internetTeams` includes its team. |
@@ -670,6 +676,61 @@ Why the gateway can't serve an API: its OpenAPI document can't be read or used, 
 | `api_id` | uuid | no | The API (`apis.id`). The key. |
 | `problem` | text | no | What the gateway found, such as `its OpenAPI document can't be used: …`. |
 | `found_at` | timestamptz | no | When the gateway found it. |
+
+### api_grants
+
+Who may call an API besides its own team (decision 26): a single sign-on group (each person in it) or one user (a person or a bot). Made and changed by the API's team's maintainers, directly or by approving a request; revoked by them, an admin, the person it names (their own), or a maintainer of the bot's team (their bot's). Revoked grants stay, for the history. The gateway reads the active ones every few seconds, so a revoked one stops calls within its refresh (well under a minute). Grants are this install's own: the catalog doesn't carry them. Kept for 30 days while their API is out of the catalog's release (its row gone, `api_id` null, `away_since` set; such a grant lets nobody call anything, and its team's maintainers or an admin may revoke it), linked again when an API of the same team and name is back within them, and deleted after (retention.ts). Deleted with its team.
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `id` | uuid | no | |
+| `api_id` | uuid | yes | The API (`apis.id`); null while it's out of the release. Among active grants, unique with the principal. |
+| `team_id` | uuid | no | The API's team (`teams.id`). |
+| `api_name` | text | no | The API's name: with `team_id` (indexed together), how the grant finds its API again when it's back in a release. |
+| `group_name` | text | yes | A group, trimmed and lowercased as group mappings take them (a groups claim value, spaces and all, or a Google group's email), up to 256 characters. Exactly one of this and `user_id`. Among active grants, unique with `api_id`. |
+| `user_id` | uuid | yes | A person or a bot (`users.id`). Among active grants, unique with `api_id`. Deleted with the user. |
+| `per_minute` | integer | yes | Requests a minute: a user's, or each member's of a group. Null: the API's default limit (`per_minute`'s `default`, else the gateway's). |
+| `granted_by` | uuid | yes | The maintainer who made it, or approved the request (`users.id`); null for an `open` API's request, granted at once, or if since deleted. |
+| `from_request` | uuid | yes | The request it answered (`api_access_requests.id`), approved or, for an API whose requests are `open`, granted at once (then `granted_by` is null); null for one a maintainer added directly. |
+| `created_at` | timestamptz | no | |
+| `updated_at` | timestamptz | no | When its rate last changed. |
+| `revoked_at` | timestamptz | yes | When it was revoked; null while it's active. |
+| `revoked_by` | uuid | yes | Who revoked it; null when the platform did (`revoke_reason`). |
+| `revoke_reason` | text | yes | Why the platform revoked it: superseded by a grant to the same group or user made while its API was away. |
+| `away_since` | timestamptz | yes | When its API left the catalog's release; null while it's published. 30 days after, it's deleted. |
+
+### api_access_requests
+
+A request for access to an API: a person's for themselves, or a maintainer's for one of their team's bots, with a reason. At most one waits per API and user; after a decline, the next may be asked at once. Kept, as grants are, for 30 days while its API is out of the release; then a waiting one is declined, saying why, and one ended that long ago deleted. Deleted with its team or its user.
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `id` | uuid | no | |
+| `api_id` | uuid | yes | The API (`apis.id`); null while it's out of the release. |
+| `team_id` | uuid | no | The API's team (`teams.id`). |
+| `api_name` | text | no | The API's name, as `api_grants.api_name`. |
+| `user_id` | uuid | no | Whom it's for: the person, or the bot. With `api_id`, unique while `waiting`. |
+| `requested_by` | uuid | yes | Who asked: the person themselves, or the bot's team's maintainer. |
+| `reason` | text | no | Why, as they said it. |
+| `requester_groups` | text[] | no | A person's groups when they asked (`users.sso_groups`), one of which the API's maintainers may grant instead; shown to them only while it waits (or the person's as read since, if later). Empty for a bot, and emptied when where groups come from changes. |
+| `requester_groups_read_at` | timestamptz | yes | When those groups were read. Over 24 hours ago, a group can't be granted from them unless Google Workspace confirms it. |
+| `state` | text | no | `waiting`, `granted`, `declined` or `withdrawn`. |
+| `decided_by` | uuid | yes | The maintainer who granted or declined it, or who withdrew it. |
+| `decision_reason` | text | yes | A decline's reason. |
+| `grant_id` | uuid | yes | The grant it made (`api_grants.id`), when granted. |
+| `created_at` | timestamptz | no | |
+| `decided_at` | timestamptz | yes | When it was granted, declined or withdrawn. |
+| `away_since` | timestamptz | yes | When its API left the catalog's release; null while it's published. |
+
+### user_groups
+
+Each person's single sign-on groups that matter, for group grants: of the groups the console last read (a groups claim's, or the Google Workspace groups it asks about), only those mapped to a team or named by an active grant, every one of them. Replaced at each sign-in and by the hourly Google resync; a group newly granted is added for everyone whose last-read groups (`users.sso_groups`) include it, and for a person Google confirms while a maintainer grants their request. The gateway reads it. Groups count only while single sign-on is on and a group source is set: with a claim, for a single sign-on session signed in within the hour; with Google's alone, rows read within 90 minutes. Emptied whenever the sources change. Deleted with the user.
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `user_id` | uuid | no | The person (`users.id`). With `group_name`, the key. |
+| `group_name` | text | no | Lowercased. |
+| `read_at` | timestamptz | no | When it was read. |
 
 ### gateway_state
 
@@ -877,7 +938,7 @@ Something worth telling people: a run that failed or finished, a step waiting fo
 | --- | --- | --- | --- |
 | `id` | uuid | no | |
 | `key` | text | no | What makes it the same event (`run:<id>:<state>:<finished at>`, `approval:<run>:<step>:<since>`, `catalog:<last applied>`). Unique, so it's only ever made once. |
-| `kind` | text | no | `run_failed`, `run_succeeded`, `approval_waiting`, `catalog_failing`, `product_not_ready`, `step_refused` (a step the cluster refused) or `platform_alert` (a team purged, the allowed image sources changed, a policy not syncing, a run's image gone, the audit log's copy not copying for half an hour (or never yet), its chain broken or an entry differing from its copy). |
+| `kind` | text | no | `run_failed`, `run_succeeded`, `approval_waiting`, `catalog_failing`, `product_not_ready`, `step_refused` (a step the cluster refused), `api_access` (a request for access to an API asked, granted, declined or withdrawn, or a grant added, changed or revoked: to whom it's for, who asked, and the API's team's maintainers) or `platform_alert` (a team purged, the allowed image sources changed, a policy not syncing, a run's image gone, the audit log's copy not copying for half an hour (or never yet), its chain broken or an entry differing from its copy). |
 | `title` | text | no | |
 | `body` | text | no | |
 | `link` | text | yes | The console page it's about, such as `/runs/<id>`. |

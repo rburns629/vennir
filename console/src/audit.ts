@@ -49,6 +49,12 @@ const TARGET_FIELDS = [
   "product",
   "onBehalfOf",
   "issuer",
+  // API access (core/apiAccess.ts): the grant or request, the group, the rate, the bot.
+  "grantId",
+  "accessRequestId",
+  "group",
+  "perMinute",
+  "botEmail",
 ] as const;
 
 /** The single sign-on settings' (SetSsoSettings): the provider, who may sign in, where groups come from. */

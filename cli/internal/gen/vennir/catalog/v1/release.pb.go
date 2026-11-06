@@ -1305,7 +1305,8 @@ type Api struct {
 	// The Kubernetes ServiceAccount, in the team's namespace, its
 	// credentials are minted for.
 	ServiceAccount string `protobuf:"bytes,8,opt,name=service_account,json=serviceAccount,proto3" json:"service_account,omitempty"`
-	// The other teams that may call it, or "*".
+	// The other teams that may call it, or "*". Deprecated (decision 26):
+	// each install's grants replace it; kept for one release.
 	ShareWith []string `protobuf:"bytes,9,rep,name=share_with,json=shareWith,proto3" json:"share_with,omitempty"`
 	// visibility: hidden: only its own team sees it (it has no share_with).
 	Hidden bool `protobuf:"varint,10,opt,name=hidden,proto3" json:"hidden,omitempty"`
@@ -1322,9 +1323,13 @@ type Api struct {
 	// The largest request body forwarded.
 	MaxRequestBytes int64 `protobuf:"varint,15,opt,name=max_request_bytes,json=maxRequestBytes,proto3" json:"max_request_bytes,omitempty"`
 	// Its api.yaml in the catalog repository: "teams/<team>/apis/<name>/api.yaml".
-	Path          string `protobuf:"bytes,16,opt,name=path,proto3" json:"path,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Path string `protobuf:"bytes,16,opt,name=path,proto3" json:"path,omitempty"`
+	// access.requests: how a request for access is answered: "open"
+	// (granted at once), "approval" (its team's maintainers decide) or
+	// "closed" (none are taken). Empty, from an older vennir: approval.
+	AccessRequests string `protobuf:"bytes,17,opt,name=access_requests,json=accessRequests,proto3" json:"access_requests,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Api) Reset() {
@@ -1465,6 +1470,13 @@ func (x *Api) GetMaxRequestBytes() int64 {
 func (x *Api) GetPath() string {
 	if x != nil {
 		return x.Path
+	}
+	return ""
+}
+
+func (x *Api) GetAccessRequests() string {
+	if x != nil {
+		return x.AccessRequests
 	}
 	return ""
 }
@@ -1856,7 +1868,7 @@ const file_vennir_catalog_v1_release_proto_rawDesc = "" +
 	"\tResources\x12\x10\n" +
 	"\x03cpu\x18\x01 \x01(\tR\x03cpu\x12\x16\n" +
 	"\x06memory\x18\x02 \x01(\tR\x06memory\x12!\n" +
-	"\fmemory_limit\x18\x03 \x01(\tR\vmemoryLimit\"\xf9\x04\n" +
+	"\fmemory_limit\x18\x03 \x01(\tR\vmemoryLimit\"\xa2\x05\n" +
 	"\x03Api\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04team\x18\x02 \x01(\tR\x04team\x12!\n" +
@@ -1879,7 +1891,8 @@ const file_vennir_catalog_v1_release_proto_rawDesc = "" +
 	"per_minute\x18\r \x03(\v2%.vennir.catalog.v1.Api.PerMinuteEntryR\tperMinute\x12'\n" +
 	"\x0ftimeout_seconds\x18\x0e \x01(\x05R\x0etimeoutSeconds\x12*\n" +
 	"\x11max_request_bytes\x18\x0f \x01(\x03R\x0fmaxRequestBytes\x12\x12\n" +
-	"\x04path\x18\x10 \x01(\tR\x04path\x1a<\n" +
+	"\x04path\x18\x10 \x01(\tR\x04path\x12'\n" +
+	"\x0faccess_requests\x18\x11 \x01(\tR\x0eaccessRequests\x1a<\n" +
 	"\x0ePerMinuteEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\x96\x02\n" +

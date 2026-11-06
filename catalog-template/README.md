@@ -53,7 +53,7 @@ teams/
     dags/                     optional: templates others run, and example DAGs
     apis/
       <api>/                  optional: a backend you run, published through the gateway
-        api.yaml              its backend, how the gateway signs in there, sharing, limits
+        api.yaml              its backend, how the gateway signs in there, access requests, limits
         openapi.yaml          what may reach the backend (OpenAPI 3.0 or 3.1)
 ```
 
@@ -491,14 +491,36 @@ backend:
   auth:
     googleIdToken:                        # minted per request; nothing stored
       serviceAccount: orders-gateway@payments-prod.iam.gserviceaccount.com
-shareWith: [web, data]        # who may call it; left out, only your team
+access:
+  requests: approval          # open (granted at once) | approval (the default) | closed
 reachable: cluster            # or internet, where the install allows your team
 limits:
-  default: 600/min            # per calling team
-  data: 60/min
+  default: 600/min            # your team's, and every grant's without a rate of its own
+  data: 60/min                # a calling team by name (shareWith, this release)
 timeout: 30s
 maxRequest: 1MiB
 ```
+
+**Who may call it** is each install's own, not the catalog's: your team's
+members and bots always may; anyone else needs a **grant**, which your
+team's maintainers make in the console, to a single sign-on group
+(everyone in it) or to one user, a person or a bot, each with its own rate
+(by default your `limits.default`; a group's rate is each member's).
+People ask for access with a reason, and a maintainer of a bot's team asks
+for the bot; `access.requests` says how a request is answered: `open`
+grants it at once, at the default limit; `approval` (the default) waits
+for your maintainers to grant it (the person, or a group of theirs) or
+decline it; `closed` takes none (grants already made stay until revoked).
+Admins may call only what a grant lets them. The console's Docs page,
+**APIs and the gateway**, has the
+rest.
+
+`shareWith` (a list of teams, or `["*"]`) still works for this release,
+deprecated: its teams' members and bots keep calling, shown in the console
+as *from the catalog*, which can't be revoked there, at the limit `limits`
+names for the team. `./vennir catalog validate` warns while an `api.yaml`
+has it, and the next release drops it: grant the people and bots that call
+your API in the console first, then remove `shareWith`.
 
 `./vennir catalog validate` checks the OpenAPI file: 3.0 or 3.1, every
 `$ref` inside the file, `servers` including `backend.url`, a schema for

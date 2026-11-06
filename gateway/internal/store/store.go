@@ -3,7 +3,8 @@
 // Package store holds the gateway's view of the published APIs: read from
 // the console's apis table (which the catalog's releases fill) every few
 // seconds, each with its OpenAPI validator, built again only when its row
-// changes. An API whose team is retired or purged isn't there at all.
+// changes; and each API's active grants (api_grants), read whole each time.
+// An API whose team is retired or purged isn't there at all.
 package store
 
 import (
@@ -33,7 +34,9 @@ type API struct {
 	BackendURL     *url.URL
 	BackendAuth    map[string]map[string]string
 	ServiceAccount string
-	ShareWith      []string
+	// ShareWith: teams whose members and bots may call it, from the
+	// catalog. Deprecated (decision 26): grants replace it, this release.
+	ShareWith []string
 	// Hidden: only its own team, and admins, hear of it, whatever it's
 	// shared with (the console's sees()).
 	Hidden        bool
@@ -133,6 +136,17 @@ func endpoints(spec []byte) []Endpoint {
 // Key is <team>/<name>.
 func (a *API) Key() string { return a.Team + "/" + a.Name }
 
+// Grant lets someone besides an API's own team call it (decision 26, the
+// console's api_grants): a single sign-on group (each person in it) or one
+// user (a person or a bot), at a rate of requests a minute (0: the API's
+// default).
+type Grant struct {
+	ID string
+	// Exactly one of: Group (lowercased), UserID.
+	Group, UserID string
+	PerMinute     int
+}
+
 // Store is the published APIs.
 type Store struct {
 	DB interface {
@@ -145,8 +159,48 @@ type Store struct {
 
 	mu   sync.RWMutex
 	apis map[string]*API
+	// grants are each API's active grants, by its id: read whole at every
+	// refresh, so a revoked one stops counting within Refresh.
+	grants map[string][]Grant
 	// closed is the message an admin closed the gateway with, or "".
 	closed string
+}
+
+// Grants are an API's active grants, by its id (never changed in place).
+func (s *Store) Grants(apiID string) []Grant {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.grants[apiID]
+}
+
+// PutGrants sets an API's grants, for tests.
+func (s *Store) PutGrants(apiID string, grants []Grant) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.grants == nil {
+		s.grants = map[string][]Grant{}
+	}
+	s.grants[apiID] = grants
+}
+
+// readGrants are the active grants, by API.
+func (s *Store) readGrants(ctx context.Context) (map[string][]Grant, error) {
+	rows, err := s.DB.Query(ctx, `SELECT g.id::text, g.api_id::text, coalesce(g.group_name, ''), coalesce(g.user_id::text, ''), coalesce(g.per_minute, 0)
+		FROM api_grants g WHERE g.revoked_at IS NULL AND g.api_id IS NOT NULL`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	grants := map[string][]Grant{}
+	for rows.Next() {
+		var g Grant
+		var apiID string
+		if err := rows.Scan(&g.ID, &apiID, &g.Group, &g.UserID, &g.PerMinute); err != nil {
+			return nil, err
+		}
+		grants[apiID] = append(grants[apiID], g)
+	}
+	return grants, rows.Err()
 }
 
 // Closed is why an admin closed the gateway, or "" when it's open.
@@ -184,6 +238,10 @@ func (s *Store) Refresh(ctx context.Context) error {
 		}
 	}
 	states.Close()
+	grants, err := s.readGrants(ctx)
+	if err != nil {
+		return err
+	}
 	rows, err := s.DB.Query(ctx, `SELECT a.id::text, t.name, a.name, a.openapi::text, a.backend_url, coalesce(a.backend_auth::text, ''),
 			a.service_account, a.share_with, a.hidden, a.internet, a.per_minute::text, a.timeout_seconds, a.max_request_bytes,
 			a.paused_message, a.updated_at, EXISTS (SELECT 1 FROM teams o WHERE o.name = t.name || '-apis')
@@ -240,6 +298,7 @@ func (s *Store) Refresh(ctx context.Context) error {
 	}
 	s.mu.Lock()
 	s.apis = next
+	s.grants = grants
 	s.closed = closed
 	s.mu.Unlock()
 	return nil

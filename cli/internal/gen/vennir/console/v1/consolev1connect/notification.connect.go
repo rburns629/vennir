@@ -109,7 +109,7 @@ type NotificationServiceClient interface {
 	GetEmailPreferences(context.Context, *connect.Request[v1.GetEmailPreferencesRequest]) (*connect.Response[v1.GetEmailPreferencesResponse], error)
 	// Chooses which kinds are emailed to you (any of run_failed,
 	// run_succeeded, approval_waiting, product_not_ready, catalog_failing,
-	// step_refused, platform_alert).
+	// step_refused, platform_alert, api_access).
 	SetEmailPreferences(context.Context, *connect.Request[v1.SetEmailPreferencesRequest]) (*connect.Response[v1.SetEmailPreferencesResponse], error)
 }
 
@@ -317,7 +317,7 @@ type NotificationServiceHandler interface {
 	GetEmailPreferences(context.Context, *connect.Request[v1.GetEmailPreferencesRequest]) (*connect.Response[v1.GetEmailPreferencesResponse], error)
 	// Chooses which kinds are emailed to you (any of run_failed,
 	// run_succeeded, approval_waiting, product_not_ready, catalog_failing,
-	// step_refused, platform_alert).
+	// step_refused, platform_alert, api_access).
 	SetEmailPreferences(context.Context, *connect.Request[v1.SetEmailPreferencesRequest]) (*connect.Response[v1.SetEmailPreferencesResponse], error)
 }
 
