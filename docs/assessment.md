@@ -996,6 +996,113 @@ wired into a run as a dependency. Deleting something others depend on (3)
 is refused and alerts the admins; it goes ahead only once an admin
 approves it, and the approval is audited as theirs.
 
+**26. Each API at a host of its own, called by subscription or by group**
+(proposed 2026-11-05). Today every API is a path on the gateway's one host
+(`/<team>/<api>/`), shared team by team by its `api.yaml`'s `shareWith`, and
+a team without access asks for it by opening an issue. Two problems: every
+API's pages share one origin, so a page one API serves can read another's
+cookies that aren't HttpOnly, and access is a pull request to someone
+else's catalog folder. Proposed:
+
+1. *The gateway assigns the endpoint:* each API is served at
+   `<api>.<team>.<apiDomain>` (`gateway.apiDomain`, set at install; for
+   example `orders.web.apis.example.com`). The catalog doesn't choose it:
+   the console records it when the API is first published, and a renamed
+   API is a new endpoint. Its own host makes it its own origin. The gateway
+   also makes every cookie a backend sets host-only (it drops `Domain`), so
+   one API can't set a cookie for the others. The old paths keep working
+   for one release (`gateway.pathRoutes`, on by default for it, then
+   removed), answering with `Deprecation` and the new address.
+2. *Names and certificates:* a DNS wildcard covers one label, so each team
+   needs `*.<team>.<apiDomain>` in DNS and in a certificate. The console
+   asks for both when it creates the team (a cert-manager `Certificate`,
+   and a DNS record where the cluster runs external-dns; otherwise the
+   Admin page lists the record to add), and the gateway's listener takes
+   each team's certificate. An API whose team's certificate isn't ready is
+   held, with the reason, like a backend host that isn't allowed.
+3. *Who may call, set in the catalog:* `api.yaml`'s `access` replaces
+   `shareWith`:
+
+   ```yaml
+   access:
+     subscriptions: approval   # open (granted at once) | approval | closed
+     groups: [orders-readers@example.com]   # people in these groups may call
+   ```
+
+   The owning team and admins may always call. During the release with both,
+   a `shareWith` team is a standing subscription that needs no approval, and
+   the catalog tool warns that `shareWith` is going away.
+4. *Subscriptions, held by the console:* a maintainer of a team asks to
+   subscribe it to an API, with a reason. A maintainer of the API's team
+   approves it (setting a rate no higher than the API's `limits` give that
+   team) or declines it. Either team's maintainers, or an admin, may later
+   revoke it. Each step is audited and told to the other team. A
+   subscription is per install, like a secret store's credential: the
+   catalog sets the policy, an install's people hold the grants. The
+   gateway checks the calling team (`Vennir-Team`, as today) has an active
+   subscription; a revoked one stops calls within the gateway's cache
+   time (a minute at most).
+5. *Groups:* a person (never a bot: bots aren't in groups) whose single
+   sign-on groups include one of `access.groups` may call without a
+   subscription, under the API's default limit, counted per person. The
+   console records each person's groups at sign-in for the gateway to read
+   (a session that relies on a groups claim lasts an hour, so groups are
+   at most an hour old).
+
+Rejected: an opaque host per API (unreadable, and the API's name is already
+unique within its team); a path per API assigned by the gateway (one origin
+still); subscriptions as catalog pull requests (every grant a change to
+someone else's folder, and the same grant on every install); stripping
+`Set-Cookie` alone (it leaves scripts on one API's pages able to call
+another as the signed-in person).
+
+Open, for review: whether an approved subscription expires (proposed: no,
+but the API's team sees each subscriber's last call, and may revoke unused
+ones); the console's pages for it, which go on the mockups canvas first (an
+API's page with its endpoint and Subscribe; a team's Subscriptions, both
+ways, with approvals; the Admin page's API domain and certificates).
+
+**27. The cluster's policies from the catalog, written by the kernel**
+(proposed 2026-11-05). The console keeps the admission policies' literals
+current: which digests are a product's releases and as which
+ServiceAccount, with which token audiences (the identity policy), each
+API's ServiceAccount's audiences, the scan allowlist, the image sources,
+and each team's secret names. So whoever controls the console can loosen
+them: a compromised console could let an unreviewed image run as a
+product's identity. Proposed:
+
+1. *A process of the kernel's, `kernel policy`,* with a ServiceAccount of
+   its own, pulls the catalog release the console reads (`catalog.release`)
+   and verifies its signature itself, against the signers the kernel chart
+   trusts (set at install, never by the console). From it, it writes what
+   the catalog decides: each product's released digests with their
+   ServiceAccount and token audiences, and each API's ServiceAccount's
+   audiences. An earlier release stays allowed while it's in use, as now
+   (an unfinished task runs it, read from the kernel's own database, or it
+   was in a release in the last hour).
+2. *Split policies:* those rules move to policies only it may update (RBAC
+   by name; the console's write fence refuses them). The console keeps
+   what the console decides, in policies of its own: each team's secret
+   names, the image sources, the scan allowlist. Admission policies all
+   apply, so a step must pass both: a reviewed release run as its own
+   ServiceAccount, and only its team's registered secrets.
+3. *Upgrading:* the new policies are seeded from the current ones (the
+   chart's `lookup`, as now). The kernel writes them for a release while the
+   console still writes the old ones; the next release drops the console's.
+
+What it doesn't change: the console still writes team Secrets (that's how a
+secret is registered), sets image sources and accepts scans, and submits
+runs. So a compromised console can still put a value in a team's Secret or
+run a reviewed product with inputs it chooses; it can't make an image no
+release names run as a product, or give an API's ServiceAccount an audience
+its `api.yaml` doesn't need. An install without a signed catalog
+(`catalog.signature` trusting nobody) keeps the console's writes, and the
+Admin page says so.
+
+Rejected: a policy engine (Kyverno, Gatekeeper) beside the admission
+policies (a second policy language, and the same question of who writes
+its rules); signing each policy edit (the console would hold the key).
+
 ## 18. Roadmap
 
 None of these needs a new service. All contract changes are additive.
