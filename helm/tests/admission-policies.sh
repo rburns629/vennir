@@ -911,6 +911,9 @@ k get validatingadmissionpolicy "$RELEASE-execution-kernel-identity" -o json | p
 import json, sys
 policy = json.load(sys.stdin)
 policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+# Unconditionally: the API server may still be writing the type-checking
+# status of the last replace, which would make this one conflict.
+policy["metadata"].pop("resourceVersion", None)
 for variable in policy["spec"]["variables"]:
     if variable["name"] == "products":
         variable["expression"] = sys.argv[1]
