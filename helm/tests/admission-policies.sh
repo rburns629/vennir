@@ -169,7 +169,7 @@ echo "Setting up on $(k config current-context)"
 # A previous run's namespaces may still be terminating; creating them again
 # would fail until they're gone.
 for _ in $(seq 1 90); do
-  k get namespaces --field-selector status.phase=Terminating -o name | grep -q "namespace/$RELEASE-" || break
+  grep -q "namespace/$RELEASE-" <<<"$(k get namespaces --field-selector status.phase=Terminating -o name)" || break
   sleep 2
 done
 for ns in "$PLATFORM_NS" "$TEAM_A" "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$PROTECTED_NS" "$APIS_NS" "$RETIRED_APIS_NS" "$NOT_APIS_NS"; do
@@ -532,7 +532,7 @@ expect() {  # label, "allowed" | text the refusal must contain, output
 
 # Policies take a few seconds to reach the API server's admission chain.
 for _ in $(seq 1 30); do
-  job "$OTHER_NS" $SOURCE/app:1 run default "" | grep -q "not a Vennir team namespace" && break
+  grep -q "not a Vennir team namespace" <<<"$(job "$OTHER_NS" $SOURCE/app:1 run default "")" && break
   sleep 1
 done
 
@@ -681,7 +681,7 @@ expect "a token for another digest in its repository" IDENTITY_NOT_ALLOWED "$(jo
 # digest) until the console, its rollout over, empties it.
 identity_literal "$LEGACY_PRODUCTS" "$TEAM_SECRETS" "$RELEASES"
 for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/db:1 create db-sa db-key | grep -q "(server dry run)" && break
+  grep -q "(server dry run)" <<<"$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)" && break
   sleep 1
 done
 expect "upgraded: the legacy list, by repository" allowed              "$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)"
@@ -689,7 +689,7 @@ expect "upgraded: and another digest of it"      allowed               "$(job "$
 expect "upgraded: still not another repository" IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/app:1 run db-sa "")"
 identity_literal '[]' "$TEAM_SECRETS" "$RELEASES"
 for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/db:1 create db-sa db-key | grep -q "IDENTITY_NOT_ALLOWED" && break
+  grep -q "IDENTITY_NOT_ALLOWED" <<<"$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)" && break
   sleep 1
 done
 expect "emptied: its tag again refused"          IDENTITY_NOT_ALLOWED  "$(job "$TEAM_A" $SOURCE/db:1 create db-sa db-key)"
@@ -706,7 +706,7 @@ expect "a digest that isn't sha256"              IMAGE_SCAN_FAILED     "$(job "$
 # (scanning.ts's MAX_PER_MAP), near the API server's limit on an expression.
 scan_literal '{"'$PASSED_DIGEST'":true}' false 1200 c
 for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/app:1@$ACCEPTED_DIGEST run default "" | grep -q IMAGE_SCAN_FAILED && break
+  grep -q IMAGE_SCAN_FAILED <<<"$(job "$TEAM_A" $SOURCE/app:1@$ACCEPTED_DIGEST run default "")" && break
   sleep 1
 done
 expect "a full map: a digest in it"              allowed               "$(job "$TEAM_A" $SOURCE/app:1@$PASSED_DIGEST run default "")"
@@ -715,7 +715,7 @@ expect "a full map: one that isn't"              IMAGE_SCAN_FAILED     "$(job "$
 # admitted, what's listed false isn't (until the console writes its list).
 scan_literal '{"'$FAILED_DIGEST'":false}' true
 for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "" | grep -q "(server dry run)" && break
+  grep -q "(server dry run)" <<<"$(job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "")" && break
   sleep 1
 done
 expect "upgrade seed: a digest not listed"       allowed               "$(job "$TEAM_A" $SOURCE/app:1@$UNSCANNED_DIGEST run default "")"
@@ -821,7 +821,7 @@ expect "still never a ServiceAccount not an API's" "only mint tokens for API" "$
 gateway_literal "$API_AUDIENCES"
 API_ONLY="only for the audiences its published API needs"
 for _ in $(seq 1 30); do
-  token "$TEAM_A" orders-api sts.amazonaws.com | grep -q "$API_ONLY" && break
+  grep -q "$API_ONLY" <<<"$(token "$TEAM_A" orders-api sts.amazonaws.com)" && break
   sleep 1
 done
 echo "Gateway tokens:"
@@ -906,12 +906,12 @@ CATALOG_IDENTITY=$RELEASE-execution-kernel-catalog-identity
 CATALOG_TOKENS=$RELEASE-execution-kernel-catalog-tokens
 POLICY_SA=system:serviceaccount:$PLATFORM_NS:$RELEASE-execution-kernel-policy
 seeded() { k get validatingadmissionpolicy "$1" -o jsonpath="{.spec.variables[?(@.name==\"$2\")].expression}"; }
-expect "upgrade seed: the console's releases kept" allowed "$(seeded "$CATALOG_IDENTITY" releases0 | grep -q "$TEAM_A" && echo '(server dry run)' || seeded "$CATALOG_IDENTITY" releases0)"
-expect "upgrade seed: the console's API audiences kept" allowed "$(seeded "$CATALOG_TOKENS" apiAudiencesWritten | grep -q true && echo '(server dry run)' || echo 'not seeded')"
+expect "upgrade seed: the console's releases kept" allowed "$(grep -q "$TEAM_A" <<<"$(seeded "$CATALOG_IDENTITY" releases0)" && echo '(server dry run)' || seeded "$CATALOG_IDENTITY" releases0)"
+expect "upgrade seed: the console's API audiences kept" allowed "$(grep -q true <<<"$(seeded "$CATALOG_TOKENS" apiAudiencesWritten)" && echo '(server dry run)' || echo 'not seeded')"
 # Held to the kernel's rules: no platform product (team ""), no ESO
 # ServiceAccount, though the console's lists them.
-expect "upgrade seed: no platform product"       allowed "$(seeded "$CATALOG_IDENTITY" releases1 | grep -q 'plat-sa' && echo 'seeded it' || echo '(server dry run)')"
-expect "upgrade seed: no ESO ServiceAccount"     allowed "$(seeded "$CATALOG_IDENTITY" releases0 | grep -q 'eso-gcp' && echo 'seeded it' || echo '(server dry run)')"
+expect "upgrade seed: no platform product"       allowed "$(grep -q 'plat-sa' <<<"$(seeded "$CATALOG_IDENTITY" releases1)" && echo 'seeded it' || echo '(server dry run)')"
+expect "upgrade seed: no ESO ServiceAccount"     allowed "$(grep -q 'eso-gcp' <<<"$(seeded "$CATALOG_IDENTITY" releases0)" && echo 'seeded it' || echo '(server dry run)')"
 # What kernel policy writes from the verified release: db's release and
 # big's, with their audiences; no platform product (no release names one);
 # orders-api's backend audience only.
@@ -922,7 +922,7 @@ catalog_literal "$CATALOG_TOKENS" apiAudiences '{"'$TEAM_A'/orders-api":["https:
 identity_literal '[]' "$TEAM_SECRETS" '{"'$ZERO_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}],"'$UNRELEASED_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}],"'$PLATFORM_DIGEST'":[{"team":"","repository":"registry.example/platform","action":"run","serviceAccount":"plat-sa","audiences":""}]}'
 gateway_literal '{"'$TEAM_A'/orders-api":["https://orders.example","sts.amazonaws.com"]}'
 for _ in $(seq 1 30); do
-  job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "" | grep -q "catalog's verified release" && break
+  grep -q "catalog's verified release" <<<"$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "")" && break
   sleep 1
 done
 CATALOG_ONLY="the catalog's verified release doesn't name it"
@@ -937,7 +937,7 @@ expect "the console's: a Secret its team never registered" "aren't all registere
 expect "a token for its product's audience"      allowed                "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
 expect "a token for another digest, the console's listing it" IDENTITY_NOT_ALLOWED "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
 for _ in $(seq 1 30); do
-  token "$TEAM_A" orders-api sts.amazonaws.com | grep -q "catalog's verified release" && break
+  grep -q "catalog's verified release" <<<"$(token "$TEAM_A" orders-api sts.amazonaws.com)" && break
   sleep 1
 done
 expect "an API's backend audience, both list it" allowed                "$(token "$TEAM_A" orders-api https://orders.example)"
@@ -957,9 +957,9 @@ expect "the console replacing the kernel's identity policy" "forbidden" "$(k get
 # The next upgrade: the chart seeds from the kernel's own policy (as
 # written), not the console's (loosened above).
 render_catalog | k apply -f - > /dev/null
-expect "second upgrade: the kernel's literals kept" allowed "$(seeded "$CATALOG_IDENTITY" releasesc | grep -q 'registry.example/big' && echo '(server dry run)' || echo 'lost')"
-expect "second upgrade: not the console's"       allowed "$(seeded "$CATALOG_IDENTITY" "releases$(printf %s "$UNRELEASED_DIGEST" | cut -c8)" | grep -q "$UNRELEASED_DIGEST" && echo 'seeded the console'"'"'s' || echo '(server dry run)')"
-expect "second upgrade: still written"           allowed "$(seeded "$CATALOG_TOKENS" apiAudiencesWritten | grep -q true && echo '(server dry run)' || echo 'reset')"
+expect "second upgrade: the kernel's literals kept" allowed "$(grep -q 'registry.example/big' <<<"$(seeded "$CATALOG_IDENTITY" releasesc)" && echo '(server dry run)' || echo 'lost')"
+expect "second upgrade: not the console's"       allowed "$(grep -q "$UNRELEASED_DIGEST" <<<"$(seeded "$CATALOG_IDENTITY" "releases$(printf %s "$UNRELEASED_DIGEST" | cut -c8)")" && echo 'seeded the console'"'"'s' || echo '(server dry run)')"
+expect "second upgrade: still written"           allowed "$(grep -q true <<<"$(seeded "$CATALOG_TOKENS" apiAudiencesWritten)" && echo '(server dry run)' || echo 'reset')"
 
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"
