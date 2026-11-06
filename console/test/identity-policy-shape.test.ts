@@ -10,7 +10,7 @@
  */
 import * as k8s from "@kubernetes/client-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { updateIdentityPolicy } from "../src/k8s.js";
+import { identityHoldsReleases, updateIdentityPolicy } from "../src/k8s.js";
 
 const DIGITS = "0123456789abcdef".split("");
 const variable = (name: string, expression = "{}") => ({ name, expression });
@@ -57,6 +57,10 @@ describe("the identity policy's shape", () => {
     });
     expect(holds).toBe(false);
     expect(replaced).not.toHaveBeenCalled();
+  });
+
+  it("an older chart's (no candidates, no release maps) holds releases: its legacy list", () => {
+    expect(identityHoldsReleases([variable("products", "[]"), variable("teamSecrets"), variable("matched", "[]")])).toBe(true);
   });
 
   it("a policy without its literals is an older chart's", async () => {

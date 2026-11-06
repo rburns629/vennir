@@ -75,7 +75,8 @@ gives anything else "default" with no Secrets and no tokens. This one then
 holds only what the console decides, each team's secret names (and, as that
 one does too, one container, Secrets only as volumes, never ESO's
 ServiceAccounts): the two validations that match releases aren't rendered
-(nor `candidates`, by which the console tells the shapes apart). The release
+(nor `candidates`: the sixteen maps without it are how the console tells
+the shapes apart, a chart's from before released digests having neither). The release
 maps and the legacy list are, empty and inert, so a console from before can
 still write them while an upgrade rolls out; the new console writes them
 empty, and `teamSecrets`. Turning catalogPolicy off again seeds the maps
@@ -110,13 +111,19 @@ imageRepository) read them.
 {{- $_ := set $shards . dict }}
 {{- end }}
 {{- $existing := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $name }}
-{{- /* Rendered with catalogPolicy before (no candidates): its release maps
-     are inert, and the kernel's hold the releases. */}}
+{{- /* Rendered with catalogPolicy before: all sixteen release maps and no
+     candidates. Told apart by both, never by candidates alone: a policy
+     from before released digests (v0.11 and older: the legacy products list
+     and teamSecrets) has no candidates either, and its list must be kept. */}}
 {{- $wasSplit := false }}
 {{- if $existing }}
-{{- $wasSplit = true }}
+{{- $names := dict }}
 {{- range $existing.spec.variables }}
-{{- if eq .name "candidates" }}
+{{- $_ := set $names .name true }}
+{{- end }}
+{{- $wasSplit = not (hasKey $names "candidates") }}
+{{- range $digits }}
+{{- if not (hasKey $names (printf "releases%s" .)) }}
 {{- $wasSplit = false }}
 {{- end }}
 {{- end }}

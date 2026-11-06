@@ -1091,6 +1091,40 @@ expect "catalogPolicy off again: full"                  full    "$(form "$RELEAS
 expect "its releases re-seeded from the kernel's"       allowed "$(grep -q 'registry.example/db' <<<"$RESEED" && echo '(server dry run)' || echo "not seeded: $RESEED")"
 expect "but not a platform entry"                       allowed "$(if grep -q '^not rendered' <<<"$RESEED"; then echo "$RESEED"; elif grep -q 'plat-sa' <<<"$RESEED"; then echo 'seeded it'; else echo '(server dry run)'; fi)"
 
+echo "Upgrading from a policy from before released digests (v0.11 and older: no candidates, no release maps):"
+# The full policy in place again, then reshaped as v0.11's chart rendered
+# it: the legacy products list and teamSecrets, matched by repository. It
+# has no candidates either, and must not be taken for the split one: its
+# legacy list is kept.
+LEGACY_V011='[{"team":"'$TEAM_A'","repository":"registry.example/legacy-v011","action":"run","serviceAccount":"legacy-sa","audiences":""}]'
+shape "$RELEASE" | python3 -c '
+import re, sys
+print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M)))' \
+  | k replace -f - > /dev/null || { echo "  FAIL  replacing the identity policy"; FAILURES=$((FAILURES + 1)); }
+k get validatingadmissionpolicy "$RELEASE-execution-kernel-identity" -o json | python3 -c '
+import json, sys
+policy = json.load(sys.stdin)
+policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+dropped = {"candidates", "digest", "releases"} | {"releases" + d for d in "0123456789abcdef"}
+variables = []
+for v in policy["spec"]["variables"]:
+    if v["name"] in dropped:
+        continue
+    if v["name"] == "products":
+        v["expression"] = sys.argv[1]
+    if v["name"] == "matched":
+        v["expression"] = ("variables.products.filter(p, (p.team == \"\" || p.team == request.namespace) && "
+                           "p.repository == variables.repository && p.action == variables.action && "
+                           "p.serviceAccount == variables.serviceAccount)")
+    variables.append(v)
+policy["spec"]["variables"] = variables
+print(json.dumps(policy))' "$LEGACY_V011" \
+  | k replace -f - > /dev/null || { echo "  FAIL  writing a v0.11-shaped identity policy"; FAILURES=$((FAILURES + 1)); }
+expect "it is v0.11's shape (no candidates, no releases0)" allowed "$([ -z "$(seeded "$RELEASE-execution-kernel-identity" candidates)$(seeded "$RELEASE-execution-kernel-identity" releases0)" ] && echo '(server dry run)' || echo 'not reshaped')"
+V011=$(shape "$RELEASE")
+expect "catalogPolicy off: full"                        full    "$(form "$RELEASE")"
+expect "its legacy list kept"                           allowed "$(grep -q 'registry.example/legacy-v011' <<<"$V011" && echo '(server dry run)' || echo "dropped: $(grep -A1 'name: products$' <<<"$V011")")"
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"
   exit 1

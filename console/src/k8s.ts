@@ -1254,7 +1254,7 @@ const IDENTITY_POLICY_VARIABLES = new Set([
  *
  * `build` is also told whether the policy matches releases at all
  * (`holdsReleases`): with the kernel chart's catalogPolicy (decision 27)
- * it doesn't (it has no `candidates`, which only the full policy has), the
+ * it doesn't (it has the release maps but no `candidates`, which only the full policy has), the
  * kernel writing them into a policy of its own; its release maps and legacy
  * list are inert then, kept for a console from before during an upgrade.
  */
@@ -1272,9 +1272,17 @@ export async function updateIdentityPolicy(
   );
 }
 
-/** Whether an identity policy with these variables matches releases: not with catalogPolicy. */
+/**
+ * Whether an identity policy with these variables matches releases: not with
+ * catalogPolicy, which renders all sixteen release maps and no `candidates`.
+ * Told apart by both, as identity-policy.yaml does: a chart's from before
+ * released digests (v0.11 and older) has no `candidates` either, and matches
+ * products by its legacy list.
+ */
 export function identityHoldsReleases(variables: { name: string }[]): boolean {
-  return variables.some((v) => v.name === "candidates");
+  const names = new Set(variables.map((v) => v.name));
+  if (names.has("candidates")) return true;
+  return ![...IDENTITY_POLICY_VARIABLES].every((name) => names.has(name));
 }
 
 /**

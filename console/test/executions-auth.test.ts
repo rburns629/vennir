@@ -286,6 +286,14 @@ describe("SubmitExecution: a product runs as its ServiceAccount, with its team's
       expect((await submit({ image: "unregistered-image:1" })).code).toBe("ok");
     });
 
+    // The kernel chart's split identity policy's literals: the secret names,
+    // and the inert legacy list and release maps (no candidates).
+    const SPLIT_IDENTITY: Record<string, string> = {
+      teamSecrets: "{}",
+      products: "[]",
+      ...Object.fromEntries("0123456789abcdef".split("").map((digit) => [`releases${digit}`, "{}"])),
+    };
+
     it("refuses, loudly, when its own policy holds no releases but the kernel's isn't there to ask", async () => {
       // The kernel chart's split identity policy (no candidates), and no catalog policy by that name.
       const savedName = config.identityPolicyName;
@@ -293,7 +301,7 @@ describe("SubmitExecution: a product runs as its ServiceAccount, with its team's
       config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
       forgetIdentityShape();
       vi.mocked(readPolicyVariables).mockImplementation((name: string) =>
-        Promise.resolve(name === "kernel-execution-kernel-identity" ? { variables: { teamSecrets: "{}" }, annotations: {} } : null),
+        Promise.resolve(name === "kernel-execution-kernel-identity" ? { variables: SPLIT_IDENTITY, annotations: {} } : null),
       );
       try {
         const response = await submit({ serviceAccount: GRANTEE, secretRefs: ["product-a-secret"] });
@@ -313,12 +321,12 @@ describe("SubmitExecution: a product runs as its ServiceAccount, with its team's
       forgetIdentityShape();
       // Split, as last read (cached)...
       vi.mocked(readPolicyVariables).mockImplementation((name: string) =>
-        Promise.resolve(name === "kernel-execution-kernel-identity" ? { variables: { teamSecrets: "{}" }, annotations: {} } : null),
+        Promise.resolve(name === "kernel-execution-kernel-identity" ? { variables: SPLIT_IDENTITY, annotations: {} } : null),
       );
       expect(await identityPolicyHoldsReleases()).toBe(false);
       // ...full again now, and the kernel's policy gone with catalogPolicy.
       vi.mocked(readPolicyVariables).mockImplementation((name: string) =>
-        Promise.resolve(name === "kernel-execution-kernel-identity" ? { variables: { teamSecrets: "{}", candidates: "[]" }, annotations: {} } : null),
+        Promise.resolve(name === "kernel-execution-kernel-identity" ? { variables: { ...SPLIT_IDENTITY, candidates: "[]" }, annotations: {} } : null),
       );
       try {
         expect((await submit({ serviceAccount: GRANTEE, secretRefs: ["product-a-secret"] })).code).toBe("ok");
