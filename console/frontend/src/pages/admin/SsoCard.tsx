@@ -73,7 +73,9 @@ function GroupMappings({ teams }: { teams: Team[] }) {
     >
       <Typography variant="body2" color="text.secondary">
         At each sign-in, a mapped team&apos;s membership follows the person&apos;s groups: added with the best role their groups give, or
-        removed. Teams nothing maps to, bots, and people who sign in with a password are managed by hand.
+        removed. Teams nothing maps to, bots, and people who sign in with a password are managed by hand. With a groups claim, mapping a
+        team at once signs out each of its single sign-on members who signed in over an hour ago, and their password sessions no longer
+        count the team.
       </Typography>
       {error && <Alert severity="error">{error}</Alert>}
       {mappings?.length === 0 && (

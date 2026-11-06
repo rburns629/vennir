@@ -14,6 +14,8 @@
  * only for a single sign-on from the last hour. Against a stand-in provider.
  */
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import pg from "pg";
 import { and, asc, desc, eq, like, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -429,5 +431,70 @@ describe("a session that groups from a claim gave a team", () => {
     await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-premapped", team });
     expect(await teamsSeen(old)).toBe("unauthenticated");
     expect(await teamsSeen(signedInAgo(early.id, 60))).toEqual([team]);
+  });
+});
+
+describe("memberships that follow groups", () => {
+  it("are marked when a group source is set, for members added by hand while none was", async () => {
+    const signedInAgo = (userId: string, ago: number) =>
+      app.jwt.sign({ ...newSession(userId, true), iat: Math.floor(Date.now() / 1000) - ago } as ReturnType<typeof newSession>, { expiresIn: 8 * 3600 });
+    const teamsSeen = async (token: string) => {
+      const me = await call<{ teamNames?: string[] }>(token, "AuthService/GetMe");
+      return me.code === "ok" ? (me.body.teamNames ?? []).filter((t) => t.startsWith(prefix)).sort() : me.code;
+    };
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "", googleGroups: false }));
+    const team = `${prefix}-sourceless`;
+    ids[team] = (await createTeam(team)).id;
+    await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-sourceless", team });
+    const early = await createUser(`sourceless@${domain}`, null);
+    await db.update(users).set({ oidcSubject: `sub-sourceless-${prefix}` }).where(eq(users.id, early.id));
+    // No source: a mapped team is managed by hand.
+    expect((await call(admin, "TeamService/AddMember", { team, email: `sourceless@${domain}` })).code).toBe("ok");
+    const old = signedInAgo(early.id, CLAIM_GROUPS_SESSION_SECONDS + 60);
+    expect(await teamsSeen(old)).toEqual([team]);
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    expect(await teamsSeen(old)).toBe("unauthenticated");
+  });
+
+  it("are marked by migration 0067: a single sign-on person's unmarked row on a mapped team, nothing else", async () => {
+    const file = readFileSync(new URL("../src/db/migrations/0067_membership_from_groups.sql", import.meta.url), "utf8");
+    const backfill = file.split("--> statement-breakpoint")[0] ?? "";
+    expect(backfill).toMatch(/^\s*(--.*\n)*UPDATE "team_memberships"/);
+    const client = new pg.Client({ connectionString: process.env["DATABASE_URL"] });
+    await client.connect();
+    try {
+      await client.query("BEGIN");
+      const id = async (query: string, values: unknown[]) => (await client.query<{ id: string }>(query, values)).rows[0]?.id ?? "";
+      const person = (name: string, extra = "") =>
+        id(`INSERT INTO users (email${extra ? ", oidc_subject, is_bot" : ""}) VALUES ($1${extra ? `, $2, ${extra}` : ""}) RETURNING id`, extra ? [`${name}-bf@${domain}`, `sub-${name}-bf`] : [`${name}-bf@${domain}`]);
+      const sso = await person("sso", "false");
+      const bot = await person("bot", "true");
+      const password = await person("password");
+      const mapped = await id("INSERT INTO teams (name) VALUES ($1) RETURNING id", [`${prefix}-bf-mapped`]);
+      const unmapped = await id("INSERT INTO teams (name) VALUES ($1) RETURNING id", [`${prefix}-bf-unmapped`]);
+      await client.query("INSERT INTO sso_group_mappings (group_name, team_id, role) VALUES ('g-bf', $1, 'member')", [mapped]);
+      const other = await id("INSERT INTO teams (name) VALUES ($1) RETURNING id", [`${prefix}-bf-set`]);
+      await client.query("INSERT INTO sso_group_mappings (group_name, team_id, role) VALUES ('g-bf', $1, 'member')", [other]);
+      await client.query(
+        `INSERT INTO team_memberships (user_id, team_id, role, via_groups) VALUES
+          ($1, $4, 'member', NULL), ($1, $5, 'member', NULL), ($1, $6, 'member', '{g-bf}'),
+          ($2, $4, 'member', NULL), ($3, $4, 'member', NULL)`,
+        [sso, bot, password, mapped, unmapped, other],
+      );
+      await client.query(backfill);
+      const { rows } = await client.query<{ user_id: string; team_id: string; via_groups: string[] | null }>(
+        "SELECT user_id, team_id, via_groups FROM team_memberships WHERE team_id = ANY($1::uuid[])",
+        [[mapped, unmapped, other]],
+      );
+      const via = (user: string, team: string) => rows.find((r) => r.user_id === user && r.team_id === team)?.via_groups;
+      expect(via(sso, mapped)).toEqual([]);
+      expect(via(sso, unmapped)).toBeNull();
+      expect(via(sso, other)).toEqual(["g-bf"]);
+      expect(via(bot, mapped)).toBeNull();
+      expect(via(password, mapped)).toBeNull();
+    } finally {
+      await client.query("ROLLBACK");
+      await client.end();
+    }
   });
 });

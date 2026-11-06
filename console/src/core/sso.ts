@@ -133,6 +133,9 @@ export async function setSsoSettings(caller: AuthUser | undefined, input: SsoSet
   }
   const values = { ...provider, ...groups, updatedBy: caller?.id ?? null, updatedAt: new Date() };
   await db.insert(ssoSettings).values({ id: 1, ...values }).onConflictDoUpdate({ target: ssoSettings.id, set: values });
+  // Groups decide mapped teams' single sign-on members from now on, those
+  // added by hand while no source was set included.
+  if (groups.groupsClaim || groups.googleGroups) await markFollowingGroups();
   log.warn(
     { event: "sso_settings_changed", by: caller?.id, enabled: input.enabled, issuer: input.issuer, groupsClaim: input.groupsClaim, googleGroups: input.googleGroups, secretChanged: Boolean(input.clientSecret) },
     "single sign-on settings changed",

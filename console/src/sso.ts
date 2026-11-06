@@ -335,16 +335,25 @@ export function startGroupResync(log: FastifyBaseLogger): void {
 }
 
 /**
- * A team just mapped: its single sign-on members' memberships follow their
+ * A team just mapped (or, with no team, every mapped team, once a group
+ * source is set): its single sign-on members' memberships follow their
  * groups from now on (their next sign-in keeps or removes them), so they
  * count as group-given (via_groups '{}', as migration 0067 marked them).
+ * One added by hand while no source was set is marked here too.
  */
-export async function markFollowingGroups(teamId: string): Promise<void> {
+export async function markFollowingGroups(teamId?: string): Promise<void> {
   const ssoPeople = db.select({ id: users.id }).from(users).where(and(isNotNull(users.oidcSubject), eq(users.isBot, false)));
+  const mappedTeams = db.selectDistinct({ id: ssoGroupMappings.teamId }).from(ssoGroupMappings);
   await db
     .update(teamMemberships)
     .set({ viaGroups: [] })
-    .where(and(eq(teamMemberships.teamId, teamId), isNull(teamMemberships.viaGroups), inArray(teamMemberships.userId, ssoPeople)));
+    .where(
+      and(
+        teamId ? eq(teamMemberships.teamId, teamId) : inArray(teamMemberships.teamId, mappedTeams),
+        isNull(teamMemberships.viaGroups),
+        inArray(teamMemberships.userId, ssoPeople),
+      ),
+    );
 }
 
 /** Whether a team's memberships of single sign-on users follow groups (it has a mapping). */

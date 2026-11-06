@@ -237,7 +237,11 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 // check; while it can't (JWT_SECRET changed), the console treats single
 // sign-on as off and the gateway as on, until an admin saves it again. (A
 // changed JWT_SECRET also changes the session key, so no session from
-// before it is accepted anyway.)
+// before it is accepted anyway.) The same goes for the claim-groups rule:
+// meanwhile, with a groups claim saved, the gateway drops group-given teams
+// from API tokens and password sessions, and refuses older single sign-on
+// sessions holding one, where the console counts them. It errs on the
+// refusing side.
 func (r *Resolver) ssoOn(saved bool) bool {
 	return r.SSO || saved
 }

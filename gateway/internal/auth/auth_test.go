@@ -440,6 +440,14 @@ func TestClaimGroupsCountOnlyForARecentSignIn(t *testing.T) {
 	if got := teams(off, session(false, time.Minute)); got != both {
 		t.Errorf("single sign-on off, a password's session: %s", got)
 	}
+	// Saved on but incomplete (no issuer, client or redirect URL): still off.
+	for _, missing := range []string{"issuer", "client_id", "redirect_url"} {
+		exec(`UPDATE sso_settings SET enabled = true, issuer = 'https://accounts.example', client_id = 'c', redirect_url = 'https://console.example/cb' WHERE id = 1`)
+		exec(`UPDATE sso_settings SET ` + missing + ` = '' WHERE id = 1`)
+		if got := teams(off, session(true, 2*time.Hour)); got != both {
+			t.Errorf("single sign-on saved on without its %s, an older single sign-on: %s", missing, got)
+		}
+	}
 	// On as an admin saved it: the rule again.
 	exec(`UPDATE sso_settings SET enabled = true, issuer = 'https://accounts.example', client_id = 'c', redirect_url = 'https://console.example/cb' WHERE id = 1`)
 	if got := teams(off, session(true, 2*time.Hour)); got != "refused" {
