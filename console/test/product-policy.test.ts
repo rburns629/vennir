@@ -22,6 +22,8 @@ import { caller } from "./rpc.js";
 import { ensureServiceAccount, updateIdentityPolicy } from "../src/k8s.js";
 import {
   admitReleases,
+  forgetIdentityShape,
+  identityPolicyHoldsReleases,
   MAX_MAP_CHARS,
   policyReleases,
   policyTeamSecrets,
@@ -41,15 +43,21 @@ const empty = (): Record<string, string> => ({
 /** What the fake cluster's policy says now. */
 let policy: Record<string, string> = empty();
 let writes = 0;
+/** Whether the fake policy matches releases: not with the kernel chart's catalogPolicy. */
+let holdsReleases = true;
 
 vi.mock("../src/k8s.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/k8s.js")>()),
-  updateIdentityPolicy: vi.fn(async (_name: string, build: (current: Record<string, string>) => Promise<Record<string, string>>) => {
-    const wanted = await build({ ...policy });
-    if (Object.keys(policy).some((key) => wanted[key] !== undefined && wanted[key] !== policy[key])) writes++;
-    policy = { ...policy, ...wanted };
-    return true;
-  }),
+  updateIdentityPolicy: vi.fn(
+    async (_name: string, build: (current: Record<string, string>, shape: { holdsReleases: boolean }) => Promise<Record<string, string>>) => {
+      const wanted = await build({ ...policy }, { holdsReleases });
+      if (Object.keys(policy).some((key) => wanted[key] !== undefined && wanted[key] !== policy[key])) writes++;
+      policy = { ...policy, ...wanted };
+      return true;
+    },
+  ),
+  // The policy as read, for its shape (its candidates, with releases).
+  readPolicyVariables: vi.fn(() => Promise.resolve({ variables: { ...policy, ...(holdsReleases ? { candidates: "[]" } : {}) }, annotations: {} })),
   ensureServiceAccount: vi.fn(() => Promise.resolve()),
 }));
 
@@ -90,7 +98,7 @@ afterAll(async () => {
   config.identityPolicyName = originalPolicyName;
   await db.delete(submittedExecutions).where(inArray(submittedExecutions.teams, [[prefix]]));
   await db.delete(products).where(like(products.name, `${prefix}%`));
-  await db.delete(teams).where(inArray(teams.name, [prefix]));
+  await db.delete(teams).where(inArray(teams.name, [prefix, `${prefix}-s`]));
   await db.delete(users).where(inArray(users.email, [email]));
   await app.close();
 });
@@ -98,6 +106,7 @@ afterAll(async () => {
 beforeEach(() => {
   writes = 0;
   vi.mocked(updateIdentityPolicy).mockClear();
+  forgetIdentityShape();
   vi.mocked(ensureServiceAccount).mockClear();
 });
 
@@ -340,5 +349,36 @@ describe("an upgraded install's legacy list (by repository)", () => {
     // And never filled again.
     await syncIdentityPolicy();
     expect(policy["products"]).toBe("[]");
+  });
+});
+
+describe("with the kernel writing the released digests (catalogPolicy, decision 27)", () => {
+  it("writes each team's secret names, keeps the inert maps empty, computes no releases, and admits nothing itself", async () => {
+    const saved = policy;
+    // The kernel chart's identity policy with catalogPolicy: it matches no
+    // releases; a console from before, during the upgrade, wrote its maps.
+    holdsReleases = false;
+    forgetIdentityShape();
+    policy = { ...empty(), releases9: JSON.stringify({ [digest("9")]: [] }) };
+    try {
+      // A team of its own (this file's was retired above), with a secret.
+      const team = await createTeam(`${prefix}-s`);
+      await recordSecretGrant({ teamId: team.id, secretName: "split-key", keys: ["value"], source: "literal" });
+      const split = { name: `${prefix}-split-run`, image: `example.com/${prefix}/split@${digest("5")}`, action: "run", team: `${prefix}-s`, serviceAccount: "split-sa" };
+      expect((await register(split)).code).toBe("ok");
+      expect(JSON.parse(policy["teamSecrets"] ?? "{}")).toMatchObject({ [`${prefix}-s`]: "split-key" });
+      // Its release maps (inert) emptied, the registered product's release not among them.
+      expect(DIGITS.every((d) => policy[`releases${d}`] === "{}") && policy["products"] === "[]").toBe(true);
+      writes = 0;
+      const use = { digest: digest("5"), team: `${prefix}-s`, repository: `example.com/${prefix}/split`, action: "run", serviceAccount: "split-sa" };
+      // The kernel's policy is asked instead (catalogPolicy.ts): nothing here to write or refuse.
+      expect(await admitReleases([use])).toEqual([]);
+      expect(writes).toBe(0);
+      expect(await identityPolicyHoldsReleases()).toBe(false);
+    } finally {
+      policy = saved;
+      holdsReleases = true;
+      forgetIdentityShape();
+    }
   });
 });

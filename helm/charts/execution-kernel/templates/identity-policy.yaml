@@ -64,12 +64,60 @@ This chart seeds the literals empty on install and keeps whatever is there
 on upgrade (lookup), re-encoded as JSON so they can only ever be literals.
 Same reasoning as image-policy.yaml for a literal rather than a ConfigMap.
 
+With catalogPolicy (a signed catalog; decision 27), once the kernel's
+catalog-identity policy and its binding exist (lookup: from the upgrade
+after the one that made them; never without lookup) and the kernel has
+written it or it holds no legacy list (below), which digests are a
+product's releases, as which ServiceAccount and token audiences, is the
+kernel's to write, from the release it verified, into catalog-policy.yaml's
+<release>-execution-kernel-catalog-identity, which the console can't
+update: that policy refuses an image no release names as a product, and
+gives anything else "default" with no Secrets and no tokens. This one then
+holds only what the console decides, each team's secret names (and, as that
+one does too, one container, Secrets only as volumes, never ESO's
+ServiceAccounts): the two validations that match releases aren't rendered
+(nor `candidates`: the sixteen maps without it are how the console tells
+the shapes apart, a chart's from before released digests having neither). The release
+maps and the legacy list are, empty and inert, so a console from before can
+still write them while an upgrade rolls out; the new console writes them
+empty, and `teamSecrets`. Turning catalogPolicy off again seeds the maps
+from the kernel's policy as it last wrote them. Both apply, so a step must
+pass both.
+
 The kernel's Jobs have exactly one container and mount Secrets only as
 volumes; anything else is refused too, so a Secret can't arrive some other
 way unchecked. Images are read the way image-policy.yaml (and the console's
 imageRepository) read them.
 */}}
 {{- if .Values.identityPolicy.enabled }}
+{{- /* With catalogPolicy, the kernel's catalog-identity policy holds which
+     digests are a product's releases (this file's comment above); this
+     one keeps what the console decides: each team's secret names. */}}
+{{- /* Only once the kernel's policy and its binding are in the cluster (an
+     upgrade after the one that made them): the upgrade that turns
+     catalogPolicy on, should it fail, never leaves no release rule. Without
+     lookup (helm template), never. And only once the kernel has written
+     it, or it holds no legacy list: until then it may hold one seeded from
+     a v0.11 console's (by repository, any digest), which the kernel's first
+     write empties, and splitting would leave that as the only release rule
+     for as long as the kernel can't apply a verified release. Written: its
+     vennir.dev/catalog-release annotation set, or its legacy `products`
+     "[]" (or not there: a chart from before it). */}}
+{{- $catalogIdentity := printf "%s-catalog-identity" (include "execution-kernel.fullname" .) }}
+{{- $split := false }}
+{{- $kernelPolicy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $catalogIdentity }}
+{{- if and .Values.catalogPolicy.enabled $kernelPolicy (lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $catalogIdentity) }}
+{{- $written := ne (get (default (dict) $kernelPolicy.metadata.annotations) "vennir.dev/catalog-release") "" }}
+{{- $noLegacy := true }}
+{{- range $kernelPolicy.spec.variables }}
+{{- if and (eq .name "products") (ne (trim .expression) "[]") }}
+{{- $noLegacy = false }}
+{{- end }}
+{{- end }}
+{{- if or $written $noLegacy }}
+{{- $split = true }}
+{{- end }}
+{{- end }}
 {{- $scheduler := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-kernel.serviceAccountName" .) }}
 {{- $name := printf "%s-identity" (include "execution-kernel.fullname" .) }}
 {{- $productsExpr := "[]" }}
@@ -80,9 +128,29 @@ imageRepository) read them.
 {{- $_ := set $shards . dict }}
 {{- end }}
 {{- $existing := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $name }}
+{{- /* Rendered with catalogPolicy before: all sixteen release maps and no
+     candidates. Told apart by both, never by candidates alone: a policy
+     from before released digests (v0.11 and older: the legacy products list
+     and teamSecrets) has no candidates either, and its list must be kept. */}}
+{{- $wasSplit := false }}
+{{- if $existing }}
+{{- $names := dict }}
+{{- range $existing.spec.variables }}
+{{- $_ := set $names .name true }}
+{{- end }}
+{{- $wasSplit = not (hasKey $names "candidates") }}
+{{- range $digits }}
+{{- if not (hasKey $names (printf "releases%s" .)) }}
+{{- $wasSplit = false }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- /* The release maps and the legacy list are kept only when this policy
+     matches releases, before and after: with catalogPolicy they're inert. */}}
+{{- $keepReleases := not (or $split $wasSplit) }}
 {{- if $existing }}
 {{- range $existing.spec.variables }}
-{{- if eq .name "products" }}
+{{- if and $keepReleases (eq .name "products") }}
 {{- $kept := list }}
 {{- range fromJsonArray .expression }}
 {{- $entry := . }}
@@ -105,7 +173,7 @@ imageRepository) read them.
 {{- $teamSecretsExpr = toJson $stored }}
 {{- end }}
 {{- $digit := trimPrefix "releases" .name }}
-{{- if and (ne $digit .name) (hasKey $shards $digit) }}
+{{- if and $keepReleases (ne $digit .name) (hasKey $shards $digit) }}
 {{- range $digest, $entries := fromJson .expression }}
 {{- if not (and (regexMatch "^sha256:[a-f0-9]{64}$" $digest) (eq (substr 7 8 $digest) $digit) (kindIs "slice" $entries)) }}
 {{- fail (printf "%s's releases%s isn't a JSON map of sha256 digests starting %s to lists of products; delete the policy and let the console resync it." $name $digit $digit) }}
@@ -119,6 +187,31 @@ imageRepository) read them.
 {{- $kept = append $kept (dict "team" $entry.team "repository" $entry.repository "action" $entry.action "serviceAccount" $entry.serviceAccount "audiences" $entry.audiences) }}
 {{- end }}
 {{- $_ := set (index $shards $digit) $digest $kept }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- /* catalogPolicy turned off: the releases come back from the kernel's
+     policy as it last wrote them (catalog-policy.yaml, removed by this
+     same upgrade), so steps keep running until the console's next write. */}}
+{{- if and (not $split) $wasSplit }}
+{{- $catalog := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" (printf "%s-catalog-identity" (include "execution-kernel.fullname" .)) }}
+{{- if $catalog }}
+{{- range $catalog.spec.variables }}
+{{- $digit := trimPrefix "releases" .name }}
+{{- if and (ne $digit .name) (hasKey $shards $digit) }}
+{{- range $digest, $entries := fromJson .expression }}
+{{- if and (regexMatch "^sha256:[a-f0-9]{64}$" $digest) (eq (substr 7 8 $digest) $digit) (kindIs "slice" $entries) }}
+{{- $kept := list }}
+{{- range $entries }}
+{{- /* Not a platform product's (team ""): this policy matches it in every namespace. */}}
+{{- if and (kindIs "map" .) (kindIs "string" (get . "team")) (ne (get . "team") "") (kindIs "string" (get . "repository")) (kindIs "string" (get . "action")) (kindIs "string" (get . "serviceAccount")) (kindIs "string" (get . "audiences")) }}
+{{- $kept = append $kept (dict "team" .team "repository" .repository "action" .action "serviceAccount" .serviceAccount "audiences" .audiences) }}
+{{- end }}
+{{- end }}
+{{- $_ := set (index $shards $digit) $digest $kept }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
@@ -141,19 +234,24 @@ spec:
     - name: from-kernel-scheduler
       expression: request.userInfo.username == {{ $scheduler | quote }}
   variables:
-    # The ones the console edits: the legacy products list, teamSecrets
-    # and the sixteen releases maps.
-    - name: products
-      expression: {{ $productsExpr | toJson }}
+    # The ones the console edits: teamSecrets, the legacy products list and
+    # the sixteen releases maps. With catalogPolicy the last two are inert,
+    # written empty: nothing here reads them (the kernel's policy holds the
+    # releases), and they're kept so a console from before, still running
+    # during the upgrade, can write them.
     - name: teamSecrets
       expression: {{ $teamSecretsExpr | toJson }}
+    - name: products
+      expression: {{ ternary "[]" $productsExpr $split | toJson }}
     {{- range $digits }}
     - name: releases{{ . }}
-      expression: {{ toJson (index $shards .) | toJson }}
+      expression: {{ ternary "{}" (toJson (index $shards .)) $split | toJson }}
     {{- end }}
+    {{- if not $split }}
     - name: releases
       expression: >-
         { {{- range $i, $digit := $digits }}{{ if $i }}, {{ end }}{{ $digit | quote }}: dyn(variables.releases{{ $digit }}){{ end -}} }
+    {{- end }}
     - name: pod
       expression: object.spec.template.spec
     - name: serviceAccount
@@ -172,6 +270,7 @@ spec:
         variables.pod.containers.exists(c,
           (has(c.envFrom) && c.envFrom.exists(e, has(e.secretRef))) ||
           (has(c.env) && c.env.exists(e, has(e.valueFrom) && has(e.valueFrom.secretKeyRef))))
+    {{- if not $split }}
     - name: image
       expression: variables.pod.containers[0].image
     - name: normalizedImage
@@ -224,6 +323,7 @@ spec:
           variables.pod.volumes.filter(v, has(v.projected) && has(v.projected.sources) &&
             v.projected.sources.exists(s, has(s.serviceAccountToken) &&
               has(s.serviceAccountToken.audience) && s.serviceAccountToken.audience != "")) : []
+    {{- end }}
   validations:
     - expression: >-
         size(variables.pod.containers) == 1 && !has(variables.pod.initContainers) &&
@@ -238,6 +338,7 @@ spec:
         "IDENTITY_NOT_ALLOWED: no step runs as " + variables.serviceAccount + ", the ServiceAccount " +
         "ESO reads team " + request.namespace + "'s vault as."
       reason: Forbidden
+    {{- if not $split }}
     - expression: >-
         (variables.serviceAccount == "default" && size(variables.secrets) == 0) ||
         size(variables.matched) > 0
@@ -250,6 +351,7 @@ spec:
         "declares; anything else, another image of the same repository included, runs as " +
         "\"default\" with no Secrets."
       reason: Forbidden
+    {{- end }}
     - expression: >-
         size(variables.secrets) == 0 ||
         (request.namespace in variables.teamSecrets &&
@@ -258,6 +360,7 @@ spec:
         "IDENTITY_NOT_ALLOWED: Secrets " + variables.secrets.join(", ") + " aren't all registered " +
         "for team " + request.namespace + " in the console; only registered secrets may be mounted."
       reason: Forbidden
+    {{- if not $split }}
     - expression: >-
         variables.tokens.all(v, v.projected.sources.all(s, !has(s.serviceAccountToken) ||
           !has(s.serviceAccountToken.audience) || s.serviceAccountToken.audience == "" ||
@@ -268,6 +371,7 @@ spec:
         "\") may not have a ServiceAccount token for an audience its product didn't declare " +
         "(product.yaml's tokenAudiences), or one lasting over an hour, in " + request.namespace + "."
       reason: Forbidden
+    {{- end }}
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding

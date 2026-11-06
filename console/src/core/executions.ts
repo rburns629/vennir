@@ -53,7 +53,7 @@ import {
   submitExecution,
   type ExecutionStateEntry,
 } from "../kernel/client.js";
-import { admitReleases, markReleasesUsed, releasedImageKey, releasedImages, UNREGISTERED_SERVICE_ACCOUNT } from "../productPolicy.js";
+import { admitReleases, identityPolicyHoldsReleases, markReleasesUsed, releasedImageKey, releasedImages, UNREGISTERED_SERVICE_ACCOUNT } from "../productPolicy.js";
 import { unlistedByKernel, type KernelUse } from "../catalogPolicy.js";
 import { ensureStillRunnable, rerunTemplate } from "./templates.js";
 import { mayDecide, notDeciders, notDecidersOf, taskTeams } from "./approvals.js";
@@ -895,7 +895,9 @@ async function admitIdentities(tasksInfo: TaskAuthInfo[], log: FastifyBaseLogger
   // With a signed catalog, the kernel's policy decides too (catalogPolicy.ts):
   // a release it doesn't list would be refused at dispatch. First, so a
   // refused submission marks nothing used.
-  const pending = await unlistedByKernel(needed, log);
+  // Required when the console's own identity policy holds no releases
+  // (catalogPolicy): its shape read again, fresh, before refusing.
+  const pending = await unlistedByKernel(needed, log, async (fresh) => !(await identityPolicyHoldsReleases(fresh)));
   if (pending.length > 0) {
     throw new ApiError(
       409,

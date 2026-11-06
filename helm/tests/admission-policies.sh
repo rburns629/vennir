@@ -1029,6 +1029,130 @@ expect "second upgrade: the kernel's literals kept" allowed "$(grep -q 'registry
 expect "second upgrade: not the console's"       allowed "$(grep -q "$UNRELEASED_DIGEST" <<<"$(seeded "$CATALOG_IDENTITY" "releases$(printf %s "$UNRELEASED_DIGEST" | cut -c8)")" && echo 'seeded the console'"'"'s' || echo '(server dry run)')"
 expect "second upgrade: still written"           allowed "$(grep -q true <<<"$(seeded "$CATALOG_TOKENS" apiAudiencesWritten)" && echo '(server dry run)' || echo 'reset')"
 
+echo "The console's identity policy beside the kernel's (catalogPolicy: each team's secret names alone):"
+# The kernel chart's identity policy as it renders with catalogPolicy on,
+# in place of the full one (split: an upgrade after the one that made the
+# kernel's policy and binding, which lookup finds); the console writes its
+# teamSecrets. Before it, catalogPolicy on, the chart still renders it full.
+ht "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
+  --set catalogPolicy.enabled=true --set catalogPolicy.release=$SOURCE/catalog-release:latest \
+  --set 'catalogPolicy.signature.publicKeys[0]=unused' \
+  ${HELM_CONTEXT_ARGS[@]+"${HELM_CONTEXT_ARGS[@]}"} --dry-run=server --take-ownership \
+  --show-only templates/identity-policy.yaml | python3 -c '
+import re, sys
+print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M)))' \
+  | k replace -f - > /dev/null || { echo "  FAIL  replacing the identity policy"; FAILURES=$((FAILURES + 1)); }
+# Its release maps and legacy list are inert (kept for a console from
+# before, during the upgrade): here a console writes another digest of
+# db's repository into them, and the legacy list by repository, and
+# neither lets anything run.
+identity_literal "$LEGACY_PRODUCTS" "$TEAM_SECRETS" '{"'$UNRELEASED_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}]}'
+expect "it matches no releases (no candidates)"  allowed "$([ -z "$(seeded "$RELEASE-execution-kernel-identity" candidates)" ] && echo '(server dry run)' || echo 'it still matches them')"
+# Until the API server has the new version: the full one's refusal names
+# "a registered product's release". Where both policies refuse, either
+# refusal may come back, so every probe must show the new one.
+# (Each captured: a refused dry run exits 1, which pipefail would take for
+# the grep's answer.)
+for _ in $(seq 1 60); do
+  probes="$(job "$TEAM_A" $SOURCE/app:1 run default db-key)$(job "$TEAM_A" $SOURCE/db:1 create db-sa "")"
+  grep -q "registered product's release" <<<"$probes" || break
+  sleep 1
+done
+expect "a release the kernel lists, its team's secret"  allowed            "$(job "$TEAM_A" $DB create db-sa db-key)"
+expect "a token for its product's audience"             allowed            "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
+expect "a Secret its team never registered (the console's)" "aren't all registered" "$(job "$TEAM_A" $DB create db-sa eso-auth)"
+expect "another team's Secret (the console's)"           "aren't all registered" "$(job "$TEAM_A" $DB create db-sa b-key)"
+expect "an unreleased digest its inert maps list (the kernel's)" "$CATALOG_ONLY" "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "")"
+expect "its tag, by the inert legacy list (the kernel's)" "$CATALOG_ONLY"     "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "")"
+expect "an unregistered image with a Secret (the kernel's)" "$CATALOG_ONLY"   "$(job "$TEAM_A" $SOURCE/app:1 run default db-key)"
+expect "ESO's SA (both)"                                 IDENTITY_NOT_ALLOWED "$(job "$TEAM_A" $SOURCE/vault:1@$ZERO_DIGEST run eso-gcp "")"
+expect "an unregistered image as default"                allowed            "$(job "$TEAM_A" $SOURCE/app:1 run default "")"
+
+echo "The identity policy's shape, rendered (candidates: it matches releases):"
+shape() {  # release, extra helm arguments: the identity policy rendered, or "not rendered: <helm's error>"
+  local release=$1 out; shift
+  out=$(ht "$release" helm/charts/execution-kernel -n "$PLATFORM_NS" ${HELM_CONTEXT_ARGS[@]+"${HELM_CONTEXT_ARGS[@]}"} \
+    --dry-run=server --take-ownership --show-only templates/identity-policy.yaml "$@" 2>&1)
+  if grep -q '^kind: ValidatingAdmissionPolicy$' <<<"$out"; then echo "$out"; else echo "not rendered: $(tail -1 <<<"$out")"; fi
+}
+form() {  # release, extra helm arguments: full (candidates: it matches releases), split, or not rendered
+  local out
+  out=$(shape "$@")
+  if grep -q '^not rendered' <<<"$out"; then echo "$out"; elif grep -q 'name: candidates' <<<"$out"; then echo full; else echo split; fi
+}
+CATALOG_ON=(--set catalogPolicy.enabled=true --set catalogPolicy.release=$SOURCE/catalog-release:latest --set 'catalogPolicy.signature.publicKeys[0]=unused')
+expect "catalogPolicy on, the kernel's policy there: split" split "$(form "$RELEASE" "${CATALOG_ON[@]}")"
+expect "catalogPolicy on, no kernel policy yet: full"      full  "$(form "$RELEASE-none" "${CATALOG_ON[@]}")"
+# The kernel's policy holding a legacy list seeded from a v0.11 console's
+# (any digest of a repository), the kernel not having written yet: not
+# split, or that list would be the only release rule until it does.
+kernel_legacy() {  # legacy products JSON, catalog-release annotation (a chart whose policy has no products gets one, unread)
+  k get validatingadmissionpolicy "$CATALOG_IDENTITY" -o json | python3 -c '
+import json, sys
+policy = json.load(sys.stdin)
+policy["metadata"].pop("resourceVersion", None)
+annotations = policy["metadata"].setdefault("annotations", {})
+annotations.pop("kubectl.kubernetes.io/last-applied-configuration", None)
+annotations["vennir.dev/catalog-release"] = sys.argv[2]
+variables = policy["spec"]["variables"]
+found = [v for v in variables if v["name"] == "products"]
+if found:
+    found[0]["expression"] = sys.argv[1]
+else:
+    variables.insert(0, {"name": "products", "expression": sys.argv[1]})
+print(json.dumps(policy))' "$1" "$2" | k replace -f - > /dev/null || { echo "  FAIL  writing the kernel policy's legacy list"; FAILURES=$((FAILURES + 1)); }
+}
+kernel_legacy "$LEGACY_PRODUCTS" ""
+expect "kernel policy with a seeded legacy list, unwritten: full" full  "$(form "$RELEASE" "${CATALOG_ON[@]}")"
+kernel_legacy "$LEGACY_PRODUCTS" "$SOURCE/catalog-release@$ZERO_DIGEST"
+expect "the same, once the kernel has written: split"          split "$(form "$RELEASE" "${CATALOG_ON[@]}")"
+kernel_legacy "[]" ""
+expect "its legacy list emptied: split"                        split "$(form "$RELEASE" "${CATALOG_ON[@]}")"
+# Turning catalogPolicy off again: the releases back from the kernel's
+# policy, but never a platform product's (team "": every namespace here).
+catalog_literal "$CATALOG_IDENTITY" releases '{"'$ZERO_DIGEST'":[{"action":"create","audiences":"sts.amazonaws.com","repository":"registry.example/db","serviceAccount":"db-sa","team":"'$TEAM_A'"}],"'$PLATFORM_DIGEST'":[{"action":"run","audiences":"","repository":"registry.example/platform","serviceAccount":"plat-sa","team":""}]}'
+RESEED=$(shape "$RELEASE")
+expect "catalogPolicy off again: full"                  full    "$(form "$RELEASE")"
+expect "its releases re-seeded from the kernel's"       allowed "$(grep -q 'registry.example/db' <<<"$RESEED" && echo '(server dry run)' || echo "not seeded: $RESEED")"
+expect "but not a platform entry"                       allowed "$(if grep -q '^not rendered' <<<"$RESEED"; then echo "$RESEED"; elif grep -q 'plat-sa' <<<"$RESEED"; then echo 'seeded it'; else echo '(server dry run)'; fi)"
+
+echo "Upgrading from a policy from before released digests (v0.11 and older: no candidates, no release maps):"
+# The full policy in place again, then reshaped as v0.11's chart rendered
+# it: the legacy products list and teamSecrets, matched by repository. It
+# has no candidates either, and must not be taken for the split one: its
+# legacy list is kept.
+LEGACY_V011='[{"team":"'$TEAM_A'","repository":"registry.example/legacy-v011","action":"run","serviceAccount":"legacy-sa","audiences":""}]'
+shape "$RELEASE" | python3 -c '
+import re, sys
+print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M)))' \
+  | k replace -f - > /dev/null || { echo "  FAIL  replacing the identity policy"; FAILURES=$((FAILURES + 1)); }
+k get validatingadmissionpolicy "$RELEASE-execution-kernel-identity" -o json | python3 -c '
+import json, sys
+policy = json.load(sys.stdin)
+policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+# Unconditionally: the API server writes the type-checking status of the policy
+# just after the replace above, which would make this one conflict.
+policy["metadata"].pop("resourceVersion", None)
+dropped = {"candidates", "digest", "releases"} | {"releases" + d for d in "0123456789abcdef"}
+variables = []
+for v in policy["spec"]["variables"]:
+    if v["name"] in dropped:
+        continue
+    if v["name"] == "products":
+        v["expression"] = sys.argv[1]
+    if v["name"] == "matched":
+        v["expression"] = ("variables.products.filter(p, (p.team == \"\" || p.team == request.namespace) && "
+                           "p.repository == variables.repository && p.action == variables.action && "
+                           "p.serviceAccount == variables.serviceAccount)")
+    variables.append(v)
+policy["spec"]["variables"] = variables
+print(json.dumps(policy))' "$LEGACY_V011" \
+  | k replace -f - > /dev/null || { echo "  FAIL  writing a v0.11-shaped identity policy"; FAILURES=$((FAILURES + 1)); }
+expect "it is v0.11's shape (no candidates, no releases0)" allowed "$([ -z "$(seeded "$RELEASE-execution-kernel-identity" candidates)$(seeded "$RELEASE-execution-kernel-identity" releases0)" ] && echo '(server dry run)' || echo 'not reshaped')"
+V011=$(shape "$RELEASE")
+expect "catalogPolicy off: full"                        full    "$(form "$RELEASE")"
+expect "its legacy list kept"                           allowed "$(grep -q 'registry.example/legacy-v011' <<<"$V011" && echo '(server dry run)' || echo "dropped: $(grep -A1 'name: products$' <<<"$V011")")"
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"
   exit 1

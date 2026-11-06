@@ -1015,10 +1015,25 @@ in `assessment.md`). With the kernel chart's
   refused, not retried (`IDENTITY_NOT_ALLOWED`). Wait for such executions to
   finish (Observe's runs list the unfinished ones), or turn `catalogPolicy` on
   when none run.
-- **The next release** drops the released digests from the console's
-  identity policy when `catalogPolicy` is on, leaving it each team's secret
-  names; the console stops computing them. An install whose catalog isn't
-  signed keeps the console writing them, as now.
+- **The release after drops the console's copy** (decision 27's second
+  step, unreleased). With `catalogPolicy` on, and once the kernel's policy and
+  its binding are in the cluster (an upgrade after the one that made them:
+  should that one fail, the console's release rules are still there; a
+  render without lookup never splits), the kernel chart renders the
+  console's identity policy without the released digests and the two rules
+  that read them: it holds each team's secret names alone (and, as the
+  kernel's does too, one container, Secrets only as volumes, never ESO's
+  ServiceAccounts). The console writes `teamSecrets` and stops computing
+  releases; the release maps stay in the policy, empty and read by nothing,
+  so the console from before keeps working while the upgrade rolls out.
+  Upgrading straight to it from an install without the kernel's policies
+  is safe too: the kernel's are seeded from the console's maps before they
+  go. Turning `catalogPolicy` off again gives the console's policy back its
+  releases, seeded from the kernel's. An install whose catalog isn't signed
+  keeps the console writing them, as now. With `catalogPolicy` on and the
+  console chart's `catalogPolicy.identityPolicyName` not naming the kernel's
+  policy, submissions of products' steps fail (an internal error, logged),
+  rather than pass unchecked.
 
 **Images reused under the same tag.** With `pullPolicy: IfNotPresent` (the
 default) and a reused tag such as `:latest`, a node that already has the old

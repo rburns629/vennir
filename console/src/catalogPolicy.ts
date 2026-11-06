@@ -141,12 +141,29 @@ export type KernelUse = ReleaseUse & { audiences: string[] };
  * would refuse every product on a signed install that runs without
  * catalogPolicy (the console writes everything there).
  */
-export async function unlistedByKernel(uses: KernelUse[], log?: FastifyBaseLogger): Promise<string[]> {
-  if (uses.length === 0 || !config.catalogIdentityPolicyName) return [];
+export async function unlistedByKernel(
+  uses: KernelUse[],
+  log?: FastifyBaseLogger,
+  required: (fresh: boolean) => Promise<boolean> = () => Promise.resolve(false),
+): Promise<string[]> {
+  if (uses.length === 0) return [];
+  // The console's own identity policy holds no releases (the kernel chart's
+  // catalogPolicy): a missing kernel policy is a misconfiguration, not a
+  // reason to let everything through. Its shape is read again, fresh,
+  // before that's said: catalogPolicy may have just been turned off.
+  const missing = async () => {
+    if (!(await required(true))) return [];
+    throw new Error(
+      "The console's identity policy holds no released digests (the kernel chart's catalogPolicy), but the kernel's catalog " +
+        `identity policy (the console chart's catalogPolicy.identityPolicyName, \"${config.catalogIdentityPolicyName}\") isn't there to check them against.`,
+    );
+  };
+  if (!config.catalogIdentityPolicyName) return (await required(false)) ? missing() : [];
   const key = (use: KernelUse) => kernelKey(use.digest, use.team, use.repository, use.action, use.serviceAccount, use.audiences.join(","));
   const unlisted = (listed: Set<string>) => uses.filter((use) => !listed.has(key(use)));
   let listed = await kernelListed(false);
   if (listed && unlisted(listed).length > 0) listed = await kernelListed(true);
+  if (!listed && (await required(false))) return missing();
   if (!listed) {
     if (catalogSigned()) {
       log?.warn({ event: "catalog_policy_missing", policy: config.catalogIdentityPolicyName },
