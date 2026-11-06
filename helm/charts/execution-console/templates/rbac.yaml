@@ -72,11 +72,20 @@ rules:
     resources: ["externalsecrets"]
     verbs: ["get", "list", "create", "update", "delete"]
   # Each team namespace's default-deny NetworkPolicy (teamNetwork.ts); the
-  # write fence accepts only that one, in that shape. Never delete.
+  # write fence accepts only that one, in that shape. Never delete, but for
+  # the vennir-gateway-ingress earlier consoles wrote into team namespaces
+  # (API backends run in <team>-apis now): the fence allows that delete
+  # only in a team namespace, and taking it away only closes one.
   {{- if and .Values.teamNamespaces.manage .Values.teamNamespaces.defaultDenyIngress }}
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["create", "update"]
+  {{- if .Values.gateway.enabled }}
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    resourceNames: ["vennir-gateway-ingress"]
+    verbs: ["delete"]
+  {{- end }}
   {{- end }}
   # Each team namespace's ResourceQuota and LimitRange (teamQuota.ts); the
   # write fence accepts only vennir-team-quota and vennir-team-limits.

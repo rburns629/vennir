@@ -666,6 +666,19 @@ export async function writeTeamNetworkPolicy(namespace: string, gateway: Gateway
   return true;
 }
 
+/** Deletes a team namespace's TEAM_GATEWAY_INGRESS, which earlier consoles
+ * wrote there for API backends before they moved to `<team>-apis`; the
+ * write fence lets the console delete only that one, only in a team
+ * namespace. Gone already is fine. */
+export async function deleteTeamGatewayIngress(namespace: string): Promise<void> {
+  const { networking } = getApis();
+  try {
+    await networking.deleteNamespacedNetworkPolicy({ name: TEAM_GATEWAY_INGRESS, namespace });
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+}
+
 /** Creates or replaces one of the console's NetworkPolicies (reserved
  * names: always its own). False when the namespace doesn't exist. */
 async function writeNetworkPolicy(namespace: string, body: k8s.V1NetworkPolicy): Promise<boolean> {

@@ -20,6 +20,7 @@ import { teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import {
   applySecretStoreObjects,
+  deleteTeamGatewayIngress,
   deleteTeamNamespace,
   ExternalSecretsMissingError,
   gatewayIngressPolicy,
@@ -47,6 +48,7 @@ vi.mock("../src/k8s.js", async (importOriginal) => ({
   applySecretStoreObjects: vi.fn(() => Promise.resolve()),
   writeTeamPullSecret: vi.fn(() => Promise.resolve(true)),
   writeTeamNetworkPolicy: vi.fn(() => Promise.resolve(true)),
+  deleteTeamGatewayIngress: vi.fn(() => Promise.resolve()),
   writeSchedulerLogsBinding: vi.fn(() => Promise.resolve(true)),
   writeTeamQuota: vi.fn(() => Promise.resolve(true)),
 }));
@@ -102,6 +104,7 @@ beforeEach(() => {
   vi.mocked(applySecretStoreObjects).mockClear();
   vi.mocked(writeTeamPullSecret).mockClear();
   vi.mocked(writeTeamNetworkPolicy).mockClear();
+  vi.mocked(deleteTeamGatewayIngress).mockClear();
 });
 
 describe("creating a team", () => {
@@ -578,9 +581,11 @@ describe("the default-deny network policy", () => {
     config.teamNamespaces.gatewayIngress = gateway;
     await syncTeamNetworkPolicies();
     config.teamNamespaces.gatewayIngress = null;
-    // Into the team's namespace (for backends not yet moved) and its API backends'.
-    expect(writeTeamNetworkPolicy).toHaveBeenCalledWith(name("net-sync"), gateway, false);
+    // Into its API backends' namespace alone; the team's own loses the copy earlier consoles wrote.
+    expect(writeTeamNetworkPolicy).not.toHaveBeenCalledWith(name("net-sync"), gateway, false);
     expect(writeTeamNetworkPolicy).toHaveBeenCalledWith(`${name("net-sync")}-apis`, gateway, false);
+    expect(deleteTeamGatewayIngress).toHaveBeenCalledWith(name("net-sync"));
+    expect(deleteTeamGatewayIngress).not.toHaveBeenCalledWith(`${name("net-sync")}-apis`);
     // With blockMetadata (EKS), the no-metadata policy goes too.
     config.teamNamespaces.blockMetadata = true;
     await syncTeamNetworkPolicies();

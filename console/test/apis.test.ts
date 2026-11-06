@@ -222,7 +222,7 @@ describe("who sees what", () => {
     ["http://orders.payments-apis.svc.cluster.local:8080", "", "payments-apis", true, "apis"],
     ["http://orders.payments-apis.svc", "", "payments-apis", true, "apis"],
     ["http://ORDERS.Payments-Apis.svc.cluster.local.", "", "payments-apis", true, "apis"],
-    ["http://orders.payments.svc.cluster.local", "", "payments", true, "team"],
+    ["http://orders.payments.svc.cluster.local", "", "payments", true, "other"],
     ["http://orders.web.svc.cluster.local", "", "web", true, "other"],
     // A headless Service's Pods, and Pods.
     ["http://pod-1.orders.web.svc.cluster.local", "", "web", true, "other"],
@@ -281,9 +281,12 @@ describe("who sees what", () => {
     config.gateway.backendHosts.splice(0, Infinity, "*.svc.cluster.local");
     try {
       const state = (url: string, taken = false) => apiState({ backendUrl: url, pausedMessage: null, teamName: "team-a" }, null, taken);
-      // Its API backends' namespace; for one release, its own too.
+      // Its API backends' namespace alone: its own, where its steps run, is held too.
       expect(state("http://orders.team-a-apis.svc.cluster.local:8080").state).toBe("live");
-      expect(state("http://orders.team-a.svc.cluster.local:8080").state).toBe("live");
+      expect(state("http://orders.team-a.svc.cluster.local:8080")).toMatchObject({
+        state: "held",
+        heldReason: expect.stringContaining("its team's own namespace") as string,
+      });
       const theirs = state("http://orders.team-b.svc.cluster.local:8080");
       expect(theirs).toMatchObject({ state: "held", heldReason: expect.stringContaining("team-b") as string });
       expect(theirs.heldReason).toContain("team-a-apis");
@@ -294,7 +297,7 @@ describe("who sees what", () => {
       config.gateway.backendHosts.splice(0, Infinity, ...before);
     }
     expect(backendPlace("http://orders.team-a-apis.svc", "team-a")).toBe("apis");
-    expect(backendPlace("http://orders.team-a.svc", "team-a")).toBe("team");
+    expect(backendPlace("http://orders.team-a.svc", "team-a")).toBe("other");
     expect(backendPlace("http://orders.team-a-apis-apis.svc", "team-a")).toBe("other");
     expect(backendPlace("https://orders.example.run.app", "team-a")).toBe("outside");
   });
