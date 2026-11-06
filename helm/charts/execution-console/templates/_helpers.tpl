@@ -144,8 +144,8 @@ capabilities: {drop: ["ALL"]}
 {{- end }}
 
 {{/*
-The gateway's Pods: its Deployment selects them by these, and each team
-namespace's vennir-gateway-ingress lets them reach the team's API backends.
+The gateway's Pods: its Deployment selects them by these, and each team's
+API backends' namespace's vennir-gateway-ingress lets them reach its backends.
 */}}
 {{- define "execution-console.gatewaySelectorLabels" -}}
 {{ include "execution-console.selectorLabels" . }}

@@ -10,8 +10,7 @@
  *   (a raw DAG's other teams included);
  * - an API backend's lines (a Pod a team labels vennir/api-backend), every
  *   level, to its own team only: they belong to no run. A team's backends
- *   run in its API backends' namespace, `<team>-apis` (k8s.ts apiNamespace),
- *   and, for one release, in its own;
+ *   run in its API backends' namespace, `<team>-apis` (k8s.ts apiNamespace);
  * - the platform's own logs to admins only.
  *
  * Nothing the caller typed reaches a query unchecked: teams and levels are
@@ -117,12 +116,12 @@ async function allTeamNames(): Promise<Set<string>> {
 }
 
 /**
- * The namespaces these teams' API backends log from: each one's own, for one
- * release, and its `<team>-apis`, unless that's a team's name (one named
- * before such names were refused): then it's that team's, not this one's.
+ * The namespaces these teams' API backends log from: each one's
+ * `<team>-apis`, unless that's a team's name (one named before such names
+ * were refused): then it's that team's, and this one has none.
  */
 function backendNamespaces(own: string[], names: Set<string>): string[] {
-  return own.flatMap((t) => (names.has(apiNamespace(t)) ? [t] : [t, apiNamespace(t)]));
+  return own.map(apiNamespace).filter((ns) => !names.has(ns));
 }
 
 /** The team an API backend's namespace is: itself when a team has its name, else `<team>` of `<team>-apis`. */
@@ -149,12 +148,9 @@ export async function visibleQueries(who: AuthUser, input: SearchLogsInput, sinc
     }
     names ??= await allTeamNames();
     const api = input.api ? `, api=${quoted(input.api)}` : "";
-    if (who.isAdmin) {
-      const team = input.team ? `, namespace=~${oneOf(backendNamespaces([input.team], names))}` : "";
-      return [`{component="api"${team}${api}${level}}${pipeline}`];
-    }
-    const own = who.teamNames.filter((t) => !input.team || t === input.team);
-    return own.length > 0 ? [`{component="api", namespace=~${oneOf(backendNamespaces(own, names))}${api}${level}}${pipeline}`] : [];
+    if (who.isAdmin && !input.team) return [`{component="api"${api}${level}}${pipeline}`];
+    const namespaces = backendNamespaces(who.isAdmin ? [input.team ?? ""] : who.teamNames.filter((t) => !input.team || t === input.team), names);
+    return namespaces.length > 0 ? [`{component="api", namespace=~${oneOf(namespaces)}${api}${level}}${pipeline}`] : [];
   }
   const access = input.executionId ? await runAccess(who, input.executionId) : "full";
   if (access === "none") {

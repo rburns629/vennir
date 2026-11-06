@@ -762,11 +762,11 @@ teamNamespaces:
   # -- A NetworkPolicy (vennir-default-deny) in every team namespace: its
   # Pods accept connections only from Pods in the same namespace, so one
   # team's steps can't reach another's. Written with each namespace and
-  # rewritten on every policy resync. With gateway.enabled, a second one
-  # (vennir-gateway-ingress) lets the gateway's Pods reach the Pods a team
-  # labels vennir/api-backend: "true", its APIs' in-cluster backends. Both
-  # (and vennir-no-metadata) go into each team's <team>-apis too, where its
-  # backends run. The write fence accepts no other policy from the console. Needs a CNI that
+  # rewritten on every policy resync, and into each team's <team>-apis too,
+  # where its API backends run. With gateway.enabled, a second one there
+  # alone (vennir-gateway-ingress) lets the gateway's Pods reach the Pods a
+  # team labels vennir/api-backend: "true", its APIs' in-cluster backends.
+  # The write fence accepts no other policy from the console. Needs a CNI that
   # enforces NetworkPolicy.
   defaultDenyIngress: true
   # -- With defaultDenyIngress, a third NetworkPolicy (vennir-no-metadata)

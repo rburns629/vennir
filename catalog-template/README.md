@@ -551,8 +551,8 @@ steps, their identities and your Secrets stay in the team's), and its
 `backend.url` is `http://<service>.<team>-apis.svc.cluster.local:<port>`.
 It's reachable by the gateway only when its Pods are labelled
 `vennir/api-backend: "true"` (every other Pod there stays closed to
-everything outside the namespace). For one release, a backend still in the
-team's own namespace is served too; move it. So no team may be called
+everything outside the namespace). One in the team's own namespace, where
+its steps run, is held, as is one anywhere else. So no team may be called
 `*-apis`, or more than 58 characters long. What those Pods
 print is searchable by your team, and only your team, on Observe's Logs tab
 (From: API backends), when the install keeps logs. The samples show

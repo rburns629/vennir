@@ -98,7 +98,9 @@ spec:
         only update one that already did.
       reason: Forbidden
     # Its NetworkPolicies are each team's default deny (k8s.ts,
-    # writeTeamNetworkPolicy), in its namespace and its API backends', never deleted, and only ever refusing more:
+    # writeTeamNetworkPolicy), in its namespace and its API backends', never
+    # deleted (but for the vennir-gateway-ingress earlier consoles wrote into
+    # team namespaces, before API backends had their own), and only ever refusing more:
     # every Pod selected, and connections let in from this namespace's own
     # Pods alone, with no egress rule (NetworkPolicy allows add up, so one
     # would undo vennir-no-metadata). So the console can't open a team
@@ -108,7 +110,10 @@ spec:
     # everything less the metadata server's address.
     {{- $gatewayIngress := and .Values.gateway.enabled .Values.teamNamespaces.manage .Values.teamNamespaces.defaultDenyIngress }}
     - expression: >-
-        request.resource.resource != "networkpolicies" || (
+        request.resource.resource != "networkpolicies" || {{ if $gatewayIngress }}(
+          request.operation == "DELETE" && request.name == "vennir-gateway-ingress" &&
+          has(namespaceObject.metadata.labels) &&
+          {{ .Values.writeFence.teamNamespaceLabel | quote }} in namespaceObject.metadata.labels) || {{ end }}(
           request.operation != "DELETE" && ((
           object.metadata.name == "vennir-default-deny" &&
           (!has(object.spec.podSelector.matchLabels) || size(object.spec.podSelector.matchLabels) == 0) &&
@@ -155,7 +160,7 @@ spec:
         vennir-gateway-ingress, letting only the gateway's Pods reach the team's API backends, and
         (with teamNamespaces.blockMetadata) vennir-no-metadata, letting out everything but the
         metadata server (169.254.169.254); none but that one has an egress rule, and it never
-        deletes one.
+        deletes one but a team namespace's vennir-gateway-ingress.
       reason: Forbidden
     # Its only RoleBinding written is each team namespace's
     # vennir-scheduler-logs (schedulerLogs.ts): the kernel's logs-only

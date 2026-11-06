@@ -164,7 +164,7 @@ describe("log search", () => {
 describe("API backends' log search", () => {
   it("gives a member every level of their own team's backends, and nothing of another team's", async () => {
     expect((await search(memberOfA, { source: "api" })).code).toBe("ok");
-    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA}|${teamA}-apis)$"}`]);
+    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA}-apis)$"}`]);
     queries.length = 0;
     const elsewhere = await search(memberOfA, { source: "api", team: teamB });
     expect(elsewhere.code).toBe("ok");
@@ -172,7 +172,7 @@ describe("API backends' log search", () => {
     expect(queries).toHaveLength(0);
   });
 
-  it("finds a team's backends in its API backends' namespace and, for now, its own, and names the team", async () => {
+  it("names the team of each backend's line an admin finds", async () => {
     const found = await search(admin, { source: "api" });
     expect(found.body.lines?.map((l) => [l.line, l.team])).toEqual([
       ["moved backend", teamA],
@@ -183,21 +183,21 @@ describe("API backends' log search", () => {
 
   it("gives an admin every team's", async () => {
     await search(admin, { source: "api", team: teamA, level: "error" });
-    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA}|${teamA}-apis)$", level="error"}`]);
+    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA}-apis)$", level="error"}`]);
   });
 
   it("never takes another team's namespace for a team's API backends' namespace", async () => {
+    // teamB-apis is a team's own namespace, so teamB's backends have none to log from.
     await search(admin, { source: "api", team: teamB });
-    expect(queries).toEqual([`{component="api", namespace=~"^(${teamB})$"}`]);
-    queries.length = 0;
+    expect(queries).toHaveLength(0);
     await search(memberOfB, { source: "api" });
-    expect(queries).toEqual([`{component="api", namespace=~"^(${teamB})$"}`]);
+    expect(queries).toHaveLength(0);
   });
 
   it("narrows to one API product's backend, its Pods' vennir/api label", async () => {
     queries.length = 0;
     await search(memberOfA, { source: "api", api: "orders" });
-    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA}|${teamA}-apis)$", api="orders"}`]);
+    expect(queries).toEqual([`{component="api", namespace=~"^(${teamA}-apis)$", api="orders"}`]);
     queries.length = 0;
     expect((await search(memberOfA, { source: "api", api: "Not An API" })).code).toBe("invalid_argument");
     expect(queries).toHaveLength(0);

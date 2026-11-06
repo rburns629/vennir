@@ -151,17 +151,14 @@ it was seen.
 
 ## Security
 
-- [ ] **Next release: drop API backends in their team's namespace** (API
-  backends moved to `<team>-apis` on 2026-11-05): for one release the
-  gateway still serves an in-cluster backend in the team's own namespace,
-  logging `api_backend_in_team_namespace`, and the console counts it live.
-  Then hold it like any other namespace (`gateway/internal/store`
-  `BackendPlace`, `console/src/core/apis.ts` `backendPlace`), stop writing
-  `vennir-gateway-ingress` into team namespaces and delete the copies there
-  (`console/src/teamNetwork.ts`; the write fence then needs to allow that
-  delete, or the chart's upgrade notes say to), and drop the team's own
-  namespace from API backends' log search (`console/src/core/logs.ts`).
-  Before, check the gateway's logs for the warning on each install.
+- [ ] **Drop the console's delete of team namespaces' gateway ingress**
+  (the release after the one that held API backends in their team's own
+  namespace, 2026-11-06): each policy resync deletes the
+  `vennir-gateway-ingress` earlier consoles wrote into team namespaces
+  (`console/src/teamNetwork.ts`, `k8s.ts` `deleteTeamGatewayIngress`), the
+  console's one NetworkPolicy delete (its RBAC, scoped to that name, and the
+  write fence's rule for it). Once every install has run a console that did,
+  drop all three, and the admission tests' two cases.
 
 - [ ] **Drop the `apis.share_with` column** (the release after the one
   that stopped reading it, 2026-11-06): nothing reads or writes it now

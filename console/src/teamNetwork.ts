@@ -7,8 +7,8 @@
  * teamNamespaces.blockMetadata, one refusing the instance metadata server
  * (TEAM_NO_METADATA). The same ones go into each team's API backends'
  * namespace (k8s.ts apiNamespace), where its backends run apart from its
- * steps. (The team namespace keeps TEAM_GATEWAY_INGRESS for one release,
- * for backends not yet moved.) Written when a team is created or
+ * steps; TEAM_GATEWAY_INGRESS goes only there, and the copy earlier consoles
+ * wrote into the team's namespace is deleted. Written when a team is created or
  * un-retired, and again in every policy resync (policySync.ts), which puts
  * it into namespaces made before it existed and undoes any edit within one
  * interval. Only when the console manages team namespaces
@@ -17,7 +17,7 @@
 import { config } from "./config.js";
 import { ownApiNamespaces } from "./core/apis.js";
 import { listAllTeams } from "./db/queries.js";
-import { writeTeamNetworkPolicy } from "./k8s.js";
+import { deleteTeamGatewayIngress, writeTeamNetworkPolicy } from "./k8s.js";
 
 function applies(): boolean {
   return config.teamNamespaces.manage && config.teamNamespaces.defaultDenyIngress;
@@ -26,7 +26,8 @@ function applies(): boolean {
 /** Into the team's namespace, and its API backends' (`apis`), if it has one. */
 async function write(team: string, apis: string | undefined): Promise<void> {
   const { gatewayIngress, blockMetadata } = config.teamNamespaces;
-  await writeTeamNetworkPolicy(team, gatewayIngress, blockMetadata);
+  await writeTeamNetworkPolicy(team, null, blockMetadata);
+  if (gatewayIngress) await deleteTeamGatewayIngress(team);
   if (apis) await writeTeamNetworkPolicy(apis, gatewayIngress, blockMetadata);
 }
 

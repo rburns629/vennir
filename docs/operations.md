@@ -919,6 +919,15 @@ through it (in the console, or `ApiService/AddApiGrant`), then drop
 `shareWith` from the catalog. A team named in `limits` gets no access from
 it either.
 
+**API backends in a team's own namespace are held** (unreleased, on main
+since 2026-11-06): 0.12.0 still served an in-cluster backend at
+`<service>.<team>.svc`, logging `api_backend_in_team_namespace` on every
+refresh; now it's held like any namespace but `<team>-apis`, and the
+console deletes the `vennir-gateway-ingress` earlier consoles wrote into
+team namespaces. Before upgrading, check the gateway's logs for that
+warning, and move each backend it names
+([API backends' namespaces](#api-backends-namespaces)).
+
 **kernel policy signs in as its own database role** (unreleased, on main
 since 2026-11-06): with `catalogPolicy` and the bundled Postgres, the
 upgrade's migration Job makes `postgres.auth.policyUsername`
@@ -1579,8 +1588,9 @@ console with the namespace and rewritten on every policy resync (console
 chart, `teamNamespaces.defaultDenyIngress`, on by default; only when the
 console manages team namespaces). Its Pods accept connections only from
 Pods in the same namespace, so teams can't reach each other. With the
-gateway on, a second one, `vennir-gateway-ingress`, lets the gateway's Pods
-(and nothing else) reach the Pods a team labels `vennir/api-backend: "true"`. Outbound traffic isn't restricted, except, with
+gateway on, a team's API backends' namespace (below) gets a second one,
+`vennir-gateway-ingress`, which lets the gateway's Pods (and nothing else)
+reach the Pods a team labels `vennir/api-backend: "true"`. Outbound traffic isn't restricted, except, with
 `teamNamespaces.blockMetadata` (on EKS), a third policy,
 `vennir-no-metadata`, which lets a team's Pods out anywhere but the
 instance metadata server (`169.254.169.254`; IPv4 clusters, which are
@@ -1601,12 +1611,13 @@ dispatches nothing there; it writes only `vennir-default-deny` and
 deletes it with the team's when it may purge. No quota or limits: those
 are a ceiling on steps; set a ResourceQuota there yourself if a team's
 backends need one. A namespace the console doesn't manage needs the same
-policies from whoever made it. For one release, a backend still in the
-team's own namespace is served too (its namespace keeps
-`vennir-gateway-ingress`), and the gateway logs
-`api_backend_in_team_namespace` for each such API on every refresh: move
-it, and point its `backend.url` at `<service>.<team>-apis.svc.cluster.local`
-(with `gateway.backendHosts` allowing `*.<team>-apis.svc.cluster.local`).
+policies from whoever made it. A backend in the team's own namespace is
+held, as one anywhere else is (0.12.0 served it, logging
+`api_backend_in_team_namespace`; check for that warning before upgrading):
+move it, and point its `backend.url` at
+`<service>.<team>-apis.svc.cluster.local` (with `gateway.backendHosts`
+allowing `*.<team>-apis.svc.cluster.local`). The console deletes the
+`vennir-gateway-ingress` earlier consoles wrote into team namespaces.
 
 Whatever deploys a team's backend (its CD, or a person) needs rights in
 `<team>-apis` only, never in the team's namespace: a cluster administrator

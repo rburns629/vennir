@@ -99,9 +99,9 @@ export function backendNamespace(url: string, clusterDomain = config.clusterDoma
 /**
  * Where an API's backend runs, for the team the API is: "outside" the
  * cluster (any host backendHosts allows), in the team's API backends'
- * namespace ("apis", `<team>-apis`, k8s.ts apiNamespace), in the team's own
- * namespace ("team": accepted for one release, until backends have moved;
- * the gateway logs it), or anywhere else ("other": held). `<team>-apis` is
+ * namespace ("apis", `<team>-apis`, k8s.ts apiNamespace), or anywhere else
+ * ("other": held), the team's own namespace too, where its steps run with
+ * its Secrets. `<team>-apis` is
  * the team's only when no team has that name (`apiNamespaceTaken`: one
  * named before such names were refused). In the cluster, naming no
  * namespace, is "other" too. The gateway's store.BackendPlace, kept in step.
@@ -111,13 +111,11 @@ export function backendPlace(
   team: string,
   apiNamespaceTaken = false,
   clusterDomain = config.clusterDomain,
-): "outside" | "apis" | "team" | "other" {
+): "outside" | "apis" | "other" {
   const { inCluster, namespace } = backendNamespace(url, clusterDomain);
   if (!inCluster) return "outside";
   if (namespace === null) return "other";
-  if (namespace === apiNamespace(team) && !apiNamespaceTaken) return "apis";
-  if (namespace === team) return "team";
-  return "other";
+  return namespace === apiNamespace(team) && !apiNamespaceTaken ? "apis" : "other";
 }
 
 /** Of these teams, the ones whose `<team>-apis` is a team's name (purged ones too: names stay reserved). */
@@ -174,7 +172,9 @@ export function apiState(
       heldReason:
         (namespace === null
           ? `Its backend's host, ${hostOf(api.backendUrl)}, is inside the cluster but names no namespace (an IP address, a short name), not its team's API backends' namespace `
-          : `Its backend is in namespace ${namespace}, not its team's API backends' namespace `) +
+          : namespace === api.teamName
+            ? `Its backend is in its team's own namespace, where its steps run, not its team's API backends' namespace `
+            : `Its backend is in namespace ${namespace}, not its team's API backends' namespace `) +
         `(${apiNamespace(api.teamName)}): an API may only use a backend of its own team.`,
     };
   }

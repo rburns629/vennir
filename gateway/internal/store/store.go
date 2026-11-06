@@ -263,7 +263,6 @@ func (s *Store) Refresh(ctx context.Context) error {
 			if !prev.recorded {
 				s.record(ctx, prev)
 			}
-			s.warnTeamNamespace(prev)
 			next[a.Key()] = prev
 			continue
 		}
@@ -286,7 +285,6 @@ func (s *Store) Refresh(ctx context.Context) error {
 		if a.Problem != "" {
 			s.Log.Warn("an API can't be served", "api", a.Key(), "problem", a.Problem)
 		}
-		s.warnTeamNamespace(&a)
 		s.record(ctx, &a)
 		next[a.Key()] = &a
 	}
@@ -299,16 +297,6 @@ func (s *Store) Refresh(ctx context.Context) error {
 	s.closed = closed
 	s.mu.Unlock()
 	return nil
-}
-
-// warnTeamNamespace logs, once a refresh, an API whose backend still runs
-// in its team's own namespace: served for one release, until it moves to
-// the team's API backends' namespace.
-func (s *Store) warnTeamNamespace(a *API) {
-	if a.BackendURL != nil && BackendPlace(a.BackendURL, a.Team, a.APINamespaceTaken, s.ClusterDomain) == BackendInTeam {
-		s.Log.Warn("an API's backend runs in its team's namespace: move it to the team's API backends' namespace",
-			"event", "api_backend_in_team_namespace", "api", a.Key(), "namespace", a.Team, "move_to", APINamespace(a.Team))
-	}
 }
 
 // maxProblem is the most of a problem the console is told: a parser's
@@ -519,11 +507,9 @@ const (
 	BackendOutside = "outside"
 	// BackendInAPIs: in the team's API backends' namespace.
 	BackendInAPIs = "apis"
-	// BackendInTeam: in the team's own namespace, where its steps run.
-	// Served for one release, until backends have moved, and logged.
-	BackendInTeam = "team"
-	// BackendElsewhere: in any other namespace, or in the cluster where
-	// no namespace is named (an IP address, a short name): held.
+	// BackendElsewhere: in any other namespace (the team's own too, where
+	// its steps run with its Secrets), or in the cluster where no namespace
+	// is named (an IP address, a short name): held.
 	BackendElsewhere = "other"
 )
 
@@ -539,8 +525,6 @@ func BackendPlace(u *url.URL, team string, apiNamespaceTaken bool, clusterDomain
 		return BackendElsewhere
 	case ns == APINamespace(team) && !apiNamespaceTaken:
 		return BackendInAPIs
-	case ns == team:
-		return BackendInTeam
 	default:
 		return BackendElsewhere
 	}

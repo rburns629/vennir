@@ -197,7 +197,11 @@ k apply -f - > /dev/null <<EOF
  {"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"ek-mine","namespace":"$PLATFORM_NS","labels":{"app":"execution-kernel"}}},
  {"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"ek-mine","namespace":"$OTHER_NS","labels":{"app":"execution-kernel"}}},
  {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"name":"vennir-default-deny","namespace":"$TEAM_B"},
-  "spec":{"podSelector":{},"policyTypes":["Ingress"],"ingress":[{"from":[{"podSelector":{}}]}]}}]}
+  "spec":{"podSelector":{},"policyTypes":["Ingress"],"ingress":[{"from":[{"podSelector":{}}]}]}},
+ {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"name":"vennir-gateway-ingress","namespace":"$TEAM_B"},
+  "spec":{"podSelector":{"matchLabels":{"vennir/api-backend":"true"}},"policyTypes":["Ingress"]}},
+ {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"name":"vennir-gateway-ingress","namespace":"$RETIRED_APIS_NS"},
+  "spec":{"podSelector":{"matchLabels":{"vennir/api-backend":"true"}},"policyTypes":["Ingress"]}}]}
 EOF
 # ExternalSecrets the console made (labelled) and one it didn't, for the
 # write fence's cases. Without External Secrets Operator (CI's cluster), a
@@ -758,6 +762,10 @@ expect "no-metadata excepting something else"    "$NP_REFUSED"    "$(network_pol
 expect "no-metadata letting out to Pods"         "$NP_REFUSED"    "$(network_policy vennir-no-metadata 'spec["egress"].append({"to": [{"podSelector": {}}]})')"
 expect "a policy of another name"                "$NP_REFUSED"    "$(network_policy allow-all 'spec["ingress"] = [{}]')"
 expect "deleting the default deny"               "$NP_REFUSED"    "$(as_console -n "$TEAM_B" delete networkpolicy vennir-default-deny)"
+# The copy earlier consoles wrote into team namespaces, for API backends
+# before they had their own: taking it away only closes one.
+expect "deleting a team's gateway ingress"       allowed          "$(as_console -n "$TEAM_B" delete networkpolicy vennir-gateway-ingress)"
+expect "deleting the gateway ingress, API backends' namespace" "$NP_REFUSED" "$(as_console -n "$RETIRED_APIS_NS" delete networkpolicy vennir-gateway-ingress)"
 expect "the default deny, API backends' namespace"   allowed      "$(network_policy vennir-default-deny pass "$APIS_NS")"
 expect "the gateway's ingress, API backends' namespace" allowed   "$(network_policy vennir-gateway-ingress pass "$APIS_NS")"
 expect "the no-metadata one, API backends' namespace" allowed     "$(network_policy vennir-no-metadata pass "$APIS_NS")"
