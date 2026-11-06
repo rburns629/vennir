@@ -6,12 +6,13 @@
 // identity, with no key stored anywhere.
 //
 //   - A reader on another cloud, or in another AWS account, is its
-//     cluster's OIDC identity: the console's ServiceAccount, from one
-//     issuer. On gcp the owner's Workload Identity pool (vennir-installs)
-//     gets a provider for that issuer accepting that subject alone, mapped
-//     to a subject of the reader's own, and that principal reads the
+//     cluster's OIDC identity: the console's ServiceAccount, and kernel
+//     policy's when it verifies the catalog itself, from one issuer. On gcp
+//     the owner's Workload Identity pool (vennir-installs) gets a provider
+//     for that issuer accepting those subjects alone, each mapped to a
+//     subject of the reader's own, and those principals read the
 //     repository. On aws the account gets an IAM OIDC provider for the
-//     issuer and a role (vennir-reader-<reader>) only that subject may
+//     issuer and a role (vennir-reader-<reader>) only they may
 //     assume by web identity, which may read only the registry's
 //     repositories: a role scoped to <prefix>/* covers every product
 //     published later, where a repository policy would have to be added
@@ -48,6 +49,10 @@ type Reader struct {
 	// Issuer and Subject are a cluster's OIDC identity: its issuer, and
 	// the console's ServiceAccount (system:serviceaccount:<ns>:<name>).
 	Issuer, Subject string
+	// PolicySubject is its kernel policy's ServiceAccount, which verifies
+	// the catalog's release itself, when it does; trusted beside the
+	// console's, never instead of it.
+	PolicySubject string
 	// ServiceAccounts are a reader's Google service accounts (gcp only).
 	ServiceAccounts []string
 }
@@ -65,6 +70,23 @@ const Pool = "vennir-installs"
 // Federated says whether the reader is a cluster's OIDC identity.
 func (r Reader) Federated() bool { return r.Issuer != "" }
 
+// subjects are whom of the reader's cluster the grant trusts: its console,
+// then its kernel policy when it has one.
+func (r Reader) subjects() []string {
+	if r.PolicySubject == "" {
+		return []string{r.Subject}
+	}
+	return []string{r.Subject, r.PolicySubject}
+}
+
+// who says whom of the reader the grant trusts, for the screen.
+func (r Reader) who() string {
+	if r.PolicySubject == "" {
+		return r.Name + "'s console"
+	}
+	return r.Name + "'s console and kernel policy"
+}
+
 // Validate checks the reader for an owner on target (gcp or aws).
 func (r Reader) Validate(target string) error {
 	var problems []string
@@ -80,12 +102,23 @@ func (r Reader) Validate(target string) error {
 		if !issuerURL.MatchString(r.Issuer) {
 			problems = append(problems, fmt.Sprintf("--issuer %q isn't an https URL (the reader's cluster's OIDC issuer)", r.Issuer))
 		}
-		if !saSubject.MatchString(r.Subject) {
-			problems = append(problems, fmt.Sprintf("--subject %q isn't system:serviceaccount:NAMESPACE:NAME", r.Subject))
-		} else if len(gcpSubject(r)) > 127 {
-			problems = append(problems, "--reader and --subject are too long together (Google's subject is at most 127 characters)")
+		for _, s := range []struct{ flag, subject string }{{"--subject", r.Subject}, {"--policy-subject", r.PolicySubject}} {
+			if s.subject == "" && s.flag == "--policy-subject" {
+				continue
+			}
+			if !saSubject.MatchString(s.subject) {
+				problems = append(problems, fmt.Sprintf("%s %q isn't system:serviceaccount:NAMESPACE:NAME", s.flag, s.subject))
+			} else if len(gcpSubject(r, s.subject)) > 127 {
+				problems = append(problems, fmt.Sprintf("--reader and %s are too long together (Google's subject is at most 127 characters)", s.flag))
+			}
+		}
+		if r.PolicySubject != "" && r.PolicySubject == r.Subject {
+			problems = append(problems, "--policy-subject is kernel policy's ServiceAccount, not the console's (--subject)")
 		}
 	default:
+		if r.PolicySubject != "" {
+			problems = append(problems, "--policy-subject is with --issuer and --subject: a reader on Google Cloud names kernel policy's service account with --service-account")
+		}
 		if target != "gcp" {
 			problems = append(problems, "--service-account is for an owner on gcp; an aws owner trusts the reader's cluster (--issuer, --subject)")
 		}
@@ -186,12 +219,25 @@ func ProviderID(r Reader) string {
 	return "vennir-" + r.Name
 }
 
-// gcpSubject is the reader's subject in the pool: its console's
-// ServiceAccount, prefixed with the reader, so two readers' consoles (the
-// same ServiceAccount name in their own clusters) are two principals, each
+// gcpSubject is a reader's subject in the pool: one of its ServiceAccounts
+// (subject), prefixed with the reader, so two readers' consoles (the same
+// ServiceAccount name in their own clusters) are two principals, each
 // granted and revoked on its own.
-func gcpSubject(r Reader) string {
-	return r.Name + ":" + r.Subject
+func gcpSubject(r Reader, subject string) string {
+	return r.Name + ":" + subject
+}
+
+// gcpCondition is the provider's: the reader's subjects alone.
+func gcpCondition(r Reader) string {
+	s := r.subjects()
+	if len(s) == 1 {
+		return fmt.Sprintf("assertion.sub=='%s'", s[0])
+	}
+	quoted := make([]string, len(s))
+	for i, subject := range s {
+		quoted[i] = "'" + subject + "'"
+	}
+	return "assertion.sub in [" + strings.Join(quoted, ", ") + "]"
 }
 
 const readerRole = "roles/artifactregistry.reader"
@@ -271,10 +317,12 @@ func PlanGCP(ctx context.Context, exec Exec, o GCPOwner, r Reader, revoke bool) 
 	}
 	pool := []string{"--location=global", "--project=" + o.Project}
 	providerID := ProviderID(r)
-	subject := gcpSubject(r)
 	poolName := fmt.Sprintf("projects/%s/locations/global/workloadIdentityPools/%s", number, Pool)
-	member := fmt.Sprintf("principal://iam.googleapis.com/%s/subject/%s", poolName, subject)
-	p.Identity = fmt.Sprintf("%s from %s (%s's console), as %s", r.Subject, r.Issuer, r.Name, member)
+	var members []string
+	for _, subject := range r.subjects() {
+		members = append(members, fmt.Sprintf("principal://iam.googleapis.com/%s/subject/%s", poolName, gcpSubject(r, subject)))
+	}
+	p.Identity = fmt.Sprintf("%s from %s (%s), as %s", strings.Join(r.subjects(), " and "), r.Issuer, r.who(), strings.Join(members, " and "))
 
 	poolState, err := exec(ctx, "gcloud", append([]string{"iam", "workload-identity-pools", "describe", Pool, "--format=value(state)"}, pool...)...)
 	if err != nil && !notFound(err) {
@@ -296,7 +344,9 @@ func PlanGCP(ctx context.Context, exec Exec, o GCPOwner, r Reader, revoke bool) 
 	}
 
 	if revoke {
-		readerAction(member)
+		for _, member := range members {
+			readerAction(member)
+		}
 		if provider != nil && provider.State != "DELETED" {
 			p.Actions = append(p.Actions, Action{Label: "Will delete", Text: "provider " + providerID + ": " + r.Name + "'s tokens are no longer accepted",
 				Tool: "gcloud", Args: append([]string{"iam", "workload-identity-pools", "providers", "delete", providerID, "--quiet"}, providerArgs...)})
@@ -316,9 +366,9 @@ func PlanGCP(ctx context.Context, exec Exec, o GCPOwner, r Reader, revoke bool) 
 		p.Actions = append(p.Actions, Action{Label: "Has", Text: "the Workload Identity pool " + Pool})
 	}
 	mapping := fmt.Sprintf(`google.subject="%s:"+assertion.sub`, r.Name)
-	condition := fmt.Sprintf("assertion.sub=='%s'", r.Subject)
+	condition := gcpCondition(r)
 	settings := []string{"--issuer-uri=" + r.Issuer, "--attribute-mapping=" + mapping, "--attribute-condition=" + condition, "--format=none"}
-	trusts := "provider " + providerID + ": trusts " + r.Issuer + " for " + r.Subject + " alone"
+	trusts := "provider " + providerID + ": trusts " + r.Issuer + " for " + strings.Join(r.subjects(), " and ") + " alone"
 	switch {
 	case provider == nil:
 		p.Actions = append(p.Actions, Action{Label: "Will create", Text: trusts,
@@ -335,7 +385,9 @@ func PlanGCP(ctx context.Context, exec Exec, o GCPOwner, r Reader, revoke bool) 
 			p.Actions = append(p.Actions, Action{Label: "Has", Text: trusts})
 		}
 	}
-	readerAction(member)
+	for _, member := range members {
+		readerAction(member)
+	}
 	// The commands earlier versions printed mapped the bare subject, shared
 	// by every reader in the pool.
 	if old := fmt.Sprintf("principal://iam.googleapis.com/%s/subject/%s", poolName, r.Subject); policy.has(readerRole, old) {
@@ -384,12 +436,12 @@ type document struct {
 }
 
 type statement struct {
-	Sid       string                       `json:"Sid,omitempty"`
-	Effect    string                       `json:"Effect"`
-	Principal map[string]string            `json:"Principal,omitempty"`
-	Action    any                          `json:"Action"`
-	Resource  any                          `json:"Resource,omitempty"`
-	Condition map[string]map[string]string `json:"Condition,omitempty"`
+	Sid       string                    `json:"Sid,omitempty"`
+	Effect    string                    `json:"Effect"`
+	Principal map[string]string         `json:"Principal,omitempty"`
+	Action    any                       `json:"Action"`
+	Resource  any                       `json:"Resource,omitempty"`
+	Condition map[string]map[string]any `json:"Condition,omitempty"`
 }
 
 func mustJSON(v any) string {
@@ -400,17 +452,21 @@ func mustJSON(v any) string {
 	return string(data)
 }
 
-// TrustPolicy lets the reader's console, and nothing else, assume the role
-// by web identity: a token its cluster issued for STS, naming its
-// ServiceAccount.
+// TrustPolicy lets the reader's console (and its kernel policy, when it
+// has one), and nothing else, assume the role by web identity: a token its
+// cluster issued for STS, naming one of those ServiceAccounts.
 func TrustPolicy(providerArn string, r Reader) string {
 	host := strings.TrimPrefix(r.Issuer, "https://")
+	var sub any = r.Subject
+	if r.PolicySubject != "" {
+		sub = r.subjects()
+	}
 	return mustJSON(document{Version: "2012-10-17", Statement: []statement{{
 		Sid: "ReaderConsole", Effect: "Allow", Principal: map[string]string{"Federated": providerArn},
 		Action: "sts:AssumeRoleWithWebIdentity",
-		Condition: map[string]map[string]string{"StringEquals": {
+		Condition: map[string]map[string]any{"StringEquals": {
 			host + ":aud": "sts.amazonaws.com",
-			host + ":sub": r.Subject,
+			host + ":sub": sub,
 		}},
 	}}})
 }
@@ -450,12 +506,12 @@ func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke, repla
 	p := &Plan{
 		Registry: fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", me.Account, o.Region, o.Prefix),
 		SignedIn: me.Arn,
-		Identity: fmt.Sprintf("%s from %s (%s's console), assuming %s by web identity", r.Subject, r.Issuer, r.Name, roleArn),
+		Identity: fmt.Sprintf("%s from %s (%s), assuming %s by web identity", strings.Join(r.subjects(), " and "), r.Issuer, r.who(), roleArn),
 		Access:   "pull and list tags on " + o.Prefix + "/* (its images and its release), nothing else",
 	}
 
 	trust := TrustPolicy(providerArn, r)
-	trusts := "only " + r.Subject + " from " + host + " may assume it"
+	trusts := "only " + strings.Join(r.subjects(), " and ") + " from " + host + " may assume it"
 	out, roleErr := exec(ctx, "aws", o.Args("iam", "get-role", "--role-name", role)...)
 	if roleErr != nil && !notFound(roleErr) {
 		return nil, roleErr
@@ -475,7 +531,8 @@ func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke, repla
 			return nil, fmt.Errorf("the role %s: %w", role, err)
 		}
 		has, who := trustedBy(got.Role.AssumeRolePolicyDocument)
-		sameReader = has == (trusted{providerArn, r.Subject})
+		// This reader's: it trusts its console (with or without its kernel policy).
+		sameReader = has.provider == providerArn && slices.Contains(has.subjects, r.Subject)
 		if !sameReader {
 			leaving = who
 		}
@@ -567,8 +624,11 @@ func PlanAWS(ctx context.Context, exec Exec, o AWSOwner, r Reader, revoke, repla
 	return p, nil
 }
 
-// trusted is whom a role's trust lets assume it: a provider's subject.
-type trusted struct{ provider, subject string }
+// trusted is whom a role's trust lets assume it: a provider's subjects.
+type trusted struct {
+	provider string
+	subjects []string
+}
 
 // trustedBy reads whom a trust policy lets assume the role, when it's the
 // one web-identity statement TrustPolicy writes, and says so for the screen.
@@ -586,9 +646,19 @@ func trustedBy(doc json.RawMessage) (trusted, string) {
 		provider, _ := st.Principal.Federated.(string)
 		for key, value := range st.Condition["StringEquals"] {
 			host, ok := strings.CutSuffix(key, ":sub")
-			subject, isString := value.(string)
-			if ok && isString && provider != "" && st.Effect == "Allow" && st.Action == "sts:AssumeRoleWithWebIdentity" {
-				return trusted{provider, subject}, subject + " from " + host
+			var subjects []string
+			switch v := value.(type) {
+			case string:
+				subjects = []string{v}
+			case []any:
+				for _, s := range v {
+					if s, isString := s.(string); isString {
+						subjects = append(subjects, s)
+					}
+				}
+			}
+			if ok && len(subjects) > 0 && provider != "" && st.Effect == "Allow" && st.Action == "sts:AssumeRoleWithWebIdentity" {
+				return trusted{provider, subjects}, strings.Join(subjects, " and ") + " from " + host
 			}
 		}
 	}

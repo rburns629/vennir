@@ -133,6 +133,23 @@ catalogPolicy:
     gcpMetadataToken: false
     ecrToken: false
     mirrors: {}
+    # -- Another install's catalog on another cloud, or in another AWS
+    # account, read with no stored key, as the console chart's
+    # registryCheck.gcpFederation or awsFederation (and the same values):
+    # its own ServiceAccount's token, projected for the other side, is
+    # exchanged there (Google's STS, then impersonating serviceAccount when
+    # set; or AssumeRoleWithWebIdentity for roleArn). The owner's `vennir
+    # catalog grant` trusts this ServiceAccount beside the console's. It
+    # signs in to hosts so. One side, not both.
+    federation:
+      gcp:
+        # projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+        workloadIdentityProvider: ""
+        serviceAccount: ""
+      aws:
+        # arn:aws:iam::<owner's account>:role/<name>
+        roleArn: ""
+      hosts: []
   serviceAccountAnnotations: {}
   # -- With the console chart's gateway: its ServiceAccount (the console
   # release's <release>-execution-console-gateway, in this namespace),

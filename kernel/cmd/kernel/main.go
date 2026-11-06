@@ -464,10 +464,15 @@ func runPolicy(ctx context.Context, s config.Settings, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	registry := &policy.Registry{Mirrors: s.CatalogPolicyRegistryMirrors, GCPMetadataToken: s.CatalogPolicyRegistryGCPToken,
+		ECRToken: s.CatalogPolicyRegistryECRToken, Timeout: s.KubernetesTimeout}
+	if s.CatalogPolicyFederationGCPProvider != "" || s.CatalogPolicyFederationAWSRoleArn != "" {
+		registry.Federation = &policy.Federation{GCPProvider: s.CatalogPolicyFederationGCPProvider, GCPServiceAccount: s.CatalogPolicyFederationGCPServiceAccount,
+			AWSRoleArn: s.CatalogPolicyFederationAWSRoleArn, Hosts: s.CatalogPolicyFederationHosts, TokenFile: s.CatalogPolicyFederationTokenFile}
+	}
 	controller := &policy.Controller{
 		Source: &policy.Catalog{Reference: s.CatalogPolicyRelease, NewestVersion: s.CatalogPolicyNewestVersion, Signers: signers,
-			Registry: &policy.Registry{Mirrors: s.CatalogPolicyRegistryMirrors, GCPMetadataToken: s.CatalogPolicyRegistryGCPToken,
-				ECRToken: s.CatalogPolicyRegistryECRToken, Timeout: s.KubernetesTimeout}},
+			Registry: registry},
 		Store:          &policy.Store{DB: pool},
 		Writer:         &policy.Kubernetes{Client: client},
 		IdentityPolicy: s.CatalogPolicyIdentityPolicy,

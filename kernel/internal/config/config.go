@@ -149,6 +149,16 @@ type Settings struct {
 	CatalogPolicyRegistryMirrors  map[string]string
 	CatalogPolicyRegistryGCPToken bool
 	CatalogPolicyRegistryECRToken bool
+	// CatalogPolicyFederation*: another install's catalog on another cloud
+	// (or AWS account), read by federation (policy.Federation): Google's
+	// Workload Identity provider (and a service account to impersonate),
+	// or the owner's AWS role; the hosts it signs in to so, and its
+	// ServiceAccount's token projected for that side.
+	CatalogPolicyFederationGCPProvider       string
+	CatalogPolicyFederationGCPServiceAccount string
+	CatalogPolicyFederationAWSRoleArn        string
+	CatalogPolicyFederationHosts             []string
+	CatalogPolicyFederationTokenFile         string
 	// CatalogPolicyDatabaseRole: `kernel policy`'s own database role, which
 	// `kernel migrate` gives what it uses alone (migrate.GrantPolicy).
 	// Empty: it signs in as the kernel's.
@@ -341,49 +351,53 @@ func (r *reader) jsonValue(name string, into any) {
 func Load(getenv func(string) string) (Settings, error) {
 	r := &reader{getenv: getenv}
 	s := Settings{
-		DatabaseURL:                     r.str("DATABASE_URL", "postgresql://localhost/execution_kernel"),
-		DatabaseCommandTimeout:          r.seconds("DATABASE_COMMAND_TIMEOUT_SECONDS", 60, true),
-		DatabaseConnectTimeout:          r.seconds("DATABASE_CONNECT_TIMEOUT_SECONDS", 10, true),
-		DatabaseMaxConnections:          r.integer("DATABASE_MAX_CONNECTIONS", 10, true),
-		DatabaseIAMAuth:                 r.str("DATABASE_IAM_AUTH", ""),
-		DatabaseIAMRegion:               r.str("DATABASE_IAM_REGION", ""),
-		DatabaseAdminSecret:             r.str("DATABASE_ADMIN_SECRET", ""),
-		APIAuth:                         r.str("API_AUTH", "tokenreview"),
-		APITokenAudience:                r.str("API_TOKEN_AUDIENCE", "vennir-kernel-api"),
-		APIPort:                         r.integer("API_PORT", 8000, true),
-		APITLSCertFile:                  r.str("API_TLS_CERT_FILE", ""),
-		APITLSKeyFile:                   r.str("API_TLS_KEY_FILE", ""),
-		MaxTasksPerExecution:            r.integer("MAX_TASKS_PER_EXECUTION", 500, true),
-		SleeperNamespace:                r.str("SLEEPER_NAMESPACE", ""),
-		SleeperIdleAfter:                r.seconds("SLEEPER_IDLE_AFTER_SECONDS", 7200, true),
-		SleeperStateConfigMap:           r.str("SLEEPER_STATE_CONFIGMAP", ""),
-		SleeperConsoleActivityConfigMap: r.str("SLEEPER_CONSOLE_ACTIVITY_CONFIGMAP", ""),
-		SleeperAPIPodSelector:           r.str("SLEEPER_API_POD_SELECTOR", ""),
-		SleeperCronJob:                  r.str("SLEEPER_CRONJOB", ""),
-		SleeperScheduledWait:            r.seconds("SLEEPER_SCHEDULED_WAIT_SECONDS", 6*3600, true),
-		SleeperWakeCronJob:              r.str("SLEEPER_WAKE_CRONJOB", ""),
-		SleeperWakeLead:                 r.seconds("SLEEPER_WAKE_LEAD_SECONDS", 300, true),
-		CatalogPolicyRelease:            r.str("CATALOG_POLICY_RELEASE", ""),
-		CatalogPolicyDatabaseRole:       r.str("CATALOG_POLICY_DATABASE_ROLE", ""),
-		CatalogPolicyNewestVersion:      r.boolean("CATALOG_POLICY_NEWEST_VERSION", false),
-		CatalogPolicyPoll:               r.seconds("CATALOG_POLICY_POLL_SECONDS", 60, true),
-		CatalogPolicyKeylessIssuer:      r.str("CATALOG_POLICY_KEYLESS_ISSUER", ""),
-		CatalogPolicyKeylessSubject:     r.str("CATALOG_POLICY_KEYLESS_SUBJECT_REGEXP", ""),
-		CatalogPolicyTUFCache:           r.str("CATALOG_POLICY_TUF_CACHE", "/tmp/sigstore-tuf"),
-		CatalogPolicyIdentityPolicy:     r.str("CATALOG_POLICY_IDENTITY_POLICY", ""),
-		CatalogPolicyGatewayPolicy:      r.str("CATALOG_POLICY_GATEWAY_POLICY", ""),
-		CatalogPolicyGatewayAudience:    r.str("CATALOG_POLICY_GATEWAY_GCP_AUDIENCE", ""),
-		CatalogPolicyReleaseGrace:       r.seconds("CATALOG_POLICY_RELEASE_GRACE_SECONDS", 3600, true),
-		CatalogPolicyInUseMax:           r.seconds("CATALOG_POLICY_IN_USE_MAX_SECONDS", 259200, true),
-		CatalogPolicyInUseLimit:         r.seconds("CATALOG_POLICY_IN_USE_LIMIT_SECONDS", 604800, true),
-		CatalogPolicyRegistryGCPToken:   r.boolean("CATALOG_POLICY_REGISTRY_GCP_METADATA_TOKEN", false),
-		CatalogPolicyRegistryECRToken:   r.boolean("CATALOG_POLICY_REGISTRY_ECR_TOKEN", false),
-		PollInterval:                    r.seconds("SCHEDULER_POLL_INTERVAL_SECONDS", 1, true),
-		LeaseDuration:                   r.seconds("LEASE_DURATION_SECONDS", 60, true),
-		ClaimLimit:                      r.integer("SCHEDULER_CLAIM_LIMIT", 50, true),
-		ExecutorConcurrency:             r.integer("SCHEDULER_EXECUTOR_CONCURRENCY", 16, true),
-		MaxRunning:                      r.integer("SCHEDULER_MAX_RUNNING_TASKS", 0, false),
-		MaxRunningPerTeam:               r.integer("SCHEDULER_MAX_RUNNING_TASKS_PER_TEAM", 0, false),
+		DatabaseURL:                              r.str("DATABASE_URL", "postgresql://localhost/execution_kernel"),
+		DatabaseCommandTimeout:                   r.seconds("DATABASE_COMMAND_TIMEOUT_SECONDS", 60, true),
+		DatabaseConnectTimeout:                   r.seconds("DATABASE_CONNECT_TIMEOUT_SECONDS", 10, true),
+		DatabaseMaxConnections:                   r.integer("DATABASE_MAX_CONNECTIONS", 10, true),
+		DatabaseIAMAuth:                          r.str("DATABASE_IAM_AUTH", ""),
+		DatabaseIAMRegion:                        r.str("DATABASE_IAM_REGION", ""),
+		DatabaseAdminSecret:                      r.str("DATABASE_ADMIN_SECRET", ""),
+		APIAuth:                                  r.str("API_AUTH", "tokenreview"),
+		APITokenAudience:                         r.str("API_TOKEN_AUDIENCE", "vennir-kernel-api"),
+		APIPort:                                  r.integer("API_PORT", 8000, true),
+		APITLSCertFile:                           r.str("API_TLS_CERT_FILE", ""),
+		APITLSKeyFile:                            r.str("API_TLS_KEY_FILE", ""),
+		MaxTasksPerExecution:                     r.integer("MAX_TASKS_PER_EXECUTION", 500, true),
+		SleeperNamespace:                         r.str("SLEEPER_NAMESPACE", ""),
+		SleeperIdleAfter:                         r.seconds("SLEEPER_IDLE_AFTER_SECONDS", 7200, true),
+		SleeperStateConfigMap:                    r.str("SLEEPER_STATE_CONFIGMAP", ""),
+		SleeperConsoleActivityConfigMap:          r.str("SLEEPER_CONSOLE_ACTIVITY_CONFIGMAP", ""),
+		SleeperAPIPodSelector:                    r.str("SLEEPER_API_POD_SELECTOR", ""),
+		SleeperCronJob:                           r.str("SLEEPER_CRONJOB", ""),
+		SleeperScheduledWait:                     r.seconds("SLEEPER_SCHEDULED_WAIT_SECONDS", 6*3600, true),
+		SleeperWakeCronJob:                       r.str("SLEEPER_WAKE_CRONJOB", ""),
+		SleeperWakeLead:                          r.seconds("SLEEPER_WAKE_LEAD_SECONDS", 300, true),
+		CatalogPolicyRelease:                     r.str("CATALOG_POLICY_RELEASE", ""),
+		CatalogPolicyDatabaseRole:                r.str("CATALOG_POLICY_DATABASE_ROLE", ""),
+		CatalogPolicyNewestVersion:               r.boolean("CATALOG_POLICY_NEWEST_VERSION", false),
+		CatalogPolicyPoll:                        r.seconds("CATALOG_POLICY_POLL_SECONDS", 60, true),
+		CatalogPolicyKeylessIssuer:               r.str("CATALOG_POLICY_KEYLESS_ISSUER", ""),
+		CatalogPolicyKeylessSubject:              r.str("CATALOG_POLICY_KEYLESS_SUBJECT_REGEXP", ""),
+		CatalogPolicyTUFCache:                    r.str("CATALOG_POLICY_TUF_CACHE", "/tmp/sigstore-tuf"),
+		CatalogPolicyIdentityPolicy:              r.str("CATALOG_POLICY_IDENTITY_POLICY", ""),
+		CatalogPolicyGatewayPolicy:               r.str("CATALOG_POLICY_GATEWAY_POLICY", ""),
+		CatalogPolicyGatewayAudience:             r.str("CATALOG_POLICY_GATEWAY_GCP_AUDIENCE", ""),
+		CatalogPolicyReleaseGrace:                r.seconds("CATALOG_POLICY_RELEASE_GRACE_SECONDS", 3600, true),
+		CatalogPolicyInUseMax:                    r.seconds("CATALOG_POLICY_IN_USE_MAX_SECONDS", 259200, true),
+		CatalogPolicyInUseLimit:                  r.seconds("CATALOG_POLICY_IN_USE_LIMIT_SECONDS", 604800, true),
+		CatalogPolicyRegistryGCPToken:            r.boolean("CATALOG_POLICY_REGISTRY_GCP_METADATA_TOKEN", false),
+		CatalogPolicyRegistryECRToken:            r.boolean("CATALOG_POLICY_REGISTRY_ECR_TOKEN", false),
+		CatalogPolicyFederationGCPProvider:       r.str("CATALOG_POLICY_FEDERATION_GCP_PROVIDER", ""),
+		CatalogPolicyFederationGCPServiceAccount: r.str("CATALOG_POLICY_FEDERATION_GCP_SERVICE_ACCOUNT", ""),
+		CatalogPolicyFederationAWSRoleArn:        r.str("CATALOG_POLICY_FEDERATION_AWS_ROLE_ARN", ""),
+		CatalogPolicyFederationTokenFile:         r.str("CATALOG_POLICY_FEDERATION_TOKEN_FILE", ""),
+		PollInterval:                             r.seconds("SCHEDULER_POLL_INTERVAL_SECONDS", 1, true),
+		LeaseDuration:                            r.seconds("LEASE_DURATION_SECONDS", 60, true),
+		ClaimLimit:                               r.integer("SCHEDULER_CLAIM_LIMIT", 50, true),
+		ExecutorConcurrency:                      r.integer("SCHEDULER_EXECUTOR_CONCURRENCY", 16, true),
+		MaxRunning:                               r.integer("SCHEDULER_MAX_RUNNING_TASKS", 0, false),
+		MaxRunningPerTeam:                        r.integer("SCHEDULER_MAX_RUNNING_TASKS_PER_TEAM", 0, false),
 		RetryBackoff: domain.RetryBackoff{
 			Base: r.seconds("SCHEDULER_RETRY_BACKOFF_SECONDS", 5, false),
 			Max:  r.seconds("SCHEDULER_RETRY_BACKOFF_MAX_SECONDS", 300, false),
@@ -439,6 +453,19 @@ func Load(getenv func(string) string) (Settings, error) {
 	}
 	r.jsonValue("CATALOG_POLICY_PUBLIC_KEYS", &s.CatalogPolicyPublicKeys)
 	r.jsonValue("CATALOG_POLICY_REGISTRY_MIRRORS", &s.CatalogPolicyRegistryMirrors)
+	r.jsonValue("CATALOG_POLICY_FEDERATION_HOSTS", &s.CatalogPolicyFederationHosts)
+	if gcp, aws := s.CatalogPolicyFederationGCPProvider != "", s.CatalogPolicyFederationAWSRoleArn != ""; gcp || aws {
+		switch {
+		case gcp && aws:
+			r.problems = append(r.problems, "CATALOG_POLICY_FEDERATION_GCP_PROVIDER or CATALOG_POLICY_FEDERATION_AWS_ROLE_ARN, not both (it reads one other catalog)")
+		case len(s.CatalogPolicyFederationHosts) == 0:
+			r.problems = append(r.problems, "CATALOG_POLICY_FEDERATION_HOSTS: the registries to sign in to by federation are needed with it")
+		case s.CatalogPolicyFederationTokenFile == "":
+			r.problems = append(r.problems, "CATALOG_POLICY_FEDERATION_TOKEN_FILE: its projected token is needed with it")
+		}
+	} else if s.CatalogPolicyFederationGCPServiceAccount != "" {
+		r.problems = append(r.problems, "CATALOG_POLICY_FEDERATION_GCP_SERVICE_ACCOUNT: needs CATALOG_POLICY_FEDERATION_GCP_PROVIDER")
+	}
 	if s.CatalogPolicyRelease != "" {
 		if s.CatalogPolicyIdentityPolicy == "" {
 			r.problems = append(r.problems, "CATALOG_POLICY_IDENTITY_POLICY: needed with CATALOG_POLICY_RELEASE (the policy it writes)")

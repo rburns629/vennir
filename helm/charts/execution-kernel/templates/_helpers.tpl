@@ -320,3 +320,28 @@ runAsUser: 999
 runAsGroup: 999
 seccompProfile: {type: RuntimeDefault}
 {{- end }}
+
+{{/*
+The audience kernel policy's federation token is projected for (the
+console chart's registryFederationAudience, the same): Google's Workload
+Identity provider, or AWS STS; empty without federation.
+*/}}
+{{- define "execution-kernel.policyFederationAudience" -}}
+{{- $f := .Values.catalogPolicy.registry.federation -}}
+{{- $gcp := $f.gcp.workloadIdentityProvider -}}
+{{- $aws := $f.aws.roleArn -}}
+{{- if and $gcp $aws -}}
+{{- fail "catalogPolicy.registry.federation: gcp or aws, not both (it reads one other catalog)." -}}
+{{- else if or $gcp $aws -}}
+{{- if not $f.hosts -}}
+{{- fail "catalogPolicy.registry.federation.hosts: the registries it signs in to by federation." -}}
+{{- end -}}
+{{- if $gcp -}}
+{{- printf "https://iam.googleapis.com/%s" $gcp -}}
+{{- else -}}
+sts.amazonaws.com
+{{- end -}}
+{{- else if $f.gcp.serviceAccount -}}
+{{- fail "catalogPolicy.registry.federation.gcp.serviceAccount needs its workloadIdentityProvider." -}}
+{{- end -}}
+{{- end -}}

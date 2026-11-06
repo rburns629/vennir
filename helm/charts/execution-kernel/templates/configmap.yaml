@@ -97,5 +97,14 @@ data:
   CATALOG_POLICY_REGISTRY_MIRRORS: {{ .registry.mirrors | toJson | quote }}
   CATALOG_POLICY_REGISTRY_GCP_METADATA_TOKEN: {{ .registry.gcpMetadataToken | toString | quote }}
   CATALOG_POLICY_REGISTRY_ECR_TOKEN: {{ .registry.ecrToken | toString | quote }}
+  {{- if include "execution-kernel.policyFederationAudience" $ }}
+  {{- with .registry.federation }}
+  CATALOG_POLICY_FEDERATION_GCP_PROVIDER: {{ .gcp.workloadIdentityProvider | quote }}
+  CATALOG_POLICY_FEDERATION_GCP_SERVICE_ACCOUNT: {{ .gcp.serviceAccount | quote }}
+  CATALOG_POLICY_FEDERATION_AWS_ROLE_ARN: {{ .aws.roleArn | quote }}
+  CATALOG_POLICY_FEDERATION_HOSTS: {{ .hosts | toJson | quote }}
+  CATALOG_POLICY_FEDERATION_TOKEN_FILE: /var/run/vennir/federation/token
+  {{- end }}
+  {{- end }}
   {{- end }}
   {{- end }}
