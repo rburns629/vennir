@@ -569,7 +569,7 @@ func TestMonitoringValues(t *testing.T) {
 // own Google identity, signing in as its own database user with a managed
 // one, and the gateway's token audience as the console chart has it.
 // Off when unsigned, from a module before its identity, or with another
-// install's catalog. On EKS, as its role.
+// install's catalog it can't read as its own. On EKS, as its role.
 func TestKernelPolicyRunsOnACloudInstallWhoseCatalogIsSigned(t *testing.T) {
 	c := kindConfig()
 	c.Target = "gcp"
@@ -618,10 +618,26 @@ func TestKernelPolicyRunsOnACloudInstallWhoseCatalogIsSigned(t *testing.T) {
 		t.Errorf("EKS: %v", p)
 	}
 
+	// Another project's Artifact Registry: read as its own service account,
+	// which the owner's grant names, the release the console reads.
+	reader := *c
+	reader.ExternalCatalog.Registry = "us-docker.pkg.dev/other/catalog"
+	p = KernelValues(&reader, Images{}, "", cloud)["catalogPolicy"].(map[string]any)
+	if p["release"] != "us-docker.pkg.dev/other/catalog/catalog-release:latest" ||
+		p["release"] != ConsoleValues(&reader, "dev", Images{}, cloud)["catalog"].(map[string]any)["release"] {
+		t.Errorf("another project's catalog: %v", p["release"])
+	}
+	if g := CatalogGrant(&reader, cloud); g == nil || !strings.Contains(g.Command, "--service-account dev-policy@acme.iam.gserviceaccount.com") {
+		t.Errorf("the owner's grant leaves out kernel policy: %+v", g)
+	}
+
 	for name, change := range map[string]func(*Cloud, *config.Config){
 		"EKS, a module from before": func(cl *Cloud, _ *config.Config) { cl.Provider = "aws" },
 		"a module from before":      func(cl *Cloud, _ *config.Config) { cl.PolicyServiceAccount = "" },
-		"another install's catalog": func(_ *Cloud, cfg *config.Config) { cfg.ExternalCatalog.Registry = "us-docker.pkg.dev/other/catalog" },
+		"another install's, by federation": func(_ *Cloud, cfg *config.Config) {
+			cfg.ExternalCatalog.Registry, cfg.ExternalCatalog.GCPWorkloadIdentityProvider = "us-docker.pkg.dev/other/catalog", "projects/1/locations/global/workloadIdentityPools/p/providers/q"
+		},
+		"another install's, in this project": func(_ *Cloud, cfg *config.Config) { cfg.ExternalCatalog.Registry = "us-docker.pkg.dev/acme/catalog" },
 	} {
 		cl, cfg := *cloud, *c
 		change(&cl, &cfg)
