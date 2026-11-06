@@ -36,7 +36,7 @@
  */
 import { Code } from "@connectrpc/connect";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { ApiError } from "../apiError.js";
 import { ensureNotBot } from "../auth/access.js";
 import type { AuthUser } from "../auth/plugin.js";
@@ -45,6 +45,7 @@ import { db } from "../db/client.js";
 import { findApi, findTeamByName, findUserByEmail, findUserById, listBotsForTeam, teamRolesForUser, type ApiRow } from "../db/queries.js";
 import { apiAccessRequests, apiGrants, apis, teamMemberships, teams, userGroups, users, type AccessRequestState } from "../db/schema.js";
 import { notify } from "../notifier.js";
+import { currentSso, GOOGLE_GROUPS_FRESH_SECONDS, groupSources, groupSourceSet, GroupsUnavailable, inGoogleGroup, keepConfirmedGroup, keepGrantedGroup } from "../sso.js";
 import { ensureNotRetired } from "./retired.js";
 
 type Api = ApiRow & { teamName: string };
@@ -136,9 +137,20 @@ async function liveTeams(names: string[]): Promise<string[]> {
   return names.filter((n) => live.has(n));
 }
 
-/** A user's groups as kept (user_groups). */
+/**
+ * A user's groups as kept (user_groups) that may count: with Google's
+ * groups alone (no claim), only those read within
+ * GOOGLE_GROUPS_FRESH_SECONDS, so a resync that keeps failing fails closed
+ * (the gateway's auth.go, the same). Whether groups count at all is the
+ * caller's groupsCurrent.
+ */
 async function groupsOf(userId: string): Promise<string[]> {
-  const rows = await db.select({ group: userGroups.groupName }).from(userGroups).where(eq(userGroups.userId, userId)).orderBy(asc(userGroups.groupName));
+  const fresh = groupSources().claim === "" ? gte(userGroups.readAt, new Date(Date.now() - GOOGLE_GROUPS_FRESH_SECONDS * 1000)) : undefined;
+  const rows = await db
+    .select({ group: userGroups.groupName })
+    .from(userGroups)
+    .where(and(eq(userGroups.userId, userId), fresh))
+    .orderBy(asc(userGroups.groupName));
   return rows.map((r) => r.group);
 }
 
@@ -153,12 +165,12 @@ export async function callerContext(who: Pick<AuthUser, "id" | "isBot" | "teamNa
   return { teams: teamNames, groups, grants };
 }
 
-/** A user as accessFor sees them, by id: their teams as now, their groups counting (as for a recent sign-in). */
+/** A user as accessFor sees them, by id: their teams as now, their groups counting as for a recent sign-in. */
 async function userAsCaller(userId: string): Promise<{ who: Pick<AuthUser, "id" | "isBot" | "teamNames" | "groupsCurrent">; email: string } | null> {
   const user = await findUserById(userId);
   if (!user) return null;
   const roles = await teamRolesForUser(user.id);
-  return { who: { id: user.id, isBot: user.isBot, teamNames: roles.map((r) => r.name), groupsCurrent: !user.isBot }, email: user.email };
+  return { who: { id: user.id, isBot: user.isBot, teamNames: roles.map((r) => r.name), groupsCurrent: !user.isBot && groupSourceSet() }, email: user.email };
 }
 
 // --- reading ---
@@ -192,10 +204,15 @@ function ensureApiMaintainer(who: AuthUser, api: Api, what: string): void {
   }
 }
 
-/** The teams a bot is in that the caller maintains. */
+/** The live teams (not retired) a bot is in that the caller maintains: a retired team's maintainers act for none of its bots. */
 async function botTeamsMaintainedBy(who: AuthUser, botId: string): Promise<string[]> {
   const roles = await teamRolesForUser(botId);
-  return roles.map((r) => r.name).filter((t) => who.maintainerOf.includes(t));
+  return liveTeams(roles.map((r) => r.name).filter((t) => who.maintainerOf.includes(t)));
+}
+
+/** Locks an API's row for the rest of a transaction: its grants and requests change one writer at a time. */
+async function lockApi(tx: Pick<typeof db, "select">, apiId: string): Promise<void> {
+  await tx.select({ id: apis.id }).from(apis).where(eq(apis.id, apiId)).for("update");
 }
 
 /** A bot may be granted while one of its teams is live. */
@@ -213,10 +230,11 @@ function perMinuteOf(perMinute: number): number | null {
   return perMinute === 0 ? null : perMinute;
 }
 
+/** A group's name as single sign-on group mappings take it (core/sso.ts setSsoGroupMapping): trimmed, lowercased, 1 to 256 characters. */
 function groupOf(group: string): string {
   const g = group.trim().toLowerCase();
-  if (!g || g.length > MAX_GROUP || /[\s\p{Cc}]/u.test(g)) {
-    throw new ApiError(400, "BAD_REQUEST", `A group is its name as single sign-on gives it (a groups claim value, or a Google group's email): 1 to ${String(MAX_GROUP)} characters, no spaces.`);
+  if (!g || g.length > MAX_GROUP) {
+    throw new ApiError(400, "BAD_REQUEST", "A group is its name or ID as the provider sends it, or a Google group's email.");
   }
   return g;
 }
@@ -264,7 +282,7 @@ export interface GrantView {
 async function grantViews(rows: Grant[], apisById: Map<string, Api>): Promise<GrantView[]> {
   const people = await emailsOf(rows.flatMap((g) => [g.userId, g.grantedBy, g.revokedBy]));
   return rows.flatMap((g) => {
-    const api = apisById.get(g.apiId);
+    const api = g.apiId ? apisById.get(g.apiId) : undefined;
     if (!api) return [];
     const user = g.userId ? people.get(g.userId) : undefined;
     return [
@@ -307,20 +325,15 @@ export interface RequestView {
   groups: string[];
 }
 
-/** `withGroups`: show each person's groups (to the API's team, deciding). */
+/**
+ * `withGroups`: show each waiting request's groups (the requester's when
+ * they asked), for the API's maintainers to grant one of them; never an
+ * ended request's, and never to anyone else.
+ */
 async function requestViews(rows: AccessRequest[], apisById: Map<string, Api>, withGroups = false): Promise<RequestView[]> {
   const people = await emailsOf(rows.flatMap((r) => [r.userId, r.requestedBy, r.decidedBy]));
-  const groups = new Map<string, string[]>();
-  if (withGroups) {
-    const ids = [...new Set(rows.map((r) => r.userId))];
-    if (ids.length > 0) {
-      for (const g of await db.select().from(userGroups).where(inArray(userGroups.userId, ids)).orderBy(asc(userGroups.groupName))) {
-        groups.set(g.userId, [...(groups.get(g.userId) ?? []), g.groupName]);
-      }
-    }
-  }
   return rows.flatMap((r) => {
-    const api = apisById.get(r.apiId);
+    const api = r.apiId ? apisById.get(r.apiId) : undefined;
     if (!api) return [];
     const user = people.get(r.userId);
     return [
@@ -339,7 +352,7 @@ async function requestViews(rows: AccessRequest[], apisById: Map<string, Api>, w
         grantId: r.grantId ?? "",
         createdAt: r.createdAt,
         decidedAt: r.decidedAt,
-        groups: user?.isBot ? [] : (groups.get(r.userId) ?? []),
+        groups: withGroups && r.state === "waiting" && !user?.isBot ? r.requesterGroups : [],
       },
     ];
   });
@@ -408,8 +421,13 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
   let targetEmail: string;
   if (botEmail) {
     const bot = await findUserByEmail(botEmail);
-    if (!bot?.isBot || (await botTeamsMaintainedBy(who, bot.id)).length === 0) {
+    const maintained = bot?.isBot ? (await teamRolesForUser(bot.id)).map((r) => r.name).filter((t) => who.maintainerOf.includes(t)) : [];
+    if (!bot || maintained.length === 0) {
       throw new ApiError(403, "FORBIDDEN", `${botEmail} isn't a bot of a team you maintain: its team's maintainers ask for it.`);
+    }
+    // Only for a team of theirs that isn't retired (read-only, as elsewhere).
+    if ((await liveTeams(maintained)).length === 0) {
+      throw new ApiError(409, "TEAM_RETIRED", `${maintained.join(", ")} is retired, so nothing new can be asked for its bots. An admin can un-retire it.`);
     }
     await ensureBotTeamLive(bot.id, bot.email);
     target = { id: bot.id, isBot: true, teamNames: (await teamRolesForUser(bot.id)).map((r) => r.name), groupsCurrent: false };
@@ -418,6 +436,8 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
     target = who;
     targetEmail = (await findUserById(who.id))?.email ?? "";
   }
+  // A person's groups as last read, for the API's maintainers to grant one of them.
+  const requesterGroups = botEmail ? [] : ((await db.select({ groups: users.ssoGroups }).from(users).where(eq(users.id, who.id)))[0]?.groups ?? []);
   if (api.accessRequests === "closed") {
     throw new ApiError(409, "REQUESTS_CLOSED", `${api.teamName}/${api.name} takes no requests for access: ask its team directly.`);
   }
@@ -428,18 +448,28 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
   let made: { request: AccessRequest; grant: Grant | null };
   try {
     made = await db.transaction(async (tx) => {
-      const [request] = await tx.insert(apiAccessRequests).values({ apiId: api.id, userId: target.id, requestedBy: who.id, reason: why }).returning();
+      // One writer at a time per API, and checked again inside: a grant made
+      // meanwhile (AddApiGrant) means there's nothing to ask for.
+      await lockApi(tx, api.id);
+      const [granted] = await tx
+        .select({ id: apiGrants.id })
+        .from(apiGrants)
+        .where(and(eq(apiGrants.apiId, api.id), eq(apiGrants.userId, target.id), isNull(apiGrants.revokedAt)));
+      if (granted) throw new ApiError(409, "ALREADY_ALLOWED", `${targetEmail} may call ${api.teamName}/${api.name} already.`);
+      const key = { apiId: api.id, teamId: api.teamId, apiName: api.name };
+      const [request] = await tx.insert(apiAccessRequests).values({ ...key, userId: target.id, requestedBy: who.id, reason: why, requesterGroups }).returning();
       if (!request) throw new Error("no request was made");
       if (api.accessRequests !== "open") return { request, grant: null };
-      // Open: granted at once, by nobody, at the API's default limit.
-      const [grant] = await tx.insert(apiGrants).values({ apiId: api.id, userId: target.id, fromRequest: request.id }).returning();
+      // Open: granted at once, by nobody, at the API's default limit; the
+      // request it answers marked granted in the same transaction.
+      const [grant] = await tx.insert(apiGrants).values({ ...key, userId: target.id, fromRequest: request.id }).returning();
       if (!grant) throw new Error("no grant was made");
-      const [granted] = await tx
+      const [answered] = await tx
         .update(apiAccessRequests)
         .set({ state: "granted", grantId: grant.id, decidedAt: new Date() })
         .where(eq(apiAccessRequests.id, request.id))
         .returning();
-      return { request: granted ?? request, grant };
+      return { request: answered ?? request, grant };
     });
   } catch (error) {
     if (isUniqueViolation(error, "api_access_requests_one_waiting")) {
@@ -459,7 +489,7 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
 
 async function waitingRequest(id: string): Promise<{ request: AccessRequest; api: Api & { retiredAt: Date | null } }> {
   const [request] = await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, id));
-  const api = request ? await apiById(request.apiId) : null;
+  const api = request?.apiId ? await apiById(request.apiId) : null;
   if (!request || !api) throw new ApiError(404, "NOT_FOUND", "No such request for access.");
   if (request.state !== "waiting") throw new ApiError(409, "NOT_WAITING", `That request was ${request.state} already.`);
   return { request, api };
@@ -485,6 +515,7 @@ export async function decideRequest(caller: AuthUser | undefined, id: string, ap
   const who = signedIn(caller);
   const { request, api } = await waitingRequest(id);
   ensureApiMaintainer(who, api, "decide requests to call its APIs");
+  ensureNotRetired({ name: api.teamName, retiredAt: api.retiredAt });
   const target = await userAsCaller(request.userId);
   if (!target) throw new ApiError(404, "NOT_FOUND", "Whom that request was for is gone.");
   const byApi = new Map<string, Api>([[api.id, api]]);
@@ -499,15 +530,28 @@ export async function decideRequest(caller: AuthUser | undefined, id: string, ap
     await tell(api, `${target.email}'s request to call ${api.teamName}/${api.name} was declined`, why, [request.userId, request.requestedBy]);
     return { request: one(await requestViews([declined], byApi)), grant: null };
   }
-  // Nothing new for a retired team's API.
-  ensureNotRetired({ name: api.teamName, retiredAt: api.retiredAt });
   const rate = perMinuteOf(perMinute);
   let groupName: string | null = null;
+  // Whether Google confirmed it just now (then it's kept for the person, read now).
+  let confirmed = false;
   if (group) {
     if (target.who.isBot) throw new ApiError(400, "BAD_REQUEST", "A bot is in no group: grant it by name.");
     groupName = groupOf(group);
-    if (!(await groupsOf(request.userId)).includes(groupName)) {
-      throw new ApiError(400, "NOT_THEIR_GROUP", `${target.email} isn't in ${groupName}, as the console last read their groups.`);
+    // One of their groups when they asked (a claim's, or Google's they were
+    // asked about); or, with Google Workspace groups, one Google says
+    // they're in now (Google can't list a person's groups: it's asked of
+    // each named group).
+    if (!request.requesterGroups.includes(groupName)) {
+      const sources = groupSources();
+      try {
+        confirmed = currentSso() !== null && sources.google && groupName.includes("@") && (await inGoogleGroup(target.email, groupName));
+      } catch (error) {
+        if (error instanceof GroupsUnavailable) throw new ApiError(503, "GROUPS_UNAVAILABLE", error.message);
+        throw error;
+      }
+      if (!confirmed) {
+        throw new ApiError(400, "NOT_THEIR_GROUP", `${target.email} isn't in ${groupName}: not among their groups when they asked${sources.google ? ", nor in it now by Google Workspace" : ""}.`);
+      }
     }
   } else if (target.who.isBot) {
     await ensureBotTeamLive(target.who.id, target.email);
@@ -515,9 +559,18 @@ export async function decideRequest(caller: AuthUser | undefined, id: string, ap
   let made: { request: AccessRequest; grant: Grant };
   try {
     made = await db.transaction(async (tx) => {
+      await lockApi(tx, api.id);
       const [grant] = await tx
         .insert(apiGrants)
-        .values({ apiId: api.id, ...(groupName ? { groupName } : { userId: request.userId }), perMinute: rate, grantedBy: who.id, fromRequest: request.id })
+        .values({
+          apiId: api.id,
+          teamId: api.teamId,
+          apiName: api.name,
+          ...(groupName ? { groupName } : { userId: request.userId }),
+          perMinute: rate,
+          grantedBy: who.id,
+          fromRequest: request.id,
+        })
         .returning();
       if (!grant) throw new Error("no grant was made");
       const [granted] = await tx
@@ -533,6 +586,12 @@ export async function decideRequest(caller: AuthUser | undefined, id: string, ap
       throw new ApiError(409, "ALREADY_GRANTED", `${groupName ? `Group ${groupName}` : target.email} has a grant to ${api.teamName}/${api.name} already.`);
     }
     throw error;
+  }
+  // The granted group is kept for whoever's in it (as last read), and
+  // for the requester as Google just said.
+  if (groupName) {
+    await keepGrantedGroup(groupName);
+    if (confirmed) await keepConfirmedGroup(request.userId, groupName);
   }
   await tell(
     api,
@@ -566,9 +625,11 @@ export async function addGrant(caller: AuthUser | undefined, team: string, name:
   let grant: Grant;
   try {
     grant = await db.transaction(async (tx) => {
-      const [made] = await tx.insert(apiGrants).values({ apiId: api.id, ...target, perMinute: rate, grantedBy: who.id }).returning();
+      await lockApi(tx, api.id);
+      const [made] = await tx.insert(apiGrants).values({ apiId: api.id, teamId: api.teamId, apiName: api.name, ...target, perMinute: rate, grantedBy: who.id }).returning();
       if (!made) throw new Error("no grant was made");
-      // A request of theirs that waits is answered by it.
+      // A request of theirs that waits is answered by it, in the same
+      // transaction (requestAccess takes the same lock, and checks again).
       if ("userId" in target) {
         await tx
           .update(apiAccessRequests)
@@ -583,6 +644,7 @@ export async function addGrant(caller: AuthUser | undefined, team: string, name:
     }
     throw error;
   }
+  if ("groupName" in target) await keepGrantedGroup(target.groupName);
   await tell(api, `${named} may call ${api.teamName}/${api.name}`, `Granted by ${(await findUserById(who.id))?.email ?? ""}, at ${rateText(api, rate)}.`, [
     "userId" in target ? target.userId : null,
   ]);
@@ -591,7 +653,7 @@ export async function addGrant(caller: AuthUser | undefined, team: string, name:
 
 async function activeGrant(id: string): Promise<{ grant: Grant; api: Api & { retiredAt: Date | null } }> {
   const [grant] = await db.select().from(apiGrants).where(eq(apiGrants.id, id));
-  const api = grant ? await apiById(grant.apiId) : null;
+  const api = grant?.apiId ? await apiById(grant.apiId) : null;
   if (!grant || !api) throw new ApiError(404, "NOT_FOUND", "No such grant.");
   if (grant.revokedAt) throw new ApiError(409, "REVOKED", "That grant was revoked already.");
   return { grant, api };
@@ -624,12 +686,15 @@ export async function revokeGrant(caller: AuthUser | undefined, id: string, reas
   ensureNotBot(who, "revoke an API's grant");
   const { grant, api } = await activeGrant(id);
   const subject = grant.userId ? await findUserById(grant.userId) : undefined;
+  const asMaintainer = who.maintainerOf.includes(api.teamName) && api.retiredAt === null;
   const allowed =
-    who.maintainerOf.includes(api.teamName) ||
+    asMaintainer ||
     who.isAdmin ||
     grant.userId === who.id ||
     (subject?.isBot === true && (await botTeamsMaintainedBy(who, subject.id)).length > 0);
   if (!allowed) {
+    // Its maintainers, while their team is retired: read-only, as elsewhere.
+    if (who.maintainerOf.includes(api.teamName)) ensureNotRetired({ name: api.teamName, retiredAt: api.retiredAt });
     throw new ApiError(403, "FORBIDDEN", `Only ${api.teamName}'s maintainers, an admin, or whom it names (a bot's team's maintainers) may revoke a grant.`);
   }
   const why = reason.trim().slice(0, MAX_REASON);
@@ -667,7 +732,7 @@ export async function listApiAccess(caller: AuthUser | undefined, team: string, 
     .from(apiAccessRequests)
     .where(eq(apiAccessRequests.apiId, api.id))
     .orderBy(sql`${apiAccessRequests.state} <> 'waiting'`, desc(apiAccessRequests.createdAt));
-  return { grants: await grantViews(grants, byApi), requests: await requestViews(requests, byApi, true), shareWith: api.shareWith };
+  return { grants: await grantViews(grants, byApi), requests: await requestViews(requests, byApi, who.maintainerOf.includes(api.teamName)), shareWith: api.shareWith };
 }
 
 /** Every live API, by id. */

@@ -3,7 +3,10 @@
 package gateway
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -154,6 +157,90 @@ func TestGrantRatesAndRevoking(t *testing.T) {
 	}
 }
 
+// The shared table of access cases (testdata/api-access-cases.json), which
+// the console's accessFor runs too.
+func TestAccessCasesSharedWithTheConsole(t *testing.T) {
+	data, err := os.ReadFile("../../../testdata/api-access-cases.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	type grant struct {
+		ID, UserID, Group string
+		PerMinute         int
+	}
+	type apiFields struct {
+		ID        string
+		Team      string
+		ShareWith []string
+		PerMinute map[string]int
+	}
+	var table struct {
+		GatewayDefaultPerMinute int
+		API                     apiFields
+		Cases                   []struct {
+			Name   string
+			API    *apiFields
+			Caller struct {
+				ID            string
+				Bot, Admin    bool
+				Teams, Groups []string
+				GroupsCurrent bool
+			}
+			Grants []grant
+			Expect *struct {
+				Via, Team, Group, Grant string
+				PerMinute               int
+			}
+			StaleGroup bool
+		}
+	}
+	if err := json.Unmarshal(data, &table); err != nil {
+		t.Fatal(err)
+	}
+	if len(table.Cases) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range table.Cases {
+		api := &store.API{ID: table.API.ID, Team: table.API.Team, ShareWith: table.API.ShareWith, PerMinute: table.API.PerMinute}
+		if c.API != nil {
+			if c.API.ShareWith != nil {
+				api.ShareWith = c.API.ShareWith
+			}
+			if c.API.PerMinute != nil {
+				api.PerMinute = c.API.PerMinute
+			}
+		}
+		st := &store.Store{}
+		var grants []store.Grant
+		for _, g := range c.Grants {
+			grants = append(grants, store.Grant{ID: g.ID, UserID: g.UserID, Group: g.Group, PerMinute: g.PerMinute})
+		}
+		st.PutGrants(api.ID, grants)
+		gw := &Gateway{Store: st, Settings: Settings{DefaultPerMinute: table.GatewayDefaultPerMinute}}
+		who := &auth.Caller{UserID: c.Caller.ID, IsBot: c.Caller.Bot, IsAdmin: c.Caller.Admin, Teams: c.Caller.Teams, Groups: c.Caller.Groups, GroupsCurrent: c.Caller.GroupsCurrent}
+		way, stale := gw.accessFor(who, api, "")
+		if stale != c.StaleGroup {
+			t.Errorf("%s: staleGroup %v, want %v", c.Name, stale, c.StaleGroup)
+		}
+		switch {
+		case c.Expect == nil && way != nil:
+			t.Errorf("%s: %+v, want none", c.Name, way)
+		case c.Expect != nil && way == nil:
+			t.Errorf("%s: none, want %+v", c.Name, *c.Expect)
+		case c.Expect != nil:
+			grantID := ""
+			if way.grant != nil {
+				grantID = way.grant.ID
+			}
+			got := fmt.Sprintf("%s %s %s %s %d", way.via, way.team, way.group(), grantID, gw.rate(api, way))
+			want := fmt.Sprintf("%s %s %s %s %d", c.Expect.Via, c.Expect.Team, c.Expect.Group, c.Expect.Grant, c.Expect.PerMinute)
+			if got != want {
+				t.Errorf("%s: %s, want %s", c.Name, got, want)
+			}
+		}
+	}
+}
+
 // A hidden API is heard of by whoever a grant lets in, as by its own team
 // (the console's sees()); not by a shareWith team, nor by an admin without
 // one (who hears of it, but may not call).
@@ -162,7 +249,7 @@ func TestAHiddenAPIsGrantees(t *testing.T) {
 	f.api.Hidden = true
 	path := "/payments/orders/orders/ord_abcdefgh"
 	missing := f.do("GET", "/payments/ledger/orders", "", "", nil)
-	for who, want := range map[string]int{"ada": 201, "eng-1": 201, "payments-person": 201, "admin": 403, "web-person": 404, "outsider": 404} {
+	for who, want := range map[string]int{"ada": 201, "eng-1": 201, "payments-person": 201, "admin": 403, "web-person": 404, "outsider": 404, "eng-stale-sso": 401} {
 		w := f.do("GET", path, who, "", nil)
 		if w.Code != want || want == 404 && w.Body.String() != missing.Body.String() {
 			t.Errorf("hidden, %s: %d %s", who, w.Code, w.Body)

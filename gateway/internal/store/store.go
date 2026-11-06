@@ -186,7 +186,7 @@ func (s *Store) PutGrants(apiID string, grants []Grant) {
 // readGrants are the active grants, by API.
 func (s *Store) readGrants(ctx context.Context) (map[string][]Grant, error) {
 	rows, err := s.DB.Query(ctx, `SELECT g.id::text, g.api_id::text, coalesce(g.group_name, ''), coalesce(g.user_id::text, ''), coalesce(g.per_minute, 0)
-		FROM api_grants g WHERE g.revoked_at IS NULL`)
+		FROM api_grants g WHERE g.revoked_at IS NULL AND g.api_id IS NOT NULL`)
 	if err != nil {
 		return nil, err
 	}

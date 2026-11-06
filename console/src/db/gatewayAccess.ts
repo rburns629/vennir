@@ -31,10 +31,10 @@ const GRANTS = [
   // and rates, never who granted or why; and each person's groups, for a
   // group's grant. Nothing of the requests for access.
   "GRANT SELECT (id, api_id, group_name, user_id, per_minute, revoked_at) ON api_grants TO %I",
-  "GRANT SELECT (user_id, group_name) ON user_groups TO %I",
+  "GRANT SELECT (user_id, group_name, read_at) ON user_groups TO %I",
   // Whether an admin turned single sign-on on, and whether groups come from
-  // a claim: never its client secret.
-  "GRANT SELECT (id, enabled, issuer, client_id, redirect_url, groups_claim) ON sso_settings TO %I",
+  // a claim or Google Workspace: never its client secret.
+  "GRANT SELECT (id, enabled, issuer, client_id, redirect_url, groups_claim, google_groups) ON sso_settings TO %I",
   "GRANT SELECT, INSERT, UPDATE ON api_traffic TO %I",
   "GRANT SELECT, INSERT, UPDATE, DELETE ON api_problems TO %I",
 ];

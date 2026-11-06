@@ -517,12 +517,29 @@ func TestAPersonsGroupsCountAsTheirGroupGivenTeamsDo(t *testing.T) {
 			t.Errorf("%s, groups from a claim: %+v", name, who)
 		}
 	}
-	exec(`UPDATE sso_settings SET groups_claim = '' WHERE id = 1`)
-	if who := resolve(session(true, 2*time.Hour)); !who.GroupsCurrent {
-		t.Errorf("without a claim (Google's groups, read hourly), an older single sign-on: %+v", who)
+	// Google's groups alone, read hourly: any session, while they're fresh.
+	exec(`UPDATE sso_settings SET groups_claim = '', google_groups = true WHERE id = 1`)
+	if who := resolve(session(true, 2*time.Hour)); !who.GroupsCurrent || len(who.Groups) != 2 {
+		t.Errorf("Google's groups, an older single sign-on: %+v", who)
 	}
-	if who := resolve(session(false, time.Minute)); !who.GroupsCurrent {
-		t.Errorf("without a claim, a password's session: %+v", who)
+	if who := resolve(session(false, time.Minute)); !who.GroupsCurrent || len(who.Groups) != 2 {
+		t.Errorf("Google's groups, a password's session: %+v", who)
+	}
+	// The resync keeps failing: a row read over 90 minutes ago doesn't count.
+	exec(`UPDATE user_groups SET read_at = now() - interval '91 minutes' WHERE user_id = $1 AND group_name = 'all@example.com'`, userID)
+	if who := resolve(session(false, time.Minute)); strings.Join(who.Groups, ",") != "eng@example.com" {
+		t.Errorf("Google's groups, one read too long ago: %+v", who)
+	}
+	// No source set (the claim cleared, Google off): none count.
+	exec(`UPDATE sso_settings SET google_groups = false WHERE id = 1`)
+	if who := resolve(session(true, time.Minute)); who.GroupsCurrent {
+		t.Errorf("no group source: %+v", who)
+	}
+	// Single sign-on off (not the install's, and saved off): none count.
+	exec(`UPDATE sso_settings SET groups_claim = 'groups', enabled = false WHERE id = 1`)
+	off := &Resolver{DB: db, Keys: keys, Now: func() time.Time { return now }}
+	if who, err := off.Resolve(ctx, session(true, time.Minute)); err != nil || who.GroupsCurrent {
+		t.Errorf("single sign-on off: %+v, %v", who, err)
 	}
 	if bot := resolve("Bearer " + token); len(bot.Groups) != 0 || bot.GroupsCurrent || bot.SSOSession {
 		t.Errorf("a bot: %+v", bot)

@@ -20,6 +20,8 @@ import {
   wiringTypes,
   templates,
   apis,
+  apiAccessRequests,
+  apiGrants,
   catalogSync,
   schedules,
   ssoGroupMappings,
@@ -1381,10 +1383,20 @@ export async function upsertApi(
   input: Omit<typeof apis.$inferInsert, "id" | "pausedMessage" | "pausedBy" | "updatedAt">,
 ): Promise<void> {
   const { teamId, name, ...rest } = input;
-  await db
+  const [row] = await db
     .insert(apis)
     .values({ teamId, name, ...rest })
-    .onConflictDoUpdate({ target: [apis.teamId, apis.name], set: { ...rest, updatedAt: new Date() } });
+    .onConflictDoUpdate({ target: [apis.teamId, apis.name], set: { ...rest, updatedAt: new Date() } })
+    .returning({ id: apis.id });
+  if (!row) return;
+  // Back in the release after being dropped: its grants and requests are its
+  // again (they're kept by its team and name while it's away).
+  const away = and(isNull(apiGrants.apiId), eq(apiGrants.teamId, teamId), eq(apiGrants.apiName, name));
+  await db.update(apiGrants).set({ apiId: row.id }).where(away);
+  await db
+    .update(apiAccessRequests)
+    .set({ apiId: row.id })
+    .where(and(isNull(apiAccessRequests.apiId), eq(apiAccessRequests.teamId, teamId), eq(apiAccessRequests.apiName, name)));
 }
 
 /** Removes every API of these teams but those kept ("<team id>/<name>"); returns how many went. */

@@ -30,7 +30,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type { FastifyBaseLogger } from "fastify";
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { writeAuditEntry } from "./audit.js";
 import { config, sessionTtlSeconds } from "./config.js";
 import { db } from "./db/client.js";
@@ -90,6 +90,26 @@ export const CLAIM_GROUPS_SESSION_SECONDS = 60 * 60;
  */
 export function claimGroupsInUse(): boolean {
   return currentSso() !== null && groupSources().claim !== "";
+}
+
+/**
+ * How long Google Workspace groups (user_groups.read_at) count for an API's
+ * group grant: the hourly resync's hour and half as much again, so a resync
+ * that keeps failing fails closed. The gateway's auth.go, the same.
+ */
+export const GOOGLE_GROUPS_FRESH_SECONDS = 90 * 60;
+
+/**
+ * Whether a person's groups (user_groups) count for an API's group grant at
+ * all: single sign-on is in effect and a group source is set. Then, with a
+ * claim, only for a single sign-on from the last hour (as group-given
+ * teams); with Google's alone, only rows read within
+ * GOOGLE_GROUPS_FRESH_SECONDS. auth/plugin.ts and apiAccess.ts apply it;
+ * the gateway's auth.go, the same.
+ */
+export function groupSourceSet(): boolean {
+  const sources = groupSources();
+  return currentSso() !== null && (sources.claim !== "" || sources.google);
 }
 
 /**
@@ -209,17 +229,16 @@ export async function groupsOf(claims: Record<string, unknown>, email: string): 
 }
 
 /**
- * The groups something names: mapped to a team (sso_group_mappings), or
- * granted an API whose team is live (api_grants, active). Lowercased.
+ * The groups that matter: mapped to a team (sso_group_mappings), or named
+ * by an active grant (api_grants; one whose API is out of the release
+ * too, so it's there when the API is back). Lowercased.
  */
 async function namedGroups(): Promise<string[]> {
   const mapped = await db.selectDistinct({ group: ssoGroupMappings.groupName }).from(ssoGroupMappings);
   const granted = await db
     .selectDistinct({ group: apiGrants.groupName })
     .from(apiGrants)
-    .innerJoin(apis, eq(apis.id, apiGrants.apiId))
-    .innerJoin(teams, eq(teams.id, apis.teamId))
-    .where(and(isNull(apiGrants.revokedAt), isNotNull(apiGrants.groupName), isNull(teams.retiredAt), isNull(teams.deletedAt)));
+    .where(and(isNull(apiGrants.revokedAt), isNotNull(apiGrants.groupName)));
   return [...new Set([...mapped.map((m) => m.group), ...granted.map((g) => g.group ?? "")].filter((g) => g !== "").map((g) => g.toLowerCase()))];
 }
 
@@ -228,20 +247,74 @@ async function namedGoogleGroups(): Promise<string[]> {
   return (await namedGroups()).filter((g) => g.includes("@"));
 }
 
-/** The most of a person's groups kept (user_groups): a claim may list many. */
-const MAX_KEPT_GROUPS = 1000;
+/** Whether a person is in one Google group (by email), asked of Google now. */
+export async function inGoogleGroup(email: string, group: string): Promise<boolean> {
+  try {
+    return (await googleGroupsOf(email, [group])).length > 0;
+  } catch (error) {
+    throw new GroupsUnavailable(`Couldn't read Google Workspace groups: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** The most of a person's groups kept for deciding requests (users.sso_groups): a claim may list many. */
+const MAX_SNAPSHOT_GROUPS = 1000;
 
 /**
- * Keeps a person's groups as just read (user_groups), replacing what was
- * there: null (no source set) keeps none. The gateway reads them for group
- * grants, and an API's maintainers see them when deciding a request.
+ * Keeps a person's groups as just read: all of them (at most
+ * MAX_SNAPSHOT_GROUPS) in users.sso_groups, the console's alone, for a
+ * request's maintainers to choose from; and in user_groups, which the
+ * gateway reads, only the ones that matter (namedGroups), every one of
+ * them, replacing what was there. null (no source set) keeps none.
  */
 export async function storeUserGroups(userId: string, groups: string[] | null): Promise<void> {
-  const kept = [...new Set((groups ?? []).map((g) => g.toLowerCase()))].sort().slice(0, MAX_KEPT_GROUPS);
+  const all = [...new Set((groups ?? []).map((g) => g.toLowerCase()))].sort();
+  const named = new Set(await namedGroups());
+  const kept = all.filter((g) => named.has(g));
+  const now = new Date();
   await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({ ssoGroups: groups === null ? null : all.slice(0, MAX_SNAPSHOT_GROUPS), ssoGroupsReadAt: groups === null ? null : now })
+      .where(eq(users.id, userId));
     await tx.delete(userGroups).where(eq(userGroups.userId, userId));
-    if (kept.length > 0) await tx.insert(userGroups).values(kept.map((groupName) => ({ userId, groupName }))).onConflictDoNothing();
+    if (kept.length > 0) await tx.insert(userGroups).values(kept.map((groupName) => ({ userId, groupName, readAt: now }))).onConflictDoNothing();
   });
+}
+
+/**
+ * A group just granted: everyone whose last-read groups (users.sso_groups)
+ * include it has it in user_groups now, as read then (read_at), rather than
+ * at their next sign-in.
+ */
+export async function keepGrantedGroup(group: string): Promise<void> {
+  const people = await db
+    .select({ id: users.id, readAt: users.ssoGroupsReadAt })
+    .from(users)
+    .where(and(sql`${group} = any(${users.ssoGroups})`, isNotNull(users.ssoGroupsReadAt)));
+  if (people.length === 0) return;
+  await db
+    .insert(userGroups)
+    .values(people.map((p) => ({ userId: p.id, groupName: group, readAt: p.readAt ?? new Date() })))
+    .onConflictDoNothing();
+}
+
+/** One person's group, just confirmed (Google, deciding a request): kept, read now. */
+export async function keepConfirmedGroup(userId: string, group: string): Promise<void> {
+  await db
+    .insert(userGroups)
+    .values({ userId, groupName: group, readAt: new Date() })
+    .onConflictDoUpdate({ target: [userGroups.userId, userGroups.groupName], set: { readAt: new Date() } });
+}
+
+/**
+ * Where groups come from changed (a claim set, cleared or renamed, Google
+ * turned on or off, single sign-on turned off): nobody's groups as read
+ * count any more, so none are kept; each person's next sign-in (or the
+ * Google resync) reads them again.
+ */
+export async function clearKeptGroups(): Promise<void> {
+  await db.delete(userGroups);
+  await db.update(users).set({ ssoGroups: null, ssoGroupsReadAt: null }).where(isNotNull(users.ssoGroups));
 }
 
 /** Whether one of the person's groups (as kept) has an active grant to a live team's API. */

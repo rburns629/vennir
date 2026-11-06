@@ -309,6 +309,14 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		o.endpoint = r.Method + " " + rest
 	}
 	way, staleGroup := g.accessFor(who, api, r.Header.Get(TeamHeader))
+	if way == nil && staleGroup && who.SSOSession {
+		// As for a team a group gave: an older single sign-on session signs
+		// in again, so its groups are read, rather than counting stale ones.
+		// Before the hidden check: a group's grant lets them hear of it.
+		w.Header().Set("WWW-Authenticate", `Bearer realm="vennir"`)
+		return g.refuse(w, o.as("unauthenticated"), http.StatusUnauthorized, "UNAUTHENTICATED",
+			"Your access to this API is through a single sign-on group, and your groups were read over an hour ago: sign in again.")
+	}
 	if api.Hidden && !who.IsAdmin && !slices.Contains(who.Teams, api.Team) && (way == nil || way.grant == nil) {
 		// As the console's sees(): a hidden API is its own team's (and
 		// admins', and whoever a grant lets in), whatever it's shared with,
@@ -337,12 +345,6 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 
 	result := o
 	switch {
-	case way == nil && staleGroup && who.SSOSession:
-		// As for a team a group gave: an older single sign-on session signs
-		// in again, so its groups are read, rather than counting stale ones.
-		w.Header().Set("WWW-Authenticate", `Bearer realm="vennir"`)
-		return g.refuse(w, o.as("unauthenticated"), http.StatusUnauthorized, "UNAUTHENTICATED",
-			"Your access to this API is through a single sign-on group, and your groups were read over an hour ago: sign in again.")
 	case way == nil:
 		result.name = "forbidden"
 		message := "You may not call this API: ask its team for access on its page in the console (APIs → " + api.Key() + ")."

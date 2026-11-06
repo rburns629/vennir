@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { claimGroupsInUse, CLAIM_GROUPS_SESSION_SECONDS, currentSso } from "../sso.js";
+import { claimGroupsInUse, CLAIM_GROUPS_SESSION_SECONDS, currentSso, groupSourceSet } from "../sso.js";
 import fp from "fastify-plugin";
 import fastifyJwt from "@fastify/jwt";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
@@ -53,10 +53,12 @@ declare module "fastify" {
       // A session's (not an API token's): its id and when it expires
       // (seconds), for signing it out (AuthService.SignOut).
       session?: { sid: string; exp: number };
-      // A person whose single sign-on groups (user_groups) count now, for
-      // an API's group grants: always, unless groups come from an ID
-      // token's claim and this isn't a single sign-on session signed in
-      // within the hour (the gateway's auth.go, the same). Never a bot's.
+      // A person whose single sign-on groups (user_groups) may count now,
+      // for an API's group grants: while single sign-on is on and a group
+      // source is set, and with a claim, only for a single sign-on signed in
+      // within the hour (with Google's alone, apiAccess.ts also needs each
+      // row read within GOOGLE_GROUPS_FRESH_SECONDS). The gateway's auth.go,
+      // the same. Never a bot's.
       groupsCurrent?: boolean;
     };
   }
@@ -180,7 +182,7 @@ export async function resolveCaller(request: FastifyRequest): Promise<CallerReso
       // As for group-given teams: an older session's groups don't count
       // for an API's group grant (the gateway refuses an older single
       // sign-on session whose only way in is one, so it signs in again).
-      groupsCurrent: !user.isBot && !stale,
+      groupsCurrent: !user.isBot && groupSourceSet() && !stale,
     },
   };
 }

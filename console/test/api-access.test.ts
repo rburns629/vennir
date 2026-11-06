@@ -9,6 +9,7 @@
  * write audited and told.
  */
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { create } from "@bufbuild/protobuf";
 import { and, eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -18,7 +19,7 @@ import { config } from "../src/config.js";
 import { accessFor, type CallerContext } from "../src/core/apiAccess.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, findApi, findTeamByName, findUserByEmail } from "../src/db/queries.js";
-import { apiAccessRequests, apiGrants, apis, auditLog, notificationEvents, teams, userGroups, userNotifications } from "../src/db/schema.js";
+import { apiAccessRequests, apiGrants, apis, auditLog, notificationEvents, teams, userGroups, userNotifications, users as users_ } from "../src/db/schema.js";
 import { ApiSchema } from "../src/gen/vennir/catalog/v1/release_pb.js";
 import { buildApp } from "../src/index.js";
 import { caller, rpcClient } from "./rpc.js";
@@ -135,11 +136,6 @@ beforeAll(async () => {
   emails.oldBot = oldBotEmail;
   ids.bot = (await findUserByEmail(botEmail))?.id ?? "";
   ids.oldBot = (await findUserByEmail(oldBotEmail))?.id ?? "";
-  // The person's groups, as a sign-in keeps them.
-  await db.insert(userGroups).values([
-    { userId: ids.bob, groupName: `eng@${prefix}.example.com` },
-    { userId: ids.bob, groupName: `all@${prefix}.example.com` },
-  ]);
 });
 
 afterAll(async () => {
@@ -174,22 +170,41 @@ describe("who may call", () => {
     }
   });
 
-  it("follows the gateway's order: team, user, group (the best rate, while groups count), catalog; a bot by its grant only while a team of its is live", () => {
-    const a = { id: "api-1", teamName: "pay", shareWith: ["web"], perMinute: { default: 60, web: 600 } } as unknown as Parameters<typeof accessFor>[1];
-    const grant = (g: Partial<CallerContext["grants"][number]>) =>
-      ({ id: randomUUID(), apiId: "api-1", groupName: null, userId: null, perMinute: null, revokedAt: null, ...g }) as CallerContext["grants"][number];
-    const person = { id: "p", isBot: false, groupsCurrent: true };
-    const ctx = (c: Partial<CallerContext>): CallerContext => ({ teams: [], groups: [], grants: [], ...c });
-    expect(accessFor(person, a, ctx({ teams: ["pay"], grants: [grant({ userId: "p", perMinute: 5 })] }))).toMatchObject({ via: "team", perMinute: 60 });
-    expect(accessFor(person, a, ctx({ teams: ["web"], grants: [grant({ userId: "p", perMinute: 5 })] }))).toMatchObject({ via: "user", perMinute: 5 });
-    const groups = ctx({ groups: ["eng", "ops"], grants: [grant({ groupName: "eng", perMinute: 3 }), grant({ groupName: "ops" })] });
-    expect(accessFor(person, a, groups)).toMatchObject({ via: "group", group: "ops", perMinute: 60 });
-    expect(accessFor({ ...person, groupsCurrent: false }, a, groups)).toBeNull();
-    expect(accessFor({ ...person, groupsCurrent: false }, a, { ...groups, teams: ["web"] })).toMatchObject({ via: "catalog", callingTeam: "web", perMinute: 600 });
-    expect(accessFor(person, a, ctx({ grants: [grant({ userId: "p", revokedAt: new Date() })] }))).toBeNull();
-    expect(accessFor({ id: "b", isBot: true }, a, ctx({ teams: ["tools"], grants: [grant({ userId: "b" })] }))).toMatchObject({ via: "user", perMinute: 60 });
-    expect(accessFor({ id: "b", isBot: true }, a, ctx({ teams: [], grants: [grant({ userId: "b" })] }))).toBeNull();
-    expect(accessFor({ id: "b", isBot: true, groupsCurrent: true }, a, ctx({ teams: ["tools"], groups: ["eng"], grants: [grant({ groupName: "eng" })] }))).toBeNull();
+  it("follows the gateway's order, as the table both run says (testdata/api-access-cases.json)", () => {
+    type Fields = { id?: string; team?: string; shareWith?: string[]; perMinute?: Record<string, number> };
+    const table = JSON.parse(readFileSync(new URL("../../testdata/api-access-cases.json", import.meta.url), "utf8")) as {
+      gatewayDefaultPerMinute: number;
+      api: Required<Fields>;
+      cases: {
+        name: string;
+        api?: Fields;
+        caller: { id: string; bot?: boolean; teams?: string[]; groups?: string[]; groupsCurrent?: boolean };
+        grants: { id: string; userId?: string; group?: string; perMinute?: number }[];
+        expect: { via: string; team?: string; group?: string; grant?: string; perMinute: number } | null;
+      }[];
+    };
+    const kept = config.gateway.defaultPerMinute;
+    config.gateway.defaultPerMinute = table.gatewayDefaultPerMinute;
+    try {
+      expect(table.cases.length).toBeGreaterThan(10);
+      for (const c of table.cases) {
+        const a = { id: table.api.id, teamName: table.api.team, shareWith: c.api?.shareWith ?? table.api.shareWith, perMinute: c.api?.perMinute ?? table.api.perMinute } as unknown as Parameters<typeof accessFor>[1];
+        const grants = c.grants.map(
+          (g) =>
+            ({ id: g.id, apiId: table.api.id, groupName: g.group ?? null, userId: g.userId ?? null, perMinute: g.perMinute || null, revokedAt: null }) as CallerContext["grants"][number],
+        );
+        const got = accessFor(
+          { id: c.caller.id, isBot: c.caller.bot ?? false, groupsCurrent: c.caller.groupsCurrent ?? false },
+          a,
+          { teams: c.caller.teams ?? [], groups: c.caller.groups ?? [], grants },
+        );
+        const shown = got ? { via: got.via, team: got.callingTeam ?? "", group: got.group ?? "", grant: got.grantId ?? "", perMinute: got.perMinute } : null;
+        const want = c.expect ? { via: c.expect.via, team: c.expect.team ?? "", group: c.expect.group ?? "", grant: c.expect.grant ?? "", perMinute: c.expect.perMinute } : null;
+        expect(shown, c.name).toEqual(want);
+      }
+    } finally {
+      config.gateway.defaultPerMinute = kept;
+    }
   });
 });
 
@@ -263,6 +278,13 @@ describe("deciding a request", () => {
     expect(declined.body.request).toMatchObject({ state: "API_ACCESS_REQUEST_STATE_DECLINED", decisionReason: "use the export", decidedBy: emails.maintainer });
     const mine = await call<{ requests?: Request[] }>(tokens.bob, "ApiService/ListMyApiAccess");
     expect(mine.body.requests?.find((r) => r.id === asked.body.request.id)?.state).toBe("API_ACCESS_REQUEST_STATE_DECLINED");
+    // Every group bob's last sign-in read (the console's own copy), which his
+    // request copies as he asks. (Set here, just before: another test file's
+    // change of where groups come from empties everyone's.)
+    await db
+      .update(users_)
+      .set({ ssoGroups: [`all@${prefix}.example.com`, `eng@${prefix}.example.com`], ssoGroupsReadAt: new Date() })
+      .where(eq(users_.id, ids.bob));
     expect((await ask("bob", "orders", "reports, again")).code).toBe("ok");
   });
 
@@ -270,10 +292,20 @@ describe("deciding a request", () => {
     const [waiting] = await db.select().from(apiAccessRequests).where(and(eq(apiAccessRequests.userId, ids.bob), eq(apiAccessRequests.state, "waiting")));
     const access = await call<{ requests?: Request[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "orders" });
     expect(access.body.requests?.find((r) => r.id === waiting?.id)?.groups).toEqual([`all@${prefix}.example.com`, `eng@${prefix}.example.com`]);
+    // Only to its maintainers: not to a plain member, nor an admin.
+    for (const who of ["member", "admin"] as const) {
+      const seen = await call<{ requests?: Request[] }>(tokens[who], "ApiService/ListApiAccess", { team: owner, name: "orders" });
+      expect(seen.body.requests?.find((r) => r.id === waiting?.id)?.groups ?? [], who).toEqual([]);
+    }
     expect((await decide("maintainer", waiting?.id ?? "", { approve: true, group: "ops@elsewhere.example.com" })).failure).toBe("NOT_THEIR_GROUP");
     const decided = await decide("maintainer", waiting?.id ?? "", { approve: true, group: `ENG@${prefix}.example.com`, perMinute: 5 });
     expect(decided.body.grant).toMatchObject({ group: `eng@${prefix}.example.com`, perMinute: 5 });
-    expect(await listed("bob", "orders")).toMatchObject({ mayCall: true, accessVia: "API_ACCESS_VIA_GROUP", perMinute: 5 });
+    // Ended, its groups aren't shown any more.
+    const after = await call<{ requests?: Request[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "orders" });
+    expect(after.body.requests?.find((r) => r.id === waiting?.id)?.groups ?? []).toEqual([]);
+    // With no group source set here (single sign-on off), groups count for
+    // nothing (sso.test.ts has them counting, and kept for the gateway).
+    expect((await listed("bob", "orders"))?.mayCall ?? false).toBe(false);
     const [botWaiting] = await db.select().from(apiAccessRequests).where(and(eq(apiAccessRequests.state, "waiting"), eq(apiAccessRequests.requestedBy, ids.toolsMaintainer)));
     expect((await decide("maintainer", botWaiting?.id ?? "", { approve: true, group: `eng@${prefix}.example.com` })).failure).toBe("BAD_REQUEST");
     expect((await decide("maintainer", botWaiting?.id ?? "", { approve: true })).body.grant).toMatchObject({ userEmail: botEmail, bot: true });
@@ -292,6 +324,23 @@ describe("grants", () => {
     const made = await add("maintainer", "open", { group: " Ops@Example.com ", perMinute: 9 });
     expect(made.body.grant).toMatchObject({ group: "ops@example.com", perMinute: 9, grantedBy: emails.maintainer });
     expect((await add("maintainer", "open", { group: "ops@example.com" })).failure).toBe("ALREADY_GRANTED");
+    // Group names as single sign-on group mappings take them: spaces too (Entra's display names).
+    expect((await add("maintainer", "open", { group: "  Platform Engineers " })).body.grant).toMatchObject({ group: "platform engineers" });
+    expect((await add("maintainer", "open", { group: "   " })).failure).toBe("BAD_REQUEST");
+  });
+
+  it("outlive their API leaving the release, and are its again when it's back", async () => {
+    const before = (await call<{ grants?: Grant[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "open" })).body.grants ?? [];
+    expect(await listed("ada", "open")).toMatchObject({ mayCall: true });
+    await apply(release().filter((a) => a.name !== "open"));
+    // Gone from the release: nobody calls it, and its grants are kept, linked to nothing.
+    expect(await listed("ada", "open")).toBeUndefined();
+    const away = await db.select().from(apiGrants).where(inArray(apiGrants.id, before.map((g) => g.id)));
+    expect(away.map((g) => g.apiId)).toEqual(before.map(() => null));
+    await apply(release());
+    const after = (await call<{ grants?: Grant[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "open" })).body.grants ?? [];
+    expect(after.map((g) => g.id).sort()).toEqual(before.map((g) => g.id).sort());
+    expect(await listed("ada", "open")).toMatchObject({ mayCall: true, accessVia: "API_ACCESS_VIA_USER" });
   });
 
   it("answer a request of theirs that waits", async () => {
@@ -396,8 +445,10 @@ describe("retired teams", () => {
       expect((await ask("bob", "orders")).code).toBe("not_found");
       const [waiting] = await db.select().from(apiAccessRequests).where(and(eq(apiAccessRequests.userId, ids.ada), eq(apiAccessRequests.state, "waiting")));
       expect((await decide("maintainer", waiting?.id ?? "", { approve: true })).failure).toBe("TEAM_RETIRED");
-      // Revoking still works: it only takes away.
-      expect((await revoke("maintainer", made.body.grant.id)).code).toBe("ok");
+      expect((await decide("maintainer", waiting?.id ?? "", { approve: false, reason: "no" })).failure).toBe("TEAM_RETIRED");
+      // A retired team is read-only to its maintainers; an admin may still revoke (an incident).
+      expect((await revoke("maintainer", made.body.grant.id)).failure).toBe("TEAM_RETIRED");
+      expect((await revoke("admin", made.body.grant.id)).code).toBe("ok");
     } finally {
       await db.update(teams).set({ retiredAt: null }).where(eq(teams.name, owner));
     }

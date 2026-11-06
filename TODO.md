@@ -198,9 +198,9 @@ it was seen.
   grants don't expire; the proposal is that the API's team sees each
   grant's last call and revokes unused ones. The gateway would need to
   write a `last_used_at` per grant (as for API tokens, at a few minutes'
-  resolution; a grant to `vennir_gateway` of that one column). Also: a
-  grant goes with its API when a release drops the API (`api_grants`
-  cascades), so a renamed API starts with none.
+  resolution; a grant to `vennir_gateway` of that one column). A renamed
+  API starts with no grants (they're kept by team and name, and come back
+  only under the old name).
 
 - [ ] **The console can loosen the cluster's policies** (a known gap since
   the security review of 2026-11-04): it writes the admission policies'

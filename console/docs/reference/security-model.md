@@ -515,8 +515,14 @@ this release, its `api.yaml`'s `shareWith` names a team of theirs
 (deprecated). Admins are no exception: they call only what a grant lets them,
 and a grant to themselves is audited like any other. Everyone else gets 403
 `NOT_GRANTED` and nothing reaches the backend. A person's groups are those
-the console last read (`user_groups`: at each single sign-on, and hourly
-for Google Workspace groups); while groups come from an ID token's claim,
+the console last read that matter (`user_groups`: only groups mapped to a
+team or named by a grant; everything else a sign-in read stays in a column
+the gateway's role can't read, shown to an API's maintainers only on a
+waiting request), at each single sign-on, and hourly for Google Workspace
+groups. They count only while single sign-on is on and a group source is
+set, and are cleared when the sources change; with Google's alone, only
+rows read within 90 minutes (a failing resync fails closed); while groups
+come from an ID token's claim,
 they count only for a single sign-on session from the last hour, as
 group-given teams do, so a session whose only way in is a group's grant is
 refused (401) once older, and its person signs in again; a sign-in whose

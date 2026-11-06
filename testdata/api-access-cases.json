@@ -1,0 +1,106 @@
+{
+  "_comment": "Who may call an API (decision 26): one table both accessFor implementations run, the console's (console/test/api-access.test.ts, core/apiAccess.ts) and the gateway's (gateway/internal/gateway/grants_test.go), so they can't drift. Grants are the API's active ones; a perMinute of 0 is the API's default. expect null: the caller may not call it; staleGroup: the gateway's 'sign in again' case (a group's grant would let them in, but their groups don't count now).",
+  "gatewayDefaultPerMinute": 600,
+  "api": { "id": "api-1", "team": "pay", "shareWith": ["web"], "perMinute": { "default": 60, "web": 600 } },
+  "cases": [
+    {
+      "name": "its own team, before a grant",
+      "caller": { "id": "p", "teams": ["pay"], "groupsCurrent": true },
+      "grants": [{ "id": "g1", "userId": "p", "perMinute": 5 }],
+      "expect": { "via": "team", "team": "pay", "perMinute": 60 }
+    },
+    {
+      "name": "a grant to them, before a shareWith team",
+      "caller": { "id": "p", "teams": ["web"], "groupsCurrent": true },
+      "grants": [{ "id": "g1", "userId": "p", "perMinute": 5 }],
+      "expect": { "via": "user", "grant": "g1", "perMinute": 5 }
+    },
+    {
+      "name": "a grant to them, before a group's",
+      "caller": { "id": "p", "groups": ["eng"], "groupsCurrent": true },
+      "grants": [{ "id": "g-eng", "group": "eng", "perMinute": 50 }, { "id": "g1", "userId": "p", "perMinute": 5 }],
+      "expect": { "via": "user", "grant": "g1", "perMinute": 5 }
+    },
+    {
+      "name": "a grant without a rate: the API's default",
+      "caller": { "id": "p", "groupsCurrent": true },
+      "grants": [{ "id": "g1", "userId": "p" }],
+      "expect": { "via": "user", "grant": "g1", "perMinute": 60 }
+    },
+    {
+      "name": "a grant without a rate, an API without a default: the gateway's",
+      "api": { "perMinute": {} },
+      "caller": { "id": "p", "groupsCurrent": true },
+      "grants": [{ "id": "g1", "userId": "p" }],
+      "expect": { "via": "user", "grant": "g1", "perMinute": 600 }
+    },
+    {
+      "name": "the best rate of their groups",
+      "caller": { "id": "p", "groups": ["eng", "ops"], "groupsCurrent": true },
+      "grants": [{ "id": "g-eng", "group": "eng", "perMinute": 3 }, { "id": "g-ops", "group": "ops" }],
+      "expect": { "via": "group", "group": "ops", "grant": "g-ops", "perMinute": 60 }
+    },
+    {
+      "name": "groups at the same rate: the first by name, byte for byte",
+      "caller": { "id": "p", "groups": ["B-team", "a-team"], "groupsCurrent": true },
+      "grants": [{ "id": "g-a", "group": "a-team", "perMinute": 10 }, { "id": "g-b", "group": "B-team", "perMinute": 10 }],
+      "expect": { "via": "group", "group": "B-team", "grant": "g-b", "perMinute": 10 }
+    },
+    {
+      "name": "groups that don't count now",
+      "caller": { "id": "p", "groups": ["eng"], "groupsCurrent": false },
+      "grants": [{ "id": "g-eng", "group": "eng" }],
+      "expect": null,
+      "staleGroup": true
+    },
+    {
+      "name": "groups that don't count now, but a shareWith team",
+      "caller": { "id": "p", "teams": ["web"], "groups": ["eng"], "groupsCurrent": false },
+      "grants": [{ "id": "g-eng", "group": "eng" }],
+      "expect": { "via": "catalog", "team": "web", "perMinute": 600 }
+    },
+    {
+      "name": "a group they aren't in",
+      "caller": { "id": "p", "groups": ["ops"], "groupsCurrent": true },
+      "grants": [{ "id": "g-eng", "group": "eng" }],
+      "expect": null
+    },
+    {
+      "name": "a bot of a live team, by name",
+      "caller": { "id": "b", "bot": true, "teams": ["tools"] },
+      "grants": [{ "id": "g1", "userId": "b" }],
+      "expect": { "via": "user", "grant": "g1", "perMinute": 60 }
+    },
+    {
+      "name": "a bot of retired teams only: its grant doesn't count",
+      "caller": { "id": "b", "bot": true },
+      "grants": [{ "id": "g1", "userId": "b" }],
+      "expect": null
+    },
+    {
+      "name": "a bot is in no group",
+      "caller": { "id": "b", "bot": true, "teams": ["tools"], "groups": ["eng"], "groupsCurrent": true },
+      "grants": [{ "id": "g-eng", "group": "eng" }],
+      "expect": null
+    },
+    {
+      "name": "an admin without a grant",
+      "caller": { "id": "a", "admin": true, "teams": ["data"], "groupsCurrent": true },
+      "grants": [{ "id": "g1", "userId": "p" }],
+      "expect": null
+    },
+    {
+      "name": "shared with every team: the first of theirs, at its limit",
+      "api": { "shareWith": ["*"], "perMinute": { "default": 60, "data": 5 } },
+      "caller": { "id": "p", "teams": ["data", "web"], "groupsCurrent": true },
+      "grants": [],
+      "expect": { "via": "catalog", "team": "data", "perMinute": 5 }
+    },
+    {
+      "name": "nobody",
+      "caller": { "id": "p", "teams": ["data"], "groupsCurrent": true },
+      "grants": [],
+      "expect": null
+    }
+  ]
+}

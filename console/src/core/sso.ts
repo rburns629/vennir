@@ -17,7 +17,7 @@ import { db } from "../db/client.js";
 import { findTeamByName } from "../db/queries.js";
 import { ssoGroupMappings, ssoSettings, teams, users, type TeamRole } from "../db/schema.js";
 import { seal } from "../sealed.js";
-import { googleIdentity, markFollowingGroups, refreshSso, SECRET_PURPOSE } from "../sso.js";
+import { clearKeptGroups, googleIdentity, markFollowingGroups, refreshSso, SECRET_PURPOSE } from "../sso.js";
 
 const REQUIRES_ADMIN = "Requires admin access.";
 const DOMAIN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
@@ -133,6 +133,13 @@ export async function setSsoSettings(caller: AuthUser | undefined, input: SsoSet
   }
   const values = { ...provider, ...groups, updatedBy: caller?.id ?? null, updatedAt: new Date() };
   await db.insert(ssoSettings).values({ id: 1, ...values }).onConflictDoUpdate({ target: ssoSettings.id, set: values });
+  // Where groups come from changed, or single sign-on was turned on or off:
+  // nobody's groups as read count for an API's group grant any more.
+  const sourcesChanged =
+    (stored?.groupsClaim ?? "") !== groups.groupsClaim ||
+    (stored?.googleGroups ?? false) !== groups.googleGroups ||
+    (!config.oidc && (stored?.enabled ?? false) !== input.enabled);
+  if (sourcesChanged) await clearKeptGroups();
   // Groups decide mapped teams' single sign-on members from now on, those
   // added by hand while no source was set included.
   if (groups.groupsClaim || groups.googleGroups) await markFollowingGroups();

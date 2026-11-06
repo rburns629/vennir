@@ -136,13 +136,17 @@ func TestGrantsAreReadEachRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	var userGrant string
-	if err := pool.QueryRow(ctx, `INSERT INTO api_grants (api_id, user_id, per_minute) VALUES ($1::uuid, $2::uuid, 7) RETURNING id::text`, apiID, userID).Scan(&userGrant); err != nil {
+	if err := pool.QueryRow(ctx, `INSERT INTO api_grants (api_id, team_id, api_name, user_id, per_minute) VALUES ($1::uuid, $3::uuid, 'orders', $2::uuid, 7) RETURNING id::text`, apiID, userID, teamID).Scan(&userGrant); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO api_grants (api_id, group_name) VALUES ($1::uuid, 'eng@example.com')`, apiID); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO api_grants (api_id, team_id, api_name, group_name) VALUES ($1::uuid, $2::uuid, 'orders', 'eng@example.com')`, apiID, teamID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO api_grants (api_id, group_name, revoked_at) VALUES ($1::uuid, 'gone@example.com', now())`, apiID); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO api_grants (api_id, team_id, api_name, group_name, revoked_at) VALUES ($1::uuid, $2::uuid, 'orders', 'gone@example.com', now())`, apiID, teamID); err != nil {
+		t.Fatal(err)
+	}
+	// One kept for an API out of the release (no api_id): it lets nobody in.
+	if _, err := pool.Exec(ctx, `INSERT INTO api_grants (team_id, api_name, group_name) VALUES ($1::uuid, 'ledger', 'away@example.com')`, teamID); err != nil {
 		t.Fatal(err)
 	}
 	s := &Store{DB: pool, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}

@@ -160,6 +160,13 @@ export const users = pgTable("users", {
   // team by email is told so (core/teams.ts addMember).
   selfRegistered: boolean("self_registered").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Every single sign-on group the person's last sign-in (or the hourly
+  // Google resync) read, lowercased, at most 1000, and when: the console's
+  // alone (the gateway's role can't read these columns). A request for
+  // access copies them, for the API's maintainers to grant one of them
+  // (core/apiAccess.ts); user_groups holds the ones that matter.
+  ssoGroups: text("sso_groups").array(),
+  ssoGroupsReadAt: timestamp("sso_groups_read_at", { withTimezone: true }),
 });
 
 /**
@@ -1220,9 +1227,14 @@ export const apiGrants = pgTable(
   "api_grants",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    apiId: uuid("api_id")
+    // The published API; null while it's out of the catalog's release, then
+    // linked again by its team and name (upsertApi) when it's back. A grant
+    // of an API that isn't published lets nobody call anything.
+    apiId: uuid("api_id").references(() => apis.id, { onDelete: "set null" }),
+    teamId: uuid("team_id")
       .notNull()
-      .references(() => apis.id, { onDelete: "cascade" }),
+      .references(() => teams.id, { onDelete: "cascade" }),
+    apiName: text("api_name").notNull(),
     groupName: text("group_name"),
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     perMinute: integer("per_minute"),
@@ -1256,14 +1268,20 @@ export const apiAccessRequests = pgTable(
   "api_access_requests",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    apiId: uuid("api_id")
+    // As api_grants': null while the API is out of the release.
+    apiId: uuid("api_id").references(() => apis.id, { onDelete: "set null" }),
+    teamId: uuid("team_id")
       .notNull()
-      .references(() => apis.id, { onDelete: "cascade" }),
+      .references(() => teams.id, { onDelete: "cascade" }),
+    apiName: text("api_name").notNull(),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
     reason: text("reason").notNull(),
+    // A person's single sign-on groups when they asked (users.sso_groups),
+    // one of which the API's maintainers may grant instead; none for a bot.
+    requesterGroups: text("requester_groups").array().notNull().default(sql`'{}'::text[]`),
     state: text("state").$type<AccessRequestState>().notNull().default("waiting"),
     decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
     decisionReason: text("decision_reason"),

@@ -48,7 +48,8 @@ describe("the gateway's database role", () => {
       await gateway.query(
         "SELECT g.id::text, g.api_id::text, coalesce(g.group_name, ''), coalesce(g.user_id::text, ''), coalesce(g.per_minute, 0) FROM api_grants g WHERE g.revoked_at IS NULL LIMIT 1",
       );
-      await gateway.query("SELECT ARRAY(SELECT group_name FROM user_groups WHERE user_id = gen_random_uuid())");
+      await gateway.query("SELECT ARRAY(SELECT group_name FROM user_groups WHERE user_id = gen_random_uuid() AND read_at > now())");
+      await gateway.query("SELECT google_groups FROM sso_settings WHERE id = 1");
       await gateway.query("SELECT access_requests FROM apis LIMIT 1");
       const { rows } = await gateway.query<{ write: boolean }>("SELECT has_table_privilege('api_traffic', 'INSERT, UPDATE') AS write");
       expect(rows[0]?.write).toBe(true);
@@ -71,7 +72,9 @@ describe("the gateway's database role", () => {
         "SELECT revoked_by FROM api_grants LIMIT 1",
         "SELECT from_request FROM api_grants LIMIT 1",
         "SELECT * FROM api_access_requests LIMIT 1",
-        "SELECT read_at FROM user_groups LIMIT 1",
+        // Every group a person's sign-in read is the console's alone.
+        "SELECT sso_groups FROM users LIMIT 1",
+        "SELECT sso_groups_read_at FROM users LIMIT 1",
         "UPDATE api_grants SET revoked_at = NULL WHERE false",
         "INSERT INTO api_grants (api_id, group_name) VALUES (gen_random_uuid(), 'x')",
         "DELETE FROM user_groups WHERE false",
