@@ -1123,7 +1123,11 @@ its rules); signing each policy edit (the console would hold the key).
   it verifies only Sigstore bundles, and catalog CI signs in cosign's older
   format (`--new-bundle-format=false`, a `.sig` tag), which only cosign
   reads. A release older than the one applied is refused, as the console
-  refuses one.
+  refuses one. It needs rekor 1.5.5 or later (and sigstore-go 1.4.0):
+  rekor's PGP entry type, which cosign's verifier reaches, used the
+  deprecated `golang.org/x/crypto/openpgp` before, with a vulnerability that
+  won't be fixed (govulncheck GO-2026-5932), and ProtonMail's maintained
+  `go-crypto` since. The binary grows by about 25 MB.
 - *What moved:* two policies in the kernel chart that only its
   ServiceAccount may update (RBAC by name; admission policies don't apply
   to admission policy objects, so the write fence can't help): `-catalog-
