@@ -996,71 +996,74 @@ wired into a run as a dependency. Deleting something others depend on (3)
 is refused and alerts the admins; it goes ahead only once an admin
 approves it, and the approval is audited as theirs.
 
-**26. Each API at a host of its own, called by subscription or by group**
-(proposed 2026-11-05). Today every API is a path on the gateway's one host
-(`/<team>/<api>/`), shared team by team by its `api.yaml`'s `shareWith`, and
-a team without access asks for it by opening an issue. Two problems: every
-API's pages share one origin, so a page one API serves can read another's
-cookies that aren't HttpOnly, and access is a pull request to someone
-else's catalog folder. Proposed:
+**26. One gateway, and who may call each API** (proposed 2026-11-05,
+revised the same day with the owner). Today every API is a path on the
+gateway's one host (`/<team>/<api>/`), shared team by team by its
+`api.yaml`'s `shareWith`, and a team without access asks for it by opening
+an issue: access is a pull request to someone else's catalog folder, and
+it's granted to whole teams, not to the people and services that call.
+Proposed:
 
-1. *The gateway assigns the endpoint:* each API is served at
-   `<api>.<team>.<apiDomain>` (`gateway.apiDomain`, set at install; for
-   example `orders.web.apis.example.com`). The catalog doesn't choose it:
-   the console records it when the API is first published, and a renamed
-   API is a new endpoint. Its own host makes it its own origin. The gateway
-   also makes every cookie a backend sets host-only (it drops `Domain`), so
-   one API can't set a cookie for the others. The old paths keep working
-   for one release (`gateway.pathRoutes`, on by default for it, then
-   removed), answering with `Deprecation` and the new address.
-2. *Names and certificates:* a DNS wildcard covers one label, so each team
-   needs `*.<team>.<apiDomain>` in DNS and in a certificate. The console
-   asks for both when it creates the team (a cert-manager `Certificate`,
-   and a DNS record where the cluster runs external-dns; otherwise the
-   Admin page lists the record to add), and the gateway's listener takes
-   each team's certificate. An API whose team's certificate isn't ready is
-   held, with the reason, like a backend host that isn't allowed.
-3. *Who may call, set in the catalog:* `api.yaml`'s `access` replaces
-   `shareWith`:
+1. *The gateway assigns the endpoint, as a path:* each API stays at
+   `/<team>/<api>/` on the gateway's one host, as Google's API Gateway
+   serves every API under one address. The catalog doesn't choose it: it
+   follows from the team and the API's name, and a renamed API is a new
+   endpoint. One host means one certificate and one DNS name for the whole
+   install, however many teams it has, from wherever the organisation gets
+   them (its own CA, the cloud's certificate service, cert-manager).
+2. *A pass-through:* the gateway routes each request to the team's
+   backend and its answer back, whatever it is (JSON, HTML, nothing),
+   swapping only the caller's credential for the backend's and adding
+   `Vennir-Caller`. The one origin all APIs share doesn't let one reach
+   another through a browser: the gateway takes only a bearer token in
+   `Authorization`, which a browser never sends when it opens a link or a
+   frame, so no browser can load an API's page there as a signed-in person.
+3. *An access list per API, held by the console:* each API has grants,
+   each naming either a single sign-on group (everyone in it may call:
+   groups as read at sign-in, at most an hour old) or one user, a person
+   or a bot (bots aren't in groups, so each service that calls an API is
+   named). Each grant has its own rate (by default the API's limit) and
+   can be changed or revoked. The API's own team's members and bots may
+   always call it; admins may not, unless granted, and a grant to
+   themselves is audited like any other. Anyone else is refused (403) at
+   the gateway and never reaches the backend; a revoked grant stops calls
+   within the gateway's cache time (a minute at most). Grants are per
+   install, like a secret store's credential.
+4. *Who grants:* only the API's team's maintainers add grants, of groups
+   or users. A person asks for access for themselves, with a reason; the
+   API's maintainers approve it (granting that person, or a group they're
+   in) or decline it. A request may be withdrawn while it waits, and asked
+   again at once after a decline, shown beside it. Each step is audited
+   and told to the person and the API's maintainers. A bot's grant is
+   asked for by its team's maintainers, the bot's owners. The API's
+   maintainers change or revoke any grant; an admin may revoke one (an
+   incident) but not add or change it; a person may give up their own, and
+   a bot's team its bot's. A group's rate is each member's.
+5. *What the catalog says:* `api.yaml`'s `access` replaces `shareWith`:
 
    ```yaml
    access:
-     subscriptions: approval   # open (granted at once) | approval | closed
-     groups: [orders-readers@example.com]   # people in these groups may call
+     requests: approval   # open (granted at once) | approval | closed
    ```
 
-   The owning team and admins may always call. During the release with both,
-   a `shareWith` team is a standing subscription that needs no approval, and
-   the catalog tool warns that `shareWith` is going away.
-4. *Subscriptions, held by the console:* a maintainer of a team asks to
-   subscribe it to an API, with a reason. A maintainer of the API's team
-   approves it (setting a rate no higher than the API's `limits` give that
-   team) or declines it. Either team's maintainers, or an admin, may later
-   revoke it. Each step is audited and told to the other team. A
-   subscription is per install, like a secret store's credential: the
-   catalog sets the policy, an install's people hold the grants. The
-   gateway checks the calling team (`Vennir-Team`, as today) has an active
-   subscription; a revoked one stops calls within the gateway's cache
-   time (a minute at most).
-5. *Groups:* a person (never a bot: bots aren't in groups) whose single
-   sign-on groups include one of `access.groups` may call without a
-   subscription, under the API's default limit, counted per person. The
-   console records each person's groups at sign-in for the gateway to read
-   (a session that relies on a groups claim lasts an hour, so groups are
-   at most an hour old).
+   Closed refuses new requests; grants already made stay until revoked.
+   During the release with both, a `shareWith` team's members and bots
+   keep calling, marked "from the catalog" (not revocable in the console;
+   their named limit kept), and the catalog tool warns that `shareWith` is
+   going away, so the API's team grants them properly first.
 
-Rejected: an opaque host per API (unreadable, and the API's name is already
-unique within its team); a path per API assigned by the gateway (one origin
-still); subscriptions as catalog pull requests (every grant a change to
-someone else's folder, and the same grant on every install); stripping
-`Set-Cookie` alone (it leaves scripts on one API's pages able to call
-another as the signed-in person).
+Rejected: a host per API (`<api>.<team>.<apiDomain>`, proposed first: a
+wildcard certificate and DNS record per team, which a large organisation's
+certificate authority and rate limits don't scale to, for a browser risk
+the bearer-only sign-in doesn't have); team subscriptions (a team is too
+coarse: every member and every bot it makes would get in); grants as
+catalog pull requests (every grant a change to someone else's folder, and
+the same grant on every install); a grant to a whole team as a group
+(broader than a bot's own grant, for convenience only).
 
-Open, for review: whether an approved subscription expires (proposed: no,
-but the API's team sees each subscriber's last call, and may revoke unused
-ones); the console's pages for it, which go on the mockups canvas first (an
-API's page with its endpoint and Subscribe; a team's Subscriptions, both
-ways, with approvals; the Admin page's API domain and certificates).
+Open, for review: whether a grant expires (proposed: no, but the API's team
+sees each grant's last call, and may revoke unused ones); the console's
+pages for it, which go on the mockups canvas first.
 
 **27. The cluster's policies from the catalog, written by the kernel**
 (proposed 2026-11-05). The console keeps the admission policies' literals
