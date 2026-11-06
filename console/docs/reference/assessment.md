@@ -1163,10 +1163,12 @@ its rules); signing each policy edit (the console would hold the key).
   console refuses to submit a step the kernel's policy doesn't list
   (`IDENTITY_PENDING`, also while the kernel hasn't read a new release
   yet).
-- *Upgrading:* this release, both write: the kernel its policies, the
+- *Upgrading:* the first release, both write: the kernel its policies, the
   console its identity policy whole (releases too) and its gateway token
   policy. The next drops the releases from the console's identity policy
-  when the kernel writes them, leaving it the secret names. An install
+  when the kernel writes them, leaving it the secret names (the chart
+  renders it matching no releases, its maps kept empty and inert for the
+  console from before during the rollout). An install
   whose catalog trusts no signer runs no `kernel policy` and keeps the
   console writing them, and the Admin page says which.
 - *Which teams:* every team the release names, including one made by hand

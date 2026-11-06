@@ -233,9 +233,11 @@ Sigstore's TUF repository out of reach), nothing is applied that pass and
 it's tried again on the next. Until the first verified release, the policies
 hold the chart's seed from the console's, held to the kernel's own rules
 (no platform product, no API's or ESO's ServiceAccount, no audience of the
-cluster's). Both policies apply, so a step runs as a product only if both
-list it, and mounts only its team's registered Secrets (the console's
-policy). Products registered by hand, and platform products, aren't in any
+cluster's). Both policies apply. The console's then holds only what the
+console decides, each team's registered secret names (the chart renders
+it without the released digests, and the console stops computing them),
+so a step runs as a product only if the kernel's lists it, and mounts
+only its team's registered Secrets (the console's). Products registered by hand, and platform products, aren't in any
 release: with `catalogPolicy` on they run only as `default`, and the
 console refuses to submit one as its product (`IDENTITY_PENDING`, as for a
 new release the kernel hasn't read yet, or one listed with other token

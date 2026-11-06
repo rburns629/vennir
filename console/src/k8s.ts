@@ -1251,19 +1251,30 @@ const IDENTITY_POLICY_VARIABLES = new Set([
  * `releases` maps, by name) with what `build` returns, given what they say
  * now, as updateScanPolicy does. Returns false when the policy doesn't
  * exist (identityPolicy disabled).
+ *
+ * `build` is also told whether the policy matches releases at all
+ * (`holdsReleases`): with the kernel chart's catalogPolicy (decision 27)
+ * it doesn't (it has no `candidates`, which only the full policy has), the
+ * kernel writing them into a policy of its own; its release maps and legacy
+ * list are inert then, kept for a console from before during an upgrade.
  */
 export async function updateIdentityPolicy(
   name: string,
-  build: (current: Record<string, string>) => Promise<Record<string, string>>,
+  build: (current: Record<string, string>, shape: { holdsReleases: boolean }) => Promise<Record<string, string>>,
   { settle = false } = {},
 ): Promise<boolean> {
   return updatePolicyVariables(
     name,
     IDENTITY_POLICY_VARIABLES,
     `Identity policy "${name}" doesn't have the released digests' variables: upgrade the kernel chart before the console.`,
-    build,
+    (current, policy) => build(current, { holdsReleases: identityHoldsReleases(policy.spec?.variables ?? []) }),
     settle,
   );
+}
+
+/** Whether an identity policy with these variables matches releases: not with catalogPolicy. */
+export function identityHoldsReleases(variables: { name: string }[]): boolean {
+  return variables.some((v) => v.name === "candidates");
 }
 
 /**
@@ -1632,13 +1643,13 @@ export async function updateGatewayTokenPolicy(
  * `settle`, a write that changed any waits POLICY_SETTLE_MS, so the cluster
  * enforces what it added by the time this returns. Returns false when the
  * policy doesn't exist; throws `missing` when it lacks one of `names` (an
- * older kernel chart).
+ * older kernel chart). `build` also gets the policy as read.
  */
 async function updatePolicyVariables(
   name: string,
   names: Set<string>,
   missing: string,
-  build: (current: Record<string, string>) => Promise<Record<string, string>>,
+  build: (current: Record<string, string>, policy: k8s.V1ValidatingAdmissionPolicy) => Promise<Record<string, string>>,
   settle: boolean,
 ): Promise<boolean> {
   const { admission } = getApis();
@@ -1652,7 +1663,7 @@ async function updatePolicyVariables(
     }
     const variables = (policy.spec?.variables ?? []).filter((v) => names.has(v.name));
     if (variables.length !== names.size) throw new Error(missing);
-    const wanted = await build(Object.fromEntries(variables.map((v) => [v.name, v.expression])));
+    const wanted = await build(Object.fromEntries(variables.map((v) => [v.name, v.expression])), policy);
     let changed = false;
     for (const variable of variables) {
       const literal = wanted[variable.name];

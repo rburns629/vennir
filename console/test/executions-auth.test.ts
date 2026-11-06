@@ -21,6 +21,7 @@ import { KernelApiError, cancelExecution, getExecution, retryTask, submitExecuti
 import { scanBlocker } from "../src/scanning.js";
 import { ensureServiceAccount, readPolicyVariables } from "../src/k8s.js";
 import { forgetKernelPolicy } from "../src/catalogPolicy.js";
+import { forgetIdentityShape } from "../src/productPolicy.js";
 import { missingImages, pinImages } from "../src/registry.js";
 import { config } from "../src/config.js";
 import { caller, failureDetail, problemFields, type RpcError } from "./rpc.js";
@@ -281,6 +282,26 @@ describe("SubmitExecution: a product runs as its ServiceAccount, with its team's
       config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
       vi.mocked(readPolicyVariables).mockResolvedValue(kernelPolicy([]));
       expect((await submit({ image: "unregistered-image:1" })).code).toBe("ok");
+    });
+
+    it("refuses, loudly, when its own policy holds no releases but the kernel's isn't there to ask", async () => {
+      // The kernel chart's split identity policy (no candidates), and no catalog policy by that name.
+      const savedName = config.identityPolicyName;
+      config.identityPolicyName = "kernel-execution-kernel-identity";
+      config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
+      forgetIdentityShape();
+      vi.mocked(readPolicyVariables).mockImplementation((name: string) =>
+        Promise.resolve(name === "kernel-execution-kernel-identity" ? { variables: { teamSecrets: "{}" }, annotations: {} } : null),
+      );
+      try {
+        const response = await submit({ serviceAccount: GRANTEE, secretRefs: ["product-a-secret"] });
+        expect(response.code).toBe("internal");
+        expect(submitExecution).not.toHaveBeenCalled();
+      } finally {
+        config.identityPolicyName = savedName;
+        vi.mocked(readPolicyVariables).mockReset();
+        forgetIdentityShape();
+      }
     });
 
     it("leaves it to the console's own policy when the kernel writes none (an unsigned catalog)", async () => {

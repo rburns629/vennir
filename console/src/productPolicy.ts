@@ -6,7 +6,11 @@
  * identity-policy.yaml makes the Kubernetes API server enforce the same rule
  * on every Job the scheduler creates, from literals held in the policy
  * itself. This writes them, from the database, whenever products or secrets
- * change, every few minutes (policySync.ts) and at startup:
+ * change, every few minutes (policySync.ts) and at startup. With the kernel
+ * chart's catalogPolicy (a signed catalog, decision 27), the kernel writes
+ * the released digests into a policy of its own (catalogPolicy.ts), the
+ * chart renders this one matching none, and only `teamSecrets` is written
+ * here (the releases aren't computed; the maps, inert, are kept empty):
  *
  * - `releases0` to `releasesf`: a product's identity is tied to the digests
  *   it was released as (db/schema.ts's productReleases), never to whatever
@@ -46,7 +50,7 @@ import { listTeamSecretNames } from "./db/queries.js";
 import { productReleases, products, submittedExecutions, teams } from "./db/schema.js";
 import { imageRepository } from "./imageRef.js";
 import { allowedPrefixes, readImagePolicy } from "./imagePolicy.js";
-import { updateIdentityPolicy } from "./k8s.js";
+import { identityHoldsReleases, readPolicyVariables, updateIdentityPolicy } from "./k8s.js";
 import { pinImages } from "./registry.js";
 import { ADMIT_GRACE_MINUTES, digestOf, PINNED_DIGEST } from "./scanning.js";
 
@@ -362,13 +366,56 @@ function legacyProducts(current: string | undefined): string {
   return "[]";
 }
 
-/** Everything the policy should say, given what it says now. */
-async function wantedVariables(current: Record<string, string>): Promise<Record<string, string>> {
+/** The inert release maps and legacy list of a policy that holds no releases. */
+const INERT: Record<string, string> = { products: "[]", ...Object.fromEntries(DIGITS.map((digit) => [`releases${digit}`, "{}"])) };
+
+/**
+ * Everything the policy should say, given what it says now. When it holds
+ * no releases (the kernel chart's catalogPolicy, decision 27: the kernel
+ * writes them into a policy of its own), the secret names alone: the
+ * releases aren't computed, and the inert maps (a console from before may
+ * have written them during the upgrade) are emptied.
+ */
+async function wantedVariables(current: Record<string, string>, holdsReleases: boolean): Promise<Record<string, string>> {
+  const teamSecrets = JSON.stringify(policyTeamSecrets(await listTeamSecretNames()));
+  if (!holdsReleases) return { ...INERT, teamSecrets };
   return {
     products: legacyProducts(current["products"]),
-    teamSecrets: JSON.stringify(policyTeamSecrets(await listTeamSecretNames())),
+    teamSecrets,
     ...releaseVariables(policyReleases(await listReleaseIdentities())),
   };
+}
+
+/**
+ * Whether the identity policy holds releases, as last read (each write
+ * reads it): the chart's shape changes only with an upgrade, so a
+ * submission needn't read the policy again within SHAPE_MS of the last.
+ */
+const SHAPE_MS = 60_000;
+let shape: { holdsReleases: boolean; at: number } | null = null;
+
+function remember(holdsReleases: boolean): void {
+  shape = { holdsReleases, at: Date.now() };
+}
+
+/**
+ * Whether the console's identity policy holds the released digests; false
+ * with the kernel chart's catalogPolicy, when the kernel's catalog identity
+ * policy alone does (catalogPolicy.ts). True with no policy (nothing to
+ * hold them but this console's checks).
+ */
+export async function identityPolicyHoldsReleases(fresh = false): Promise<boolean> {
+  if (!config.identityPolicyName) return true;
+  if (!fresh && shape && Date.now() - shape.at < SHAPE_MS) return shape.holdsReleases;
+  const policy = await readPolicyVariables(config.identityPolicyName);
+  const holds = policy ? identityHoldsReleases(Object.keys(policy.variables).map((name) => ({ name }))) : true;
+  remember(holds);
+  return holds;
+}
+
+/** Forgets the policy's shape (tests). */
+export function forgetIdentityShape(): void {
+  shape = null;
 }
 
 /**
@@ -381,7 +428,10 @@ async function wantedVariables(current: Record<string, string>): Promise<Record<
  */
 export async function syncIdentityPolicy(): Promise<boolean> {
   if (!config.identityPolicyName) return false;
-  return updateIdentityPolicy(config.identityPolicyName, wantedVariables);
+  return updateIdentityPolicy(config.identityPolicyName, (current, { holdsReleases }) => {
+    remember(holdsReleases);
+    return wantedVariables(current, holdsReleases);
+  });
 }
 
 /**
@@ -390,22 +440,33 @@ export async function syncIdentityPolicy(): Promise<boolean> {
  * kernel-api has it: when one isn't listed yet (its digest may be, as
  * another product's), the whole policy is rewritten and the write waited
  * for. Returns the digests it still doesn't list so: their product changed
- * meanwhile.
+ * meanwhile. Nothing, when the policy holds no releases: the kernel's does
+ * (catalogPolicy.ts asks it).
  */
 export async function admitReleases(uses: ReleaseUse[]): Promise<string[]> {
   const wanted = [...new Map(uses.map((use) => [useKey(use), use])).values()];
   if (wanted.length === 0 || !config.identityPolicyName) return [];
-  let listed = new Set<string>();
+  // Holds none, as last read: read again, fresh, before nothing is written (catalogPolicy
+  // may have just been turned off, or the kernel chart rolled back).
+  if (!(await identityPolicyHoldsReleases()) && !(await identityPolicyHoldsReleases(true))) return [];
+  // What the build below found listed; null when the policy turned out to
+  // hold no releases (an object: TypeScript doesn't follow a callback's assignments).
+  const seen: { listed: Set<string> | null } = { listed: null };
   const exists = await updateIdentityPolicy(
     config.identityPolicyName,
-    async (current) => {
-      listed = listedUses(current);
+    async (current, { holdsReleases }) => {
+      remember(holdsReleases);
+      if (!holdsReleases) return current;
+      const listed = listedUses(current);
+      seen.listed = listed;
       if (wanted.every((use) => isListed(listed, use))) return current;
-      const variables = await wantedVariables(current);
-      listed = listedUses(variables);
+      const variables = await wantedVariables(current, holdsReleases);
+      seen.listed = listedUses(variables);
       return variables;
     },
     { settle: true },
   );
-  return exists ? [...new Set(wanted.filter((use) => !isListed(listed, use)).map((use) => use.digest))] : [];
+  const found = seen.listed;
+  if (!exists || !found) return [];
+  return [...new Set(wanted.filter((use) => !isListed(found, use)).map((use) => use.digest))];
 }

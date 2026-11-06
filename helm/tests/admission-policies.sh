@@ -1029,6 +1029,38 @@ expect "second upgrade: the kernel's literals kept" allowed "$(grep -q 'registry
 expect "second upgrade: not the console's"       allowed "$(grep -q "$UNRELEASED_DIGEST" <<<"$(seeded "$CATALOG_IDENTITY" "releases$(printf %s "$UNRELEASED_DIGEST" | cut -c8)")" && echo 'seeded the console'"'"'s' || echo '(server dry run)')"
 expect "second upgrade: still written"           allowed "$(grep -q true <<<"$(seeded "$CATALOG_TOKENS" apiAudiencesWritten)" && echo '(server dry run)' || echo 'reset')"
 
+echo "The console's identity policy beside the kernel's (catalogPolicy: each team's secret names alone):"
+# The kernel chart's identity policy as it renders with catalogPolicy on,
+# in place of the full one; the console writes its teamSecrets.
+ht "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
+  --set catalogPolicy.enabled=true --set catalogPolicy.release=$SOURCE/catalog-release:latest \
+  --set 'catalogPolicy.signature.publicKeys[0]=unused' \
+  --show-only templates/identity-policy.yaml | python3 -c '
+import re, sys
+print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M)))' \
+  | k replace -f - > /dev/null || { echo "  FAIL  replacing the identity policy"; FAILURES=$((FAILURES + 1)); }
+# Its release maps and legacy list are inert (kept for a console from
+# before, during the upgrade): here a console writes another digest of
+# db's repository into them, and the legacy list by repository, and
+# neither lets anything run.
+identity_literal "$LEGACY_PRODUCTS" "$TEAM_SECRETS" '{"'$UNRELEASED_DIGEST'":[{"team":"'$TEAM_A'","repository":"registry.example/db","action":"create","serviceAccount":"db-sa","audiences":"sts.amazonaws.com"}]}'
+expect "it matches no releases (no candidates)"  allowed "$([ -z "$(seeded "$RELEASE-execution-kernel-identity" candidates)" ] && echo '(server dry run)' || echo 'it still matches them')"
+# Until the API server has the new version: the full one's refusal names
+# "a registered product's release".
+for _ in $(seq 1 30); do
+  job "$TEAM_A" $SOURCE/app:1 run default db-key | grep -q "registered product's release" || break
+  sleep 1
+done
+expect "a release the kernel lists, its team's secret"  allowed            "$(job "$TEAM_A" $DB create db-sa db-key)"
+expect "a token for its product's audience"             allowed            "$(job "$TEAM_A" $DB create db-sa "" "" "" ",$AUDIENCE"'sts.amazonaws.com","expirationSeconds":3600}}]}}')"
+expect "a Secret its team never registered (the console's)" "aren't all registered" "$(job "$TEAM_A" $DB create db-sa eso-auth)"
+expect "another team's Secret (the console's)"           "aren't all registered" "$(job "$TEAM_A" $DB create db-sa b-key)"
+expect "an unreleased digest its inert maps list (the kernel's)" "$CATALOG_ONLY" "$(job "$TEAM_A" $SOURCE/db:1@$UNRELEASED_DIGEST create db-sa "")"
+expect "its tag, by the inert legacy list (the kernel's)" "$CATALOG_ONLY"     "$(job "$TEAM_A" $SOURCE/db:1 create db-sa "")"
+expect "an unregistered image with a Secret (the kernel's)" "$CATALOG_ONLY"   "$(job "$TEAM_A" $SOURCE/app:1 run default db-key)"
+expect "ESO's SA (both)"                                 IDENTITY_NOT_ALLOWED "$(job "$TEAM_A" $SOURCE/vault:1@$ZERO_DIGEST run eso-gcp "")"
+expect "an unregistered image as default"                allowed            "$(job "$TEAM_A" $SOURCE/app:1 run default "")"
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"
   exit 1
