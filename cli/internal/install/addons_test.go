@@ -61,7 +61,7 @@ func TestRecordIfMissing(t *testing.T) {
 				t.Errorf("recorded = %v", got)
 			}
 			args, _ := os.ReadFile(filepath.Join(bin, "args"))
-			if !strings.Contains(string(args), "list") || !strings.Contains(string(args), "--namespace external-secrets --all --filter ^external-secrets$") {
+			if !strings.Contains(string(args), "list") || !strings.Contains(string(args), "--namespace external-secrets --filter ^external-secrets$") {
 				t.Errorf("args: %s", args)
 			}
 		})

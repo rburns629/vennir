@@ -52,8 +52,9 @@ const AddOnsFile = "add-ons"
 // taken for "not installed", so someone else's add-on is never recorded.
 // Recorded first, so a failed install is recorded too.
 func RecordIfMissing(ctx context.Context, r *run.Runner, c *config.Config, dir string, a AddOn) error {
+	// Helm 4 lists releases in any state by default (Helm 3's --all is gone).
 	out, err := r.Output(ctx, "helm", "list", "--kube-context", cluster.Context(c), "--namespace", a.Namespace,
-		"--all", "--filter", "^"+a.Release+"$", "--short")
+		"--filter", "^"+a.Release+"$", "--short")
 	if err != nil {
 		return fmt.Errorf("couldn't tell whether %s is installed already: %w", a.Name, err)
 	}
