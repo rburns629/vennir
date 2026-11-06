@@ -917,6 +917,14 @@ through it (in the console, or `ApiService/AddApiGrant`), then drop
 `shareWith` from the catalog. A team named in `limits` gets no access from
 it either.
 
+**kernel policy signs in as its own database role** (unreleased, on main
+since 2026-11-06): with `catalogPolicy` and the bundled Postgres, the
+upgrade's migration Job makes `postgres.auth.policyUsername`
+(`vennir_kernel_policy`) and the migration grants it only what it uses; its
+Pod restarts onto it. With a managed database it still signs in as the
+kernel's (`TODO.md`); name a role of your own with `catalogPolicy.database`
+(and a Secret whose `database-url` signs in as it) to narrow it there.
+
 **Settings the console now refuses or turns off** (since 2026-11-03):
 
 - A `jwtSecret` set by hand shorter than 32 bytes stops the console at
@@ -1158,7 +1166,11 @@ makes it, sets its password from the release's Secret, and hands it the
 database and everything in it, so an upgrade from an install that used the
 superuser moves over by itself (kernel-api and the scheduler restart onto
 it). The superuser (`postgres.auth.username`) is then only Postgres's own,
-the backups', and that step's.
+the backups', and that step's. With `catalogPolicy`, `kernel policy` signs
+in as a role of its own (`postgres.auth.policyUsername`,
+`vennir_kernel_policy`): the same step makes it, with its own password in
+its own Secret (`<release>-execution-kernel-policy-db`), and the migration
+gives it what it reads and writes alone (`kernel/internal/migrate/grants.go`).
 
 **Passwords** are generated on install when left empty, kept in the
 release's Secret (`<release>-execution-kernel-db` for the kernel: the
@@ -1180,7 +1192,10 @@ The kernel role's: set `kernel-password` and the password in `database-url`
 together in the same Secret, then `helm upgrade` (the step before the
 migration sets the role's password from it), then restart kernel-api and
 the scheduler. With `kernelUsername` empty the kernel's processes use the
-superuser, as before, and its rotation changes `database-url` too.
+superuser, as before, and its rotation changes `database-url` too. kernel
+policy's: set `password` and the password in `database-url` together in
+`<release>-execution-kernel-policy-db`, then `helm upgrade`, then restart
+`deploy/kernel-execution-kernel-policy`.
 
 A console with its own Postgres is the same with its Secret
 (`console-execution-console`, deployment `console-execution-console-postgres`),

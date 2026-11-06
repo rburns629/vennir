@@ -81,6 +81,13 @@ spec:
                 secretKeyRef:
                   name: {{ include "execution-kernel.fullname" . }}-db-migrate
                   key: kernel-password
+            {{- if include "execution-kernel.policyBundledRole" . }}
+            - name: POLICY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "execution-kernel.fullname" . }}-db-migrate
+                  key: policy-password
+            {{- end }}
           command:
             - sh
             - -c
@@ -118,6 +125,17 @@ spec:
                 WHERE n.nspname = 'public' AND pg_get_userbyid(p.proowner) <> :'role' \gexec
               SQL
               echo "the kernel's database is {{ .Values.postgres.auth.kernelUsername }}'s"
+              {{- with include "execution-kernel.policyBundledRole" . }}
+              # kernel policy's own login role, with nothing yet: the
+              # migration below gives it what it uses (migrate.GrantPolicy).
+              psql -v ON_ERROR_STOP=1 -d {{ $.Values.postgres.auth.database | quote }} -v role={{ . | quote }} <<'SQL'
+              \getenv password POLICY_PASSWORD
+              SELECT format('CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT', :'role')
+                WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'role') \gexec
+              SELECT format('ALTER ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD %L', :'role', :'password') \gexec
+              SQL
+              echo "kernel policy signs in as {{ . }}"
+              {{- end }}
       {{- end }}
       containers:
         - name: migrate
@@ -136,6 +154,12 @@ spec:
               value: {{ .Values.database.iamAuth | quote }}
             - name: DATABASE_IAM_REGION
               value: {{ .Values.database.region | quote }}
+            {{- with include "execution-kernel.policyRole" . }}
+            # Here, not from the ConfigMap: a pre-upgrade hook runs before the
+            # release's ConfigMap is updated.
+            - name: CATALOG_POLICY_DATABASE_ROLE
+              value: {{ . | quote }}
+            {{- end }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

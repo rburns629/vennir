@@ -141,6 +141,17 @@ catalogPolicy:
   gateway:
     serviceAccount: ""
     gcpTokenAudience: ""
+  # -- Its database role, which `kernel migrate` gives what it uses alone
+  # (read schema_migrations, executions and execution_tasks; write
+  # catalog_policy_*), so a flaw in what parses registries' and Sigstore's
+  # answers reaches no other table. With the bundled Postgres it's
+  # postgres.auth.policyUsername, made with its own password and Secret.
+  # Otherwise name the role (one the cloud makes, or you did) and a Secret
+  # in this namespace whose database-url signs in as it. Neither: it signs
+  # in as the kernel's.
+  database:
+    role: ""
+    existingSecret: ""
   resources:
     requests: {cpu: 10m, memory: 64Mi}
     limits: {memory: 256Mi}
@@ -502,6 +513,11 @@ postgres:
     # database before each migration (templates/migration-job.yaml). Empty:
     # they use username, the superuser, as installs from before 2026-11-03 did.
     kernelUsername: vennir_kernel
+    # -- With catalogPolicy and kernelUsername: kernel policy's own login
+    # role (catalogPolicy.database), made with its own generated password
+    # in a Secret of its own (<release>-execution-kernel-policy-db). Empty:
+    # it signs in as kernelUsername.
+    policyUsername: vennir_kernel_policy
   # -- Also host the console's database on this instance, under its own role
   # (templates/console-database.yaml), so the console needs no Postgres of
   # its own: one Pod and volume instead of two. Then set the console chart's

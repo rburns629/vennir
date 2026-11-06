@@ -232,7 +232,7 @@ spec:
         prometheus.io/path: "/metrics"
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- if and .Values.postgres.enabled (not .Values.existingSecret) }}
-        checksum/database-role: {{ .Values.postgres.auth.kernelUsername | default .Values.postgres.auth.username | sha256sum }}
+        checksum/database-role: {{ include "execution-kernel.policyRole" . | default .Values.postgres.auth.kernelUsername | default .Values.postgres.auth.username | sha256sum }}
         {{- end }}
     spec:
       securityContext:
@@ -279,11 +279,21 @@ spec:
             - configMapRef:
                 name: {{ $fullname }}-config
           env:
+            # Its own role's sign-in when it has one (catalogPolicy.database),
+            # never then the kernel's.
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
+                  {{- if include "execution-kernel.policyBundledRole" . }}
+                  name: {{ $fullname }}-policy-db
+                  key: database-url
+                  {{- else if include "execution-kernel.policyRole" . }}
+                  name: {{ $c.database.existingSecret }}
+                  key: database-url
+                  {{- else }}
                   name: {{ include "execution-kernel.databaseSecretName" . }}
                   key: {{ include "execution-kernel.databaseSecretKey" . }}
+                  {{- end }}
             {{- if $c.registry.authSecret }}
             # The registry's Docker config (go-containerregistry's default keychain).
             - {name: DOCKER_CONFIG, value: /etc/vennir/registry}

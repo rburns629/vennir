@@ -98,6 +98,48 @@ random one. Call it once per render (secret.yaml does).
 {{- end -}}
 
 {{/*
+kernel policy's own database role (catalogPolicy.database), made by this
+chart: with the bundled Postgres, the kernel's own role and a policy one
+named. Empty when it isn't this chart's to make.
+*/}}
+{{- define "execution-kernel.policyBundledRole" -}}
+{{- if and .Values.catalogPolicy.enabled .Values.postgres.enabled .Values.postgres.auth.kernelUsername .Values.postgres.auth.policyUsername (not .Values.existingSecret) -}}
+{{- .Values.postgres.auth.policyUsername -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+kernel policy's own database role, whoever makes it: this chart's, else
+catalogPolicy.database.role (with its existingSecret). Empty: it signs in
+as the kernel's.
+*/}}
+{{- define "execution-kernel.policyRole" -}}
+{{- $bundled := include "execution-kernel.policyBundledRole" . -}}
+{{- if $bundled -}}
+{{- $bundled -}}
+{{- else if and .Values.catalogPolicy.enabled .Values.catalogPolicy.database.role -}}
+{{- if not .Values.catalogPolicy.database.existingSecret -}}
+{{- fail "catalogPolicy.database.role needs catalogPolicy.database.existingSecret: a Secret whose database-url signs in as it." -}}
+{{- end -}}
+{{- .Values.catalogPolicy.database.role -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The bundled policy role's password: the one already in its Secret, so
+upgrades keep it; otherwise a new random one. Call it once per render
+(secret.yaml does).
+*/}}
+{{- define "execution-kernel.policyPassword" -}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace (printf "%s-policy-db" (include "execution-kernel.fullname" .)) -}}
+{{- if and $existing (index ($existing.data | default dict) "password") -}}
+{{- index $existing.data "password" | b64dec -}}
+{{- else -}}
+{{- randAlphaNum 32 -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 kernel-api's ServiceAccount: its own when the chart creates ServiceAccounts.
 */}}
 {{- define "execution-kernel.apiServiceAccountName" -}}
