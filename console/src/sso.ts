@@ -76,9 +76,15 @@ export function groupSources(): GroupSources {
  */
 export const CLAIM_GROUPS_SESSION_SECONDS = 60 * 60;
 
-/** Whether memberships from groups need a recent sign-in to count: groups come from a claim, which only a sign-in reads. */
+/**
+ * Whether memberships from groups need a recent sign-in to count: single
+ * sign-on is in effect (while it's off, or its secret can't be read, nobody
+ * could sign in to have their groups read, and its settings change nothing)
+ * and groups come from a claim, which only a sign-in reads. The gateway's
+ * auth.go, the same.
+ */
 export function claimGroupsInUse(): boolean {
-  return groupSources().claim !== "";
+  return currentSso() !== null && groupSources().claim !== "";
 }
 
 /**
@@ -326,6 +332,19 @@ export function startGroupResync(log: FastifyBaseLogger): void {
     });
   }, GROUP_RESYNC_MS);
   timer.unref();
+}
+
+/**
+ * A team just mapped: its single sign-on members' memberships follow their
+ * groups from now on (their next sign-in keeps or removes them), so they
+ * count as group-given (via_groups '{}', as migration 0067 marked them).
+ */
+export async function markFollowingGroups(teamId: string): Promise<void> {
+  const ssoPeople = db.select({ id: users.id }).from(users).where(and(isNotNull(users.oidcSubject), eq(users.isBot, false)));
+  await db
+    .update(teamMemberships)
+    .set({ viaGroups: [] })
+    .where(and(eq(teamMemberships.teamId, teamId), isNull(teamMemberships.viaGroups), inArray(teamMemberships.userId, ssoPeople)));
 }
 
 /** Whether a team's memberships of single sign-on users follow groups (it has a mapping). */

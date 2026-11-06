@@ -118,7 +118,7 @@ export async function resolveCaller(request: FastifyRequest): Promise<CallerReso
     user = await findUserById(request.user.userId);
     passwordSession = request.user.sso !== true;
     sessionSso = !passwordSession;
-    recentSso = sessionSso && Date.now() / 1000 - request.user.iat <= CLAIM_GROUPS_SESSION_SECONDS;
+    recentSso = sessionSso && Math.floor(Date.now() / 1000) - request.user.iat <= CLAIM_GROUPS_SESSION_SECONDS;
     // A session issued before the user's last password change/reset is
     // revoked. `iat` only has one-second resolution, so compare in
     // whole seconds: the replacement token a password change issues in

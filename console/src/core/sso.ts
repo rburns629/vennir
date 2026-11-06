@@ -17,7 +17,7 @@ import { db } from "../db/client.js";
 import { findTeamByName } from "../db/queries.js";
 import { ssoGroupMappings, ssoSettings, teams, users, type TeamRole } from "../db/schema.js";
 import { seal } from "../sealed.js";
-import { googleIdentity, refreshSso, SECRET_PURPOSE } from "../sso.js";
+import { googleIdentity, markFollowingGroups, refreshSso, SECRET_PURPOSE } from "../sso.js";
 
 const REQUIRES_ADMIN = "Requires admin access.";
 const DOMAIN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
@@ -176,6 +176,7 @@ export async function setSsoGroupMapping(
     .values({ groupName: group, teamId: team.id, role: input.role, createdBy: caller?.id ?? null })
     .onConflictDoUpdate({ target: [ssoGroupMappings.groupName, ssoGroupMappings.teamId], set: { role: input.role } })
     .returning();
+  await markFollowingGroups(team.id);
   log.warn({ event: "sso_group_mapped", by: caller?.id, group, team: team.name, role: input.role }, "single sign-on group mapped to a team");
   return { id: row?.id ?? "", group, team: team.name, role: input.role };
 }

@@ -335,7 +335,6 @@ describe("Google Workspace groups", () => {
 });
 
 describe("a session that groups from a claim gave a team", () => {
-  const teamD = `${prefix}-d`;
   const lifetime = (token: string) => {
     const claims = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString()) as { iat: number; exp: number };
     return claims.exp - claims.iat;
@@ -344,21 +343,27 @@ describe("a session that groups from a claim gave a team", () => {
     const me = await call<{ teamNames?: string[] }>(token, "AuthService/GetMe");
     return me.code === "ok" ? (me.body.teamNames ?? []).filter((t) => t.startsWith(prefix)).sort() : me.code;
   };
-  /** A single sign-on session of this person's, signed in `ago` seconds ago and not yet expired. */
-  const signedInAgo = (userId: string, ago: number) =>
-    app.jwt.sign({ ...newSession(userId, true), iat: Math.floor(Date.now() / 1000) - ago } as ReturnType<typeof newSession>, { expiresIn: 8 * 3600 });
+  /** A single sign-on session of this person's, signed in `ago` seconds before `now` (seconds) and not yet expired. */
+  const signedInAgo = (userId: string, ago: number, now = Math.floor(Date.now() / 1000)) =>
+    app.jwt.sign({ ...newSession(userId, true), iat: now - ago } as ReturnType<typeof newSession>, { expiresIn: 8 * 3600 });
+  /** A team mapped from `group`, and a person in it by that group, signed in once. */
+  async function groupMember(name: string, group: string) {
+    const team = `${prefix}-${name}`;
+    ids[team] = (await createTeam(team)).id;
+    await call(admin, "SsoService/SetSsoGroupMapping", { group, team });
+    const signedIn = await provider.signIn(app, person(name, { groups: [group] }));
+    expect(signedIn.error).toBe("");
+    const [row] = await db.select().from(users).where(eq(users.email, `${name}@${domain}`));
+    return { team, id: row?.id ?? "", token: signedIn.token };
+  }
 
   it("lasts an hour at most; without one, or without a claim, the install's jwtTtl", async () => {
     const ttl = sessionTtlSeconds(config.jwtTtl);
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
-    ids[teamD] = (await createTeam(teamD)).id;
-    await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-fresh", team: teamD });
-
-    const fresh = await provider.signIn(app, person("fresh", { groups: ["g-fresh"] }));
-    expect(fresh.error).toBe("");
+    const fresh = await groupMember("fresh", "g-fresh");
     expect(lifetime(fresh.token)).toBe(Math.min(ttl, CLAIM_GROUPS_SESSION_SECONDS));
     expect(CLAIM_GROUPS_SESSION_SECONDS).toBe(3600);
-    expect(await teamsSeen(fresh.token)).toEqual([teamD]);
+    expect(await teamsSeen(fresh.token)).toEqual([fresh.team]);
     // Groups that give no team: nothing to read again, so the whole session.
     const none = await provider.signIn(app, person("fresh-none", { groups: ["unmapped"] }));
     expect(lifetime(none.token)).toBe(ttl);
@@ -366,7 +371,7 @@ describe("a session that groups from a claim gave a team", () => {
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "" }));
     const unread = await provider.signIn(app, person("fresh"));
     expect(lifetime(unread.token)).toBe(ttl);
-    expect(await teamsSeen(unread.token)).toEqual([teamD]);
+    expect(await teamsSeen(unread.token)).toEqual([fresh.team]);
     // A password's session too.
     const password = await people.makeUser();
     expect(lifetime(await people.signIn(password.email))).toBe(ttl);
@@ -374,23 +379,55 @@ describe("a session that groups from a claim gave a team", () => {
 
   it("counts that team only for a single sign-on from the last hour: an older one ends, a password's goes on without it", async () => {
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
-    const [fresh] = await db.select().from(users).where(eq(users.email, `fresh@${domain}`));
-    const id = fresh?.id ?? "";
+    const { team, id } = await groupMember("hourly", "g-hourly");
     await addTeamMember(id, ids[teamC] ?? "", "member"); // unmapped: by hand
-    expect(await teamsSeen(signedInAgo(id, CLAIM_GROUPS_SESSION_SECONDS - 60))).toEqual([teamC, teamD].sort());
+    const both = [teamC, team].sort();
+    expect(await teamsSeen(signedInAgo(id, CLAIM_GROUPS_SESSION_SECONDS - 60))).toEqual(both);
+    // The hour itself still counts; a second more doesn't.
+    const now = Math.floor(Date.now() / 1000);
+    vi.spyOn(Date, "now").mockReturnValue(now * 1000 + 999);
+    expect(await teamsSeen(signedInAgo(id, CLAIM_GROUPS_SESSION_SECONDS, now))).toEqual(both);
+    expect(await teamsSeen(signedInAgo(id, CLAIM_GROUPS_SESSION_SECONDS + 1, now))).toBe("unauthenticated");
+    vi.restoreAllMocks();
     const old = signedInAgo(id, CLAIM_GROUPS_SESSION_SECONDS + 60);
     expect(await teamsSeen(old)).toBe("unauthenticated");
-    // Groups read another way (Google's, every hour) or not at all: as before.
+    // Groups not from a claim (Google's are read every hour) or none: as before.
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "" }));
-    expect(await teamsSeen(old)).toEqual([teamC, teamD].sort());
+    expect(await teamsSeen(old)).toEqual(both);
+    // Single sign-on off, a claim still saved: its settings change nothing, as before.
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", enabled: false }));
+    expect(await teamsSeen(old)).toEqual(both);
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    expect(await teamsSeen(old)).toBe("unauthenticated");
     // A team unmapped since is managed by hand: it counts as one.
-    await db.delete(ssoGroupMappings).where(eq(ssoGroupMappings.teamId, ids[teamD] ?? ""));
-    expect(await teamsSeen(old)).toEqual([teamC, teamD].sort());
-    await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-fresh", team: teamD });
+    const mappings = await db.select().from(ssoGroupMappings).where(eq(ssoGroupMappings.teamId, ids[team] ?? ""));
+    await db.delete(ssoGroupMappings).where(eq(ssoGroupMappings.teamId, ids[team] ?? ""));
+    expect(await teamsSeen(old)).toEqual(both);
+    await db.insert(ssoGroupMappings).values(mappings);
     // A password an admin set: its session never counts the group's team.
     await setUserPassword(id, await hashPassword(PASSWORD), false);
-    const password = await people.signIn(`fresh@${domain}`);
-    expect(await teamsSeen(password)).toEqual([teamC]);
+    expect(await teamsSeen(await people.signIn(`hourly@${domain}`))).toEqual([teamC]);
+  });
+
+  it("keeps the rule for a retired team: listed while recent, and an older session still ends", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const { team, id } = await groupMember("retiring", "g-retiring");
+    await db.update(teams).set({ retiredAt: new Date() }).where(eq(teams.id, ids[team] ?? ""));
+    expect(await teamsSeen(signedInAgo(id, 60))).toEqual([team]);
+    expect(await teamsSeen(signedInAgo(id, CLAIM_GROUPS_SESSION_SECONDS + 60))).toBe("unauthenticated");
+  });
+
+  it("counts a single sign-on member added by hand before the team was mapped as following groups", async () => {
+    await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
+    const team = `${prefix}-premapped`;
+    ids[team] = (await createTeam(team)).id;
+    const early = await createUser(`premapped@${domain}`, null);
+    await db.update(users).set({ oidcSubject: `sub-premapped-${prefix}` }).where(eq(users.id, early.id));
+    await addTeamMember(early.id, ids[team] ?? "", "member");
+    const old = signedInAgo(early.id, CLAIM_GROUPS_SESSION_SECONDS + 60);
+    expect(await teamsSeen(old)).toEqual([team]); // not mapped yet: by hand
+    await call(admin, "SsoService/SetSsoGroupMapping", { group: "g-premapped", team });
+    expect(await teamsSeen(old)).toBe("unauthenticated");
+    expect(await teamsSeen(signedInAgo(early.id, 60))).toEqual([team]);
   });
 });

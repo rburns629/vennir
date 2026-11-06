@@ -470,6 +470,13 @@
       "when": 1793903943396,
       "tag": "0066_user_self_registered",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1793924030801,
+      "tag": "0067_membership_from_groups",
+      "breakpoints": true
     }
   ]
 }

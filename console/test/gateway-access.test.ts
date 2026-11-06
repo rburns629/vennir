@@ -38,7 +38,7 @@ describe("the gateway's database role", () => {
       await gateway.query("SELECT id, user_id, token_hash, revoked_at, expires_at, last_used_at FROM api_tokens LIMIT 1");
       await gateway.query("UPDATE api_tokens SET last_used_at = now() WHERE id = gen_random_uuid()");
       await gateway.query(
-        "SELECT t.name, t.require_sso, m.via_groups IS NOT NULL AND EXISTS (SELECT 1 FROM sso_group_mappings g WHERE g.team_id = t.id) FROM team_memberships m JOIN teams t ON t.id = m.team_id LIMIT 1",
+        "SELECT t.name, t.require_sso, m.from_groups AND EXISTS (SELECT 1 FROM sso_group_mappings g WHERE g.team_id = t.id) FROM team_memberships m JOIN teams t ON t.id = m.team_id LIMIT 1",
       );
       await gateway.query("SELECT EXISTS (SELECT 1 FROM sso_settings WHERE id = 1 AND groups_claim <> '')");
       await gateway.query("SELECT a.id FROM apis a JOIN teams t ON t.id = a.team_id WHERE t.retired_at IS NULL AND t.deleted_at IS NULL LIMIT 1");
@@ -55,6 +55,7 @@ describe("the gateway's database role", () => {
         "SELECT * FROM sso_settings LIMIT 1",
         "SELECT client_secret_encrypted FROM sso_settings LIMIT 1",
         "SELECT group_name FROM sso_group_mappings LIMIT 1",
+        "SELECT via_groups FROM team_memberships LIMIT 1",
         "UPDATE users SET is_admin = true WHERE false",
         "UPDATE api_tokens SET revoked_at = NULL WHERE false",
       ]) {

@@ -213,6 +213,19 @@ it was seen.
   to drop the prompt (or send it only from the sign-in button). Also not
   yet seen against a real provider: the hour on Entra ID or Okta.
 
+- [ ] **Group-given memberships outlive the hour outside sign-in** (found
+  2026-11-05, reviewing #244): while groups come from a claim, sign-in
+  (`auth/plugin.ts`, the gateway's `internal/auth`) counts a membership a
+  group gave only for a single sign-on from the last hour, but the row
+  stays until the person's next single sign-on, and other readers take it
+  as it is: `notifier.ts`'s `notifyApprovals`, `scheduleRunner.ts`'s
+  `tellMaintainers` and `readiness.ts` (so a maintainer the provider took
+  out of the group keeps getting approval and failure notifications), the
+  team's Members tab and the admin user list (they still show as a
+  member). Decide: have these readers apply the same rule (by the person's
+  last sign-in, `users.last_signed_in_at`), or drop group-given rows of
+  people who haven't signed in for an hour.
+
 ## Products and catalog
 
 - [ ] **`vennir catalog create` applies `main`'s ruleset** (found

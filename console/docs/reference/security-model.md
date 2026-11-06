@@ -738,15 +738,21 @@ every hour for everyone who signs in with single sign-on, so leaving one
 takes someone out of its team within the hour (a person whose groups can't
 be read then keeps their teams until the next try); this runs only while
 Google Workspace is the only source. A groups claim can be read only at a
-sign-in, so while one is set, a membership a group gave (on a team that's
-still mapped, `team_memberships.via_groups`) counts only for a single
+sign-in, so while one is set and single sign-on is on, a membership a group
+gave (on a team that's still mapped, `team_memberships.from_groups`; the
+gateway may read that, not the groups' names) counts only for a single
 sign-on session signed in within the hour, at the console and the gateway
 alike: an older single sign-on session is refused, so its person signs in
 again and their groups are read, and a password's session (say, after an
 admin's reset) or an API token goes on without those teams. A sign-in that
 leaves someone such a membership gets a session of an hour at most
 (`CLAIM_GROUPS_SESSION_SECONDS`, `console/src/sso.ts`), so someone the
-provider takes out of a group is out of its team within the hour. Groups that can't be read (a missing claim,
+provider takes out of a group is out of its team within the hour. While
+single sign-on is off (or its saved client secret can't be read), nobody
+could sign in to have their groups read, so the rule doesn't apply. Other
+readers of memberships (approval and failure notifications, the Members
+tab) still see a group's team until the person's next single sign-on
+(`TODO.md`). Groups that can't be read (a missing claim,
 too many groups for the token, Google's API failing) refuse the sign-in
 (`GROUPS_UNAVAILABLE`) rather than count as none, which would take people
 out of their teams. On a mapped team, a single sign-on member's membership

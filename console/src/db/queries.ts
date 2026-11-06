@@ -372,7 +372,7 @@ export async function teamRolesForUser(userId: string, exec: Db = db): Promise<{
       name: teams.name,
       role: teamMemberships.role,
       requireSso: teams.requireSso,
-      fromGroups: sql<boolean>`(${teamMemberships.viaGroups} is not null and exists (select 1 from ${ssoGroupMappings} where ${ssoGroupMappings.teamId} = ${teams.id}))`,
+      fromGroups: sql<boolean>`(${teamMemberships.fromGroups} and exists (select 1 from ${ssoGroupMappings} where ${ssoGroupMappings.teamId} = ${teams.id}))`,
     })
     .from(teamMemberships)
     .innerJoin(teams, eq(teams.id, teamMemberships.teamId))
