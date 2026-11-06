@@ -443,6 +443,12 @@ func Load(getenv func(string) string) (Settings, error) {
 			// Without a signer, nothing is verified: the console writes them.
 			r.problems = append(r.problems, "CATALOG_POLICY_PUBLIC_KEYS or CATALOG_POLICY_KEYLESS_ISSUER: a signer to trust is needed with CATALOG_POLICY_RELEASE")
 		}
+		// A step awaiting its approval keeps its execution's releases
+		// listed only this long: an approval given later would be refused.
+		if s.ApprovalTimeout > 0 && s.CatalogPolicyInUseMax < s.ApprovalTimeout {
+			r.problems = append(r.problems, fmt.Sprintf("CATALOG_POLICY_IN_USE_MAX_SECONDS: must be at least SCHEDULER_APPROVAL_TIMEOUT_SECONDS (%s), got %s",
+				s.ApprovalTimeout, s.CatalogPolicyInUseMax))
+		}
 	}
 	r.jsonValue("SLEEPER_DEPLOYMENTS", &s.SleeperDeployments)
 	r.jsonValue("SLEEPER_DATABASE_DEPLOYMENTS", &s.SleeperDatabases)

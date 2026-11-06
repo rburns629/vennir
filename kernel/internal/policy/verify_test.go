@@ -10,6 +10,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -192,14 +194,22 @@ func TestAReleaseNoTrustedSignerSignedIsRefused(t *testing.T) {
 	key, _ := testKey(t)
 	_, trusted := testKey(t)
 	unsigned := pushRelease(t, r, "catalog.example/catalog-release:unsigned", testRelease())
-	if err := verifyAt(t, r, &Signers{PublicKeys: []string{trusted}}, "catalog.example/catalog-release", unsigned); err == nil {
-		t.Fatal("an unsigned release was verified")
+	if err := verifyAt(t, r, &Signers{PublicKeys: []string{trusted}}, "catalog.example/catalog-release", unsigned); !errors.Is(err, ErrNotSigned) {
+		t.Fatalf("an unsigned release: %v", err)
 	}
 	// Signed, by a key the chart doesn't trust.
 	other := pushRelease(t, r, "catalog.example/catalog-release:other", testRelease(&catalogv1.ProductAction{Name: "x"}))
 	keySign(t, r, "catalog.example/catalog-release", other, key)
-	if err := verifyAt(t, r, &Signers{PublicKeys: []string{trusted}}, "catalog.example/catalog-release", other); err == nil {
-		t.Fatal("a release an untrusted key signed was verified")
+	if err := verifyAt(t, r, &Signers{PublicKeys: []string{trusted}}, "catalog.example/catalog-release", other); !errors.Is(err, ErrNotSigned) {
+		t.Fatalf("a release an untrusted key signed: %v", err)
+	}
+	// The registry out of reach: refused, but not as unsigned (it's not
+	// known who signed it; kernel policy tries again).
+	gone := httptest.NewServer(registry.New())
+	gone.Close()
+	down := &Registry{Mirrors: map[string]string{"catalog.example": gone.URL}}
+	if err := verifyAt(t, down, &Signers{PublicKeys: []string{trusted}}, "catalog.example/catalog-release", other); err == nil || errors.Is(err, ErrNotSigned) {
+		t.Fatalf("the registry out of reach: %v", err)
 	}
 	// A trusted key's signature of another digest, copied beside this one.
 	signedDigest := pushRelease(t, r, "catalog.example/catalog-release:signed", testRelease(&catalogv1.ProductAction{Name: "y"}))
@@ -326,6 +336,13 @@ func TestSignersAreCheckedAtStartup(t *testing.T) {
 		if err := c.signers.Check(); (err == nil) != c.ok {
 			t.Errorf("%s: %v", name, err)
 		}
+	}
+	// A key's id is its DER's: the same key, its PEM written otherwise
+	// (one line of base64), is the same signer; another key isn't.
+	block, _ := pem.Decode([]byte(public))
+	oneLine := "-----BEGIN PUBLIC KEY-----\n" + base64.StdEncoding.EncodeToString(block.Bytes) + "\n-----END PUBLIC KEY-----\n"
+	if oneLine == public || KeyID(oneLine) != KeyID(public) {
+		t.Errorf("the same key re-encoded: %s, %s", KeyID(oneLine), KeyID(public))
 	}
 	// Each signer by its own id: a key's whatever its PEM's surrounding
 	// space, the keyless identity's by both its halves.

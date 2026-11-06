@@ -484,11 +484,16 @@ chart refuses `catalogPolicy` without `identityPolicy` (the console's,
 which holds each team's secret names). An earlier release stays listed for
 `catalogPolicy.releaseGraceSeconds` (an hour) after a release dropped it,
 or while an unfinished execution runs it that was submitted before then and
-within `catalogPolicy.inUseMaxSeconds`. That defaults to the scheduler's
-`approvalTimeoutSeconds`, or three days if that's longer or off, and the
-chart refuses less than the approval timeout: a step awaiting an approval
-longer than it (with no timeout) is refused its product's identity when it
-starts.
+is still moving: a step of it running, or one that became ready or began
+awaiting its approval within `catalogPolicy.inUseMaxSeconds`. That bounds
+each step's wait, not the execution's age, and defaults to the scheduler's
+`approvalTimeoutSeconds`, or three days if that's longer or off; the chart
+(and kernel policy at startup) refuses less than the approval timeout. An
+execution whose steps all wait longer (an approval with no timeout) is
+refused its product's identity when the next one starts. The grace is per
+digest: when two products share a digest and action and a release drops
+one of them (keeping the digest for the other), the dropped one is revoked
+at once, with no grace and not while in use.
 
 **Rotating its signers.** Add the new key (or identity) to
 `catalogPolicy.signature` beside the old, publish a release signed by it,

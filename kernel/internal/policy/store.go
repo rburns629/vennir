@@ -216,13 +216,18 @@ var unfinished = []string{string(domain.TaskBlocked), string(domain.TaskReady), 
 	string(domain.TaskClaimed), string(domain.TaskRunning)}
 
 // InUse are the releases unfinished tasks run, as the policy matches them,
-// each with when the earliest execution running it was submitted; only
-// executions submitted within max count (an execution older than that,
-// awaiting an approval or blocked, keeps nothing listed).
+// each with when the earliest execution running it was submitted. An
+// execution counts while it's moving: a step of it is claimed or running,
+// or one became ready (or began awaiting its approval) within max, which
+// is at least the approval timeout. Each step's wait is bounded, not the
+// execution's age, so a long DAG or several approval gates keep their
+// releases; one stalled longer than max keeps nothing listed.
 func (s *Store) InUse(ctx context.Context, max time.Duration) (map[Use]time.Time, error) {
 	rows, err := s.DB.Query(ctx, `SELECT t.image, t.team, t.action, t.service_account, min(e.created_at)
 		FROM execution_tasks t JOIN executions e ON e.id = t.execution_id
-		WHERE t.state = ANY($1) AND e.created_at > now() - make_interval(secs => $2)
+		WHERE t.state = ANY($1) AND t.execution_id IN (
+			SELECT execution_id FROM execution_tasks WHERE state = ANY($1) GROUP BY execution_id
+			HAVING max(available_at) > now() - make_interval(secs => $2) OR bool_or(state IN ('CLAIMED', 'RUNNING')))
 		GROUP BY t.image, t.team, t.action, t.service_account`, unfinished, max.Seconds())
 	if err != nil {
 		return nil, err

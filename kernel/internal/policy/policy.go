@@ -179,6 +179,13 @@ func (c *Controller) look(ctx context.Context) error {
 	var reverifyErr error
 	if current != nil && !TrustedBy(current.Signers, c.Source.Trusted()) {
 		if signers, err := c.Source.Verify(ctx, current.Reference, current.Digest); err != nil {
+			if !errors.Is(err, ErrNotSigned) {
+				// Not known unsigned (the registry, or Sigstore's TUF
+				// repository, out of reach): nothing is applied this pass,
+				// so an older release is still refused; tried next pass.
+				return fmt.Errorf("the catalog release applied (%s) couldn't be verified again against the signers trusted now, "+
+					"so no product is listed and nothing is applied until it is: %w", pinned(current.Reference, current.Digest), err)
+			}
 			reverifyErr = fmt.Errorf("the catalog release applied (%s) doesn't verify against the signers trusted now, "+
 				"so no product is listed until one that does is applied: %w", pinned(current.Reference, current.Digest), err)
 		} else {

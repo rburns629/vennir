@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -49,12 +50,35 @@ type Signers struct {
 
 func (s *Signers) keyless() bool { return s.KeylessIssuer != "" && s.KeylessSubjectRegExp != "" }
 
-// KeyID and KeylessID name one signer: a public key (by its PEM), the
-// keyless identity (by its issuer and subject). Each release records which
-// of them verified it; it's trusted while any of those still is.
+// KeyID and KeylessID name one signer: a public key (by its DER, PKIX,
+// so the same key however its PEM is written), the keyless identity (by
+// its issuer and subject). Each release records which of them verified
+// it; it's trusted while any of those still is.
 func KeyID(pem string) string {
-	sum := sha256.Sum256([]byte(strings.TrimSpace(pem)))
+	data := []byte(strings.TrimSpace(pem))
+	// One that doesn't parse verifies nothing (verifiers refuses it).
+	if key, err := cryptoutils.UnmarshalPEMToPublicKey(data); err == nil {
+		if der, err := x509.MarshalPKIXPublicKey(key); err == nil {
+			data = der
+		}
+	}
+	sum := sha256.Sum256(data)
 	return "key:" + hex.EncodeToString(sum[:])
+}
+
+// ErrNotSigned is Verify's answer when every trusted signer was asked and
+// none signed the release: definite, unlike a registry or Sigstore's TUF
+// repository out of reach (an error without it), which says nothing about
+// who signed it.
+var ErrNotSigned = errors.New("no trusted signer signed it")
+
+// definite: a verification that failed because of the signatures found
+// (none, or none matching), not because they couldn't be read.
+func definite(err error) bool {
+	var noMatch *cosign.ErrNoMatchingSignatures
+	var none *cosign.ErrNoSignaturesFound
+	var noCert *cosign.ErrNoCertificateFoundOnSignature
+	return errors.As(err, &noMatch) || errors.As(err, &none) || errors.As(err, &noCert)
 }
 
 func KeylessID(issuer, subject string) string {
@@ -153,9 +177,13 @@ func (s *Signers) Verify(ctx context.Context, ref name.Digest, opts []remote.Opt
 		}})
 	}
 	var failures []string
+	// Whether every failure says who signed it (none of these): when one
+	// couldn't be checked at all, the answer isn't ErrNotSigned.
+	allDefinite := true
 	if s.keyless() {
 		trusted, err := s.trustedRoot()
 		if err != nil {
+			allDefinite = false
 			failures = append(failures, "keyless: "+err.Error())
 		} else {
 			tries = append(tries, try{id: KeylessID(s.KeylessIssuer, s.KeylessSubjectRegExp), opts: &cosign.CheckOpts{
@@ -172,6 +200,7 @@ func (s *Signers) Verify(ctx context.Context, ref name.Digest, opts []remote.Opt
 	var verified []string
 	for _, t := range tries {
 		if _, _, err := cosign.VerifyImageSignatures(ctx, ref, t.opts); err != nil {
+			allDefinite = allDefinite && definite(err)
 			failures = append(failures, err.Error())
 			continue
 		}
@@ -182,7 +211,10 @@ func (s *Signers) Verify(ctx context.Context, ref name.Digest, opts []remote.Opt
 		return verified, nil
 	}
 	if len(tries) == 0 && len(failures) == 0 {
-		return nil, errors.New("no signer is trusted")
+		return nil, fmt.Errorf("no signer is trusted: %w", ErrNotSigned)
 	}
-	return nil, fmt.Errorf("no trusted signer signed %s: %s", ref.DigestStr(), strings.Join(failures, "; "))
+	if allDefinite {
+		return nil, fmt.Errorf("%s: %w: %s", ref.DigestStr(), ErrNotSigned, strings.Join(failures, "; "))
+	}
+	return nil, fmt.Errorf("%s couldn't be verified (tried again next pass): %s", ref.DigestStr(), strings.Join(failures, "; "))
 }

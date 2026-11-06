@@ -35,8 +35,9 @@ type fakeSource struct {
 	// (default: the signers given to release, key-a).
 	trusted  []string
 	signedBy map[string][]string
-	// The registry can't be read.
-	down bool
+	// The registry can't be read; signatures can't be checked (Sigstore's
+	// TUF repository out of reach).
+	down, verifyDown bool
 }
 
 func (f *fakeSource) Follow(context.Context) (string, error) {
@@ -56,6 +57,9 @@ func (f *fakeSource) Fetch(_ context.Context, ref string) (Fetched, error) {
 	return Fetched{Digest: f.digest, JSON: f.json}, nil
 }
 func (f *fakeSource) Verify(_ context.Context, _, digest string) ([]string, error) {
+	if f.verifyDown {
+		return nil, errors.New("the TUF repository is out of reach")
+	}
 	var verified []string
 	for _, s := range f.signedBy[digest] {
 		if f.verified && TrustedBy([]string{s}, f.Trusted()) {
@@ -63,7 +67,7 @@ func (f *fakeSource) Verify(_ context.Context, _, digest string) ([]string, erro
 		}
 	}
 	if len(verified) == 0 {
-		return nil, errors.New("no trusted signer signed it")
+		return nil, ErrNotSigned
 	}
 	return verified, nil
 }
@@ -204,9 +208,9 @@ func TestAnEarlierReleaseStaysListedWhileInUseThenGoes(t *testing.T) {
 	}
 	// An unfinished task runs it (as that product), awaiting an approval, in
 	// an execution submitted after the release dropped it (during its
-	// grace): that keeps nothing listed. Nor one submitted before, but
-	// longer ago than InUseMax.
-	task := func(n int, submitted, state string) {
+	// grace): that keeps nothing listed. Nor one submitted before whose
+	// steps have waited longer than InUseMax.
+	task := func(n int, submitted, waiting, state string) {
 		t.Helper()
 		execution := fmt.Sprintf("00000000-0000-0000-0000-0000000000e%d", n)
 		if _, err := store.DB.Exec(ctx, `INSERT INTO executions (id, external_reference, idempotency_key, state, created_at)
@@ -214,27 +218,29 @@ func TestAnEarlierReleaseStaysListedWhileInUseThenGoes(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := store.DB.Exec(ctx, `INSERT INTO execution_tasks (id, execution_id, task_key, image, action, team, service_account,
-			state, original_inputs, timeout_seconds, max_attempts, attempt_count)
-			VALUES ($1, $2, 'db', $3, 'create', 'local', 'db-sa', $4, '{}', 60, 1, 0)`,
-			fmt.Sprintf("00000000-0000-0000-0000-0000000000f%d", n), execution, "registry.example/local/db:1@"+digest("1"), state); err != nil {
+			state, original_inputs, timeout_seconds, max_attempts, attempt_count, available_at)
+			VALUES ($1, $2, 'db', $3, 'create', 'local', 'db-sa', $4, '{}', 60, 1, 0, now() - $5::interval)`,
+			fmt.Sprintf("00000000-0000-0000-0000-0000000000f%d", n), execution, "registry.example/local/db:1@"+digest("1"), state, waiting); err != nil {
 			t.Fatal(err)
 		}
 	}
-	task(1, "1 hour", "AWAITING_APPROVAL")
-	task(2, "4 days", "BLOCKED")
+	task(1, "1 hour", "1 hour", "AWAITING_APPROVAL")
+	task(2, "4 days", "4 days", "BLOCKED")
 	if err := c.Pass(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if writer.listed(t, digest("1")) != nil {
 		t.Fatal("a task submitted after the release dropped it, or too long ago, kept it listed")
 	}
-	// ...but one submitted while the release still named it does (the row,
-	// pruned by that pass, put back as it was: dropped two hours ago).
+	// ...but one submitted while the release still named it does, however
+	// long ago, while a step of it waits less than InUseMax (here a second
+	// approval gate, begun an hour ago, in an execution four days old). The
+	// row, pruned by that pass, put back as it was: dropped two hours ago.
 	if _, err := store.DB.Exec(ctx, `INSERT INTO catalog_policy_releases (digest, team, repository, action, service_account, audiences, signers, released_until)
 		VALUES ($1, 'local', 'registry.example/local/db', 'create', 'db-sa', 'sts.amazonaws.com', '{key-a}', now() - interval '2 hours')`, digest("1")); err != nil {
 		t.Fatal(err)
 	}
-	task(3, "3 hours", "READY")
+	task(3, "4 days", "1 hour", "AWAITING_APPROVAL")
 	if err := c.Pass(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -343,6 +349,41 @@ func TestTheReleaseAppliedIsVerifiedAgainWhenOthersAreTrusted(t *testing.T) {
 	}
 }
 
+// The applied release verified again, but the check itself failing (not
+// "unsigned": the registry or Sigstore's TUF repository out of reach):
+// nothing is applied that pass, an older release least of all.
+func TestAReverifyThatCantCheckStillRefusesAnOlderRelease(t *testing.T) {
+	ctx := context.Background()
+	source := &fakeSource{}
+	c, writer, store := newController(t, source)
+	now := time.Now()
+	source.release(t, digest("a"), releaseAt(now, db("1")))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// The chart trusts key-b now; the registry serves an older release
+	// key-b signed, and verification can't reach what it needs.
+	source.trusted = []string{"key-b"}
+	source.release(t, digest("b"), releaseAt(now.Add(-time.Hour), db("2")), "key-b")
+	source.verifyDown = true
+	if err := c.Pass(ctx); err == nil || !strings.Contains(err.Error(), "couldn't be verified again") {
+		t.Fatalf("%v", err)
+	}
+	state, err := store.State(ctx)
+	if err != nil || state.Digest != digest("a") || writer.listed(t, digest("2")) != nil {
+		t.Fatalf("the older release was applied: %+v %v", state, err)
+	}
+	// Back: the applied one is known unsigned by key-b, so (as documented,
+	// a one-step replacement) the older one key-b signed may be applied.
+	source.verifyDown = false
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if state, err := store.State(ctx); err != nil || state.Digest != digest("b") {
+		t.Fatalf("%+v %v", state, err)
+	}
+}
+
 // A key removed in one step: the earlier release only it signed isn't
 // listed, though in its grace, as soon as the current release (signed by
 // the key kept too) is applied.
@@ -422,6 +463,30 @@ func TestTwoProductsSharingADigestAndActionAreBothListed(t *testing.T) {
 	}
 	if entries := writer.listed(t, digest("1")); len(entries) != 2 {
 		t.Fatalf("listed after another apply: %+v", entries)
+	}
+}
+
+// One of two products sharing a digest and action dropped: no grace for
+// it (the rows are by digest, and the digest is still released), it's
+// revoked at once (operations.md says so).
+func TestADroppedSiblingIsRevokedAtOnce(t *testing.T) {
+	ctx := context.Background()
+	source := &fakeSource{}
+	c, writer, _ := newController(t, source)
+	first, second := db("1"), db("1")
+	second.Name, second.ServiceAccount, second.TokenAudiences = "local-db2-create", "db-other", nil
+	start := time.Now().Add(-time.Minute)
+	source.release(t, digest("a"), releaseAt(start, first, second))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	source.release(t, digest("b"), releaseAt(start.Add(time.Second), first))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	entries := writer.listed(t, digest("1"))
+	if len(entries) != 1 || entries[0].ServiceAccount != "db-sa" {
+		t.Fatalf("listed: %+v", entries)
 	}
 }
 

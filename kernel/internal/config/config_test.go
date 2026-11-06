@@ -252,6 +252,8 @@ func TestTheCatalogPolicyNeedsASignerAndItsPolicy(t *testing.T) {
 		"keyless without its subject": with(map[string]string{"CATALOG_POLICY_KEYLESS_ISSUER": "https://token.actions.githubusercontent.com"}),
 		"no policy":                   {"CATALOG_POLICY_RELEASE": "r", "CATALOG_POLICY_PUBLIC_KEYS": `["k"]`},
 		"a flag that isn't one":       with(map[string]string{"CATALOG_POLICY_PUBLIC_KEYS": `["k"]`, "CATALOG_POLICY_REGISTRY_ECR_TOKEN": "yes"}),
+		"in use under the approval timeout": with(map[string]string{"CATALOG_POLICY_PUBLIC_KEYS": `["k"]`,
+			"SCHEDULER_APPROVAL_TIMEOUT_SECONDS": "604800", "CATALOG_POLICY_IN_USE_MAX_SECONDS": "259200"}),
 	} {
 		if _, err := load(t, env); err == nil {
 			t.Errorf("%s: accepted", name)
