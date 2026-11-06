@@ -15,7 +15,7 @@
 # checkout: .github/scripts/build-vennir.sh there).
 set -euo pipefail
 
-version="0.11.0"
+version="0.12.0"
 registry="https://ghcr.io"
 repository="rburns629/vennir/cli"
 
@@ -35,10 +35,10 @@ esac
 platform="$os-$arch"
 # Each platform's binary's SHA-256 (the release's vennir-checksums.txt).
 case $platform in
-  linux-amd64) sha256="f0d8d780308d45246745753ac1b45c8efcc15aca6716b8db140bded68c3da909" ;;
-  linux-arm64) sha256="2ca15ba5aecb9c1d16287eec8e72464dedec63ade4a1e0927739efcb965474c9" ;;
-  darwin-amd64) sha256="61e2fa77121143782b9836f14dd31c911823dc83117a4730425558891a8d476b" ;;
-  darwin-arm64) sha256="20d40179ab7a7b4ddcc96dab20d967301e519ee95d31379eb20f210dda1ada84" ;;
+  linux-amd64) sha256="9e64eac4f0aad8118c8aea73ac41f559c7697ebb2370c68eafd2e1f27ca8173a" ;;
+  linux-arm64) sha256="0b6c7ae497a54e81679e68a430104bb461c9118e8cb31f5b6453d9715ab7dbde" ;;
+  darwin-amd64) sha256="07860a040e4ff12e1d9fcec8076e3aa5345360dd20cbde4ffa269f1c3d3fe84d" ;;
+  darwin-arm64) sha256="2bf2b044c0bab09217eee1e5e21ee326ef023e232f6bfa646fe891fa315b1eb5" ;;
   *) echo "vennir: no release for $platform" >&2; exit 1 ;;
 esac
 if [ -z "$version" ] || [ -z "$sha256" ]; then
