@@ -171,12 +171,12 @@ it was seen.
   same-origin frame), and can fetch other APIs' paths with their cookies
   attached. The gateway's own sign-in is a bearer header, so that fetch gets
   the gateway's 401, but a backend that takes its own cookies as sign-in
-  would answer it. Until each API has an origin of its own (a host per API,
-  e.g. `<api>.<team>.<gateway host>`), a backend serving browsers should
-  keep its cookies HttpOnly and not take a cookie alone as sign-in.
-  Proposed 2026-11-05 as decision 26 (`docs/assessment.md`): a host per
-  API that the gateway assigns, called by subscription or by group; its
-  console pages go on the mockups canvas first.
+  would answer it. Until the gateway stops acting as a web host, a backend
+  serving browsers should keep its cookies HttpOnly and not take a cookie
+  alone as sign-in. Proposed 2026-11-05 as decision 26
+  (`docs/assessment.md`): the paths stay; the gateway forwards no cookies
+  either way and sandboxes every answer; APIs are called by subscription
+  or by group; its console pages go on the mockups canvas first.
 
 - [ ] **The console can loosen the cluster's policies** (a known gap since
   the security review of 2026-11-04): it writes the admission policies'

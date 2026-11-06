@@ -996,30 +996,31 @@ wired into a run as a dependency. Deleting something others depend on (3)
 is refused and alerts the admins; it goes ahead only once an admin
 approves it, and the approval is audited as theirs.
 
-**26. Each API at a host of its own, called by subscription or by group**
-(proposed 2026-11-05). Today every API is a path on the gateway's one host
-(`/<team>/<api>/`), shared team by team by its `api.yaml`'s `shareWith`, and
-a team without access asks for it by opening an issue. Two problems: every
-API's pages share one origin, so a page one API serves can read another's
-cookies that aren't HttpOnly, and access is a pull request to someone
-else's catalog folder. Proposed:
+**26. One gateway, called by subscription or by group** (proposed
+2026-11-05, revised the same day). Today every API is a path on the
+gateway's one host (`/<team>/<api>/`), shared team by team by its
+`api.yaml`'s `shareWith`, and a team without access asks for it by opening
+an issue. Two problems: every API's pages share one origin, so a page one
+API serves can read another's cookies that aren't HttpOnly, and access is a
+pull request to someone else's catalog folder. Proposed:
 
-1. *The gateway assigns the endpoint:* each API is served at
-   `<api>.<team>.<apiDomain>` (`gateway.apiDomain`, set at install; for
-   example `orders.web.apis.example.com`). The catalog doesn't choose it:
-   the console records it when the API is first published, and a renamed
-   API is a new endpoint. Its own host makes it its own origin. The gateway
-   also makes every cookie a backend sets host-only (it drops `Domain`), so
-   one API can't set a cookie for the others. The old paths keep working
-   for one release (`gateway.pathRoutes`, on by default for it, then
-   removed), answering with `Deprecation` and the new address.
-2. *Names and certificates:* a DNS wildcard covers one label, so each team
-   needs `*.<team>.<apiDomain>` in DNS and in a certificate. The console
-   asks for both when it creates the team (a cert-manager `Certificate`,
-   and a DNS record where the cluster runs external-dns; otherwise the
-   Admin page lists the record to add), and the gateway's listener takes
-   each team's certificate. An API whose team's certificate isn't ready is
-   held, with the reason, like a backend host that isn't allowed.
+1. *The gateway assigns the endpoint, as a path:* each API stays at
+   `/<team>/<api>/` on the gateway's one host, as Google's API Gateway
+   serves every API under one address. The catalog doesn't choose it: it
+   follows from the team and the API's name, and a renamed API is a new
+   endpoint. One host means one certificate and one DNS name for the whole
+   install, however many teams it has, from wherever the organisation gets
+   them (its own CA, the cloud's certificate service, cert-manager).
+2. *An API, not a website:* the gateway is a pass-through to the teams'
+   backends, and keeps one API from reaching another through the browser
+   by not acting as a web host. It never forwards a caller's `Cookie`
+   header and drops every `Set-Cookie` a backend sends (callers sign in
+   with a bearer token; no API needs cookies through it), and it adds
+   `Content-Security-Policy: sandbox` and `X-Content-Type-Options: nosniff`
+   to every answer, so HTML a backend returns runs in an opaque origin of
+   its own: its scripts can't read the gateway's host or call another API
+   with the caller's sign-in. A backend that serves a browser app does it
+   at its own address, not through the gateway.
 3. *Who may call, set in the catalog:* `api.yaml`'s `access` replaces
    `shareWith`:
 
@@ -1049,18 +1050,30 @@ else's catalog folder. Proposed:
    (a session that relies on a groups claim lasts an hour, so groups are
    at most an hour old).
 
-Rejected: an opaque host per API (unreadable, and the API's name is already
-unique within its team); a path per API assigned by the gateway (one origin
-still); subscriptions as catalog pull requests (every grant a change to
-someone else's folder, and the same grant on every install); stripping
-`Set-Cookie` alone (it leaves scripts on one API's pages able to call
-another as the signed-in person).
+Rejected: a host per API (`<api>.<team>.<apiDomain>`, proposed first: a
+wildcard certificate and DNS record per team, which a large organisation's
+certificate authority and rate limits don't scale to, for no gain once the
+gateway acts as an API only); subscriptions as catalog pull requests (every
+grant a change to someone else's folder, and the same grant on every
+install); keeping backends' cookies, scoped to their paths (a path is no
+boundary within one origin).
 
 Open, for review: whether an approved subscription expires (proposed: no,
 but the API's team sees each subscriber's last call, and may revoke unused
 ones); the console's pages for it, which go on the mockups canvas first (an
 API's page with its endpoint and Subscribe; a team's Subscriptions, both
-ways, with approvals; the Admin page's API domain and certificates).
+ways, with approvals).
+
+Proposed with the boards (2026-11-05): a person calling under a
+subscription sends `Vennir-Team`, one of their own teams (the only
+subscribed one by default, as today); a request may be withdrawn while it
+waits, and asked again at once after a decline, shown beside it; closing an
+API's subscriptions stops new ones, and those granted keep working until
+revoked; a `shareWith` team's standing subscription can't be revoked in the
+console (it's the catalog's) and keeps its named limit; an approval's rate
+defaults to the API's limit for that team and can be changed later without
+revoking; each request, approval, decline and revocation is told to both
+teams' maintainers (the bell; the team's chat later).
 
 **27. The cluster's policies from the catalog, written by the kernel**
 (proposed 2026-11-05). The console keeps the admission policies' literals
