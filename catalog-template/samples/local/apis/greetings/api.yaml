@@ -21,7 +21,8 @@ backend:
   # backend trusts the gateway's signed Vennir-Caller instead (the other
   # samples' APIs show the gateway signing in to the backend itself).
   url: http://greetings.local-apis.svc.cluster.local:8080
-shareWith: ["*"]
+access:
+  requests: open        # anyone who asks is granted at once, at the default limit
 limits:
   default: 60/min
 timeout: 10s

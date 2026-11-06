@@ -917,7 +917,7 @@ to know:
   audience `vennir`. To keep keyless sign-in, set `keyless.audience` (and
   have each CI job request a token for it).
 
-**Settings removed** (unreleased, on main since 2026-11-05):
+**Settings removed** (0.12.0):
 
 - **The kernel chart's `scheduler.taskPodHardening`.** Step Pods are
   always hardened (Pod Security's `restricted`: non-root, a read-only root
@@ -933,7 +933,7 @@ to know:
   and an unhardened Job it made but hadn't started is never adopted by the
   new one; steps already running finish as they started.
 
-**Changes people will notice** (unreleased, on main since 2026-11-05):
+**Changes people will notice** (0.12.0):
 
 - **Who may call an API is its access list** (decision 26 in
   `assessment.md`; `console/docs/11-apis.md`). Besides the API's own team,
@@ -989,8 +989,8 @@ to know:
   `.github/workflows/`, `.github/actions/` and the pin in one pull request
   (the catalog guide, "Updating your catalog").
 
-**The catalog's policies, written by the kernel** (unreleased, on main
-since 2026-11-06; decision 27 in `assessment.md`). With the kernel chart's
+**The catalog's policies, written by the kernel** (0.12.0; decision 27
+in `assessment.md`). With the kernel chart's
 `catalogPolicy` on ([The catalog's policies](#the-catalogs-policies)):
 
 - **This release, both write.** The kernel chart adds two policies,
