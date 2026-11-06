@@ -366,7 +366,7 @@ export async function clearKeptGroups(tx: Pick<typeof db, "update" | "delete">):
   // Waiting requests' copies too: a maintainer can't grant a group read under the old settings.
   await tx
     .update(apiAccessRequests)
-    .set({ requesterGroups: [], requesterGroupsReadAt: null })
+    .set({ offeredGroups: [], offeredGroupsReadAt: null, requesterGroups: [], requesterGroupsReadAt: null })
     .where(eq(apiAccessRequests.state, "waiting"));
 }
 

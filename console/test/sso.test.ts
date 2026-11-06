@@ -387,7 +387,7 @@ describe("Google Workspace groups", () => {
     expect(asked.request.groups).toEqual([]);
     // Read over a day ago since.
     const dayAgo = new Date(Date.now() - 25 * 3_600_000);
-    await db.update(apiAccessRequests).set({ requesterGroupsReadAt: dayAgo }).where(eq(apiAccessRequests.id, asked.request.id));
+    await db.update(apiAccessRequests).set({ offeredGroupsReadAt: dayAgo }).where(eq(apiAccessRequests.id, asked.request.id));
     await db.update(users).set({ ssoGroupsReadAt: dayAgo }).where(eq(users.id, gws?.id ?? ""));
     // A group of theirs they didn't offer: refused, and Google never asked about it.
     await expect(decideRequest(asMaintainer, asked.request.id, true, `others@${domain}`, 0, "")).rejects.toMatchObject({ code: "GROUP_NOT_OFFERED" });
@@ -595,11 +595,11 @@ describe("kept groups and the settings they're read under", () => {
     const [someone] = await db.insert(users).values({ email: `copied@${domain}` }).returning();
     const [request] = await db
       .insert(apiAccessRequests)
-      .values({ apiId: api?.id ?? "", teamId: ids[teamA] ?? "", apiName: "copies", userId: someone?.id ?? "", reason: "r", requesterGroups: ["g-a"], requesterGroupsReadAt: new Date() })
+      .values({ apiId: api?.id ?? "", teamId: ids[teamA] ?? "", apiName: "copies", userId: someone?.id ?? "", reason: "r", offeredGroups: ["g-a"], offeredGroupsReadAt: new Date(), requesterGroups: ["g-old"] })
       .returning();
     // The same settings again: nothing changes.
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
-    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]?.requesterGroups).toEqual(["g-a"]);
+    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]?.offeredGroups).toEqual(["g-a"]);
     // Another issuer: everyone's groups, and the copies, go.
     vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
       const url = String(input instanceof Request ? input.url : input);
@@ -607,7 +607,7 @@ describe("kept groups and the settings they're read under", () => {
     });
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", issuer: "https://other.example" }));
     vi.restoreAllMocks();
-    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]).toMatchObject({ requesterGroups: [], requesterGroupsReadAt: null });
+    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]).toMatchObject({ offeredGroups: [], offeredGroupsReadAt: null, requesterGroups: [] });
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
     await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
   });
@@ -618,10 +618,10 @@ describe("kept groups and the settings they're read under", () => {
     // A waiting request whose emptying fails: a trigger on this row's emptying alone (it's marked
     // away, so another file's release, marking rows away, doesn't touch it).
     const marker = `fail-clear-${prefix}`;
-    await db.insert(apiAccessRequests).values({ teamId: ids[teamA] ?? "", apiName: "atomic", userId: someone?.id ?? "", reason: marker, requesterGroups: ["g-kept"], awaySince: new Date() });
+    await db.insert(apiAccessRequests).values({ teamId: ids[teamA] ?? "", apiName: "atomic", userId: someone?.id ?? "", reason: marker, offeredGroups: ["g-kept"], awaySince: new Date() });
     const fn = `fail_clear_${prefix.replace(/-/g, "_")}`;
     await db.execute(sql.raw(`CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'emptying fails'; END $$`));
-    await db.execute(sql.raw(`CREATE TRIGGER ${fn} BEFORE UPDATE ON api_access_requests FOR EACH ROW WHEN (OLD.reason = '${marker}' AND NEW.requester_groups IS DISTINCT FROM OLD.requester_groups) EXECUTE FUNCTION ${fn}()`));
+    await db.execute(sql.raw(`CREATE TRIGGER ${fn} BEFORE UPDATE ON api_access_requests FOR EACH ROW WHEN (OLD.reason = '${marker}' AND NEW.offered_groups IS DISTINCT FROM OLD.offered_groups) EXECUTE FUNCTION ${fn}()`));
     try {
       const saved = await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "roles" }));
       expect(saved.code).toBe("internal");

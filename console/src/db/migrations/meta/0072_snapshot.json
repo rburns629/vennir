@@ -1,5 +1,5 @@
 {
-  "id": "27baf022-f2d9-4f13-afff-01207a25743c",
+  "id": "dac8b261-3ebd-45db-8710-0d07eeddf73b",
   "prevId": "4af3a5ad-45d8-4bf1-9ab8-e97e58aa357d",
   "version": "7",
   "dialect": "postgresql",
@@ -60,6 +60,19 @@
         },
         "requester_groups_read_at": {
           "name": "requester_groups_read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "offered_groups": {
+          "name": "offered_groups",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "offered_groups_read_at": {
+          "name": "offered_groups_read_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

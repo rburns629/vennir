@@ -163,9 +163,9 @@ export const users = pgTable("users", {
   // Every single sign-on group the person's last sign-in (or the hourly
   // Google resync) read, lowercased, at most 1000, and when: the console's
   // alone (the gateway's role can't read these columns). A request for
-  // access keeps the ones its person offers, for the API's maintainers to
-  // grant one of them (core/apiAccess.ts); user_groups holds the ones that
-  // matter.
+  // access keeps the ones its person offers (offered_groups), for the
+  // API's maintainers to grant one of them (core/apiAccess.ts); user_groups
+  // holds the ones that matter.
   ssoGroups: text("sso_groups").array(),
   ssoGroupsReadAt: timestamp("sso_groups_read_at", { withTimezone: true }),
 });
@@ -1285,12 +1285,18 @@ export const apiAccessRequests = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
     reason: text("reason").notNull(),
+    // Unread: what consoles before migration 0072 copied of a person's
+    // groups (every one of them) as they asked. Still written by such a
+    // console during a rolling upgrade, so never shown; emptied when where
+    // groups come from changes, and to be dropped (TODO.md).
+    requesterGroups: text("requester_groups").array().notNull().default(sql`'{}'::text[]`),
+    requesterGroupsReadAt: timestamp("requester_groups_read_at", { withTimezone: true }),
     // The single sign-on groups the person offered when they asked (some
     // of users.sso_groups, their choice), one of which the API's
     // maintainers may grant instead; never their others; none for a bot.
-    requesterGroups: text("requester_groups").array().notNull().default(sql`'{}'::text[]`),
+    offeredGroups: text("offered_groups").array().notNull().default(sql`'{}'::text[]`),
     // When those groups were read (users.sso_groups_read_at then).
-    requesterGroupsReadAt: timestamp("requester_groups_read_at", { withTimezone: true }),
+    offeredGroupsReadAt: timestamp("offered_groups_read_at", { withTimezone: true }),
     state: text("state").$type<AccessRequestState>().notNull().default("waiting"),
     decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
     decisionReason: text("decision_reason"),

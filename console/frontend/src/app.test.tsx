@@ -1219,6 +1219,39 @@ describe("who may call an API (decision 26)", () => {
     await waitFor(() => { expect(asked.seen).toEqual([{ team: "payments", name: "orders", reason: "Fraud model.", groups: ["ml-engineers@acme.com"] }]); });
   });
 
+  it("lets you offer at most 100 groups, and find them in a long list", async () => {
+    const many = Array.from({ length: 101 }, (_, i) => `g${String(i).padStart(3, "0")}@acme.com`);
+    await renderAt("/apis/payments/orders", PRIYA, {
+      "ApiService/GetApi": { api: ORDERS, openapi: "{}" },
+      "ApiService/ListMyApiAccess": { groups: many },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Request access…" }));
+    const dialog = await screen.findByRole("dialog");
+    // (By the inputs themselves: a hundred role queries are slow.)
+    const boxes = [...dialog.querySelectorAll<HTMLInputElement>("input[type=checkbox]")];
+    expect(boxes).toHaveLength(101);
+    for (const box of boxes.slice(0, 100)) fireEvent.click(box);
+    expect(within(dialog).getByText(/That’s 100, the most a request may offer/)).toBeTruthy();
+    expect(boxes[100]?.disabled).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText("Find a group"), { target: { value: "G100" } });
+    expect(within(dialog).getAllByRole("checkbox")).toHaveLength(1);
+  });
+
+  it("tells you, not a maintainer's way out, when your groups are too old to offer", async () => {
+    await renderAt("/apis/payments/orders", PRIYA, {
+      "ApiService/GetApi": { api: ORDERS, openapi: "{}" },
+      "ApiService/ListMyApiAccess": { groups: ["ml-engineers@acme.com"] },
+      "ApiService/RequestApiAccess": refused(409, "failed_precondition", "Your groups haven't been read lately enough to offer one: sign in again, then ask.", "GROUPS_STALE"),
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Request access…" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "ml-engineers@acme.com" }));
+    fireEvent.change(within(dialog).getByLabelText(/Why you need it/), { target: { value: "x" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ask payments" }));
+    expect(await within(dialog).findByText("Your groups haven't been read lately enough to offer one: sign in again, then ask.")).toBeTruthy();
+    expect(within(dialog).queryByText(/grant them by name/)).toBeNull();
+  });
+
   it("offers no groups for a bot, nor where requests are granted at once", async () => {
     await renderAt("/apis/payments/orders", PRIYA, {
       "ApiService/GetApi": { api: { ...ORDERS, accessRequests: "open" }, openapi: "{}" },

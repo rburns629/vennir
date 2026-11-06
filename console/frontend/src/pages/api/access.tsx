@@ -61,11 +61,17 @@ export function botTeamsOf(user: Pick<Me, "maintainerOf" | "retiredTeams"> | nul
   return (user?.maintainerOf ?? []).filter((t) => t !== except && !user?.retiredTeams.includes(t));
 }
 
-/** What an access error says, with what to do for the ones that need it. */
-export function accessError(err: unknown): string {
+/** What an access error says; `deciding` (a maintainer approving a request), with what else they may do. */
+export function accessError(err: unknown, deciding = false): string {
   const message = errorMessage(err, "That didn't work. Try again.");
-  return err instanceof ApiError && err.code === "GROUPS_STALE" ? `${message} Or grant them by name.` : message;
+  return deciding && err instanceof ApiError && err.code === "GROUPS_STALE" ? `${message} Or grant them by name.` : message;
 }
+
+/** The most groups a request may offer (core/apiAccess.ts's MAX_OFFERED_GROUPS). */
+export const MAX_OFFERED_GROUPS = 100;
+
+/** Past this many groups to offer, the dialog has a box to find them by. */
+const FILTER_GROUPS_FROM = 10;
 
 /** A rate in words: a group's is each member's. */
 export function rateText(perMinute: number, group = false): string {
@@ -236,6 +242,7 @@ export function RequestAccessDialog({
   const [bots, setBots] = useState<{ email: string; teams: string[] }[] | null>(null);
   const [botsError, setBotsError] = useState<string | null>(null);
   const [offered, setOffered] = useState<string[]>([]);
+  const [groupFilter, setGroupFilter] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -252,6 +259,7 @@ export function RequestAccessDialog({
     setError(null);
     setPicked("");
     setOffered([]);
+    setGroupFilter("");
   }, [open, bot, forBot]);
 
   // The bots that may be asked for: those of the live teams the caller maintains.
@@ -280,6 +288,8 @@ export function RequestAccessDialog({
   const chosenBot = bot ?? (choosable.some((b) => b.email === botEmail) ? botEmail : "");
   // Your groups to offer: not for a bot, nor where requests are granted at once (by name).
   const offerable = !asBot && target?.accessRequests !== "open" ? groups : [];
+  const shownGroups = groupFilter.trim() ? offerable.filter((g) => g.includes(groupFilter.trim().toLowerCase())) : offerable;
+  const atMost = offered.filter((g) => offerable.includes(g)).length >= MAX_OFFERED_GROUPS;
   const ready = target !== null && reason.trim() !== "" && (!asBot || chosenBot !== "");
 
   async function submit(): Promise<void> {
@@ -407,15 +417,33 @@ export function RequestAccessDialog({
             </FormLabel>
             <Typography variant="caption" color="text.secondary">
               {target?.team ?? "Its team"}’s maintainers see only the groups you tick, never your others, and may grant one of them instead of you. None ticked: you, by name.
+              {offerable.length > MAX_OFFERED_GROUPS ? ` At most ${String(MAX_OFFERED_GROUPS)}.` : ""}
             </Typography>
-            <FormGroup>
-              {offerable.map((g) => (
+            {offerable.length > FILTER_GROUPS_FROM && (
+              <TextField
+                size="small"
+                label="Find a group"
+                value={groupFilter}
+                onChange={(e) => {
+                  setGroupFilter(e.target.value);
+                }}
+                sx={{ mt: 1 }}
+              />
+            )}
+            {atMost && (
+              <Typography variant="caption" color="warning.main">
+                That’s {MAX_OFFERED_GROUPS}, the most a request may offer.
+              </Typography>
+            )}
+            <FormGroup sx={{ maxHeight: 280, overflowY: "auto", flexWrap: "nowrap" }}>
+              {shownGroups.map((g) => (
                 <FormControlLabel
                   key={g}
                   control={
                     <Checkbox
                       size="small"
                       checked={offered.includes(g)}
+                      disabled={atMost && !offered.includes(g)}
                       onChange={(e) => {
                         const on = e.target.checked;
                         setOffered((was) => (on ? [...was, g] : was.filter((o) => o !== g)));

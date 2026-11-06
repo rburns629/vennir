@@ -413,11 +413,11 @@ export const GROUPS_DECIDE_HOURS = 24;
  * (readAt) at a later sign-in whose groups still include every one of them.
  */
 async function requesterGroupsOf(r: AccessRequest): Promise<{ groups: string[]; readAt: Date | null }> {
-  if (r.requesterGroups.length === 0) return { groups: [], readAt: r.requesterGroupsReadAt };
+  if (r.offeredGroups.length === 0) return { groups: [], readAt: r.offeredGroupsReadAt };
   const [now] = await db.select({ groups: users.ssoGroups, readAt: users.ssoGroupsReadAt }).from(users).where(eq(users.id, r.userId));
-  const still = now?.readAt && now.groups && r.requesterGroups.every((g) => now.groups?.includes(g));
-  if (still && now.readAt && (!r.requesterGroupsReadAt || now.readAt > r.requesterGroupsReadAt)) return { groups: r.requesterGroups, readAt: now.readAt };
-  return { groups: r.requesterGroups, readAt: r.requesterGroupsReadAt };
+  const still = now?.readAt && now.groups && r.offeredGroups.every((g) => now.groups?.includes(g));
+  if (still && now.readAt && (!r.offeredGroupsReadAt || now.readAt > r.offeredGroupsReadAt)) return { groups: r.offeredGroups, readAt: now.readAt };
+  return { groups: r.offeredGroups, readAt: r.offeredGroupsReadAt };
 }
 
 /**
@@ -546,10 +546,9 @@ export async function requestAccess(caller: AuthUser | undefined, team: string, 
       const theirs = counted ?? [];
       const notTheirs = offered.filter((g) => !theirs.includes(g));
       if (notTheirs.length > 0) throw new ApiError(400, "NOT_THEIR_GROUP", `You aren't in ${notTheirs.join(", ")}, as your groups were last read: offer only your own.`);
-      const requesterGroups = offered;
-      const requesterGroupsReadAt = offered.length > 0 ? (read?.readAt ?? null) : null;
+      const offeredGroupsReadAt = offered.length > 0 ? (read?.readAt ?? null) : null;
       const key = { apiId: api.id, teamId: api.teamId, apiName: api.name };
-      const [request] = await tx.insert(apiAccessRequests).values({ ...key, userId: target.id, requestedBy: who.id, reason: why, requesterGroups, requesterGroupsReadAt }).returning();
+      const [request] = await tx.insert(apiAccessRequests).values({ ...key, userId: target.id, requestedBy: who.id, reason: why, offeredGroups: offered, offeredGroupsReadAt }).returning();
       if (!request) throw new Error("no request was made");
       if (api.accessRequests !== "open") return { request, grant: null };
       // Open: granted at once, by nobody, at the API's default limit; the

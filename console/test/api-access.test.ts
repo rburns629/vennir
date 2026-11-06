@@ -351,6 +351,12 @@ describe("deciding a request", () => {
       await db.update(users_).set({ ssoGroupsReadAt: new Date(Date.now() - 2 * 3_600_000) }).where(eq(users_.id, ids.bob));
       expect((await ask("bob", "orders", "reports, again", "", offer)).failure).toBe("GROUPS_STALE");
       await db.update(users_).set({ ssoGroupsReadAt: new Date() }).where(eq(users_.id, ids.bob));
+      // At most 100 offered.
+      const many = Array.from({ length: 101 }, (_, i) => `g${String(i)}@${prefix}.example.com`);
+      expect((await ask("bob", "orders", "reports, again", "", many)).code).toBe("invalid_argument");
+      // A bot has no groups to offer, whatever its row says.
+      await db.update(users_).set({ ssoGroups: theirs, ssoGroupsReadAt: new Date() }).where(eq(users_.id, ids.bot));
+      expect((await call<{ groups?: string[] }>(tokens.bot, "ApiService/ListMyApiAccess")).body.groups ?? []).toEqual([]);
       expect((await ask("bob", "orders", "reports, again", "", offer)).code).toBe("ok");
     });
   });
@@ -360,7 +366,11 @@ describe("deciding a request", () => {
     const access = await call<{ requests?: Request[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "orders" });
     // Only the groups he offered, never his others (private@).
     expect(access.body.requests?.find((r) => r.id === waiting?.id)?.groups).toEqual([`all@${prefix}.example.com`, `eng@${prefix}.example.com`]);
-    expect(waiting?.requesterGroups).toEqual([`all@${prefix}.example.com`, `eng@${prefix}.example.com`]);
+    expect(waiting?.offeredGroups).toEqual([`all@${prefix}.example.com`, `eng@${prefix}.example.com`]);
+    // What a console from before 0072 copies (every group of his) is never shown, nor grantable.
+    await db.update(apiAccessRequests).set({ requesterGroups: [`private@${prefix}.example.com`], requesterGroupsReadAt: new Date() }).where(eq(apiAccessRequests.id, waiting?.id ?? ""));
+    const again = await call<{ requests?: Request[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "orders" });
+    expect(again.body.requests?.find((r) => r.id === waiting?.id)?.groups).toEqual([`all@${prefix}.example.com`, `eng@${prefix}.example.com`]);
     // Only to its maintainers: not to a plain member, nor an admin.
     for (const who of ["member", "admin"] as const) {
       const seen = await call<{ requests?: Request[] }>(tokens[who], "ApiService/ListApiAccess", { team: owner, name: "orders" });
@@ -372,13 +382,21 @@ describe("deciding a request", () => {
     }
     // Groups read over a day ago can't be granted from: they sign in again first.
     const dayAgo = new Date(Date.now() - 25 * 3_600_000);
-    await db.update(apiAccessRequests).set({ requesterGroupsReadAt: dayAgo }).where(eq(apiAccessRequests.id, waiting?.id ?? ""));
+    await db.update(apiAccessRequests).set({ offeredGroupsReadAt: dayAgo }).where(eq(apiAccessRequests.id, waiting?.id ?? ""));
     await db.update(users_).set({ ssoGroupsReadAt: dayAgo }).where(eq(users_.id, ids.bob));
     const stale = await decide("maintainer", waiting?.id ?? "", { approve: true, group: `eng@${prefix}.example.com` });
     expect(stale.failure).toBe("GROUPS_STALE");
     expect(stale.message).toContain("sign in again");
-    // They sign in again (their groups read now): the fresher read is the one that counts.
-    await db.update(users_).set({ ssoGroupsReadAt: new Date() }).where(eq(users_.id, ids.bob));
+    // A later sign-in that read one of them no longer doesn't make them fresh.
+    await db.update(users_).set({ ssoGroups: [`eng@${prefix}.example.com`], ssoGroupsReadAt: new Date() }).where(eq(users_.id, ids.bob));
+    const partly = await call<{ requests?: (Request & { groupsReadAt?: string })[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "orders" });
+    expect(new Date(partly.body.requests?.find((r) => r.id === waiting?.id)?.groupsReadAt ?? 0).getTime()).toBe(dayAgo.getTime());
+    expect((await decide("maintainer", waiting?.id ?? "", { approve: true, group: `eng@${prefix}.example.com` })).failure).toBe("GROUPS_STALE");
+    // They sign in again (their groups read now, every one offered among them): the fresher read is the one that counts.
+    await db
+      .update(users_)
+      .set({ ssoGroups: [`all@${prefix}.example.com`, `eng@${prefix}.example.com`, `private@${prefix}.example.com`], ssoGroupsReadAt: new Date() })
+      .where(eq(users_.id, ids.bob));
     const decided = await decide("maintainer", waiting?.id ?? "", { approve: true, group: `ENG@${prefix}.example.com`, perMinute: 5 });
     expect(decided.body.grant).toMatchObject({ group: `eng@${prefix}.example.com`, perMinute: 5 });
     // Ended, its groups aren't shown any more.
