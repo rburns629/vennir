@@ -3103,6 +3103,13 @@
      "repeated": true,
      "optional": false,
      "comment": "Waiting ones first, then the rest, newest first."
+    },
+    {
+     "name": "shareWith",
+     "type": "string",
+     "repeated": true,
+     "optional": false,
+     "comment": "Always empty: grants replaced the catalog's teams (decision 26)."
     }
    ]
   },
@@ -3293,6 +3300,13 @@
      "comment": "Whether the caller may call it: their own team's, or granted to them or\na group of theirs (access_via)."
     },
     {
+     "name": "shareWith",
+     "type": "string",
+     "repeated": true,
+     "optional": false,
+     "comment": "Always empty: grants replaced the catalog's teams (decision 26)."
+    },
+    {
      "name": "hidden",
      "type": "boolean",
      "repeated": false,
@@ -3390,6 +3404,13 @@
      "repeated": false,
      "optional": false,
      "comment": ""
+    },
+    {
+     "name": "askForAccessUrl",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "Always empty: people ask for access in the console (decision 26), not\nby an issue asking its team to share it in the catalog."
     },
     {
      "name": "problem",
@@ -13525,6 +13546,10 @@
     {
      "name": "API_ACCESS_VIA_GROUP",
      "comment": "A grant names a single sign-on group they're in."
+    },
+    {
+     "name": "API_ACCESS_VIA_CATALOG",
+     "comment": "Never sent: a team its api.yaml's shareWith named, until grants\nreplaced it (decision 26)."
     }
    ]
   },

@@ -568,6 +568,14 @@ export declare type ListApiAccessResponse = Message<"vennir.console.v1.ListApiAc
    * @generated from field: repeated vennir.console.v1.ApiAccessRequest requests = 2;
    */
   requests: ApiAccessRequest[];
+
+  /**
+   * Always empty: grants replaced the catalog's teams (decision 26).
+   *
+   * @generated from field: repeated string share_with = 3 [deprecated = true];
+   * @deprecated
+   */
+  shareWith: string[];
 };
 
 /**
@@ -759,6 +767,14 @@ export declare type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
   mayCall: boolean;
 
   /**
+   * Always empty: grants replaced the catalog's teams (decision 26).
+   *
+   * @generated from field: repeated string share_with = 9 [deprecated = true];
+   * @deprecated
+   */
+  shareWith: string[];
+
+  /**
    * @generated from field: bool hidden = 10;
    */
   hidden: boolean;
@@ -847,6 +863,15 @@ export declare type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
    * @generated from field: string spec_version = 23;
    */
   specVersion: string;
+
+  /**
+   * Always empty: people ask for access in the console (decision 26), not
+   * by an issue asking its team to share it in the catalog.
+   *
+   * @generated from field: string ask_for_access_url = 24 [deprecated = true];
+   * @deprecated
+   */
+  askForAccessUrl: string;
 
   /**
    * Unavailable: what the gateway found, and when.
@@ -1577,6 +1602,15 @@ export enum ApiAccessVia {
    * @generated from enum value: API_ACCESS_VIA_GROUP = 3;
    */
   GROUP = 3,
+
+  /**
+   * Never sent: a team its api.yaml's shareWith named, until grants
+   * replaced it (decision 26).
+   *
+   * @generated from enum value: API_ACCESS_VIA_CATALOG = 4 [deprecated = true];
+   * @deprecated
+   */
+  CATALOG = 4,
 }
 
 /**

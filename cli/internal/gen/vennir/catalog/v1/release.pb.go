@@ -1305,6 +1305,12 @@ type Api struct {
 	// The Kubernetes ServiceAccount, in the team's namespace, its
 	// credentials are minted for.
 	ServiceAccount string `protobuf:"bytes,8,opt,name=service_account,json=serviceAccount,proto3" json:"service_account,omitempty"`
+	// Ignored: each install's grants say who else may call it (decision 26),
+	// and vennir no longer writes it. Kept so a release from before still
+	// reads.
+	//
+	// Deprecated: Marked as deprecated in vennir/catalog/v1/release.proto.
+	ShareWith []string `protobuf:"bytes,9,rep,name=share_with,json=shareWith,proto3" json:"share_with,omitempty"`
 	// visibility: hidden: only its own team, and whoever a grant names, sees it.
 	Hidden bool `protobuf:"varint,10,opt,name=hidden,proto3" json:"hidden,omitempty"`
 	// Why it's deprecated and what to use instead; empty when it isn't.
@@ -1413,6 +1419,14 @@ func (x *Api) GetServiceAccount() string {
 		return x.ServiceAccount
 	}
 	return ""
+}
+
+// Deprecated: Marked as deprecated in vennir/catalog/v1/release.proto.
+func (x *Api) GetShareWith() []string {
+	if x != nil {
+		return x.ShareWith
+	}
+	return nil
 }
 
 func (x *Api) GetHidden() bool {
@@ -1858,7 +1872,7 @@ const file_vennir_catalog_v1_release_proto_rawDesc = "" +
 	"\tResources\x12\x10\n" +
 	"\x03cpu\x18\x01 \x01(\tR\x03cpu\x12\x16\n" +
 	"\x06memory\x18\x02 \x01(\tR\x06memory\x12!\n" +
-	"\fmemory_limit\x18\x03 \x01(\tR\vmemoryLimit\"\x95\x05\n" +
+	"\fmemory_limit\x18\x03 \x01(\tR\vmemoryLimit\"\xa6\x05\n" +
 	"\x03Api\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04team\x18\x02 \x01(\tR\x04team\x12!\n" +
@@ -1868,7 +1882,9 @@ const file_vennir_catalog_v1_release_proto_rawDesc = "" +
 	"\vbackend_url\x18\x06 \x01(\tR\n" +
 	"backendUrl\x12A\n" +
 	"\fbackend_auth\x18\a \x01(\v2\x1e.vennir.catalog.v1.BackendAuthR\vbackendAuth\x12'\n" +
-	"\x0fservice_account\x18\b \x01(\tR\x0eserviceAccount\x12\x16\n" +
+	"\x0fservice_account\x18\b \x01(\tR\x0eserviceAccount\x12!\n" +
+	"\n" +
+	"share_with\x18\t \x03(\tB\x02\x18\x01R\tshareWith\x12\x16\n" +
 	"\x06hidden\x18\n" +
 	" \x01(\bR\x06hidden\x12\x1e\n" +
 	"\n" +
@@ -1883,9 +1899,7 @@ const file_vennir_catalog_v1_release_proto_rawDesc = "" +
 	"\x0faccess_requests\x18\x11 \x01(\tR\x0eaccessRequests\x1a<\n" +
 	"\x0ePerMinuteEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01J\x04\b\t\x10\n" +
-	"R\n" +
-	"share_with\"\x96\x02\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\x96\x02\n" +
 	"\vBackendAuth\x12`\n" +
 	"\x15service_account_token\x18\x01 \x01(\v2*.vennir.catalog.v1.ServiceAccountTokenAuthH\x00R\x13serviceAccountToken\x12N\n" +
 	"\x0fgoogle_id_token\x18\x02 \x01(\v2$.vennir.catalog.v1.GoogleIdTokenAuthH\x00R\rgoogleIdToken\x12?\n" +

@@ -123,10 +123,9 @@ enum ApiAccessVia {
   API_ACCESS_VIA_USER = 2;
   // A grant names a single sign-on group they're in.
   API_ACCESS_VIA_GROUP = 3;
-  // Was API_ACCESS_VIA_CATALOG: a team its api.yaml's shareWith named,
-  // until grants replaced it (decision 26).
-  reserved 4;
-  reserved "API_ACCESS_VIA_CATALOG";
+  // Never sent: a team its api.yaml's shareWith named, until grants
+  // replaced it (decision 26).
+  API_ACCESS_VIA_CATALOG = 4 [deprecated = true];
 }
 
 enum ApiAccessRequestState {
@@ -282,9 +281,8 @@ message ListApiAccessResponse {
   repeated ApiGrant grants = 1;
   // Waiting ones first, then the rest, newest first.
   repeated ApiAccessRequest requests = 2;
-  // Was share_with: the catalog's teams, until grants replaced them (decision 26).
-  reserved 3;
-  reserved "share_with";
+  // Always empty: grants replaced the catalog's teams (decision 26).
+  repeated string share_with = 3 [deprecated = true];
 }
 
 message MyApiAccess {
@@ -347,9 +345,8 @@ message ApiProduct {
   // Whether the caller may call it: their own team's, or granted to them or
   // a group of theirs (access_via).
   bool may_call = 8;
-  // Was share_with (decision 26).
-  reserved 9;
-  reserved "share_with";
+  // Always empty: grants replaced the catalog's teams (decision 26).
+  repeated string share_with = 9 [deprecated = true];
   bool hidden = 10;
   // Why it's deprecated, and what to use instead.
   string deprecated = 11;
@@ -376,10 +373,9 @@ message ApiProduct {
   // The spec's title and version.
   string spec_title = 22;
   string spec_version = 23;
-  // Was ask_for_access_url: an issue asking its team to share it in the
-  // catalog; people ask for access in the console now (decision 26).
-  reserved 24;
-  reserved "ask_for_access_url";
+  // Always empty: people ask for access in the console (decision 26), not
+  // by an issue asking its team to share it in the catalog.
+  string ask_for_access_url = 24 [deprecated = true];
   // Unavailable: what the gateway found, and when.
   string problem = 25;
   google.protobuf.Timestamp problem_found_at = 26;
