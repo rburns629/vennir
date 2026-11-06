@@ -124,7 +124,8 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | `internal/policy/policy.go` | The pass: look at the catalog's release, verify and apply a new one (never an older one), then write the catalog identity and token policies from what's applied, pruning earlier releases no longer in use. |
 | `internal/policy/compute.go` | Pure: what the console would register from a release (product releases, APIs' sign-ins), which releases are in use, the audiences each API ServiceAccount needs, and the sixteen maps' literals with their size limits. |
 | `internal/policy/verify.go` | Verifying a release's signature with cosign's Go library: each trusted public key (no transparency log), then a keyless identity against Sigstore's trusted root, its Rekor entry checked offline. |
-| `internal/policy/registry.go` | Reading the release from the registry as this Pod's own identity (a Docker config, GKE's metadata token, ECR's), through mirrors; following the newest version. |
+| `internal/policy/registry.go` | Reading the release from the registry as this Pod's own identity (by federation, a Docker config, GKE's metadata token, ECR's), through mirrors; following the newest version. |
+| `internal/policy/federation.go` | Another cloud's catalog (or another AWS account's ECR) by a federation of its own: its projected ServiceAccount token exchanged at Google's STS (then impersonating), or by `AssumeRoleWithWebIdentity` for ECR's token. |
 | `internal/policy/store.go` | The release applied and the product releases it named, in the kernel's database; which releases unfinished tasks run. |
 | `internal/policy/writer.go` | Rewriting an admission policy's literals through the API server, conditionally on the version read. |
 | `internal/policy/cel_test.go` | The policies' literals compiled by cel-go as the API server compiles them, whatever strings a catalog release carries. |
