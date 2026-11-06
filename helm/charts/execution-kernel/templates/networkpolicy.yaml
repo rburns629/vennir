@@ -91,4 +91,31 @@ spec:
   {{- else }}
   ingress: []
   {{- end }}
+{{- if .Values.catalogPolicy.enabled }}
+---
+# kernel policy serves nothing but /metrics: only the scrapers listed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "execution-kernel.fullname" . }}-policy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "execution-kernel.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "execution-kernel.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: policy
+  policyTypes: ["Ingress"]
+  {{- with .Values.networkPolicy.metricsFrom }}
+  ingress:
+    - from:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - port: {{ $.Values.scheduler.metricsPort }}
+          protocol: TCP
+  {{- else }}
+  ingress: []
+  {{- end }}
+{{- end }}
 {{- end }}

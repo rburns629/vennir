@@ -2354,6 +2354,41 @@
      "repeated": false,
      "optional": false,
      "comment": "By policy (identityPolicy, scanPolicy, ...); a policy missing here\nhasn't been synced since the console started."
+    },
+    {
+     "name": "catalog",
+     "type": "CatalogPolicies",
+     "ref": "vennir.console.v1.CatalogPolicies",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    }
+   ]
+  },
+  "vennir.console.v1.CatalogPolicies": {
+   "name": "CatalogPolicies",
+   "comment": "Who writes the cluster's policies of what the catalog decides: which\ndigests are a product's releases (as which ServiceAccount, with which\ntoken audiences) and each API ServiceAccount's audiences.",
+   "fields": [
+    {
+     "name": "writer",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "\"kernel\": kernel policy, from the catalog release it verified itself,\ninto policies this console may only read (beside this console's own);\n\"console\": this console (the catalog isn't signed)."
+    },
+    {
+     "name": "release",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": "With the kernel: the release it last wrote them from\n(<repository>@<digest>), and that release's commit."
+    },
+    {
+     "name": "commit",
+     "type": "string",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
     }
    ]
   },
@@ -2370,6 +2405,14 @@
      "name": "outcomes",
      "type": "map of string to PolicySyncOutcome",
      "ref": "vennir.console.v1.PolicySyncOutcome",
+     "repeated": false,
+     "optional": false,
+     "comment": ""
+    },
+    {
+     "name": "catalog",
+     "type": "CatalogPolicies",
+     "ref": "vennir.console.v1.CatalogPolicies",
      "repeated": false,
      "optional": false,
      "comment": ""

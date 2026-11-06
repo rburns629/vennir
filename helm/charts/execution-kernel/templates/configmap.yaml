@@ -63,3 +63,23 @@ data:
   TASK_LOG_MAX_BYTES: {{ .Values.scheduler.taskLogs.maxBytes | int | quote }}
   TASK_LOG_REFRESH_SECONDS: {{ .Values.scheduler.taskLogs.refreshSeconds | quote }}
   EXECUTION_RETENTION_DAYS: {{ .Values.executionRetentionDays | quote }}
+  {{- with .Values.catalogPolicy }}
+  {{- if .enabled }}
+  # kernel policy (templates/catalog-policy.yaml): the catalog release it
+  # verifies, who may sign it, and the policies it writes.
+  CATALOG_POLICY_RELEASE: {{ .release | quote }}
+  CATALOG_POLICY_NEWEST_VERSION: {{ .newestVersion | toString | quote }}
+  CATALOG_POLICY_POLL_SECONDS: {{ .pollSeconds | quote }}
+  CATALOG_POLICY_PUBLIC_KEYS: {{ .signature.publicKeys | toJson | quote }}
+  CATALOG_POLICY_KEYLESS_ISSUER: {{ .signature.keyless.issuer | quote }}
+  CATALOG_POLICY_KEYLESS_SUBJECT_REGEXP: {{ .signature.keyless.subjectRegExp | quote }}
+  CATALOG_POLICY_IDENTITY_POLICY: {{ printf "%s-catalog-identity" (include "execution-kernel.fullname" $) | quote }}
+  {{- if .gateway.serviceAccount }}
+  CATALOG_POLICY_GATEWAY_POLICY: {{ printf "%s-catalog-tokens" (include "execution-kernel.fullname" $) | quote }}
+  CATALOG_POLICY_GATEWAY_GCP_AUDIENCE: {{ .gateway.gcpTokenAudience | quote }}
+  {{- end }}
+  CATALOG_POLICY_REGISTRY_MIRRORS: {{ .registry.mirrors | toJson | quote }}
+  CATALOG_POLICY_REGISTRY_GCP_METADATA_TOKEN: {{ .registry.gcpMetadataToken | toString | quote }}
+  CATALOG_POLICY_REGISTRY_ECR_TOKEN: {{ .registry.ecrToken | toString | quote }}
+  {{- end }}
+  {{- end }}

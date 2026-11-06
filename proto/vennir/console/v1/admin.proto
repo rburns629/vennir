@@ -280,10 +280,26 @@ message GetPolicySyncResponse {
   // By policy (identityPolicy, scanPolicy, ...); a policy missing here
   // hasn't been synced since the console started.
   map<string, PolicySyncOutcome> outcomes = 1;
+  CatalogPolicies catalog = 2;
+}
+
+// Who writes the cluster's policies of what the catalog decides: which
+// digests are a product's releases (as which ServiceAccount, with which
+// token audiences) and each API ServiceAccount's audiences.
+message CatalogPolicies {
+  // "kernel": kernel policy, from the catalog release it verified itself,
+  // into policies this console may only read (beside this console's own);
+  // "console": this console (the catalog isn't signed).
+  string writer = 1;
+  // With the kernel: the release it last wrote them from
+  // (<repository>@<digest>), and that release's commit.
+  string release = 2;
+  string commit = 3;
 }
 
 message SyncPoliciesRequest {}
 
 message SyncPoliciesResponse {
   map<string, PolicySyncOutcome> outcomes = 1;
+  CatalogPolicies catalog = 2;
 }

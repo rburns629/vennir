@@ -22,6 +22,10 @@ metadata:
 {{- $s := .Values.scaleDown }}
 {{- $console := $s.consoleFullname }}
 {{- $deployments := list (printf "%s-api" $fullname) (printf "%s-scheduler" $fullname) (printf "%s-headroom" $fullname) $console (printf "%s-trivy" $console) }}
+{{- if .Values.catalogPolicy.enabled }}
+{{- /* kernel policy sleeps too: nothing runs, so nothing to list. */}}
+{{- $deployments = append $deployments (printf "%s-policy" $fullname) }}
+{{- end }}
 {{- $databases := list (printf "%s-postgres" $fullname) (printf "%s-postgres" $console) }}
 {{- $activity := printf "%s-activity" $console }}
 {{- $name := printf "%s-sleeper" $fullname }}

@@ -2,7 +2,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { and, eq, inArray, like, sql } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { hashPassword } from "../src/auth/password.js";
 import { db } from "../src/db/client.js";
@@ -19,7 +19,8 @@ import { buildApp } from "../src/index.js";
 import { loadExecution } from "../src/auth/access.js";
 import { KernelApiError, cancelExecution, getExecution, retryTask, submitExecution } from "../src/kernel/client.js";
 import { scanBlocker } from "../src/scanning.js";
-import { ensureServiceAccount } from "../src/k8s.js";
+import { ensureServiceAccount, readPolicyVariables } from "../src/k8s.js";
+import { forgetKernelPolicy } from "../src/catalogPolicy.js";
 import { missingImages, pinImages } from "../src/registry.js";
 import { config } from "../src/config.js";
 import { caller, failureDetail, problemFields, type RpcError } from "./rpc.js";
@@ -29,6 +30,8 @@ import { caller, failureDetail, problemFields, type RpcError } from "./rpc.js";
 vi.mock("../src/k8s.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/k8s.js")>()),
   ensureServiceAccount: vi.fn(() => Promise.resolve()),
+  // The kernel's catalog identity policy (catalogPolicy.ts): none, unless a test says.
+  readPolicyVariables: vi.fn(() => Promise.resolve(null)),
 }));
 
 // The registry is asked about every submission; test/registry.test.ts
@@ -228,6 +231,62 @@ describe("SubmitExecution: a product runs as its ServiceAccount, with its team's
     const forwarded = vi.mocked(submitExecution).mock.calls[0]?.[0] as { tasks: Record<string, unknown>[] };
     expect(forwarded.tasks[0]?.["serviceAccount"]).toBe("default");
     expect(forwarded.tasks[0]).not.toHaveProperty("tokenAudiences");
+  });
+
+  describe("with a signed catalog, whose policy the kernel writes (decision 27)", () => {
+    const digestC = `sha256:${"c".repeat(64)}`;
+    const kernelPolicy = (entries: Record<string, unknown>[]) => ({
+      variables: Object.fromEntries(
+        "0123456789abcdef".split("").map((d) => [`releases${d}`, d === "c" && entries.length > 0 ? JSON.stringify({ [digestC]: entries }) : "{}"]),
+      ),
+      annotations: {},
+    });
+    const productA = { team: "", repository: "docker.io/library/some-image", action: "create", serviceAccount: GRANTEE, audiences: "sts.amazonaws.com" };
+    afterEach(() => {
+      config.catalogIdentityPolicyName = "";
+      vi.mocked(readPolicyVariables).mockResolvedValue(null);
+      forgetKernelPolicy();
+    });
+
+    it("forwards a release the kernel's policy lists as its product's, in its team", async () => {
+      config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
+      vi.mocked(readPolicyVariables).mockResolvedValue(kernelPolicy([{ ...productA, team: teamName }]));
+      expect((await submit({ serviceAccount: GRANTEE, secretRefs: ["product-a-secret"] })).code).toBe("ok");
+      expect(readPolicyVariables).toHaveBeenCalledWith("kernel-execution-kernel-catalog-identity");
+    });
+
+    it("refuses one it doesn't list yet (or another team's), and forwards nothing", async () => {
+      config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
+      // Not at all, in another team, as another action, or as a platform product (team ""), which the kernel never lists.
+      for (const listed of [[], [{ ...productA, team: otherTeamName }], [{ ...productA, team: teamName, action: "delete" }], [productA]]) {
+        vi.mocked(submitExecution).mockClear();
+        vi.mocked(readPolicyVariables).mockResolvedValue(kernelPolicy(listed));
+        forgetKernelPolicy();
+        const response = await submit({ serviceAccount: GRANTEE, secretRefs: ["product-a-secret"] });
+        expect(response.code).toBe("failed_precondition");
+        expect(message(response)).toContain(`The kernel's policy doesn't list ${digestC}`);
+        expect(submitExecution).not.toHaveBeenCalled();
+      }
+    });
+
+    it("asks nothing of a product's step as default with no Secrets or tokens, which any image may run as", async () => {
+      config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
+      vi.mocked(readPolicyVariables).mockResolvedValue(kernelPolicy([]));
+      const response = await submit({ image: `schema-image:1@sha256:${"c".repeat(64)}`, action: "check", inputs: { name: "a", count: 1 } });
+      expect(response.code).toBe("ok");
+    });
+
+    it("asks nothing of an unregistered image's step, which runs as default", async () => {
+      config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
+      vi.mocked(readPolicyVariables).mockResolvedValue(kernelPolicy([]));
+      expect((await submit({ image: "unregistered-image:1" })).code).toBe("ok");
+    });
+
+    it("leaves it to the console's own policy when the kernel writes none (an unsigned catalog)", async () => {
+      config.catalogIdentityPolicyName = "kernel-execution-kernel-catalog-identity";
+      vi.mocked(readPolicyVariables).mockResolvedValue(null);
+      expect((await submit({ serviceAccount: GRANTEE, secretRefs: ["product-a-secret"] })).code).toBe("ok");
+    });
   });
 
   it("rejects a product's task that runs as another ServiceAccount", async () => {

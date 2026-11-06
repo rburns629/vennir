@@ -43,7 +43,7 @@ kernel and module in the console, a run call by call, and the state machines.
   kernel-api. It also owns team namespaces, writes teams' Secrets (it can't
   read them), pins and scans images, and keeps the kernel's admission
   policies' lists current.
-- **kernel** (`kernel/`, Go): one binary and image, two processes that
+- **kernel** (`kernel/`, Go): one binary and image, processes that
   never call each other and coordinate only through Postgres rows.
   - **kernel-api** validates a DAG and stores it (`KernelService`, over
     Connect). It knows nothing about users or teams and accepts only the
@@ -51,6 +51,11 @@ kernel and module in the console, a run call by call, and the state machines.
   - **kernel-scheduler** claims ready steps, starts them as Jobs, watches
     them, records their results, and releases the steps that depended on
     them.
+  - **kernel policy** (optional, with a signed catalog: `catalogPolicy`)
+    verifies the catalog's release itself and writes what it decides
+    (which digests are a product's releases, as which identity; each API's
+    token audiences) into admission policies only it may update, beside
+    the console's (decision 27).
 - **gateway** (`gateway/`, Go; optional, `gateway.enabled` in the console
   chart): serves API products (decision 20), forwarding to each one's
   backend only what its reviewed OpenAPI document describes. Every backend

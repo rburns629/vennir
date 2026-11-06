@@ -131,6 +131,17 @@ imagePolicy:
 identityPolicy:
   policyName: kernel-execution-kernel-identity
 
+# -- The kernel's catalog identity policy (the kernel chart's catalogPolicy:
+# "<execution-kernel release name>-execution-kernel-catalog-identity"),
+# which `kernel policy` writes from the catalog release it verified itself.
+# The console may only read it (get, by name): to say on the Admin page who
+# writes products' identities, and to refuse a submission whose release it
+# doesn't list yet, rather than have the step refused at dispatch. Not
+# installed (an unsigned catalog): the console's identity policy is all
+# there is. Empty: never read.
+catalogPolicy:
+  identityPolicyName: kernel-execution-kernel-catalog-identity
+
 # -- How often the identity and scan policies are rewritten from the
 # console's database whatever changed, so a failed write or a hand edit
 # doesn't last (admins see the outcome on the Admin page: AdminService/GetPolicySync).

@@ -1887,6 +1887,25 @@ describe("admin", () => {
     expect(screen.getByText("quota refused")).toBeTruthy();
     const main = screen.getByRole("main");
     expect(main.textContent).not.toMatch(/pullSecrets|schedulerLogs|teamQuotas/);
+    // An unsigned catalog: the console alone writes the catalog's policies.
+    expect(screen.getByText(/The catalog isn't signed, so the console alone writes/)).toBeTruthy();
+  });
+
+  it("says the kernel writes the catalog's policies from the release it verified", async () => {
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": {
+        outcomes: { identityPolicy: { applies: true, ok: true } },
+        catalog: { writer: "kernel", release: "r.example/catalog-release@sha256:abc", commit: "0123456789abcdef" },
+      },
+    });
+    expect(await screen.findByText(/the kernel also writes, from the catalog release it verified \(commit 0123456789ab\)/)).toBeTruthy();
+    expect(screen.queryByText(/The catalog isn't signed/)).toBeNull();
+    cleanup();
+    // Before it has verified one, it says so, not that it already holds.
+    await renderAt("/admin/policies", ADMIN, {
+      "AdminService/GetPolicySync": { outcomes: {}, catalog: { writer: "kernel", release: "", commit: "" } },
+    });
+    expect(await screen.findByText(/once it has verified a catalog release/)).toBeTruthy();
   });
 
   it("sets the chat agent's model in place of the install's, keeps its key unshown, and tries it first", async () => {

@@ -196,6 +196,12 @@ jobs:
           done
           helm template kernel helm/charts/execution-kernel --set networkPolicy.enabled=false \
             --set identityPolicy.enabled=false --set api.auth.enabled=false --set imagePolicy.enabled=false > /dev/null
+          # kernel policy (decision 27), with the gateway's policy, a registry Secret and sleeping.
+          helm template kernel helm/charts/execution-kernel --set catalogPolicy.enabled=true \
+            --set catalogPolicy.release=r.example/catalog-release:latest --set 'catalogPolicy.signature.publicKeys[0]=k' \
+            --set catalogPolicy.gateway.serviceAccount=console-execution-console-gateway \
+            --set catalogPolicy.registry.authSecret=pull \
+            --set scaleDown.enabled=true --set scaleDown.schedule="0 20 * * *" > /dev/null
           helm template console helm/charts/execution-console --set kernelApiUrl=http://x \
             --set writeFence.enabled=false --set kernelApiToken.enabled=false > /dev/null
           for provider in operator google bundled; do

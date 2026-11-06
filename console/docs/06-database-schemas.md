@@ -65,6 +65,15 @@ erDiagram
     uuid task_id FK
     text event_type
   }
+  catalog_policy_state {
+    smallint id PK
+    text release_digest
+  }
+  catalog_policy_releases {
+    text digest PK
+    text team PK
+    text action PK
+  }
 ```
 
 Deleting an execution deletes everything under it (every foreign key is `ON DELETE CASCADE`). States are plain `varchar` columns with a check, not Postgres enums, so adding a state is an ordinary migration.
@@ -183,6 +192,35 @@ An append-only log of everything that happened to an execution, in order. It's w
 | `event_type` | text | no | `EXECUTION_CREATED`, `EXECUTION_STARTED`, `EXECUTION_SUCCEEDED`, `EXECUTION_FAILED`, `EXECUTION_CANCELLED`, `EXECUTION_RESUMED`, `TASK_CLAIMED`, `TASK_STARTED`, `TASK_SUCCEEDED`, `TASK_FAILED`, `TASK_CANCELLED`, `TASK_RETRIED`. |
 | `payload` | jsonb | no | Details for that event, such as a failure. |
 | `created_at` | timestamptz | no | |
+
+### catalog_policy_state
+
+The catalog release `kernel policy` last applied, after verifying its signature itself (decision 27 in `docs/assessment.md`): what it writes the cluster's catalog policies from. One row, once a release has been applied; none on an install whose catalog isn't signed (the console writes those policies then).
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `id` | smallint | no | Always 1. |
+| `release_reference` | text | no | Where it was read (the kernel chart's `catalogPolicy.release`, or its newest version). |
+| `release_digest` | text | no | Its manifest's digest: what was signed. |
+| `released_at` | timestamptz | no | When it was made (its `createdAt`); an older release is never applied. |
+| `commit` | text | no | The catalog commit it was made from. |
+| `signers` | text | no | A fingerprint of the signers it was verified against: when the kernel chart trusts others, it's verified again, and until a release they signed is applied the policies list nothing. |
+| `applied_at` | timestamptz | no | |
+| `apis` | jsonb | no | Each API's ServiceAccount and backend sign-in (`{team, serviceAccount, kind, audience}`), which the gateway token policy's audiences are computed from. |
+
+### catalog_policy_releases
+
+Each product release a verified catalog release named, as the catalog identity policy lists it. One row per digest and product (action).
+
+| Column | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `digest` | text | no | The released image's digest. |
+| `team` | text | no | The product's team: the namespace it runs in. |
+| `repository` | text | no | The image's repository, normalized as the kubelet reads it. |
+| `action` | text | no | |
+| `service_account` | text | no | What it runs as (`default` when its `product.yaml` declares none). |
+| `audiences` | text | no | Its token audiences, comma-separated. |
+| `released_until` | timestamptz | yes | When a later release stopped naming it; null while the applied one does. It's listed for an hour after, or while an unfinished task runs it, then removed. |
 
 `schema_migrations` also exists: which of `kernel/internal/migrate/sql/` the database has (`kernel migrate`).
 

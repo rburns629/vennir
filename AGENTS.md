@@ -62,6 +62,13 @@ its own directory.
     dispatches via the Kubernetes executor, polls status (informers wake
     it), releases dependents. A failed pass is logged and retried from
     durable state on the next one.
+  - `kernel policy` (kernel-policy, `internal/policy`; the kernel chart's
+    `catalogPolicy`, decision 27): with a signed catalog, verifies the
+    catalog's release itself (cosign's Go library, against signers set in
+    the kernel chart) and writes what it decides (each product's released
+    digests as its ServiceAccount and token audiences, each API's
+    audiences) into two admission policies only it may update, beside the
+    console's. Off with an unsigned catalog: the console writes them all.
   - `kernel migrate` (`internal/migrate`) owns the schema: `sql/NNNN_*.sql`,
     applied in order by the chart's hook Job; a released file never
     changes. kernel-api and the scheduler wait until the database is at

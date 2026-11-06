@@ -18,6 +18,7 @@ import { countProducts, countSubmittedExecutions, countTeams, countUsers } from 
 import { auditLog, auditReads, users } from "../db/schema.js";
 import { adoptTeam, catalogStatus, syncCatalog } from "../catalogSync.js";
 import { policySyncOutcomes, syncPolicies } from "../policySync.js";
+import { catalogPolicies } from "../catalogPolicy.js";
 import { clusterImagePolicyExists } from "../k8s.js";
 
 const REQUIRES_ADMIN = "Requires admin access.";
@@ -195,17 +196,31 @@ export async function auditReadEntries(
   return { reads: rows, nextBefore: rows.length === limit ? (rows.at(-1)?.id ?? null) : null };
 }
 
-/** The last outcome of each policy sync. */
-export function policySync(caller: AuthUser | undefined) {
+/**
+ * Who writes the catalog's policies (catalogPolicy.ts), for display beside
+ * the outcomes: when it can't be read, it's left out (and logged), never
+ * guessed, and the outcomes are still shown.
+ */
+async function catalogWriter(log: FastifyBaseLogger) {
+  try {
+    return await catalogPolicies();
+  } catch (error) {
+    log.warn({ err: error, event: "catalog_policy_unread" }, "couldn't read the kernel's catalog identity policy");
+    return undefined;
+  }
+}
+
+/** The last outcome of each policy sync, and who writes the catalog's. */
+export async function policySync(caller: AuthUser | undefined, log: FastifyBaseLogger) {
   forbiddenUnlessAdmin(caller, REQUIRES_ADMIN);
-  return policySyncOutcomes();
+  return { outcomes: policySyncOutcomes(), catalog: await catalogWriter(log) };
 }
 
 /** Runs every policy sync now, then returns their outcomes. */
 export async function syncPoliciesNow(caller: AuthUser | undefined, log: FastifyBaseLogger) {
   forbiddenUnlessAdmin(caller, REQUIRES_ADMIN);
   await syncPolicies(log);
-  return policySyncOutcomes();
+  return { outcomes: policySyncOutcomes(), catalog: await catalogWriter(log) };
 }
 
 /** The catalog release last applied, and how the last look went. */

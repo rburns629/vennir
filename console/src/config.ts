@@ -691,6 +691,13 @@ export const config = {
   // ServiceAccount and Secrets too. The chart always sets it; unset (as in
   // tests) means the console never writes to the cluster.
   identityPolicyName: process.env["IDENTITY_POLICY_NAME"] ?? "",
+  // The kernel chart's catalog identity policy (catalog-policy.yaml), which
+  // `kernel policy` writes from the catalog release it verified (decision
+  // 27), and this console only reads (catalogPolicy.ts): to say on the
+  // Admin page who writes products' identities, and to refuse a submission
+  // it doesn't list yet. Not installed (an unsigned catalog): this console
+  // writes them all. Unset (tests): never read.
+  catalogIdentityPolicyName: process.env["CATALOG_IDENTITY_POLICY_NAME"] ?? "",
   // How often the identity and scan policies are rewritten from the
   // database whatever changed (policySync.ts), so drift doesn't last.
   policySyncIntervalSeconds: positiveInt("POLICY_SYNC_INTERVAL_SECONDS", 300),

@@ -1,0 +1,1 @@
+{"critical":{"identity":{"docker-reference":"gcr.io/projectsigstore/cosign"},"image":{"docker-manifest-digest":"sha256:f1946d0f30fc8e3777b02f2201e02efdba9fe38f4918162f937052fac98e083f"},"type":"cosign container image signature"},"optional":{"GIT_HASH":"488ef8ceed5ab5d77379e9077a124a0d0df41d06","GIT_VERSION":"v2.5.3"}}

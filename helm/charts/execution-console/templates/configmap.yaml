@@ -136,6 +136,9 @@ data:
   # The kernel's identity admission policy, whose product list the console
   # keeps current (the execution-kernel chart's identity-policy.yaml).
   IDENTITY_POLICY_NAME: {{ .Values.identityPolicy.policyName | quote }}
+  # The kernel's catalog identity policy, which the console only reads
+  # (catalogPolicy.ts; the kernel chart's catalog-policy.yaml).
+  CATALOG_IDENTITY_POLICY_NAME: {{ .Values.catalogPolicy.identityPolicyName | quote }}
   POLICY_SYNC_INTERVAL_SECONDS: {{ .Values.policySyncIntervalSeconds | quote }}
   EXECUTION_RETENTION_DAYS: {{ .Values.retention.executionDays | quote }}
   AUDIT_RETENTION_DAYS: {{ .Values.retention.auditDays | quote }}

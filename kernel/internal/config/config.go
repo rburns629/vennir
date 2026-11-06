@@ -128,6 +128,26 @@ type Settings struct {
 	SleeperWakeCronJob string
 	SleeperWakeLead    time.Duration
 
+	// `kernel policy` (internal/policy, the chart's catalogPolicy): the
+	// catalog release it reads (CatalogPolicyRelease; following its newest
+	// version with CatalogPolicyNewestVersion), every CatalogPolicyPoll, the
+	// signers it trusts (keys and/or a keyless identity, never the
+	// console's), and the policies it writes. Empty release: it doesn't run.
+	CatalogPolicyRelease          string
+	CatalogPolicyNewestVersion    bool
+	CatalogPolicyPoll             time.Duration
+	CatalogPolicyPublicKeys       []string
+	CatalogPolicyKeylessIssuer    string
+	CatalogPolicyKeylessSubject   string
+	CatalogPolicyTUFCache         string
+	CatalogPolicyIdentityPolicy   string
+	CatalogPolicyGatewayPolicy    string
+	CatalogPolicyGatewayAudience  string
+	CatalogPolicyReleaseGrace     time.Duration
+	CatalogPolicyRegistryMirrors  map[string]string
+	CatalogPolicyRegistryGCPToken bool
+	CatalogPolicyRegistryECRToken bool
+
 	// kernel-scheduler, below.
 
 	// The longest the scheduler waits between passes when nothing has
@@ -280,6 +300,18 @@ func (r *reader) integer(name string, fallback int, positive bool) int {
 	return int(n)
 }
 
+// boolean is true or false, or fallback when unset.
+func (r *reader) boolean(name string, fallback bool) bool {
+	v, ok := r.raw(name)
+	if !ok {
+		return fallback
+	}
+	if v != "true" && v != "false" {
+		r.problems = append(r.problems, fmt.Sprintf("%s: true or false, got %q", name, v))
+	}
+	return v == "true"
+}
+
 func (r *reader) seconds(name string, fallback float64, positive bool) time.Duration {
 	return time.Duration(r.number(name, fallback, positive) * float64(time.Second))
 }
@@ -325,6 +357,18 @@ func Load(getenv func(string) string) (Settings, error) {
 		SleeperScheduledWait:            r.seconds("SLEEPER_SCHEDULED_WAIT_SECONDS", 6*3600, true),
 		SleeperWakeCronJob:              r.str("SLEEPER_WAKE_CRONJOB", ""),
 		SleeperWakeLead:                 r.seconds("SLEEPER_WAKE_LEAD_SECONDS", 300, true),
+		CatalogPolicyRelease:            r.str("CATALOG_POLICY_RELEASE", ""),
+		CatalogPolicyNewestVersion:      r.boolean("CATALOG_POLICY_NEWEST_VERSION", false),
+		CatalogPolicyPoll:               r.seconds("CATALOG_POLICY_POLL_SECONDS", 60, true),
+		CatalogPolicyKeylessIssuer:      r.str("CATALOG_POLICY_KEYLESS_ISSUER", ""),
+		CatalogPolicyKeylessSubject:     r.str("CATALOG_POLICY_KEYLESS_SUBJECT_REGEXP", ""),
+		CatalogPolicyTUFCache:           r.str("CATALOG_POLICY_TUF_CACHE", "/tmp/sigstore-tuf"),
+		CatalogPolicyIdentityPolicy:     r.str("CATALOG_POLICY_IDENTITY_POLICY", ""),
+		CatalogPolicyGatewayPolicy:      r.str("CATALOG_POLICY_GATEWAY_POLICY", ""),
+		CatalogPolicyGatewayAudience:    r.str("CATALOG_POLICY_GATEWAY_GCP_AUDIENCE", ""),
+		CatalogPolicyReleaseGrace:       r.seconds("CATALOG_POLICY_RELEASE_GRACE_SECONDS", 3600, true),
+		CatalogPolicyRegistryGCPToken:   r.boolean("CATALOG_POLICY_REGISTRY_GCP_METADATA_TOKEN", false),
+		CatalogPolicyRegistryECRToken:   r.boolean("CATALOG_POLICY_REGISTRY_ECR_TOKEN", false),
 		PollInterval:                    r.seconds("SCHEDULER_POLL_INTERVAL_SECONDS", 1, true),
 		LeaseDuration:                   r.seconds("LEASE_DURATION_SECONDS", 60, true),
 		ClaimLimit:                      r.integer("SCHEDULER_CLAIM_LIMIT", 50, true),
@@ -383,6 +427,20 @@ func Load(getenv func(string) string) (Settings, error) {
 	}
 	if s.DatabaseAdminSecret != "" && s.DatabaseIAMRegion == "" {
 		r.problems = append(r.problems, "DATABASE_IAM_REGION: needed with DATABASE_ADMIN_SECRET (the secret's region)")
+	}
+	r.jsonValue("CATALOG_POLICY_PUBLIC_KEYS", &s.CatalogPolicyPublicKeys)
+	r.jsonValue("CATALOG_POLICY_REGISTRY_MIRRORS", &s.CatalogPolicyRegistryMirrors)
+	if s.CatalogPolicyRelease != "" {
+		if s.CatalogPolicyIdentityPolicy == "" {
+			r.problems = append(r.problems, "CATALOG_POLICY_IDENTITY_POLICY: needed with CATALOG_POLICY_RELEASE (the policy it writes)")
+		}
+		if (s.CatalogPolicyKeylessIssuer == "") != (s.CatalogPolicyKeylessSubject == "") {
+			r.problems = append(r.problems, "CATALOG_POLICY_KEYLESS_ISSUER and CATALOG_POLICY_KEYLESS_SUBJECT_REGEXP: both, or neither")
+		}
+		if len(s.CatalogPolicyPublicKeys) == 0 && s.CatalogPolicyKeylessIssuer == "" {
+			// Without a signer, nothing is verified: the console writes them.
+			r.problems = append(r.problems, "CATALOG_POLICY_PUBLIC_KEYS or CATALOG_POLICY_KEYLESS_ISSUER: a signer to trust is needed with CATALOG_POLICY_RELEASE")
+		}
 	}
 	r.jsonValue("SLEEPER_DEPLOYMENTS", &s.SleeperDeployments)
 	r.jsonValue("SLEEPER_DATABASE_DEPLOYMENTS", &s.SleeperDatabases)

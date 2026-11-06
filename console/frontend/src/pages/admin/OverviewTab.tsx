@@ -8,7 +8,7 @@ import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import SyncIcon from "@mui/icons-material/Sync";
 import LinkIcon from "@mui/icons-material/LinkOutlined";
-import { errorMessage, getAuditCopy, getPolicySync, getSecurity, syncPolicies, type AuditCopy, type PolicySync } from "../../api";
+import { errorMessage, getAuditCopy, getPolicyState, getSecurity, syncPolicyState, type AuditCopy, type CatalogPolicies, type PolicySync } from "../../api";
 import { Mono } from "../../components/Mono";
 import { Pill } from "../../components/Pill";
 import { when } from "../../time";
@@ -89,12 +89,16 @@ function RefusedToday() {
 /** The cluster's admission policies: the ones the console writes, the ones the kernel chart installs, and what they refused. */
 export function PoliciesCard() {
   const [policies, setPolicies] = useState<PolicySync[] | null>(null);
+  const [catalog, setCatalog] = useState<CatalogPolicies | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    getPolicySync()
-      .then(setPolicies)
+    getPolicyState()
+      .then((s) => {
+        setPolicies(s.policies);
+        setCatalog(s.catalog);
+      })
       .catch((err: unknown) => { setError(errorMessage(err, "Couldn't read the policies.")); });
   }, []);
 
@@ -103,7 +107,9 @@ export function PoliciesCard() {
     setBusy(true);
     setError(null);
     try {
-      setPolicies(await syncPolicies());
+      const s = await syncPolicyState();
+      setPolicies(s.policies);
+      setCatalog(s.catalog);
       changed();
     } catch (err) {
       setError(errorMessage(err, "Couldn't write them."));
@@ -196,6 +202,15 @@ export function PoliciesCard() {
           </Link>{" "}
           are saved.
         </Typography>
+        {catalog && (
+          <Typography variant="caption" color="text.secondary">
+            {catalog.writer === "console"
+              ? "The catalog isn't signed, so the console alone writes which images run as each product, and each API's token audiences: a console that's taken over could loosen them."
+              : catalog.release
+                ? `Which images run as each product, and each API's token audiences, the kernel also writes, from the catalog release it verified${catalog.commit ? ` (commit ${catalog.commit.slice(0, 12)})` : ""}: a step must pass both, so the console can't loosen them.`
+                : "The kernel will also write which images run as each product, and each API's token audiences, once it has verified a catalog release; until then its copies are what the console last wrote."}
+          </Typography>
+        )}
       </AdminCard>
 
       <AdminCard title="Installed with the kernel" status={<Aside>Changed by an upgrade, not here</Aside>}>
