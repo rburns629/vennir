@@ -277,10 +277,11 @@ resource "aws_eks_addon" "ebs" {
   count        = local.standard ? 1 : 0
   cluster_name = aws_eks_cluster.this.name
   addon_name   = "aws-ebs-csi-driver"
-  # Volumes it makes carry this cluster's tag (kubernetes.io/cluster/<name>
-  # and KubernetesCluster), so a destroy that can't reach the cluster tells
-  # its left volumes from another install's (awscloud.LeftVolumes).
-  configuration_values = jsonencode({ controller = { k8sTagClusterId = aws_eks_cluster.this.name } })
+  # Volumes it makes carry this cluster's name (KubernetesCluster), so a
+  # destroy that can't reach the cluster tells its left volumes from another
+  # install's (awscloud.LeftVolumes). The add-on's schema dropped
+  # controller.k8sTagClusterId (v1.67): extraVolumeTags sets it instead.
+  configuration_values = jsonencode({ controller = { extraVolumeTags = { KubernetesCluster = aws_eks_cluster.this.name } } })
   pod_identity_association {
     role_arn        = aws_iam_role.ebs[0].arn
     service_account = "ebs-csi-controller-sa"
