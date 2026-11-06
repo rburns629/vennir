@@ -250,15 +250,15 @@ func (s *Store) InUse(ctx context.Context, max time.Duration) (map[Use]time.Time
 }
 
 // Prune forgets the releases no longer listed (Kept). Returns how many.
-func (s *Store) Prune(ctx context.Context, releases []Release, inUse map[Use]time.Time, now time.Time, grace time.Duration) (int, error) {
+func (s *Store) Prune(ctx context.Context, releases []Release, inUse map[Use]time.Time, now time.Time, w Window) (int, error) {
 	pruned := 0
 	for _, r := range releases {
-		if Kept(r, inUse, now, grace) {
+		if Kept(r, inUse, now, w) {
 			continue
 		}
 		tag, err := s.DB.Exec(ctx, `DELETE FROM catalog_policy_releases WHERE digest = $1 AND team = $2 AND repository = $3
 			AND action = $4 AND service_account = $5 AND audiences = $6 AND released_until IS NOT NULL AND released_until < $7`,
-			r.Digest, r.Team, r.Repository, r.Action, r.ServiceAccount, r.Audiences, now.Add(-grace))
+			r.Digest, r.Team, r.Repository, r.Action, r.ServiceAccount, r.Audiences, now.Add(-w.Grace))
 		if err != nil {
 			return pruned, err
 		}

@@ -78,6 +78,13 @@ data:
   {{- fail (printf "catalogPolicy.inUseMaxSeconds (%d) must be at least scheduler.approvalTimeoutSeconds (%d): a step approved later would be refused its product's identity." $inUse $approval) }}
   {{- end }}
   CATALOG_POLICY_IN_USE_MAX_SECONDS: {{ $inUse | quote }}
+  {{- /* The most any use keeps it, after a release dropped it: retries keep
+       an execution moving, this doesn't move. */}}
+  {{- $limit := int (.inUseLimitSeconds | default (max 604800 (mul 2 $inUse))) }}
+  {{- if lt $limit $inUse }}
+  {{- fail (printf "catalogPolicy.inUseLimitSeconds (%d) must be at least the in-use bound (%d)." $limit $inUse) }}
+  {{- end }}
+  CATALOG_POLICY_IN_USE_LIMIT_SECONDS: {{ $limit | quote }}
   CATALOG_POLICY_RELEASE_GRACE_SECONDS: {{ .releaseGraceSeconds | default 3600 | quote }}
   CATALOG_POLICY_PUBLIC_KEYS: {{ .signature.publicKeys | toJson | quote }}
   CATALOG_POLICY_KEYLESS_ISSUER: {{ .signature.keyless.issuer | quote }}

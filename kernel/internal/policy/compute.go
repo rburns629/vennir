@@ -455,20 +455,33 @@ func Audiences(apis []API, gcpAudience string, reserved Reserved) map[string][]s
 // after (during the grace) keeps nothing: it can't hold a dropped release
 // open. inUse carries each use's earliest submission, from executions
 // recent enough to count at all (Store.InUse's bound).
-func Kept(r Release, inUse map[Use]time.Time, now time.Time, grace time.Duration) bool {
-	if r.ReleasedUntil == nil || now.Sub(*r.ReleasedUntil) < grace {
+//
+// However long its executions keep moving (a retry makes a step ready
+// again, and the console asks for retries), nothing keeps it past
+// w.Limit after a release dropped it: the bound holds whatever the
+// console does through kernel-api.
+func Kept(r Release, inUse map[Use]time.Time, now time.Time, w Window) bool {
+	if r.ReleasedUntil == nil || now.Sub(*r.ReleasedUntil) < w.Grace {
 		return true
+	}
+	if w.Limit > 0 && now.Sub(*r.ReleasedUntil) >= w.Limit {
+		return false
 	}
 	submitted, ok := inUse[Use{Digest: r.Digest, Team: r.Team, Repository: r.Repository, Action: r.Action, ServiceAccount: r.ServiceAccount}]
 	return ok && !submitted.After(*r.ReleasedUntil)
 }
 
+// Window is how long an earlier release stays listed after a release
+// dropped it: Grace in any case, and while in use (Kept) up to Limit, never
+// longer (0: no limit, a test's).
+type Window struct{ Grace, Limit time.Duration }
+
 // Listed are the releases the identity policy lists now (Kept), by digest.
-func Listed(releases []Release, inUse map[Use]time.Time, now time.Time, grace time.Duration) map[string][]Entry {
+func Listed(releases []Release, inUse map[Use]time.Time, now time.Time, w Window) map[string][]Entry {
 	listed := map[string][]Entry{}
 	seen := map[string]bool{}
 	for _, r := range releases {
-		if !Kept(r, inUse, now, grace) {
+		if !Kept(r, inUse, now, w) {
 			continue
 		}
 		key := r.Digest + "\x00" + mustJSON(r.Entry)

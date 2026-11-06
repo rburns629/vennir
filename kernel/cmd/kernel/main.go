@@ -470,6 +470,7 @@ func runPolicy(ctx context.Context, s config.Settings, log *slog.Logger) error {
 		Reserved:       policy.ReservedAudiences(append(own, s.APITokenAudience)...),
 		ReleaseGrace:   s.CatalogPolicyReleaseGrace,
 		InUseMax:       s.CatalogPolicyInUseMax,
+		InUseLimit:     s.CatalogPolicyInUseLimit,
 		PollInterval:   s.CatalogPolicyPoll,
 		PassTimeout:    5 * time.Minute,
 		Log:            log,

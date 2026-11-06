@@ -490,7 +490,11 @@ each step's wait, not the execution's age, and defaults to the scheduler's
 `approvalTimeoutSeconds`, or three days if that's longer or off; the chart
 (and kernel policy at startup) refuses less than the approval timeout. An
 execution whose steps all wait longer (an approval with no timeout) is
-refused its product's identity when the next one starts. The grace is per
+refused its product's identity when the next one starts. However its
+executions keep moving (retries make a step ready again), nothing keeps an
+earlier release past `catalogPolicy.inUseLimitSeconds` after a release
+dropped it: a week, or twice the in-use bound if longer, by default, and
+never less than it. The grace is per
 digest: when two products share a digest and action and a release drops
 one of them (keeping the digest for the other), the dropped one is revoked
 at once, with no grace and not while in use.

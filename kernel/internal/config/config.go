@@ -145,6 +145,7 @@ type Settings struct {
 	CatalogPolicyGatewayAudience  string
 	CatalogPolicyReleaseGrace     time.Duration
 	CatalogPolicyInUseMax         time.Duration
+	CatalogPolicyInUseLimit       time.Duration
 	CatalogPolicyRegistryMirrors  map[string]string
 	CatalogPolicyRegistryGCPToken bool
 	CatalogPolicyRegistryECRToken bool
@@ -369,6 +370,7 @@ func Load(getenv func(string) string) (Settings, error) {
 		CatalogPolicyGatewayAudience:    r.str("CATALOG_POLICY_GATEWAY_GCP_AUDIENCE", ""),
 		CatalogPolicyReleaseGrace:       r.seconds("CATALOG_POLICY_RELEASE_GRACE_SECONDS", 3600, true),
 		CatalogPolicyInUseMax:           r.seconds("CATALOG_POLICY_IN_USE_MAX_SECONDS", 259200, true),
+		CatalogPolicyInUseLimit:         r.seconds("CATALOG_POLICY_IN_USE_LIMIT_SECONDS", 604800, true),
 		CatalogPolicyRegistryGCPToken:   r.boolean("CATALOG_POLICY_REGISTRY_GCP_METADATA_TOKEN", false),
 		CatalogPolicyRegistryECRToken:   r.boolean("CATALOG_POLICY_REGISTRY_ECR_TOKEN", false),
 		PollInterval:                    r.seconds("SCHEDULER_POLL_INTERVAL_SECONDS", 1, true),
@@ -448,6 +450,10 @@ func Load(getenv func(string) string) (Settings, error) {
 		if s.ApprovalTimeout > 0 && s.CatalogPolicyInUseMax < s.ApprovalTimeout {
 			r.problems = append(r.problems, fmt.Sprintf("CATALOG_POLICY_IN_USE_MAX_SECONDS: must be at least SCHEDULER_APPROVAL_TIMEOUT_SECONDS (%s), got %s",
 				s.ApprovalTimeout, s.CatalogPolicyInUseMax))
+		}
+		if s.CatalogPolicyInUseLimit < s.CatalogPolicyInUseMax {
+			r.problems = append(r.problems, fmt.Sprintf("CATALOG_POLICY_IN_USE_LIMIT_SECONDS: must be at least CATALOG_POLICY_IN_USE_MAX_SECONDS (%s), got %s",
+				s.CatalogPolicyInUseMax, s.CatalogPolicyInUseLimit))
 		}
 	}
 	r.jsonValue("SLEEPER_DEPLOYMENTS", &s.SleeperDeployments)

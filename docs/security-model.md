@@ -210,7 +210,12 @@ moving: a step of it running, or one that became ready or began awaiting
 its approval within the scheduler's approval timeout or three days,
 whichever is longer. Each step's wait is bounded, not the execution's age,
 so a long DAG or several approval gates keep it; one submitted during the
-hour, or stalled longer (say never to be approved), doesn't hold it open. A digest a newer release names as another ServiceAccount or
+hour, or stalled longer (say never to be approved), doesn't hold it open.
+Whatever its executions do, nothing keeps it past
+`catalogPolicy.inUseLimitSeconds` (a week by default) after the release
+dropped it: a retry makes a step ready again, and the console asks for
+retries, so a compromised console could otherwise keep one moving, and the
+policy lists the digest for every execution, not only that one. A digest a newer release names as another ServiceAccount or
 other audiences loses the old ones at once. Each release records which of
 the trusted signers (each key, the keyless identity) verified it, and is
 listed only while one of them is still trusted: removing a key takes the

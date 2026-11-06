@@ -108,6 +108,12 @@ catalogPolicy:
   # wait longer (an approval with no timeout) is refused its product's
   # identity when it starts.
   inUseMaxSeconds: 0
+  # -- The most an earlier release stays listed after a release dropped it,
+  # however its executions keep moving (a retry makes a step ready again,
+  # and the console asks for retries): the bound holds whatever the console
+  # does. 0: a week, or twice the in-use bound if that's longer; never
+  # less than the in-use bound.
+  inUseLimitSeconds: 0
   # -- Who may sign a release: any of these cosign public keys (PEM), and/or
   # a keyless identity (both issuer and subjectRegExp), as the console
   # chart's catalog.signature. One is needed.

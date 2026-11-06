@@ -136,7 +136,7 @@ func newController(t *testing.T, source Source) (*Controller, *fakeWriter, *Stor
 	store := &Store{DB: tx}
 	writer := &fakeWriter{policies: map[string]map[string]string{"identity": {"seeded": "yes"}, "tokens": {"seeded": "yes"}}}
 	return &Controller{Source: source, Store: store, Writer: writer, IdentityPolicy: "identity", GatewayPolicy: "tokens",
-		Reserved: ReservedAudiences(), ReleaseGrace: time.Hour, InUseMax: 72 * time.Hour, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}, writer, store
+		Reserved: ReservedAudiences(), ReleaseGrace: time.Hour, InUseMax: 72 * time.Hour, InUseLimit: 7 * 24 * time.Hour, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}, writer, store
 }
 
 func releaseAt(at time.Time, products ...*catalogv1.ProductAction) *catalogv1.Release {
@@ -463,6 +463,63 @@ func TestTwoProductsSharingADigestAndActionAreBothListed(t *testing.T) {
 	}
 	if entries := writer.listed(t, digest("1")); len(entries) != 2 {
 		t.Fatalf("listed after another apply: %+v", entries)
+	}
+}
+
+// Retries keep an execution moving (each makes its step ready again, and
+// the console asks for them): however often, an earlier release stays
+// listed no longer than InUseLimit after a release dropped it.
+func TestARetryDoesntKeepAReleasePastTheLimit(t *testing.T) {
+	ctx := context.Background()
+	source := &fakeSource{}
+	c, writer, store := newController(t, source)
+	start := time.Now().Add(-time.Minute)
+	source.release(t, digest("a"), releaseAt(start, db("1")))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	source.release(t, digest("b"), releaseAt(start.Add(time.Second), db("2")))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// An execution submitted before the release dropped digest 1, its step
+	// retried just now (READY, available_at now).
+	dropped := func(ago string) {
+		t.Helper()
+		if _, err := store.DB.Exec(ctx, `UPDATE catalog_policy_releases SET released_until = now() - $1::interval
+			WHERE released_until IS NOT NULL`, ago); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dropped("6 days")
+	execution := "00000000-0000-0000-0000-0000000000e9"
+	if _, err := store.DB.Exec(ctx, `INSERT INTO executions (id, external_reference, idempotency_key, state, created_at)
+		VALUES ($1::uuid, 'policy-test', $1::text, 'RUNNING', now() - interval '30 days')`, execution); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.DB.Exec(ctx, `INSERT INTO execution_tasks (id, execution_id, task_key, image, action, team, service_account,
+		state, original_inputs, timeout_seconds, max_attempts, attempt_count, available_at)
+		VALUES ('00000000-0000-0000-0000-0000000000f9', $1, 'db', $2, 'create', 'local', 'db-sa', 'READY', '{}', 60, 3, 1, now())`,
+		execution, "registry.example/local/db:1@"+digest("1")); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(writer.listed(t, digest("1"))) != 1 {
+		t.Fatal("within the limit, a release in use was dropped")
+	}
+	// Past the limit: not listed, and pruned, though retried just now.
+	dropped("8 days")
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if writer.listed(t, digest("1")) != nil {
+		t.Fatal("a retried step kept a release listed past InUseLimit")
+	}
+	var left int
+	if err := store.DB.QueryRow(ctx, `SELECT count(*) FROM catalog_policy_releases WHERE digest = $1`, digest("1")).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("not pruned: %d, %v", left, err)
 	}
 }
 

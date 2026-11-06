@@ -43,6 +43,13 @@ in_use() { helm template kernel helm/charts/execution-kernel "${on[@]}" "$@" --s
 [ "$(in_use)" = 'CATALOG_POLICY_IN_USE_MAX_SECONDS: "259200"' ] && ok "in use: three days by default" || fail "in use, by default" "$(in_use)"
 [ "$(in_use --set scheduler.approvalTimeoutSeconds=604800)" = 'CATALOG_POLICY_IN_USE_MAX_SECONDS: "604800"' ] \
   && ok "in use: the approval timeout, when longer" || fail "in use, a week's approval" "$(in_use --set scheduler.approvalTimeoutSeconds=604800)"
+limit() { helm template kernel helm/charts/execution-kernel "${on[@]}" "$@" --show-only templates/configmap.yaml 2>&1 | grep -o 'CATALOG_POLICY_IN_USE_LIMIT_SECONDS: "[0-9]*"'; }
+[ "$(limit)" = 'CATALOG_POLICY_IN_USE_LIMIT_SECONDS: "604800"' ] && ok "in-use limit: a week by default" || fail "in-use limit, by default" "$(limit)"
+[ "$(limit --set scheduler.approvalTimeoutSeconds=604800)" = 'CATALOG_POLICY_IN_USE_LIMIT_SECONDS: "1209600"' ] \
+  && ok "in-use limit: twice the in-use bound, when longer" || fail "in-use limit, a week's approval" "$(limit --set scheduler.approvalTimeoutSeconds=604800)"
+low=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --set catalogPolicy.inUseLimitSeconds=3600 --show-only templates/configmap.yaml 2>&1)
+if echo "$low" | grep -q "must be at least the in-use bound"; then ok "in-use limit: refused under the in-use bound"
+else fail "in-use limit under the in-use bound" "rendered"; fi
 short=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --set scheduler.approvalTimeoutSeconds=604800 --set catalogPolicy.inUseMaxSeconds=3600 \
   --show-only templates/configmap.yaml 2>&1)
 if echo "$short" | grep -q "must be at least scheduler.approvalTimeoutSeconds"; then ok "in use: refused under the approval timeout"

@@ -126,9 +126,13 @@ type Controller struct {
 	// release stopped naming it (the console's RELEASE_GRACE_MINUTES).
 	ReleaseGrace time.Duration
 	// InUseMax bounds which unfinished executions keep an earlier release
-	// listed: those submitted within it (the scheduler's approval timeout,
-	// by default).
-	InUseMax     time.Duration
+	// listed: those with a step running, or ready or awaiting its approval
+	// within it (Store.InUse; at least the scheduler's approval timeout).
+	InUseMax time.Duration
+	// InUseLimit is the most an earlier release stays listed after a
+	// release dropped it, in use or not (retries keep an execution
+	// moving; this doesn't move).
+	InUseLimit   time.Duration
 	PollInterval time.Duration
 	PassTimeout  time.Duration
 	Log          *slog.Logger
@@ -261,7 +265,7 @@ func (c *Controller) apply(ctx context.Context, ref, digest string, current *Sta
 	}
 	// What it lists by itself must fit the policies, or it isn't applied:
 	// applied, it couldn't be written, and what's written now would stand.
-	if _, err := IdentityVariables(Listed(releases, nil, time.Now(), 0)); err != nil {
+	if _, err := IdentityVariables(Listed(releases, nil, time.Now(), Window{})); err != nil {
 		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err)
 	}
 	if _, err := AudienceVariables(Audiences(apis, c.GCPAudience, c.Reserved)); err != nil {
@@ -309,7 +313,8 @@ func (c *Controller) write(ctx context.Context) error {
 	// Only releases a signer trusted now verified: an earlier release only
 	// a removed key signed isn't listed, in its grace or in use.
 	trusted := TrustedReleases(releases, c.Source.Trusted())
-	listed := Listed(trusted, inUse, now, c.ReleaseGrace)
+	window := Window{Grace: c.ReleaseGrace, Limit: c.InUseLimit}
+	listed := Listed(trusted, inUse, now, window)
 	apis := state.APIs
 	if !TrustedBy(state.Signers, c.Source.Trusted()) {
 		listed, apis = map[string][]Entry{}, nil
@@ -340,7 +345,7 @@ func (c *Controller) write(ctx context.Context) error {
 	if changed {
 		c.Log.Info("identity policy written", "policy", c.IdentityPolicy, "digests", len(listed), "release", state.Digest)
 	}
-	pruned, err := c.Store.Prune(ctx, releases, inUse, now, c.ReleaseGrace)
+	pruned, err := c.Store.Prune(ctx, releases, inUse, now, window)
 	if err != nil {
 		return errors.Join(overflow, err)
 	}

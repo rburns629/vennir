@@ -148,7 +148,7 @@ func TestAnEarlierReleaseIsListedWhileInUseOrForAnHour(t *testing.T) {
 		use("5", "other", "create"): *ago(3 * time.Hour),
 		use("6", "local", "create"): *ago(90 * time.Minute),
 	}
-	listed := Listed(releases, inUse, now, time.Hour)
+	listed := Listed(releases, inUse, now, Window{Grace: time.Hour})
 	for _, c := range []struct {
 		digest string
 		listed bool
