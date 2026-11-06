@@ -22,7 +22,7 @@ func grantFixture(t *testing.T) (*fixture, *recorder) {
 	t.Helper()
 	f := setup(t, "")
 	f.api.ID = "orders-id"
-	f.api.PerMinute = map[string]int{"default": 100, "web": 50}
+	f.api.PerMinute = map[string]int{"default": 100}
 	f.gw.Store.PutGrants("orders-id", []store.Grant{
 		{ID: "g-ada", UserID: "ada", PerMinute: 2},
 		{ID: "g-eng", Group: "eng@example.com", PerMinute: 3},
@@ -51,15 +51,17 @@ func TestGrants(t *testing.T) {
 	f, traffic := grantFixture(t)
 	path := "/payments/orders/orders/ord_abcdefgh"
 	for who, want := range map[string]int{
-		"ada": 201, "eng-1": 201, "eng-and-ops": 201, "bot": 201, "payments-person": 201, "web-person": 201,
+		"ada": 201, "eng-1": 201, "eng-and-ops": 201, "bot": 201, "payments-person": 201,
 		// Admins only if granted; a bot in a granted group is no member of it;
 		// a bot of retired teams only has no grant.
 		"admin": 403, "outsider": 403, "group-bot": 403, "lonely-bot": 403,
+		// Another team of theirs gives nothing: only the API's own does.
+		"web-person": 403,
 		// Groups that don't count: an older single sign-on session signs in
 		// again (401); a password's session or an API token is refused (403).
 		"eng-stale-sso": 401, "eng-stale-password": 403,
-		// Stale groups, but a shareWith team lets them in anyway.
-		"eng-stale-web": 201,
+		// Stale groups, and a team that isn't the API's: signs in again.
+		"eng-stale-web": 401,
 	} {
 		w := f.do("GET", path, who, "", nil)
 		if w.Code != want {
@@ -101,7 +103,7 @@ func TestGrants(t *testing.T) {
 	for _, r := range *traffic {
 		teams[r.team] = true
 	}
-	for _, want := range []string{"grant:user", "grant:group:eng@example.com", "payments", "web"} {
+	for _, want := range []string{"grant:user", "grant:group:eng@example.com", "payments"} {
 		if !teams[want] {
 			t.Errorf("traffic has no %q: %v", want, *traffic)
 		}
@@ -142,10 +144,6 @@ func TestGrantRatesAndRevoking(t *testing.T) {
 	if ok, _ := calls("eng-and-ops", 10); ok != 10 {
 		t.Errorf("the better of two groups: %d through, want 10", ok)
 	}
-	// A shareWith team at its named limit, as before.
-	if ok, _ := calls("web-person", 55); ok != 50 {
-		t.Errorf("a shareWith team at 50/min: %d", ok)
-	}
 
 	// Revoked: the store's next refresh has it gone.
 	if w := f.do("GET", path, "bot", "", nil); w.Code != 201 {
@@ -172,7 +170,6 @@ func TestAccessCasesSharedWithTheConsole(t *testing.T) {
 	type apiFields struct {
 		ID        string
 		Team      string
-		ShareWith []string
 		PerMinute map[string]int
 	}
 	var table struct {
@@ -202,11 +199,8 @@ func TestAccessCasesSharedWithTheConsole(t *testing.T) {
 		t.Fatal("no cases")
 	}
 	for _, c := range table.Cases {
-		api := &store.API{ID: table.API.ID, Team: table.API.Team, ShareWith: table.API.ShareWith, PerMinute: table.API.PerMinute}
+		api := &store.API{ID: table.API.ID, Team: table.API.Team, PerMinute: table.API.PerMinute}
 		if c.API != nil {
-			if c.API.ShareWith != nil {
-				api.ShareWith = c.API.ShareWith
-			}
 			if c.API.PerMinute != nil {
 				api.PerMinute = c.API.PerMinute
 			}
@@ -247,7 +241,7 @@ func TestAccessCasesSharedWithTheConsole(t *testing.T) {
 }
 
 // A hidden API is heard of by whoever a grant lets in, as by its own team
-// (the console's sees()); not by a shareWith team, nor by an admin without
+// (the console's sees()); not by another team, nor by an admin without
 // one (who hears of it, but may not call).
 func TestAHiddenAPIsGrantees(t *testing.T) {
 	f, _ := grantFixture(t)

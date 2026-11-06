@@ -15,11 +15,10 @@ import type { AuthUser } from "../auth/plugin.js";
 import { config } from "../config.js";
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { catalogRepository, findApi, findUserById, listLiveTeamApis, setApiPaused, type ApiRow } from "../db/queries.js";
+import { findApi, findUserById, listLiveTeamApis, setApiPaused, type ApiRow } from "../db/queries.js";
 import { apiProblems, apiTraffic, gatewayState, teams, type BackendAuth } from "../db/schema.js";
 import { apiNamespace, hasApiNamespace } from "../k8s.js";
 import { accessFor, callerContext, type Access } from "./apiAccess.js";
-import { catalogLinks, githubBase } from "./catalogLinks.js";
 
 type Api = ApiRow & { teamName: string };
 
@@ -248,10 +247,9 @@ function joinUrl(base: string, api: Api): string {
 }
 
 /**
- * One API as the caller sees it; `base` is the catalog repository's GitHub
- * page, for its links; `access`, how they may call it (apiAccess.ts).
+ * One API as the caller sees it; `access`, how they may call it (apiAccess.ts).
  */
-function view(caller: AuthUser, api: Api, base: string | null, problem: Problem | null, apiNamespaceTaken: boolean, access: Access | null) {
+function view(caller: AuthUser, api: Api, problem: Problem | null, apiNamespaceTaken: boolean, access: Access | null) {
   const own = caller.isAdmin || caller.teamNames.includes(api.teamName);
   const mayCall = access !== null;
   const internet = api.internet && config.gateway.internetTeams.includes(api.teamName);
@@ -266,7 +264,6 @@ function view(caller: AuthUser, api: Api, base: string | null, problem: Problem 
     mayCall,
     accessVia: access?.via ?? null,
     accessRequests: api.accessRequests,
-    shareWith: api.shareWith,
     hidden: api.hidden,
     deprecated: api.deprecated ?? "",
     internet,
@@ -278,8 +275,6 @@ function view(caller: AuthUser, api: Api, base: string | null, problem: Problem 
     maxRequestBytes: api.maxRequestBytes,
     sourcePath: api.sourcePath ?? "",
     ...limitsOf(api),
-    // Shared with everyone, asking for it can't help: a caller without a team needs one.
-    askForAccessUrl: catalogLinks(base, api.sourcePath ?? null, "the API", `${api.teamName}/${api.name}`, caller, mayCall || api.shareWith.includes("*")).askForAccessUrl ?? "",
     backendUrl: own ? api.backendUrl : "",
     backendAuth: own ? authKind(api.backendAuth) : "",
     specTitle: typeof info["title"] === "string" ? info["title"] : "",
@@ -291,7 +286,6 @@ export type ApiView = ReturnType<typeof view>;
 
 export async function listApis(caller: AuthUser | undefined): Promise<ApiView[]> {
   const who = signedIn(caller);
-  const base = githubBase(await catalogRepository());
   const ctx = await callerContext(who);
   const seen = (await listLiveTeamApis()).flatMap((api) => {
     const access = accessFor(who, api, ctx);
@@ -299,7 +293,7 @@ export async function listApis(caller: AuthUser | undefined): Promise<ApiView[]>
   });
   const problems = await problemsOf(seen.map(({ api }) => api.id));
   const taken = await apiNamespacesTaken(seen.map(({ api }) => api.teamName));
-  return seen.map(({ api, access }) => view(who, api, base, problems.get(api.id) ?? null, taken.has(api.teamName), access));
+  return seen.map(({ api, access }) => view(who, api, problems.get(api.id) ?? null, taken.has(api.teamName), access));
 }
 
 /** An API the caller may see, and how they may call it. */
@@ -315,7 +309,7 @@ export async function getApi(caller: AuthUser | undefined, team: string, name: s
   const { api, access } = await visibleApi(who, team, name);
   const problem = (await problemsOf([api.id])).get(api.id) ?? null;
   const taken = (await apiNamespacesTaken([api.teamName])).has(api.teamName);
-  return { api: view(who, api, githubBase(await catalogRepository()), problem, taken, access), openapi: JSON.stringify(api.openapi) };
+  return { api: view(who, api, problem, taken, access), openapi: JSON.stringify(api.openapi) };
 }
 
 /** Pauses (a message) or resumes (null) an API; a maintainer of its team or an admin. */

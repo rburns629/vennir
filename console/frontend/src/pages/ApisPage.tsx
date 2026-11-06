@@ -39,7 +39,7 @@ function gatewayBase(address: string, a: ApiProduct): string {
   return address.endsWith(suffix) ? address.slice(0, -suffix.length) : "";
 }
 
-const VIA: Record<string, string> = { user: "by name", group: "through a group", catalog: "from the catalog (shareWith)" };
+const VIA: Record<string, string> = { user: "by name", group: "through a group" };
 
 /** The You column: whether you may call it, and on what terms. */
 function You({ api, mine }: { api: ApiProduct; mine: boolean }) {
@@ -325,7 +325,7 @@ export function ApisPage() {
                 apis={mine}
                 mine
               />
-              <Group title="You may call" note="granted to you, a group of yours, or from the catalog" apis={shared} mine={false} />
+              <Group title="You may call" note="granted to you, or to a group of yours" apis={shared} mine={false} />
               <Group
                 title="Not granted to you"
                 note="listed so you know they exist; ask for access from its page"

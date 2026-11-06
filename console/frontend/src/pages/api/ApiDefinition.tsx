@@ -7,7 +7,6 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import type { ApiProduct } from "../../api";
 import { Mono } from "../../components/Mono";
-import { sharedWith } from "./ApiOverview";
 
 const AUTH: Record<string, string> = {
   service_account_token: "a token for the API's own ServiceAccount, minted per request",
@@ -21,11 +20,11 @@ const STEPS: [string, string][] = [
   ["Who is calling", "A person's session or a bot's token; Google sign-in when the caller's team requires it; else 401. A single sign-on over an hour old whose only way in is a group's grant signs in again (401). Until then, nothing about the API is said."],
   ["Can they see it?", "A hidden API is its own team's, admins' and whoever a grant lets in; else 404, as for no API at all."],
   ["Open?", "The gateway isn't closed, and the API isn't paused (with its message), held or unusable; else 503."],
-  ["May they call it?", "In this order: its own team's members and bots; a grant naming them; a grant to a single sign-on group they're in (people only); this release, a team its api.yaml's shareWith names (from the catalog). Admins too need a grant. Else 403 NOT_GRANTED."],
+  ["May they call it?", "In this order: its own team's members and bots; a grant naming them; a grant to a single sign-on group they're in (people only). Admins too need a grant. Else 403 NOT_GRANTED."],
   ["Small enough?", "The body is within its size limit; else 413."],
   ["In the spec?", "The method and path are an operation in its OpenAPI file; else 404, blocked."],
   ["Does it fit?", "Only the query parameters and body it declares, against that operation's schemas; else 400."],
-  ["Within its rate", "Requests a minute: their grant's (a group's counted per member), or for its own team or a shareWith team, that team's limit; else 429."],
+  ["Within its rate", "Requests a minute: their grant's (a group's counted per member), or for its own team, its limit; else 429."],
   ["Forward", "Same method, path, query and body; Authorization swapped for the backend's, Vennir-Caller added; the caller's Forwarded and X-Forwarded-* dropped."],
   ["Answer", "The backend's response; any cookie it sets is kept to this API's path."],
 ];
@@ -45,7 +44,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** What the catalog says an API is (its api.yaml): backend, how the gateway signs in there, who it's shared with, where it's reachable. For its own team. */
+/** What the catalog says an API is (its api.yaml): backend, how the gateway signs in there, where it's reachable. For its own team. */
 export function ApiBackend({ api }: { api: ApiProduct }) {
   return (
     <Card component="section" aria-label="As the catalog says" sx={{ flex: "3 1 560px", minWidth: 0, p: 2.75, display: "flex", flexDirection: "column", gap: 1.75 }}>
@@ -70,7 +69,6 @@ export function ApiBackend({ api }: { api: ApiProduct }) {
         </Row>
         <Row label="The gateway signs in there with">{AUTH[api.backendAuth] ?? api.backendAuth}</Row>
         <Row label="Reachable">{api.internet ? "From the internet, and in the cluster" : "In the cluster only"}</Row>
-        {api.shareWith.length > 0 && <Row label="Shared with (catalog, going away)">{sharedWith(api)}</Row>}
       </Box>
     </Card>
   );

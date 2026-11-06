@@ -141,10 +141,12 @@ func setup(t *testing.T, basePath string) *fixture {
 	b := newBackend(t)
 	backendURL, _ := url.Parse(b.URL + basePath)
 	pub, key, _ := ed25519.GenerateKey(nil)
-	api := &store.API{Team: "payments", Name: "orders", BackendURL: backendURL, ShareWith: []string{"web"},
+	api := &store.API{ID: "orders-id", Team: "payments", Name: "orders", BackendURL: backendURL,
 		PerMinute: map[string]int{"default": 100}, Timeout: 5 * time.Second, MaxRequest: 1024}
 	st := &store.Store{}
 	st.Put(api, []byte(strings.ReplaceAll(spec, "BACKEND", b.URL+basePath)))
+	// Grants (decision 26) let web-person and two-teams call it, by name.
+	st.PutGrants(api.ID, []store.Grant{{ID: "g-web", UserID: "u1"}, {ID: "g-two", UserID: "u3"}})
 	if api.Problem != "" {
 		t.Fatal(api.Problem)
 	}
@@ -232,7 +234,7 @@ func TestItForwardsWhatTheSpecDescribesAsSent(t *testing.T) {
 		t.Errorf("Set-Cookie = %q", cookies)
 	}
 	claims := verify(t, got.Header.Get(caller.Header), f.public)
-	if claims.Subject != "user:u1" || claims.Team != "web" || claims.Via != "catalog" || claims.API != "payments/orders" || claims.Email != "web@example.com" {
+	if claims.Subject != "user:u1" || claims.Team != "" || claims.Via != "user" || claims.API != "payments/orders" || claims.Email != "web@example.com" {
 		t.Errorf("Vennir-Caller = %+v", claims)
 	}
 }
@@ -387,8 +389,9 @@ func TestWhatTheSpecDoesntDescribeIsBlockedAndNeverForwarded(t *testing.T) {
 func TestASemicolonInAPathOnlyWithMatrixParameters(t *testing.T) {
 	f := setup(t, "")
 	files := func(name, param string) *store.API {
-		a := &store.API{Team: "payments", Name: name, BackendURL: f.api.BackendURL, ShareWith: []string{"web"},
+		a := &store.API{ID: name + "-id", Team: "payments", Name: name, BackendURL: f.api.BackendURL,
 			PerMinute: map[string]int{"default": 100}, Timeout: 5 * time.Second, MaxRequest: 1024}
+		f.gw.Store.PutGrants(a.ID, []store.Grant{{ID: "g-" + name, UserID: "u1"}})
 		f.gw.Store.Put(a, []byte(`{"openapi": "3.1.0", "info": {"title": "Files", "version": "1"},
 			"paths": {"/files/{name}": {"get": {"parameters": [`+param+`], "responses": {"200": {"description": "ok"}}}}}}`))
 		if a.Problem != "" {
@@ -428,13 +431,13 @@ func TestWhoMayCall(t *testing.T) {
 		t.Errorf("a bad credential: %d", w.Code)
 	}
 	if w := f.do("GET", path, "outsider", "", nil); w.Code != 403 || errorCode(t, w) != "NOT_GRANTED" {
-		t.Errorf("not shared: %d", w.Code)
+		t.Errorf("no grant: %d", w.Code)
 	}
 	if w := f.do("GET", path, "two-teams", "", nil); w.Code != 201 {
-		t.Errorf("a team it's shared with, among theirs: %d", w.Code)
+		t.Errorf("a grant to them: %d", w.Code)
 	}
 	if w := f.do("GET", path, "two-teams", "", map[string]string{TeamHeader: "data"}); w.Code != 403 {
-		t.Errorf("calling as a team it isn't shared with: %d", w.Code)
+		t.Errorf("calling as a team that isn't the API's: %d", w.Code)
 	}
 	if w := f.do("GET", path, "web-person", "", map[string]string{TeamHeader: "payments"}); w.Code != 403 || errorCode(t, w) != "NOT_GRANTED" {
 		t.Errorf("calling as a team the caller isn't in: %d", w.Code)
@@ -509,14 +512,14 @@ func TestPausedHeldAndClosedForwardNothing(t *testing.T) {
 
 func TestATeamIsHeldToItsRate(t *testing.T) {
 	f := setup(t, "")
-	f.api.PerMinute = map[string]int{"web": 2}
+	f.api.PerMinute = map[string]int{"payments": 2}
 	path := "/payments/orders/orders/ord_abcdefgh"
 	for i := range 2 {
-		if w := f.do("GET", path, "web-person", "", nil); w.Code != 201 {
+		if w := f.do("GET", path, "payments-person", "", nil); w.Code != 201 {
 			t.Fatalf("request %d: %d", i, w.Code)
 		}
 	}
-	w := f.do("GET", path, "web-person", "", nil)
+	w := f.do("GET", path, "payments-person", "", nil)
 	if w.Code != 429 || w.Header().Get("Retry-After") == "" {
 		t.Errorf("over the rate: %d %v", w.Code, w.Header())
 	}
@@ -615,13 +618,13 @@ func TestWhatsToldBeforeSignIn(t *testing.T) {
 		t.Errorf("hidden, before sign-in: %d %s", w.Code, w.Body)
 	}
 	if w := f.do("GET", path, "outsider", "", nil); w.Code != 404 || w.Body.String() != missing.Body.String() {
-		t.Errorf("hidden, from a team it isn't shared with: %d %s", w.Code, w.Body)
+		t.Errorf("hidden, from another team: %d %s", w.Code, w.Body)
 	}
 	if w := f.do("GET", path, "admin", "", nil); w.Code != 403 || errorCode(t, w) != "NOT_GRANTED" {
 		t.Errorf("hidden, an admin: %d %s", w.Code, w.Body)
 	}
-	if w := f.do("GET", path, "web-person", "", nil); w.Code != 404 || w.Body.String() != missing.Body.String() {
-		t.Errorf("hidden, from a team it's shared with (as the console, only its own team's): %d %s", w.Code, w.Body)
+	if w := f.do("GET", path, "web-person", "", nil); w.Code != 201 {
+		t.Errorf("hidden, to someone a grant names (as the console's sees()): %d %s", w.Code, w.Body)
 	}
 	if w := f.do("GET", path, "payments-person", "", nil); w.Code != 201 {
 		t.Errorf("hidden, from its own team: %d %s", w.Code, w.Body)
@@ -880,7 +883,6 @@ func (r *recorder) Record(_, team, endpoint, outcome string, _ time.Time, _ time
 // signed in: before that, a made-up path is counted, but not as itself.
 func TestTrafficNamesAnEndpointOnlyOnceMatchedOrSignedIn(t *testing.T) {
 	f := setup(t, "")
-	f.api.ID = "api-1"
 	var got recorder
 	f.gw.Traffic = &got
 	f.do("GET", "/payments/orders/made-up-1", "", "", nil)
@@ -893,8 +895,8 @@ func TestTrafficNamesAnEndpointOnlyOnceMatchedOrSignedIn(t *testing.T) {
 		{"", "", "unauthenticated"},
 		{"", "", "unauthenticated"},
 		{"", "GET /orders/{orderId}", "unauthenticated"},
-		{"web", "DELETE /orders", "blocked"},
-		{"web", "GET /orders/{orderId}", "forwarded_2xx"},
+		{"grant:user", "DELETE /orders", "blocked"},
+		{"grant:user", "GET /orders/{orderId}", "forwarded_2xx"},
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("recorded %v, want %v", got, want)

@@ -262,10 +262,11 @@ message Api {
   // The Kubernetes ServiceAccount, in the team's namespace, its
   // credentials are minted for.
   string service_account = 8;
-  // The other teams that may call it, or "*". Deprecated (decision 26):
-  // each install's grants replace it; kept for one release.
-  repeated string share_with = 9;
-  // visibility: hidden: only its own team sees it (it has no share_with).
+  // Ignored: each install's grants say who else may call it (decision 26),
+  // and vennir no longer writes it. Kept so a release from before still
+  // reads.
+  repeated string share_with = 9 [deprecated = true];
+  // visibility: hidden: only its own team, and whoever a grant names, sees it.
   bool hidden = 10;
   // Why it's deprecated and what to use instead; empty when it isn't.
   string deprecated = 11;

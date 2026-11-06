@@ -72,10 +72,9 @@ access:
 reachable: cluster            # or internet, if your team is in gateway.internetTeams
 limits:
   default: 600/min            # your team's, and a grant's unless it has its own rate
-  data: 60/min                # a calling team by name (yours, or a shareWith team)
 timeout: 30s
 maxRequest: 1MiB
-visibility: listed            # or hidden: only your team and admins know it exists
+visibility: listed            # or hidden: only your team, whoever a grant names, and admins know it exists
 ```
 
 ### A Service in your namespace (no `auth`, or `serviceAccountToken`)
@@ -133,9 +132,9 @@ curl -H "Authorization: Bearer $VENNIR_TOKEN" \
 ```
 
 - **A bot's token** (`mp_…`) for scripts and services: a maintainer makes one on their team's page → **Automation** ([Bots and automation](14-bots-and-automation.md)). Or a person's console session.
-- **Who may call.** The API's own team's members and bots; the people and bots a grant names; the people in a single sign-on group a grant names; and, for this release, the teams its `api.yaml`'s `shareWith` names (deprecated). Anyone else, admins included, gets 403 `NOT_GRANTED`. The order, the rates and who grants what: [How do I get access to an API?](11-apis.md#how-do-i-get-access-to-an-api)
+- **Who may call.** The API's own team's members and bots; the people and bots a grant names; and the people in a single sign-on group a grant names. Anyone else, admins included, gets 403 `NOT_GRANTED`. The order, the rates and who grants what: [How do I get access to an API?](11-apis.md#how-do-i-get-access-to-an-api)
 - **Asking for access.** Ask with a reason (`ApiService/RequestApiAccess`: for yourself, or as a maintainer of a bot's team, for the bot). The API's `access.requests` decides: `open` grants it at once, `approval` waits for its team's maintainers, who grant you or one of your groups, or decline; `closed` takes none. In the console: **Your access** on the API's page, **You may call** on the APIs page, a bot's on its team's **Automation** tab, and the API team's **Who may call** on its page ([APIs and the gateway](11-apis.md#answering-requests-and-keeping-the-access-list)).
-- **Calling for a team.** If you're in several teams that may call it (its own, or a `shareWith` team), send `Vennir-Team: <team>` to choose which one's limit you use. With it, the gateway uses only that team: grants aren't, so a person who calls by a grant doesn't send it, and a team that may not call the API answers 403 naming it.
+- **Calling as its team.** `Vennir-Team: <team>` names the API's own team to call as. With it, the gateway uses only that team: grants aren't, so a person who calls by a grant doesn't send it, and any other team answers 403 naming it.
 - **Groups are at most an hour old.** A group's grant counts the groups the console last read, while single sign-on is on and a group source is set: at each single sign-on, and every hour for Google Workspace groups. While groups come from the ID token's claim, a single sign-on older than an hour whose only way in is a group's grant gets 401: sign in again. With Google's groups alone, a group read over 90 minutes ago doesn't count (a failing resync fails closed). A revoked grant stops calls within the gateway's refresh, well under a minute.
 - **An API that leaves the release** keeps its grants and requests for 30 days, listed as away (`ApiService/ListAwayApiAccess`) and revocable by its team's maintainers and admins, but calls nobody in; back within them under the same team and name, it has them again; after them, they're gone (a waiting request is declined saying why).
 - **Reporting a problem.** Every answer carries `Vennir-Request-Id`, and the backend gets the same id; `Vennir-Answered-By` says whether the gateway or the backend answered.

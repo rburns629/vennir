@@ -36,14 +36,13 @@ function how(row: Row): ReactNode {
   if (a?.via === "user") return <Two first="By name" second="granted to you" />;
   if (a?.via === "group") return <Two first="Through a group" second={`${a.group}, as of your sign-in; not yours to give up`} />;
   if (a?.via === "team") return <Two first="Your team’s" second={`you’re in ${a.callingTeam}, so always`} />;
-  if (a?.via === "catalog") return <Two first="From the catalog" second={`its shareWith names ${a.callingTeam}; going away`} />;
   if (r?.state === "waiting") return <Two first={`Waiting for ${team}`} second={r.createdAt ? `you asked ${when(r.createdAt)}` : undefined} />;
   return <Two first="Declined" second={`by ${r?.decidedBy ?? ""}${r?.decidedAt ? `, ${when(r.decidedAt)}` : ""}: “${r?.decisionReason ?? ""}”`} />;
 }
 
 /**
  * The APIs page's You may call (15g): every API you may call and how
- * (by name, through a group, your team's, from the catalog), at your rate,
+ * (by name, through a group, your team's), at your rate,
  * and your requests that wait or were declined; give up a grant by name,
  * withdraw a request, ask again. Beside it, your teams' bots' grants, and
  * how access works.

@@ -570,10 +570,10 @@ export declare type ListApiAccessResponse = Message<"vennir.console.v1.ListApiAc
   requests: ApiAccessRequest[];
 
   /**
-   * From the catalog (shareWith, deprecated): teams whose members and bots
-   * may call it, not revocable here.
+   * Always empty: grants replaced the catalog's teams (decision 26).
    *
-   * @generated from field: repeated string share_with = 3;
+   * @generated from field: repeated string share_with = 3 [deprecated = true];
+   * @deprecated
    */
   shareWith: string[];
 };
@@ -759,15 +759,18 @@ export declare type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
   pausedMessage: string;
 
   /**
-   * Whether the caller may call it: their own team's, granted to them or a
-   * group of theirs, or shared with one of their teams (access_via).
+   * Whether the caller may call it: their own team's, or granted to them or
+   * a group of theirs (access_via).
    *
    * @generated from field: bool may_call = 8;
    */
   mayCall: boolean;
 
   /**
-   * @generated from field: repeated string share_with = 9;
+   * Always empty: grants replaced the catalog's teams (decision 26).
+   *
+   * @generated from field: repeated string share_with = 9 [deprecated = true];
+   * @deprecated
    */
   shareWith: string[];
 
@@ -862,11 +865,11 @@ export declare type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
   specVersion: string;
 
   /**
-   * When the caller may not call it: a new issue on the catalog repository,
-   * filled in with what to change, asking its team to share it (opened in
-   * the person's own browser). Empty when it can't be built.
+   * Always empty: people ask for access in the console (decision 26), not
+   * by an issue asking its team to share it in the catalog.
    *
-   * @generated from field: string ask_for_access_url = 24;
+   * @generated from field: string ask_for_access_url = 24 [deprecated = true];
+   * @deprecated
    */
   askForAccessUrl: string;
 
@@ -1601,10 +1604,11 @@ export enum ApiAccessVia {
   GROUP = 3,
 
   /**
-   * Its api.yaml's shareWith names a team of theirs: from the catalog, not
-   * revocable here. Deprecated: goes with shareWith.
+   * Never sent: a team its api.yaml's shareWith named, until grants
+   * replaced it (decision 26).
    *
-   * @generated from enum value: API_ACCESS_VIA_CATALOG = 4;
+   * @generated from enum value: API_ACCESS_VIA_CATALOG = 4 [deprecated = true];
+   * @deprecated
    */
   CATALOG = 4,
 }
@@ -1803,9 +1807,7 @@ export declare const ApiService: GenService<{
    * Asks for access to an API, with a reason: a person for themselves, or a
    * maintainer of a bot's team for that bot (bot_email). Refused when its
    * api.yaml takes no requests (access.requests: closed), when whoever
-   * it's for may call it already (but only "from the catalog", by its
-   * api.yaml's shareWith: then a grant may be asked for), or while a
-   * request of theirs waits. An API whose requests are open grants it at
+   * it's for may call it already, or while a request of theirs waits. An API whose requests are open grants it at
    * once, at its default limit.
    *
    * @generated from rpc vennir.console.v1.ApiService.RequestApiAccess
@@ -1884,7 +1886,7 @@ export declare const ApiService: GenService<{
   },
   /**
    * The APIs the caller may call, and how (their team's, granted to them,
-   * through a group, from the catalog), and their requests that wait or
+   * or through a group), and their requests that wait or
    * were declined.
    *
    * @generated from rpc vennir.console.v1.ApiService.ListMyApiAccess

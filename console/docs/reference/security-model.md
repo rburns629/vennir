@@ -586,9 +586,9 @@ purged team counts for nobody), and may call an API only when they may by
 its access list (decision 26; `gateway/internal/gateway` accessFor and the
 console's `core/apiAccess.ts`, kept in step): they're in its own team; a
 grant names them (a bot's counts while a team of its isn't retired); a grant
-names a single sign-on group they're in (people only, never a bot); or, for
-this release, its `api.yaml`'s `shareWith` names a team of theirs
-(deprecated). Admins are no exception: they call only what a grant lets them,
+names a single sign-on group they're in (people only, never a bot). Another
+team of theirs gives nothing, even one its `api.yaml`'s `limits` names.
+Admins are no exception: they call only what a grant lets them,
 and a grant to themselves is audited like any other. Everyone else gets 403
 `NOT_GRANTED` and nothing reaches the backend. A person's groups are those
 the console last read that matter (`user_groups`: only groups mapped to a

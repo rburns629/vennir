@@ -496,7 +496,6 @@ access:
 reachable: cluster            # or internet, where the install allows your team
 limits:
   default: 600/min            # your team's, and every grant's without a rate of its own
-  data: 60/min                # a calling team by name (shareWith, this release)
 timeout: 30s
 maxRequest: 1MiB
 ```
@@ -515,12 +514,10 @@ Admins may call only what a grant lets them. The console's Docs page,
 **APIs and the gateway**, has the
 rest.
 
-`shareWith` (a list of teams, or `["*"]`) still works for this release,
-deprecated: its teams' members and bots keep calling, shown in the console
-as *from the catalog*, which can't be revoked there, at the limit `limits`
-names for the team. `./vennir catalog validate` warns while an `api.yaml`
-has it, and the next release drops it: grant the people and bots that call
-your API in the console first, then remove `shareWith`.
+An `api.yaml` has no `shareWith`: 0.12.0 still let the teams it named
+call, and warned; the release after it lets them call no more, and
+`./vennir catalog validate` refuses it. Grant the people and bots that
+called through it in the console first, then delete it.
 
 `./vennir catalog validate` checks the OpenAPI file: 3.0 or 3.1, every
 `$ref` inside the file, `servers` including `backend.url`, a schema for

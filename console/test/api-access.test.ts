@@ -2,8 +2,8 @@
 /**
  * Who may call each API, and who may change that (decision 26,
  * core/apiAccess.ts): its own team; a user a grant names; a person in a
- * group a grant names; for this release a shareWith team ("from the
- * catalog"); nobody else, admins included. Requests (open, approval,
+ * group a grant names; nobody else, admins included, nor a team api.yaml
+ * names a limit for. Requests (open, approval,
  * closed), deciding them, adding grants, changing their rates and revoking
  * them, each by whom it's for; bots; retired teams; the lists; and every
  * write audited and told.
@@ -64,7 +64,6 @@ function api(name: string, fields: Record<string, unknown> = {}) {
     openapi: JSON.stringify(openapi),
     backendUrl: "https://orders.example.run.app",
     serviceAccount: `${name}-api`,
-    shareWith: [] as string[],
     perMinute: { default: 60, [consumer]: 600 },
     timeoutSeconds: 20,
     maxRequestBytes: BigInt(1024),
@@ -74,7 +73,7 @@ function api(name: string, fields: Record<string, unknown> = {}) {
   };
 }
 const release = () => [
-  api("orders", { shareWith: [consumer] }),
+  api("orders"),
   api("open", { accessRequests: "open" }),
   api("closed", { accessRequests: "closed" }),
   api("secret", { hidden: true, perMinute: {} }),
@@ -182,10 +181,9 @@ describe("from the catalog", () => {
 });
 
 describe("who may call", () => {
-  it("is its own team, and a shareWith team from the catalog; not an outsider, nor an admin", async () => {
+  it("is its own team; not another team, even one api.yaml names a limit for, an outsider, nor an admin", async () => {
     expect(await listed("member", "orders")).toMatchObject({ mayCall: true, accessVia: "API_ACCESS_VIA_TEAM", perMinute: 60 });
-    expect(await listed("consumer", "orders")).toMatchObject({ mayCall: true, accessVia: "API_ACCESS_VIA_CATALOG", perMinute: 600 });
-    for (const who of ["ada", "admin", "toolsMember", "bot"] as const) {
+    for (const who of ["consumer", "ada", "admin", "toolsMember", "bot"] as const) {
       const a = await listed(who, "orders");
       expect(a?.mayCall ?? false, who).toBe(false);
       expect(a?.accessVia ?? "API_ACCESS_VIA_UNSPECIFIED", who).toBe("API_ACCESS_VIA_UNSPECIFIED");
@@ -193,7 +191,7 @@ describe("who may call", () => {
   });
 
   it("follows the gateway's order, as the table both run says (testdata/api-access-cases.json)", () => {
-    type Fields = { id?: string; team?: string; shareWith?: string[]; perMinute?: Record<string, number> };
+    type Fields = { id?: string; team?: string; perMinute?: Record<string, number> };
     const table = JSON.parse(readFileSync(new URL("../../testdata/api-access-cases.json", import.meta.url), "utf8")) as {
       gatewayDefaultPerMinute: number;
       api: Required<Fields>;
@@ -211,7 +209,7 @@ describe("who may call", () => {
     try {
       expect(table.cases.length).toBeGreaterThan(10);
       for (const c of table.cases) {
-        const a = { id: table.api.id, teamName: table.api.team, shareWith: c.api?.shareWith ?? table.api.shareWith, perMinute: c.api?.perMinute ?? table.api.perMinute } as unknown as Parameters<typeof accessFor>[1];
+        const a = { id: table.api.id, teamName: table.api.team, perMinute: c.api?.perMinute ?? table.api.perMinute } as unknown as Parameters<typeof accessFor>[1];
         const grants = c.grants.map(
           (g) =>
             ({
@@ -258,9 +256,8 @@ describe("asking for access", () => {
     expect((await ask("bob", "secret")).code).toBe("not_found");
   });
 
-  it("may ask for a grant of their own, where they may call only from the catalog (shareWith)", async () => {
-    expect(await listed("consumer", "orders")).toMatchObject({ accessVia: "API_ACCESS_VIA_CATALOG" });
-    const asked = await ask("consumer", "orders", "shareWith is going away");
+  it("is asked for like anyone by a team api.yaml names a limit for: a team gives no access", async () => {
+    const asked = await ask("consumer", "orders", "our team calls it");
     expect(asked.code).toBe("ok");
     expect(asked.body.request).toMatchObject({ state: "API_ACCESS_REQUEST_STATE_WAITING", userEmail: emails.consumer });
     expect((await call(tokens.consumer, "ApiService/WithdrawApiAccessRequest", { accessRequestId: asked.body.request.id })).code).toBe("ok");
@@ -643,8 +640,7 @@ describe("the lists", () => {
     for (const who of ["consumer", "ada", "bot"] as const) {
       expect((await call(tokens[who], "ApiService/ListApiAccess", { team: owner, name: "orders" })).failure, who).toBe("FORBIDDEN");
     }
-    const access = await call<{ shareWith?: string[]; requests?: Request[] }>(tokens.member, "ApiService/ListApiAccess", { team: owner, name: "orders" });
-    expect(access.body.shareWith).toEqual([consumer]);
+    const access = await call<{ requests?: Request[] }>(tokens.member, "ApiService/ListApiAccess", { team: owner, name: "orders" });
     expect(access.body.requests?.[0]?.state).toBe("API_ACCESS_REQUEST_STATE_WAITING");
   });
 
@@ -653,7 +649,8 @@ describe("the lists", () => {
       tokens.consumer,
       "ApiService/ListMyApiAccess",
     );
-    expect(mine.body.access?.filter((a) => a.team === owner)).toMatchObject([{ team: owner, name: "orders", via: "API_ACCESS_VIA_CATALOG", callingTeam: consumer, perMinute: 600 }]);
+    // None of the owner's: a team api.yaml names a limit for gives no access.
+    expect((mine.body.access ?? []).filter((a) => a.team === owner)).toEqual([]);
     const ada = await call<{ access?: { name: string; via: string }[]; requests?: Request[] }>(tokens.ada, "ApiService/ListMyApiAccess");
     expect(ada.body.access?.map((a) => `${a.name}:${a.via}`)).toEqual(["open:API_ACCESS_VIA_USER"]);
     expect(ada.body.requests?.map((r) => r.state)).toEqual(["API_ACCESS_REQUEST_STATE_WAITING"]);

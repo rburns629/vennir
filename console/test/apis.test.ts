@@ -58,7 +58,6 @@ function api(name: string, fields: Record<string, unknown> = {}) {
     backendUrl: "https://orders.example.run.app",
     backendAuth: { kind: { case: "googleIdToken" as const, value: { serviceAccount: "gw@p.iam.gserviceaccount.com", audience: "https://orders.example.run.app" } } },
     serviceAccount: `${name}-api`,
-    shareWith: [consumer],
     perMinute: { default: 60, [consumer]: 600 },
     timeoutSeconds: 20,
     maxRequestBytes: BigInt(1024),
@@ -98,7 +97,7 @@ beforeAll(async () => {
   config.gateway.url = "http://gateway.vennir-system.svc:8080";
   config.gateway.publicUrl = "https://api.example.com";
   await Promise.all([createTeam(owner), createTeam(consumer), createTeam(outsider)]);
-  await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
+  await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
   serviceAccounts = [...vi.mocked(ensureServiceAccount).mock.calls];
   const made = { maintainer: await users.makeUser(), member: await users.makeUser(), consumer: await users.makeUser(), outsider: await users.makeUser() };
   const [ownerTeam, consumerTeam, outsiderTeam] = await Promise.all([findTeamByName(owner), findTeamByName(consumer), findTeamByName(outsider)]);
@@ -107,6 +106,9 @@ beforeAll(async () => {
   await addTeamMember(made.consumer.id, consumerTeam?.id ?? "", "member");
   await addTeamMember(made.outsider.id, outsiderTeam?.id ?? "", "member");
   for (const [who, user] of Object.entries(made)) tokens[who as keyof typeof tokens] = await users.signIn(user.email);
+  // The consumer calls orders by a grant of its team's maintainers (decision 26).
+  const granted = await call(tokens.maintainer, "ApiService/AddApiGrant", { team: owner, name: "orders", email: made.consumer.email, perMinute: 600 });
+  if (granted.code !== "ok") throw new Error(`granting the consumer: ${JSON.stringify(granted.body)}`);
 });
 
 afterAll(async () => {
@@ -117,7 +119,7 @@ afterAll(async () => {
   await app.close();
 });
 
-type Listed = { apis?: { team: string; name: string; state: string; mayCall?: boolean; limits?: { team: string; perMinute: number }[]; defaultPerMinute?: number; askForAccessUrl?: string; problem?: string; problemFoundAt?: string; backendUrl?: string; perMinute?: number; publicUrl?: string; endpoints?: { method: string; path: string }[]; heldReason?: string }[] };
+type Listed = { apis?: { team: string; name: string; state: string; mayCall?: boolean; limits?: { team: string; perMinute: number }[]; defaultPerMinute?: number; problem?: string; problemFoundAt?: string; backendUrl?: string; perMinute?: number; publicUrl?: string; endpoints?: { method: string; path: string }[]; heldReason?: string }[] };
 const listFor = async (who: keyof typeof tokens) =>
   ((await call<Listed>(tokens[who], "ApiService/ListApis")).body.apis ?? []).filter((a) => a.team === owner);
 
@@ -134,9 +136,9 @@ describe("from the release", () => {
   });
 
   it("removes what a later release drops", async () => {
-    await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} })]);
+    await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} })]);
     expect((await listFor("maintainer")).map((a) => a.name).sort()).toEqual(["ledger", "orders"]);
-    await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
+    await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
   });
 });
 
@@ -172,29 +174,17 @@ describe("who sees what", () => {
     expect((await call(tokens.outsider, "ApiService/GetApi", { team: owner, name: "ledger" })).code).toBe("not_found");
   });
 
-  it("lets only a team call one shared with everyone, as the gateway does: an admin in no team may not", async () => {
-    await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com", shareWith: ["*"], perMinute: { default: 60, [outsider]: 5 } })]);
+  it("lets no other team call it by its name in limits, nor an admin in no team, as the gateway does", async () => {
+    await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com", perMinute: { default: 60, [outsider]: 5 } })]);
     const adminUser = await users.makeUser({ admin: true });
     try {
       const teamless = ((await call<Listed>(await users.signIn(adminUser.email), "ApiService/ListApis")).body.apis ?? []).find((a) => a.team === owner && a.name === "legacy");
       expect(teamless?.mayCall ?? false).toBe(false);
       expect(teamless?.perMinute ?? 0).toBe(0);
-      expect(teamless?.askForAccessUrl ?? "").toBe("");
-      // At its own team's limit, as the gateway counts it, even below the default.
-      expect((await listFor("outsider")).find((a) => a.name === "legacy")).toMatchObject({ mayCall: true, perMinute: 5 });
+      expect((await listFor("outsider")).find((a) => a.name === "legacy")).toMatchObject({ mayCall: false });
     } finally {
-      await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
+      await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
     }
-  });
-
-  it("offers whoever may not call it an issue asking its team to share it, and nobody else", async () => {
-    const ask = new URL((await listFor("outsider")).find((a) => a.name === "orders")?.askForAccessUrl ?? "");
-    expect(`${ask.origin}${ask.pathname}`).toBe("https://github.com/acme/vennir-catalog/issues/new");
-    expect(ask.searchParams.get("title")).toBe(`Share ${owner}/orders with ${outsider}`);
-    expect(ask.searchParams.get("body")).toContain(`[\`teams/${owner}/apis/orders/api.yaml\`]`);
-    expect(ask.searchParams.get("body")).toContain(`shareWith: [${outsider}]`);
-    expect((await listFor("consumer")).find((a) => a.name === "orders")?.askForAccessUrl ?? "").toBe("");
-    expect((await listFor("member")).find((a) => a.name === "orders")?.askForAccessUrl ?? "").toBe("");
   });
 
   it("says it can't be served, and why, while the gateway has recorded that it can't use its spec", async () => {
@@ -315,7 +305,7 @@ describe("who sees what", () => {
     const before = [...config.gateway.backendHosts];
     config.gateway.backendHosts.splice(0, Infinity, "*.svc.cluster.local");
     try {
-      await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: `http://legacy.${taken}.svc.cluster.local` })]);
+      await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} }), api("legacy", { backendUrl: `http://legacy.${taken}.svc.cluster.local` })]);
       const got = await call<{ api: { state: string } }>(tokens.member, "ApiService/GetApi", { team: owner, name: "legacy" });
       expect(got.body.api.state).toBe("API_STATE_HELD");
       const listed = await call<Listed>(tokens.member, "ApiService/ListApis", {});
@@ -323,7 +313,7 @@ describe("who sees what", () => {
     } finally {
       config.gateway.backendHosts.splice(0, Infinity, ...before);
       await db.delete(teams).where(eq(teams.name, taken));
-      await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
+      await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
     }
   });
 
@@ -346,7 +336,7 @@ describe("pausing", () => {
   });
 
   it("lasts across releases, until it's resumed", async () => {
-    await apply([api("orders", { internet: true }), api("ledger", { hidden: true, shareWith: [], perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
+    await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
     expect((await listFor("maintainer")).find((a) => a.name === "orders")?.state).toBe("API_STATE_PAUSED");
     expect((await call(tokens.maintainer, "ApiService/ResumeApi", { team: owner, name: "orders" })).code).toBe("ok");
     expect((await listFor("maintainer")).find((a) => a.name === "orders")?.state).toBe("API_STATE_LIVE");

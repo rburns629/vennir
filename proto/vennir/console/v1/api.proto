@@ -64,9 +64,7 @@ service ApiService {
   // Asks for access to an API, with a reason: a person for themselves, or a
   // maintainer of a bot's team for that bot (bot_email). Refused when its
   // api.yaml takes no requests (access.requests: closed), when whoever
-  // it's for may call it already (but only "from the catalog", by its
-  // api.yaml's shareWith: then a grant may be asked for), or while a
-  // request of theirs waits. An API whose requests are open grants it at
+  // it's for may call it already, or while a request of theirs waits. An API whose requests are open grants it at
   // once, at its default limit.
   rpc RequestApiAccess(RequestApiAccessRequest) returns (RequestApiAccessResponse);
   // Withdraws a request while it waits: whoever asked, or, for a bot's, a
@@ -91,7 +89,7 @@ service ApiService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // The APIs the caller may call, and how (their team's, granted to them,
-  // through a group, from the catalog), and their requests that wait or
+  // or through a group), and their requests that wait or
   // were declined.
   rpc ListMyApiAccess(ListMyApiAccessRequest) returns (ListMyApiAccessResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -125,9 +123,9 @@ enum ApiAccessVia {
   API_ACCESS_VIA_USER = 2;
   // A grant names a single sign-on group they're in.
   API_ACCESS_VIA_GROUP = 3;
-  // Its api.yaml's shareWith names a team of theirs: from the catalog, not
-  // revocable here. Deprecated: goes with shareWith.
-  API_ACCESS_VIA_CATALOG = 4;
+  // Never sent: a team its api.yaml's shareWith named, until grants
+  // replaced it (decision 26).
+  API_ACCESS_VIA_CATALOG = 4 [deprecated = true];
 }
 
 enum ApiAccessRequestState {
@@ -283,9 +281,8 @@ message ListApiAccessResponse {
   repeated ApiGrant grants = 1;
   // Waiting ones first, then the rest, newest first.
   repeated ApiAccessRequest requests = 2;
-  // From the catalog (shareWith, deprecated): teams whose members and bots
-  // may call it, not revocable here.
-  repeated string share_with = 3;
+  // Always empty: grants replaced the catalog's teams (decision 26).
+  repeated string share_with = 3 [deprecated = true];
 }
 
 message MyApiAccess {
@@ -345,10 +342,11 @@ message ApiProduct {
   ApiState state = 5;
   string held_reason = 6;
   string paused_message = 7;
-  // Whether the caller may call it: their own team's, granted to them or a
-  // group of theirs, or shared with one of their teams (access_via).
+  // Whether the caller may call it: their own team's, or granted to them or
+  // a group of theirs (access_via).
   bool may_call = 8;
-  repeated string share_with = 9;
+  // Always empty: grants replaced the catalog's teams (decision 26).
+  repeated string share_with = 9 [deprecated = true];
   bool hidden = 10;
   // Why it's deprecated, and what to use instead.
   string deprecated = 11;
@@ -375,10 +373,9 @@ message ApiProduct {
   // The spec's title and version.
   string spec_title = 22;
   string spec_version = 23;
-  // When the caller may not call it: a new issue on the catalog repository,
-  // filled in with what to change, asking its team to share it (opened in
-  // the person's own browser). Empty when it can't be built.
-  string ask_for_access_url = 24;
+  // Always empty: people ask for access in the console (decision 26), not
+  // by an issue asking its team to share it in the catalog.
+  string ask_for_access_url = 24 [deprecated = true];
   // Unavailable: what the gateway found, and when.
   string problem = 25;
   google.protobuf.Timestamp problem_found_at = 26;

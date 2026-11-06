@@ -180,18 +180,12 @@ it was seen.
   gateway's `accessFor`) with its console pages (what they can't show yet
   is below, under Console).
 
-- [ ] **Next release: drop `shareWith` from `api.yaml`** (decision 26; the
-  access list was built 2026-11-05): for one release a `shareWith` team's
-  members and bots still call, "from the catalog", and `vennir catalog
-  validate` warns (`cli/internal/catalogtool/apis.go`,
-  `ShareWithDeprecated`). Then remove it from both `api.schema.json`
-  copies, the release's `Api.share_with`, `apis.share_with` (a migration),
-  `catalogSync.ts`, the gateway's `store.API.ShareWith` and `accessFor`'s
-  last step, the console's `accessFor` and its `catalog` way, and the docs
-  (`console/docs/11-apis.md`, `21-api-gateway.md`, the catalog guide).
-  Before, tell each API's team that still has it to grant its callers. The
-  template's samples use `access.requests` since 0.12.0 was pinned.
-
+- [ ] **Drop the `apis.share_with` column** (the release after the one
+  that stopped reading it, 2026-11-06): nothing reads or writes it now
+  (migration 0073 emptied it, so a gateway from before still running
+  during that upgrade let nobody in through it); a gateway from before
+  still selects it, so it stays one release. Then drop it in a migration,
+  and the `shareWith` key `upsertApi` is given in `catalogSync.ts`.
 - [ ] **A grant's last call** (decision 26's open question, 2026-11-05):
   grants don't expire; the proposal is that the API's team sees each
   grant's last call and revokes unused ones. The gateway would need to
@@ -285,9 +279,7 @@ it was seen.
   a picker of people and bots for Add a grant (it takes an email). The
   boards cap a grant's rate at the API's limit; the backend allows up to
   1,000,000 a minute, so the pages say "by default" instead of "up to".
-  Also drop the backend's issue link for APIs (`catalogLinks.ts`'s
-  `askForAccessUrl`, `ApiProduct.ask_for_access_url`), which no page uses
-  any more. A grant's last call is the item above.
+  A grant's last call is the item above.
 
 - [ ] **A page for who read what** (built 2026-11-05, backend only):
   `audit_reads` and `AdminService/ListAuditReads` record and list who was

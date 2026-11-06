@@ -198,7 +198,8 @@ export async function applyApis(
         backendUrl: a.backendUrl,
         backendAuth: backendAuth(a.backendAuth),
         serviceAccount: a.serviceAccount,
-        shareWith: a.shareWith,
+        // Who else may call it is each install's grants (decision 26).
+        shareWith: [],
         accessRequests,
         hidden: a.hidden,
         deprecated: a.deprecated || null,

@@ -79,8 +79,8 @@ import (
 // AnsweredBy says who answered: gateway or backend.
 const AnsweredBy = "Vennir-Answered-By"
 
-// TeamHeader picks the team a caller in several calls as: their own or a
-// shareWith team's, for its limit. It never gives access a grant doesn't.
+// TeamHeader names the team a caller calls as: only the API's own team
+// counts. It never gives access a grant doesn't.
 const TeamHeader = "Vennir-Team"
 
 // RequestIDHeader is the gateway's id for a request, on both sides.
@@ -529,11 +529,10 @@ func peerKey(client string) string {
 
 // access is how a caller may call an API (accessFor), as Vennir-Caller's
 // via says it: "team" (its own team's), "user" (a grant names them),
-// "group" (a grant names a group of theirs) or "catalog" (shareWith names
-// a team of theirs; deprecated).
+// "group" (a grant names a group of theirs).
 type access struct {
 	via string
-	// team: the calling team, for "team" and "catalog".
+	// team: the calling team, for "team".
 	team string
 	// grant: the grant, for "user" and "group".
 	grant *store.Grant
@@ -594,24 +593,14 @@ func (g *Gateway) rate(api *store.API, a *access) int {
 // console's core/apiAccess.ts accessFor, kept in step), in this order:
 // their own team's; a grant to them (a bot's, while it's in a team that
 // isn't retired); a grant to a single sign-on group of theirs (a person's,
-// while their groups count: the best rate of them); a team of theirs
-// shareWith names. Admins are no exception. Vennir-Team (asked) picks the
-// calling team of the first and last: one of theirs that's the API's own or
-// shared with, else nil; it gives no access by itself. staleGroup: a group
+// while their groups count: the best rate of them). Admins are no
+// exception. Vennir-Team (asked) calls as the API's own team, if it's
+// theirs, else nil; it gives no access by itself. staleGroup: a group
 // grant would let them in, but their groups don't count now.
 func (g *Gateway) accessFor(who *auth.Caller, api *store.API, asked string) (way *access, staleGroup bool) {
-	shared := func(team string) bool {
-		return slices.Contains(api.ShareWith, "*") || slices.Contains(api.ShareWith, team)
-	}
 	if asked != "" {
-		if !slices.Contains(who.Teams, asked) {
-			return nil, false
-		}
-		if asked == api.Team {
+		if asked == api.Team && slices.Contains(who.Teams, asked) {
 			return &access{via: "team", team: asked}, false
-		}
-		if shared(asked) {
-			return &access{via: "catalog", team: asked}, false
 		}
 		return nil, false
 	}
@@ -641,11 +630,6 @@ func (g *Gateway) accessFor(who *auth.Caller, api *store.API, asked string) (way
 				return &access{via: "group", grant: best}, false
 			}
 			staleGroup = true
-		}
-	}
-	for _, team := range who.Teams {
-		if shared(team) {
-			return &access{via: "catalog", team: team}, false
 		}
 	}
 	return nil, staleGroup

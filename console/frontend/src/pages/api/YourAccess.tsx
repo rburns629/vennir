@@ -65,8 +65,7 @@ function Act({ button, note }: { button: ReactNode; note: ReactNode }) {
  * Your access to someone else's API (15a, 15c, 15d, 15e): not granted, with
  * Request access; your request waiting, with Withdraw; granted, by name
  * (Give up my access) or through a group; or declined, with its reason and
- * Ask again. From the catalog only (shareWith, going away), the same, with
- * a note of it. A maintainer of other teams may also ask for one of their
+ * Ask again. A maintainer of other teams may also ask for one of their
  * bots. `groups`: yours, to offer in a request.
  */
 export function YourAccess({ api, standing, groups, onChanged }: { api: ApiProduct; standing: Standing; groups: string[]; onChanged: () => void }) {
@@ -77,10 +76,7 @@ export function YourAccess({ api, standing, groups, onChanged }: { api: ApiProdu
   const t = api.team;
   const closed = api.accessRequests === "closed";
   const botTeams = botTeamsOf(user, t);
-  // From the catalog only: they may call it, and may ask for a grant of their own.
-  const catalog = access?.via === "catalog" ? access : null;
-  const title =
-    access && !catalog ? "Granted" : request?.state === "waiting" ? `Waiting for ${t}` : request?.state === "declined" ? "Declined" : catalog ? "From the catalog" : "Not granted";
+  const title = access ? "Granted" : request?.state === "waiting" ? `Waiting for ${t}` : request?.state === "declined" ? "Declined" : "Not granted";
 
   let body: ReactNode;
   if (access?.via === "user" || access?.via === "group") {
@@ -154,7 +150,7 @@ export function YourAccess({ api, standing, groups, onChanged }: { api: ApiProdu
     body = (
       <>
         <Typography variant="body2">
-          {catalog ? "" : "You aren’t on its access list: not by name, and not through a group. "}
+          You aren’t on its access list: not by name, and not through a group.{" "}
           {closed
             ? `${t} takes no requests for it (access.requests: closed): ask its team directly.`
             : api.accessRequests === "open"
@@ -185,12 +181,6 @@ export function YourAccess({ api, standing, groups, onChanged }: { api: ApiProdu
           {title}
         </Typography>
       </Box>
-      {catalog && (
-        <Typography variant="body2">
-          From the catalog: its api.yaml’s shareWith names {catalog.callingTeam}, so its members and bots may call it, at {rateText(catalog.perMinute)}. shareWith is going
-          away, so you’ll need a grant of your own.
-        </Typography>
-      )}
       {body}
       {!closed && botTeams.length > 0 && (
         <Act

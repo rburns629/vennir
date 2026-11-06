@@ -1,7 +1,7 @@
 {
   "_comment": "Who may call an API (decision 26): one table both accessFor implementations run, the console's (console/test/api-access.test.ts, core/apiAccess.ts) and the gateway's (gateway/internal/gateway/grants_test.go), so they can't drift. A grant is active unless revoked, and of the published API unless away (no api_id; the gateway's store never holds either); a perMinute of 0 is the API's default. expect null: the caller may not call it; staleGroup: the gateway's 'sign in again' case (a group's grant would let them in, but their groups don't count now).",
   "gatewayDefaultPerMinute": 600,
-  "api": { "id": "api-1", "team": "pay", "shareWith": ["web"], "perMinute": { "default": 60, "web": 600 } },
+  "api": { "id": "api-1", "team": "pay", "perMinute": { "default": 60, "web": 600 } },
   "cases": [
     {
       "name": "its own team, before a grant",
@@ -10,7 +10,7 @@
       "expect": { "via": "team", "team": "pay", "perMinute": 60 }
     },
     {
-      "name": "a grant to them, before a shareWith team",
+      "name": "a grant to them, whatever their own team",
       "caller": { "id": "p", "teams": ["web"], "groupsCurrent": true },
       "grants": [{ "id": "g1", "userId": "p", "perMinute": 5 }],
       "expect": { "via": "user", "grant": "g1", "perMinute": 5 }
@@ -54,10 +54,11 @@
       "staleGroup": true
     },
     {
-      "name": "groups that don't count now, but a shareWith team",
+      "name": "groups that don't count now, and another team of theirs: sign in again",
       "caller": { "id": "p", "teams": ["web"], "groups": ["eng"], "groupsCurrent": false },
       "grants": [{ "id": "g-eng", "group": "eng" }],
-      "expect": { "via": "catalog", "team": "web", "perMinute": 600 }
+      "expect": null,
+      "staleGroup": true
     },
     {
       "name": "a group they aren't in",
@@ -90,11 +91,10 @@
       "expect": null
     },
     {
-      "name": "shared with every team: the first of theirs, at its limit",
-      "api": { "shareWith": ["*"], "perMinute": { "default": 60, "data": 5 } },
+      "name": "other teams, even ones api.yaml names a limit for, give nothing",
       "caller": { "id": "p", "teams": ["data", "web"], "groupsCurrent": true },
       "grants": [],
-      "expect": { "via": "catalog", "team": "data", "perMinute": 5 }
+      "expect": null
     },
     {
       "name": "a revoked grant",

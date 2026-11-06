@@ -158,7 +158,7 @@
     },
     {
      "name": "RequestApiAccess",
-     "comment": "Asks for access to an API, with a reason: a person for themselves, or a\nmaintainer of a bot's team for that bot (bot_email). Refused when its\napi.yaml takes no requests (access.requests: closed), when whoever\nit's for may call it already (but only \"from the catalog\", by its\napi.yaml's shareWith: then a grant may be asked for), or while a\nrequest of theirs waits. An API whose requests are open grants it at\nonce, at its default limit.",
+     "comment": "Asks for access to an API, with a reason: a person for themselves, or a\nmaintainer of a bot's team for that bot (bot_email). Refused when its\napi.yaml takes no requests (access.requests: closed), when whoever\nit's for may call it already, or while a request of theirs waits. An API whose requests are open grants it at\nonce, at its default limit.",
      "input": "vennir.console.v1.RequestApiAccessRequest",
      "output": "vennir.console.v1.RequestApiAccessResponse",
      "streaming": false,
@@ -221,7 +221,7 @@
     },
     {
      "name": "ListMyApiAccess",
-     "comment": "The APIs the caller may call, and how (their team's, granted to them,\nthrough a group, from the catalog), and their requests that wait or\nwere declined.",
+     "comment": "The APIs the caller may call, and how (their team's, granted to them,\nor through a group), and their requests that wait or\nwere declined.",
      "input": "vennir.console.v1.ListMyApiAccessRequest",
      "output": "vennir.console.v1.ListMyApiAccessResponse",
      "streaming": false,
@@ -3109,7 +3109,7 @@
      "type": "string",
      "repeated": true,
      "optional": false,
-     "comment": "From the catalog (shareWith, deprecated): teams whose members and bots\nmay call it, not revocable here."
+     "comment": "Always empty: grants replaced the catalog's teams (decision 26)."
     }
    ]
   },
@@ -3297,14 +3297,14 @@
      "type": "boolean",
      "repeated": false,
      "optional": false,
-     "comment": "Whether the caller may call it: their own team's, granted to them or a\ngroup of theirs, or shared with one of their teams (access_via)."
+     "comment": "Whether the caller may call it: their own team's, or granted to them or\na group of theirs (access_via)."
     },
     {
      "name": "shareWith",
      "type": "string",
      "repeated": true,
      "optional": false,
-     "comment": ""
+     "comment": "Always empty: grants replaced the catalog's teams (decision 26)."
     },
     {
      "name": "hidden",
@@ -3410,7 +3410,7 @@
      "type": "string",
      "repeated": false,
      "optional": false,
-     "comment": "When the caller may not call it: a new issue on the catalog repository,\nfilled in with what to change, asking its team to share it (opened in\nthe person's own browser). Empty when it can't be built."
+     "comment": "Always empty: people ask for access in the console (decision 26), not\nby an issue asking its team to share it in the catalog."
     },
     {
      "name": "problem",
@@ -13549,7 +13549,7 @@
     },
     {
      "name": "API_ACCESS_VIA_CATALOG",
-     "comment": "Its api.yaml's shareWith names a team of theirs: from the catalog, not\nrevocable here. Deprecated: goes with shareWith."
+     "comment": "Never sent: a team its api.yaml's shareWith named, until grants\nreplaced it (decision 26)."
     }
    ]
   },

@@ -34,11 +34,8 @@ type API struct {
 	BackendURL     *url.URL
 	BackendAuth    map[string]map[string]string
 	ServiceAccount string
-	// ShareWith: teams whose members and bots may call it, from the
-	// catalog. Deprecated (decision 26): grants replace it, this release.
-	ShareWith []string
-	// Hidden: only its own team, and admins, hear of it, whatever it's
-	// shared with (the console's sees()).
+	// Hidden: only its own team, the people and bots a grant names, and
+	// admins, hear of it (the console's sees()).
 	Hidden        bool
 	Internet      bool
 	PerMinute     map[string]int
@@ -243,7 +240,7 @@ func (s *Store) Refresh(ctx context.Context) error {
 		return err
 	}
 	rows, err := s.DB.Query(ctx, `SELECT a.id::text, t.name, a.name, a.openapi::text, a.backend_url, coalesce(a.backend_auth::text, ''),
-			a.service_account, a.share_with, a.hidden, a.internet, a.per_minute::text, a.timeout_seconds, a.max_request_bytes,
+			a.service_account, a.hidden, a.internet, a.per_minute::text, a.timeout_seconds, a.max_request_bytes,
 			a.paused_message, a.updated_at, EXISTS (SELECT 1 FROM teams o WHERE o.name = t.name || '-apis')
 		FROM apis a JOIN teams t ON t.id = a.team_id WHERE t.retired_at IS NULL AND t.deleted_at IS NULL`)
 	if err != nil {
@@ -258,7 +255,7 @@ func (s *Store) Refresh(ctx context.Context) error {
 		var a API
 		var spec, backendURL, auth, perMinute string
 		var timeout int
-		if err := rows.Scan(&a.ID, &a.Team, &a.Name, &spec, &backendURL, &auth, &a.ServiceAccount, &a.ShareWith, &a.Hidden, &a.Internet,
+		if err := rows.Scan(&a.ID, &a.Team, &a.Name, &spec, &backendURL, &auth, &a.ServiceAccount, &a.Hidden, &a.Internet,
 			&perMinute, &timeout, &a.MaxRequest, &a.PausedMessage, &a.UpdatedAt, &a.APINamespaceTaken); err != nil {
 			return err
 		}

@@ -512,6 +512,13 @@
       "when": 1793976347700,
       "tag": "0072_api_access_offered_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1793988007152,
+      "tag": "0073_api_share_with_emptied",
+      "breakpoints": true
     }
   ]
 }

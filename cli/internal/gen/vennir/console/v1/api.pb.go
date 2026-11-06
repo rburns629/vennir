@@ -35,8 +35,10 @@ const (
 	ApiAccessVia_API_ACCESS_VIA_USER ApiAccessVia = 2
 	// A grant names a single sign-on group they're in.
 	ApiAccessVia_API_ACCESS_VIA_GROUP ApiAccessVia = 3
-	// Its api.yaml's shareWith names a team of theirs: from the catalog, not
-	// revocable here. Deprecated: goes with shareWith.
+	// Never sent: a team its api.yaml's shareWith named, until grants
+	// replaced it (decision 26).
+	//
+	// Deprecated: Marked as deprecated in vennir/console/v1/api.proto.
 	ApiAccessVia_API_ACCESS_VIA_CATALOG ApiAccessVia = 4
 )
 
@@ -1278,8 +1280,9 @@ type ListApiAccessResponse struct {
 	Grants []*ApiGrant `protobuf:"bytes,1,rep,name=grants,proto3" json:"grants,omitempty"`
 	// Waiting ones first, then the rest, newest first.
 	Requests []*ApiAccessRequest `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty"`
-	// From the catalog (shareWith, deprecated): teams whose members and bots
-	// may call it, not revocable here.
+	// Always empty: grants replaced the catalog's teams (decision 26).
+	//
+	// Deprecated: Marked as deprecated in vennir/console/v1/api.proto.
 	ShareWith     []string `protobuf:"bytes,3,rep,name=share_with,json=shareWith,proto3" json:"share_with,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1329,6 +1332,7 @@ func (x *ListApiAccessResponse) GetRequests() []*ApiAccessRequest {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in vennir/console/v1/api.proto.
 func (x *ListApiAccessResponse) GetShareWith() []string {
 	if x != nil {
 		return x.ShareWith
@@ -1637,9 +1641,12 @@ type ApiProduct struct {
 	State         ApiState               `protobuf:"varint,5,opt,name=state,proto3,enum=vennir.console.v1.ApiState" json:"state,omitempty"`
 	HeldReason    string                 `protobuf:"bytes,6,opt,name=held_reason,json=heldReason,proto3" json:"held_reason,omitempty"`
 	PausedMessage string                 `protobuf:"bytes,7,opt,name=paused_message,json=pausedMessage,proto3" json:"paused_message,omitempty"`
-	// Whether the caller may call it: their own team's, granted to them or a
-	// group of theirs, or shared with one of their teams (access_via).
-	MayCall   bool     `protobuf:"varint,8,opt,name=may_call,json=mayCall,proto3" json:"may_call,omitempty"`
+	// Whether the caller may call it: their own team's, or granted to them or
+	// a group of theirs (access_via).
+	MayCall bool `protobuf:"varint,8,opt,name=may_call,json=mayCall,proto3" json:"may_call,omitempty"`
+	// Always empty: grants replaced the catalog's teams (decision 26).
+	//
+	// Deprecated: Marked as deprecated in vennir/console/v1/api.proto.
 	ShareWith []string `protobuf:"bytes,9,rep,name=share_with,json=shareWith,proto3" json:"share_with,omitempty"`
 	Hidden    bool     `protobuf:"varint,10,opt,name=hidden,proto3" json:"hidden,omitempty"`
 	// Why it's deprecated, and what to use instead.
@@ -1667,9 +1674,10 @@ type ApiProduct struct {
 	// The spec's title and version.
 	SpecTitle   string `protobuf:"bytes,22,opt,name=spec_title,json=specTitle,proto3" json:"spec_title,omitempty"`
 	SpecVersion string `protobuf:"bytes,23,opt,name=spec_version,json=specVersion,proto3" json:"spec_version,omitempty"`
-	// When the caller may not call it: a new issue on the catalog repository,
-	// filled in with what to change, asking its team to share it (opened in
-	// the person's own browser). Empty when it can't be built.
+	// Always empty: people ask for access in the console (decision 26), not
+	// by an issue asking its team to share it in the catalog.
+	//
+	// Deprecated: Marked as deprecated in vennir/console/v1/api.proto.
 	AskForAccessUrl string `protobuf:"bytes,24,opt,name=ask_for_access_url,json=askForAccessUrl,proto3" json:"ask_for_access_url,omitempty"`
 	// Unavailable: what the gateway found, and when.
 	Problem        string                 `protobuf:"bytes,25,opt,name=problem,proto3" json:"problem,omitempty"`
@@ -1774,6 +1782,7 @@ func (x *ApiProduct) GetMayCall() bool {
 	return false
 }
 
+// Deprecated: Marked as deprecated in vennir/console/v1/api.proto.
 func (x *ApiProduct) GetShareWith() []string {
 	if x != nil {
 		return x.ShareWith
@@ -1879,6 +1888,7 @@ func (x *ApiProduct) GetSpecVersion() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in vennir/console/v1/api.proto.
 func (x *ApiProduct) GetAskForAccessUrl() string {
 	if x != nil {
 		return x.AskForAccessUrl
@@ -3452,12 +3462,12 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\x16RevokeApiGrantResponse\">\n" +
 	"\x14ListApiAccessRequest\x12\x12\n" +
 	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xac\x01\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xb0\x01\n" +
 	"\x15ListApiAccessResponse\x123\n" +
 	"\x06grants\x18\x01 \x03(\v2\x1b.vennir.console.v1.ApiGrantR\x06grants\x12?\n" +
-	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\x12\x1d\n" +
+	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\x12!\n" +
 	"\n" +
-	"share_with\x18\x03 \x03(\tR\tshareWith\"\xdb\x01\n" +
+	"share_with\x18\x03 \x03(\tB\x02\x18\x01R\tshareWith\"\xdb\x01\n" +
 	"\vMyApiAccess\x12\x12\n" +
 	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +
@@ -3476,7 +3486,7 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\x04team\x18\x01 \x01(\tR\x04team\"\x94\x01\n" +
 	"\x1cListTeamBotApiAccessResponse\x123\n" +
 	"\x06grants\x18\x01 \x03(\v2\x1b.vennir.console.v1.ApiGrantR\x06grants\x12?\n" +
-	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\"\x98\t\n" +
+	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\"\xa0\t\n" +
 	"\n" +
 	"ApiProduct\x12\x12\n" +
 	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
@@ -3487,9 +3497,9 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\vheld_reason\x18\x06 \x01(\tR\n" +
 	"heldReason\x12%\n" +
 	"\x0epaused_message\x18\a \x01(\tR\rpausedMessage\x12\x19\n" +
-	"\bmay_call\x18\b \x01(\bR\amayCall\x12\x1d\n" +
+	"\bmay_call\x18\b \x01(\bR\amayCall\x12!\n" +
 	"\n" +
-	"share_with\x18\t \x03(\tR\tshareWith\x12\x16\n" +
+	"share_with\x18\t \x03(\tB\x02\x18\x01R\tshareWith\x12\x16\n" +
 	"\x06hidden\x18\n" +
 	" \x01(\bR\x06hidden\x12\x1e\n" +
 	"\n" +
@@ -3511,8 +3521,8 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\fbackend_auth\x18\x15 \x01(\tR\vbackendAuth\x12\x1d\n" +
 	"\n" +
 	"spec_title\x18\x16 \x01(\tR\tspecTitle\x12!\n" +
-	"\fspec_version\x18\x17 \x01(\tR\vspecVersion\x12+\n" +
-	"\x12ask_for_access_url\x18\x18 \x01(\tR\x0faskForAccessUrl\x12\x18\n" +
+	"\fspec_version\x18\x17 \x01(\tR\vspecVersion\x12/\n" +
+	"\x12ask_for_access_url\x18\x18 \x01(\tB\x02\x18\x01R\x0faskForAccessUrl\x12\x18\n" +
 	"\aproblem\x18\x19 \x01(\tR\aproblem\x12D\n" +
 	"\x10problem_found_at\x18\x1a \x01(\v2\x1a.google.protobuf.TimestampR\x0eproblemFoundAt\x124\n" +
 	"\x06limits\x18\x1b \x03(\v2\x1c.vennir.console.v1.TeamLimitR\x06limits\x12,\n" +
@@ -3617,13 +3627,13 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\x06people\x18\x05 \x01(\x05R\x06people\x12\x12\n" +
 	"\x04bots\x18\x06 \x01(\x05R\x04bots\x12)\n" +
 	"\x10waiting_requests\x18\a \x01(\x05R\x0fwaitingRequests\x12!\n" +
-	"\fwaiting_apis\x18\b \x01(\x05R\vwaitingApis*\x96\x01\n" +
+	"\fwaiting_apis\x18\b \x01(\x05R\vwaitingApis*\x9a\x01\n" +
 	"\fApiAccessVia\x12\x1e\n" +
 	"\x1aAPI_ACCESS_VIA_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13API_ACCESS_VIA_TEAM\x10\x01\x12\x17\n" +
 	"\x13API_ACCESS_VIA_USER\x10\x02\x12\x18\n" +
-	"\x14API_ACCESS_VIA_GROUP\x10\x03\x12\x1a\n" +
-	"\x16API_ACCESS_VIA_CATALOG\x10\x04*\xdc\x01\n" +
+	"\x14API_ACCESS_VIA_GROUP\x10\x03\x12\x1e\n" +
+	"\x16API_ACCESS_VIA_CATALOG\x10\x04\x1a\x02\b\x01*\xdc\x01\n" +
 	"\x15ApiAccessRequestState\x12(\n" +
 	"$API_ACCESS_REQUEST_STATE_UNSPECIFIED\x10\x00\x12$\n" +
 	" API_ACCESS_REQUEST_STATE_WAITING\x10\x01\x12$\n" +

@@ -36,7 +36,7 @@ const Group = Type.String({ maxLength: MAX_GROUP });
 const Email = Type.Union([Type.Literal(""), Type.String({ format: "email", maxLength: 320 })]);
 
 const STATE = { live: ApiState.LIVE, held: ApiState.HELD, paused: ApiState.PAUSED, unavailable: ApiState.UNAVAILABLE } as const;
-const VIA: Record<Via, ApiAccessVia> = { team: ApiAccessVia.TEAM, user: ApiAccessVia.USER, group: ApiAccessVia.GROUP, catalog: ApiAccessVia.CATALOG };
+const VIA: Record<Via, ApiAccessVia> = { team: ApiAccessVia.TEAM, user: ApiAccessVia.USER, group: ApiAccessVia.GROUP };
 const REQUEST_STATE = {
   waiting: ApiAccessRequestState.WAITING,
   granted: ApiAccessRequestState.GRANTED,
@@ -165,7 +165,7 @@ export function apiService(): ServiceImpl<typeof ApiService> {
     async listApiAccess(req, ctx) {
       const { team, name } = check({ team: Name, name: Name }, req);
       const a = await listApiAccess(callerOf(ctx), team, name);
-      return { grants: a.grants.map(grant), requests: a.requests.map(request), shareWith: a.shareWith };
+      return { grants: a.grants.map(grant), requests: a.requests.map(request) };
     },
 
     async listMyApiAccess(_req, ctx) {

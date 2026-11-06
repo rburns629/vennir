@@ -17,7 +17,7 @@ import { when } from "../time";
 import { Pill } from "../components/Pill";
 import { ApiBackend, ApiPause, RequestSteps } from "./api/ApiDefinition";
 import { ApiLogs } from "./api/ApiLogs";
-import { ApiEndpoints, Fact, sharedWith, size } from "./api/ApiOverview";
+import { ApiEndpoints, Fact, size } from "./api/ApiOverview";
 import { WhoMayCall, type ApiAccessList } from "./api/WhoMayCall";
 import { StandingPill, standingFor, YourAccess } from "./api/YourAccess";
 import { ApiStatePill } from "./api/ApiStatePill";
@@ -257,24 +257,6 @@ function ApiView({ team, name }: { team: string; name: string }) {
               <Fact label={inTeam ? "Your team’s limit" : "Your rate"}>
                 {`${String(api.perMinute)} a minute · ${size(api.maxRequestBytes)} a request · ${String(api.timeoutSeconds)} s`}
               </Fact>
-            )}
-            {api.shareWith.length > 0 && (
-              <Box sx={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 0.75, borderTop: 1, borderColor: "divider", pt: 1.5 }}>
-                <Typography variant="body2" color="text.secondary">
-                  From the catalog: its api.yaml’s shareWith names {sharedWith(api)}, whose members and bots may call it at these limits. Going away: {api.team} grants
-                  them instead.
-                </Typography>
-                <Box component="ul" sx={{ display: "flex", flexWrap: "wrap", gap: 1, m: 0, p: 0, listStyle: "none" }}>
-                  {api.limits.map((l) => (
-                    <Box component="li" key={l.team} sx={{ px: 1.25, py: 0.5, borderRadius: 999, bgcolor: "background.default", fontSize: 12.5 }}>
-                      {l.team} · {l.perMinute.toLocaleString()} a minute
-                    </Box>
-                  ))}
-                  <Box component="li" sx={{ px: 1.25, py: 0.5, borderRadius: 999, bgcolor: "background.default", fontSize: 12.5 }}>
-                    {api.limits.length > 0 ? "Every other team" : "Every team"} · {api.defaultPerMinute.toLocaleString()} a minute
-                  </Box>
-                </Box>
-              </Box>
             )}
           </Card>
 
