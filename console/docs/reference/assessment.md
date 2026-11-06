@@ -1035,7 +1035,10 @@ Proposed:
    in) or decline it. A request may be withdrawn while it waits, and asked
    again at once after a decline, shown beside it. Each step is audited
    and told to the person and the API's maintainers. A bot's grant is
-   asked for by its team's maintainers, the bot's owners.
+   asked for by its team's maintainers, the bot's owners. The API's
+   maintainers change or revoke any grant; an admin may revoke one (an
+   incident) but not add or change it; a person may give up their own, and
+   a bot's team its bot's. A group's rate is each member's.
 5. *What the catalog says:* `api.yaml`'s `access` replaces `shareWith`:
 
    ```yaml
