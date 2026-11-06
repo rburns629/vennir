@@ -56,8 +56,11 @@ scheduler:
       nodeSelector: {vennir.dev/pool: steps, karpenter.sh/capacity-type: on-demand}
       tolerations:
         - {key: vennir.dev/steps, operator: Equal, value: "true", effect: NoSchedule}
-# No catalogPolicy (kernel policy verifying the signed catalog release and
-# writing which images run as each product, decision 27): off here until
-# its ServiceAccount, kernel-execution-kernel-policy, may read the
-# catalog's registry and it's proven on this cloud (TODO.md). Meanwhile the
-# console writes those policies alone, and its Admin page says so.
+# No catalogPolicy here (kernel policy verifying the signed catalog release
+# and writing which images run as each product, decision 27): vennir turns
+# it on for an EKS install whose catalog is signed, with the role the aws
+# module makes for it (cli/internal/install's catalogPolicyValues). An
+# install from these values gives kernel-execution-kernel-policy a role
+# that reads the catalog's registry first (Pod Identity), then sets
+# catalogPolicy as vennir does. Meanwhile the console writes those
+# policies alone, and its Admin page says so.

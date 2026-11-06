@@ -266,7 +266,10 @@ func databaseSetupManifest(db *ManagedDatabase, image string) (string, error) {
 	env := `            - {name: DATABASE_IAM_AUTH, value: gcp}`
 	if db.Provider == "aws" {
 		setup.Databases = []string{"execution_kernel", "execution_console"}
-		for _, user := range []string{db.KernelUser, db.ConsoleUser, db.GatewayUser} {
+		for _, user := range []string{db.KernelUser, db.ConsoleUser, db.GatewayUser, db.PolicyUser} {
+			if user == "" {
+				continue
+			}
 			setup.Roles = append(setup.Roles, role{Name: user, MemberOf: []string{"rds_iam"}})
 		}
 		env = fmt.Sprintf("            - {name: DATABASE_ADMIN_SECRET, value: %q}\n            - {name: DATABASE_IAM_REGION, value: %q}", db.AdminSecret, db.Region)

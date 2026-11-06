@@ -568,9 +568,9 @@ func TestMonitoringValues(t *testing.T) {
 // own catalog is signed: the console's release and signers, read as its
 // own Google identity, signing in as its own database user with a managed
 // one, and the gateway's token audience as the console chart has it.
-// Off when unsigned, on EKS, from a module before its identity, or with
-// another install's catalog.
-func TestKernelPolicyRunsOnAGKEInstallWhoseCatalogIsSigned(t *testing.T) {
+// Off when unsigned, from a module before its identity, or with another
+// install's catalog. On EKS, as its role.
+func TestKernelPolicyRunsOnACloudInstallWhoseCatalogIsSigned(t *testing.T) {
 	c := kindConfig()
 	c.Target = "gcp"
 	c.GCP.Project = "acme"
@@ -606,8 +606,20 @@ func TestKernelPolicyRunsOnAGKEInstallWhoseCatalogIsSigned(t *testing.T) {
 		t.Errorf("a managed database: %v", p["database"])
 	}
 
+	// EKS: its role, by Pod Identity, reading ECR with its token; no
+	// Google audience for the gateway.
+	eks := *cloud
+	eks.Provider, eks.PolicyServiceAccount, eks.PolicyRole = "aws", "", "arn:aws:iam::1:role/dev-policy"
+	eks.Database = &ManagedDatabase{Provider: "aws", KernelUser: "vennir_kernel", PolicyUser: "vennir_kernel_policy"}
+	p = KernelValues(c, Images{}, "", &eks)["catalogPolicy"].(map[string]any)
+	if fmt.Sprint(p["registry"]) != "map[ecrToken:true]" || p["serviceAccountAnnotations"] != nil ||
+		fmt.Sprint(p["gateway"]) != "map[serviceAccount:console-execution-console-gateway]" ||
+		fmt.Sprint(p["database"]) != "map[existingSecret:vennir-kernel-policy-db role:vennir_kernel_policy]" {
+		t.Errorf("EKS: %v", p)
+	}
+
 	for name, change := range map[string]func(*Cloud, *config.Config){
-		"EKS":                       func(cl *Cloud, _ *config.Config) { cl.Provider = "aws" },
+		"EKS, a module from before": func(cl *Cloud, _ *config.Config) { cl.Provider = "aws" },
 		"a module from before":      func(cl *Cloud, _ *config.Config) { cl.PolicyServiceAccount = "" },
 		"another install's catalog": func(_ *Cloud, cfg *config.Config) { cfg.ExternalCatalog.Registry = "us-docker.pkg.dev/other/catalog" },
 	} {

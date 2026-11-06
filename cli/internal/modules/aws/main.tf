@@ -419,6 +419,36 @@ resource "aws_eks_pod_identity_association" "scanner" {
   role_arn        = aws_iam_role.scanner.arn
 }
 
+# kernel policy (decision 27) reads the task registry, where the catalog's
+# release is, to verify it itself, and with a managed database signs in as
+# its own user, which kernel migrate gives only what it uses: a role of its
+# own, not the kernel's.
+resource "aws_iam_role" "policy" {
+  name               = "${var.name}-policy"
+  assume_role_policy = data.aws_iam_policy_document.pod_trust.json
+}
+
+resource "aws_iam_role_policy" "policy" {
+  name   = "read-task-registry"
+  role   = aws_iam_role.policy.id
+  policy = data.aws_iam_policy_document.console.json
+}
+
+resource "aws_eks_pod_identity_association" "policy" {
+  cluster_name    = aws_eks_cluster.this.name
+  namespace       = var.namespace
+  service_account = "kernel-execution-kernel-policy"
+  role_arn        = aws_iam_role.policy.arn
+}
+
+# With a managed database it was the kernel's role's: the same
+# association, given its own role in place (a second one for a
+# ServiceAccount is refused).
+moved {
+  from = aws_eks_pod_identity_association.database["kernel-execution-kernel-policy"]
+  to   = aws_eks_pod_identity_association.policy
+}
+
 # Both were one for_each of the console's role: moved, not made again
 # (a second association for a ServiceAccount is refused), the scanner's
 # then given its own role in place.
@@ -1016,7 +1046,7 @@ locals {
     auto      = { class = "db.t4g.medium", max_connections = 200 }
   }[var.size]
   # Its users: made by database-setup, signed in to by IAM.
-  database_users = { kernel = "vennir_kernel", console = "vennir_console", gateway = "vennir_gateway" }
+  database_users = { kernel = "vennir_kernel", console = "vennir_console", gateway = "vennir_gateway", policy = "vennir_kernel_policy" }
 }
 
 resource "aws_db_subnet_group" "this" {
@@ -1108,6 +1138,7 @@ resource "aws_iam_role_policy" "database_connect" {
     kernel  = aws_iam_role.kernel_db[0].id
     console = aws_iam_role.console.id
     gateway = aws_iam_role.gateway_db[0].id
+    policy  = aws_iam_role.policy.id
   } : {}
   name = "connect-to-the-database"
   role = each.value
@@ -1136,15 +1167,14 @@ resource "aws_iam_role_policy" "database_admin" {
 }
 
 # Which ServiceAccounts sign in as which role: every kernel Pod that
-# connects (the scheduler, kernel-api and its migration, the sleeper, kernel
-# policy with the chart's catalogPolicy), the
-# gateway, and database-setup's Job. The console's is bound above.
+# connects (the scheduler, kernel-api and its migration, the sleeper), the
+# gateway, and database-setup's Job. The console's and kernel policy's are
+# bound above.
 resource "aws_eks_pod_identity_association" "database" {
   for_each = var.managed_database ? {
     "kernel-execution-kernel"           = aws_iam_role.kernel_db[0].arn
     "kernel-execution-kernel-api"       = aws_iam_role.kernel_db[0].arn
     "kernel-execution-kernel-sleeper"   = aws_iam_role.kernel_db[0].arn
-    "kernel-execution-kernel-policy"    = aws_iam_role.kernel_db[0].arn
     "console-execution-console-gateway" = aws_iam_role.gateway_db[0].arn
     "vennir-db-admin"                   = aws_iam_role.database_admin[0].arn
   } : {}

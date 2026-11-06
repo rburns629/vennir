@@ -158,7 +158,7 @@ func sameIdentity(recorded, now string) error {
 
 // optionalOutputs are the modules' outputs that are null when not used
 // (no backups, no catalog, no public console), which `tofu output` omits.
-var optionalOutputs = map[string]bool{"database": true, "scanner_service_account": true, "policy_service_account": true, "backup": true, "logs": true, "audit": true, "catalog": true, "console_address": true, "signing": true, "capacity_placements": true, "prometheus": true}
+var optionalOutputs = map[string]bool{"database": true, "scanner_service_account": true, "policy_service_account": true, "policy_role": true, "backup": true, "logs": true, "audit": true, "catalog": true, "console_address": true, "signing": true, "capacity_placements": true, "prometheus": true}
 
 // cloudFromGCP reads the module's outputs.
 func cloudFromGCP(outputs map[string]json.RawMessage) (*install.Cloud, error) {

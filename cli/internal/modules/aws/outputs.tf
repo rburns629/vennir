@@ -96,6 +96,12 @@ output "signing" {
 # The managed database: where it is, the users the services sign in as (no
 # passwords of Vennir's), and the administrator's password's secret, which
 # only database-setup's role may read.
+# kernel policy's role (Pod Identity binds it to its ServiceAccount by
+# name): reads the task registry, where the catalog's release is.
+output "policy_role" {
+  value = aws_iam_role.policy.arn
+}
+
 output "database" {
   value = var.managed_database ? {
     instance     = aws_db_instance.this[0].identifier

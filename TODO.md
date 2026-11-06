@@ -206,18 +206,19 @@ it was seen.
   console's identity policy holds the secret names alone). `kernel policy`
   signs in as a database role of its own, which `kernel migrate` gives
   only what it uses (`migrate.GrantPolicy`): with the bundled Postgres the
-  chart makes it (`postgres.auth.policyUsername`); with Cloud SQL, its own
-  IAM user (the gcp module's `policy` service account). On GKE `vennir`
-  turns it on for an install whose own catalog is signed
+  chart makes it (`postgres.auth.policyUsername`); with Cloud SQL or RDS,
+  its own IAM user (the gcp module's `policy` service account, the aws
+  module's `policy` role). On GKE and EKS `vennir` turns it on for an
+  install whose own catalog is signed
   (`catalogPolicyValues`), reading the catalog's registry as that service
   account, with the console's release, signers and gateway token audience
   (one helper each, so the two charts can't disagree). Next:
-  - **`kernel policy` on EKS**: the aws module has no identity of its own
-    for it (it shares the kernel's database role, with no ECR read): a role
-    for `kernel-execution-kernel-policy` by Pod Identity, with ECR read on
-    the task registry and `rds-db:connect` as its own RDS user
-    (`database-setup` makes it, in `rds_iam`), then `catalogPolicyValues`
-    for aws (`registry.ecrToken`) and a proof on EKS.
+  - **Prove `kernel policy` on EKS** (built 2026-11-06, unproven): the
+    aws module gives it a role of its own (`<name>-policy`, by Pod
+    Identity: ECR read on the task registry, and `rds-db:connect` as
+    `vennir_kernel_policy`, which `database-setup` makes in `rds_iam`), and
+    `vennir` turns it on as on GKE (`registry.ecrToken`). Needs a billed
+    run on AWS, as the GKE one (2026-11-06) did.
   - **Another install's catalog**: `kernel policy` is off when the catalog
     is another install's (`externalCatalog`): the console reads it by its
     own identity, or by federation, which `kernel policy` doesn't borrow.

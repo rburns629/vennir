@@ -125,7 +125,7 @@ func TestTheDatabaseVolumeGrowsWithTheSize(t *testing.T) {
 // the services' values carry the region and no Google identities.
 func TestOnRDSSetupMakesTheUsersAndTheServicesSignInByRole(t *testing.T) {
 	db := &ManagedDatabase{Provider: "aws", Host: "vennir.abc.us-east-2.rds.amazonaws.com", Region: "us-east-2", CACert: "PEM",
-		KernelUser: "vennir_kernel", ConsoleUser: "vennir_console", GatewayUser: "vennir_gateway", AdminUser: "vennir_admin",
+		KernelUser: "vennir_kernel", ConsoleUser: "vennir_console", GatewayUser: "vennir_gateway", PolicyUser: "vennir_kernel_policy", AdminUser: "vennir_admin",
 		AdminSecret: "arn:aws:secretsmanager:us-east-2:123456789012:secret:rds!db-abc"}
 	m, err := databaseSetupManifest(db, "img")
 	if err != nil {
@@ -137,6 +137,8 @@ func TestOnRDSSetupMakesTheUsersAndTheServicesSignInByRole(t *testing.T) {
 		`"postgresql://vennir_admin@vennir.abc.us-east-2.rds.amazonaws.com:5432/postgres?sslmode=verify-full&sslrootcert=/etc/vennir/tls-db/ca.crt"`,
 		`\"databases\":[\"execution_kernel\",\"execution_console\"]`,
 		`{\"name\":\"vennir_gateway\",\"memberOf\":[\"rds_iam\"]}`,
+		`{\"name\":\"vennir_kernel_policy\",\"memberOf\":[\"rds_iam\"]}`,
+		`{\"database\":\"execution_kernel\",\"role\":\"vennir_kernel\",\"regrant\":true}`,
 	} {
 		if !strings.Contains(m, want) {
 			t.Errorf("missing %s in:\n%s", want, m)
