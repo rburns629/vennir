@@ -66,7 +66,8 @@ Same reasoning as image-policy.yaml for a literal rather than a ConfigMap.
 
 With catalogPolicy (a signed catalog; decision 27), once the kernel's
 catalog-identity policy and its binding exist (lookup: from the upgrade
-after the one that made them; never without lookup), which digests are a
+after the one that made them; never without lookup) and the kernel has
+written it or it holds no legacy list (below), which digests are a
 product's releases, as which ServiceAccount and token audiences, is the
 kernel's to write, from the release it verified, into catalog-policy.yaml's
 <release>-execution-kernel-catalog-identity, which the console can't
@@ -95,11 +96,27 @@ imageRepository) read them.
 {{- /* Only once the kernel's policy and its binding are in the cluster (an
      upgrade after the one that made them): the upgrade that turns
      catalogPolicy on, should it fail, never leaves no release rule. Without
-     lookup (helm template), never. */}}
+     lookup (helm template), never. And only once the kernel has written
+     it, or it holds no legacy list: until then it may hold one seeded from
+     a v0.11 console's (by repository, any digest), which the kernel's first
+     write empties, and splitting would leave that as the only release rule
+     for as long as the kernel can't apply a verified release. Written: its
+     vennir.dev/catalog-release annotation set, or its legacy `products`
+     "[]" (or not there: a chart from before it). */}}
 {{- $catalogIdentity := printf "%s-catalog-identity" (include "execution-kernel.fullname" .) }}
 {{- $split := false }}
-{{- if and .Values.catalogPolicy.enabled (lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $catalogIdentity) (lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $catalogIdentity) }}
+{{- $kernelPolicy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $catalogIdentity }}
+{{- if and .Values.catalogPolicy.enabled $kernelPolicy (lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $catalogIdentity) }}
+{{- $written := ne (get (default (dict) $kernelPolicy.metadata.annotations) "vennir.dev/catalog-release") "" }}
+{{- $noLegacy := true }}
+{{- range $kernelPolicy.spec.variables }}
+{{- if and (eq .name "products") (ne (trim .expression) "[]") }}
+{{- $noLegacy = false }}
+{{- end }}
+{{- end }}
+{{- if or $written $noLegacy }}
 {{- $split = true }}
+{{- end }}
 {{- end }}
 {{- $scheduler := printf "system:serviceaccount:%s:%s" .Release.Namespace (include "execution-kernel.serviceAccountName" .) }}
 {{- $name := printf "%s-identity" (include "execution-kernel.fullname" .) }}

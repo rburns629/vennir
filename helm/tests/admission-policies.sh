@@ -1083,6 +1083,30 @@ form() {  # release, extra helm arguments: full (candidates: it matches releases
 CATALOG_ON=(--set catalogPolicy.enabled=true --set catalogPolicy.release=$SOURCE/catalog-release:latest --set 'catalogPolicy.signature.publicKeys[0]=unused')
 expect "catalogPolicy on, the kernel's policy there: split" split "$(form "$RELEASE" "${CATALOG_ON[@]}")"
 expect "catalogPolicy on, no kernel policy yet: full"      full  "$(form "$RELEASE-none" "${CATALOG_ON[@]}")"
+# The kernel's policy holding a legacy list seeded from a v0.11 console's
+# (any digest of a repository), the kernel not having written yet: not
+# split, or that list would be the only release rule until it does.
+kernel_legacy() {  # legacy products JSON ("" removes it), catalog-release annotation
+  k get validatingadmissionpolicy "$CATALOG_IDENTITY" -o json | python3 -c '
+import json, sys
+policy = json.load(sys.stdin)
+policy["metadata"].pop("resourceVersion", None)
+annotations = policy["metadata"].setdefault("annotations", {})
+annotations.pop("kubectl.kubernetes.io/last-applied-configuration", None)
+annotations["vennir.dev/catalog-release"] = sys.argv[2]
+variables = [v for v in policy["spec"]["variables"] if v["name"] != "products"]
+if sys.argv[1]:
+    variables.insert(0, {"name": "products", "expression": sys.argv[1]})
+policy["spec"]["variables"] = variables
+print(json.dumps(policy))' "$1" "$2" | k replace -f - > /dev/null || { echo "  FAIL  writing the kernel policy's legacy list"; FAILURES=$((FAILURES + 1)); }
+}
+kernel_legacy "$LEGACY_PRODUCTS" ""
+expect "kernel policy with a seeded legacy list, unwritten: full" full  "$(form "$RELEASE" "${CATALOG_ON[@]}")"
+kernel_legacy "$LEGACY_PRODUCTS" "$SOURCE/catalog-release@$ZERO_DIGEST"
+expect "the same, once the kernel has written: split"          split "$(form "$RELEASE" "${CATALOG_ON[@]}")"
+kernel_legacy "[]" ""
+expect "its legacy list emptied: split"                        split "$(form "$RELEASE" "${CATALOG_ON[@]}")"
+kernel_legacy "" ""
 # Turning catalogPolicy off again: the releases back from the kernel's
 # policy, but never a platform product's (team "": every namespace here).
 catalog_literal "$CATALOG_IDENTITY" releases '{"'$ZERO_DIGEST'":[{"action":"create","audiences":"sts.amazonaws.com","repository":"registry.example/db","serviceAccount":"db-sa","team":"'$TEAM_A'"}],"'$PLATFORM_DIGEST'":[{"action":"run","audiences":"","repository":"registry.example/platform","serviceAccount":"plat-sa","team":""}]}'
