@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { Alert, Box, Button, Card, Link, Stack, Typography } from "@mui/material";
 import { errorMessage, listApis, listTeamBotApiAccess, type ApiAccessRequest, type ApiGrant, type ApiProduct, type Bot } from "../../api";
@@ -16,7 +16,7 @@ type Row = { key: string; team: string; name: string; grant: ApiGrant | null; re
 /**
  * A team's Automation: each bot's grants to other teams' APIs and its
  * requests (15i). Its maintainers ask for a bot's access, with a reason,
- * withdraw a request they made, and revoke a bot's grant; an admin may
+ * withdraw a bot's request, and revoke a bot's grant; an admin may
  * revoke one too. Members of the API's own team never need a grant.
  */
 export function BotApiAccess({ teamName, bots, readOnly }: { teamName: string; bots: Bot[]; readOnly: boolean }) {
@@ -27,12 +27,28 @@ export function BotApiAccess({ teamName, bots, readOnly }: { teamName: string; b
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
 
+  // Only the latest load's answer is shown: one superseded by a later load,
+  // or of a team switched away from, is ignored. (Its parent keys it by
+  // team too, so nothing of another team's is shown meanwhile.)
+  const latest = useRef(0);
   const load = useCallback(() => {
+    const mine = ++latest.current;
     listTeamBotApiAccess(teamName)
-      .then(setAccess)
-      .catch((err: unknown) => { setError(errorMessage(err, "Couldn't load the bots' grants.")); });
+      .then((got) => {
+        if (mine !== latest.current) return;
+        setAccess(got);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (mine === latest.current) setError(errorMessage(err, "Couldn't load the bots' grants."));
+      });
   }, [teamName]);
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+    return () => {
+      latest.current++;
+    };
+  }, [load]);
   useEffect(() => {
     let cancelled = false;
     listApis()
@@ -111,8 +127,8 @@ export function BotApiAccess({ teamName, bots, readOnly }: { teamName: string; b
             </Button>
           );
         }
-        // Only whoever asked may withdraw it.
-        if (request?.state === "waiting" && request.requestedBy === user?.email) {
+        // Whoever asked, or any maintainer of its team while the team isn't retired.
+        if (request?.state === "waiting" && (request.requestedBy === user?.email || canAsk)) {
           return (
             <Button size="small" onClick={() => { ask(withdrawAsk(request)); }}>
               Withdraw

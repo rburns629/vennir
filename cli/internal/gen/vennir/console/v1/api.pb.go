@@ -403,12 +403,14 @@ type ApiAccessRequest struct {
 	GrantId        string                 `protobuf:"bytes,12,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
 	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	DecidedAt      *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=decided_at,json=decidedAt,proto3" json:"decided_at,omitempty"`
-	// A person's single sign-on groups (when they asked, or as read since),
-	// one of which may be granted instead: shown to the API's maintainers
-	// only, and only while it waits.
+	// The single sign-on groups the person offered when they asked (none,
+	// or some of theirs), one of which may be granted instead: shown to the
+	// API's maintainers only, and only while it waits. Never the person's
+	// other groups.
 	Groups []string `protobuf:"bytes,15,rep,name=groups,proto3" json:"groups,omitempty"`
-	// When those groups were read: older than 24 hours, a group can't be
-	// granted from them (GROUPS_STALE) unless Google Workspace confirms it.
+	// When those groups were read (when they asked, or a later sign-in that
+	// read them all again): older than 24 hours, a group can't be granted
+	// from them (GROUPS_STALE) unless Google Workspace confirms it.
 	GroupsReadAt *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=groups_read_at,json=groupsReadAt,proto3" json:"groups_read_at,omitempty"`
 	// When its API left the catalog's release; unset while it's published.
 	AwaySince     *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=away_since,json=awaySince,proto3" json:"away_since,omitempty"`
@@ -572,7 +574,11 @@ type RequestApiAccessRequest struct {
 	// Why: the API's maintainers read it. At most 1000 characters.
 	Reason string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
 	// For a bot of a team the caller maintains; empty: for the caller.
-	BotEmail      string `protobuf:"bytes,4,opt,name=bot_email,json=botEmail,proto3" json:"bot_email,omitempty"`
+	BotEmail string `protobuf:"bytes,4,opt,name=bot_email,json=botEmail,proto3" json:"bot_email,omitempty"`
+	// For the caller: which of their single sign-on groups (as last read,
+	// while they count) the API's maintainers may grant instead of them.
+	// Empty: none, so they're granted by name. Never for a bot.
+	Groups        []string `protobuf:"bytes,5,rep,name=groups,proto3" json:"groups,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -633,6 +639,13 @@ func (x *RequestApiAccessRequest) GetBotEmail() string {
 		return x.BotEmail
 	}
 	return ""
+}
+
+func (x *RequestApiAccessRequest) GetGroups() []string {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
 }
 
 type RequestApiAccessResponse struct {
@@ -1457,7 +1470,11 @@ type ListMyApiAccessResponse struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Access []*MyApiAccess         `protobuf:"bytes,1,rep,name=access,proto3" json:"access,omitempty"`
 	// Requests for the caller that wait, or were declined.
-	Requests      []*ApiAccessRequest `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty"`
+	Requests []*ApiAccessRequest `protobuf:"bytes,2,rep,name=requests,proto3" json:"requests,omitempty"`
+	// The caller's single sign-on groups as last read, which they may offer
+	// in a request; empty while their groups don't count (no group source,
+	// an older single sign-on session, or Google's read over 90 minutes ago).
+	Groups        []string `protobuf:"bytes,3,rep,name=groups,proto3" json:"groups,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1502,6 +1519,13 @@ func (x *ListMyApiAccessResponse) GetAccess() []*MyApiAccess {
 func (x *ListMyApiAccessResponse) GetRequests() []*ApiAccessRequest {
 	if x != nil {
 		return x.Requests
+	}
+	return nil
+}
+
+func (x *ListMyApiAccessResponse) GetGroups() []string {
+	if x != nil {
+		return x.Groups
 	}
 	return nil
 }
@@ -3384,12 +3408,13 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\x06groups\x18\x0f \x03(\tR\x06groups\x12@\n" +
 	"\x0egroups_read_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\fgroupsReadAt\x129\n" +
 	"\n" +
-	"away_since\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tawaySince\"v\n" +
+	"away_since\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tawaySince\"\x8e\x01\n" +
 	"\x17RequestApiAccessRequest\x12\x12\n" +
 	"\x04team\x18\x01 \x01(\tR\x04team\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x1b\n" +
-	"\tbot_email\x18\x04 \x01(\tR\bbotEmail\"\x8c\x01\n" +
+	"\tbot_email\x18\x04 \x01(\tR\bbotEmail\x12\x16\n" +
+	"\x06groups\x18\x05 \x03(\tR\x06groups\"\x8c\x01\n" +
 	"\x18RequestApiAccessResponse\x12=\n" +
 	"\arequest\x18\x01 \x01(\v2#.vennir.console.v1.ApiAccessRequestR\arequest\x121\n" +
 	"\x05grant\x18\x02 \x01(\v2\x1b.vennir.console.v1.ApiGrantR\x05grant\"M\n" +
@@ -3442,10 +3467,11 @@ const file_vennir_console_v1_api_proto_rawDesc = "" +
 	"\bgrant_id\x18\x06 \x01(\tR\agrantId\x12\x1d\n" +
 	"\n" +
 	"per_minute\x18\a \x01(\x05R\tperMinute\"\x18\n" +
-	"\x16ListMyApiAccessRequest\"\x92\x01\n" +
+	"\x16ListMyApiAccessRequest\"\xaa\x01\n" +
 	"\x17ListMyApiAccessResponse\x126\n" +
 	"\x06access\x18\x01 \x03(\v2\x1e.vennir.console.v1.MyApiAccessR\x06access\x12?\n" +
-	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\"1\n" +
+	"\brequests\x18\x02 \x03(\v2#.vennir.console.v1.ApiAccessRequestR\brequests\x12\x16\n" +
+	"\x06groups\x18\x03 \x03(\tR\x06groups\"1\n" +
 	"\x1bListTeamBotApiAccessRequest\x12\x12\n" +
 	"\x04team\x18\x01 \x01(\tR\x04team\"\x94\x01\n" +
 	"\x1cListTeamBotApiAccessResponse\x123\n" +

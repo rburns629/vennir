@@ -20,7 +20,9 @@ const GRANTS = [
   "GRANT SELECT (id, user_id, token_hash, revoked_at, expires_at, last_used_at) ON api_tokens TO %I",
   // A token used at the gateway is used: its last_used_at, and nothing else of it.
   "GRANT UPDATE (last_used_at) ON api_tokens TO %I",
-  // from_groups, never via_groups: whether groups gave a membership, not which.
+  // from_groups, never via_groups: whether groups gave a membership, not
+  // which of them did. (It does read the names of each person's groups that
+  // matter, in user_groups below, for an API's group grant.)
   "REVOKE SELECT (via_groups) ON team_memberships FROM %I",
   "GRANT SELECT (user_id, team_id, from_groups) ON team_memberships TO %I",
   // Which teams follow single sign-on groups: their ids, nothing of the groups.

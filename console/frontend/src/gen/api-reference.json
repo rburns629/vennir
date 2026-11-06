@@ -91,7 +91,7 @@
   {
    "name": "ApiService",
    "fullName": "vennir.console.v1.ApiService",
-   "comment": "API products (decision 20): a backend a team already runs, published\nthrough this install's gateway. Its OpenAPI file is the allowlist: the\ngateway forwards only requests whose method and path are an operation\nthere and that fit its schemas, and blocks everything else. An API comes\nfrom its team's catalog (apis/<name>/api.yaml); pausing one is the only\nchange made here.\n\nEveryone signed in sees the APIs that aren't hidden; they may call one\n(may_call) when it's their own team's, when it's granted to them or to a\nsingle sign-on group they're in, or, for this release, when its\napi.yaml's shareWith names one of their teams (decision 26). The\nbackend's address and how the gateway signs in there are shown to the\nAPI's own team only.\n\nAccess (decision 26): each API has grants, to a group (each person in it)\nor to one user (a person or a bot), each with its rate. Only the API's\nteam's maintainers add grants or change their rates. A person asks for\naccess for themselves; a maintainer of a bot's team asks for the bot.\nThe API's maintainers approve (granting the person, or one of their\ngroups) or decline. Revoking: the API's maintainers, an admin, the\nperson a grant names, or the maintainers of the bot it names. Every\nchange is audited and told to whoever it's for and the API's maintainers.",
+   "comment": "API products (decision 20): a backend a team already runs, published\nthrough this install's gateway. Its OpenAPI file is the allowlist: the\ngateway forwards only requests whose method and path are an operation\nthere and that fit its schemas, and blocks everything else. An API comes\nfrom its team's catalog (apis/<name>/api.yaml); pausing one is the only\nchange made here.\n\nEveryone signed in sees the APIs that aren't hidden; they may call one\n(may_call) when it's their own team's, when it's granted to them or to a\nsingle sign-on group they're in, or, for this release, when its\napi.yaml's shareWith names one of their teams (decision 26). The\nbackend's address and how the gateway signs in there are shown to the\nAPI's own team only.\n\nAccess (decision 26): each API has grants, to a group (each person in it)\nor to one user (a person or a bot), each with its rate. Only the API's\nteam's maintainers add grants or change their rates. A person asks for\naccess for themselves, offering none or some of their groups; a\nmaintainer of a bot's team asks for the bot. The API's maintainers\napprove (granting the person, or one of the groups they offered) or\ndecline. Revoking: the API's maintainers, an admin, the\nperson a grant names, or the maintainers of the bot it names. Every\nchange is audited and told to whoever it's for and the API's maintainers.",
    "methods": [
     {
      "name": "ListApis",
@@ -158,7 +158,7 @@
     },
     {
      "name": "RequestApiAccess",
-     "comment": "Asks for access to an API, with a reason: a person for themselves, or a\nmaintainer of a bot's team for that bot (bot_email). Refused when its\napi.yaml takes no requests (access.requests: closed), when whoever\nit's for may call it already, or while a request of theirs waits. An\nAPI whose requests are open grants it at once, at its default limit.",
+     "comment": "Asks for access to an API, with a reason: a person for themselves, or a\nmaintainer of a bot's team for that bot (bot_email). Refused when its\napi.yaml takes no requests (access.requests: closed), when whoever\nit's for may call it already (but only \"from the catalog\", by its\napi.yaml's shareWith: then a grant may be asked for), or while a\nrequest of theirs waits. An API whose requests are open grants it at\nonce, at its default limit.",
      "input": "vennir.console.v1.RequestApiAccessRequest",
      "output": "vennir.console.v1.RequestApiAccessResponse",
      "streaming": false,
@@ -167,7 +167,7 @@
     },
     {
      "name": "WithdrawApiAccessRequest",
-     "comment": "Withdraws a request while it waits: whoever asked.",
+     "comment": "Withdraws a request while it waits: whoever asked, or, for a bot's, a\nmaintainer of one of the bot's teams that isn't retired.",
      "input": "vennir.console.v1.WithdrawApiAccessRequestRequest",
      "output": "vennir.console.v1.WithdrawApiAccessRequestResponse",
      "streaming": false,
@@ -176,7 +176,7 @@
     },
     {
      "name": "DecideApiAccessRequest",
-     "comment": "Grants (approve) or declines a waiting request: a maintainer of the\nAPI's team. Granting a person may grant one of their groups instead,\nas the console last read them; a bot is granted by name only.",
+     "comment": "Grants (approve) or declines a waiting request: a maintainer of the\nAPI's team. Granting a person may grant one of the groups they offered\ninstead (and only those); a bot is granted by name only.",
      "input": "vennir.console.v1.DecideApiAccessRequestRequest",
      "output": "vennir.console.v1.DecideApiAccessRequestResponse",
      "streaming": false,
@@ -2781,14 +2781,14 @@
      "type": "string",
      "repeated": true,
      "optional": false,
-     "comment": "A person's single sign-on groups (when they asked, or as read since),\none of which may be granted instead: shown to the API's maintainers\nonly, and only while it waits."
+     "comment": "The single sign-on groups the person offered when they asked (none,\nor some of theirs), one of which may be granted instead: shown to the\nAPI's maintainers only, and only while it waits. Never the person's\nother groups."
     },
     {
      "name": "groupsReadAt",
      "type": "timestamp (RFC 3339 string)",
      "repeated": false,
      "optional": false,
-     "comment": "When those groups were read: older than 24 hours, a group can't be\ngranted from them (GROUPS_STALE) unless Google Workspace confirms it."
+     "comment": "When those groups were read (when they asked, or a later sign-in that\nread them all again): older than 24 hours, a group can't be granted\nfrom them (GROUPS_STALE) unless Google Workspace confirms it."
     },
     {
      "name": "awaySince",
@@ -2830,6 +2830,13 @@
      "repeated": false,
      "optional": false,
      "comment": "For a bot of a team the caller maintains; empty: for the caller."
+    },
+    {
+     "name": "groups",
+     "type": "string",
+     "repeated": true,
+     "optional": false,
+     "comment": "For the caller: which of their single sign-on groups (as last read,\nwhile they count) the API's maintainers may grant instead of them.\nEmpty: none, so they're granted by name. Never for a bot."
     }
    ]
   },
@@ -3179,6 +3186,13 @@
      "repeated": true,
      "optional": false,
      "comment": "Requests for the caller that wait, or were declined."
+    },
+    {
+     "name": "groups",
+     "type": "string",
+     "repeated": true,
+     "optional": false,
+     "comment": "The caller's single sign-on groups as last read, which they may offer\nin a request; empty while their groups don't count (no group source,\nan older single sign-on session, or Google's read over 90 minutes ago)."
     }
    ]
   },

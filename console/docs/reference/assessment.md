@@ -1033,12 +1033,15 @@ people and services that call. Decided:
    within the gateway's cache time (a minute at most). Grants are per
    install, like a secret store's credential.
 4. *Who grants:* only the API's team's maintainers add grants, of groups
-   or users. A person asks for access for themselves, with a reason; the
-   API's maintainers approve it (granting that person, or a group they're
-   in) or decline it. A request may be withdrawn while it waits, and asked
-   again at once after a decline, shown beside it. Each step is audited
-   and told to the person and the API's maintainers. A bot's grant is
-   asked for by its team's maintainers, the bot's owners. The API's
+   or users. A person asks for access for themselves, with a reason,
+   choosing which of their groups (none, or some) to offer for a group
+   grant; the API's maintainers see only those, never the rest of their
+   groups, and approve it (granting that person, or one of the groups they
+   offered, never another) or decline it (decided 2026-11-06). A request
+   may be withdrawn while it waits, and asked again at once after a
+   decline, shown beside it. Each step is audited and told to the person
+   and the API's maintainers. A bot's grant is asked for (and its request
+   withdrawn) by its team's maintainers, the bot's owners. The API's
    maintainers change or revoke any grant; an admin may revoke one (an
    incident) but not add or change it; a person may give up their own, and
    a bot's team its bot's. A group's rate is each member's.

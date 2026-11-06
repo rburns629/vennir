@@ -358,7 +358,7 @@ describe("Google Workspace groups", () => {
     await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
   });
 
-  it("let a maintainer grant a requester's Google group, asked of Google as they decide", async () => {
+  it("let a maintainer grant a group the requester offered, read over a day ago, once Google says they're in it still", async () => {
     const [api] = await db
       .insert(apis)
       .values({ teamId: ids[teamA] ?? "", name: "gws-decided", displayName: "G", openapi: { openapi: "3.1.0", paths: {} }, backendUrl: "https://x.example", serviceAccount: "gws-decided-api" })
@@ -369,19 +369,29 @@ describe("Google Workspace groups", () => {
     const asMaintainer = { id: maintainer.id, teamNames: [teamA], maintainerOf: [teamA], isAdmin: false, scopes: [] };
     const asGws = { id: gws?.id ?? "", teamNames: [], maintainerOf: [], isAdmin: false, scopes: [], groupsCurrent: true };
     const real = globalThis.fetch;
+    const lookedUp: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const url = String(input instanceof Request ? input.url : input);
       if (url.startsWith("http://metadata.google.internal/")) return Promise.resolve(Response.json({ access_token: "t" }));
       if (url.startsWith("https://cloudidentity.googleapis.com/v1/groups:lookup")) {
         const group = new URL(url).searchParams.get("groupKey.id") ?? "";
-        return Promise.resolve(group === `readers@${domain}` ? Response.json({ name: "groups/readers1" }) : new Response("{}", { status: 404 }));
+        lookedUp.push(group);
+        return Promise.resolve(group === `readers@${domain}` || group === `others@${domain}` ? Response.json({ name: `groups/${group.split("@")[0] ?? ""}1` }) : new Response("{}", { status: 404 }));
       }
-      if (url.includes("/memberships:checkTransitiveMembership")) return Promise.resolve(Response.json({ hasMembership: ours(url) && url.includes("groups/readers1") }));
+      if (url.includes("/memberships:checkTransitiveMembership")) return Promise.resolve(Response.json({ hasMembership: ours(url) }));
       return real(input, init);
     });
-    const asked = await requestAccess(asGws, teamA, "gws-decided", "reports", "");
-    // Not a group Google says they're in: refused.
-    await expect(decideRequest(asMaintainer, asked.request.id, true, `others@${domain}`, 0, "")).rejects.toMatchObject({ code: "NOT_THEIR_GROUP" });
+    // Their groups as Google gave them just now: they offer readers, not others.
+    await db.update(users).set({ ssoGroups: [`others@${domain}`, `readers@${domain}`], ssoGroupsReadAt: new Date() }).where(eq(users.id, gws?.id ?? ""));
+    const asked = await requestAccess(asGws, teamA, "gws-decided", "reports", "", [`Readers@${domain}`]);
+    expect(asked.request.groups).toEqual([]);
+    // Read over a day ago since.
+    const dayAgo = new Date(Date.now() - 25 * 3_600_000);
+    await db.update(apiAccessRequests).set({ offeredGroupsReadAt: dayAgo }).where(eq(apiAccessRequests.id, asked.request.id));
+    await db.update(users).set({ ssoGroupsReadAt: dayAgo }).where(eq(users.id, gws?.id ?? ""));
+    // A group of theirs they didn't offer: refused, and Google never asked about it.
+    await expect(decideRequest(asMaintainer, asked.request.id, true, `others@${domain}`, 0, "")).rejects.toMatchObject({ code: "GROUP_NOT_OFFERED" });
+    expect(lookedUp).toEqual([]);
     const decided = await decideRequest(asMaintainer, asked.request.id, true, `Readers@${domain}`, 0, "");
     expect(decided.grant?.group).toBe(`readers@${domain}`);
     // Kept for them now, read now.
@@ -585,11 +595,11 @@ describe("kept groups and the settings they're read under", () => {
     const [someone] = await db.insert(users).values({ email: `copied@${domain}` }).returning();
     const [request] = await db
       .insert(apiAccessRequests)
-      .values({ apiId: api?.id ?? "", teamId: ids[teamA] ?? "", apiName: "copies", userId: someone?.id ?? "", reason: "r", requesterGroups: ["g-a"], requesterGroupsReadAt: new Date() })
+      .values({ apiId: api?.id ?? "", teamId: ids[teamA] ?? "", apiName: "copies", userId: someone?.id ?? "", reason: "r", offeredGroups: ["g-a"], offeredGroupsReadAt: new Date(), requesterGroups: ["g-old"] })
       .returning();
     // The same settings again: nothing changes.
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
-    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]?.requesterGroups).toEqual(["g-a"]);
+    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]?.offeredGroups).toEqual(["g-a"]);
     // Another issuer: everyone's groups, and the copies, go.
     vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
       const url = String(input instanceof Request ? input.url : input);
@@ -597,7 +607,7 @@ describe("kept groups and the settings they're read under", () => {
     });
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", issuer: "https://other.example" }));
     vi.restoreAllMocks();
-    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]).toMatchObject({ requesterGroups: [], requesterGroupsReadAt: null });
+    expect((await db.select().from(apiAccessRequests).where(eq(apiAccessRequests.id, request?.id ?? "")))[0]).toMatchObject({ offeredGroups: [], offeredGroupsReadAt: null, requesterGroups: [] });
     await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "" }));
     await db.delete(apis).where(eq(apis.id, api?.id ?? ""));
   });
@@ -608,10 +618,10 @@ describe("kept groups and the settings they're read under", () => {
     // A waiting request whose emptying fails: a trigger on this row's emptying alone (it's marked
     // away, so another file's release, marking rows away, doesn't touch it).
     const marker = `fail-clear-${prefix}`;
-    await db.insert(apiAccessRequests).values({ teamId: ids[teamA] ?? "", apiName: "atomic", userId: someone?.id ?? "", reason: marker, requesterGroups: ["g-kept"], awaySince: new Date() });
+    await db.insert(apiAccessRequests).values({ teamId: ids[teamA] ?? "", apiName: "atomic", userId: someone?.id ?? "", reason: marker, offeredGroups: ["g-kept"], awaySince: new Date() });
     const fn = `fail_clear_${prefix.replace(/-/g, "_")}`;
     await db.execute(sql.raw(`CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'emptying fails'; END $$`));
-    await db.execute(sql.raw(`CREATE TRIGGER ${fn} BEFORE UPDATE ON api_access_requests FOR EACH ROW WHEN (OLD.reason = '${marker}' AND NEW.requester_groups IS DISTINCT FROM OLD.requester_groups) EXECUTE FUNCTION ${fn}()`));
+    await db.execute(sql.raw(`CREATE TRIGGER ${fn} BEFORE UPDATE ON api_access_requests FOR EACH ROW WHEN (OLD.reason = '${marker}' AND NEW.offered_groups IS DISTINCT FROM OLD.offered_groups) EXECUTE FUNCTION ${fn}()`));
     try {
       const saved = await call(admin, "SsoService/SetSsoSettings", settings({ clientSecret: "", groupsClaim: "roles" }));
       expect(saved.code).toBe("internal");

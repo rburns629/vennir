@@ -340,6 +340,12 @@ it was seen.
 
 ## Testing and housekeeping
 
+- [ ] **Drop `api_access_requests.requester_groups` and `requester_groups_read_at`**
+  in the release after the one with migration 0072. Since 0072 a request
+  keeps only the groups its person offers (`offered_groups`); the old
+  columns stay only so a console from before can still insert requests
+  during a rolling upgrade (it copies every group of the person's there,
+  which nothing reads). Empty them in the same migration that drops them.
 - [ ] **Deploy vennir.io from CI.** `site/` is deployed by hand
   (`site/README.md`). A workflow on main that deploys it, signing in to
   Google Cloud by Workload Identity Federation (no stored key) as an account

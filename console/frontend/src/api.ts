@@ -2110,8 +2110,8 @@ function accessRequest(r: ApiAccessRequestMessage): ApiAccessRequest {
 }
 
 /** Asks for access, with a reason: for yourself, or (botEmail) for a bot of a team you maintain. An open API's grant comes back at once. */
-export async function requestApiAccess(team: string, name: string, reason: string, botEmail = ""): Promise<{ request: ApiAccessRequest | null; grant: ApiGrant | null }> {
-  const r = await call(() => apisApi.requestApiAccess({ team, name, reason, botEmail }));
+export async function requestApiAccess(team: string, name: string, reason: string, botEmail = "", groups: string[] = []): Promise<{ request: ApiAccessRequest | null; grant: ApiGrant | null }> {
+  const r = await call(() => apisApi.requestApiAccess({ team, name, reason, botEmail, groups }));
   return { request: r.request ? accessRequest(r.request) : null, grant: r.grant ? apiGrant(r.grant) : null };
 }
 
@@ -2169,12 +2169,20 @@ export interface MyApiAccess {
   perMinute: number;
 }
 
-/** What the caller may call, and how, and their requests that wait or were declined. */
-export async function listMyApiAccess(): Promise<{ access: MyApiAccess[]; requests: ApiAccessRequest[] }> {
+/** What the caller may call, their requests, and their groups as last read while they count (the ones they may offer in a request). */
+export interface MyAccessList {
+  access: MyApiAccess[];
+  requests: ApiAccessRequest[];
+  groups: string[];
+}
+
+/** What the caller may call, and how, their requests that wait or were declined, and the groups they may offer. */
+export async function listMyApiAccess(): Promise<MyAccessList> {
   const r = await call(() => apisApi.listMyApiAccess({}));
   return {
     access: r.access.map((a) => ({ team: a.team, name: a.name, via: via(a.via) ?? "user", callingTeam: a.callingTeam, group: a.group, grantId: a.grantId, perMinute: a.perMinute })),
     requests: r.requests.map(accessRequest),
+    groups: r.groups,
   };
 }
 

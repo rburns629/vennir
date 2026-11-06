@@ -60,7 +60,7 @@ function WaitingRequest({ api, request, maintains, onDecline, onDone }: { api: A
       await decideApiAccessRequest(request.id, { approve: true, group: to, perMinute: typedRate(rate) });
       onDone();
     } catch (err) {
-      setError(accessError(err));
+      setError(accessError(err, true));
     } finally {
       setBusy(false);
     }

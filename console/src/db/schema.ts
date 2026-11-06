@@ -150,9 +150,9 @@ export const users = pgTable("users", {
   // list of people. Null means never.
   lastSignedInAt: timestamp("last_signed_in_at", { withTimezone: true }),
   // Which notifications reach them by email too, when the install sends
-  // email (notifier.ts): failures, approvals and readiness by default, not
-  // every finished run.
-  emailKinds: text("email_kinds").array().$type<NotificationKind[]>().notNull().default(sql`'{run_failed,approval_waiting,product_not_ready,catalog_failing,step_refused,platform_alert}'::text[]`),
+  // email (notifier.ts): failures, approvals, readiness and API access by
+  // default, not every finished run.
+  emailKinds: text("email_kinds").array().$type<NotificationKind[]>().notNull().default(sql`'{run_failed,approval_waiting,product_not_ready,catalog_failing,step_refused,platform_alert,api_access}'::text[]`),
   // Made by its own sign-up (AuthService.Register, with self-registration
   // on), which checks nothing about the email: anyone may register any
   // address. Until single sign-on binds it (oidcSubject), nobody has
@@ -163,8 +163,9 @@ export const users = pgTable("users", {
   // Every single sign-on group the person's last sign-in (or the hourly
   // Google resync) read, lowercased, at most 1000, and when: the console's
   // alone (the gateway's role can't read these columns). A request for
-  // access copies them, for the API's maintainers to grant one of them
-  // (core/apiAccess.ts); user_groups holds the ones that matter.
+  // access keeps the ones its person offers (offered_groups), for the
+  // API's maintainers to grant one of them (core/apiAccess.ts); user_groups
+  // holds the ones that matter.
   ssoGroups: text("sso_groups").array(),
   ssoGroupsReadAt: timestamp("sso_groups_read_at", { withTimezone: true }),
 });
@@ -1284,11 +1285,18 @@ export const apiAccessRequests = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
     reason: text("reason").notNull(),
-    // A person's single sign-on groups when they asked (users.sso_groups),
-    // one of which the API's maintainers may grant instead; none for a bot.
+    // Unread: what consoles before migration 0072 copied of a person's
+    // groups (every one of them) as they asked. Still written by such a
+    // console during a rolling upgrade, so never shown; emptied when where
+    // groups come from changes, and to be dropped (TODO.md).
     requesterGroups: text("requester_groups").array().notNull().default(sql`'{}'::text[]`),
-    // When those groups were read (users.sso_groups_read_at then).
     requesterGroupsReadAt: timestamp("requester_groups_read_at", { withTimezone: true }),
+    // The single sign-on groups the person offered when they asked (some
+    // of users.sso_groups, their choice), one of which the API's
+    // maintainers may grant instead; never their others; none for a bot.
+    offeredGroups: text("offered_groups").array().notNull().default(sql`'{}'::text[]`),
+    // When those groups were read (users.sso_groups_read_at then).
+    offeredGroupsReadAt: timestamp("offered_groups_read_at", { withTimezone: true }),
     state: text("state").$type<AccessRequestState>().notNull().default("waiting"),
     decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
     decisionReason: text("decision_reason"),

@@ -12,6 +12,7 @@ import {
   listTeamBotAccess,
   MAX_GRANT_PER_MINUTE,
   MAX_GROUP,
+  MAX_OFFERED_GROUPS,
   MAX_REASON,
   requestAccess,
   revokeGrant,
@@ -122,8 +123,11 @@ export function apiService(): ServiceImpl<typeof ApiService> {
     },
 
     async requestApiAccess(req, ctx) {
-      const { team, name, reason, botEmail } = check({ team: Name, name: Name, reason: Reason, botEmail: Email }, req);
-      const made = await requestAccess(callerOf(ctx), team, name, reason, botEmail);
+      const { team, name, reason, botEmail, groups } = check(
+        { team: Name, name: Name, reason: Reason, botEmail: Email, groups: Type.Array(Group, { maxItems: MAX_OFFERED_GROUPS }) },
+        req,
+      );
+      const made = await requestAccess(callerOf(ctx), team, name, reason, botEmail, groups);
       return { request: request(made.request), grant: made.grant ? grant(made.grant) : undefined };
     },
 
@@ -177,6 +181,7 @@ export function apiService(): ServiceImpl<typeof ApiService> {
           perMinute: a.perMinute,
         })),
         requests: mine.requests.map(request),
+        groups: mine.groups,
       };
     },
 
