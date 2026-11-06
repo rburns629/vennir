@@ -106,6 +106,12 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
             <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">Addresses and firewall rules: which address each part uses, how to find it, and when a fixed outbound address is worth it.</span></li>
           </ul>
         </li>
+        <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 14px">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Steps always hardened</h3>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 15px; line-height: 1.6; color: #AEB5C2">The kernel chart's <span class="mono" style="font-size: 14px; color: #E8EAEE">scheduler.taskPodHardening</span> is gone: every step runs non-root, on a read-only root filesystem, with no capabilities and no Kubernetes token. A values file that sets it can drop the key.</span></li>
+          </ul>
+        </li>
       </ul>
     </div>
   </section>

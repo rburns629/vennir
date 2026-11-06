@@ -407,8 +407,7 @@ func runScheduler(ctx context.Context, s config.Settings, log *slog.Logger) erro
 		RequestTimeout: s.KubernetesTimeout, WatchResync: s.WatchResync,
 		ExtraEnvironment: s.TaskExtraEnvironment, DefaultResources: s.TaskDefaultResources,
 		NodeSelector: s.TaskNodeSelector, Tolerations: tolerations, Affinity: affinity, CapacityPlacements: capacities,
-		PodLabels:    s.TaskPodLabels,
-		PodHardening: s.TaskPodHardening, ImagePullSecret: s.TaskImagePullSecret,
+		PodLabels: s.TaskPodLabels, ImagePullSecret: s.TaskImagePullSecret,
 		LogMaxLines: s.TaskLogMaxLines, LogMaxBytes: s.TaskLogMaxBytes,
 	}, logging.New("kernel-scheduler", "app.executors.kubernetes"))
 	exec.Watch(ctx)

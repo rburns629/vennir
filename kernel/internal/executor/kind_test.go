@@ -30,7 +30,7 @@ import (
 
 func kindOptions() executor.KubernetesOptions {
 	return executor.KubernetesOptions{JobTTL: time.Hour, ImagePullGrace: 120 * time.Second, JobDeadlineGrace: 600 * time.Second,
-		RequestTimeout: 30 * time.Second, WatchResync: 30 * time.Second, PodHardening: true, LogMaxLines: 5000, LogMaxBytes: 1 << 20}
+		RequestTimeout: 30 * time.Second, WatchResync: 30 * time.Second, LogMaxLines: 5000, LogMaxBytes: 1 << 20}
 }
 
 func kindExecutor(t *testing.T, change ...func(*executor.KubernetesOptions)) (*executor.Kubernetes, kubernetes.Interface) {
@@ -360,4 +360,23 @@ func TestKindTheDemoProducts(t *testing.T) {
 	if deployed.State != executor.Succeeded || deployed.Outputs["applicationUrl"] != "https://demo.example" {
 		t.Errorf("application create = %+v", deployed)
 	}
+}
+
+// A start retried for the same attempt (the scheduler stopped between
+// creating its Job and recording it) adopts the Job it made: the API
+// server's defaults never make it look like someone else's.
+func TestKindARetriedStartAdoptsItsOwnJob(t *testing.T) {
+	k, client := kindExecutor(t, func(o *executor.KubernetesOptions) { o.ExtraEnvironment = map[string]string{"VENNIR_TEST": "1"} })
+	task := fixtureTask(t, "greet", map[string]any{"name": "again"}, kindtest.Image(t, kindtest.FixtureImage))
+	task.SecretRefs = []string{"no-such-secret"}
+	task.TokenAudiences = []string{"vennir-test"}
+	first := start(t, k, task)
+	again, err := k.Start(context.Background(), task)
+	if err != nil {
+		t.Fatalf("not adopted: %v", err)
+	}
+	if again["jobName"] != first["jobName"] {
+		t.Errorf("handles differ: %v, %v", first, again)
+	}
+	_ = job(t, client, again)
 }

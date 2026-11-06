@@ -943,15 +943,14 @@ And at the network level, NetworkPolicies (`templates/networkpolicy.yaml` in bot
 
 ## What a step can reach
 
-**Its Pod.** With the kernel chart's `scheduler.taskPodHardening` on (the
-default), every step Pod meets Pod Security's `restricted`
+**Its Pod.** Every step Pod meets Pod Security's `restricted`
 (`kernel/internal/executor/kubernetes.go`): it runs as a non-root user (the
 image must name a numeric non-root `USER`), on a read-only root filesystem
 with a writable `/tmp`, with every capability dropped, no privilege
 escalation, the runtime's seccomp profile, and no Kubernetes API token
-(`automountServiceAccountToken: false`). It's never privileged. Turned off,
-for images that can't run that way, a step runs as its image's user on a
-writable filesystem and gets its ServiceAccount's API token.
+(`automountServiceAccountToken: false`). It's never privileged. There's no
+setting to turn this off (the kernel chart's `scheduler.taskPodHardening`
+was removed 2026-11-05): an image that can't run that way must be changed.
 
 The cluster holds a step to that only where the namespace enforces Pod
 Security: the console labels each namespace it creates
@@ -959,13 +958,13 @@ Security: the console labels each namespace it creates
 `teamNamespaces.podSecurity`; `console/src/k8s.ts`, `setTeamNamespace`), and
 the namespace policy won't let it remove the label. A team namespace the
 console adopted rather than created, or one made with `podSecurity` empty,
-has no such label. Either way, while `taskPodHardening` is on the kernel's
+has no such label. Either way, the kernel's
 dispatch policy refuses any Job of the scheduler's that isn't hardened
 that way (no API token, non-root, a read-only root filesystem, no
 capabilities or privilege, nothing of the host's: proven on kind
 2026-10-28), so a scheduler tricked into making another Job still can't.
 
-Whatever the hardening setting, the dispatch policy holds a step's container
+The dispatch policy also holds a step's container
 to what the executor builds: its image's own entrypoint (no `command`), the
 action as its one argument, no environment but the install's
 `scheduler.taskExtraEnvironment` (as values, never from a Secret or
@@ -979,12 +978,12 @@ a Job the kernel made never mounts a request it didn't write (proven on kind
 2026-11-03). A Job someone else made first under the attempt's name, exactly
 as the kernel would and already resumed, is still adopted; making one needs
 Job-create rights in a team namespace, which teams and steps don't have
-(`TODO.md`). With hardening on, each container is held to it too: non-root,
+(`TODO.md`). Each container is held to the hardening too: non-root,
 never user 0, seccomp `RuntimeDefault`, no host port.
 
 **The network.** In, only Pods of its own namespace (and the gateway, to a
 team's API backends). Out, anything: the internet, its cloud, the
-Kubernetes API server (with no token to call it, while hardening is on),
+Kubernetes API server (with no token to call it),
 the console's and the gateway's public ports, and Services in namespaces
 with no ingress policy; the cloud's metadata server too, except on EKS
 (below). It can't reach either Postgres, kernel-api, the image scanner,
@@ -1247,7 +1246,6 @@ Vennir isn't production-ready yet.
 | Groups from an ID token's claim are read at sign-in only | Someone who leaves a group the provider reports in its token stays in its team until their session ends (8 hours by default) or they sign in again; Google Workspace groups are read again every hour | Shorter sessions where that matters (`JWT_TTL`) |
 | Reads aren't audited ([Audit](#audit)) | Who looked at a run's outputs or logs isn't recorded | Not decided |
 | The audit log lives in the console's own database unless `audit.export` copies it to write-once storage (its entries are hash-chained, and with the copy compared with the database entry by entry; Observe shows the log as each caller may see it) | Without the copy, someone who can write that database could change it, rewriting the chain after it | Turn on `audit.export`, or ship the `event: "audit"` log lines to a SIEM |
-| Step Pod hardening is a chart setting: with `scheduler.taskPodHardening: false`, the dispatch policy no longer requires it, and only Pod Security, on namespaces the console created, holds a step to `restricted` | Steps run as root with an API token in an adopted namespace | Keep `taskPodHardening` on and let the console create team namespaces |
 
 ## Out of scope
 

@@ -241,11 +241,6 @@ scheduler:
   # A step that needs an approval fails with APPROVAL_EXPIRED if nobody
   # approves or declines it within this many seconds (3 days); 0, never.
   approvalTimeoutSeconds: 259200
-  # Step Pods meet Pod Security's `restricted`: non-root (images must name a
-  # numeric non-root USER), a read-only root filesystem with a writable
-  # /tmp, no capabilities, no privilege escalation, no Kubernetes token.
-  # Turn off only for images that can't run that way.
-  taskPodHardening: true
   # A step's stored output: its last maxLines lines, at most maxBytes,
   # refreshed every refreshSeconds while it runs and once when it ends.
   taskLogs:

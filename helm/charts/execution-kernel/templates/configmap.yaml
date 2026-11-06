@@ -59,7 +59,6 @@ data:
   TASK_CAPACITY_PLACEMENTS: {{ .Values.scheduler.capacityPlacements | toJson | quote }}
   TASK_POD_LABELS: {{ .Values.scheduler.taskPodLabels | toJson | quote }}
   TASK_IMAGE_PULL_SECRET: {{ .Values.scheduler.taskImagePullSecret | quote }}
-  TASK_POD_HARDENING: {{ .Values.scheduler.taskPodHardening | quote }}
   TASK_LOG_MAX_LINES: {{ .Values.scheduler.taskLogs.maxLines | quote }}
   TASK_LOG_MAX_BYTES: {{ .Values.scheduler.taskLogs.maxBytes | int | quote }}
   TASK_LOG_REFRESH_SECONDS: {{ .Values.scheduler.taskLogs.refreshSeconds | quote }}

@@ -27,8 +27,8 @@ A step may also get a short-lived ServiceAccount token for another cloud
 (a projected token with an audience; OIDC federation), but only for an
 audience its product declared (product.yaml's tokenAudiences), lasting an
 hour at most. A projected token with no audience is the Kubernetes API's
-own, which the kernel never asks for (it turns automounting off, unless
-scheduler.taskPodHardening is off).
+own, which the kernel never asks for (it turns automounting off, and the
+dispatch policy refuses a Job that doesn't).
 
 What's registered lives in this policy itself, as CEL literals the console
 rewrites whenever products or secrets change, every few minutes and at
@@ -217,7 +217,7 @@ spec:
           p.repository == variables.repository && p.action == variables.action &&
           p.serviceAccount == variables.serviceAccount)
     # Every projected token that names an audience (one with none is the
-    # Kubernetes API's: automounting's, governed by taskPodHardening).
+    # Kubernetes API's: automounting's, always off for a step).
     - name: tokens
       expression: >-
         has(variables.pod.volumes) ?

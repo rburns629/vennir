@@ -21,6 +21,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +73,6 @@ type KubernetesOptions struct {
 	// runs where any step does.
 	CapacityPlacements map[string]Placement
 	PodLabels          map[string]string
-	PodHardening       bool
 	ImagePullSecret    string
 	LogMaxLines        int
 	LogMaxBytes        int
@@ -268,7 +268,7 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 			// is off) was never checked, and its result would become this
 			// step's outputs.
 			return nil, &DispatchRejected{Code: "DISPATCH_REJECTED", Message: fmt.Sprintf(
-				"A Job named %s already exists in %s that the kernel didn't make for this attempt (its labels, image, command, ServiceAccount or Secrets differ), so it wasn't adopted.", job.Name, namespace)}
+				"A Job named %s already exists in %s that the kernel didn't make for this attempt (its labels, image, command, ServiceAccount, Secrets, tokens, environment or hardening differ), so it wasn't adopted.", job.Name, namespace)}
 		}
 		k.log.Info("adopting this attempt's existing Job", "namespace", namespace, "job", job.Name)
 		return created, nil
@@ -280,8 +280,9 @@ func (k *Kubernetes) createJob(ctx context.Context, namespace string, job *batch
 }
 
 // sameAttempt says found is the Job jobFor built as want, as far as what
-// the step runs, as whom, and with which Secrets: what a Job made by
-// anyone else would change.
+// the step runs, as whom, with which Secrets, tokens and environment, and
+// how hardened: what a Job made by anyone else, or by a scheduler from
+// before step Pods were always hardened, would change.
 func sameAttempt(found, want *batchv1.Job) bool {
 	for _, key := range []string{"app", "vennir.dev/execution-id", "vennir.dev/attempt"} {
 		if found.Labels[key] != want.Labels[key] {
@@ -295,22 +296,59 @@ func sameAttempt(found, want *batchv1.Job) bool {
 	if f.ServiceAccountName != w.ServiceAccountName || len(f.Containers) != 1 || len(f.InitContainers) != 0 {
 		return false
 	}
-	fc, wc := f.Containers[0], w.Containers[0]
-	if fc.Name != wc.Name || fc.Image != wc.Image || len(fc.Command) != 0 || !slices.Equal(fc.Args, wc.Args) {
+	if f.HostNetwork || f.HostPID || f.HostIPC || !sameBool(f.AutomountServiceAccountToken, w.AutomountServiceAccountToken) ||
+		!equality.Semantic.DeepEqual(f.SecurityContext, w.SecurityContext) {
 		return false
 	}
-	return slices.Equal(secretNames(f.Volumes), secretNames(w.Volumes))
+	fc, wc := f.Containers[0], w.Containers[0]
+	if fc.Name != wc.Name || fc.Image != wc.Image || len(fc.Command) != 0 || !slices.Equal(fc.Args, wc.Args) ||
+		!equality.Semantic.DeepEqual(fc.SecurityContext, wc.SecurityContext) || len(fc.EnvFrom) != 0 ||
+		!slices.EqualFunc(fc.Env, wc.Env, func(a, b corev1.EnvVar) bool { return a.Name == b.Name && a.Value == b.Value && a.ValueFrom == nil }) ||
+		!slices.Equal(mountShapes(fc.VolumeMounts), mountShapes(wc.VolumeMounts)) {
+		return false
+	}
+	return slices.Equal(volumeShapes(f.Volumes), volumeShapes(w.Volumes))
 }
 
-func secretNames(volumes []corev1.Volume) []string {
-	var names []string
+func sameBool(a, b *bool) bool {
+	return (a == nil) == (b == nil) && (a == nil || *a == *b)
+}
+
+// volumeShapes describes each volume by what it brings into the Pod, sorted:
+// any kind jobFor never makes reads as "other", so it never matches.
+func volumeShapes(volumes []corev1.Volume) []string {
+	var shapes []string
 	for _, v := range volumes {
-		if v.Secret != nil {
-			names = append(names, v.Secret.SecretName)
+		switch {
+		case v.Secret != nil:
+			shapes = append(shapes, "secret:"+v.Name+":"+v.Secret.SecretName)
+		case v.ConfigMap != nil:
+			shapes = append(shapes, "configMap:"+v.Name+":"+v.ConfigMap.Name)
+		case v.EmptyDir != nil:
+			shapes = append(shapes, "emptyDir:"+v.Name)
+		case v.Projected != nil:
+			for _, source := range v.Projected.Sources {
+				if t := source.ServiceAccountToken; t != nil && source.Secret == nil && source.ConfigMap == nil && source.DownwardAPI == nil && source.ClusterTrustBundle == nil {
+					shapes = append(shapes, "token:"+v.Name+":"+t.Audience+":"+t.Path)
+				} else {
+					shapes = append(shapes, "other:"+v.Name)
+				}
+			}
+		default:
+			shapes = append(shapes, "other:"+v.Name)
 		}
 	}
-	slices.Sort(names)
-	return names
+	slices.Sort(shapes)
+	return shapes
+}
+
+func mountShapes(mounts []corev1.VolumeMount) []string {
+	var shapes []string
+	for _, m := range mounts {
+		shapes = append(shapes, fmt.Sprintf("%s:%s:%t:%s", m.Name, m.MountPath, m.ReadOnly, m.SubPath))
+	}
+	slices.Sort(shapes)
+	return shapes
 }
 
 // createConfigMap makes the attempt's request ConfigMap, immutable, so
@@ -452,24 +490,20 @@ func (k *Kubernetes) jobFor(name string, task ResolvedTask) (*batchv1.Job, error
 	if strings.HasSuffix(task.Image, ":latest") && strings.Contains(task.Image, "/") {
 		pullPolicy = corev1.PullAlways
 	}
-	f := false
-	security := &corev1.SecurityContext{Privileged: &f, AllowPrivilegeEscalation: &f}
-	var podSecurity *corev1.PodSecurityContext
-	var automount *bool
-	if k.opts.PodHardening {
-		// Pod Security's restricted: non-root (a numeric non-root USER), a
-		// read-only root filesystem with a writable /tmp, no capabilities,
-		// the runtime's seccomp profile, no Kubernetes token.
-		t := true
-		seccomp := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
-		security.RunAsNonRoot, security.ReadOnlyRootFilesystem = &t, &t
-		security.Capabilities = &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}
-		security.SeccompProfile = seccomp
-		podSecurity = &corev1.PodSecurityContext{RunAsNonRoot: &t, SeccompProfile: seccomp}
-		automount = &f
-		mounts = append(mounts, corev1.VolumeMount{Name: "tmp", MountPath: "/tmp"})
-		volumes = append(volumes[:2], append([]corev1.Volume{{Name: "tmp", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}, volumes[2:]...)...)
+	// Pod Security's restricted, always: non-root (a numeric non-root
+	// USER), a read-only root filesystem with a writable /tmp, no
+	// capabilities or privilege escalation, the runtime's seccomp profile,
+	// no Kubernetes token. The dispatch policy refuses a Job without it.
+	f, t := false, true
+	seccomp := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	security := &corev1.SecurityContext{
+		Privileged: &f, AllowPrivilegeEscalation: &f, RunAsNonRoot: &t, ReadOnlyRootFilesystem: &t,
+		Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}, SeccompProfile: seccomp,
 	}
+	podSecurity := &corev1.PodSecurityContext{RunAsNonRoot: &t, SeccompProfile: seccomp}
+	automount := &f
+	mounts = append(mounts, corev1.VolumeMount{Name: "tmp", MountPath: "/tmp"})
+	volumes = append(volumes[:2], append([]corev1.Volume{{Name: "tmp", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}, volumes[2:]...)...)
 	var pullSecrets []corev1.LocalObjectReference
 	if k.opts.ImagePullSecret != "" {
 		pullSecrets = []corev1.LocalObjectReference{{Name: k.opts.ImagePullSecret}}

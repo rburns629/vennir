@@ -805,6 +805,22 @@ to know:
   audience `vennir`. To keep keyless sign-in, set `keyless.audience` (and
   have each CI job request a token for it).
 
+**Settings removed** (unreleased, on main since 2026-11-05):
+
+- **The kernel chart's `scheduler.taskPodHardening`.** Step Pods are
+  always hardened (Pod Security's `restricted`: non-root, a read-only root
+  filesystem with a writable `/tmp`, no capabilities, no privilege
+  escalation, no Kubernetes token), and the dispatch policy always refuses
+  a Job that isn't. Drop the key from a values file that sets it (Helm
+  ignores it if left). An install that had it `false` must first rebuild
+  any step image that runs as root or writes outside `/tmp` and
+  `/platform/output`; until then those steps fail. The kernel ignores a
+  `TASK_POD_HARDENING` left in an older ConfigMap. While the upgrade rolls
+  out, a step the old scheduler still dispatches unhardened is refused
+  (`DISPATCH_REJECTED`, not retried: retry it once the new scheduler runs),
+  and an unhardened Job it made but hadn't started is never adopted by the
+  new one; steps already running finish as they started.
+
 **Changes an upgrade must carry together** (since 2026-11-03):
 
 - **The kernel's image and chart.** A step's Job is now created suspended

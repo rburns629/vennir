@@ -120,7 +120,7 @@ are done (decided 2026-10-19).
 | GCP products | Proven | |
 | AWS products | Proven 2026-10-19 (not their SecretStore) | |
 | Azure products | Unproven, and blocked: AKS Workload Identity needs a Pod label the kernel can't set | |
-| A ServiceAccount token in step Pods | Missing: `automountServiceAccountToken: false`, no projected token. *Since fixed (noted 2026-10-28): step Pods get no Kubernetes token while `scheduler.taskPodHardening` is on, the default (`kernel/internal/executor/kubernetes.go`)* | `kubernetes.py:594` |
+| A ServiceAccount token in step Pods | Missing: `automountServiceAccountToken: false`, no projected token. *Since fixed (noted 2026-10-28): step Pods get no Kubernetes token while `scheduler.taskPodHardening` is on, the default; since 2026-11-05 always, the setting removed (`kernel/internal/executor/kubernetes.go`)* | `kubernetes.py:594` |
 | Default-deny between team namespaces | Done 2026-10-21: `vennir-default-deny` in every team namespace | [security-model.md](security-model.md#guardrails-the-cluster-enforces) |
 | SSO sign-in | Missing (documented) | same |
 | GitLab | Planned | `cli/DESIGN.md` |
