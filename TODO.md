@@ -219,11 +219,13 @@ it was seen.
     `vennir_kernel_policy`, which `database-setup` makes in `rds_iam`), and
     `vennir` turns it on as on GKE (`registry.ecrToken`). Needs a billed
     run on AWS, as the GKE one (2026-11-06) did.
-  - **Another install's catalog**: `kernel policy` is off when the catalog
-    is another install's (`externalCatalog`): the console reads it by its
-    own identity, or by federation, which `kernel policy` doesn't borrow.
-    It needs its own grant on that registry (`vennir catalog grant`), or
-    federation of its own.
+  - **Another install's catalog, beyond another GCP project's**:
+    `kernel policy` reads another project's Artifact Registry as its own
+    service account (the owner's `vennir catalog grant` names it), but is
+    off for a catalog read by federation (the console's identity, which it
+    doesn't borrow), from AWS, or in the reader's own project (no grant
+    names it there). Each needs its own read: federation of its own, or
+    the module granting it the repository.
 
 ## Console
 

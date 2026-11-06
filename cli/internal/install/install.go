@@ -504,6 +504,30 @@ func ownCatalogRelease(c *config.Config, cloud *Cloud) string {
 	return cloud.TaskRegistry + "/catalog-release:" + releaseTag(c)
 }
 
+// catalogRelease is the release the console reads: another install's
+// (externalCatalog), else this install's own. Kernel policy reads the
+// same one.
+func catalogRelease(c *config.Config, cloud *Cloud) string {
+	if e := c.ExternalCatalog; e.Registry != "" {
+		return e.Registry + "/catalog-release:" + releaseTag(c)
+	}
+	return ownCatalogRelease(c, cloud)
+}
+
+// policyReadsExternal says whether kernel policy can read another
+// install's catalog as its own identity: on Google Cloud, another
+// project's Artifact Registry, whose owner grants its service account read
+// (CatalogGrant lists it). Not by federation (the console's, which kernel
+// policy doesn't borrow), nor from AWS.
+func policyReadsExternal(c *config.Config, cloud *Cloud) bool {
+	e := c.ExternalCatalog
+	if e.Registry == "" || e.Federated() || cloud == nil || cloud.Provider != "gcp" || cloud.PolicyServiceAccount == "" ||
+		!config.IsArtifactRegistry(e.Registry) {
+		return false
+	}
+	return strings.SplitN(e.Registry, "/", 3)[1] != c.GCP.Project
+}
+
 // gatewayTokenAudience is the audience the gateway's Google ID tokens are
 // minted for (gcp): the cluster's Workload Identity pool. The console
 // chart's gateway.gcp.tokenAudience and the kernel chart's
@@ -513,17 +537,20 @@ func gatewayTokenAudience(c *config.Config) string {
 }
 
 // catalogPolicyValues turn on kernel policy (the kernel chart's
-// catalogPolicy, decision 27) on a cloud install whose own catalog is
-// signed: the kernel verifies the release itself, from the release and
+// catalogPolicy, decision 27) on a cloud install whose catalog is signed,
+// its own or another install's it reads as its own identity
+// (policyReadsExternal): the kernel verifies the release itself, from the release and
 // signers the console chart gets, reading the registry as its own identity
 // (gcp: PolicyServiceAccount, by Workload Identity; aws: PolicyRole, by Pod
 // Identity, with ECR's token), and with a managed database signs in as its
-// own user. nil otherwise: off a cloud, unsigned, another install's catalog
-// (read by the console's identity, which kernel policy doesn't borrow), or
-// a module from before kernel policy's identity.
+// own user. Until another install's owner grants it read, its passes fail
+// and its policies stand as the chart seeded them from the console's. nil
+// otherwise: off a cloud, unsigned, another install's catalog it can't read
+// as its own (by federation, from AWS, or in this project), or a module
+// from before kernel policy's identity.
 func catalogPolicyValues(c *config.Config, cloud *Cloud) map[string]any {
-	release := ownCatalogRelease(c, cloud)
-	if release == "" || c.ExternalCatalog.Registry != "" ||
+	release := catalogRelease(c, cloud)
+	if release == "" || (c.ExternalCatalog.Registry != "" && !policyReadsExternal(c, cloud)) ||
 		(cloud.Provider == "gcp" && cloud.PolicyServiceAccount == "") || (cloud.Provider == "aws" && cloud.PolicyRole == "") {
 		return nil
 	}
@@ -673,7 +700,7 @@ func ConsoleValues(c *config.Config, env string, img Images, cloud *Cloud) map[s
 		catalog["release"] = release
 	}
 	if e := c.ExternalCatalog; e.Registry != "" {
-		catalog["release"] = e.Registry + "/catalog-release:" + releaseTag(c)
+		catalog["release"] = catalogRelease(c, cloud)
 		// For the Admin page: another install's catalog.
 		catalog["external"] = true
 		if e.Federated() {
@@ -1310,6 +1337,10 @@ func CatalogGrant(c *config.Config, cloud *Cloud) *Grant {
 		}
 		// The nodes' identity (the module's ${name}-nodes) pulls steps' images.
 		accounts = append(accounts, fmt.Sprintf("%s-nodes@%s.iam.gserviceaccount.com", c.Cluster.Name, c.GCP.Project))
+		// kernel policy verifies the signed release itself, as its own.
+		if catalogPolicyValues(c, cloud) != nil {
+			accounts = append(accounts, cloud.PolicyServiceAccount)
+		}
 		if c.VerifiesCatalog() && cloud.SigningVerifier != "" {
 			accounts = append(accounts, cloud.SigningVerifier)
 		}
