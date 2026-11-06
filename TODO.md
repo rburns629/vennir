@@ -201,6 +201,31 @@ it was seen.
   Try again (`components/LoadFailed`, as the Runs page does). Design it on
   the mockups canvas first.
 
+- [ ] **The hourly sign-in that claim groups bring** (found 2026-11-05):
+  a session in which a groups claim gave someone a team
+  lasts an hour (`console/src/sso.ts`, `CLAIM_GROUPS_SESSION_SECONDS`).
+  Two things make that hour cost more than it should: the session ending
+  forgets the browser's cart (`AuthContext.tsx`'s `forgetKept`, there for
+  the next person to sign in on a shared browser), and single sign-on
+  always sends `prompt=select_account` (`auth/oidc.ts`), so the provider
+  asks which account even when it could sign the person straight back in.
+  Decide: keep the cart for the same person signing back in, and whether
+  to drop the prompt (or send it only from the sign-in button). Also not
+  yet seen against a real provider: the hour on Entra ID or Okta.
+
+- [ ] **Group-given memberships outlive the hour outside sign-in** (found
+  2026-11-05, reviewing #244): while groups come from a claim, sign-in
+  (`auth/plugin.ts`, the gateway's `internal/auth`) counts a membership a
+  group gave only for a single sign-on from the last hour, but the row
+  stays until the person's next single sign-on, and other readers take it
+  as it is: `notifier.ts`'s `notifyApprovals`, `scheduleRunner.ts`'s
+  `tellMaintainers` and `readiness.ts` (so a maintainer the provider took
+  out of the group keeps getting approval and failure notifications), the
+  team's Members tab and the admin user list (they still show as a
+  member). Decide: have these readers apply the same rule (by the person's
+  last sign-in, `users.last_signed_in_at`), or drop group-given rows of
+  people who haven't signed in for an hour.
+
 ## Products and catalog
 
 - [ ] **`vennir catalog create` applies `main`'s ruleset** (found

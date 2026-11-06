@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { currentSso } from "../sso.js";
+import { claimGroupsInUse, CLAIM_GROUPS_SESSION_SECONDS, currentSso } from "../sso.js";
 import fp from "fastify-plugin";
 import fastifyJwt from "@fastify/jwt";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
@@ -95,6 +95,9 @@ export async function resolveCaller(request: FastifyRequest): Promise<CallerReso
   let scopes: string[] = [];
   // A session a password made (not single sign-on, not an API token).
   let passwordSession = false;
+  // A single sign-on session, and one signed in within CLAIM_GROUPS_SESSION_SECONDS.
+  let sessionSso = false;
+  let recentSso = false;
   let session: { sid: string; exp: number } | undefined;
   if (bearer?.startsWith(API_TOKEN_PREFIX)) {
     const principal = await findApiTokenPrincipal(hashApiToken(bearer));
@@ -114,6 +117,8 @@ export async function resolveCaller(request: FastifyRequest): Promise<CallerReso
     }
     user = await findUserById(request.user.userId);
     passwordSession = request.user.sso !== true;
+    sessionSso = !passwordSession;
+    recentSso = sessionSso && Math.floor(Date.now() / 1000) - request.user.iat <= CLAIM_GROUPS_SESSION_SECONDS;
     // A session issued before the user's last password change/reset is
     // revoked. `iat` only has one-second resolution, so compare in
     // whole seconds: the replacement token a password change issues in
@@ -141,8 +146,18 @@ export async function resolveCaller(request: FastifyRequest): Promise<CallerReso
   if (passwordSession && ssoRequiredBy(user, roles).length > 0) {
     return { problem: "Your team signs in with single sign-on now: sign in again." };
   }
-  const teamNames = roles.map((row) => row.name);
-  const maintainerOf = roles.filter((row) => row.role === "maintainer").map((row) => row.name);
+  // While groups come from an ID token's claim, which only a sign-in reads,
+  // a membership a group gave counts only for a recent single sign-on
+  // (sso.ts). An older single sign-on session ends, so its person signs in
+  // again and their groups are read; a password's session or an API token
+  // goes on without those teams. The gateway's auth.go, the same.
+  const stale = claimGroupsInUse() && !recentSso;
+  if (stale && sessionSso && roles.some((row) => row.fromGroups)) {
+    return { problem: "Your teams follow your single sign-on groups: sign in again." };
+  }
+  const usable = stale ? roles.filter((row) => !row.fromGroups) : roles;
+  const teamNames = usable.map((row) => row.name);
+  const maintainerOf = usable.filter((row) => row.role === "maintainer").map((row) => row.name);
   const mustChangePassword = passwordSession && user.mustChangePassword;
   return {
     authUser: {

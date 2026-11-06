@@ -9,7 +9,9 @@
 // its last_used_at kept as the console keeps it). The caller's teams are
 // read from the console's database on every request, so a membership change
 // counts at once; a retired team (read-only in the console) calls as
-// nobody. A token is never logged or kept.
+// nobody. While single sign-on groups come from an ID token's claim, a
+// membership a group gave counts only for a single sign-on session signed in
+// within the hour (claimGroupsSession). A token is never logged or kept.
 package auth
 
 import (
@@ -53,6 +55,12 @@ var ErrOrdersOnly = errors.New("an ordering bot calls no API")
 // before a request updates it (console/src/auth/plugin.ts, the same).
 const tokenUseResolution = 5 * time.Minute
 
+// claimGroupsSession is how long after its sign-in a session counts the
+// memberships single sign-on groups gave, while those groups come from an ID
+// token's claim, which only a sign-in reads: the console's
+// CLAIM_GROUPS_SESSION_SECONDS (console/src/sso.ts), the same.
+const claimGroupsSession = time.Hour
+
 // uuidPattern is a user id as the console makes them: anything else in a
 // session names nobody.
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -88,6 +96,8 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	var passwordChanged *time.Time
 	var mustChangePassword, ordering bool
 	passwordSession := false
+	// A single sign-on session, and one signed in within claimGroupsSession.
+	ssoSession, recentSSO := false, false
 	if strings.HasPrefix(bearer, APITokenPrefix) {
 		sum := sha256.Sum256([]byte(bearer))
 		var tokenID string
@@ -146,6 +156,8 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 			}
 		}
 		passwordSession = !claims.SSO
+		ssoSession = claims.SSO
+		recentSSO = ssoSession && r.now().Unix()-claims.IssuedAt <= int64(claimGroupsSession/time.Second)
 		// A password someone else set: the console allows nothing but
 		// changing it, and neither does the gateway.
 		if passwordSession && mustChangePassword {
@@ -160,54 +172,78 @@ func (r *Resolver) Resolve(ctx context.Context, authorization string) (*Caller, 
 	c.IsAdmin = c.IsAdmin && !c.IsBot
 	// Ordered by name byte for byte, as the console's teamRolesForUser is,
 	// so both pick the same calling team. A retired team's require_sso
-	// still counts (as the console's does), but it calls as nobody.
-	rows, err := r.DB.Query(ctx, `SELECT t.name, t.require_sso, t.retired_at IS NOT NULL FROM team_memberships m JOIN teams t ON t.id = m.team_id
+	// still counts (as the console's does), but it calls as nobody. From
+	// groups: a group gave it and the team is still mapped (the console's
+	// fromGroups). With each row, the single sign-on settings an admin saved
+	// (ssoOn): whether they're on, and whether groups come from a claim.
+	rows, err := r.DB.Query(ctx, `SELECT t.name, t.require_sso, t.retired_at IS NOT NULL,
+		m.from_groups AND EXISTS (SELECT 1 FROM sso_group_mappings g WHERE g.team_id = t.id),
+		COALESCE((SELECT s.enabled AND s.issuer <> '' AND s.client_id <> '' AND s.redirect_url <> '' FROM sso_settings s WHERE s.id = 1), false),
+		COALESCE((SELECT s.groups_claim <> '' FROM sso_settings s WHERE s.id = 1), false)
+		FROM team_memberships m JOIN teams t ON t.id = m.team_id
 		WHERE m.user_id = $1::uuid AND t.deleted_at IS NULL ORDER BY t.name COLLATE "C"`, c.UserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	ssoRequired := false
+	type membership struct {
+		team       string
+		fromGroups bool
+	}
+	var held []membership
+	ssoRequired, anyFromGroups, savedOn, claimSet := false, false, false, false
 	for rows.Next() {
 		var team string
-		var requireSSO, retired bool
-		if err := rows.Scan(&team, &requireSSO, &retired); err != nil {
+		var requireSSO, retired, fromGroups bool
+		if err := rows.Scan(&team, &requireSSO, &retired, &fromGroups, &savedOn, &claimSet); err != nil {
 			return nil, err
 		}
 		if !retired {
-			c.Teams = append(c.Teams, team)
+			held = append(held, membership{team, fromGroups})
 		}
+		anyFromGroups = anyFromGroups || fromGroups
 		ssoRequired = ssoRequired || requireSSO
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if passwordSession && ssoRequired && !c.IsAdmin {
-		on, err := r.ssoOn(ctx)
-		if err != nil {
-			return nil, err
+	rows.Close()
+	ssoOn := r.ssoOn(savedOn)
+	// While single sign-on is on and groups come from an ID token's claim, a
+	// membership a group gave counts only for a recent single sign-on: an
+	// older one is refused (its person signs in again, and their groups are
+	// read), and a password's session or an API token calls without those
+	// teams. While it's off, nothing changes (the console's claimGroupsInUse
+	// and resolveCaller, the same).
+	stale := anyFromGroups && !recentSSO && ssoOn && claimSet
+	if stale && ssoSession {
+		return nil, ErrUnauthenticated
+	}
+	for _, m := range held {
+		if !stale || !m.fromGroups {
+			c.Teams = append(c.Teams, m.team)
 		}
-		if on {
-			return nil, ErrUnauthenticated
-		}
+	}
+	if passwordSession && ssoRequired && !c.IsAdmin && ssoOn {
+		return nil, ErrUnauthenticated
 	}
 	return &c, nil
 }
 
 // ssoOn: single sign-on is on, by the install's settings or as an admin
-// saved it in the console (sso.ts refreshSso: on, and complete). One
-// difference, on the side of refusing: the console also needs the saved
+// saved it in the console (saved: sso.ts refreshSso's on, and complete).
+// One difference, on the side of refusing: the console also needs the saved
 // client secret to unseal, which the gateway, granted no part of it, can't
 // check; while it can't (JWT_SECRET changed), the console treats single
-// sign-on as off and the gateway as on, until an admin saves it again.
-func (r *Resolver) ssoOn(ctx context.Context) (bool, error) {
-	if r.SSO {
-		return true, nil
-	}
-	var on bool
-	err := r.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM sso_settings WHERE id = 1 AND enabled
-		AND issuer <> '' AND client_id <> '' AND redirect_url <> '')`).Scan(&on)
-	return on, err
+// sign-on as off and the gateway as on, until an admin saves it again. (A
+// changed JWT_SECRET also changes the session key, so no session from
+// before it is accepted anyway.) The same goes for the claim-groups rule:
+// meanwhile, with a groups claim saved, the gateway drops group-given teams
+// from API tokens and password sessions, and refuses older single sign-on
+// sessions holding one, where the console counts them. It errs on the
+// refusing side.
+func (r *Resolver) ssoOn(saved bool) bool {
+	return r.SSO || saved
 }
 
 type claims struct {

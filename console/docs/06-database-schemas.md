@@ -334,7 +334,8 @@ Who is in which team, and as what. Any member sees the team's executions, logs a
 | `team_id` | uuid | no | |
 | `role` | text | no | `maintainer` or `member`. Memberships from before roles are maintainers. |
 | `created_at` | timestamptz | no | |
-| `via_groups` | text[] | yes | The single sign-on groups that give the role, as the person's last sign-in (or the hourly Google groups read) found them; null when added by hand. |
+| `via_groups` | text[] | yes | The single sign-on groups that give the role, as the person's last sign-in (or the hourly Google groups read) found them; null when added by hand. Empty (`{}`) for a single sign-on member of a team that was mapped after they joined it (or before 0067): it follows their groups from their next sign-in. |
+| `from_groups` | boolean | no | Generated: `via_groups is not null`. Whether groups gave it, without which ones: what the gateway may read. |
 
 ### api_tokens
 

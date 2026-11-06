@@ -17,7 +17,7 @@ import { db } from "../db/client.js";
 import { findTeamByName } from "../db/queries.js";
 import { ssoGroupMappings, ssoSettings, teams, users, type TeamRole } from "../db/schema.js";
 import { seal } from "../sealed.js";
-import { googleIdentity, refreshSso, SECRET_PURPOSE } from "../sso.js";
+import { googleIdentity, markFollowingGroups, refreshSso, SECRET_PURPOSE } from "../sso.js";
 
 const REQUIRES_ADMIN = "Requires admin access.";
 const DOMAIN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
@@ -133,6 +133,9 @@ export async function setSsoSettings(caller: AuthUser | undefined, input: SsoSet
   }
   const values = { ...provider, ...groups, updatedBy: caller?.id ?? null, updatedAt: new Date() };
   await db.insert(ssoSettings).values({ id: 1, ...values }).onConflictDoUpdate({ target: ssoSettings.id, set: values });
+  // Groups decide mapped teams' single sign-on members from now on, those
+  // added by hand while no source was set included.
+  if (groups.groupsClaim || groups.googleGroups) await markFollowingGroups();
   log.warn(
     { event: "sso_settings_changed", by: caller?.id, enabled: input.enabled, issuer: input.issuer, groupsClaim: input.groupsClaim, googleGroups: input.googleGroups, secretChanged: Boolean(input.clientSecret) },
     "single sign-on settings changed",
@@ -176,6 +179,7 @@ export async function setSsoGroupMapping(
     .values({ groupName: group, teamId: team.id, role: input.role, createdBy: caller?.id ?? null })
     .onConflictDoUpdate({ target: [ssoGroupMappings.groupName, ssoGroupMappings.teamId], set: { role: input.role } })
     .returning();
+  await markFollowingGroups(team.id);
   log.warn({ event: "sso_group_mapped", by: caller?.id, group, team: team.name, role: input.role }, "single sign-on group mapped to a team");
   return { id: row?.id ?? "", group, team: team.name, role: input.role };
 }

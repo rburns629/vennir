@@ -990,6 +990,11 @@ export const teamMemberships = pgTable(
     // The single sign-on groups that give this membership its role (sso.ts,
     // at each sign-in or group resync); null when it was added by hand.
     viaGroups: text("via_groups").array(),
+    // Whether groups gave it (via_groups set), kept by the database: what
+    // the gateway reads, which may not read the groups' names.
+    fromGroups: boolean("from_groups")
+      .notNull()
+      .generatedAlwaysAs(sql`via_groups is not null`),
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.teamId] }),

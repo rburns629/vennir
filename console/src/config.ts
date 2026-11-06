@@ -27,6 +27,12 @@ function parseSessionTtl(value: string): string {
   return value;
 }
 
+/** A session lifetime parseSessionTtl accepted, in seconds. */
+export function sessionTtlSeconds(value: string): number {
+  const amount = Number(value.slice(0, -1));
+  return amount * { m: 60, h: 3600, d: 86_400 }[value.slice(-1) as "m" | "h" | "d"];
+}
+
 function parseBoolean(name: string): boolean {
   const value = process.env[name];
   if (value === undefined || value === "" || value === "false") return false;
