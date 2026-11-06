@@ -70,6 +70,15 @@ data:
   CATALOG_POLICY_RELEASE: {{ .release | quote }}
   CATALOG_POLICY_NEWEST_VERSION: {{ .newestVersion | toString | quote }}
   CATALOG_POLICY_POLL_SECONDS: {{ .pollSeconds | quote }}
+  {{- /* How long an unfinished execution keeps an earlier release listed:
+       at least as long as a step may await its approval. */}}
+  {{- $approval := int $.Values.scheduler.approvalTimeoutSeconds }}
+  {{- $inUse := int (.inUseMaxSeconds | default (max $approval 259200)) }}
+  {{- if and (gt $approval 0) (lt $inUse $approval) }}
+  {{- fail (printf "catalogPolicy.inUseMaxSeconds (%d) must be at least scheduler.approvalTimeoutSeconds (%d): a step approved later would be refused its product's identity." $inUse $approval) }}
+  {{- end }}
+  CATALOG_POLICY_IN_USE_MAX_SECONDS: {{ $inUse | quote }}
+  CATALOG_POLICY_RELEASE_GRACE_SECONDS: {{ .releaseGraceSeconds | default 3600 | quote }}
   CATALOG_POLICY_PUBLIC_KEYS: {{ .signature.publicKeys | toJson | quote }}
   CATALOG_POLICY_KEYLESS_ISSUER: {{ .signature.keyless.issuer | quote }}
   CATALOG_POLICY_KEYLESS_SUBJECT_REGEXP: {{ .signature.keyless.subjectRegExp | quote }}

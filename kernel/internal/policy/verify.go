@@ -49,18 +49,31 @@ type Signers struct {
 
 func (s *Signers) keyless() bool { return s.KeylessIssuer != "" && s.KeylessSubjectRegExp != "" }
 
-// Fingerprint names who's trusted (the keys, in any order, and the keyless
-// identity): a release applied under other signers is verified again
-// before it's trusted.
-func (s *Signers) Fingerprint() string {
-	keys := make([]string, 0, len(s.PublicKeys))
-	for _, k := range s.PublicKeys {
-		keys = append(keys, strings.TrimSpace(k))
-	}
-	sort.Strings(keys)
-	data, _ := json.Marshal([]any{keys, s.KeylessIssuer, s.KeylessSubjectRegExp})
+// KeyID and KeylessID name one signer: a public key (by its PEM), the
+// keyless identity (by its issuer and subject). Each release records which
+// of them verified it; it's trusted while any of those still is.
+func KeyID(pem string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(pem)))
+	return "key:" + hex.EncodeToString(sum[:])
+}
+
+func KeylessID(issuer, subject string) string {
+	data, _ := json.Marshal([]string{issuer, subject})
 	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
+	return "keyless:" + hex.EncodeToString(sum[:])
+}
+
+// IDs are the signers trusted now, each by KeyID or KeylessID, sorted.
+func (s *Signers) IDs() []string {
+	var ids []string
+	for _, k := range s.PublicKeys {
+		ids = append(ids, KeyID(k))
+	}
+	if s.keyless() {
+		ids = append(ids, KeylessID(s.KeylessIssuer, s.KeylessSubjectRegExp))
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 // Check is what's wrong with the signers as configured: a key that isn't a
@@ -119,21 +132,25 @@ func (s *Signers) trustedRoot() (root.TrustedMaterial, error) {
 // digest), in cosign's signature format (a .sig tag beside it), which
 // catalog CI signs in (`--new-bundle-format=false`). Nil when one did; an
 // error saying why none did otherwise.
-func (s *Signers) Verify(ctx context.Context, ref name.Digest, opts []remote.Option) error {
+func (s *Signers) Verify(ctx context.Context, ref name.Digest, opts []remote.Option) ([]string, error) {
 	verifiers, err := s.verifiers()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	registry := []ociremote.Option{ociremote.WithRemoteOptions(opts...)}
-	var tries []*cosign.CheckOpts
-	for _, verifier := range verifiers {
-		tries = append(tries, &cosign.CheckOpts{
+	type try struct {
+		id   string
+		opts *cosign.CheckOpts
+	}
+	var tries []try
+	for i, verifier := range verifiers {
+		tries = append(tries, try{id: KeyID(s.PublicKeys[i]), opts: &cosign.CheckOpts{
 			RegistryClientOpts: registry, SigVerifier: verifier, ClaimVerifier: cosign.SimpleClaimVerifier,
 			// Catalog CI's key signatures go to no public log
 			// (`cosign sign --tlog-upload=false`), as the console's
 			// --insecure-ignore-tlog.
 			IgnoreTlog: true, IgnoreSCT: true,
-		})
+		}})
 	}
 	var failures []string
 	if s.keyless() {
@@ -141,24 +158,31 @@ func (s *Signers) Verify(ctx context.Context, ref name.Digest, opts []remote.Opt
 		if err != nil {
 			failures = append(failures, "keyless: "+err.Error())
 		} else {
-			tries = append(tries, &cosign.CheckOpts{
+			tries = append(tries, try{id: KeylessID(s.KeylessIssuer, s.KeylessSubjectRegExp), opts: &cosign.CheckOpts{
 				RegistryClientOpts: registry, TrustedMaterial: trusted, ClaimVerifier: cosign.SimpleClaimVerifier,
 				Identities: []cosign.Identity{{Issuer: s.KeylessIssuer, SubjectRegExp: s.KeylessSubjectRegExp}},
 				// The Rekor entry the signature carries, checked offline: no
 				// look-up in the log.
 				Offline: true,
-			})
+			}})
 		}
 	}
-	for _, try := range tries {
-		_, _, err := cosign.VerifyImageSignatures(ctx, ref, try)
-		if err == nil {
-			return nil
+	// Every one is tried: which signers verified it is what keeps it trusted
+	// when the chart stops trusting some (a key rotation).
+	var verified []string
+	for _, t := range tries {
+		if _, _, err := cosign.VerifyImageSignatures(ctx, ref, t.opts); err != nil {
+			failures = append(failures, err.Error())
+			continue
 		}
-		failures = append(failures, err.Error())
+		verified = append(verified, t.id)
+	}
+	if len(verified) > 0 {
+		sort.Strings(verified)
+		return verified, nil
 	}
 	if len(tries) == 0 && len(failures) == 0 {
-		return errors.New("no signer is trusted")
+		return nil, errors.New("no signer is trusted")
 	}
-	return fmt.Errorf("no trusted signer signed %s: %s", ref.DigestStr(), strings.Join(failures, "; "))
+	return nil, fmt.Errorf("no trusted signer signed %s: %s", ref.DigestStr(), strings.Join(failures, "; "))
 }

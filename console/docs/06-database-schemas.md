@@ -204,7 +204,7 @@ The catalog release `kernel policy` last applied, after verifying its signature 
 | `release_digest` | text | no | Its manifest's digest: what was signed. |
 | `released_at` | timestamptz | no | When it was made (its `createdAt`); an older release is never applied. |
 | `commit` | text | no | The catalog commit it was made from. |
-| `signers` | text | no | A fingerprint of the signers it was verified against: when the kernel chart trusts others, it's verified again, and until a release they signed is applied the policies list nothing. |
+| `signers` | text[] | no | Which of the trusted signers verified it, each by its id (a public key's, the keyless identity's): when none of them is trusted any more, it's verified again, and until a release a trusted signer verified is applied the policies list nothing. |
 | `applied_at` | timestamptz | no | |
 | `apis` | jsonb | no | Each API's ServiceAccount and backend sign-in (`{team, serviceAccount, kind, audience}`), which the gateway token policy's audiences are computed from. |
 
@@ -220,7 +220,7 @@ Each product release a verified catalog release named, as the catalog identity p
 | `action` | text | no | |
 | `service_account` | text | no | What it runs as (`default` when its `product.yaml` declares none). |
 | `audiences` | text | no | Its token audiences, comma-separated. |
-| `signers` | text | no | The fingerprint of the signers its release was verified by: when the kernel chart trusts others, an earlier release only they signed goes. |
+| `signers` | text[] | no | Which signers verified its release (as `catalog_policy_state.signers`): it's listed only while one of them is trusted, so a key removed takes the releases only it signed with it. |
 | `released_until` | timestamptz | yes | When a later release stopped naming it; null while the applied one does. It's listed for an hour after, or while an unfinished task runs it, then removed. |
 
 `schema_migrations` also exists: which of `kernel/internal/migrate/sql/` the database has (`kernel migrate`).

@@ -13,6 +13,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -150,7 +152,8 @@ func verifyAt(t *testing.T, r *Registry, signers *Signers, repository, digest st
 	if err != nil {
 		t.Fatal(err)
 	}
-	return signers.Verify(context.Background(), read.(name.Digest), r.Options(context.Background()))
+	_, err = signers.Verify(context.Background(), read.(name.Digest), r.Options(context.Background()))
+	return err
 }
 
 func testRelease(products ...*catalogv1.ProductAction) *catalogv1.Release {
@@ -170,6 +173,17 @@ func TestAReleaseSignedWithATrustedKeyIsVerified(t *testing.T) {
 	_, other := testKey(t)
 	if err := verifyAt(t, r, &Signers{PublicKeys: []string{other, public}}, "catalog.example/catalog-release", digest); err != nil {
 		t.Fatalf("with another key trusted first: %v", err)
+	}
+	// Signed by both keys trusted: both said, so it stays trusted when
+	// either is removed. Only the one that signed it, when one did.
+	otherKey, otherPublic := testKey(t)
+	keySign(t, r, "catalog.example/catalog-release", digest, otherKey)
+	read, _ := r.Reference("catalog.example/catalog-release@" + digest)
+	ids, err := (&Signers{PublicKeys: []string{public, otherPublic, other}}).Verify(context.Background(), read.(name.Digest), r.Options(context.Background()))
+	want := []string{KeyID(public), KeyID(otherPublic)}
+	sort.Strings(want)
+	if err != nil || !reflect.DeepEqual(ids, want) {
+		t.Fatalf("verified by %v, %v; want %v", ids, err, want)
 	}
 }
 
@@ -313,13 +327,13 @@ func TestSignersAreCheckedAtStartup(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	// Who's trusted, in any order: another key, or another identity, is another fingerprint.
+	// Each signer by its own id: a key's whatever its PEM's surrounding
+	// space, the keyless identity's by both its halves.
 	_, other := testKey(t)
-	a := (&Signers{PublicKeys: []string{public, other}}).Fingerprint()
-	if a != (&Signers{PublicKeys: []string{other + "\n", public}}).Fingerprint() ||
-		a == (&Signers{PublicKeys: []string{public}}).Fingerprint() ||
-		a == (&Signers{PublicKeys: []string{public, other}, KeylessIssuer: "https://i", KeylessSubjectRegExp: "^s$"}).Fingerprint() {
-		t.Error("Fingerprint")
+	ids := (&Signers{PublicKeys: []string{public, other + "\n"}, KeylessIssuer: "https://i", KeylessSubjectRegExp: "^s$"}).IDs()
+	if len(ids) != 3 || !TrustedBy([]string{KeyID(public)}, ids) || !TrustedBy([]string{KeyID(other)}, ids) ||
+		!TrustedBy([]string{KeylessID("https://i", "^s$")}, ids) || TrustedBy([]string{KeylessID("https://i", "^t$")}, ids) {
+		t.Errorf("IDs: %v", ids)
 	}
 }
 

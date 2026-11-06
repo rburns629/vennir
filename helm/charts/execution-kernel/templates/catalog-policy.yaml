@@ -74,13 +74,13 @@ to submit one the kernel hasn't listed (IDENTITY_PENDING).
 {{- if and (ne $digit .name) (hasKey $shards $digit) }}
 {{- range $digest, $entries := fromJson .expression }}
 {{- if not (and (regexMatch "^sha256:[a-f0-9]{64}$" $digest) (eq (substr 7 8 $digest) $digit) (kindIs "slice" $entries)) }}
-{{- fail (printf "%s's releases%s isn't a JSON map of sha256 digests starting %s to lists of products; delete the policy and let the kernel rewrite it." $seed.metadata.name $digit $digit) }}
+{{- fail (printf "%s's releases%s isn't a JSON map of sha256 digests starting %s to lists of products; set that variable's expression to {} (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $seed.metadata.name $digit $digit) }}
 {{- end }}
 {{- $kept := list }}
 {{- range $entries }}
 {{- $entry := . }}
 {{- if or (not (kindIs "map" $entry)) (not (and (kindIs "string" (get $entry "team")) (kindIs "string" (get $entry "repository")) (kindIs "string" (get $entry "action")) (kindIs "string" (get $entry "serviceAccount")) (kindIs "string" (get $entry "audiences")))) }}
-{{- fail (printf "%s's releases%s has a product that isn't {team, repository, action, serviceAccount, audiences} strings; delete the policy and let the kernel rewrite it." $seed.metadata.name $digit) }}
+{{- fail (printf "%s's releases%s has a product that isn't {team, repository, action, serviceAccount, audiences} strings; set that variable's expression to {} (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $seed.metadata.name $digit) }}
 {{- end }}
 {{- /* Only what the kernel would list itself (internal/policy's
      Releases): a team's (none of the platform's), not as an API's or
@@ -395,7 +395,7 @@ spec:
 {{- range $existing.spec.variables }}
 {{- if eq .name "apiAudiencesWritten" }}
 {{- if not (has .expression (list "true" "false")) }}
-{{- fail (printf "%s's apiAudiencesWritten isn't true or false; delete the policy and let the kernel rewrite it." $existing.metadata.name) }}
+{{- fail (printf "%s's apiAudiencesWritten isn't true or false; set its expression to \"false\" (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $existing.metadata.name) }}
 {{- end }}
 {{- $written = .expression }}
 {{- end }}
@@ -403,11 +403,11 @@ spec:
 {{- if and (ne $digit .name) (hasKey $audiences $digit) }}
 {{- range $key, $list := fromJson .expression }}
 {{- if not (and (regexMatch "^[a-z0-9-]+/[a-z0-9.-]+$" $key) (kindIs "slice" $list) (eq (mod (len $key) 16) (index $shardIndex $digit))) }}
-{{- fail (printf "%s's apiAudiences%s isn't a JSON map of <namespace>/<serviceAccount> keys whose length modulo 16 is %d to lists of audiences; delete the policy and let the kernel rewrite it." $existing.metadata.name $digit (index $shardIndex $digit)) }}
+{{- fail (printf "%s's apiAudiences%s isn't a JSON map of <namespace>/<serviceAccount> keys whose length modulo 16 is %d to lists of audiences; set that variable's expression to {} (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $existing.metadata.name $digit (index $shardIndex $digit)) }}
 {{- end }}
 {{- range $list }}
 {{- if not (kindIs "string" .) }}
-{{- fail (printf "%s's apiAudiences%s has an audience that isn't a string; delete the policy and let the kernel rewrite it." $existing.metadata.name $digit) }}
+{{- fail (printf "%s's apiAudiences%s has an audience that isn't a string; set that variable's expression to {} (kubectl edit) and kernel policy rewrites it within a pass. Deleting the policy instead leaves no release rule until it does (the console's policy holds none once split)." $existing.metadata.name $digit) }}
 {{- end }}
 {{- end }}
 {{- $_ := set (index $audiences $digit) $key $list }}

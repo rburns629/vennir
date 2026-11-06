@@ -52,10 +52,11 @@ type Source interface {
 	Digest(ctx context.Context, ref string) (string, error)
 	// Fetch reads the release by its manifest.
 	Fetch(ctx context.Context, ref string) (Fetched, error)
-	// Verify checks a trusted signer signed repository@digest.
-	Verify(ctx context.Context, ref string, digest string) error
-	// Fingerprint names the signers Verify trusts (Signers.Fingerprint).
-	Fingerprint() string
+	// Verify checks a trusted signer signed repository@digest, and says
+	// which of them did (Signers.IDs).
+	Verify(ctx context.Context, ref string, digest string) ([]string, error)
+	// Trusted are the signers Verify trusts now (Signers.IDs).
+	Trusted() []string
 }
 
 // Catalog is a Source on a registry: Registry's sign-in and mirrors,
@@ -79,16 +80,16 @@ func (c *Catalog) Fetch(ctx context.Context, ref string) (Fetched, error) {
 	return c.Registry.Fetch(ctx, ref)
 }
 
-func (c *Catalog) Fingerprint() string { return c.Signers.Fingerprint() }
+func (c *Catalog) Trusted() []string { return c.Signers.IDs() }
 
-func (c *Catalog) Verify(ctx context.Context, ref, digest string) error {
+func (c *Catalog) Verify(ctx context.Context, ref, digest string) ([]string, error) {
 	read, err := c.Registry.Reference(pinned(ref, digest))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	pinnedRef, ok := read.(name.Digest)
 	if !ok {
-		return fmt.Errorf("%s isn't pinned to a digest", ref)
+		return nil, fmt.Errorf("%s isn't pinned to a digest", ref)
 	}
 	return c.Signers.Verify(ctx, pinnedRef, c.Registry.Options(ctx))
 }
@@ -167,23 +168,24 @@ func (c *Controller) Pass(ctx context.Context) error {
 // look applies the release the catalog names now, if it's new, signed by a
 // trusted signer, and not older than the one applied. First, the release
 // applied under other signers than the chart trusts now (a key removed, a
-// keyless identity changed) is verified again; until one verifies under
-// them, the policies list nothing (write: its signers aren't these).
+// keyless identity changed: none of the signers that verified it is
+// trusted now) is verified again; until one of them verifies a release, the
+// policies list nothing (write).
 func (c *Controller) look(ctx context.Context) error {
 	current, err := c.Store.State(ctx)
 	if err != nil {
 		return err
 	}
 	var reverifyErr error
-	if current != nil && current.Signers != c.Source.Fingerprint() {
-		if err := c.Source.Verify(ctx, current.Reference, current.Digest); err != nil {
+	if current != nil && !TrustedBy(current.Signers, c.Source.Trusted()) {
+		if signers, err := c.Source.Verify(ctx, current.Reference, current.Digest); err != nil {
 			reverifyErr = fmt.Errorf("the catalog release applied (%s) doesn't verify against the signers trusted now, "+
 				"so no product is listed until one that does is applied: %w", pinned(current.Reference, current.Digest), err)
 		} else {
-			if err := c.Store.Reverified(ctx, current.Digest, c.Source.Fingerprint()); err != nil {
+			if err := c.Store.Reverified(ctx, current.Digest, signers); err != nil {
 				return err
 			}
-			current.Signers = c.Source.Fingerprint()
+			current.Signers = signers
 			c.Log.Info("catalog release applied verified against the signers trusted now", "digest", current.Digest)
 		}
 	}
@@ -214,7 +216,8 @@ const FutureSkew = 10 * time.Minute
 func (c *Controller) apply(ctx context.Context, ref, digest string, current *State) error {
 	// Verified by the digest read, and then the release read by it: the
 	// bytes applied are exactly the ones signed.
-	if err := c.Source.Verify(ctx, ref, digest); err != nil {
+	signers, err := c.Source.Verify(ctx, ref, digest)
+	if err != nil {
 		return fmt.Errorf("catalog release %s: %w; nothing was applied", ref, err)
 	}
 	fetched, err := c.Source.Fetch(ctx, pinned(ref, digest))
@@ -236,7 +239,7 @@ func (c *Controller) apply(ctx context.Context, ref, digest string, current *Sta
 		return fmt.Errorf("catalog release %s@%s says when it was made nowhere; nothing was applied", ref, digest)
 	}
 	releasedAt := release.GetCreatedAt().AsTime()
-	trusted := current != nil && current.Signers == c.Source.Fingerprint()
+	trusted := current != nil && TrustedBy(current.Signers, c.Source.Trusted())
 	if trusted && releasedAt.Before(current.ReleasedAt) {
 		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, ErrOlder{Release: releasedAt, Applied: current.ReleasedAt})
 	}
@@ -258,7 +261,7 @@ func (c *Controller) apply(ctx context.Context, ref, digest string, current *Sta
 		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err)
 	}
 	applied, err := c.Store.Apply(ctx, State{Reference: ref, Digest: digest, ReleasedAt: releasedAt, Commit: release.GetCommit(),
-		Signers: c.Source.Fingerprint(), APIs: apis}, releases)
+		Signers: signers, APIs: apis}, releases, c.Source.Trusted())
 	if err != nil {
 		return fmt.Errorf("catalog release %s@%s: %w; nothing was applied", ref, digest, err)
 	}
@@ -296,9 +299,12 @@ func (c *Controller) write(ctx context.Context) error {
 		return err
 	}
 	annotations := map[string]string{ReleaseAnnotation: pinned(state.Reference, state.Digest), CommitAnnotation: state.Commit}
-	listed := Listed(releases, inUse, now, c.ReleaseGrace)
+	// Only releases a signer trusted now verified: an earlier release only
+	// a removed key signed isn't listed, in its grace or in use.
+	trusted := TrustedReleases(releases, c.Source.Trusted())
+	listed := Listed(trusted, inUse, now, c.ReleaseGrace)
 	apis := state.APIs
-	if state.Signers != c.Source.Fingerprint() {
+	if !TrustedBy(state.Signers, c.Source.Trusted()) {
 		listed, apis = map[string][]Entry{}, nil
 		annotations = map[string]string{ReleaseAnnotation: "", CommitAnnotation: ""}
 	}
@@ -310,8 +316,8 @@ func (c *Controller) write(ctx context.Context) error {
 		// written now (revoked releases with it) standing.
 		overflow = err
 		current := map[string][]Entry{}
-		for _, r := range releases {
-			if r.ReleasedUntil == nil && state.Signers == c.Source.Fingerprint() {
+		for _, r := range trusted {
+			if r.ReleasedUntil == nil && TrustedBy(state.Signers, c.Source.Trusted()) {
 				current[r.Digest] = append(current[r.Digest], r.Entry)
 			}
 		}

@@ -31,9 +31,10 @@ type fakeSource struct {
 	json     []byte
 	verified bool
 	fetches  int
-	// Who's trusted now, and the earlier digests they signed too.
-	fingerprint string
-	alsoSigned  map[string]bool
+	// Who's trusted now (default key-a), and who signed each release
+	// (default: the signers given to release, key-a).
+	trusted  []string
+	signedBy map[string][]string
 	// The registry can't be read.
 	down bool
 }
@@ -54,26 +55,38 @@ func (f *fakeSource) Fetch(_ context.Context, ref string) (Fetched, error) {
 	}
 	return Fetched{Digest: f.digest, JSON: f.json}, nil
 }
-func (f *fakeSource) Verify(_ context.Context, _, digest string) error {
-	if !f.verified || (digest != f.digest && !f.alsoSigned[digest]) {
-		return errors.New("no trusted signer signed it")
+func (f *fakeSource) Verify(_ context.Context, _, digest string) ([]string, error) {
+	var verified []string
+	for _, s := range f.signedBy[digest] {
+		if f.verified && TrustedBy([]string{s}, f.Trusted()) {
+			verified = append(verified, s)
+		}
 	}
-	return nil
+	if len(verified) == 0 {
+		return nil, errors.New("no trusted signer signed it")
+	}
+	return verified, nil
 }
-func (f *fakeSource) Fingerprint() string {
-	if f.fingerprint == "" {
-		return "signers-1"
+func (f *fakeSource) Trusted() []string {
+	if f.trusted == nil {
+		return []string{"key-a"}
 	}
-	return f.fingerprint
+	return f.trusted
 }
 
-func (f *fakeSource) release(t *testing.T, d string, release *catalogv1.Release) {
+func (f *fakeSource) release(t *testing.T, d string, release *catalogv1.Release, signers ...string) {
 	t.Helper()
 	data, err := protojson.Marshal(release)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.digest, f.json, f.verified = d, data, true
+	if len(signers) == 0 {
+		signers = []string{"key-a"}
+	}
+	if f.signedBy == nil {
+		f.signedBy = map[string][]string{}
+	}
+	f.digest, f.json, f.verified, f.signedBy[d] = d, data, true, signers
 }
 
 // fakeWriter is the cluster's policies, by name.
@@ -218,7 +231,7 @@ func TestAnEarlierReleaseStaysListedWhileInUseThenGoes(t *testing.T) {
 	// ...but one submitted while the release still named it does (the row,
 	// pruned by that pass, put back as it was: dropped two hours ago).
 	if _, err := store.DB.Exec(ctx, `INSERT INTO catalog_policy_releases (digest, team, repository, action, service_account, audiences, signers, released_until)
-		VALUES ($1, 'local', 'registry.example/local/db', 'create', 'db-sa', 'sts.amazonaws.com', 'signers-1', now() - interval '2 hours')`, digest("1")); err != nil {
+		VALUES ($1, 'local', 'registry.example/local/db', 'create', 'db-sa', 'sts.amazonaws.com', '{key-a}', now() - interval '2 hours')`, digest("1")); err != nil {
 		t.Fatal(err)
 	}
 	task(3, "3 hours", "READY")
@@ -300,7 +313,7 @@ func TestTheReleaseAppliedIsVerifiedAgainWhenOthersAreTrusted(t *testing.T) {
 	}
 	// The chart now trusts other signers, who didn't sign it (its key was
 	// removed): until a release they signed is applied, nothing is listed.
-	source.fingerprint, source.verified = "signers-2", false
+	source.trusted = []string{"key-b"}
 	if err := c.Pass(ctx); err == nil || !strings.Contains(err.Error(), "doesn't verify against the signers trusted now") {
 		t.Fatalf("%v", err)
 	}
@@ -320,39 +333,95 @@ func TestTheReleaseAppliedIsVerifiedAgainWhenOthersAreTrusted(t *testing.T) {
 	source.down = false
 	// They did sign it after all (a rotation listing both keys): listed
 	// again, and not verified again after that.
-	source.verified = true
+	source.signedBy[digest("a")] = []string{"key-a", "key-b"}
 	if err := c.Pass(ctx); err != nil || len(writer.listed(t, digest("1"))) != 1 {
 		t.Fatalf("%v", err)
 	}
 	state, err := store.State(ctx)
-	if err != nil || state.Signers != "signers-2" {
+	if err != nil || len(state.Signers) != 1 || state.Signers[0] != "key-b" {
 		t.Fatalf("%+v %v", state, err)
 	}
 }
 
-func TestAnEarlierReleaseOnlyDistrustedSignersSignedGoes(t *testing.T) {
+// A key removed in one step: the earlier release only it signed isn't
+// listed, though in its grace, as soon as the current release (signed by
+// the key kept too) is applied.
+func TestAnEarlierReleaseOnlyARemovedKeySignedIsntListed(t *testing.T) {
 	ctx := context.Background()
-	source := &fakeSource{}
+	source := &fakeSource{trusted: []string{"key-a", "key-b"}}
 	c, writer, _ := newController(t, source)
 	start := time.Now().Add(-time.Minute)
-	source.release(t, digest("a"), releaseAt(start, db("1")))
+	source.release(t, digest("a"), releaseAt(start, db("1")), "key-a")
 	if err := c.Pass(ctx); err != nil {
 		t.Fatal(err)
 	}
-	source.release(t, digest("b"), releaseAt(start.Add(time.Second), db("2")))
-	if err := c.Pass(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if len(writer.listed(t, digest("1"))) != 1 {
-		t.Fatal("the earlier release isn't in its grace")
-	}
-	// Other signers now, who signed the current release (b) but not a.
-	source.fingerprint = "signers-2"
+	// key-a removed; the next release, b, signed by key-b.
+	source.trusted = []string{"key-b"}
+	source.release(t, digest("b"), releaseAt(start.Add(time.Second), db("2")), "key-b")
 	if err := c.Pass(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if writer.listed(t, digest("1")) != nil || len(writer.listed(t, digest("2"))) != 1 {
-		t.Fatal("an earlier release the signers trusted now never verified is still listed")
+		t.Fatal("an earlier release only a removed key signed is still listed")
+	}
+}
+
+// The documented rotation: add key-b beside key-a, publish a release (both
+// sign it), then remove key-a. Nothing a trusted key signed stops being
+// listed at either step.
+func TestATwoStepRotationKeepsWhatAKeptKeySigned(t *testing.T) {
+	ctx := context.Background()
+	source := &fakeSource{}
+	c, writer, _ := newController(t, source)
+	start := time.Now().Add(-time.Minute)
+	source.release(t, digest("a"), releaseAt(start, db("1")), "key-a")
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// 1: key-b added. A release both sign.
+	source.trusted = []string{"key-a", "key-b"}
+	source.release(t, digest("b"), releaseAt(start.Add(time.Second), db("2")), "key-a", "key-b")
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(writer.listed(t, digest("1"))) != 1 || len(writer.listed(t, digest("2"))) != 1 {
+		t.Fatal("adding a key dropped a release a trusted key signed")
+	}
+	// 2: key-a removed. b, which key-b signed too, stays; a (key-a's only) goes.
+	source.trusted = []string{"key-b"}
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(writer.listed(t, digest("2"))) != 1 {
+		t.Fatal("removing a key dropped the release the kept key signed")
+	}
+	if writer.listed(t, digest("1")) != nil {
+		t.Fatal("removing a key kept the earlier release only it signed")
+	}
+}
+
+// Two products of one image and action, as two ServiceAccounts (the
+// release allows it): both listed, neither replacing the other.
+func TestTwoProductsSharingADigestAndActionAreBothListed(t *testing.T) {
+	ctx := context.Background()
+	source := &fakeSource{}
+	c, writer, _ := newController(t, source)
+	first, second := db("1"), db("1")
+	second.Name, second.ServiceAccount, second.TokenAudiences = "local-db2-create", "db-other", nil
+	source.release(t, digest("a"), releaseAt(time.Now(), first, second))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if entries := writer.listed(t, digest("1")); len(entries) != 2 {
+		t.Fatalf("listed: %+v", entries)
+	}
+	// And again, the same release re-applied after another: still both.
+	source.release(t, digest("b"), releaseAt(time.Now().Add(time.Second), first, second))
+	if err := c.Pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if entries := writer.listed(t, digest("1")); len(entries) != 2 {
+		t.Fatalf("listed after another apply: %+v", entries)
 	}
 }
 

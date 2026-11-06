@@ -37,6 +37,17 @@ assert all(v[k] == "{}" for k in maps), "a map seeded with no lookup"
 assert v["kernel-execution-kernel-catalog-tokens/apiAudiencesWritten"] == "false"' "$literals" \
   && ok "no lookup: every map empty, apiAudiencesWritten false" || fail "no lookup" "$literals"
 
+# How long an unfinished execution keeps an earlier release: at least the
+# scheduler's approval timeout.
+in_use() { helm template kernel helm/charts/execution-kernel "${on[@]}" "$@" --show-only templates/configmap.yaml 2>&1 | grep -o 'CATALOG_POLICY_IN_USE_MAX_SECONDS: "[0-9]*"'; }
+[ "$(in_use)" = 'CATALOG_POLICY_IN_USE_MAX_SECONDS: "259200"' ] && ok "in use: three days by default" || fail "in use, by default" "$(in_use)"
+[ "$(in_use --set scheduler.approvalTimeoutSeconds=604800)" = 'CATALOG_POLICY_IN_USE_MAX_SECONDS: "604800"' ] \
+  && ok "in use: the approval timeout, when longer" || fail "in use, a week's approval" "$(in_use --set scheduler.approvalTimeoutSeconds=604800)"
+short=$(helm template kernel helm/charts/execution-kernel "${on[@]}" --set scheduler.approvalTimeoutSeconds=604800 --set catalogPolicy.inUseMaxSeconds=3600 \
+  --show-only templates/configmap.yaml 2>&1)
+if echo "$short" | grep -q "must be at least scheduler.approvalTimeoutSeconds"; then ok "in use: refused under the approval timeout"
+else fail "in use under the approval timeout" "rendered"; fi
+
 refused() {  # label, the error it must say, helm arguments
   local label=$1 want=$2; shift 2
   local out

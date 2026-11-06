@@ -482,10 +482,13 @@ whenever the console chart's gateway is on (otherwise only the console's
 token policy holds each API's audiences, and the Admin page says so). The
 chart refuses `catalogPolicy` without `identityPolicy` (the console's,
 which holds each team's secret names). An earlier release stays listed for
-`CATALOG_POLICY_RELEASE_GRACE_SECONDS` (an hour) after a release dropped it,
-or while an unfinished execution submitted before then, and within
-`CATALOG_POLICY_IN_USE_MAX_SECONDS` (three days, the scheduler's approval
-timeout), runs it.
+`catalogPolicy.releaseGraceSeconds` (an hour) after a release dropped it,
+or while an unfinished execution runs it that was submitted before then and
+within `catalogPolicy.inUseMaxSeconds`. That defaults to the scheduler's
+`approvalTimeoutSeconds`, or three days if that's longer or off, and the
+chart refuses less than the approval timeout: a step awaiting an approval
+longer than it (with no timeout) is refused its product's identity when it
+starts.
 
 **Rotating its signers.** Add the new key (or identity) to
 `catalogPolicy.signature` beside the old, publish a release signed by it,
@@ -503,6 +506,14 @@ annotations of `ValidatingAdmissionPolicy` `<kernel>-execution-kernel-catalog-*`
 Without lookup the chart renders them empty, and `apiAudiencesWritten`
 false: product steps are refused until kernel policy's next write (a
 minute), and the API audience check waits for it.
+
+**Repairing them.** When an upgrade refuses one of these policies' literals
+(it says which), set that variable's expression to `{}` (`false` for
+`apiAudiencesWritten`) with `kubectl edit`: kernel policy rewrites it from
+its database within a pass. Don't delete the policy: the next upgrade then
+renders it empty, and the console's identity policy (holding no releases
+once split) with it, so every product step is refused until kernel policy
+writes again.
 
 On kind, whose local catalog isn't signed, try it with a key of your own,
 kept out of git (`_local/` is ignored): generate one with `cosign

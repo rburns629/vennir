@@ -10,9 +10,10 @@ CREATE TABLE catalog_policy_state (
     release_digest text NOT NULL,
     released_at timestamptz NOT NULL,
     commit text NOT NULL DEFAULT '',
-    -- Which signers verified it (Signers.Fingerprint): when the kernel
-    -- chart trusts others, it's verified again before it's trusted.
-    signers text NOT NULL DEFAULT '',
+    -- Which signers verified it, each by its id (a key's, the keyless
+    -- identity's: Signers.IDs): when none of them is trusted any more, it's
+    -- verified again before it's trusted.
+    signers text[] NOT NULL DEFAULT '{}',
     applied_at timestamptz NOT NULL DEFAULT now(),
     apis jsonb NOT NULL DEFAULT '[]'
 );
@@ -29,9 +30,9 @@ CREATE TABLE catalog_policy_releases (
     action text NOT NULL,
     service_account text NOT NULL,
     audiences text NOT NULL,
-    -- The signers its release was verified by (as catalog_policy_state's):
-    -- when the chart trusts others, an earlier release only they signed goes.
-    signers text NOT NULL DEFAULT '',
+    -- The signers that verified its release (as catalog_policy_state's): it's
+    -- listed only while one of them is trusted.
+    signers text[] NOT NULL DEFAULT '{}',
     released_until timestamptz,
     PRIMARY KEY (digest, team, repository, action, service_account, audiences)
 );

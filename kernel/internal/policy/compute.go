@@ -92,9 +92,33 @@ type Release struct {
 	// ReleasedUntil is when a release stopped naming it; nil while the
 	// release applied names it.
 	ReleasedUntil *time.Time
-	// Signers is the fingerprint of the signers its release was verified
-	// by (Signers.Fingerprint).
-	Signers string
+	// Signers are the signers (Signers.IDs) that verified its release.
+	Signers []string
+}
+
+// TrustedBy says whether any of these signers (that verified something) is
+// one trusted now.
+func TrustedBy(signers, trusted []string) bool {
+	for _, s := range signers {
+		for _, t := range trusted {
+			if s == t {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// TrustedReleases are the releases one of the signers trusted now verified:
+// only those are listed, whatever's recorded.
+func TrustedReleases(releases []Release, trusted []string) []Release {
+	var out []Release
+	for _, r := range releases {
+		if TrustedBy(r.Signers, trusted) {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // API is what one of the release's APIs needs minted: its ServiceAccount

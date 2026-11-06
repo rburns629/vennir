@@ -25,9 +25,8 @@ type State struct {
 	Digest     string
 	ReleasedAt time.Time
 	Commit     string
-	// Signers is the fingerprint of the signers it was verified against
-	// (Signers.Fingerprint).
-	Signers   string
+	// Signers are the signers (Signers.IDs) that verified it.
+	Signers   []string
 	AppliedAt time.Time
 	APIs      []API
 }
@@ -75,13 +74,14 @@ func (s *Store) State(ctx context.Context) (*State, error) {
 // Apply records a verified release as the one applied: its product
 // releases named now (verified by st.Signers), every other one released
 // until now (if it wasn't already), and its APIs. An earlier release of a
-// product at a digest this one names too, with another ServiceAccount or
-// other audiences, goes at once: the release decides what that digest runs
-// as. false when another process holds the lock; ErrOlder, under the lock,
-// when the one applied is newer and was verified by the same signers
-// (another process applied it meanwhile; one under other signers, not
-// trusted now, doesn't hold a newer one back).
-func (s *Store) Apply(ctx context.Context, st State, releases []Release) (bool, error) {
+// product at a digest this one names too (same team, repository and
+// action), with another ServiceAccount or other audiences than any this one
+// names there, goes at once: the release decides what that digest runs as.
+// false when another process holds the lock; ErrOlder, under the lock, when
+// the one applied is newer and a signer trusted now (trusted) verified it
+// (another process applied it meanwhile; one no trusted signer verified
+// doesn't hold a newer one back).
+func (s *Store) Apply(ctx context.Context, st State, releases []Release, trusted []string) (bool, error) {
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		return false, err
@@ -95,10 +95,10 @@ func (s *Store) Apply(ctx context.Context, st State, releases []Release) (bool, 
 		return false, nil
 	}
 	var applied time.Time
-	var appliedSigners string
+	var appliedSigners []string
 	err = tx.QueryRow(ctx, `SELECT released_at, signers FROM catalog_policy_state WHERE id = 1`).Scan(&applied, &appliedSigners)
 	switch {
-	case err == nil && appliedSigners == st.Signers && st.ReleasedAt.Before(applied):
+	case err == nil && TrustedBy(appliedSigners, trusted) && st.ReleasedAt.Before(applied):
 		return false, ErrOlder{Release: st.ReleasedAt, Applied: applied}
 	case err != nil && !errors.Is(err, pgx.ErrNoRows):
 		return false, err
@@ -110,15 +110,46 @@ func (s *Store) Apply(ctx context.Context, st State, releases []Release) (bool, 
 	if st.APIs == nil {
 		apis = []byte("[]")
 	}
+	// What this release names, at each (digest, team, repository, action):
+	// recorded rows there that it doesn't name go, once, before anything is
+	// inserted (two of its products may share a digest and an action).
+	named := map[[4]string]map[[2]string]bool{}
+	for _, r := range releases {
+		at := [4]string{r.Digest, r.Team, r.Repository, r.Action}
+		if named[at] == nil {
+			named[at] = map[[2]string]bool{}
+		}
+		named[at][[2]string{r.ServiceAccount, r.Audiences}] = true
+	}
+	recorded, err := tx.Query(ctx, `SELECT digest, team, repository, action, service_account, audiences FROM catalog_policy_releases`)
+	if err != nil {
+		return false, err
+	}
+	var gone [][6]string
+	for recorded.Next() {
+		var row [6]string
+		if err := recorded.Scan(&row[0], &row[1], &row[2], &row[3], &row[4], &row[5]); err != nil {
+			recorded.Close()
+			return false, err
+		}
+		if names, ok := named[[4]string{row[0], row[1], row[2], row[3]}]; ok && !names[[2]string{row[4], row[5]}] {
+			gone = append(gone, row)
+		}
+	}
+	recorded.Close()
+	if err := recorded.Err(); err != nil {
+		return false, err
+	}
+	for _, row := range gone {
+		if _, err := tx.Exec(ctx, `DELETE FROM catalog_policy_releases WHERE digest = $1 AND team = $2 AND repository = $3
+			AND action = $4 AND service_account = $5 AND audiences = $6`, row[0], row[1], row[2], row[3], row[4], row[5]); err != nil {
+			return false, err
+		}
+	}
 	if _, err := tx.Exec(ctx, `UPDATE catalog_policy_releases SET released_until = now() WHERE released_until IS NULL`); err != nil {
 		return false, err
 	}
 	for _, r := range releases {
-		if _, err := tx.Exec(ctx, `DELETE FROM catalog_policy_releases WHERE digest = $1 AND team = $2 AND repository = $3
-			AND action = $4 AND (service_account <> $5 OR audiences <> $6)`,
-			r.Digest, r.Team, r.Repository, r.Action, r.ServiceAccount, r.Audiences); err != nil {
-			return false, err
-		}
 		if _, err := tx.Exec(ctx, `INSERT INTO catalog_policy_releases
 			(digest, team, repository, action, service_account, audiences, signers, released_until) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
 			ON CONFLICT (digest, team, repository, action, service_account, audiences) DO UPDATE SET released_until = NULL, signers = $7`,
@@ -135,11 +166,12 @@ func (s *Store) Apply(ctx context.Context, st State, releases []Release) (bool, 
 	return true, tx.Commit(ctx)
 }
 
-// Reverified records that the release applied, digest, was verified again
-// against the signers trusted now (their fingerprint): it and its product
-// releases are theirs; every earlier release verified only by others goes
-// (it can't be verified again: it isn't the one the catalog names).
-func (s *Store) Reverified(ctx context.Context, digest, signers string) error {
+// Reverified records which signers verified the release applied, digest,
+// when it was verified again (none of those recorded was trusted any more):
+// it and the product releases it names are theirs now. Earlier releases
+// keep the signers that verified them, and are listed only while one of
+// those is trusted (TrustedReleases).
+func (s *Store) Reverified(ctx context.Context, digest string, signers []string) error {
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		return err
@@ -153,9 +185,6 @@ func (s *Store) Reverified(ctx context.Context, digest, signers string) error {
 		return nil
 	}
 	if _, err := tx.Exec(ctx, `UPDATE catalog_policy_releases SET signers = $1 WHERE released_until IS NULL`, signers); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM catalog_policy_releases WHERE released_until IS NOT NULL AND signers <> $1`, signers); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

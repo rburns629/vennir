@@ -205,13 +205,22 @@ API's or ESO's ServiceAccount, with token audiences the console accepts;
 no repository two teams claim, no ServiceAccount two of a team's products
 share), and an earlier release for an hour after a release stopped naming
 it, or while an unfinished task runs it as that product (`execution_tasks`)
-in an execution submitted before the release dropped it and within three
-days (so one submitted during the hour, say never to be approved, doesn't
+in an execution submitted before the release dropped it and within the
+scheduler's approval timeout or three days, whichever is longer (so one
+submitted during the hour, say never to be approved, doesn't
 hold it open). A digest a newer release names as another ServiceAccount or
-other audiences loses the old ones at once. When the kernel chart's signers
-change, the release applied is verified again (and until a release they
-signed is applied, both policies list nothing), and earlier releases only
-the old signers signed go. Until the first verified release, the policies
+other audiences loses the old ones at once. Each release records which of
+the trusted signers (each key, the keyless identity) verified it, and is
+listed only while one of them is still trusted: removing a key takes the
+releases only it signed with it, at once, in their grace or in use, and
+keeps those another trusted signer signed too (so the two-step rotation in
+`operations.md` drops nothing). When none of the signers that verified the
+release applied is trusted any more, it's verified again, and until a
+release a trusted signer verified is applied, both policies list nothing;
+meanwhile the older-release check is skipped (an untrusted release's date
+mustn't hold back a trusted one), so whoever controls the registry could
+serve any older release the new signers signed. The two-step rotation
+avoids that window. Until the first verified release, the policies
 hold the chart's seed from the console's, held to the kernel's own rules
 (no platform product, no API's or ESO's ServiceAccount, no audience of the
 cluster's). Both policies apply, so a step runs as a product only if both

@@ -96,6 +96,15 @@ catalogPolicy:
   release: ""
   newestVersion: false
   pollSeconds: 60
+  # -- How long an earlier release stays listed after a release dropped it
+  # (the console's release grace, an hour).
+  releaseGraceSeconds: 3600
+  # -- How long an unfinished execution, submitted before a release dropped
+  # an earlier one, keeps it listed while it runs it. 0: the scheduler's
+  # approvalTimeoutSeconds, or three days if that's longer (or off); never
+  # less than that timeout. A step that waits longer (an approval with no
+  # timeout) is refused its product's identity when it starts.
+  inUseMaxSeconds: 0
   # -- Who may sign a release: any of these cosign public keys (PEM), and/or
   # a keyless identity (both issuer and subjectRegExp), as the console
   # chart's catalog.signature. One is needed.
