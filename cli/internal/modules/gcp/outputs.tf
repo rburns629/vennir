@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: MIT
 # What vennir turns into Helm values and kubectl access.
 
+locals {
+  # The toleration GKE Autopilot adds to a Pod that asks for Spot capacity
+  # (its workload defaulter), as the chart's placements give it.
+  spot_toleration = [{ key = "cloud.google.com/gke-spot", operator = "Equal", value = "true", effect = "NoSchedule" }]
+}
+
 output "cluster" {
   value = {
     name     = google_container_cluster.this.name
@@ -57,9 +63,12 @@ output "step_placement" {
     nodeSelector = { "vennir.dev/pool" = "steps" }
     tolerations  = [{ key = "vennir.dev/steps", operator = "Equal", value = "true", effect = "NoSchedule" }]
     } : {
-    # Autopilot: Spot Pods, except at `scaled` (on-demand).
+    # Autopilot: Spot Pods, except at `scaled` (on-demand), with the
+    # toleration Autopilot adds to a Job asking for Spot: named here, so
+    # the dispatch policy, which allows only the install's placements,
+    # sees the Job as the scheduler made it.
     nodeSelector = local.pools.spot ? { "cloud.google.com/gke-spot" = "true" } : {}
-    tolerations  = []
+    tolerations  = local.pools.spot ? local.spot_toleration : []
   }
 }
 
@@ -68,7 +77,7 @@ output "step_placement" {
 # steps pool has one kind, so none.
 output "capacity_placements" {
   value = local.standard ? {} : {
-    spot     = { nodeSelector = { "cloud.google.com/gke-spot" = "true" }, tolerations = [] }
+    spot     = { nodeSelector = { "cloud.google.com/gke-spot" = "true" }, tolerations = local.spot_toleration }
     onDemand = { nodeSelector = {}, tolerations = [] }
   }
 }
