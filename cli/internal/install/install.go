@@ -515,17 +515,18 @@ func catalogRelease(c *config.Config, cloud *Cloud) string {
 }
 
 // policyReadsExternal says whether kernel policy can read another
-// install's catalog as its own identity: on Google Cloud, another
-// project's Artifact Registry, whose owner grants its service account read
-// (CatalogGrant lists it). Not by federation (the console's, which kernel
-// policy doesn't borrow), nor from AWS.
+// install's catalog as its own identity: on Google Cloud, an Artifact
+// Registry in another project, whose owner grants its service account read
+// (CatalogGrant lists it), or in this one, as this install's task registry,
+// which its module grants it read on. Not by federation (the console's,
+// which kernel policy doesn't borrow), nor from AWS.
 func policyReadsExternal(c *config.Config, cloud *Cloud) bool {
 	e := c.ExternalCatalog
 	if e.Registry == "" || e.Federated() || cloud == nil || cloud.Provider != "gcp" || cloud.PolicyServiceAccount == "" ||
 		!config.IsArtifactRegistry(e.Registry) {
 		return false
 	}
-	return strings.SplitN(e.Registry, "/", 3)[1] != c.GCP.Project
+	return true
 }
 
 // gatewayTokenAudience is the audience the gateway's Google ID tokens are
@@ -546,7 +547,7 @@ func gatewayTokenAudience(c *config.Config) string {
 // own user. Until another install's owner grants it read, its passes fail
 // and its policies stand as the chart seeded them from the console's. nil
 // otherwise: off a cloud, unsigned, another install's catalog it can't read
-// as its own (by federation, from AWS, or in this project), or a module
+// as its own (by federation, or from AWS), or a module
 // from before kernel policy's identity.
 func catalogPolicyValues(c *config.Config, cloud *Cloud) map[string]any {
 	release := catalogRelease(c, cloud)

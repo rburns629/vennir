@@ -377,6 +377,31 @@ func TestExternalCatalog(t *testing.T) {
 	}
 }
 
+// Another install's catalog in this install's own project: its repository
+// is this install's task registry, not made here, so the module grants
+// this install's identities read on it.
+func TestAnExternalCatalogInThisProjectIsTheTaskRegistry(t *testing.T) {
+	c := Default("gcp")
+	c.Source = checkout(t)
+	c.Admin.Email = "admin@example.com"
+	c.GCP.Project, c.GCP.Region = "acme-dev", "us-central1"
+	c.ExternalCatalog = ExternalCatalog{Registry: "us-central1-docker.pkg.dev/acme-dev/vennir-products"}
+	c.TaskImages = TaskImages{Create: true, Name: "vennir-reader-products"}
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "set taskImages.name to its repository and taskImages.create to false") {
+		t.Errorf("its own task registry: %v", err)
+	}
+	c.TaskImages = TaskImages{Create: false, Name: "vennir-products", Registry: "us-central1-docker.pkg.dev/acme-dev/vennir-products"}
+	if err := c.Validate(); err != nil {
+		t.Errorf("the owner's repository as its task registry: %v", err)
+	}
+	// Another project's: the owner's grant, whatever taskImages says.
+	c.ExternalCatalog.Registry = "us-central1-docker.pkg.dev/owner/vennir-products"
+	c.TaskImages = TaskImages{Create: true, Name: "vennir-reader-products"}
+	if err := c.Validate(); err != nil {
+		t.Errorf("another project's: %v", err)
+	}
+}
+
 func TestECRRegistry(t *testing.T) {
 	account, region, prefix := ECRRegistry("123456789012.dkr.ecr.eu-west-2.amazonaws.com/vennir-products")
 	if account != "123456789012" || region != "eu-west-2" || prefix != "vennir-products" {

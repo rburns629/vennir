@@ -775,6 +775,14 @@ func (c *Config) Validate() error {
 		if e.GCPWorkloadIdentityProvider != "" && !IsArtifactRegistry(e.Registry) {
 			add("externalCatalog.gcpWorkloadIdentityProvider: only for an Artifact Registry (<region>-docker.pkg.dev/...)")
 		}
+		// In this install's own project, it reads the owner's repository as
+		// its task registry, which its module grants its own identities
+		// read on (no owner's grant): taskImages names it, not made here.
+		if c.Target == "gcp" && IsArtifactRegistry(e.Registry) && strings.SplitN(e.Registry, "/", 3)[1] == c.GCP.Project {
+			if want := c.GCP.Region + "-docker.pkg.dev/" + c.GCP.Project + "/" + c.TaskImages.Name; e.Registry != want || c.TaskImages.Create {
+				add("externalCatalog.registry %s is in this project: set taskImages.name to its repository and taskImages.create to false (in %s), so this install's identities are granted read on it", e.Registry, c.GCP.Region)
+			}
+		}
 		if e.GCPServiceAccount != "" && e.GCPWorkloadIdentityProvider == "" {
 			add("externalCatalog.gcpServiceAccount: needs gcpWorkloadIdentityProvider")
 		}
