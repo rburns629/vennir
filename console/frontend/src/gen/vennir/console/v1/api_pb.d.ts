@@ -121,6 +121,14 @@ export declare type ApiGrant = Message<"vennir.console.v1.ApiGrant"> & {
    * @generated from field: google.protobuf.Timestamp away_since = 17;
    */
   awaySince?: Timestamp | undefined;
+
+  /**
+   * When a request was last let in through it, to within a few minutes;
+   * unset if none yet.
+   *
+   * @generated from field: google.protobuf.Timestamp last_used_at = 18;
+   */
+  lastUsedAt?: Timestamp | undefined;
 };
 
 /**

@@ -292,6 +292,8 @@ export interface GrantView {
   revokeReason: string;
   // When its API left the catalog's release; null while it's published.
   awaySince: Date | null;
+  // The last request let in through it (the gateway's, to a few minutes).
+  lastUsedAt: Date | null;
 }
 
 /**
@@ -330,6 +332,7 @@ async function grantViews(rows: Grant[], apisById: Map<string, Api>, awayTeams =
         revokedBy: g.revokedBy ? (people.get(g.revokedBy)?.email ?? "(deleted account)") : "",
         revokeReason: g.revokeReason ?? "",
         awaySince: g.awaySince,
+        lastUsedAt: g.lastUsedAt,
       },
     ];
   });

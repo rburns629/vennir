@@ -2,7 +2,7 @@
 /**
  * The gateway's own database role: what it reads to sign callers in and
  * find the published APIs, and its traffic counts, what it can't serve and
- * when an API token was last used, and nothing else. Never
+ * when an API token or grant was last used, and nothing else. Never
  * a password hash, a sealed value or a secret's name: column grants on
  * `users` and `teams`, and no grant at all on the rest. Run by the
  * migration Job (migrate.ts) after the migrations, as the tables' owner, so
@@ -32,7 +32,9 @@ const GRANTS = [
   // Who else may call each API (decision 26): the active grants' principals
   // and rates, never who granted or why; and each person's groups, for a
   // group's grant. Nothing of the requests for access.
-  "GRANT SELECT (id, api_id, group_name, user_id, per_minute, revoked_at) ON api_grants TO %I",
+  "GRANT SELECT (id, api_id, group_name, user_id, per_minute, revoked_at, last_used_at) ON api_grants TO %I",
+  // A grant called through is used: its last_used_at, and nothing else of it.
+  "GRANT UPDATE (last_used_at) ON api_grants TO %I",
   "GRANT SELECT (user_id, group_name, read_at) ON user_groups TO %I",
   // Whether an admin turned single sign-on on, and whether groups come from
   // a claim or Google Workspace: never its client secret.

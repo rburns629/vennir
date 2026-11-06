@@ -54,7 +54,7 @@ function product(a: ApiView) {
 }
 
 function grant(g: GrantView) {
-  return { ...g, createdAt: timestamp(g.createdAt), updatedAt: timestamp(g.updatedAt), revokedAt: timestamp(g.revokedAt), awaySince: timestamp(g.awaySince) };
+  return { ...g, createdAt: timestamp(g.createdAt), updatedAt: timestamp(g.updatedAt), revokedAt: timestamp(g.revokedAt), awaySince: timestamp(g.awaySince), lastUsedAt: timestamp(g.lastUsedAt) };
 }
 
 function request(r: RequestView) {

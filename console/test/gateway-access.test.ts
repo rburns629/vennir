@@ -37,6 +37,7 @@ describe("the gateway's database role", () => {
       await gateway.query("SELECT EXISTS (SELECT 1 FROM sso_settings WHERE id = 1 AND enabled AND issuer <> '' AND client_id <> '' AND redirect_url <> '')");
       await gateway.query("SELECT id, user_id, token_hash, revoked_at, expires_at, last_used_at FROM api_tokens LIMIT 1");
       await gateway.query("UPDATE api_tokens SET last_used_at = now() WHERE id = gen_random_uuid()");
+      await gateway.query("UPDATE api_grants SET last_used_at = now() WHERE id = gen_random_uuid() AND last_used_at IS NULL");
       await gateway.query(
         "SELECT t.name, t.require_sso, m.from_groups AND EXISTS (SELECT 1 FROM sso_group_mappings g WHERE g.team_id = t.id) FROM team_memberships m JOIN teams t ON t.id = m.team_id LIMIT 1",
       );
@@ -67,7 +68,7 @@ describe("the gateway's database role", () => {
         "UPDATE users SET is_admin = true WHERE false",
         "UPDATE api_tokens SET revoked_at = NULL WHERE false",
         // Who granted or revoked, and the requests, are the console's only;
-        // and the gateway changes no grant and no one's groups.
+        // and the gateway changes nothing of a grant but its last use, and no one's groups.
         "SELECT granted_by FROM api_grants LIMIT 1",
         "SELECT revoked_by FROM api_grants LIMIT 1",
         "SELECT from_request FROM api_grants LIMIT 1",
@@ -76,6 +77,7 @@ describe("the gateway's database role", () => {
         "SELECT sso_groups FROM users LIMIT 1",
         "SELECT sso_groups_read_at FROM users LIMIT 1",
         "UPDATE api_grants SET revoked_at = NULL WHERE false",
+        "UPDATE api_grants SET per_minute = 1 WHERE false",
         "INSERT INTO api_grants (api_id, group_name) VALUES (gen_random_uuid(), 'x')",
         "DELETE FROM user_groups WHERE false",
         "INSERT INTO user_groups (user_id, group_name) VALUES (gen_random_uuid(), 'x')",

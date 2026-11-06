@@ -2677,6 +2677,13 @@
      "repeated": false,
      "optional": false,
      "comment": "When its API left the catalog's release; unset while it's published.\nRemoved 30 days after."
+    },
+    {
+     "name": "lastUsedAt",
+     "type": "timestamp (RFC 3339 string)",
+     "repeated": false,
+     "optional": false,
+     "comment": "When a request was last let in through it, to within a few minutes;\nunset if none yet."
     }
    ]
   },

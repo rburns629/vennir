@@ -739,6 +739,7 @@ Who may call an API besides its own team (decision 26): a single sign-on group (
 | `revoked_by` | uuid | yes | Who revoked it; null when the platform did (`revoke_reason`). |
 | `revoke_reason` | text | yes | Why the platform revoked it: superseded by a grant to the same group or user made while its API was away. |
 | `away_since` | timestamptz | yes | When its API left the catalog's release; null while it's published. 30 days after, it's deleted. |
+| `last_used_at` | timestamptz | yes | When a request was last let in through it, as the gateway records it (to within a few minutes; it writes nothing else of a grant); null if none yet. |
 
 ### api_access_requests
 

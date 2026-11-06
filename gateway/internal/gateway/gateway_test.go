@@ -879,6 +879,11 @@ func (r *recorder) Record(_, team, endpoint, outcome string, _ time.Time, _ time
 	*r = append(*r, record{team, endpoint, outcome})
 }
 
+// Used is held as a record of its own: outcome "used", the grant as endpoint.
+func (r *recorder) Used(grantID string, _ time.Time) {
+	*r = append(*r, record{endpoint: grantID, outcome: "used"})
+}
+
 // Traffic names an endpoint only once it's the spec's, or the caller has
 // signed in: before that, a made-up path is counted, but not as itself.
 func TestTrafficNamesAnEndpointOnlyOnceMatchedOrSignedIn(t *testing.T) {
@@ -895,8 +900,11 @@ func TestTrafficNamesAnEndpointOnlyOnceMatchedOrSignedIn(t *testing.T) {
 		{"", "", "unauthenticated"},
 		{"", "", "unauthenticated"},
 		{"", "GET /orders/{orderId}", "unauthenticated"},
+		// A call through a grant is its use, whatever came of it.
 		{"grant:user", "DELETE /orders", "blocked"},
+		{"", "g-web", "used"},
 		{"grant:user", "GET /orders/{orderId}", "forwarded_2xx"},
+		{"", "g-web", "used"},
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("recorded %v, want %v", got, want)

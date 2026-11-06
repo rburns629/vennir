@@ -166,12 +166,13 @@ it was seen.
   during that upgrade let nobody in through it); a gateway from before
   still selects it, so it stays one release. Then drop it in a migration,
   and the `shareWith` key `upsertApi` is given in `catalogSync.ts`.
-- [ ] **A grant's last call** (decision 26's open question, 2026-11-05):
-  grants don't expire; the proposal is that the API's team sees each
-  grant's last call and revokes unused ones. The gateway would need to
-  write a `last_used_at` per grant (as for API tokens, at a few minutes'
-  resolution; a grant to `vennir_gateway` of that one column). A renamed
-  API starts with no grants (the old name's are kept 30 days, away, and come
+- [ ] **A grant's last call** (decision 26, 2026-11-05): grants don't
+  expire; the API's team is to see each grant's last call and revoke unused
+  ones. The gateway records it (2026-11-06: `api_grants.last_used_at`, at
+  most once every five minutes per grant, with its traffic counts) and
+  every list of grants returns it (`ApiGrant.last_used_at`). Left: the
+  API's access page shows it (on the mockups canvas first). A renamed API
+  starts with no grants (the old name's are kept 30 days, away, and come
   back only under the old name).
 
 - [ ] **The console can still loosen some of the cluster's policies**

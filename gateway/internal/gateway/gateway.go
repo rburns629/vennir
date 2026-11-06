@@ -103,10 +103,11 @@ type Gateway struct {
 	Settings Settings
 	Log      *slog.Logger
 	Metrics  *Metrics
-	// Traffic counts what each API's requests came to (its page shows it):
-	// a traffic.Recorder.
+	// Traffic counts what each API's requests came to (its page shows it),
+	// and when each grant was last called through: a traffic.Recorder.
 	Traffic interface {
 		Record(apiID, team, endpoint, outcome string, at time.Time, took time.Duration)
+		Used(grantID string, at time.Time)
 	}
 	// Public: this listener is the internet's, which serves only APIs that
 	// are reachable from the internet and allowed to be.
@@ -176,6 +177,8 @@ type outcome struct {
 	status              int
 	// apiID and endpoint, once the API is known: for traffic.
 	apiID, endpoint string
+	// grantID: the grant that let the caller in, if one did (its last call).
+	grantID string
 	// served: the path named an API served here.
 	served bool
 }
@@ -239,6 +242,9 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			outcomeName = fmt.Sprintf("forwarded_%dxx", result.status/100)
 		}
 		g.Traffic.Record(result.apiID, result.team, result.endpoint, outcomeName, start, g.now().Sub(start))
+		if result.grantID != "" {
+			g.Traffic.Used(result.grantID, start)
+		}
 	}
 	asked := "-"
 	if ok {
@@ -354,6 +360,9 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request, team, name, rest
 		return g.refuse(w, result, http.StatusForbidden, "NOT_GRANTED", message)
 	}
 	result.team = way.trafficTeam()
+	if way.grant != nil {
+		result.grantID = way.grant.ID
+	}
 
 	// The validator reads the query as Go parses it, which leaves out what it
 	// can't read (a pair with a ";", a bad escape, and all of it past 10,000

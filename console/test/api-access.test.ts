@@ -644,6 +644,18 @@ describe("the lists", () => {
     expect(access.body.requests?.[0]?.state).toBe("API_ACCESS_REQUEST_STATE_WAITING");
   });
 
+  it("say when each grant last let someone in, as the gateway records it, and nothing for one never used", async () => {
+    const used = await add("maintainer", "spare", { group: "last-call@example.com" });
+    const unused = await add("maintainer", "spare", { group: "never-called@example.com" });
+    const at = new Date("2026-11-06T12:00:00Z");
+    await db.update(apiGrants).set({ lastUsedAt: at }).where(eq(apiGrants.id, used.body.grant.id));
+    const access = await call<{ grants?: (Grant & { lastUsedAt?: string })[] }>(tokens.maintainer, "ApiService/ListApiAccess", { team: owner, name: "spare" });
+    const byId = new Map(access.body.grants?.map((g) => [g.id, g]));
+    expect(byId.get(used.body.grant.id)?.lastUsedAt).toBe("2026-11-06T12:00:00Z");
+    expect(byId.get(unused.body.grant.id)).toBeDefined();
+    expect(byId.get(unused.body.grant.id)?.lastUsedAt).toBeUndefined();
+  });
+
   it("of mine say how I may call each, and my requests that wait or were declined", async () => {
     const mine = await call<{ access?: { team: string; name: string; via: string; callingTeam?: string; perMinute: number }[]; requests?: Request[] }>(
       tokens.consumer,
