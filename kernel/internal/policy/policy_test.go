@@ -229,7 +229,10 @@ func TestAnEarlierReleaseStaysListedWhileInUseThenGoes(t *testing.T) {
 		t.Fatal("a release an unfinished task runs was dropped")
 	}
 	// Finished: pruned, and no longer listed.
-	if _, err := store.DB.Exec(ctx, `UPDATE execution_tasks SET state = 'SUCCEEDED'`); err != nil {
+	// Only this test's: other packages' tests share the database, and a row this
+	// transaction updates is locked to them until it ends.
+	if _, err := store.DB.Exec(ctx, `UPDATE execution_tasks SET state = 'SUCCEEDED' WHERE execution_id IN
+		('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000e3')`); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.Pass(ctx); err != nil {
