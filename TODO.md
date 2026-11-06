@@ -174,6 +174,16 @@ it was seen.
   would answer it. Until each API has an origin of its own (a host per API,
   e.g. `<api>.<team>.<gateway host>`), a backend serving browsers should
   keep its cookies HttpOnly and not take a cookie alone as sign-in.
+  Proposed 2026-11-05 as decision 26 (`docs/assessment.md`): a host per
+  API that the gateway assigns, called by subscription or by group; its
+  console pages go on the mockups canvas first.
+
+- [ ] **The console can loosen the cluster's policies** (a known gap since
+  the security review of 2026-11-04): it writes the admission policies'
+  literals, so a compromised console could let an unreviewed image run as
+  a product's identity. Proposed 2026-11-05 as decision 27
+  (`docs/assessment.md`): `kernel policy` verifies the catalog release
+  itself and alone writes what the catalog decides.
 
 ## Console
 
