@@ -917,8 +917,7 @@ to know:
   other resources, its main Secret included, are updated only after it. The scheduler waits for
   them on a fresh install.
 
-**`shareWith` is gone from `api.yaml`** (unreleased, on main since
-2026-11-06; decision 26): only an API's own team and whoever its access
+**`shareWith` is gone from `api.yaml`** (0.13.0; decision 26): only an API's own team and whoever its access
 list grants may call it. The teams an `api.yaml`'s `shareWith` named stop
 calling at this upgrade (the console's migration empties what it held, so
 even a gateway from before, still running, lets them in no more), and
@@ -928,8 +927,7 @@ through it (in the console, or `ApiService/AddApiGrant`), then drop
 `shareWith` from the catalog. A team named in `limits` gets no access from
 it either.
 
-**API backends in a team's own namespace are held** (unreleased, on main
-since 2026-11-06): 0.12.0 still served an in-cluster backend at
+**API backends in a team's own namespace are held** (0.13.0): 0.12.0 still served an in-cluster backend at
 `<service>.<team>.svc`, logging `api_backend_in_team_namespace` on every
 refresh; now it's held like any namespace but `<team>-apis`, and the
 console deletes the `vennir-gateway-ingress` earlier consoles wrote into
@@ -937,8 +935,7 @@ team namespaces. Before upgrading, check the gateway's logs for that
 warning, and move each backend it names
 ([API backends' namespaces](#api-backends-namespaces)).
 
-**kernel policy signs in as its own database role** (unreleased, on main
-since 2026-11-06): with `catalogPolicy` and the bundled Postgres, the
+**kernel policy signs in as its own database role** (0.13.0): with `catalogPolicy` and the bundled Postgres, the
 upgrade's migration Job makes `postgres.auth.policyUsername`
 (`vennir_kernel_policy`) and the migration grants it only what it uses; its
 Pod restarts onto it. On GKE and EKS, `vennir` turns `catalogPolicy` on
@@ -1059,7 +1056,7 @@ in `assessment.md`). With the kernel chart's
   finish (Observe's runs list the unfinished ones), or turn `catalogPolicy` on
   when none run.
 - **The release after drops the console's copy** (decision 27's second
-  step, unreleased). With `catalogPolicy` on, and once the kernel's policy and
+  step, 0.13.0). With `catalogPolicy` on, and once the kernel's policy and
   its binding are in the cluster (an upgrade after the one that made them:
   should that one fail, the console's release rules are still there; a
   render without lookup never splits), the kernel chart renders the

@@ -87,10 +87,49 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <h2 id="rel-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Newest first.</h2>
     </div>
     <div>
+      <article id="v0-13-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.13.0</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">6 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.13.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.12.0...v0.13.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.12.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Who may call each API</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">shareWith</span> is gone from api.yaml: besides the API's own team, only whoever its access list grants gets past the gateway, and <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir catalog validate</span> refuses an api.yaml that still has it. Grant your callers in the console before upgrading.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Each grant shows its last call: on the API's access list, Admin's list of every grant, a team's bots' grants, and your own. Grants don't expire, so a team can see which ones nobody uses and revoke them.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">API backends</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">A backend in its team's own namespace is held, like one anywhere but <span class="mono" style="font-size: 14px; color: #E8EAEE">&lt;team&gt;-apis</span>, and the console removes the opening older consoles made for it there. Before upgrading, look for <span class="mono" style="font-size: 14px; color: #E8EAEE">api_backend_in_team_namespace</span> in the gateway's logs and move what it names.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The gateway can't be given the console's host: the console chart refuses it, so no API's page can read the console's session.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Lambda function URLs and other SigV4 backends answer: the gateway no longer signs X-Forwarded-For, which AWS changes before it checks the signature. Proven from a GKE install to a Lambda.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">The kernel checks the catalog itself, on clouds</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">kernel policy</span> signs in to the database as a role of its own, with only what it uses.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">On GKE and EKS, vennir turns it on for an install whose catalog is signed, with its own identity for the registry and the database.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">It reads another install's catalog too: in another Google Cloud project, in the same one, or on another cloud or AWS account by a federation of its own, which the owner's <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir catalog grant --policy-subject</span> trusts beside the console. It never borrows the console's credential.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">With the kernel chart's catalogPolicy on, the console's own identity policy holds only each team's secret names.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Clouds</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">GKE Autopilot: steps on Spot capacity name the toleration Autopilot adds, so they're no longer refused.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">EKS: the cluster's volumes are tagged again (the EBS add-on dropped the setting vennir used).</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">vennir works with Helm 4, which dropped helm list --all.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The aws sample's <span class="mono" style="font-size: 14px; color: #E8EAEE">s3-bucket</span> runs from GKE or any cluster AWS trusts by OIDC, taking its team's role with its own token: proven making and deleting a bucket from GKE.</span></li>
+          </ul>
+        </div>
+      </article>
       <article id="v0-12-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
         <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
           <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
-            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.12.0</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.12.0</h3>
           </div>
           <time class="mono" style="font-size: 14px; color: #AEB5C2">6 Nov 2026</time>
           <div style="display: flex; flex-direction: column; gap: 0">
