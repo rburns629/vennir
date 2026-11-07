@@ -87,10 +87,47 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <h2 id="rel-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Newest first.</h2>
     </div>
     <div>
+      <article id="v0-13-2" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.13.2</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">6 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.13.2" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.13.1...v0.13.2" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.13.1<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">The gateway on GKE's load balancer</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">gateway.ingress.gke</span> makes what GKE's load balancer needs besides the Ingress: Google's certificate for the gateway's host, and its health check on <span class="mono" style="font-size: 14px; color: #E8EAEE">/.vennir/health</span>. With the reserved address and class in the Ingress's annotations, a values file puts the gateway on the internet on GKE, as the gateway guide says.</span></li>
+          </ul>
+        </div>
+      </article>
+      <article id="v0-13-1" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.13.1</h3>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">6 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/rburns629/vennir/releases/tag/v0.13.1" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/rburns629/vennir/compare/v0.13.0...v0.13.1" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.13.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">AWS from any cluster</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The aws samples (<span class="mono" style="font-size: 14px; color: #E8EAEE">s3-bucket</span>, <span class="mono" style="font-size: 14px; color: #E8EAEE">app-runner</span>, <span class="mono" style="font-size: 14px; color: #E8EAEE">rds-postgres</span>) run from GKE or any cluster AWS trusts by OIDC, each as its own role: a team secret named after its ServiceAccount (<span class="mono" style="font-size: 14px; color: #E8EAEE">aws-s3-bucket-role</span> and so on) holds the role, assumed with the step's own token, and that role trusts the one ServiceAccount alone.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">aws-target</span> means the same on and off EKS again: a second role, assumed as the product's own. (0.13.0's <span class="mono" style="font-size: 14px; color: #E8EAEE">s3-bucket</span> used it as the first role off EKS.)</span></li>
+          </ul>
+        </div>
+      </article>
       <article id="v0-13-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
         <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
           <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
-            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.13.0</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.13.0</h3>
           </div>
           <time class="mono" style="font-size: 14px; color: #AEB5C2">6 Nov 2026</time>
           <div style="display: flex; flex-direction: column; gap: 0">
