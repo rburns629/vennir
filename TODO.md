@@ -126,12 +126,6 @@ what users must do meanwhile (the gateway guide's ECS section).
   ECS service the API still forwards to. An API whose `backend.url` comes
   from a run's resource, or at least a warning on Delete when a published
   API names the resource's URL.
-- [ ] **A reinstall for an existing catalog**: `vennir apply` made a new
-  identity pool and left the catalog repository's
-  `GCP_WORKLOAD_IDENTITY_PROVIDER` naming the deleted one, so main's CI
-  failed to sign in and the console said only "the registry answered 404".
-  Apply should say to run `vennir catalog create <env>` (which fixed it)
-  when the repository's variables aren't this install's, or set them.
 - [ ] **A gateway backend sample on ECS**: `examples/greetings-api` answers
   its health check 204 (ECS counts only 200) and needs its audience
   configured, which an ECS backend can't know before create; the run used

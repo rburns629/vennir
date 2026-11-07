@@ -47,6 +47,39 @@ func TestOwnedElsewhere(t *testing.T) {
 	}
 }
 
+// After a reinstall, the repository's sign-in names the deleted install's
+// identity: apply names what `vennir catalog create` would set. A
+// repository publishing to another install's registry isn't flagged.
+func TestStaleCatalogVariables(t *testing.T) {
+	setup := &catalogSetup{
+		registry:  "us-central1-docker.pkg.dev/p/vennir-products",
+		signing:   [][2]string{{"VENNIR_SIGNING_MODE", "keyless"}},
+		variables: [][2]string{{"GCP_WORKLOAD_IDENTITY_PROVIDER", "projects/1/locations/global/workloadIdentityPools/vennir-gh-new/providers/github"}, {"PUBLISH_GCP_SERVICE_ACCOUNT", "vennir-publish@p.iam.gserviceaccount.com"}},
+	}
+	current := map[string]string{
+		"VENNIR_REGISTRY":                setup.registry,
+		"VENNIR_SIGNING_MODE":            "keyless",
+		"GCP_WORKLOAD_IDENTITY_PROVIDER": setup.variables[0][1],
+		"PUBLISH_GCP_SERVICE_ACCOUNT":    setup.variables[1][1],
+	}
+	if stale := staleCatalogVariables(current, setup); len(stale) != 0 {
+		t.Errorf("this install's: %v", stale)
+	}
+	reinstalled := map[string]string{}
+	for k, v := range current {
+		reinstalled[k] = v
+	}
+	reinstalled["GCP_WORKLOAD_IDENTITY_PROVIDER"] = "projects/1/locations/global/workloadIdentityPools/vennir-gh-old/providers/github"
+	delete(reinstalled, "VENNIR_SIGNING_MODE")
+	if stale := staleCatalogVariables(reinstalled, setup); fmt.Sprint(stale) != "[VENNIR_SIGNING_MODE GCP_WORKLOAD_IDENTITY_PROVIDER]" {
+		t.Errorf("reinstalled: %v", stale)
+	}
+	elsewhere := map[string]string{"VENNIR_REGISTRY": "us-central1-docker.pkg.dev/p/vennir-prod-products"}
+	if stale := staleCatalogVariables(elsewhere, setup); len(stale) != 0 {
+		t.Errorf("another install's: %v", stale)
+	}
+}
+
 // The smoke test waits out the console's first scan of a new image, and
 // nothing else.
 func TestScanningIsWaitedOut(t *testing.T) {
