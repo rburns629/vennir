@@ -378,13 +378,14 @@ release) and nothing else, to exactly the reader's identity:
 | --- | --- | --- | --- |
 | gcp | gcp, another project | its console, scanner, nodes, (verifying) policy-controller and (signed) kernel policy service accounts (`--service-account`) | `roles/artifactregistry.reader` on the repository for each |
 | gcp | gcp, the same project | nothing: the reader names the owner's repository as its own task registry (`taskImages.name`, `taskImages.create: false`, `taskImages.registry`), which its module grants its own identities read on; `vennir` refuses anything else | — |
-| gcp | aws, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`) | in the pool `vennir-installs`, a provider `vennir-<reader>` trusting that issuer for that subject alone, mapped to the subject `<reader>:<subject>`; `roles/artifactregistry.reader` on the repository for that principal |
-| aws | gcp, another AWS account, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`) | an IAM OIDC provider for the issuer (audience `sts.amazonaws.com`), and a role `vennir-reader-<reader>` only that subject may assume by web identity, whose one policy may `ecr:GetAuthorizationToken` and pull and list tags in `<prefix>/*` |
+| gcp | aws, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`), and (signed, on gcp or aws) kernel policy's (`--policy-subject`) | in the pool `vennir-installs`, a provider `vennir-<reader>` trusting that issuer for those subjects alone, each mapped to the subject `<reader>:<subject>`; `roles/artifactregistry.reader` on the repository for each principal |
+| aws | gcp, another AWS account, or any cluster with an OIDC issuer | its console's ServiceAccount from its issuer (`--issuer`, `--subject`), and (signed, on gcp or aws) kernel policy's (`--policy-subject`) | an IAM OIDC provider for the issuer (audience `sts.amazonaws.com`), and a role `vennir-reader-<reader>` only those subjects may assume by web identity, whose one policy may `ecr:GetAuthorizationToken` and pull and list tags in `<prefix>/*` |
 
 ```
 vennir catalog grant prod --reader vennir-eks \
   --issuer https://oidc.eks.us-east-2.amazonaws.com/id/<id> \
-  --subject system:serviceaccount:vennir-system:console-execution-console
+  --subject system:serviceaccount:vennir-system:console-execution-console \
+  --policy-subject system:serviceaccount:vennir-system:kernel-execution-kernel-policy
 ```
 
 A federated reader then sets what the grant prints and applies again:
@@ -398,7 +399,15 @@ Identity Federation), or the role's credentials (AWS
 `AssumeRoleWithWebIdentity`) and with them ECR's registry token. It uses
 it itself and hands it, renewed every policy sync, to the kubelet and
 policy-controller (`vennir-pull` in each team namespace) and its verify
-and scan Jobs (`vennir-registry-token`). An EKS reader of another
+and scan Jobs (`vennir-registry-token`). A reader whose catalog is signed
+(on gcp or aws) turns kernel policy on too, which verifies the release
+itself by federation of its own, never the console's: its own
+ServiceAccount's token, projected for the same side, exchanged the same
+way (the kernel chart's `catalogPolicy.registry.federation`). Until the
+owner's grant trusts it (`--policy-subject`; a grant from before trusts
+the console alone: run it again with the command the reader's `vennir
+apply` prints), its passes fail and the cluster's policies stay as the
+console last wrote them. An EKS reader of another
 account's ECR reads the same way, so its own roles (the verifier's
 included) still read only its own registry. On aws the grant is a role
 rather than a repository policy: ECR creates each product's repository on
@@ -407,7 +416,7 @@ its first push, and a role scoped to the prefix covers those too.
 Running the grant again changes nothing; `--revoke` takes it away (the
 binding and the provider; the role and its policy). On aws the role is
 named by `--reader` alone, so when `vennir-reader-<reader>` already trusts
-another issuer or subject (another reader with the same cluster name,
+another issuer, or not this reader's console (another reader with the same cluster name,
 `vennir` by default), the grant and the revoke both refuse and say whom it
 trusts: give this reader another `--reader`, or pass `--replace` to change
 (or delete) that role anyway. The pool, and an IAM

@@ -41,6 +41,7 @@ func (a *app) catalogGrantCmd() *cobra.Command {
 	f.StringVar(&o.reader.Name, "reader", "", "the reading install's cluster `NAME`, naming what the grant makes")
 	f.StringVar(&o.reader.Issuer, "issuer", "", "the reader's cluster's OIDC issuer `URL`")
 	f.StringVar(&o.reader.Subject, "subject", "", "the reader's console ServiceAccount, as its tokens name it (`SUBJECT`)")
+	f.StringVar(&o.reader.PolicySubject, "policy-subject", "", "the reader's kernel policy ServiceAccount, trusted beside its console when it verifies the catalog itself (`SUBJECT`)")
 	f.StringArrayVar(&o.reader.ServiceAccounts, "service-account", nil, "a reader on Google Cloud: one of its service accounts (`EMAIL`; repeat it)")
 	f.BoolVar(&o.revoke, "revoke", false, "take the grant away instead")
 	f.BoolVar(&o.replace, "replace", false, "aws: change (or with --revoke, delete) the reader's role even when it trusts another issuer or subject (another reader of the same name)")

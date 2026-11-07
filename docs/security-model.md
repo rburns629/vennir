@@ -225,7 +225,16 @@ it (`postgres.auth.policyUsername`, its password in a Secret its Pod alone
 mounts), with Cloud SQL or RDS its own IAM user (the gcp module's `policy`
 service account, the aws module's `policy` role, each bound to its
 ServiceAccount alone, which also reads the catalog's registry), and with
-another database the kernel's unless `catalogPolicy.database` names one. A digest a newer release names as another ServiceAccount or
+another database the kernel's unless `catalogPolicy.database` names one.
+Another install's catalog on another cloud, or in another AWS account, it
+reads by federation of its own (`catalogPolicy.registry.federation`):
+its ServiceAccount's token, projected for that side alone, exchanged at
+Google's STS or by `AssumeRoleWithWebIdentity`, which the owner's `vennir
+catalog grant` trusts beside the console's (`--policy-subject`); it never
+holds or borrows the console's credential (proven 2026-11-07: a GKE install
+reading another account's ECR, where CloudTrail shows kernel policy's and
+the console's own sessions assuming the owner's role, each as its own
+ServiceAccount). A digest a newer release names as another ServiceAccount or
 other audiences loses the old ones at once. Each release records which of
 the trusted signers (each key, the keyless identity) verified it, and is
 listed only while one of them is still trusted: removing a key takes the

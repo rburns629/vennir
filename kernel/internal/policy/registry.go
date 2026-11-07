@@ -43,8 +43,9 @@ var (
 	sha256Pattern  = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 )
 
-// Registry is how this process reads the registry the release is in: a
-// Docker config (DOCKER_CONFIG, a mounted Secret's), its own cloud identity
+// Registry is how this process reads the registry the release is in: by
+// Federation, for its hosts (another install's catalog on another cloud);
+// a Docker config (DOCKER_CONFIG, a mounted Secret's), its own cloud identity
 // for Artifact Registry and GCR (the GKE metadata server's token) or ECR
 // (EKS Pod Identity), anonymously otherwise; and mirrors, a host to the
 // URL it's read from instead (kind's localhost:5001 is
@@ -54,6 +55,7 @@ type Registry struct {
 	Mirrors          map[string]string
 	GCPMetadataToken bool
 	ECRToken         bool
+	Federation       *Federation
 	Timeout          time.Duration
 
 	once     sync.Once
@@ -92,7 +94,11 @@ func (r *Registry) Options(ctx context.Context) []remote.Option {
 			_, mirrorHost, _ := strings.Cut(mirror, "://")
 			origins[mirrorHost] = host
 		}
-		chain := []authn.Keychain{authn.DefaultKeychain}
+		var chain []authn.Keychain
+		if r.Federation != nil {
+			chain = append(chain, newFederatedKeychain(*r.Federation, r.timeout()))
+		}
+		chain = append(chain, authn.DefaultKeychain)
 		if r.GCPMetadataToken {
 			chain = append(chain, &gcpMetadataKeychain{timeout: r.timeout()})
 		}

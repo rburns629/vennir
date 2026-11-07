@@ -215,6 +215,48 @@ func TestAnExternalCatalogIsReadByFederation(t *testing.T) {
 	}
 }
 
+// With kernel policy's own identity (a module that makes it), it verifies
+// another cloud's signed catalog itself, by federation of its own: the
+// owner's grant trusts its ServiceAccount beside the console's, and the
+// kernel chart gets the same provider, account or role the console does.
+func TestKernelPolicyReadsAnExternalCatalogByFederationOfItsOwn(t *testing.T) {
+	c := kindConfig()
+	c.Target, c.Namespace, c.Cluster.Name = "aws", "vennir-system", "vennir-eks"
+	cloud := &Cloud{Provider: "aws", TaskRegistry: "123456789012.dkr.ecr.us-east-1.amazonaws.com/vennir-products",
+		ClusterIssuer: "https://oidc.eks.us-east-1.amazonaws.com/id/ABC", PolicyRole: "arn:aws:iam::123456789012:role/vennir-eks-policy"}
+	c.ExternalCatalog.Registry = "us-central1-docker.pkg.dev/acyclix-dev/vennir-products"
+	c.CatalogSignature.PublicKey = "-----BEGIN PUBLIC KEY-----\nk\n-----END PUBLIC KEY-----\n"
+
+	grant := CatalogGrant(c, cloud)
+	if grant == nil || !strings.HasSuffix(grant.Command, " --subject system:serviceaccount:vennir-system:console-execution-console"+
+		" --policy-subject system:serviceaccount:vennir-system:kernel-execution-kernel-policy") || !strings.Contains(grant.Why, "kernel policy") {
+		t.Errorf("grant: %+v", grant)
+	}
+	c.ExternalCatalog.GCPWorkloadIdentityProvider = "projects/1/locations/global/workloadIdentityPools/vennir-installs/providers/vennir-eks"
+	policy, _ := KernelValues(c, Images{}, "", cloud)["catalogPolicy"].(map[string]any)
+	if policy["release"] != "us-central1-docker.pkg.dev/acyclix-dev/vennir-products/catalog-release:latest" ||
+		fmt.Sprint(policy["registry"]) != "map[ecrToken:true federation:map[gcp:map[serviceAccount: "+
+			"workloadIdentityProvider:projects/1/locations/global/workloadIdentityPools/vennir-installs/providers/vennir-eks] hosts:[us-central1-docker.pkg.dev]]]" {
+		t.Errorf("catalogPolicy: %v", policy)
+	}
+	// An ECR in another account, from GKE: the owner's role.
+	c.Target, c.Cluster.Name, c.GCP.Project = "gcp", "vennir-gke", "reader"
+	gke := &Cloud{Provider: "gcp", ClusterIssuer: "https://container.googleapis.com/v1/projects/reader/locations/us-central1/clusters/vennir-gke",
+		PolicyServiceAccount: "vennir-gke-policy@reader.iam.gserviceaccount.com"}
+	c.ExternalCatalog = config.ExternalCatalog{Registry: "123456789012.dkr.ecr.us-east-2.amazonaws.com/vennir-products",
+		AWSRoleArn: "arn:aws:iam::123456789012:role/vennir-reader-vennir-gke"}
+	policy, _ = KernelValues(c, Images{}, "", gke)["catalogPolicy"].(map[string]any)
+	if fmt.Sprint(policy["registry"]) != "map[federation:map[aws:map[roleArn:arn:aws:iam::123456789012:role/vennir-reader-vennir-gke] "+
+		"hosts:[123456789012.dkr.ecr.us-east-2.amazonaws.com]] gcpMetadataToken:true]" {
+		t.Errorf("catalogPolicy from GKE: %v", policy)
+	}
+	// Without a cluster issuer to federate from, it stays off.
+	gke.ClusterIssuer = ""
+	if KernelValues(c, Images{}, "", gke)["catalogPolicy"] != nil {
+		t.Error("on with no issuer")
+	}
+}
+
 // A GKE install (or an EKS one in another account) reading an Amazon ECR:
 // the owner's grant trusts its console's ServiceAccount, and with the
 // owner's role set the console assumes it, the kubelet pulling with ECR's

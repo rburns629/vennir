@@ -83,6 +83,9 @@ func TestReaderValidation(t *testing.T) {
 		{Reader{Name: "eks", ServiceAccounts: []string{"c@p.iam.gserviceaccount.com"}}, "aws", "an aws owner"},
 		{Reader{Name: "eks", ServiceAccounts: []string{"not-an-email"}}, "gcp", "service account's email"},
 		{Reader{Name: "eks", Issuer: "https://x", Subject: eks.Subject, ServiceAccounts: []string{"c@p.iam.gserviceaccount.com"}}, "gcp", "not both"},
+		{Reader{Name: "eks", Issuer: "https://x", Subject: eks.Subject, PolicySubject: "policy"}, "aws", "--policy-subject"},
+		{Reader{Name: "eks", Issuer: "https://x", Subject: eks.Subject, PolicySubject: eks.Subject}, "aws", "not the console's"},
+		{Reader{Name: "eks", ServiceAccounts: []string{"c@p.iam.gserviceaccount.com"}, PolicySubject: eks.Subject}, "gcp", "--service-account"},
 	} {
 		if err := c.r.Validate(c.target); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%+v: %v, want %q", c.r, err, c.want)
@@ -424,4 +427,79 @@ func indexOf(list []string, s string) int {
 		}
 	}
 	return -2
+}
+
+// The reader's kernel policy, which verifies the catalog itself: trusted
+// beside its console. A provider and role trusting the console alone are
+// updated in place; a principal of its own is granted read.
+func TestAGrantTrustsTheReadersKernelPolicyToo(t *testing.T) {
+	r := eks
+	r.PolicySubject = "system:serviceaccount:vennir-system:kernel-execution-kernel-policy"
+	if err := r.Validate("gcp"); err != nil {
+		t.Fatal(err)
+	}
+	consoleOnly := `{"state":"ACTIVE","attributeCondition":"assertion.sub=='system:serviceaccount:vennir-system:console-execution-console'",
+		"attributeMapping":{"google.subject":"\"vennir-eks:\"+assertion.sub"},"oidc":{"issuerUri":"https://oidc.eks.us-east-2.amazonaws.com/id/ABC"}}`
+	c := &cloud{answers: [][2]any{
+		{"auth list", "owner@example.com"}, {"get-iam-policy", fmt.Sprintf(`{"bindings":[{"role":"roles/artifactregistry.reader","members":[%q]}]}`, member)},
+		{"projects describe", "42"}, {"providers describe", consoleOnly}, {"workload-identity-pools describe", "ACTIVE"},
+	}}
+	p, err := PlanGCP(context.Background(), c.exec, owner, r, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if labels(p) != "Has,Will update,Has,Will grant" {
+		t.Fatalf("gcp: %s", labels(p))
+	}
+	update := strings.Join(find(t, p, "update-oidc").Args, " ")
+	if !strings.Contains(update, "--attribute-condition=assertion.sub in ['system:serviceaccount:vennir-system:console-execution-console', "+
+		"'system:serviceaccount:vennir-system:kernel-execution-kernel-policy']") {
+		t.Errorf("update-oidc: %s", update)
+	}
+	policyMember := "principal://iam.googleapis.com/" + pool + "/subject/vennir-eks:" + r.PolicySubject
+	if bind := strings.Join(find(t, p, "add-iam-policy-binding").Args, " "); !strings.Contains(bind, "--member="+policyMember) {
+		t.Errorf("binding: %s", bind)
+	}
+	// Revoked: both principals' read, and the provider.
+	c.answers = [][2]any{{"auth list", "owner@example.com"},
+		{"get-iam-policy", fmt.Sprintf(`{"bindings":[{"role":"roles/artifactregistry.reader","members":[%q,%q]}]}`, member, policyMember)},
+		{"projects describe", "42"}, {"providers describe", consoleOnly}, {"workload-identity-pools describe", "ACTIVE"}}
+	if p, err = PlanGCP(context.Background(), c.exec, owner, r, true); err != nil || labels(p) != "Will remove,Will remove,Will delete" {
+		t.Errorf("gcp revoke: %s %v", labels(p), err)
+	}
+
+	// AWS: a role trusting the console alone is this reader's, and its
+	// trust is set to both.
+	g := gke
+	g.PolicySubject = r.PolicySubject
+	host := "container.googleapis.com/v1/projects/reader/locations/us-central1/clusters/vennir-gke"
+	providerArn := "arn:aws:iam::123456789012:oidc-provider/" + host
+	c = &cloud{answers: [][2]any{
+		{"get-caller-identity", `{"Account":"123456789012","Arn":"arn:aws:iam::123456789012:user/owner"}`},
+		{"get-role-policy", `{"PolicyDocument":` + ReadPolicy("aws", "us-east-2", "123456789012", "vennir-products") + `}`},
+		{"get-role", role(t, TrustPolicy(providerArn, gke))},
+		{"get-open-id-connect-provider", `{"ClientIDList":["sts.amazonaws.com"]}`},
+	}}
+	p, err = PlanAWS(context.Background(), c.exec, awsOwner(), g, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if labels(p) != "Has,Will set,Has" {
+		t.Fatalf("aws: %s", labels(p))
+	}
+	args := find(t, p, "update-assume-role-policy").Args
+	var trust struct {
+		Statement []struct{ Condition map[string]map[string]any }
+	}
+	if err := json.Unmarshal([]byte(args[indexOf(args, "--policy-document")+1]), &trust); err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(trust.Statement[0].Condition["StringEquals"][host+":sub"]); got != "["+gke.Subject+" "+r.PolicySubject+"]" {
+		t.Errorf("trusts %s", got)
+	}
+	// Set so, granting again changes nothing.
+	c.answers[2] = [2]any{"get-role", role(t, TrustPolicy(providerArn, g))}
+	if p, err = PlanAWS(context.Background(), c.exec, awsOwner(), g, false, false); err != nil || p.Changes() {
+		t.Errorf("aws again: %s %v", labels(p), err)
+	}
 }

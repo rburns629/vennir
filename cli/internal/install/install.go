@@ -515,18 +515,22 @@ func catalogRelease(c *config.Config, cloud *Cloud) string {
 }
 
 // policyReadsExternal says whether kernel policy can read another
-// install's catalog as its own identity: on Google Cloud, an Artifact
-// Registry in another project, whose owner grants its service account read
+// install's catalog as itself: on Google Cloud, an Artifact Registry in
+// another project, whose owner grants its service account read
 // (CatalogGrant lists it), or in this one, as this install's task registry,
-// which its module grants it read on. Not by federation (the console's,
-// which kernel policy doesn't borrow), nor from AWS.
+// which its module grants it read on; or, by federation of its own (never
+// the console's), one on another cloud or in another AWS account, whose
+// owner's grant trusts its ServiceAccount beside the console's
+// (CatalogGrant's --policy-subject).
 func policyReadsExternal(c *config.Config, cloud *Cloud) bool {
 	e := c.ExternalCatalog
-	if e.Registry == "" || e.Federated() || cloud == nil || cloud.Provider != "gcp" || cloud.PolicyServiceAccount == "" ||
-		!config.IsArtifactRegistry(e.Registry) {
+	switch {
+	case e.Registry == "" || cloud == nil:
 		return false
+	case e.Federated():
+		return cloud.ClusterIssuer != ""
 	}
-	return true
+	return cloud.Provider == "gcp" && cloud.PolicyServiceAccount != "" && config.IsArtifactRegistry(e.Registry)
 }
 
 // gatewayTokenAudience is the audience the gateway's Google ID tokens are
@@ -567,16 +571,29 @@ func catalogPolicyValues(c *config.Config, cloud *Cloud) map[string]any {
 		p["newestVersion"] = true
 	}
 	gateway := map[string]any{"serviceAccount": ConsoleRelease + "-execution-console-gateway"}
+	var registry map[string]any
 	switch cloud.Provider {
 	case "gcp":
-		p["registry"] = map[string]any{"gcpMetadataToken": true}
+		registry = map[string]any{"gcpMetadataToken": true}
 		p["serviceAccountAnnotations"] = googleIdentity(cloud.PolicyServiceAccount)
 		gateway["gcpTokenAudience"] = gatewayTokenAudience(c)
 	case "aws":
-		p["registry"] = map[string]any{"ecrToken": true}
+		registry = map[string]any{"ecrToken": true}
 	default:
 		return nil
 	}
+	if e := c.ExternalCatalog; e.Registry != "" && e.Federated() {
+		// Its own federation, as the console chart's registryCheck says the
+		// console's (the same provider, account or role).
+		federation := map[string]any{"hosts": []string{strings.SplitN(e.Registry, "/", 2)[0]}}
+		if e.GCPWorkloadIdentityProvider != "" {
+			federation["gcp"] = map[string]any{"workloadIdentityProvider": e.GCPWorkloadIdentityProvider, "serviceAccount": e.GCPServiceAccount}
+		} else {
+			federation["aws"] = map[string]any{"roleArn": e.AWSRoleArn}
+		}
+		registry["federation"] = federation
+	}
+	p["registry"] = registry
 	if c.Gateway.Enabled {
 		p["gateway"] = gateway
 	}
@@ -1299,6 +1316,13 @@ func ConsoleSubject(c *config.Config) string {
 	return fmt.Sprintf("system:serviceaccount:%s:%s-execution-console", c.Namespace, ConsoleRelease)
 }
 
+// PolicySubject is kernel policy's ServiceAccount as its tokens name it
+// (the kernel chart's catalog-policy.yaml), which a federated owner's grant
+// trusts beside the console's.
+func PolicySubject(c *config.Config) string {
+	return fmt.Sprintf("system:serviceaccount:%s:%s-execution-kernel-policy", c.Namespace, KernelRelease)
+}
+
 // Grant is what the catalog registry's owner runs, in its own environment,
 // to let this install read the catalog (`vennir catalog grant`), and what
 // this install does after.
@@ -1355,21 +1379,27 @@ func CatalogGrant(c *config.Config, cloud *Cloud) *Grant {
 		return nil
 	}
 	set := ""
+	// What the reader is set to once it sets what the grant prints.
+	after := *c
 	switch {
 	case config.IsArtifactRegistry(e.Registry):
 		set = "vennir config set externalCatalog.gcpWorkloadIdentityProvider <the provider it prints>"
+		after.ExternalCatalog.GCPWorkloadIdentityProvider = "<the provider it prints>"
 	default:
 		if account, _, _ := config.ECRRegistry(e.Registry); account == "" {
 			return nil
 		}
 		set = "vennir config set externalCatalog.awsRoleArn <the role it prints>"
+		after.ExternalCatalog.AWSRoleArn = "<the role it prints>"
 	}
-	return &Grant{
-		Why: "sign in to it with no stored key, as this cluster's console alone",
-		Command: fmt.Sprintf("vennir catalog grant --reader %s --issuer %s --subject %s",
-			reader, cloud.ClusterIssuer, ConsoleSubject(c)),
-		Then: []string{set, "vennir apply"},
+	why := "sign in to it with no stored key, as this cluster's console alone"
+	command := fmt.Sprintf("vennir catalog grant --reader %s --issuer %s --subject %s", reader, cloud.ClusterIssuer, ConsoleSubject(c))
+	// kernel policy will verify the signed release itself, by federation of its own.
+	if catalogPolicyValues(&after, cloud) != nil {
+		why = "sign in to it with no stored key, as this cluster's console and kernel policy alone"
+		command += " --policy-subject " + PolicySubject(c)
 	}
+	return &Grant{Why: why, Command: command, Then: []string{set, "vennir apply"}}
 }
 
 // releaseTag is the tag of the catalog's release the console reads: a

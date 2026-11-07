@@ -247,6 +247,17 @@ spec:
             secretName: {{ . | quote }}
             items: [{key: .dockerconfigjson, path: config.json}]
         {{- end }}
+        {{- with include "execution-kernel.policyFederationAudience" . }}
+        # Its own token for the other side alone (Google's Workload Identity
+        # provider, or AWS STS), so it's no use against the Kubernetes API.
+        - name: federation-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ . | quote }}
+                  expirationSeconds: 3600
+                  path: token
+        {{- end }}
       {{- if .Values.postgres.enabled }}
       initContainers:
         - name: wait-for-postgres
@@ -269,6 +280,9 @@ spec:
             {{- include "execution-kernel.tlsCaMount" . | nindent 12 }}
             {{- if $c.registry.authSecret }}
             - {name: registry-auth, mountPath: /etc/vennir/registry, readOnly: true}
+            {{- end }}
+            {{- if include "execution-kernel.policyFederationAudience" . }}
+            - {name: federation-token, mountPath: /var/run/vennir/federation, readOnly: true}
             {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/usr/local/bin/kernel", "policy"]

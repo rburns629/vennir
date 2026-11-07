@@ -99,6 +99,26 @@ refused "refused without identityPolicy"   "needs identityPolicy.enabled" "${on[
 refused "refused without a release"        "catalogPolicy.release"        --set catalogPolicy.enabled=true --set 'catalogPolicy.signature.publicKeys[0]=k'
 refused "refused with no signer to trust"  "catalogPolicy.signature"      --set catalogPolicy.enabled=true --set catalogPolicy.release=r/c:l
 
+# Another install's catalog by federation: its own token, projected for
+# the other side alone, and the settings that say where; one side only.
+gcp_fed=(--set catalogPolicy.registry.federation.gcp.workloadIdentityProvider=projects/1/locations/global/workloadIdentityPools/p/providers/q
+  --set catalogPolicy.registry.federation.gcp.serviceAccount=reader@owner.iam.gserviceaccount.com
+  --set 'catalogPolicy.registry.federation.hosts[0]=us-central1-docker.pkg.dev')
+policy() { helm template kernel helm/charts/execution-kernel "${on[@]}" "$@" --show-only templates/catalog-policy.yaml --show-only templates/configmap.yaml 2>&1; }
+fed=$(policy "${gcp_fed[@]}")
+if grep -q 'audience: "https://iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/q"' <<<"$fed" &&
+  grep -q 'mountPath: /var/run/vennir/federation' <<<"$fed" && grep -qF 'CATALOG_POLICY_FEDERATION_HOSTS: "[\"us-central1-docker.pkg.dev\"]"' <<<"$fed" &&
+  grep -q 'CATALOG_POLICY_FEDERATION_TOKEN_FILE: /var/run/vennir/federation/token' <<<"$fed"; then ok "federation to Google: its token, for the provider"
+else fail "federation to Google" "$(grep -n 'federation\|FEDERATION\|audience' <<<"$fed" | head)"; fi
+aws_fed=$(policy --set catalogPolicy.registry.federation.aws.roleArn=arn:aws:iam::111111111111:role/r \
+  --set 'catalogPolicy.registry.federation.hosts[0]=111111111111.dkr.ecr.us-east-2.amazonaws.com')
+grep -q 'audience: "sts.amazonaws.com"' <<<"$aws_fed" && ok "federation to AWS: its token, for STS" || fail "federation to AWS" "no STS audience"
+! grep -qi 'federation' <<<"$(policy)" && ok "no federation: no token, no settings" || fail "no federation" "rendered some"
+grep -q "not both" <<<"$(policy "${gcp_fed[@]}" --set catalogPolicy.registry.federation.aws.roleArn=arn:aws:iam::111111111111:role/r)" \
+  && ok "federation refused: both sides" || fail "federation, both sides" "rendered"
+grep -q "federation.hosts" <<<"$(policy --set catalogPolicy.registry.federation.gcp.workloadIdentityProvider=p)" \
+  && ok "federation refused: no hosts" || fail "federation, no hosts" "rendered"
+
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES case(s) failed"
   exit 1

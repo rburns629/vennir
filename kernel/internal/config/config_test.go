@@ -266,3 +266,38 @@ func TestTheCatalogPolicyNeedsASignerAndItsPolicy(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// Federation names one other side, its hosts and the projected token.
+func TestTheCatalogPolicysFederation(t *testing.T) {
+	gcp := map[string]string{"CATALOG_POLICY_FEDERATION_GCP_PROVIDER": "projects/1/locations/global/workloadIdentityPools/p/providers/q",
+		"CATALOG_POLICY_FEDERATION_GCP_SERVICE_ACCOUNT": "reader@owner.iam.gserviceaccount.com",
+		"CATALOG_POLICY_FEDERATION_HOSTS":               `["us-central1-docker.pkg.dev"]`, "CATALOG_POLICY_FEDERATION_TOKEN_FILE": "/var/run/federation/token"}
+	s, err := load(t, gcp)
+	if err != nil || s.CatalogPolicyFederationHosts[0] != "us-central1-docker.pkg.dev" || s.CatalogPolicyFederationGCPServiceAccount == "" {
+		t.Fatalf("%+v, %v", s, err)
+	}
+	with := func(change map[string]string) map[string]string {
+		env := map[string]string{}
+		for k, v := range gcp {
+			env[k] = v
+		}
+		for k, v := range change {
+			if v == "" {
+				delete(env, k)
+			} else {
+				env[k] = v
+			}
+		}
+		return env
+	}
+	for name, env := range map[string]map[string]string{
+		"both sides":          with(map[string]string{"CATALOG_POLICY_FEDERATION_AWS_ROLE_ARN": "arn:aws:iam::111111111111:role/r"}),
+		"no hosts":            with(map[string]string{"CATALOG_POLICY_FEDERATION_HOSTS": ""}),
+		"no token":            with(map[string]string{"CATALOG_POLICY_FEDERATION_TOKEN_FILE": ""}),
+		"an account, no pool": {"CATALOG_POLICY_FEDERATION_GCP_SERVICE_ACCOUNT": "reader@owner.iam.gserviceaccount.com"},
+	} {
+		if _, err := load(t, env); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
