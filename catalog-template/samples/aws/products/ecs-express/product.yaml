@@ -28,9 +28,6 @@ tokenAudiences:
 check: check
 actions:
 - name: create
-  # Off EKS, its own role (README.md, Credentials): a template's, the
-  # Catalog's and a Delete's steps get only what an action lists here.
-  # secretRefs: [{name: aws-ecs-express-role, keys: [role-arn]}]
   # Finds the service before creating it, so a step that failed on the
   # platform's side is retried, up to three attempts in all, and waits
   # again.
@@ -124,6 +121,10 @@ actions:
             name: {type: string}
             link: {type: string}
   secretRefs:
+  # Off EKS, its own role (README.md, Credentials): a template's, the
+  # Catalog's and a Delete's steps get only what an action lists here.
+  # - name: aws-ecs-express-role
+  #   keys: [role-arn]
   - name: ecs-express
     keys: [image-registry, execution-role-arn, infrastructure-role-arn]
     description: >-
@@ -166,9 +167,6 @@ actions:
   idempotent: true   # it only asks
   maxAttempts: 2
   script: actions/check.py
-  # Off EKS, it signs in as its own role: list that role's secret here so
-  # the check does as the actions do (README.md, Credentials).
-  # secretRefs: [{name: aws-ecs-express-role, keys: [role-arn]}]
   input:
     type: object
     additionalProperties: false
@@ -186,6 +184,10 @@ actions:
         items: {type: string}
       detail: {type: string, title: Detail}
   secretRefs:
+  # Off EKS, it signs in as its own role: list that role's secret here so
+  # the check does as the actions do (README.md, Credentials).
+  # - name: aws-ecs-express-role
+  #   keys: [role-arn]
   - name: ecs-express
     keys: [image-registry, execution-role-arn, infrastructure-role-arn]
     description: Whether the team chose its registry and roles, and the region it asks in.

@@ -99,13 +99,44 @@ API on the internet. The docs say what users must do meanwhile.
   releases are uninstalled and the cluster deleted before GKE's Ingress
   controller removes its network endpoint groups and certificate, so the
   network's delete fails. Delete the Ingress and wait until its NEGs are
-  gone first. And running `destroy` again after a failure isn't safe: its
+  gone first, then the ManagedCertificate (its `mcrt-` certificate stays
+  until it's gone): done by hand in the second run (below), `destroy` then
+  went through first time. And running `destroy` again after a failure isn't safe: its
   targeted apply recreated the backups bucket, then failed on the
   `backup` output (`google_service_account.backup[0]` of an empty tuple).
   `docs/setup.md` says how to finish by hand meanwhile.
 - [ ] **`vennir logs --execution`** fails once a step's Pods are cleaned up
   (about a minute) without `logs.enabled`: fall back to what the console
   keeps of the run, or say so in its error.
+
+## Found in the second GCP-to-AWS run (2026-11-07)
+
+From the 0.13.2 release on GKE Autopilot again: `ecs-express` from main in
+the catalog, a hello API's backend on ECS Express Mode made by a member's
+template run, published through the gateway to the internet. The docs say
+what users must do meanwhile (the gateway guide's ECS section).
+
+- [ ] **Rolling out a new version of an app**: `ecs-express`'s and
+  `app-hosting`'s `create` return a service they find unchanged, so a new
+  image, environment or size means delete and create again (and, on ECS, a
+  new URL and an API pull request). Have create bring a service its team
+  made to the inputs it's given (ECS `UpdateExpressGatewayService`, Cloud
+  Run a new revision). It would also let a backend be given its own URL.
+- [ ] **An API outlives its backend**: Delete in What runs made deletes an
+  ECS service the API still forwards to. An API whose `backend.url` comes
+  from a run's resource, or at least a warning on Delete when a published
+  API names the resource's URL.
+- [ ] **A reinstall for an existing catalog**: `vennir apply` made a new
+  identity pool and left the catalog repository's
+  `GCP_WORKLOAD_IDENTITY_PROVIDER` naming the deleted one, so main's CI
+  failed to sign in and the console said only "the registry answered 404".
+  Apply should say to run `vennir catalog create <env>` (which fixed it)
+  when the repository's variables aren't this install's, or set them.
+- [ ] **A gateway backend sample on ECS**: `examples/greetings-api` answers
+  its health check 204 (ECS counts only 200) and needs its audience
+  configured, which an ECS backend can't know before create; the run used
+  a copy with a 200 `/healthz` and the audience from `Host`. A sample API
+  in `samples/aws` with such a backend.
 
 ## Found in the billed run (2026-10-31 and 2026-11-01)
 
