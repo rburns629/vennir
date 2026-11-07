@@ -83,14 +83,11 @@ API on the internet. The docs say what users must do meanwhile.
   (and to `RunAction`'s), or have validate warn when a required step input
   comes from an optional parameter.
 - [ ] **Off EKS, the AWS samples' checks ask in us-east-1**: no cluster
-  region, and nothing sets `AWS_REGION` for steps. Read the region from
+  region, and nothing sets `AWS_REGION` for steps (`ecs-express` asks in
+  its team's ECR registry's region first). Read the region from
   the team (a `region` key beside `role-arn`), and on an explicit deny
   say whether an organization policy or a boundary refused it, not "for
   role ...".
-- [ ] **Replace `app-runner` in `samples/aws`**: AWS lets no new account
-  create App Runner services, and its check (ListServices) can't tell.
-  ECS Express Mode, or a Lambda function with a function URL; the sample
-  DAG and Deploy to AWS's table with it.
 - [ ] **`vennir apply`'s screens**: the approval screen lists neither the
   gateway (internet teams, backend hosts) nor a layered values file, nor
   their cost (a GKE forwarding rule, about $18 a month); its closing

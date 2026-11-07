@@ -184,7 +184,7 @@ teams/team-a/products/hello/
 
 Each sample builds, passes its tests and passes CI's security scan exactly as it is, and CI checks that on every change to `templates/`, so a copy starts from green. Every line you must change is marked `CHANGE`.
 
-For a real cloud product, the catalog's `samples/gcp` and `samples/aws` teams have working examples that create projects, Cloud Run services, Cloud SQL instances, S3 buckets, App Runner services and RDS databases; they call real cloud APIs and cost money. [Deploy to Google Cloud](19-deploy-to-gcp.md) and [Deploy to AWS](20-deploy-to-aws.md) take you through them.
+For a real cloud product, the catalog's `samples/gcp` and `samples/aws` teams have working examples that create projects, Cloud Run services, Cloud SQL instances, S3 buckets, ECS Express services and RDS databases; they call real cloud APIs and cost money. [Deploy to Google Cloud](19-deploy-to-gcp.md) and [Deploy to AWS](20-deploy-to-aws.md) take you through them.
 
 ## Guardrails
 

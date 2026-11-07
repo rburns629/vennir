@@ -1,4 +1,4 @@
-"""Tests for aws/app-runner's check action, with boto3 mocked, so they run
+"""Tests for aws/ecs-express's check action, with boto3 mocked, so they run
 without an AWS account. `./vennir catalog check` runs them in the product's
 own image with its python3 (unittest, no pytest).
 """
@@ -13,70 +13,89 @@ from unittest.mock import MagicMock, patch
 from botocore.exceptions import ClientError, NoCredentialsError
 
 _MODULE_PATH = Path(__file__).parent / "check.py"
-ROLE_SESSION = "arn:aws:sts::123456789012:assumed-role/aws-app-runner/eks-session"
+ROLE_SESSION = "arn:aws:sts::123456789012:assumed-role/aws-ecs-express/eks-session"
 TARGET = "arn:aws:iam::123456789012:role/acts-as"
 
 
 def _load_check_module():
-    spec = importlib.util.spec_from_file_location("aws_app_runner_check", _MODULE_PATH)
+    spec = importlib.util.spec_from_file_location("aws_ecs_express_check", _MODULE_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-def _denied(operation: str) -> ClientError:
-    return ClientError({"Error": {"Code": "AccessDeniedException", "Message": "not allowed"}}, operation)
+def _error(code: str, operation: str = "DescribeExpressGatewayService") -> ClientError:
+    return ClientError({"Error": {"Code": code, "Message": "test"}}, operation)
 
 
 class CheckActionTest(unittest.TestCase):
+    region = "eu-west-1"
+
     def setUp(self) -> None:
         self.module = _load_check_module()
         self.tmp_dir = tempfile.TemporaryDirectory()
-        self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
-        self.module.TARGET_ROLE_FILE = Path(self.tmp_dir.name) / "role-arn"
-        self.module.OWN_ROLE_FILE = Path(self.tmp_dir.name) / "own-role-arn"
-        self.module.TOKEN_FILE = Path(self.tmp_dir.name) / "sts.amazonaws.com"
+        tmp = Path(self.tmp_dir.name)
+        self.module.OUTPUT_PATH = tmp / "result.json"
+        self.module.TARGET_ROLE_FILE = tmp / "role-arn"
+        self.module.OWN_ROLE_FILE = tmp / "own-role-arn"
+        self.module.TOKEN_FILE = tmp / "sts.amazonaws.com"
+        self.module.SETTINGS_DIR = tmp / "ecs-express"
+        self.module.SETTINGS_DIR.mkdir()
+        for key in self.module.SETTINGS:
+            (self.module.SETTINGS_DIR / key).write_text(f"the {key}")
         # The default credentials: on EKS, Pod Identity's; off EKS, None.
         self.credentials = MagicMock()
-        self.sts, self.apprunner = MagicMock(), MagicMock()
+        self.sts, self.ecs = MagicMock(), MagicMock()
         self.sts.get_caller_identity.return_value = {"Arn": ROLE_SESSION, "Account": "123456789012"}
         self.sts.assume_role.return_value = {
-            "AssumedRoleUser": {"Arn": "arn:aws:sts::123456789012:assumed-role/acts-as/vennir-check"},
+            "AssumedRoleUser": {"Arn": "arn:aws:sts::210987654321:assumed-role/acts-as/vennir-check"},
             "Credentials": {"AccessKeyId": "AKIAEXAMPLE", "SecretAccessKey": "not-a-secret", "SessionToken": "token"},
         }
+        # The service it asks about doesn't exist: it was allowed to ask.
+        self.ecs.describe_express_gateway_service.side_effect = _error("ClusterNotFoundException")
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
 
     def _run(self) -> tuple[int, dict]:
-        clients = {"sts": self.sts, "apprunner": self.apprunner}
+        clients = {"sts": self.sts, "ecs": self.ecs}
         with patch.object(self.module.boto3.session, "Session") as session_cls:
-            session_cls.return_value.region_name = "eu-west-1"
+            session_cls.return_value.region_name = self.region
             session_cls.return_value.get_credentials.return_value = self.credentials
             session_cls.return_value.client.side_effect = lambda name, **_: clients[name]
             exit_code = self.module.main()
         self.session_cls = session_cls
         return exit_code, json.loads(self.module.OUTPUT_PATH.read_text())
 
-    def test_ready_when_its_role_may_list_services(self) -> None:
+    def test_ready_when_its_role_may_describe_services_and_the_team_chose(self) -> None:
         exit_code, result = self._run()
         self.assertEqual(exit_code, 0)
         self.assertEqual(result["outputs"], {
             "ready": True, "principal": ROLE_SESSION, "missing": [],
-            "detail": "It may list App Runner services in eu-west-1.",
+            "detail": "It may describe ECS Express services in eu-west-1, and the team chose its registry and roles.",
         })
-        self.apprunner.list_services.assert_called_once_with(MaxResults=1)
+        self.ecs.describe_express_gateway_service.assert_called_once_with(
+            serviceArn="arn:aws:ecs:eu-west-1:123456789012:service/default/vennir-readiness-check")
         # It only asks.
-        self.apprunner.create_service.assert_not_called()
-        self.apprunner.delete_service.assert_not_called()
+        self.ecs.create_express_gateway_service.assert_not_called()
+        self.ecs.delete_express_gateway_service.assert_not_called()
 
     def test_names_what_its_role_lacks(self) -> None:
-        self.apprunner.list_services.side_effect = _denied("ListServices")
+        self.ecs.describe_express_gateway_service.side_effect = _error("AccessDeniedException")
         _, result = self._run()
         self.assertFalse(result["outputs"]["ready"])
         self.assertEqual(
             result["outputs"]["missing"],
-            ["apprunner:ListServices (and the README's other App Runner actions) for role aws-app-runner"],
+            ["ecs:DescribeExpressGatewayService (and the README's other ECS actions) for role aws-ecs-express"],
+        )
+
+    def test_without_the_teams_secret_it_is_not_ready(self) -> None:
+        (self.module.SETTINGS_DIR / "infrastructure-role-arn").unlink()
+        _, result = self._run()
+        self.assertFalse(result["outputs"]["ready"])
+        self.assertEqual(
+            result["outputs"]["missing"],
+            ["the team secret ecs-express, with image-registry, execution-role-arn and infrastructure-role-arn"],
         )
 
     def test_without_credentials_it_is_not_ready(self) -> None:
@@ -86,36 +105,67 @@ class CheckActionTest(unittest.TestCase):
         self.assertFalse(result["outputs"]["ready"])
         self.assertEqual(
             result["outputs"]["missing"],
-            ["an IAM role for ServiceAccount aws-app-runner (an EKS Pod Identity association, or IRSA; off EKS, its aws-app-runner-role secret)"],
+            ["an IAM role for ServiceAccount aws-ecs-express (an EKS Pod Identity association, or IRSA; off EKS, its aws-ecs-express-role secret)"],
         )
 
-    def test_acts_as_the_target_role_and_never_reports_its_keys(self) -> None:
+    def test_acts_as_the_target_role_in_its_account_and_never_reports_its_keys(self) -> None:
         self.module.TARGET_ROLE_FILE.write_text(TARGET + "\n")
         _, result = self._run()
         self.assertTrue(result["outputs"]["ready"])
-        self.assertEqual(result["outputs"]["principal"], "arn:aws:sts::123456789012:assumed-role/acts-as/vennir-check")
+        self.assertEqual(result["outputs"]["principal"], "arn:aws:sts::210987654321:assumed-role/acts-as/vennir-check")
         self.sts.assume_role.assert_called_once_with(RoleArn=TARGET, RoleSessionName="vennir-check")
+        self.ecs.describe_express_gateway_service.assert_called_once_with(
+            serviceArn="arn:aws:ecs:eu-west-1:210987654321:service/default/vennir-readiness-check")
         text = self.module.OUTPUT_PATH.read_text()
         for value in ("AKIAEXAMPLE", "not-a-secret", "token"):
             self.assertNotIn(value, text)
 
     def test_a_target_role_it_may_not_assume_is_missing(self) -> None:
         self.module.TARGET_ROLE_FILE.write_text(TARGET)
-        self.sts.assume_role.side_effect = ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "AssumeRole")
+        self.sts.assume_role.side_effect = _error("AccessDenied", "AssumeRole")
         _, result = self._run()
         self.assertFalse(result["outputs"]["ready"])
         self.assertEqual(
             result["outputs"]["missing"],
-            [f"sts:AssumeRole on {TARGET} for role aws-app-runner, allowed by {TARGET}'s trust policy"],
+            [f"sts:AssumeRole on {TARGET} for role aws-ecs-express, allowed by {TARGET}'s trust policy"],
         )
 
     def test_an_outage_is_a_failure_not_an_answer(self) -> None:
-        self.apprunner.list_services.side_effect = ClientError(
-            {"Error": {"Code": "ServiceUnavailable"}, "ResponseMetadata": {"HTTPStatusCode": 503}}, "ListServices")
+        self.ecs.describe_express_gateway_service.side_effect = ClientError(
+            {"Error": {"Code": "ServerException"}, "ResponseMetadata": {"HTTPStatusCode": 503}}, "DescribeExpressGatewayService")
         exit_code, result = self._run()
         self.assertEqual(exit_code, 1)
         self.assertEqual(result["error"]["code"], "AWS_API_ERROR")
         self.assertTrue(result["error"]["retryable"])
+
+
+class RegionTest(unittest.TestCase):
+    """Off EKS there's no cluster region: it asks in the team registry's."""
+
+    def setUp(self) -> None:
+        self.module = _load_check_module()
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.module.SETTINGS_DIR = Path(self.tmp_dir.name)
+
+    def tearDown(self) -> None:
+        self.tmp_dir.cleanup()
+
+    def _region(self, registry: str | None, cluster_region: str | None = None) -> str:
+        if registry is not None:
+            (self.module.SETTINGS_DIR / "image-registry").write_text(registry)
+        with patch.object(self.module.boto3.session, "Session") as session_cls:
+            session_cls.return_value.region_name = cluster_region
+            return self.module._region()
+
+    def test_the_clusters_region_first(self) -> None:
+        self.assertEqual(self._region("123456789012.dkr.ecr.us-east-2.amazonaws.com/web", "eu-west-1"), "eu-west-1")
+
+    def test_then_an_ecr_registrys(self) -> None:
+        self.assertEqual(self._region("123456789012.dkr.ecr.us-east-2.amazonaws.com/web"), "us-east-2")
+
+    def test_else_us_east_1(self) -> None:
+        self.assertEqual(self._region("public.ecr.aws/nginx"), "us-east-1")
+        self.assertEqual(self._region(None), "us-east-1")
 
 
 class OffEKSCheckTest(unittest.TestCase):
@@ -123,6 +173,7 @@ class OffEKSCheckTest(unittest.TestCase):
 
     _run = CheckActionTest._run
     tearDown = CheckActionTest.tearDown
+    region = "eu-west-1"
     OWN = "arn:aws:iam::123456789012:role/own"
 
     def setUp(self) -> None:
@@ -144,8 +195,7 @@ class OffEKSCheckTest(unittest.TestCase):
         self.sts.assume_role.assert_not_called()
 
     def test_a_role_that_doesnt_trust_it_is_not_ready(self) -> None:
-        self.sts.assume_role_with_web_identity.side_effect = ClientError(
-            {"Error": {"Code": "AccessDenied", "Message": "no"}}, "AssumeRoleWithWebIdentity")
+        self.sts.assume_role_with_web_identity.side_effect = _error("AccessDenied", "AssumeRoleWithWebIdentity")
         exit_code, result = self._run()
         self.assertEqual(exit_code, 0)
         self.assertFalse(result["outputs"]["ready"])

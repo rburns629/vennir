@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""aws/app-runner's "check" action: whether it's ready on this install
+"""aws/ecs-express's "check" action: whether it's ready on this install
 (product.yaml's check). Changes nothing.
 
-Run by the console with no inputs, as this product's identity. It signs in
+Run by the console with no inputs, as this product's identity. It looks for
+the team's ecs-express secret (create can do nothing without it), signs in
 the way create does (boto3's default chain: EKS Pod Identity or IRSA, or
 off EKS its own role by web identity; then the aws-target role when the
-team's secret is mounted), asks STS who it is,
-then lists App Runner services (one), the first call create makes, to find
-out whether its role allows it. create's region is per run, so it asks in
-the cluster's own region (AWS_REGION), or us-east-1. The other App Runner
-actions in the aws team's README.md have no read-only form, so only a
-create finds those out. Reports what's missing as what to grant its role.
+team's secret is mounted), asks STS who it is, then describes a service
+that doesn't exist, the first call create makes: "not found" means its
+role may describe services, "denied" that it may not. It asks in the
+cluster's own region (AWS_REGION), else the region of the team's registry
+when that's an ECR one, else us-east-1, since create's region is per run.
+The other actions in the aws team's README.md have no read-only form, so
+only a create finds those out. Reports what's missing as what to grant.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -26,21 +29,30 @@ from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 OUTPUT_PATH = Path("/platform/output/result.json")
 
 # product.yaml's serviceAccount: the Kubernetes identity bound to its IAM role.
-SERVICE_ACCOUNT = "aws-app-runner"
+SERVICE_ACCOUNT = "aws-ecs-express"
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 # Off EKS (GKE, AKS), with no default credentials: this product's own role,
 # as EKS Pod Identity would bind it there, named by the team secret
-# aws-app-runner-role (key role-arn) and assumed by web identity with the step's
-# own token (product.yaml's tokenAudiences). The role trusts this cluster's
-# issuer for this product's ServiceAccount alone (the aws team's README.md,
-# AWS from another cluster).
-OWN_ROLE_FILE = Path("/platform/secrets/aws-app-runner-role/role-arn")
+# aws-ecs-express-role (key role-arn) and assumed by web identity with the
+# step's own token (product.yaml's tokenAudiences). The role trusts this
+# cluster's issuer for this product's ServiceAccount alone (the aws team's
+# README.md, AWS from another cluster).
+OWN_ROLE_FILE = Path("/platform/secrets/aws-ecs-express-role/role-arn")
 TOKEN_FILE = Path("/platform/tokens/sts.amazonaws.com")
+# The team's secret ecs-express, as create reads it.
+SETTINGS_DIR = Path("/platform/secrets/ecs-express")
+SETTINGS = ("image-registry", "execution-role-arn", "infrastructure-role-arn")
 # What STS says when a role's trust doesn't take the token.
 UNTRUSTED = {"InvalidIdentityToken", "IDPRejectedClaim"}
-# Where it asks when the cluster names no region.
+# Where it asks when neither the cluster nor the registry names a region.
 FALLBACK_REGION = "us-east-1"
+ECR_REGION = re.compile(r"^[0-9]{12}\.dkr\.ecr\.([a-z0-9-]+)\.amazonaws\.com(/|$)")
 DENIED = {"AccessDenied", "AccessDeniedException", "UnauthorizedOperation"}
+# What ECS says of the service it asks about, which doesn't exist: it was
+# allowed to ask.
+NOT_FOUND = {"ResourceNotFoundException", "ServiceNotFoundException", "ClusterNotFoundException"}
+# A name no create makes (service names start with a letter or digit).
+PROBE_NAME = "vennir-readiness-check"
 
 
 def _write_result(result: dict[str, Any]) -> None:
@@ -72,8 +84,23 @@ def _role(arn: str) -> str:
     return f"role {parts[1]}" if parts[0] == "assumed-role" and len(parts) > 1 else arn
 
 
+def _setting(key: str) -> str:
+    path = SETTINGS_DIR / key
+    return path.read_text().strip() if path.exists() else ""
+
+
+def _region() -> str:
+    """The cluster's region, else the team registry's (an ECR one names
+    it), else FALLBACK_REGION."""
+    region = boto3.session.Session().region_name
+    if region:
+        return region
+    match = ECR_REGION.match(_setting("image-registry"))
+    return match.group(1) if match else FALLBACK_REGION
+
+
 def main() -> int:
-    region = boto3.session.Session().region_name or FALLBACK_REGION
+    region = _region()
     no_identity = f"Kubernetes ServiceAccount {SERVICE_ACCOUNT}, with no AWS identity"
     try:
         session = boto3.session.Session(region_name=region)
@@ -99,7 +126,7 @@ def main() -> int:
                 region_name=region,
             )
         try:
-            principal = session.client("sts").get_caller_identity()["Arn"]
+            caller = session.client("sts").get_caller_identity()
         except NoCredentialsError:
             return _answer(False, no_identity,
                            [f"an IAM role for ServiceAccount {SERVICE_ACCOUNT} (an EKS Pod Identity association, or IRSA; off EKS, its {SERVICE_ACCOUNT}-role secret)"],
@@ -109,6 +136,7 @@ def main() -> int:
             return _answer(False, no_identity,
                            [f"an IAM role for ServiceAccount {SERVICE_ACCOUNT} whose trust policy lets it in"],
                            f"Couldn't sign in: {_code(error)}: {details.get('Message', '')[:300]}")
+        principal, account = caller["Arn"], caller["Account"]
 
         target = TARGET_ROLE_FILE.read_text().strip() if TARGET_ROLE_FILE.exists() else ""
         if target:
@@ -123,6 +151,7 @@ def main() -> int:
                                [f"sts:AssumeRole on {target} for {_role(principal)}, allowed by {target}'s trust policy"],
                                "It can sign in, but can't act as the aws-target role.")
             principal = credentials["AssumedRoleUser"]["Arn"]
+            account = principal.split(":")[4]
             keys = credentials["Credentials"]
             session = boto3.session.Session(
                 aws_access_key_id=keys["AccessKeyId"],
@@ -132,12 +161,18 @@ def main() -> int:
             )
 
         missing: list[str] = []
+        if not all(_setting(key) for key in SETTINGS):
+            missing.append("the team secret ecs-express, with image-registry, execution-role-arn and infrastructure-role-arn")
+        partition = principal.split(":")[1]
         try:
-            session.client("apprunner").list_services(MaxResults=1)
+            session.client("ecs").describe_express_gateway_service(
+                serviceArn=f"arn:{partition}:ecs:{region}:{account}:service/default/{PROBE_NAME}"
+            )
         except ClientError as error:
-            if _code(error) not in DENIED:
+            if _code(error) in DENIED:
+                missing.append(f"ecs:DescribeExpressGatewayService (and the README's other ECS actions) for {_role(principal)}")
+            elif _code(error) not in NOT_FOUND:
                 raise
-            missing.append(f"apprunner:ListServices (and the README's other App Runner actions) for {_role(principal)}")
     except ClientError as error:
         details = error.response.get("Error", {})
         status = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)
@@ -146,8 +181,8 @@ def main() -> int:
         return _failure("AWS_API_ERROR", str(error), retryable=True)
 
     if missing:
-        return _answer(False, principal, missing, f"It can sign in, but may not use App Runner in {region}.")
-    return _answer(True, principal, [], f"It may list App Runner services in {region}.")
+        return _answer(False, principal, missing, f"It can sign in, but isn't ready to deploy to ECS in {region}.")
+    return _answer(True, principal, [], f"It may describe ECS Express services in {region}, and the team chose its registry and roles.")
 
 
 if __name__ == "__main__":

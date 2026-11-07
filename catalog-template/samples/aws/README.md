@@ -9,7 +9,7 @@ SecretStore isn't proven yet.
 | Product | What `create` does |
 |---|---|
 | [`s3-bucket`](products/s3-bucket/) | Finds a bucket by name, or creates it with all public access blocked. A name another account owns fails with `BUCKET_NAME_TAKEN` |
-| [`app-runner`](products/app-runner/) | Deploys an image (ECR or ECR Public) as an App Runner service and waits for it to run, or returns the existing service's URL once it runs. Private unless `public: true`. AWS no longer lets an account that hasn't used App Runner create services ("Account … can't create new App Runner services", seen 2026-11-07), though the check says ready |
+| [`ecs-express`](products/ecs-express/) | Deploys an image from the team's registry as an ECS Express Mode service, AWS's counterpart to Cloud Run (Fargate tasks behind a load balancer AWS manages, at an HTTPS URL), and waits for it to serve, or returns the existing service's URL. Run with the roles the team chose ([Hosting an app](#hosting-an-app-ecs-express)) |
 | [`rds-postgres`](products/rds-postgres/) | Finds an RDS for PostgreSQL instance, or creates it (encrypted, not public) and waits until it's available, several minutes: set `timeoutSeconds` to 1500 or more, and delete it after |
 | [`caller-identity`](products/caller-identity/) | `whoami`: signs in as a role with the step's own projected ServiceAccount token, from a cluster that isn't EKS (GKE, AKS, kind), and says who AWS says it is. Free: STS only. See [AWS from another cluster](#aws-from-another-cluster) |
 
@@ -38,14 +38,15 @@ delete it. Some deletes are careful on purpose:
 - `rds-postgres` keeps a final snapshot, named in its output
   (`finalSnapshot`): delete the snapshot once nobody needs the data, since
   it's billed as storage.
-- App Runner and RDS finish a delete on their own once it's accepted, so
-  the step doesn't wait for it.
+- ECS (its load balancer and the rest it made for the service) and RDS
+  finish a delete on their own once it's accepted, so the step doesn't
+  wait for it.
 
 Made before they were tagged with a team (before 2026-11-03), a bucket,
 service or instance has `vennir-made` but no `vennir-team`, so its delete
 refuses it (`NOT_THIS_TEAMS`). Tag it by hand with the team it was made for
 (`vennir-team=<team>`: `aws s3api put-bucket-tagging`, which replaces every
-tag, so give `vennir-made=true` again too; `aws apprunner tag-resource`;
+tag, so give `vennir-made=true` again too; `aws ecs tag-resource`;
 `aws rds add-tags-to-resource`), then delete it again, or delete it outside
 Vennir.
 
@@ -68,7 +69,7 @@ the execution.
 
 No keys: the actions use boto3's default credential chain, which EKS fills in
 for the step's Kubernetes ServiceAccount. Each product runs as its own
-(`serviceAccount` in its `product.yaml`: `aws-s3-bucket`, `aws-app-runner`,
+(`serviceAccount` in its `product.yaml`: `aws-s3-bucket`, `aws-ecs-express`,
 `aws-rds-postgres`), which the console creates in the `aws` namespace, and
 only that product's image may run as it. Bind each to its own role, either:
 
@@ -83,7 +84,7 @@ only that product's image may run as it. Bind each to its own role, either:
   role per product trusting it for exactly that product's ServiceAccount
   (`system:serviceaccount:aws:aws-s3-bucket`, and so on), registered as the
   team secret named after it with `-role` (`aws-s3-bucket-role`,
-  `aws-app-runner-role`, `aws-rds-postgres-role`), key `role-arn`.
+  `aws-ecs-express-role`, `aws-rds-postgres-role`), key `role-arn`.
   Uncomment its `secretRefs` line on every action in `product.yaml`
   (`create`, `delete` and `check`): a template's steps, the Catalog's
   runs and Delete get only what their action lists. A hand-written DAG
@@ -100,7 +101,7 @@ Grant each product's role only what it calls:
 | Product | IAM actions |
 |---|---|
 | `s3-bucket` | `s3:ListBucket` (for HeadBucket), `s3:CreateBucket`, `s3:PutBucketPublicAccessBlock`, `s3:TagResource` (it's created tagged), `s3:GetBucketTagging`, and for delete `s3:DeleteBucket`, on `arn:aws:s3:::<prefix>*` |
-| `app-runner` | `apprunner:ListServices`, `apprunner:DescribeService`, `apprunner:CreateService`, `apprunner:TagResource`, `apprunner:ListTagsForResource`, and for delete `apprunner:DeleteService`; `iam:PassRole` on the ECR access role if you use one |
+| `ecs-express` | `ecs:CreateExpressGatewayService`, `ecs:DescribeExpressGatewayService`, `ecs:DescribeServices`, and for delete `ecs:DeleteExpressGatewayService`, on `arn:aws:ecs:*:<account>:service/default/*`; `ecs:TagResource` there, only as it creates (condition `ecs:CreateAction` = `CreateExpressGatewayService`); `ecs:RegisterTaskDefinition` on `task-definition/default-*` and `ecs:CreateCluster` on `cluster/default` (it registers the service's task definition, and makes the default cluster on first use); `iam:PassRole` on the team's two roles alone, with `iam:PassedToService` `ecs-tasks.amazonaws.com` or `ecs.amazonaws.com` ([Hosting an app](#hosting-an-app-ecs-express) has the policy) |
 | `rds-postgres` | `rds:DescribeDBInstances`, `rds:CreateDBInstance`, `rds:AddTagsToResource`, and for delete `rds:DeleteDBInstance` and `rds:CreateDBSnapshot` (its final snapshot), plus `secretsmanager:CreateSecret`, `secretsmanager:TagResource` and `kms:DescribeKey` for the managed password (and `secretsmanager:DeleteSecret`, which RDS uses to remove it) |
 
 Upgrading: `s3-bucket` used to tag a bucket after making it, with
@@ -108,12 +109,13 @@ Upgrading: `s3-bucket` used to tag a bucket after making it, with
 Add that to a role granted from an older copy of this table, or every
 create fails with an AccessDenied that names it.
 
-The first App Runner service or RDS instance in an account also makes that
-service's service-linked role. Either create it once yourself (`aws iam
-create-service-linked-role --aws-service-name apprunner.amazonaws.com`, and
+The first ECS service or RDS instance in an account also needs that
+service's service-linked role (ECS: "Unable to assume the service linked
+role"). Either create it once yourself (`aws iam
+create-service-linked-role --aws-service-name ecs.amazonaws.com`, and
 `rds.amazonaws.com`) or let the product's role do it:
 `iam:CreateServiceLinkedRole` on
-`arn:aws:iam::<account>:role/aws-service-role/<service>/AWSServiceRoleFor<AppRunner|RDS>`,
+`arn:aws:iam::<account>:role/aws-service-role/<service>/AWSServiceRoleFor<ECS|RDS>`,
 with the condition `iam:AWSServiceName` equal to the service. RDS can refuse
 the create right after making its role; the step fails as retryable and
 the next attempt goes through.
@@ -167,12 +169,91 @@ Seen on kind (2026-10-31): the token mounted for the product's
 ServiceAccount, the check ready naming its issuer and subject, and real STS
 refusing kind's private issuer (`TOKEN_NOT_TRUSTED`).
 
-`s3-bucket`, `app-runner` and `rds-postgres` run off EKS the same way
+`s3-bucket`, `ecs-express` and `rds-postgres` run off EKS the same way
 (see Credentials): each declares the same `tokenAudiences`, and with no
 default credentials assumes its own role by web identity, named by the
 team secret `<its ServiceAccount>-role`. Proven on GKE (2026-11-07) for
 `s3-bucket`: a bucket made, tagged and private, then deleted, in an account
 with no AWS cluster.
+
+## Hosting an app (ecs-express)
+
+What a Cloud Run service is on Google Cloud, an ECS Express Mode service is
+on AWS: give it an image and it runs it on Fargate behind a load balancer
+it makes and manages, at `https://<id>.ecs.<region>.on.aws`, scaling by
+CPU (at least one task, so never to zero). AWS closed App Runner to new
+accounts in 2026 and points to it instead.
+
+What a service deploys, and with what, is the team's choice, not the
+caller's. Once per account, as an admin:
+
+```bash
+# The task execution role: pulls the image, writes its logs.
+aws iam create-role --role-name aws-ecs-execution --assume-role-policy-document \
+  '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+aws iam attach-role-policy --role-name aws-ecs-execution \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+# The infrastructure role: makes each service's load balancer, security groups and scaling.
+aws iam create-role --role-name aws-ecs-infrastructure --assume-role-policy-document \
+  '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+aws iam attach-role-policy --role-name aws-ecs-infrastructure \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices
+# ECS's own role, once per account.
+aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com
+```
+
+Then a maintainer adds the team secret `ecs-express`:
+
+| Key | Value |
+|---|---|
+| `image-registry` | The prefix every image must be under, such as `<account>.dkr.ecr.us-east-2.amazonaws.com/aws` (`IMAGE_OUTSIDE_REGISTRY` otherwise). The execution role may pull from any ECR repository in the account, so narrow it with a repository policy if that matters |
+| `execution-role-arn` | `arn:aws:iam::<account>:role/aws-ecs-execution` |
+| `infrastructure-role-arn` | `arn:aws:iam::<account>:role/aws-ecs-infrastructure` |
+
+The product's own role (`aws-ecs-express`, bound as in Credentials) gets
+the actions in the table above, passing only those two roles:
+
+```json
+{"Version": "2012-10-17", "Statement": [
+  {"Effect": "Allow", "Resource": "arn:aws:ecs:*:<account>:service/default/*",
+   "Action": ["ecs:CreateExpressGatewayService", "ecs:DescribeExpressGatewayService",
+              "ecs:DeleteExpressGatewayService", "ecs:DescribeServices"]},
+  {"Effect": "Allow", "Action": "ecs:TagResource", "Resource": "arn:aws:ecs:*:<account>:service/default/*",
+   "Condition": {"StringEquals": {"ecs:CreateAction": "CreateExpressGatewayService"}}},
+  {"Effect": "Allow", "Action": "ecs:RegisterTaskDefinition", "Resource": "arn:aws:ecs:*:<account>:task-definition/default-*"},
+  {"Effect": "Allow", "Action": "ecs:CreateCluster", "Resource": "arn:aws:ecs:*:<account>:cluster/default"},
+  {"Effect": "Allow", "Action": "iam:PassRole",
+   "Resource": ["arn:aws:iam::<account>:role/aws-ecs-execution", "arn:aws:iam::<account>:role/aws-ecs-infrastructure"],
+   "Condition": {"StringEquals": {"iam:PassedToService": ["ecs-tasks.amazonaws.com", "ecs.amazonaws.com"]}}}
+]}
+```
+
+- **The app gets no AWS role.** It can call nothing in AWS. A team that
+  wants its app to read a bucket, say, makes that role and adds a
+  `taskRoleArn` to its copy of `create`, and the role's PassRole above.
+- **Where it runs.** The region's default VPC, internet-facing, unless the
+  run gives `subnets` (private ones give an internal load balancer). The
+  region needs a default VPC otherwise.
+- **What it costs.** A task at the default 0.25 vCPU and 512 MiB while it
+  runs (it never scales to zero), and the Application Load Balancer AWS
+  makes for it, billed by the hour while it's there.
+- **How long.** About five minutes until a new service serves: give the
+  step `timeoutSeconds: 1200`. Its URL resolves only once its deployment
+  is done; a lookup before that can be cached as missing for a few minutes.
+  `create` waits for the deployment, then (for a public one) for its health
+  check path to answer at the URL, since the load balancer can say 503 for
+  a few seconds after.
+- **What delete leaves.** Each service's log group
+  (`/aws/ecs/default/<service>-<id>`), kept as CloudWatch keeps it: set
+  its retention, or delete it once nobody needs the logs.
+
+Proven (2026-11-07), running the product's image as the kernel would, with
+a role of exactly the policy above, not yet from a cluster: its check ready
+in the registry's region; a service made from a private ECR image in
+us-east-2 (the first in the account: the default cluster made on the way,
+after the service-linked role), serving the moment the step ended; found
+again by a second create and left alone; refused to another team's delete,
+and deleted; an image outside the registry refused before any call.
 
 ## Is it ready here?
 
@@ -182,22 +263,22 @@ and the console runs it when the product is registered, daily, and on
 it is (the `principal` it reports), assumes `aws-target` when listed, then
 makes the read-only calls its role must allow, in the cluster's region
 (`AWS_REGION`, else us-east-1: off EKS there's no cluster region, so
-us-east-1), since each run's region is an input. An organization policy
-denying us-east-1 then makes a check not ready, naming an action for the
-product's role that the role isn't what's refusing:
+us-east-1; `ecs-express` asks in its team registry's region first, when
+that's an ECR one), since each run's region is an input. An organization
+policy denying us-east-1 then makes a check not ready, naming an action for
+the product's role that the role isn't what's refusing:
 
 | Product | Asks | Missing names |
 |---|---|---|
 | `s3-bucket` | nothing more: its S3 actions are granted on bucket names, and a check names none, so only a create finds out | only an IAM role, when none is bound |
-| `app-runner` | `apprunner:ListServices` | that action, for its role |
+| `ecs-express` | the team's `ecs-express` secret, then `ecs:DescribeExpressGatewayService` (of a service that doesn't exist: not found means it may) | the secret, or that action for its role |
 | `rds-postgres` | `rds:DescribeDBInstances`, and `kms:DescribeKey` on `alias/aws/secretsmanager` | those actions, for its role |
 
 With no role bound to its ServiceAccount, or a role that won't let it in or
 let it assume `aws-target`, it isn't ready, and says what's missing. The
 actions with no read-only form (creating, tagging, deleting) only a create
 or delete finds out. Seen from GKE (2026-11-07): `s3-bucket` ready as its
-own role; `app-runner` not ready where an organization policy denied
-us-east-1.
+own role.
 
 ## Secrets
 

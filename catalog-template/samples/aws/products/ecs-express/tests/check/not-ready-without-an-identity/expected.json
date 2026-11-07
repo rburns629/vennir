@@ -1,0 +1,10 @@
+{
+  "status": "succeeded",
+  "outputs": {
+    "ready": false,
+    "principal": "Kubernetes ServiceAccount aws-ecs-express, with no AWS identity",
+    "missing": [
+      "an IAM role for ServiceAccount aws-ecs-express (an EKS Pod Identity association, or IRSA; off EKS, its aws-ecs-express-role secret)"
+    ]
+  }
+}
