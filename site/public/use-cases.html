@@ -243,10 +243,10 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <span class="eyebrow">samples/aws</span>
           <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Storage, an app and a database on AWS.</h2>
         </div>
-        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">An S3 bucket with public access blocked, an App Runner service told its name, and an encrypted RDS for PostgreSQL instance whose password no step ever sees.</p>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">An S3 bucket with public access blocked, an ECS Express service in its region, and an encrypted RDS for PostgreSQL instance whose password no step ever sees.</p>
       </div>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
-        <figure class="card" aria-label="The aws sample's DAG: a bucket, then an App Runner service" style="margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+        <figure class="card" aria-label="The aws sample's DAG: a bucket, then an ECS Express service" style="margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 16px">
           <figcaption class="mono" style="font-size: 13px; color: #8B93A3">dags/aws-hello-world-dag.yaml · two steps · team aws</figcaption>
           <div style="border: 1px solid #2A3040; border-radius: 10px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 8px">
             <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">s3-bucket.create</span><span class="chip">as aws-s3-bucket</span></span>
@@ -254,11 +254,11 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           </div>
           <div style="display: flex; align-items: center; gap: 10px; padding-left: 18px">
             <span aria-hidden="true" style="width: 1px; height: 22px; background: #3A4256"></span>
-            <span class="mono" style="font-size: 12px; color: #8FD6B4">bucketName → environment.BUCKET</span>
+            <span class="mono" style="font-size: 12px; color: #8FD6B4">region → region</span>
           </div>
           <div style="border: 1px solid #2A3040; border-radius: 10px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 8px">
-            <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">app-runner.create</span><span class="chip">as aws-app-runner</span></span>
-            <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Deploys an image as an App Runner service and waits for it to run, or returns the existing one's URL.</span>
+            <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">ecs-express.create</span><span class="chip">as aws-ecs-express</span></span>
+            <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Deploys an image from the team's registry as an ECS Express service, AWS's Cloud Run, and waits for it to serve, or returns the existing one's URL.</span>
           </div>
           <div style="border: 1px dashed #3A4256; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
             <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">rds-postgres.create</span><span class="chip">as aws-rds-postgres</span></span>

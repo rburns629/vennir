@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""aws/app-runner's "delete" action, its create's cleanup: deletes a service
-create made (tagged vennir-made=true) for the run's team (tagged
+"""aws/ecs-express's "delete" action, its create's cleanup: deletes a
+service create made (tagged vennir-made=true) for the run's team (tagged
 vennir-team=<it>), and no other, given the resource create reported (its
-ARN, which names its region). A service that's already gone counts as deleted. App Runner finishes a delete on its own once it's
-accepted, so this doesn't wait for it.
-
+ARN, which names its region). ECS then removes what it made for the
+service (its load balancer, target groups, security groups and scaling) on
+its own, draining its tasks first, so this doesn't wait. A service that's
+already gone, or going, counts as deleted.
 Credentials as for create (see the aws team's README.md).
 """
 
@@ -25,22 +26,22 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
 # Off EKS (GKE, AKS), with no default credentials: this product's own role,
 # as EKS Pod Identity would bind it there, named by the team secret
-# aws-app-runner-role (key role-arn) and assumed by web identity with the step's
-# own token (product.yaml's tokenAudiences). The role trusts this cluster's
-# issuer for this product's ServiceAccount alone (the aws team's README.md,
-# AWS from another cluster).
-OWN_ROLE_FILE = Path("/platform/secrets/aws-app-runner-role/role-arn")
+# aws-ecs-express-role (key role-arn) and assumed by web identity with the
+# step's own token (product.yaml's tokenAudiences). The role trusts this
+# cluster's issuer for this product's ServiceAccount alone (the aws team's
+# README.md, AWS from another cluster).
+OWN_ROLE_FILE = Path("/platform/secrets/aws-ecs-express-role/role-arn")
 TOKEN_FILE = Path("/platform/tokens/sts.amazonaws.com")
 MADE_BY_TAG = ("vennir-made", "true")
 TEAM_TAG = "vennir-team"
-SERVICE_ARN = re.compile(r"^arn:aws[a-z-]*:apprunner:([a-z0-9-]+):[0-9]{12}:service/[A-Za-z0-9_-]+/[0-9a-f]+$")
+SERVICE_ARN = re.compile(r"^arn:aws[a-z-]*:ecs:([a-z0-9-]+):[0-9]{12}:service/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+$")
+# What ECS says of a service that's gone, or already going.
+GONE = {"ResourceNotFoundException", "ServiceNotFoundException", "ClusterNotFoundException", "ServiceNotActiveException"}
 RETRYABLE_CODES = {
     # STS couldn't fetch the cluster's keys just then (off EKS).
     "IDPCommunicationError",
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
-    "ServiceUnavailable", "InternalError", "InternalFailure", "InternalServiceErrorException",
-    # Another operation (a deploy, say) is still running on it.
-    "InvalidStateException",
+    "ServiceUnavailable", "InternalError", "InternalFailure", "ServerException",
 }
 
 
@@ -57,7 +58,7 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
 
 def _aws_failure(error: Exception) -> int:
     if isinstance(error, NoCredentialsError):
-        return _failure("AWS_NO_CREDENTIALS", "No AWS credentials: on EKS, bind the step's ServiceAccount to an IAM role; elsewhere, give the step its aws-app-runner-role secret.")
+        return _failure("AWS_NO_CREDENTIALS", "No AWS credentials: on EKS, bind the step's ServiceAccount to an IAM role; elsewhere, give the step its aws-ecs-express-role secret.")
     if isinstance(error, ClientError):
         details = error.response.get("Error", {})
         status = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)
@@ -112,50 +113,54 @@ def _gone(arn: str) -> int:
     return 0
 
 
+def _code(error: ClientError) -> str:
+    return error.response.get("Error", {}).get("Code", "")
+
+
 def main() -> int:
     request = json.loads(INPUT_PATH.read_text())
     resource = request.get("inputs", {}).get("resource") or {}
     arn = resource.get("id", "")
-    if resource.get("type") != "aws/app-runner-service" or not arn:
-        return _failure("MISSING_INPUT", "inputs.resource is the aws/app-runner-service to delete, as create reported it")
+    if resource.get("type") != "aws/ecs-express-service" or not arn:
+        return _failure("MISSING_INPUT", "inputs.resource is the aws/ecs-express-service to delete, as create reported it")
     team = request.get("forTeam")
     if not team:
         return _failure("MISSING_TEAM", "request.json has no forTeam: run it for one of your teams")
     match = SERVICE_ARN.match(arn)
     if not match:
-        return _failure("INVALID_INPUT", f"'{arn}' isn't an App Runner service's ARN")
+        return _failure("INVALID_INPUT", f"'{arn}' isn't an ECS service's ARN")
 
     try:
-        apprunner = _session(match.group(1)).client("apprunner")
+        ecs = _session(match.group(1)).client("ecs")
         try:
-            service = apprunner.describe_service(ServiceArn=arn)["Service"]
+            service = ecs.describe_express_gateway_service(serviceArn=arn, include=["TAGS"])["service"]
         except ClientError as error:
-            if error.response.get("Error", {}).get("Code") == "ResourceNotFoundException":
+            if _code(error) in GONE:
                 return _gone(arn)
             raise
-        if service.get("Status") == "DELETED":
+        if service.get("status", {}).get("statusCode") in ("DRAINING", "INACTIVE"):
             return _gone(arn)
-        tags = apprunner.list_tags_for_resource(ResourceArn=arn).get("Tags", [])
-        if {"Key": MADE_BY_TAG[0], "Value": MADE_BY_TAG[1]} not in tags:
+        tags = {t.get("key"): t.get("value") for t in service.get("tags", [])}
+        if tags.get(MADE_BY_TAG[0]) != MADE_BY_TAG[1]:
             return _failure(
                 "NOT_MADE_BY_VENNIR",
-                f"Service '{service.get('ServiceName')}' has no {MADE_BY_TAG[0]}={MADE_BY_TAG[1]} tag: this product deletes only services it made.",
+                f"Service '{service.get('serviceName')}' has no {MADE_BY_TAG[0]}={MADE_BY_TAG[1]} tag: this product deletes only services it made.",
             )
-        if {"Key": TEAM_TAG, "Value": team} not in tags:
+        if tags.get(TEAM_TAG) != team:
             return _failure(
                 "NOT_THIS_TEAMS",
-                f"Service '{service.get('ServiceName')}' has no {TEAM_TAG}={team} tag: this product deletes only services it made for this team.",
+                f"Service '{service.get('serviceName')}' has no {TEAM_TAG}={team} tag: this product deletes only services it made for this team.",
             )
         try:
-            apprunner.delete_service(ServiceArn=arn)
+            ecs.delete_express_gateway_service(serviceArn=arn)
         except ClientError as error:
-            if error.response.get("Error", {}).get("Code") == "ResourceNotFoundException":
+            if _code(error) in GONE:
                 return _gone(arn)
             raise
     except (ClientError, BotoCoreError) as error:
         return _aws_failure(error)
 
-    print(f"deleting service '{service.get('ServiceName')}'")
+    print(f"deleting service '{service.get('serviceName')}'")
     _write_result({"status": "succeeded", "outputs": {"deleted": arn}})
     return 0
 

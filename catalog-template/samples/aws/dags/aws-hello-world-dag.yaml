@@ -1,4 +1,4 @@
-# Two aws products chained: an S3 bucket, then an App Runner service in its
+# Two aws products chained: an S3 bucket, then an ECS Express service in its
 # region. Real, billed calls. Paste into the console's Submit page
 # with <registry> and the CHANGE values replaced. `:latest` is pinned to its
 # digest when you submit. Off EKS (GKE, AKS), give each step its own role's
@@ -18,18 +18,22 @@ tasks:
       region: eu-west-1                        # CHANGE
 
   - id: web
-    image: <registry>/aws/app-runner:latest
+    image: <registry>/aws/ecs-express:latest
     action: create
     team: aws
-    # secretRefs: [aws-app-runner-role]          # off EKS
+    # A DAG's step mounts only what it lists: the team's ecs-express secret
+    # (its registry and roles), and off EKS its own role's.
+    secretRefs: [ecs-express]
+    # secretRefs: [ecs-express, aws-ecs-express-role]   # off EKS
     dependsOn: [bucket]
-    timeoutSeconds: 1200                       # a new service takes a few minutes
+    timeoutSeconds: 1200                       # a new service takes about five minutes
     inputs:
       serviceName: hello-world
-      image: public.ecr.aws/aws-containers/hello-app-runner:latest
+      # CHANGE: an image under the ecs-express secret's image-registry, such
+      # as nginx pushed to <account>.dkr.ecr.<region>.amazonaws.com/aws/hello.
+      image: <account>.dkr.ecr.eu-west-1.amazonaws.com/aws/hello:1
       # The bucket's region, from its step: an upstream output is passed as a
       # whole input (one nested inside another, like environment's, is
       # refused at submit).
       region: {$fromTask: bucket, $output: region}
-      port: 8000
-      public: true                             # a demo: anyone may reach it
+      port: 80

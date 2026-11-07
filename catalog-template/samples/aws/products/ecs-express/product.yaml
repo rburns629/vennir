@@ -1,24 +1,25 @@
-# A sample: App Runner service, with real AWS API calls (billed).
-# Its own IAM role: by EKS Pod Identity, or off EKS by web identity (the
-# team secret aws-app-runner-role); see the aws team's README.md.
+# A sample: an ECS Express Mode service, AWS's counterpart to Cloud Run,
+# with real AWS API calls (billed). Its own IAM role: by EKS Pod Identity,
+# or off EKS by web identity (the team secret aws-ecs-express-role); see the
+# aws team's README.md.
 apiVersion: vennir.dev/v2
 kind: Product
-name: app-runner
+name: ecs-express
 team: aws
-displayName: App Runner service
-description: Deploys a container image as an App Runner service and waits for it to run, or
-  returns the existing service's URL once it runs. Private (reachable through a VPC interface endpoint)
-  unless public is true.
+displayName: ECS Express service
+description: Deploys a container image as an ECS Express Mode service (Fargate, behind a load
+  balancer AWS manages, with an HTTPS URL) and waits for it to serve, or returns the existing
+  service's URL. Only images from the team's registry, run with the roles the team chose.
 owner: aws-team
 runtime: python3.12
 # AWS from EKS, or from any cluster AWS trusts by OIDC (README.md, AWS from
 # another cluster): its own clouds, over the team's [aws].
 clouds: [aws, gcp, azure, existing]
 # Its own identity: bound to only what it does (README.md, Credentials).
-serviceAccount: aws-app-runner
+serviceAccount: aws-ecs-express
 # Off EKS, a token for AWS's STS, an hour long, at
 # /platform/tokens/sts.amazonaws.com, with which it assumes its own role
-# (aws-app-runner-role) by web identity. EKS's own credentials need none.
+# (aws-ecs-express-role) by web identity. EKS's own credentials need none.
 tokenAudiences:
 - sts.amazonaws.com
 # Each install runs check (no inputs, as this identity) when this is
@@ -29,10 +30,10 @@ actions:
 - name: create
   # Off EKS, its own role (README.md, Credentials): a template's, the
   # Catalog's and a Delete's steps get only what an action lists here.
-  # secretRefs: [{name: aws-app-runner-role, keys: [role-arn]}]
-  # Finds what it would create before creating it, so a step that
-  # failed on the platform's side (a reclaimed node, a timeout) is
-  # retried, up to three attempts in all.
+  # secretRefs: [{name: aws-ecs-express-role, keys: [role-arn]}]
+  # Finds the service before creating it, so a step that failed on the
+  # platform's side is retried, up to three attempts in all, and waits
+  # again.
   idempotent: true
   maxAttempts: 3
   script: actions/create.py
@@ -51,26 +52,48 @@ actions:
     properties:
       serviceName:
         type: string
-        description: The service's name.
-        pattern: ^[A-Za-z0-9][A-Za-z0-9-_]{3,39}$
+        description: The service's name, unique in the account and region.
+        pattern: ^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$
       image:
         type: string
-        description: An ECR or ECR Public image reference.
+        description: The image to run, under the team's registry (its ecs-express secret's image-registry).
       region:
         type: string
-        description: The AWS region, such as eu-west-1.
+        description: The AWS region, such as us-east-2.
         pattern: ^[a-z]{2}(-[a-z]+)+-[0-9]$
       port:
         type: integer
         description: The port the container listens on.
         default: 8080
-      public:
-        type: boolean
-        description: Whether anyone on the internet may reach it.
-        default: false
-      accessRoleArn:
+        minimum: 1
+        maximum: 65535
+      healthCheckPath:
         type: string
-        description: An IAM role App Runner pulls a private ECR image with.
+        description: A path that answers 200 while the app is healthy.
+        default: /
+        pattern: ^/
+      cpu:
+        type: string
+        description: CPU units per task (1024 is one vCPU).
+        enum: ["256", "512", "1024", "2048", "4096"]
+        default: "256"
+      memory:
+        type: string
+        description: Memory per task, in MiB; it must suit the CPU (Fargate's combinations).
+        enum: ["512", "1024", "2048", "3072", "4096", "8192"]
+        default: "512"
+      maxTasks:
+        type: integer
+        description: The most tasks it scales out to (it keeps at least one running).
+        default: 2
+        minimum: 1
+        maximum: 20
+      subnets:
+        type: array
+        description: 'Subnets for its tasks and load balancer: private ones give an internal
+          service. Empty: the region''s default VPC, public.'
+        items: {type: string, pattern: "^subnet-[0-9a-f]+$"}
+        maxItems: 16
       environment:
         type: object
         description: 'Environment variables for the container: names to string values. Never
@@ -81,11 +104,11 @@ actions:
     type: object
     required:
     - serviceArn
+    - serviceUrl
     properties:
       serviceUrl:
         type: string
-        description: 'The service''s HTTPS URL, for a public one: a private one has none, and
-          is reached through a VPC ingress connection.'
+        description: The service's HTTPS URL (inside its VPC, for an internal one).
       serviceArn:
         type: string
         description: Its ARN.
@@ -100,10 +123,18 @@ actions:
             id: {type: string}
             name: {type: string}
             link: {type: string}
+  secretRefs:
+  - name: ecs-express
+    keys: [image-registry, execution-role-arn, infrastructure-role-arn]
+    description: >-
+      The team's choices, not the caller's: the registry every image must be
+      under, the task execution role (pulls the image, writes its logs) and
+      the infrastructure role (makes its load balancer and scaling). This
+      product's role may pass only those two.
 - name: delete
   # Off EKS, its own role (README.md, Credentials): a template's, the
   # Catalog's and a Delete's steps get only what an action lists here.
-  # secretRefs: [{name: aws-app-runner-role, keys: [role-arn]}]
+  # secretRefs: [{name: aws-ecs-express-role, keys: [role-arn]}]
   # Deleting a service that's already gone or going is a no-op.
   idempotent: true
   maxAttempts: 3
@@ -119,7 +150,7 @@ actions:
         description: The service, as create reported it.
         required: [type, id]
         properties:
-          type: {type: string, const: aws/app-runner-service}
+          type: {type: string, const: aws/ecs-express-service}
           id: {type: string, description: Its ARN.}
           name: {type: string}
           link: {type: string}
@@ -137,7 +168,7 @@ actions:
   script: actions/check.py
   # Off EKS, it signs in as its own role: list that role's secret here so
   # the check does as the actions do (README.md, Credentials).
-  # secretRefs: [{name: aws-app-runner-role, keys: [role-arn]}]
+  # secretRefs: [{name: aws-ecs-express-role, keys: [role-arn]}]
   input:
     type: object
     additionalProperties: false
@@ -154,3 +185,7 @@ actions:
         description: What an admin must grant it here.
         items: {type: string}
       detail: {type: string, title: Detail}
+  secretRefs:
+  - name: ecs-express
+    keys: [image-registry, execution-role-arn, infrastructure-role-arn]
+    description: Whether the team chose its registry and roles, and the region it asks in.
