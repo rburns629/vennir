@@ -75,7 +75,7 @@ The other samples' actions:
 | Product | IAM actions |
 | --- | --- |
 | `s3-bucket` | Above. `s3:TagResource` because a bucket is created tagged |
-| `ecs-express` | `ecs:CreateExpressGatewayService`, `ecs:DescribeExpressGatewayService`, `ecs:DescribeServices`, `ecs:DeleteExpressGatewayService` on `service/default/*`; `ecs:TagResource` there as it creates; `ecs:RegisterTaskDefinition` on `task-definition/default-*`; `ecs:CreateCluster` on `cluster/default`; `iam:PassRole` on the team's two roles alone ([Hosting an app](#hosting-an-app-on-ecs-express-mode)) |
+| `ecs-express` | `ecs:CreateExpressGatewayService`, `ecs:DescribeExpressGatewayService`, `ecs:DescribeServices`, `ecs:UpdateExpressGatewayService`, `ecs:DeleteExpressGatewayService` on `service/default/*`; `ecs:TagResource` there as it creates; `ecs:RegisterTaskDefinition` on `task-definition/default-*`; `ecs:CreateCluster` on `cluster/default`; `iam:PassRole` on the team's two roles alone ([Hosting an app](#hosting-an-app-on-ecs-express-mode)) |
 | `rds-postgres` | `rds:DescribeDBInstances`, `rds:CreateDBInstance`, `rds:AddTagsToResource`, `rds:DeleteDBInstance`, `rds:CreateDBSnapshot`; `secretsmanager:CreateSecret`, `secretsmanager:TagResource`, `secretsmanager:DeleteSecret`, `kms:DescribeKey` (RDS keeps the database's password in Secrets Manager; the step never sees it) |
 
 The first ECS service or RDS instance in an account also needs that service's service-linked role. Make it once yourself:
@@ -152,7 +152,7 @@ Each `create` tags what it makes `vennir-made=true` and `vennir-team=<the team i
 
 ## Hosting an app on ECS Express Mode
 
-`ecs-express` is AWS's counterpart to `app-hosting` on Cloud Run: it runs a container image on Fargate behind a load balancer AWS makes and manages, at `https://<id>.ecs.<region>.on.aws`, scaling on CPU (at least one task: it never scales to zero). A new service serves in about five minutes, so give its step `timeoutSeconds: 1200`.
+`ecs-express` is AWS's counterpart to `app-hosting` on Cloud Run: it runs a container image on Fargate behind a load balancer AWS makes and manages, at `https://<id>.ecs.<region>.on.aws`, scaling on CPU (at least one task: it never scales to zero). A new service serves in about five minutes, so give its step `timeoutSeconds: 1200`. Running `create` again with a new image, environment or size rolls the change out to a service it made for your team, behind the same URL, in about ten minutes: give each version its own image tag, since a tag pushed again isn't a change.
 
 What it deploys, and with what, is your team's choice, not the caller's. An account admin makes the two roles a service runs with, once:
 

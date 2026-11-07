@@ -20,9 +20,25 @@ ARN = f"arn:aws:ecs:us-east-2:{ACCOUNT}:service/default/web"
 REGISTRY = f"{ACCOUNT}.dkr.ecr.us-east-2.amazonaws.com/aws"
 URL = "https://ve-0123abcd.ecs.us-east-2.on.aws"
 TAGS = [{"key": "vennir-made", "value": "true"}, {"key": "vennir-team", "value": "web"}]
+EXECUTION_ROLE = f"arn:aws:iam::{ACCOUNT}:role/web-execution"
+TASK_DEFINITION = f"arn:aws:ecs:us-east-2:{ACCOUNT}:task-definition/default-web:1"
+# What describe reports of a service made from INPUTS, as ECS fills it in.
+CONFIGURATION = {
+    "executionRoleArn": EXECUTION_ROLE,
+    "taskDefinitionArn": TASK_DEFINITION,
+    "primaryContainer": {
+        "image": f"{REGISTRY}/web:1", "containerPort": 8080,
+        "awsLogsConfiguration": {"logGroup": "/aws/ecs/default/web-ab12", "logStreamPrefix": "ecs"},
+    },
+    "healthCheckPath": "/", "cpu": "256", "memory": "512",
+    "scalingTarget": {"minTaskCount": 1, "maxTaskCount": 2, "autoScalingMetric": "AVERAGE_CPU", "autoScalingTargetValue": 60},
+    "networkConfiguration": {"subnets": ["subnet-0a", "subnet-0b"], "securityGroups": ["sg-0a"]},
+    "ingressPaths": [{"accessType": "PUBLIC", "endpoint": URL}],
+    "createdAt": "2026-11-07 15:00:00+00:00",
+}
 SERVICE = {
     "serviceName": "web", "serviceArn": ARN, "status": {"statusCode": "ACTIVE"},
-    "activeConfigurations": [{"ingressPaths": [{"accessType": "PUBLIC", "endpoint": URL}]}],
+    "activeConfigurations": [CONFIGURATION],
 }
 INPUTS = {"serviceName": "web", "image": f"{REGISTRY}/web:1", "region": "us-east-2"}
 
@@ -31,8 +47,23 @@ def _not_found(code: str = "ClusterNotFoundException") -> ClientError:
     return ClientError({"Error": {"Code": code, "Message": "not found"}}, "DescribeExpressGatewayService")
 
 
-def _rollout(state: str, running: int = 1) -> dict:
-    return {"services": [{"runningCount": running, "deployments": [{"status": "PRIMARY", "rolloutState": state}]}]}
+def _rollout(state: str, running: int = 1, task_definition: str = TASK_DEFINITION) -> dict:
+    return {"services": [{"runningCount": running, "deployments": [
+        {"status": "PRIMARY", "rolloutState": state, "taskDefinition": task_definition}]}]}
+
+
+def _then(first, service: dict):
+    """describe's answers: first (an error to raise, or a service), then the
+    service for every call after."""
+    calls = []
+    def answer(**_):
+        calls.append(1)
+        if len(calls) == 1:
+            if isinstance(first, Exception):
+                raise first
+            return {"service": first}
+        return {"service": service}
+    return answer
 
 
 def _load_create_module():
@@ -104,7 +135,7 @@ class CreateActionTest(unittest.TestCase):
 
     def test_a_new_service_is_made_with_the_teams_roles_and_waited_for(self) -> None:
         def configure(client):
-            client.describe_express_gateway_service.side_effect = [_not_found(), {"service": {**SERVICE, "tags": TAGS}}]
+            client.describe_express_gateway_service.side_effect = _then(_not_found(), {**SERVICE, "tags": TAGS})
             client.create_express_gateway_service.return_value = {"service": SERVICE}
             client.describe_services.side_effect = [_rollout("IN_PROGRESS", 0), _rollout("COMPLETED")]
         exit_code, result, client = self._run(
@@ -112,7 +143,7 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         client.describe_express_gateway_service.assert_any_call(serviceArn=ARN, include=["TAGS"])
         kwargs = client.create_express_gateway_service.call_args.kwargs
-        self.assertEqual(kwargs["executionRoleArn"], f"arn:aws:iam::{ACCOUNT}:role/web-execution")
+        self.assertEqual(kwargs["executionRoleArn"], EXECUTION_ROLE)
         self.assertEqual(kwargs["infrastructureRoleArn"], f"arn:aws:iam::{ACCOUNT}:role/web-infrastructure")
         self.assertNotIn("taskRoleArn", kwargs)  # the app itself gets no AWS role
         self.assertEqual(kwargs["primaryContainer"], {
@@ -132,7 +163,7 @@ class CreateActionTest(unittest.TestCase):
 
     def test_without_subnets_it_uses_the_default_vpc(self) -> None:
         def configure(client):
-            client.describe_express_gateway_service.side_effect = [_not_found("ResourceNotFoundException"), {"service": SERVICE}]
+            client.describe_express_gateway_service.side_effect = _then(_not_found("ResourceNotFoundException"), SERVICE)
             client.create_express_gateway_service.return_value = {"service": SERVICE}
             client.describe_services.return_value = _rollout("COMPLETED")
         exit_code, _, client = self._run(INPUTS, configure)
@@ -162,8 +193,7 @@ class CreateActionTest(unittest.TestCase):
 
     def test_a_deleted_service_of_that_name_is_made_again(self) -> None:
         def configure(client):
-            client.describe_express_gateway_service.side_effect = [
-                {"service": {**SERVICE, "status": {"statusCode": "INACTIVE"}}}, {"service": SERVICE}]
+            client.describe_express_gateway_service.side_effect = _then({**SERVICE, "status": {"statusCode": "INACTIVE"}}, SERVICE)
             client.create_express_gateway_service.return_value = {"service": SERVICE}
             client.describe_services.return_value = _rollout("COMPLETED")
         exit_code, _, client = self._run(INPUTS, configure)
@@ -189,7 +219,7 @@ class CreateActionTest(unittest.TestCase):
 
     def test_a_failed_rollout_fails_for_good(self) -> None:
         def configure(client):
-            client.describe_express_gateway_service.side_effect = [_not_found()]
+            client.describe_express_gateway_service.side_effect = _then(_not_found(), SERVICE)
             client.create_express_gateway_service.return_value = {"service": SERVICE}
             client.describe_services.return_value = _rollout("FAILED", 0)
         exit_code, result, _ = self._run(INPUTS, configure)
@@ -219,12 +249,74 @@ class CreateActionTest(unittest.TestCase):
 
     def test_a_private_service_isnt_asked_at_its_url(self) -> None:
         self.module._answers = lambda url: self.fail("asked a private service's URL")
-        private = {**SERVICE, "tags": TAGS, "activeConfigurations": [{"ingressPaths": [{"accessType": "PRIVATE", "endpoint": URL}]}]}
+        private = {**SERVICE, "tags": TAGS, "activeConfigurations": [
+            {**CONFIGURATION, "ingressPaths": [{"accessType": "PRIVATE", "endpoint": URL}]}]}
         def configure(client):
             client.describe_express_gateway_service.return_value = {"service": private}
             client.describe_services.return_value = _rollout("COMPLETED")
         exit_code, result, _ = self._run(INPUTS, configure)
         self.assertEqual((exit_code, result["outputs"]["serviceUrl"]), (0, URL))
+
+    def test_a_service_it_made_for_this_team_is_brought_to_the_inputs(self) -> None:
+        new_definition = TASK_DEFINITION[:-1] + "2"
+        rolled = {**SERVICE, "tags": TAGS, "activeConfigurations": [
+            {**CONFIGURATION, "taskDefinitionArn": new_definition, "createdAt": "2026-11-07 16:00:00+00:00",
+             "primaryContainer": {**CONFIGURATION["primaryContainer"], "image": f"{REGISTRY}/web:2",
+                                  "environment": [{"name": "MODE", "value": "new"}]}},
+            CONFIGURATION]}
+        def configure(client):
+            client.describe_express_gateway_service.side_effect = _then({**SERVICE, "tags": TAGS}, rolled)
+            client.update_express_gateway_service.return_value = {"service": {"serviceArn": ARN, "status": {"statusCode": "ACTIVE"}}}
+            # The last deployment is still primary and done for a moment;
+            # then the new one runs, and finishes.
+            client.describe_services.side_effect = [
+                _rollout("COMPLETED"), _rollout("IN_PROGRESS", 1, new_definition), _rollout("COMPLETED", 1, new_definition)]
+        exit_code, result, client = self._run({**INPUTS, "image": f"{REGISTRY}/web:2", "environment": {"MODE": "new"}}, configure)
+        self.assertEqual(exit_code, 0)
+        client.create_express_gateway_service.assert_not_called()
+        kwargs = client.update_express_gateway_service.call_args.kwargs
+        self.assertEqual(kwargs["serviceArn"], ARN)
+        self.assertEqual(kwargs["primaryContainer"], {
+            "image": f"{REGISTRY}/web:2", "containerPort": 8080, "environment": [{"name": "MODE", "value": "new"}]})
+        self.assertEqual(kwargs["executionRoleArn"], EXECUTION_ROLE)
+        # Its autoscaling stays; its subnets, infrastructure role and tags aren't asked to change.
+        self.assertEqual(kwargs["scalingTarget"], CONFIGURATION["scalingTarget"])
+        for key in ("networkConfiguration", "infrastructureRoleArn", "tags"):
+            self.assertNotIn(key, kwargs)
+        self.assertEqual(client.describe_services.call_count, 3)
+        self.assertEqual((result["outputs"]["serviceUrl"], result["outputs"]["resources"][0]["id"]), (URL, ARN))
+
+    def test_a_configuration_still_rolling_out_is_waited_for_not_made_again(self) -> None:
+        # A retry: the last attempt's update is the newest configuration.
+        def configure(client):
+            client.describe_express_gateway_service.return_value = {"service": {**SERVICE, "tags": TAGS}}
+            client.describe_services.side_effect = [_rollout("IN_PROGRESS", 1), _rollout("COMPLETED")]
+        exit_code, _, client = self._run(INPUTS, configure)
+        self.assertEqual(exit_code, 0)
+        client.update_express_gateway_service.assert_not_called()
+        client.create_express_gateway_service.assert_not_called()
+
+    def test_one_made_some_other_way_is_changed_by_no_one(self) -> None:
+        for tags in ([], [{"key": "vennir-made", "value": "true"}, {"key": "vennir-team", "value": "data"}]):
+            with self.subTest(tags=tags):
+                def configure(client):
+                    client.describe_express_gateway_service.return_value = {"service": {**SERVICE, "tags": tags}}
+                exit_code, result, client = self._run({**INPUTS, "image": f"{REGISTRY}/web:2"}, configure)
+                self.assertEqual((exit_code, result["error"]["code"], result["error"]["retryable"]), (1, "SERVICE_EXISTS", False))
+                self.assertIn("image", result["error"]["message"])
+                client.update_express_gateway_service.assert_not_called()
+
+    def test_its_subnets_stay_as_it_was_made(self) -> None:
+        def configure(client):
+            client.describe_express_gateway_service.return_value = {"service": {**SERVICE, "tags": TAGS}}
+        exit_code, result, client = self._run({**INPUTS, "subnets": ["subnet-0c"]}, configure)
+        self.assertEqual((exit_code, result["error"]["code"]), (1, "SUBNETS_CHANGED"))
+        client.update_express_gateway_service.assert_not_called()
+        # The same subnets, in any order, are no change.
+        exit_code, _, client = self._run({**INPUTS, "subnets": ["subnet-0b", "subnet-0a"]},
+                                         lambda c: (configure(c), setattr(c.describe_services, "return_value", _rollout("COMPLETED"))))
+        self.assertEqual(exit_code, 0)
+        client.update_express_gateway_service.assert_not_called()
 
     def test_a_role_not_yet_assumable_is_retryable(self) -> None:
         # IAM's eventual consistency, right after the team made its roles.

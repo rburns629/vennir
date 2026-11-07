@@ -9,7 +9,7 @@ SecretStore isn't proven yet.
 | Product | What `create` does |
 |---|---|
 | [`s3-bucket`](products/s3-bucket/) | Finds a bucket by name, or creates it with all public access blocked. A name another account owns fails with `BUCKET_NAME_TAKEN` |
-| [`ecs-express`](products/ecs-express/) | Deploys an image from the team's registry as an ECS Express Mode service, AWS's counterpart to Cloud Run (Fargate tasks behind a load balancer AWS manages, at an HTTPS URL), and waits for it to serve, or returns the existing service's URL. Run with the roles the team chose ([Hosting an app](#hosting-an-app-ecs-express)) |
+| [`ecs-express`](products/ecs-express/) | Deploys an image from the team's registry as an ECS Express Mode service, AWS's counterpart to Cloud Run (Fargate tasks behind a load balancer AWS manages, at an HTTPS URL), and waits for it to serve, or rolls a new image, environment or size out to one it made for the team (same URL). Run with the roles the team chose ([Hosting an app](#hosting-an-app-ecs-express)) |
 | [`rds-postgres`](products/rds-postgres/) | Finds an RDS for PostgreSQL instance, or creates it (encrypted, not public) and waits until it's available, several minutes: set `timeoutSeconds` to 1500 or more, and delete it after |
 | [`caller-identity`](products/caller-identity/) | `whoami`: signs in as a role with the step's own projected ServiceAccount token, from a cluster that isn't EKS (GKE, AKS, kind), and says who AWS says it is. Free: STS only. See [AWS from another cluster](#aws-from-another-cluster) |
 
@@ -101,11 +101,13 @@ Grant each product's role only what it calls:
 | Product | IAM actions |
 |---|---|
 | `s3-bucket` | `s3:ListBucket` (for HeadBucket), `s3:CreateBucket`, `s3:PutBucketPublicAccessBlock`, `s3:TagResource` (it's created tagged), `s3:GetBucketTagging`, and for delete `s3:DeleteBucket`, on `arn:aws:s3:::<prefix>*` |
-| `ecs-express` | `ecs:CreateExpressGatewayService`, `ecs:DescribeExpressGatewayService`, `ecs:DescribeServices`, and for delete `ecs:DeleteExpressGatewayService`, on `arn:aws:ecs:*:<account>:service/default/*`; `ecs:TagResource` there, only as it creates (condition `ecs:CreateAction` = `CreateExpressGatewayService`); `ecs:RegisterTaskDefinition` on `task-definition/default-*` and `ecs:CreateCluster` on `cluster/default` (it registers the service's task definition, and makes the default cluster on first use); `iam:PassRole` on the team's two roles alone, with `iam:PassedToService` `ecs-tasks.amazonaws.com` or `ecs.amazonaws.com` ([Hosting an app](#hosting-an-app-ecs-express) has the policy) |
+| `ecs-express` | `ecs:CreateExpressGatewayService`, `ecs:DescribeExpressGatewayService`, `ecs:DescribeServices`, `ecs:UpdateExpressGatewayService` (to roll a changed configuration out to a service it made), and for delete `ecs:DeleteExpressGatewayService`, on `arn:aws:ecs:*:<account>:service/default/*`; `ecs:TagResource` there, only as it creates (condition `ecs:CreateAction` = `CreateExpressGatewayService`); `ecs:RegisterTaskDefinition` on `task-definition/default-*` and `ecs:CreateCluster` on `cluster/default` (it registers the service's task definition, and makes the default cluster on first use); `iam:PassRole` on the team's two roles alone, with `iam:PassedToService` `ecs-tasks.amazonaws.com` or `ecs.amazonaws.com` ([Hosting an app](#hosting-an-app-ecs-express) has the policy) |
 | `rds-postgres` | `rds:DescribeDBInstances`, `rds:CreateDBInstance`, `rds:AddTagsToResource`, and for delete `rds:DeleteDBInstance` and `rds:CreateDBSnapshot` (its final snapshot), plus `secretsmanager:CreateSecret`, `secretsmanager:TagResource` and `kms:DescribeKey` for the managed password (and `secretsmanager:DeleteSecret`, which RDS uses to remove it) |
 
 Upgrading: `s3-bucket` used to tag a bucket after making it, with
 `s3:PutBucketTagging`; it now makes it tagged, which needs `s3:TagResource`.
+`ecs-express` now rolls a changed configuration out to a service it made,
+which needs `ecs:UpdateExpressGatewayService`.
 Add that to a role granted from an older copy of this table, or every
 create fails with an AccessDenied that names it.
 
@@ -216,7 +218,7 @@ the actions in the table above, passing only those two roles:
 ```json
 {"Version": "2012-10-17", "Statement": [
   {"Effect": "Allow", "Resource": "arn:aws:ecs:*:<account>:service/default/*",
-   "Action": ["ecs:CreateExpressGatewayService", "ecs:DescribeExpressGatewayService",
+   "Action": ["ecs:CreateExpressGatewayService", "ecs:DescribeExpressGatewayService", "ecs:UpdateExpressGatewayService",
               "ecs:DeleteExpressGatewayService", "ecs:DescribeServices"]},
   {"Effect": "Allow", "Action": "ecs:TagResource", "Resource": "arn:aws:ecs:*:<account>:service/default/*",
    "Condition": {"StringEquals": {"ecs:CreateAction": "CreateExpressGatewayService"}}},
@@ -243,6 +245,19 @@ the actions in the table above, passing only those two roles:
   `create` waits for the deployment, then (for a public one) for its health
   check path to answer at the URL, since the load balancer can say 503 for
   a few seconds after.
+- **A new version.** Run `create` again, same name, with the new image (or
+  environment, port, health check path, size, maxTasks, or the team's
+  execution role): it updates a service it made for the team, and ECS rolls
+  the new configuration out behind the same URL, the old one serving until
+  the new one is healthy; `create` waits until it's done, about ten minutes.
+  Give each version its own tag (or a digest): an image pushed again under
+  the same tag isn't a change. Its subnets stay as it was made
+  (`SUBNETS_CHANGED`); a service of that name made some other way, or for
+  another team, is changed by no one (`SERVICE_EXISTS`). Proven
+  (2026-11-07), as a role of exactly the policy above: a second tag and a
+  new environment rolled out in ten minutes behind the same URL, the step
+  ending once the new deployment was done; the same inputs again changed
+  nothing; another team's run and a change of subnets were refused.
 - **What delete leaves.** Each service's log group
   (`/aws/ecs/default/<service>-<id>`), kept as CloudWatch keeps it: set
   its retention, or delete it once nobody needs the logs.

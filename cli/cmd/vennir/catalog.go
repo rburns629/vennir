@@ -98,6 +98,53 @@ func ownedElsewhere(repo, current, ours string, takeOver bool) error {
 		"To move the catalog to this install, `vennir catalog create --take-over`: the other stops getting releases", repo, current, current)
 }
 
+// staleCatalogVariables are the repository variables (VENNIR_REGISTRY, the
+// signing and sign-in ones) that aren't what `vennir catalog create` would
+// set for this install, given what the repository has (have, by name; ""
+// for one not set): after a reinstall, say, its sign-in still names the
+// deleted install's identity, and catalog CI can't publish. None when the
+// repository publishes to another install's registry, which may be on
+// purpose (ownedElsewhere says what to do then).
+func staleCatalogVariables(have map[string]string, setup *catalogSetup) []string {
+	if current := have["VENNIR_REGISTRY"]; current != "" && current != setup.registry {
+		return nil
+	}
+	var stale []string
+	for _, v := range append(append([][2]string{{"VENNIR_REGISTRY", setup.registry}}, setup.signing...), setup.variables...) {
+		if have[v[0]] != v[1] {
+			stale = append(stale, v[0])
+		}
+	}
+	return stale
+}
+
+// catalogVariablesNote tells apply's reader when the catalog repository's
+// variables aren't this install's, so its CI can't publish here. Reading
+// them is best effort: apply has done its work, and a gh that can't read
+// them only costs the note.
+func (a *app) catalogVariablesNote(ctx context.Context, out io.Writer, dir string, c *config.Config) {
+	repo := c.Catalog.Repo()
+	setup, err := a.catalogSetup(ctx, dir, c)
+	if err != nil {
+		fmt.Fprintf(out, "\nWarning: couldn't check %s's variables: %v\n", repo, err)
+		return
+	}
+	gh := githost.NewGitHub(a.runner)
+	have := map[string]string{}
+	for _, v := range append(append([][2]string{{"VENNIR_REGISTRY", ""}}, setup.signing...), setup.variables...) {
+		value, _, err := gh.Variable(ctx, repo, v[0])
+		if err != nil {
+			fmt.Fprintf(out, "\nWarning: couldn't read %s's variables with gh (%v), so whether its CI publishes here is unchecked.\n", repo, err)
+			return
+		}
+		have[v[0]] = value
+	}
+	if stale := staleCatalogVariables(have, setup); len(stale) > 0 {
+		fmt.Fprintf(out, "\nThe catalog repository github.com/%s isn't set up for this install (%s), so its CI can't publish here:\n", repo, strings.Join(stale, ", "))
+		fmt.Fprintf(out, "  vennir catalog create %s   (it sets them, and leaves the repository as it is)\n", envName(dir))
+	}
+}
+
 // catalogSetup is what the catalog needs from the install.
 type catalogSetup struct {
 	registry string

@@ -148,6 +148,14 @@ again fails instead, and remakes the backups bucket on its way. The
 reserved address isn't vennir's: delete it yourself
 (`gcloud compute addresses delete <name> --global`).
 
+**Installing again for the same catalog** (after `destroy`, or a second
+environment the catalog moves to): the new install makes a new identity
+for catalog CI, and the repository's variables still name the old one, so
+its CI can't publish (the console says the release's manifest is missing).
+Run `vennir catalog create <env>` again: it sets them and leaves the
+repository as it is. `vennir apply` says so at its end when they aren't
+this install's.
+
 **Upgrading.** The release an install runs is the `vennir` setting
 (`vennir init --release <x.y.z>` chooses it; `source` builds your checkout
 instead). To upgrade, `vennir config set -e <env> vennir <x.y.z>`, then
