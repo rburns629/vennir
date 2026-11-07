@@ -4,7 +4,7 @@
     "ready": false,
     "principal": "Kubernetes ServiceAccount aws-s3-bucket, with no AWS identity",
     "missing": [
-      "an IAM role for ServiceAccount aws-s3-bucket (an EKS Pod Identity association, or IRSA)"
+      "an IAM role for ServiceAccount aws-s3-bucket (an EKS Pod Identity association, or IRSA; off EKS, its aws-s3-bucket-role secret)"
     ]
   }
 }

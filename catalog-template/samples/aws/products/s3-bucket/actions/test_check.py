@@ -30,8 +30,9 @@ class CheckActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
         self.module.TARGET_ROLE_FILE = Path(self.tmp_dir.name) / "role-arn"
+        self.module.OWN_ROLE_FILE = Path(self.tmp_dir.name) / "own-role-arn"
         self.module.TOKEN_FILE = Path(self.tmp_dir.name) / "sts.amazonaws.com"
-        # Off EKS: no default credentials (None); on EKS, Pod Identity's.
+        # The default credentials: on EKS, Pod Identity's; off EKS, None.
         self.credentials = MagicMock()
         self.sts = MagicMock()
         self.sts.get_caller_identity.return_value = {"Arn": ROLE_SESSION, "Account": "123456789012"}
@@ -65,7 +66,7 @@ class CheckActionTest(unittest.TestCase):
         self.assertFalse(result["outputs"]["ready"])
         self.assertEqual(
             result["outputs"]["missing"],
-            ["an IAM role for ServiceAccount aws-s3-bucket (an EKS Pod Identity association, or IRSA)"],
+            ["an IAM role for ServiceAccount aws-s3-bucket (an EKS Pod Identity association, or IRSA; off EKS, its aws-s3-bucket-role secret)"],
         )
 
     def test_a_role_that_refuses_it_is_not_ready(self) -> None:
@@ -98,26 +99,29 @@ class CheckActionTest(unittest.TestCase):
         )
 
 
-class OffEKSTest(unittest.TestCase):
-    """GKE, AKS: no default credentials, the step's own token for STS."""
+class OffEKSCheckTest(unittest.TestCase):
+    """GKE, AKS: no default credentials; its own role by web identity."""
 
     _run = CheckActionTest._run
     tearDown = CheckActionTest.tearDown
+    OWN = "arn:aws:iam::123456789012:role/own"
 
     def setUp(self) -> None:
         CheckActionTest.setUp(self)
         self.credentials = None
+        self.module.OWN_ROLE_FILE.write_text(self.OWN + "\n")
         self.module.TOKEN_FILE.write_text("the-projected-token\n")
-        self.module.TARGET_ROLE_FILE.write_text(TARGET)
-        self.sts.assume_role_with_web_identity.return_value = self.sts.assume_role.return_value
+        self.sts.assume_role_with_web_identity.return_value = {
+            "AssumedRoleUser": {"Arn": ROLE_SESSION},
+            "Credentials": {"AccessKeyId": "ASIAEXAMPLE", "SecretAccessKey": "not-a-secret", "SessionToken": "t"},
+        }
 
-    def test_it_acts_as_aws_target_by_web_identity(self) -> None:
+    def test_it_signs_in_as_its_own_role_by_web_identity(self) -> None:
         exit_code, result = self._run()
         self.assertEqual(exit_code, 0)
         self.assertTrue(result["outputs"]["ready"])
-        self.assertEqual(result["outputs"]["principal"], "arn:aws:sts::123456789012:assumed-role/acts-as/vennir-check")
         self.sts.assume_role_with_web_identity.assert_called_once_with(
-            RoleArn=TARGET, RoleSessionName="vennir-check", WebIdentityToken="the-projected-token")
+            RoleArn=self.OWN, RoleSessionName="vennir-check", WebIdentityToken="the-projected-token")
         self.sts.assume_role.assert_not_called()
 
     def test_a_role_that_doesnt_trust_it_is_not_ready(self) -> None:

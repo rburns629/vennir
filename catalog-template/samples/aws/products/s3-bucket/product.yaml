@@ -1,5 +1,6 @@
 # A sample: S3 bucket, with real AWS API calls (billed).
-# Its own IAM role, by EKS Pod Identity: see the aws team's README.md.
+# Its own IAM role: by EKS Pod Identity, or off EKS by web identity (the
+# team secret aws-s3-bucket-role); see the aws team's README.md.
 apiVersion: vennir.dev/v2
 kind: Product
 name: s3-bucket
@@ -15,8 +16,8 @@ clouds: [aws, gcp, azure, existing]
 # Its own identity: bound to only what it does (README.md, Credentials).
 serviceAccount: aws-s3-bucket
 # Off EKS, a token for AWS's STS, an hour long, at
-# /platform/tokens/sts.amazonaws.com, with which it assumes aws-target by
-# web identity (EKS's own credentials need none).
+# /platform/tokens/sts.amazonaws.com, with which it assumes its own role
+# (aws-s3-bucket-role) by web identity. EKS's own credentials need none.
 tokenAudiences:
 - sts.amazonaws.com
 # Each install runs check (no inputs, as this identity) when this is
@@ -112,6 +113,9 @@ actions:
   idempotent: true   # it only asks
   maxAttempts: 2
   script: actions/check.py
+  # Off EKS, it signs in as its own role: list that role's secret here so
+  # the check does as the actions do (README.md, Credentials).
+  # secretRefs: [{name: aws-s3-bucket-role, keys: [role-arn]}]
   input:
     type: object
     additionalProperties: false

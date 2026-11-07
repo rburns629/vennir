@@ -4,7 +4,7 @@
     "ready": false,
     "principal": "Kubernetes ServiceAccount aws-app-runner, with no AWS identity",
     "missing": [
-      "an IAM role for ServiceAccount aws-app-runner (an EKS Pod Identity association, or IRSA)"
+      "an IAM role for ServiceAccount aws-app-runner (an EKS Pod Identity association, or IRSA; off EKS, its aws-app-runner-role secret)"
     ]
   }
 }

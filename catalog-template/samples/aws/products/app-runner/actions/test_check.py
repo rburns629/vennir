@@ -34,6 +34,10 @@ class CheckActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
         self.module.TARGET_ROLE_FILE = Path(self.tmp_dir.name) / "role-arn"
+        self.module.OWN_ROLE_FILE = Path(self.tmp_dir.name) / "own-role-arn"
+        self.module.TOKEN_FILE = Path(self.tmp_dir.name) / "sts.amazonaws.com"
+        # The default credentials: on EKS, Pod Identity's; off EKS, None.
+        self.credentials = MagicMock()
         self.sts, self.apprunner = MagicMock(), MagicMock()
         self.sts.get_caller_identity.return_value = {"Arn": ROLE_SESSION, "Account": "123456789012"}
         self.sts.assume_role.return_value = {
@@ -48,6 +52,7 @@ class CheckActionTest(unittest.TestCase):
         clients = {"sts": self.sts, "apprunner": self.apprunner}
         with patch.object(self.module.boto3.session, "Session") as session_cls:
             session_cls.return_value.region_name = "eu-west-1"
+            session_cls.return_value.get_credentials.return_value = self.credentials
             session_cls.return_value.client.side_effect = lambda name, **_: clients[name]
             exit_code = self.module.main()
         self.session_cls = session_cls
@@ -81,7 +86,7 @@ class CheckActionTest(unittest.TestCase):
         self.assertFalse(result["outputs"]["ready"])
         self.assertEqual(
             result["outputs"]["missing"],
-            ["an IAM role for ServiceAccount aws-app-runner (an EKS Pod Identity association, or IRSA)"],
+            ["an IAM role for ServiceAccount aws-app-runner (an EKS Pod Identity association, or IRSA; off EKS, its aws-app-runner-role secret)"],
         )
 
     def test_acts_as_the_target_role_and_never_reports_its_keys(self) -> None:
@@ -111,6 +116,40 @@ class CheckActionTest(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(result["error"]["code"], "AWS_API_ERROR")
         self.assertTrue(result["error"]["retryable"])
+
+
+class OffEKSCheckTest(unittest.TestCase):
+    """GKE, AKS: no default credentials; its own role by web identity."""
+
+    _run = CheckActionTest._run
+    tearDown = CheckActionTest.tearDown
+    OWN = "arn:aws:iam::123456789012:role/own"
+
+    def setUp(self) -> None:
+        CheckActionTest.setUp(self)
+        self.credentials = None
+        self.module.OWN_ROLE_FILE.write_text(self.OWN + "\n")
+        self.module.TOKEN_FILE.write_text("the-projected-token\n")
+        self.sts.assume_role_with_web_identity.return_value = {
+            "AssumedRoleUser": {"Arn": ROLE_SESSION},
+            "Credentials": {"AccessKeyId": "ASIAEXAMPLE", "SecretAccessKey": "not-a-secret", "SessionToken": "t"},
+        }
+
+    def test_it_signs_in_as_its_own_role_by_web_identity(self) -> None:
+        exit_code, result = self._run()
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(result["outputs"]["ready"])
+        self.sts.assume_role_with_web_identity.assert_called_once_with(
+            RoleArn=self.OWN, RoleSessionName="vennir-check", WebIdentityToken="the-projected-token")
+        self.sts.assume_role.assert_not_called()
+
+    def test_a_role_that_doesnt_trust_it_is_not_ready(self) -> None:
+        self.sts.assume_role_with_web_identity.side_effect = ClientError(
+            {"Error": {"Code": "AccessDenied", "Message": "no"}}, "AssumeRoleWithWebIdentity")
+        exit_code, result = self._run()
+        self.assertEqual(exit_code, 0)
+        self.assertFalse(result["outputs"]["ready"])
+        self.assertIn("trust policy", result["outputs"]["missing"][0])
 
 
 if __name__ == "__main__":
