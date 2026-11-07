@@ -116,16 +116,6 @@ the catalog, a hello API's backend on ECS Express Mode made by a member's
 template run, published through the gateway to the internet. The docs say
 what users must do meanwhile (the gateway guide's ECS section).
 
-- [ ] **Rolling out a new version of an app**: `ecs-express`'s and
-  `app-hosting`'s `create` return a service they find unchanged, so a new
-  image, environment or size means delete and create again (and, on ECS, a
-  new URL and an API pull request). Have create bring a service its team
-  made to the inputs it's given (ECS `UpdateExpressGatewayService`, Cloud
-  Run a new revision). It would also let a backend be given its own URL.
-- [ ] **An API outlives its backend**: Delete in What runs made deletes an
-  ECS service the API still forwards to. An API whose `backend.url` comes
-  from a run's resource, or at least a warning on Delete when a published
-  API names the resource's URL.
 - [ ] **A reinstall for an existing catalog**: `vennir apply` made a new
   identity pool and left the catalog repository's
   `GCP_WORKLOAD_IDENTITY_PROVIDER` naming the deleted one, so main's CI

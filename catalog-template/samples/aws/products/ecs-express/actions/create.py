@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """aws/ecs-express's "create" action: deploys a container image as an ECS
 Express Mode service (AWS's counterpart to Cloud Run: Fargate tasks behind
-a load balancer AWS makes and manages, at an HTTPS URL), or returns the
-existing service's URL if one of that name exists, once it serves. Never
-builds an image.
+a load balancer AWS makes and manages, at an HTTPS URL), or brings one it
+made for this team to the inputs (a new image, environment, size: ECS rolls
+the new configuration out, keeping its URL), and returns its URL once it
+serves. Never builds an image.
 
 What it deploys, and with what, is the team's choice, not the caller's: the
 team secret ecs-express names the registry every image must be under and
@@ -19,7 +20,8 @@ public one, until its health check path answers at its URL, so later steps
 can use it. One it creates is tagged vennir-made=true and
 vennir-team=<the run's team> and reported as a resource, which delete (its
 cleanup) removes; one it only found is neither, unless an earlier attempt
-made it for this team.
+made it for this team, and is changed only if this product made it for this
+team: one that differs, made some other way, is refused.
 Credentials as in the aws team's README.md: boto3's default chain (EKS Pod
 Identity or IRSA) or, off EKS, its own role by web identity, optionally
 assuming the aws-target role.
@@ -79,6 +81,10 @@ RETRYABLE_CODES = {
 # step's timeoutSeconds must be longer).
 START_TIMEOUT_SECONDS = 900
 POLL_SECONDS = 15
+# What a found service may change into: its subnets stay as it was made
+# (moving it is deleting it and making it again), as does its
+# infrastructure role (ECS keeps that for good).
+SUBNETS = "subnets"
 # After its deployment is done, the load balancer can answer 503 for a few
 # seconds more (seen 2026-11-07): how long a public service gets to answer
 # its health check path at its URL.
@@ -178,14 +184,58 @@ def _made_here(service: dict[str, Any], team: str) -> bool:
     return tags.get(MADE_BY_TAG[0]) == MADE_BY_TAG[1] and tags.get(TEAM_TAG) == team
 
 
+def _newest(service: dict[str, Any]) -> dict[str, Any]:
+    """The configuration ECS last accepted: while a new one rolls out, both
+    are active (ECS lists the newest first; createdAt says for sure)."""
+    configurations = service.get("activeConfigurations", [])
+    return max(configurations, key=lambda c: str(c.get("createdAt", "")), default={})
+
+
 def _ingress(service: dict[str, Any]) -> tuple[str, str]:
     """The newest configuration's endpoint, and its access type (PUBLIC or
     PRIVATE)."""
-    for configuration in reversed(service.get("activeConfigurations", [])):
-        for path in configuration.get("ingressPaths", []):
-            if path.get("endpoint"):
-                return path["endpoint"], path.get("accessType", "")
+    for path in _newest(service).get("ingressPaths", []):
+        if path.get("endpoint"):
+            return path["endpoint"], path.get("accessType", "")
     return "", ""
+
+
+def _desired(inputs: dict[str, Any], environment: dict[str, str], execution_role: str) -> dict[str, Any]:
+    """The configuration the inputs ask for, as ECS's create and update take
+    it (and describe reports it)."""
+    desired: dict[str, Any] = {
+        "executionRoleArn": execution_role,
+        "primaryContainer": {
+            "image": inputs["image"],
+            "containerPort": int(inputs.get("port", 8080)),
+            "environment": [{"name": k, "value": v} for k, v in sorted(environment.items())],
+        },
+        "healthCheckPath": inputs.get("healthCheckPath", "/"),
+        "cpu": inputs.get("cpu", "256"),
+        "memory": inputs.get("memory", "512"),
+        "scalingTarget": {"minTaskCount": 1, "maxTaskCount": int(inputs.get("maxTasks", 2))},
+    }
+    if inputs.get("subnets"):
+        desired["networkConfiguration"] = {"subnets": list(inputs["subnets"])}
+    return desired
+
+
+def _changes(current: dict[str, Any], desired: dict[str, Any]) -> list[str]:
+    """What the desired configuration changes in the current one."""
+    have, want = current.get("primaryContainer", {}), desired["primaryContainer"]
+    def env(container: dict[str, Any]) -> dict[str, str]:
+        return {e.get("name"): e.get("value") for e in container.get("environment", [])}
+    changes = [field for field in ("image", "containerPort") if have.get(field) != want[field]]
+    if env(have) != env(want):
+        changes.append("environment")
+    changes += [field for field in ("healthCheckPath", "cpu", "memory", "executionRoleArn") if current.get(field) != desired[field]]
+    if any(current.get("scalingTarget", {}).get(k) != v for k, v in desired["scalingTarget"].items()):
+        changes.append("scalingTarget")
+    if "networkConfiguration" in desired and sorted(
+        current.get("networkConfiguration", {}).get("subnets", [])
+    ) != sorted(desired["networkConfiguration"]["subnets"]):
+        changes.append(SUBNETS)
+    return changes
 
 
 def _url(service: dict[str, Any]) -> str:
@@ -204,14 +254,21 @@ def _answers(url: str) -> bool:
         return False
 
 
-def _rollout(ecs: Any, name: str) -> tuple[str, int]:
-    """The primary deployment's rollout state (IN_PROGRESS, COMPLETED or
-    FAILED), and how many tasks are running."""
+def _rollout(ecs: Any, arn: str, name: str) -> tuple[str, int]:
+    """The newest configuration's rollout state (IN_PROGRESS, COMPLETED or
+    FAILED), and how many tasks are running. Its deployment is the primary
+    one running its task definition; until ECS has made that (a moment
+    after an update, when the last one is still primary and done), it's in
+    progress."""
+    target = _newest(_describe(ecs, arn) or {}).get("taskDefinitionArn", "")
     services = ecs.describe_services(cluster=CLUSTER, services=[name]).get("services", [])
     if not services:
         return "IN_PROGRESS", 0
+    running = services[0].get("runningCount", 0)
     primary = next((d for d in services[0].get("deployments", []) if d.get("status") == "PRIMARY"), {})
-    return primary.get("rolloutState", "IN_PROGRESS"), services[0].get("runningCount", 0)
+    if target and primary.get("taskDefinition") != target:
+        return "IN_PROGRESS", running
+    return primary.get("rolloutState", "IN_PROGRESS"), running
 
 
 def _outputs(service: dict[str, Any], region: str, made_here: bool) -> dict[str, Any]:
@@ -262,43 +319,52 @@ def main() -> int:
         status = (service or {}).get("status", {}).get("statusCode")
         if status == "DRAINING":
             return _failure("SERVICE_DELETING", f"Service '{name}' is being deleted: run it again once it's gone.", retryable=True)
+        desired = _desired(inputs, environment, execution_role)
         if service and status != "INACTIVE":
-            # Left as it is, but waited for like a new one: a retry may find
-            # the service its last attempt was still creating.
-            print(f"service '{name}' already exists, leaving it as it is")
+            # Waited for like a new one: a retry may find the service, or the
+            # configuration, its last attempt was still rolling out.
             made_here = _made_here(service, team)
+            current = _newest(service)
+            changes = _changes(current, desired)
+            if changes and not made_here:
+                return _failure(
+                    "SERVICE_EXISTS",
+                    f"Service '{name}' exists, made some other way or for another team, and differs from these inputs "
+                    f"({', '.join(changes)}): this product changes only services it made for this team. Choose another name.",
+                )
+            if SUBNETS in changes:
+                return _failure(
+                    "SUBNETS_CHANGED",
+                    f"Service '{name}' keeps the subnets it was made in: to move it, delete it (its run's Delete) and create it again.",
+                )
+            if changes:
+                update = {"serviceArn": service["serviceArn"], **desired}
+                # Its autoscaling metric and target stay as they are.
+                update["scalingTarget"] = {**current.get("scalingTarget", {}), **desired["scalingTarget"]}
+                service = {**service, **ecs.update_express_gateway_service(**update)["service"]}
+                print(f"updating service '{name}': {', '.join(changes)}")
+            else:
+                print(f"service '{name}' already exists as asked, leaving it as it is")
         else:
-            container: dict[str, Any] = {
-                "image": image,
-                "containerPort": int(inputs.get("port", 8080)),
-                "environment": [{"name": k, "value": v} for k, v in sorted(environment.items())],
-            }
-            create: dict[str, Any] = {
-                "serviceName": name,
-                "cluster": CLUSTER,
-                "executionRoleArn": execution_role,
-                "infrastructureRoleArn": infrastructure_role,
-                "primaryContainer": container,
-                "healthCheckPath": inputs.get("healthCheckPath", "/"),
-                "cpu": inputs.get("cpu", "256"),
-                "memory": inputs.get("memory", "512"),
-                "scalingTarget": {"minTaskCount": 1, "maxTaskCount": int(inputs.get("maxTasks", 2))},
-                "tags": [{"key": MADE_BY_TAG[0], "value": MADE_BY_TAG[1]}, {"key": TEAM_TAG, "value": team}],
-            }
-            if inputs.get("subnets"):
-                create["networkConfiguration"] = {"subnets": list(inputs["subnets"])}
-            service = ecs.create_express_gateway_service(**create)["service"]
+            service = ecs.create_express_gateway_service(
+                serviceName=name,
+                cluster=CLUSTER,
+                infrastructureRoleArn=infrastructure_role,
+                tags=[{"key": MADE_BY_TAG[0], "value": MADE_BY_TAG[1]}, {"key": TEAM_TAG, "value": team}],
+                **desired,
+            )["service"]
             made_here = True
             print(f"creating service '{name}'")
 
         # The service and its URL exist at once; it serves once its first
-        # deployment has finished. Still rolling out is worth a retry, which
-        # waits again; a failed rollout needs someone to look.
+        # deployment has finished, and a new configuration once its own has
+        # (until then the last one serves). Still rolling out is worth a
+        # retry, which waits again; a failed rollout needs someone to look.
         deadline = time.monotonic() + START_TIMEOUT_SECONDS
-        state, running = _rollout(ecs, name)
+        state, running = _rollout(ecs, arn, name)
         while state == "IN_PROGRESS" and time.monotonic() < deadline:
             time.sleep(POLL_SECONDS)
-            state, running = _rollout(ecs, name)
+            state, running = _rollout(ecs, arn, name)
         if state != "COMPLETED" or running < 1:
             return _failure(
                 "SERVICE_NOT_RUNNING",
@@ -306,7 +372,7 @@ def main() -> int:
                 "see its events and logs in the ECS console.",
                 retryable=state == "IN_PROGRESS",
             )
-        service = _describe(ecs, service["serviceArn"]) or service
+        service = _describe(ecs, arn) or service
     except (ClientError, BotoCoreError) as error:
         return _aws_failure(error)
 

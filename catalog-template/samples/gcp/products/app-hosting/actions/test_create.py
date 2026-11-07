@@ -19,6 +19,17 @@ _VALID_INPUTS = {
 }
 
 _RUNTIME_ACCOUNT = "web-runtime@my-project.iam.gserviceaccount.com"
+_PATH = "projects/my-project/locations/us-central1/services/hello-world"
+_MADE = {"vennir-made": "true", "vennir-team": "web"}
+
+
+def _service(module, labels: dict, image: str = _VALID_INPUTS["image"], account: str = _RUNTIME_ACCOUNT):
+    """A Cloud Run service as get_service returns it: deployed from image,
+    running as account."""
+    return module.run_v2.Service(
+        name=_PATH, uri="https://hello-world-abc123-uc.a.run.app", labels=labels,
+        template=module.run_v2.RevisionTemplate(service_account=account, containers=[module.run_v2.Container(image=image)]),
+    )
 
 
 def _load_create_module():
@@ -113,14 +124,14 @@ class CreateActionTest(unittest.TestCase):
             client.service_path.return_value = (
                 "projects/my-project/locations/us-central1/services/hello-world"
             )
-            existing = MagicMock(labels={})  # deployed some other way: not reported
-            existing.uri = "https://hello-world-abc123-uc.a.run.app"
-            client.get_service.return_value = existing
+            # Deployed some other way, as the inputs ask: not reported.
+            client.get_service.return_value = _service(self.module, {})
 
             exit_code = self.module.main()
 
         client.service_path.assert_called_once_with("my-project", "us-central1", "hello-world")
         client.create_service.assert_not_called()
+        client.update_service.assert_not_called()
         self.assertEqual(exit_code, 0)
         self.assertEqual(
             self._result(),
@@ -135,9 +146,52 @@ class CreateActionTest(unittest.TestCase):
             self._write_request(_VALID_INPUTS)
             with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
                 client_cls.return_value.service_path.return_value = "projects/my-project/locations/us-central1/services/hello-world"
-                client_cls.return_value.get_service.return_value = MagicMock(uri="https://x", labels={"vennir-made": "true", "vennir-team": team})
+                client_cls.return_value.get_service.return_value = _service(self.module, {"vennir-made": "true", "vennir-team": team})
                 self.assertEqual(self.module.main(), 0)
             self.assertEqual("resources" in self._result()["outputs"], reported, team)
+
+    def test_a_service_it_deployed_for_this_team_gets_a_new_revision(self) -> None:
+        new_image = "us-central1-docker.pkg.dev/my-project/demo/hello-world-app:2"
+        self._write_request({**_VALID_INPUTS, "image": new_image, "cloudSqlConnectionName": "my-project:us-central1:db"})
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client = client_cls.return_value
+            client.service_path.return_value = _PATH
+            client.get_service.return_value = _service(self.module, _MADE)
+            client.update_service.return_value.result.return_value = _service(self.module, _MADE, image=new_image)
+            exit_code = self.module.main()
+        self.assertEqual(exit_code, 0)
+        client.create_service.assert_not_called()
+        updated = client.update_service.call_args.kwargs["service"]
+        self.assertEqual(updated.name, _PATH)
+        self.assertEqual(dict(updated.labels), _MADE)  # still its, for its team
+        self.assertEqual(updated.template.containers[0].image, new_image)
+        self.assertEqual(updated.template.service_account, _RUNTIME_ACCOUNT)
+        self.assertEqual(updated.template.volumes[0].cloud_sql_instance.instances, ["my-project:us-central1:db"])
+        self.assertEqual(self._result()["outputs"]["resources"][0]["id"], _PATH)
+
+    def test_a_new_runtime_account_is_a_new_revision_too(self) -> None:
+        self._write_request(_VALID_INPUTS)
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client = client_cls.return_value
+            client.service_path.return_value = _PATH
+            client.get_service.return_value = _service(self.module, _MADE, account="old@my-project.iam.gserviceaccount.com")
+            client.update_service.return_value.result.return_value = _service(self.module, _MADE)
+            self.assertEqual(self.module.main(), 0)
+        self.assertEqual(client.update_service.call_args.kwargs["service"].template.service_account, _RUNTIME_ACCOUNT)
+
+    def test_one_deployed_some_other_way_is_changed_by_no_one(self) -> None:
+        for labels in ({}, {"vennir-made": "true", "vennir-team": "data"}):
+            with self.subTest(labels=labels):
+                self._write_request({**_VALID_INPUTS, "image": "us-central1-docker.pkg.dev/my-project/demo/other:1"})
+                with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+                    client = client_cls.return_value
+                    client.service_path.return_value = _PATH
+                    client.get_service.return_value = _service(self.module, labels)
+                    self.assertEqual(self.module.main(), 1)
+                client.update_service.assert_not_called()
+                error = self._result()["error"]
+                self.assertEqual((error["code"], error["retryable"]), ("SERVICE_EXISTS", False))
+                self.assertIn("image", error["message"])
 
     def test_a_request_without_a_team_is_refused(self) -> None:
         self.module.INPUT_PATH.write_text(json.dumps({"inputs": _VALID_INPUTS}))
