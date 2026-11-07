@@ -30,6 +30,21 @@ HELM_CONTEXT_ARGS=()
 [ -n "${KUBE_CONTEXT:-}" ] && CONTEXT_ARGS=(--context "$KUBE_CONTEXT") && HELM_CONTEXT_ARGS=(--kube-context "$KUBE_CONTEXT")
 # ${a[@]+...}: an empty array is "unbound" to bash 3.2 (macOS) under set -u.
 k() { kubectl ${CONTEXT_ARGS[@]+"${CONTEXT_ARGS[@]}"} "$@"; }
+# Replaces a policy with the one on stdin. Without a resourceVersion,
+# kubectl replace reads the current one and sends it; the policy
+# controller writes a policy's type-checking status just after each write,
+# and when that lands between the read and the update, the update
+# conflicts. Only a conflict is tried again.
+replace_policy() {
+  local object out
+  object=$(cat)
+  for _ in 1 2 3 4 5; do
+    if out=$(printf '%s' "$object" | k replace -f - 2>&1); then return 0; fi
+    case $out in *Conflict*) sleep 1 ;; *) echo "$out" >&2; return 1 ;; esac
+  done
+  echo "$out" >&2
+  return 1
+}
 
 RELEASE=${POLICY_TEST_RELEASE:-policytest}
 PLATFORM_NS=$RELEASE-system
@@ -303,7 +318,7 @@ for variable in policy["spec"]["variables"]:
     elif variable["name"][len("allowedDigests"):] in maps and variable["name"].startswith("allowedDigests"):
         variable["expression"] = json.dumps(maps[variable["name"][len("allowedDigests"):]], separators=(",", ":"))
 print(json.dumps(policy))' "$1" "$2" "${3:-0}" "${4:-}" \
-    | k replace -f - > /dev/null || { echo "  FAIL  writing the scan policy's digests"; FAILURES=$((FAILURES + 1)); }
+    | replace_policy || { echo "  FAIL  writing the scan policy's digests"; FAILURES=$((FAILURES + 1)); }
 }
 scan_literal '{"'$ZERO_DIGEST'":true,"'$PASSED_DIGEST'":true,"'$ACCEPTED_DIGEST'":true,"'$PLATFORM_DIGEST'":true,"'$UNRELEASED_DIGEST'":true}' false 5000
 
@@ -353,7 +368,7 @@ for variable in policy["spec"]["variables"]:
     elif name.startswith("releases") and name[len("releases"):] in maps:
         variable["expression"] = dump(maps[name[len("releases"):]])
 print(json.dumps(policy))' "$1" "$2" "$3" "${4:-}" \
-    | k replace -f - > /dev/null || { echo "  FAIL  writing the identity policy's literals"; FAILURES=$((FAILURES + 1)); }
+    | replace_policy || { echo "  FAIL  writing the identity policy's literals"; FAILURES=$((FAILURES + 1)); }
 }
 identity_literal '[]' "$TEAM_SECRETS" "$RELEASES" full
 
@@ -383,7 +398,7 @@ for variable in policy["spec"]["variables"]:
     elif variable["name"].startswith("apiAudiences") and digit in maps:
         variable["expression"] = json.dumps(maps[digit], separators=(",", ":"))
 print(json.dumps(policy))' "$1" "${2:-}" \
-    | k replace -f - > /dev/null || { echo "  FAIL  writing the gateway token policy's literals"; FAILURES=$((FAILURES + 1)); }
+    | replace_policy || { echo "  FAIL  writing the gateway token policy's literals"; FAILURES=$((FAILURES + 1)); }
 }
 # The kernel's catalog policies' literals as kernel policy writes them
 # (kernel/internal/policy): releases (digest to products, by the digest's
@@ -408,7 +423,7 @@ for variable in policy["spec"]["variables"]:
     elif name.startswith(prefix) and name[len(prefix):] in maps:
         variable["expression"] = json.dumps(maps[name[len(prefix):]], separators=(",", ":"))
 print(json.dumps(policy))' "$2" "$3" \
-    | k replace -f - > /dev/null || { echo "  FAIL  writing $1's literals"; FAILURES=$((FAILURES + 1)); }
+    | replace_policy || { echo "  FAIL  writing $1's literals"; FAILURES=$((FAILURES + 1)); }
 }
 
 # The console chart rendered as an upgrade would (lookup reads this run's
@@ -939,7 +954,7 @@ for v in policy["spec"]["variables"]:
                            "p.serviceAccount == variables.serviceAccount)")
     variables.append(v)
 policy["spec"]["variables"] = variables
-print(json.dumps(policy))' "$LEGACY_SEED" "$1" | k replace -f - > /dev/null || { echo "  FAIL  writing the console's legacy list ($1)"; FAILURES=$((FAILURES + 1)); }
+print(json.dumps(policy))' "$LEGACY_SEED" "$1" | replace_policy || { echo "  FAIL  writing the console's legacy list ($1)"; FAILURES=$((FAILURES + 1)); }
 }
 catalog_products() {  # the kernel's catalog-identity policy as an upgrade would render it now: its products literal
   render_catalog | python3 -c '
@@ -960,7 +975,7 @@ ht "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" ${HELM_CONTEXT_ARGS
   --dry-run=server --take-ownership --show-only templates/identity-policy.yaml | python3 -c '
 import re, sys
 print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M)))' \
-  | k replace -f - > /dev/null || { echo "  FAIL  restoring the identity policy"; FAILURES=$((FAILURES + 1)); }
+  | replace_policy || { echo "  FAIL  restoring the identity policy"; FAILURES=$((FAILURES + 1)); }
 identity_literal '[]' "$TEAM_SECRETS" "$RELEASES"
 console_legacy full
 render_catalog | k apply -f - > /dev/null
@@ -1049,7 +1064,7 @@ ht "$RELEASE" helm/charts/execution-kernel -n "$PLATFORM_NS" \
   --show-only templates/identity-policy.yaml | python3 -c '
 import re, sys
 print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M)))' \
-  | k replace -f - > /dev/null || { echo "  FAIL  replacing the identity policy"; FAILURES=$((FAILURES + 1)); }
+  | replace_policy || { echo "  FAIL  replacing the identity policy"; FAILURES=$((FAILURES + 1)); }
 # Its release maps and legacy list are inert (kept for a console from
 # before, during the upgrade): here a console writes another digest of
 # db's repository into them, and the legacy list by repository, and
@@ -1108,7 +1123,7 @@ if found:
     found[0]["expression"] = sys.argv[1]
 else:
     variables.insert(0, {"name": "products", "expression": sys.argv[1]})
-print(json.dumps(policy))' "$1" "$2" | k replace -f - > /dev/null || { echo "  FAIL  writing the kernel policy's legacy list"; FAILURES=$((FAILURES + 1)); }
+print(json.dumps(policy))' "$1" "$2" | replace_policy || { echo "  FAIL  writing the kernel policy's legacy list"; FAILURES=$((FAILURES + 1)); }
 }
 kernel_legacy "$LEGACY_PRODUCTS" ""
 expect "kernel policy with a seeded legacy list, unwritten: full" full  "$(form "$RELEASE" "${CATALOG_ON[@]}")"
@@ -1133,7 +1148,7 @@ LEGACY_V011='[{"team":"'$TEAM_A'","repository":"registry.example/legacy-v011","a
 shape "$RELEASE" | python3 -c '
 import re, sys
 print("---".join(d for d in re.split(r"^---$", sys.stdin.read(), flags=re.M) if re.search(r"^kind: ValidatingAdmissionPolicy$", d, re.M)))' \
-  | k replace -f - > /dev/null || { echo "  FAIL  replacing the identity policy"; FAILURES=$((FAILURES + 1)); }
+  | replace_policy || { echo "  FAIL  replacing the identity policy"; FAILURES=$((FAILURES + 1)); }
 k get validatingadmissionpolicy "$RELEASE-execution-kernel-identity" -o json | python3 -c '
 import json, sys
 policy = json.load(sys.stdin)
@@ -1155,7 +1170,7 @@ for v in policy["spec"]["variables"]:
     variables.append(v)
 policy["spec"]["variables"] = variables
 print(json.dumps(policy))' "$LEGACY_V011" \
-  | k replace -f - > /dev/null || { echo "  FAIL  writing a v0.11-shaped identity policy"; FAILURES=$((FAILURES + 1)); }
+  | replace_policy || { echo "  FAIL  writing a v0.11-shaped identity policy"; FAILURES=$((FAILURES + 1)); }
 expect "it is v0.11's shape (no candidates, no releases0)" allowed "$([ -z "$(seeded "$RELEASE-execution-kernel-identity" candidates)$(seeded "$RELEASE-execution-kernel-identity" releases0)" ] && echo '(server dry run)' || echo 'not reshaped')"
 V011=$(shape "$RELEASE")
 expect "catalogPolicy off: full"                        full    "$(form "$RELEASE")"
