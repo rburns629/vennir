@@ -248,12 +248,15 @@ the actions in the table above, passing only those two roles:
   its retention, or delete it once nobody needs the logs.
 
 Proven (2026-11-07), running the product's image as the kernel would, with
-a role of exactly the policy above, not yet from a cluster: its check ready
-in the registry's region; a service made from a private ECR image in
-us-east-2 (the first in the account: the default cluster made on the way,
-after the service-linked role), serving the moment the step ended; found
-again by a second create and left alone; refused to another team's delete,
-and deleted; an image outside the registry refused before any call.
+a role of exactly the policy above: its check ready in the registry's
+region; a service made from a private ECR image in us-east-2 (the first in
+the account: the default cluster made on the way, after the service-linked
+role), serving the moment the step ended; found again by a second create
+and left alone; refused to another team's delete, and deleted; an image
+outside the registry refused before any call. Proven from GKE the same day
+(the 0.13.2 release, the role by web identity): the check ready, a member's
+template run serving an API's backend on its first attempt, published
+through the gateway to the internet, and its run's Delete.
 
 ## Is it ready here?
 

@@ -125,9 +125,21 @@ Operator, cert-manager) vennir installed there, asking about each, even
 with `--all`.
 
 **With the gateway on GKE's load balancer** (`gateway.ingress.gke`),
-`destroy` can stop at the network: GKE's Ingress controller leaves its
+delete its Ingress and its certificate before `destroy`, so GKE's Ingress
+controller removes what it made while the cluster is still there:
+
+```bash
+kubectl --context gke_<project>_<region>_<cluster> -n vennir-system delete ingress console-execution-console-gateway
+kubectl --context gke_<project>_<region>_<cluster> -n vennir-system delete managedcertificate console-execution-console-gateway
+gcloud compute network-endpoint-groups list --project <project>   # until it's empty, a few minutes
+```
+
+Then `destroy` goes through (proven on GKE Autopilot, 2026-11-07: the
+forwarding rule, backend services and every endpoint group gone within ten
+minutes, the certificate within a minute of deleting its object). If the cluster went
+first, `destroy` can stop at the network: GKE's Ingress controller leaves its
 network endpoint groups (`k8s1-…`, one per zone) and the certificate
-(`mcrt-…`) behind when the cluster goes first. Delete those
+(`mcrt-…`) behind. Delete those
 (`gcloud compute network-endpoint-groups delete <name> --zone <zone>`,
 `gcloud compute ssl-certificates delete <name> --global`), then delete
 the network with OpenTofu in `deploy/<env>/tofu`

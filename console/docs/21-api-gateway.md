@@ -122,6 +122,18 @@ backend:
 
 The role trusts the cluster's OIDC issuer (registered in IAM as an OIDC provider) for exactly `system:serviceaccount:web:orders-api`, audience `sts.amazonaws.com`, the same trust policy as [AWS from another cluster](20-deploy-to-aws.md#from-an-install-that-isnt-on-eks). On EKS the issuer is already registered; a GKE cluster's is public, so a GKE install can call AWS backends with no AWS cluster at all. For a function URL (`AuthType AWS_IAM`), the role needs both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` on the function. The sample is `samples/aws/apis/orders`. The gateway signs every header it sends but `X-Forwarded-For`, which it sends unsigned: AWS's front end adds to that header before checking the signature, so a signature over it never matches. Proven from GKE to a Lambda function URL (2026-11-07): placed and looked up through the gateway, signed as the role it assumed with the API's ServiceAccount token, with a request outside the OpenAPI document refused before anything was sent.
 
+### An ECS Express Mode service (no `auth`)
+
+An ECS Express service (the `ecs-express` sample, [Hosting an app on ECS Express Mode](20-deploy-to-aws.md#hosting-an-app-on-ecs-express-mode)) is public at its own URL, and its load balancer takes no IAM signature. So leave `auth` out, and have the backend check `Vennir-Caller` on every request and answer 401 to anything else: anyone on the internet can reach the URL, and only that check keeps them to the gateway.
+
+1. **Deploy the backend first.** ECS makes the URL when it makes the service (`https://<two letters of its name>-<32 hex digits>.ecs.<region>.on.aws`, not predictable), so run its template, then read `serviceUrl` from the step's outputs.
+2. **Then publish the API** in a second pull request, with `backend.url` and the OpenAPI file's `servers` naming that URL. An admin allows `*.ecs.<region>.on.aws` in `gateway.backendHosts`.
+3. **Give the backend the gateway's public keys**: `https://<the gateway's public host>/.vennir/jwks.json`, which the internet listener serves (it needs [Putting it on the internet](#putting-it-on-the-internet)). The backend can't be told its own URL before ECS makes it, and `create` doesn't change a service it finds, so it can't learn its `aud` that way: take the origin from the request's `Host` instead, and check `api` as ever. That's sound behind Express Mode's load balancer, which routes each service by its host, so a request reaches it only with its own host.
+4. **Answer the health check with 200.** ECS's target group counts only 200 healthy (204 isn't), on the path the run gives as `healthCheckPath`. Leave that path out of the OpenAPI file and the gateway never forwards it.
+5. **Take the API out before deleting the backend.** **Delete** in **What runs made** deletes the service, but the API stays published, forwarding to a URL that's draining and then gone: drop it from the catalog first.
+
+Proven from GKE (2026-11-07, from the 0.13.2 release): a team member's template run made the service; called directly it answered only its health check (401 with no `Vennir-Caller`, or a forged one); published, it answered through the gateway from the internet, the backend checking the gateway's signature with the keys from its public JWKS; a path outside the OpenAPI file got 404 and a bad parameter 400 from the gateway; another team's member got 403 until a maintainer granted the request, and then 429 past the grant's rate.
+
 ## 3. Call it
 
 Callers sign in to the gateway exactly as to the console, and call as one of their teams:
