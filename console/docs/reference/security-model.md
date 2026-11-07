@@ -231,7 +231,10 @@ reads by federation of its own (`catalogPolicy.registry.federation`):
 its ServiceAccount's token, projected for that side alone, exchanged at
 Google's STS or by `AssumeRoleWithWebIdentity`, which the owner's `vennir
 catalog grant` trusts beside the console's (`--policy-subject`); it never
-holds or borrows the console's credential. A digest a newer release names as another ServiceAccount or
+holds or borrows the console's credential (proven 2026-11-07: a GKE install
+reading another account's ECR, where CloudTrail shows kernel policy's and
+the console's own sessions assuming the owner's role, each as its own
+ServiceAccount). A digest a newer release names as another ServiceAccount or
 other audiences loses the old ones at once. Each release records which of
 the trusted signers (each key, the keyless identity) verified it, and is
 listed only while one of them is still trusted: removing a key takes the

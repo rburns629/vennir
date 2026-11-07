@@ -187,20 +187,11 @@ it was seen.
   (one helper each, so the two charts can't disagree). Proven on both
   clouds on 2026-11-06: on GKE end to end with `vennir catalog create`
   (keyless-signed release from catalog CI, its starter run), on EKS with a
-  by-hand signed release (ECR read and RDS sign-in as its own role). Next:
-  - **Prove kernel policy's own federation across clouds** (built
-    2026-11-06; billed, so asked first): `kernel policy` reads another
-    cloud's catalog, or another account's ECR, by a federation of its own
-    (`catalogPolicy.registry.federation`; `policy.Federation`: Google's STS
-    then impersonation, or `AssumeRoleWithWebIdentity` then ECR's token),
-    which the owner's `vennir catalog grant --policy-subject` trusts beside
-    the console's; `vennir` turns it on for a signed federated catalog with
-    a cluster issuer, and prints the grant with both. Tested against
-    stand-ins for STS, IAM Credentials and ECR, and the grant's plans
-    against recorded CLI answers; not yet against a real pool or role. The
-    smallest proof: an EKS reader of an Artifact Registry catalog in
-    acyclix-dev (or GKE of an ECR), its kernel policy writing the reader's
-    catalog-identity policy from the owner's signed release.
+  by-hand signed release (ECR read and RDS sign-in as its own role); and
+  another cloud's catalog by a federation of its own on 2026-11-07 (a GKE
+  install reading a signed release in another account's ECR: kernel
+  policy and the console each assumed the owner's role as themselves,
+  CloudTrail shows, and kernel policy wrote the reader's policies from it).
 
 ## Console
 
