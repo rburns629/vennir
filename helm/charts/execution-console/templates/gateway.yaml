@@ -392,6 +392,13 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "execution-console.labels" . | nindent 4 }}
+  {{- if and .Values.gateway.publicListener .Values.gateway.ingress.enabled .Values.gateway.ingress.gke }}
+  annotations:
+    # GKE's load balancer reaches the Pods directly (NEGs) and checks the
+    # public port's /.vennir/health.
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: {{ printf `{"ports": {"public": "%s"}}` $name | quote }}
+  {{- end }}
 spec:
   selector:
     {{- include "execution-console.selectorLabels" . | nindent 4 }}
@@ -456,6 +463,39 @@ spec:
     {{- end }}
 {{- end }}
 {{- if and .Values.gateway.publicListener .Values.gateway.ingress.enabled }}
+{{- $gke := .Values.gateway.ingress.gke }}
+{{- if $gke }}
+{{- if not .Values.gateway.ingress.host }}
+{{- fail "gateway.ingress.gke needs gateway.ingress.host: the name Google's certificate is for." }}
+{{- end }}
+---
+# Google's certificate for the gateway's host: it's issued once the host's
+# DNS record points at the Ingress's reserved address.
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "execution-console.labels" . | nindent 4 }}
+spec:
+  domains: [{{ .Values.gateway.ingress.host | quote }}]
+---
+# The load balancer's health check: the public listener's /.vennir/health,
+# which answers 200 while the gateway is up (/ is the APIs').
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "execution-console.labels" . | nindent 4 }}
+spec:
+  healthCheck:
+    type: HTTP
+    requestPath: /.vennir/health
+    port: 8081
+{{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -464,7 +504,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "execution-console.labels" . | nindent 4 }}
-  {{- with .Values.gateway.ingress.annotations }}
+  {{- $annotations := .Values.gateway.ingress.annotations | default dict }}
+  {{- if $gke }}
+  {{- $annotations = merge (dict "networking.gke.io/managed-certificates" $name) $annotations }}
+  {{- end }}
+  {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
