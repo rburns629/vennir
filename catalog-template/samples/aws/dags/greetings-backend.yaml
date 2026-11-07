@@ -1,0 +1,50 @@
+# The greetings API's backend (apis/greetings) on ECS Express Mode: the
+# greetings image (examples/greetings-api in the platform's repository,
+# built and pushed under the team's registry, its ecs-express secret's
+# image-registry), public at the URL ECS makes for it. It answers only what
+# the gateway signed, checked against the gateway's public keys, so the
+# install's gateway must be on the internet (its internet listener serves
+# them). Real, billed calls: a task and a load balancer run until its run's
+# Delete. Off EKS, ecs-express needs its role's secret on create (the aws
+# team's README.md, Credentials).
+apiVersion: vennir.dev/v2
+kind: Template
+name: greetings-backend
+displayName: The greetings API's backend
+description: Hosts the greetings API's backend on ECS Express Mode, answering only the gateway.
+parameters:
+  type: object
+  additionalProperties: false
+  required: [image, gatewayKeys]
+  properties:
+    serviceName:
+      type: string
+      title: Service name
+      default: greetings
+      pattern: ^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$
+    image:
+      type: string
+      title: Image
+      description: The greetings image, under the team's registry, a tag per version.
+    gatewayKeys:
+      type: string
+      title: The gateway's public keys
+      description: https://<the gateway's public host>/.vennir/jwks.json
+      pattern: ^https://[A-Za-z0-9.-]+(:[0-9]+)?/\.vennir/jwks\.json$
+steps:
+  - id: service
+    action: ecs-express.create
+    timeoutSeconds: 1200
+    inputs:
+      serviceName: {$param: serviceName}
+      image: {$param: image}
+      region: us-east-2          # your region; the API's URL is in it
+      port: 8080
+      healthCheckPath: /healthz
+      environment:
+        GATEWAY_JWKS_URL: {$param: gatewayKeys}
+        API: aws/greetings
+        # Its URL isn't known until ECS makes it, and Express Mode's load
+        # balancer routes each service by its host: the audience it checks
+        # is the request's own origin.
+        AUDIENCE_FROM_HOST: "true"

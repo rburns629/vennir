@@ -124,7 +124,7 @@ The role trusts the cluster's OIDC issuer (registered in IAM as an OIDC provider
 
 ### An ECS Express Mode service (no `auth`)
 
-An ECS Express service (the `ecs-express` sample, [Hosting an app on ECS Express Mode](20-deploy-to-aws.md#hosting-an-app-on-ecs-express-mode)) is public at its own URL, and its load balancer takes no IAM signature. So leave `auth` out, and have the backend check `Vennir-Caller` on every request and answer 401 to anything else: anyone on the internet can reach the URL, and only that check keeps them to the gateway.
+The catalog's `samples/aws` has one ready to copy: `apis/greetings`, its backend hosted by `dags/greetings-backend.yaml` (the aws README, An API on it). An ECS Express service (the `ecs-express` sample, [Hosting an app on ECS Express Mode](20-deploy-to-aws.md#hosting-an-app-on-ecs-express-mode)) is public at its own URL, and its load balancer takes no IAM signature. So leave `auth` out, and have the backend check `Vennir-Caller` on every request and answer 401 to anything else: anyone on the internet can reach the URL, and only that check keeps them to the gateway.
 
 1. **Deploy the backend first.** ECS makes the URL when it makes the service (`https://<two letters of its name>-<32 hex digits>.ecs.<region>.on.aws`, not predictable), so run its template, then read `serviceUrl` from the step's outputs.
 2. **Then publish the API** in a second pull request, with `backend.url` and the OpenAPI file's `servers` naming that URL. An admin allows `*.ecs.<region>.on.aws` in `gateway.backendHosts`.

@@ -109,19 +109,6 @@ API on the internet. The docs say what users must do meanwhile.
   (about a minute) without `logs.enabled`: fall back to what the console
   keeps of the run, or say so in its error.
 
-## Found in the second GCP-to-AWS run (2026-11-07)
-
-From the 0.13.2 release on GKE Autopilot again: `ecs-express` from main in
-the catalog, a hello API's backend on ECS Express Mode made by a member's
-template run, published through the gateway to the internet. The docs say
-what users must do meanwhile (the gateway guide's ECS section).
-
-- [ ] **A gateway backend sample on ECS**: `examples/greetings-api` answers
-  its health check 204 (ECS counts only 200) and needs its audience
-  configured, which an ECS backend can't know before create; the run used
-  a copy with a 200 `/healthz` and the audience from `Host`. A sample API
-  in `samples/aws` with such a backend.
-
 ## Found in the billed run (2026-10-31 and 2026-11-01)
 
 Released 0.6.0 on GKE Autopilot and EKS standard. Each item names where
