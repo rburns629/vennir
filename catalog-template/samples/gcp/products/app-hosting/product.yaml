@@ -5,8 +5,10 @@ team: gcp
 displayName: GCP App Hosting (Cloud Run)
 description: >-
   Deploys a pre-built container image to Cloud Run under the given service
-  name, or returns the existing service's URL unchanged if that name is
-  already taken in the target project/region. Never builds an image itself
+  name, or, when it deployed that service for the team, rolls a new image,
+  runtime account or Cloud SQL connection out as a new revision behind the
+  same URL. A service of that name deployed some other way is changed by no
+  one. Never builds an image itself
   -- the image to deploy is a caller-supplied input, from the registry the
   team's app-hosting secret names, and the service runs as the account that
   secret names.
@@ -46,9 +48,12 @@ actions:
           type: string
           pattern: "^[a-z][a-z0-9-]{0,61}[a-z0-9]$"
           description: >-
-            Cloud Run service name. If a service with this name already
-            exists in the given project/region, it is returned unchanged
-            -- this action never redeploys an existing service.
+            Cloud Run service name. If this product deployed a service of
+            this name for the team, in the given project/region, a run with
+            a new image (or runtime account, or Cloud SQL connection) rolls
+            it out as a new revision, behind the same URL. One deployed
+            some other way is returned only if it already matches
+            (SERVICE_EXISTS otherwise).
         region:
           type: string
           x-vennir-needs: gcp.region

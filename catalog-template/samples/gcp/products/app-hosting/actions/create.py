@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """gcp/app-hosting's "create" action: deploys a pre-built image to Cloud Run
-under the given service name, or returns the existing service's URL
-unchanged if that name is already taken.
+under the given service name, or brings a service it deployed for this team
+to the inputs (a new revision, its URL kept), and returns its URL. A service
+of that name deployed some other way is returned only if it already matches
+the inputs: this product changes no service it didn't make.
 
 Run directly by this product's entrypoint.sh, which already guarantees this
 script only ever runs for action="create" -- see product.yaml for this
@@ -111,6 +113,43 @@ def _signed_in() -> google.auth.credentials.Credentials:
     return credentials
 
 
+def _template(image: str, runtime_account: str, cloud_sql_connection_name: str) -> run_v2.RevisionTemplate:
+    """The revision the inputs ask for."""
+    container = run_v2.Container(image=image)
+    template = run_v2.RevisionTemplate(service_account=runtime_account)
+
+    # See product.yaml's cloudSqlConnectionName field -- this is the actual
+    # wiring for "an API that needs its own database": a volume backed by
+    # the named Cloud SQL instance(s), mounted where the Cloud SQL Auth
+    # Proxy convention expects it, plus an env var so the deployed app's
+    # own code knows the socket path without hardcoding it.
+    if cloud_sql_connection_name:
+        container.volume_mounts = [run_v2.VolumeMount(name="cloudsql", mount_path="/cloudsql")]
+        container.env = [run_v2.EnvVar(name="CLOUD_SQL_CONNECTION_NAME", value=cloud_sql_connection_name)]
+        template.volumes = [
+            run_v2.Volume(
+                name="cloudsql",
+                cloud_sql_instance=run_v2.CloudSqlInstance(instances=[cloud_sql_connection_name]),
+            )
+        ]
+
+    template.containers = [container]
+    return template
+
+
+def _changes(service: run_v2.Service, image: str, runtime_account: str, cloud_sql_connection_name: str) -> list[str]:
+    """What the inputs change in the service's current revision template."""
+    containers = list(service.template.containers)
+    env = {e.name: e.value for e in containers[0].env} if containers else {}
+    current = {
+        "image": containers[0].image if containers else "",
+        "runtime service account": service.template.service_account,
+        "cloudSqlConnectionName": env.get("CLOUD_SQL_CONNECTION_NAME", ""),
+    }
+    wanted = {"image": image, "runtime service account": runtime_account, "cloudSqlConnectionName": cloud_sql_connection_name}
+    return [field for field in current if current[field] != wanted[field]]
+
+
 def _outputs(service: Any, project_id: str, region: str, service_name: str, made_here: bool) -> dict[str, Any]:
     """Its URL, and the service as a resource when this product made it."""
     outputs: dict[str, Any] = {"serviceUrl": service.uri}
@@ -185,47 +224,47 @@ def _run() -> int:
 
     services = run_v2.ServicesClient(credentials=_signed_in())
     service_path = services.service_path(project_id, region, service_name)
+    cloud_sql_connection_name = inputs.get("cloudSqlConnectionName") or ""
 
-    # Existing-user path: a service with this name already exists, so this
-    # action is a no-op other than reporting its URL back.
+    # A service with this name already exists: one it deployed for this team
+    # gets a new revision when the inputs differ (a retry finds the revision
+    # its last attempt asked for, and changes nothing); any other is only
+    # reported, and only when it already matches.
     try:
         existing = services.get_service(name=service_path)
-        print(f"service '{service_name}' already exists, skipping deployment")
         labels = dict(existing.labels)
         made_here = labels.get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1] and labels.get(TEAM_LABEL) == team
-        _write_result({"status": "succeeded", "outputs": _outputs(existing, project_id, region, service_name, made_here)})
+        changes = _changes(existing, image, runtime_account, cloud_sql_connection_name)
+        if not changes:
+            print(f"service '{service_name}' already exists as asked, leaving it as it is")
+            _write_result({"status": "succeeded", "outputs": _outputs(existing, project_id, region, service_name, made_here)})
+            return 0
+        if not made_here:
+            return _failure(
+                "SERVICE_EXISTS",
+                f"Service '{service_name}' exists, deployed some other way or for another team, and differs from these "
+                f"inputs ({', '.join(changes)}): this product changes only services it deployed for this team. Choose another name.",
+            )
+        existing.template = _template(image, runtime_account, cloud_sql_connection_name)
+        print(f"updating service '{service_name}': {', '.join(changes)}")
+        # Done once the new revision serves; until then the last one does.
+        service = services.update_service(service=existing).result()
+        print(f"updated service '{service_name}' -> {service.uri}")
+        _write_result({"status": "succeeded", "outputs": _outputs(service, project_id, region, service_name, True)})
         return 0
     except NotFound:
         pass
     except GoogleAPIError as error:
         return _failure("GCP_API_ERROR", str(error), retryable=_retryable(error))
 
-    container = run_v2.Container(image=image)
-    template = run_v2.RevisionTemplate(service_account=runtime_account)
-
-    # See product.yaml's cloudSqlConnectionName field -- this is the actual
-    # wiring for "an API that needs its own database": a volume backed by
-    # the named Cloud SQL instance(s), mounted where the Cloud SQL Auth
-    # Proxy convention expects it, plus an env var so the deployed app's
-    # own code knows the socket path without hardcoding it.
-    cloud_sql_connection_name = inputs.get("cloudSqlConnectionName")
-    if cloud_sql_connection_name:
-        container.volume_mounts = [run_v2.VolumeMount(name="cloudsql", mount_path="/cloudsql")]
-        container.env = [run_v2.EnvVar(name="CLOUD_SQL_CONNECTION_NAME", value=cloud_sql_connection_name)]
-        template.volumes = [
-            run_v2.Volume(
-                name="cloudsql",
-                cloud_sql_instance=run_v2.CloudSqlInstance(instances=[cloud_sql_connection_name]),
-            )
-        ]
-
-    template.containers = [container]
-
     try:
         operation = services.create_service(
             parent=f"projects/{project_id}/locations/{region}",
             service_id=service_name,
-            service=run_v2.Service(template=template, labels={MADE_BY_LABEL[0]: MADE_BY_LABEL[1], TEAM_LABEL: team}),
+            service=run_v2.Service(
+                template=_template(image, runtime_account, cloud_sql_connection_name),
+                labels={MADE_BY_LABEL[0]: MADE_BY_LABEL[1], TEAM_LABEL: team},
+            ),
         )
         service = operation.result()
     except GoogleAPIError as error:
