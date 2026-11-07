@@ -8,8 +8,9 @@ name: ecs-express
 team: aws
 displayName: ECS Express service
 description: Deploys a container image as an ECS Express Mode service (Fargate, behind a load
-  balancer AWS manages, with an HTTPS URL) and waits for it to serve, or returns the existing
-  service's URL. Only images from the team's registry, run with the roles the team chose.
+  balancer AWS manages, with an HTTPS URL) and waits for it to serve, or rolls a new image,
+  environment or size out to one it made for the team, keeping its URL. Only images from the
+  team's registry, run with the roles the team chose.
 owner: aws-team
 runtime: python3.12
 # AWS from EKS, or from any cluster AWS trusts by OIDC (README.md, AWS from
@@ -30,7 +31,9 @@ actions:
 - name: create
   # Finds the service before creating it, so a step that failed on the
   # platform's side is retried, up to three attempts in all, and waits
-  # again.
+  # again. One it made for the team that differs from the inputs is
+  # updated (ECS rolls the new configuration out); one made some other way
+  # is changed by no one.
   idempotent: true
   maxAttempts: 3
   script: actions/create.py

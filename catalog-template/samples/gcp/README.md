@@ -7,7 +7,7 @@ product has to. Running them costs money.
 |---|---|
 | [`project`](products/project/) | Finds a project by id, or creates it under `parent` (a folder: a workload identity has no default), linking billing |
 | [`build-image`](products/build-image/) | Builds an image with Cloud Build from a source archive in GCS (with a Dockerfile at its root), unless that image already exists |
-| [`app-hosting`](products/app-hosting/) | Deploys an image from the team's registry to Cloud Run, as the team's runtime account, or returns the existing service's URL; optionally connects a Cloud SQL instance |
+| [`app-hosting`](products/app-hosting/) | Deploys an image from the team's registry to Cloud Run, as the team's runtime account, or rolls a new image out to a service it deployed for the team (same URL); optionally connects a Cloud SQL instance |
 | [`cloud-sql`](products/cloud-sql/) | Finds a Cloud SQL instance by name, or creates it (several minutes; set `timeoutSeconds` to 900 or more, and delete it after) |
 
 Every action looks before it creates, so a retried step is harmless.
@@ -94,6 +94,17 @@ other image is refused, `IMAGE_OUTSIDE_REGISTRY`), and `runtime-service-account`
 `$RUNTIME`. Grant that account only what the services need (say
 `roles/cloudsql.client` for one using `cloud-sql`): whoever may run
 `create` runs code as it.
+
+A new version is `create` again, same name, with the new image (or
+runtime account, or Cloud SQL connection): a service it deployed for the
+team gets a new revision behind the same URL, serving once it's ready
+(`roles/run.developer` covers the update). Give each version its own tag:
+an image pushed again under the same tag isn't a change. A service of that
+name deployed some other way, or for another team, is changed by no one
+(`SERVICE_EXISTS`). Proven (2026-11-07), running the product's image as
+the kernel would, as a `gcp-target` with exactly the roles above: a second
+tag rolled out as revision 2 at the same URL; the same inputs again changed
+nothing; another team's run with other inputs was refused.
 
 Optionally, the actions impersonate a second service account, using their
 own identity only to mint its tokens: register a team secret `gcp-target`
