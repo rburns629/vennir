@@ -362,6 +362,12 @@ gateway:
     annotations: {}
     # A TLS Secret for host; empty with a controller that manages its own.
     tlsSecretName: ""
+    # -- GKE's load balancer (class gce, set in annotations with its
+    # reserved address): a Google-managed certificate for host (a
+    # ManagedCertificate, named on the Ingress), and its health check on
+    # /.vennir/health (a BackendConfig on the Service's public port), since
+    # Google's checks take only a 200 and / is the APIs'.
+    gke: false
   # -- Where the gateway may connect, as NetworkPolicy egress peers (with
   # networkPolicy.enabled). Empty: anywhere but the cloud metadata server
   # (it mints every credential itself, so it never needs the node's).
