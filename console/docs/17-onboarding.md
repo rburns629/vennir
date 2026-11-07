@@ -45,7 +45,7 @@ The install's cloud matters most for keyless access: a product reaches the cloud
 Download the release for your machine from GitHub, check it against the release's checksums, and put it on your `PATH`. On a Mac with Apple silicon (`darwin-arm64`; the others are `darwin-amd64`, `linux-amd64` and `linux-arm64`):
 
 ```bash
-V=0.12.0 P=darwin-arm64
+V=0.13.0 P=darwin-arm64
 curl -fsSLO "https://github.com/rburns629/vennir/releases/download/v$V/vennir-$P"
 curl -fsSLO "https://github.com/rburns629/vennir/releases/download/v$V/vennir-checksums.txt"
 grep " vennir-$P\$" vennir-checksums.txt | shasum -a 256 -c -    # must say OK

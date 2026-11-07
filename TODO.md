@@ -26,22 +26,16 @@ Built and tested, proven on kind or against fakes, and not yet seen on a
 cloud. One billed run, on acyclix-dev and a minimal EKS install, as the
 last one was.
 
-- [ ] **The step-Pods policy on GKE and EKS** (#216): that their Job
-  controller makes Pods as a kube-system ServiceAccount, as kind's does, so
-  every step's Pod is admitted.
-- [ ] **Reading another install's catalog from ECR** (built 2026-10-30): a
-  GKE reader of an EKS owner's ECR by AWS web identity
-  (`externalCatalog.awsRoleArn`, `registryCheck.awsFederation`), and an EKS
-  reader in a second account; each granted with `vennir catalog grant`,
-  re-granted (no change) and revoked (refused within the hour): the release
-  applied, a step pulled by the kubelet, policy-controller verifying through
-  `vennir-pull`, the scan Job signing in. Also: the GKE issuer accepted as
-  an IAM OIDC provider with no thumbprint, and gcloud accepting the prefixed
-  `google.subject` mapping.
-- [ ] **What a run created, labelled `vennir-team` on the cloud**: the
-  samples label what they make with the run's team, and delete only what
-  carries it (resources made before have none, and are refused until
-  relabelled, as the sample READMEs say).
+- [ ] **The step-Pods policy on EKS** (#216): that its Job controller
+  makes Pods as a kube-system ServiceAccount, as kind's and GKE's do (seen
+  on GKE 2026-11-07), so every step's Pod is admitted.
+- [ ] **Reading another install's catalog, what's left** (GKE reading
+  another account's ECR proven 2026-11-07: the release applied by the
+  console and kernel policy, steps pulled through `vennir-pull`, the GKE
+  issuer accepted by IAM with no thumbprint): an EKS reader in a second
+  account; a grant run again (no change) and a revoke seen refusing within
+  the hour; and an Artifact Registry read by federation (gcloud accepting
+  the prefixed `google.subject` mapping).
 - [ ] **The base images' weekly mirror** (`vennir catalog bases mirror` in
   catalog CI): copying is tested against a registry; the weekly run itself
   isn't seen yet.
@@ -152,16 +146,15 @@ it was seen.
 ## Security
 
 - [ ] **Drop the console's delete of team namespaces' gateway ingress**
-  (the release after the one that held API backends in their team's own
-  namespace, 2026-11-06): each policy resync deletes the
+  (0.14.0: 0.13.0 held API backends in their team's own namespace): each policy resync deletes the
   `vennir-gateway-ingress` earlier consoles wrote into team namespaces
   (`console/src/teamNetwork.ts`, `k8s.ts` `deleteTeamGatewayIngress`), the
   console's one NetworkPolicy delete (its RBAC, scoped to that name, and the
   write fence's rule for it). Once every install has run a console that did,
   drop all three, and the admission tests' two cases.
 
-- [ ] **Drop the `apis.share_with` column** (the release after the one
-  that stopped reading it, 2026-11-06): nothing reads or writes it now
+- [ ] **Drop the `apis.share_with` column** (0.14.0: 0.13.0 stopped
+  reading it): nothing reads or writes it now
   (migration 0073 emptied it, so a gateway from before still running
   during that upgrade let nobody in through it); a gateway from before
   still selects it, so it stays one release. Then drop it in a migration,
