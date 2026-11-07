@@ -124,6 +124,18 @@ to uninstall only the add-ons (policy-controller, External Secrets
 Operator, cert-manager) vennir installed there, asking about each, even
 with `--all`.
 
+**With the gateway on GKE's load balancer** (`gateway.ingress.gke`),
+`destroy` can stop at the network: GKE's Ingress controller leaves its
+network endpoint groups (`k8s1-…`, one per zone) and the certificate
+(`mcrt-…`) behind when the cluster goes first. Delete those
+(`gcloud compute network-endpoint-groups delete <name> --zone <zone>`,
+`gcloud compute ssl-certificates delete <name> --global`), then delete
+the network with OpenTofu in `deploy/<env>/tofu`
+(`tofu destroy -target=google_compute_network.this`): running `destroy`
+again fails instead, and remakes the backups bucket on its way. The
+reserved address isn't vennir's: delete it yourself
+(`gcloud compute addresses delete <name> --global`).
+
 **Upgrading.** The release an install runs is the `vennir` setting
 (`vennir init --release <x.y.z>` chooses it; `source` builds your checkout
 instead). To upgrade, `vennir config set -e <env> vennir <x.y.z>`, then

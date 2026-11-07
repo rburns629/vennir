@@ -98,6 +98,14 @@ API on the internet. The docs say what users must do meanwhile.
   the DNS record; and it doesn't name the kubectl context it added. Print
   the cluster's token issuer too (`vennir status`), which every off-cloud
   federation guide starts from.
+- [ ] **`vennir destroy` with the gateway on GKE's load balancer**: the
+  releases are uninstalled and the cluster deleted before GKE's Ingress
+  controller removes its network endpoint groups and certificate, so the
+  network's delete fails. Delete the Ingress and wait until its NEGs are
+  gone first. And running `destroy` again after a failure isn't safe: its
+  targeted apply recreated the backups bucket, then failed on the
+  `backup` output (`google_service_account.backup[0]` of an empty tuple).
+  `docs/setup.md` says how to finish by hand meanwhile.
 - [ ] **`vennir logs --execution`** fails once a step's Pods are cleaned up
   (about a minute) without `logs.enabled`: fall back to what the console
   keeps of the run, or say so in its error.
