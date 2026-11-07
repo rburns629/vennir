@@ -9,6 +9,13 @@
 // checks it against the gateway's public keys before answering, so a
 // request that didn't come through the gateway gets 401.
 //
+// The same image is the aws sample's API backend on ECS Express Mode
+// (catalog-template/samples/aws/apis/greetings), public at a URL ECS makes
+// when it makes the service. It can't be told that URL beforehand, so there
+// AUDIENCE_FROM_HOST=true takes the audience from the request's Host:
+// Express Mode's load balancer routes each service by its host, so a
+// request reaches it only with its own. Anywhere else, set AUDIENCE.
+//
 // A demo, not a product (examples/ is exempt from the production bar):
 // standard library only, no persistence.
 package main
@@ -126,16 +133,24 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	jwks, audience, api := os.Getenv("GATEWAY_JWKS_URL"), os.Getenv("AUDIENCE"), os.Getenv("API")
-	if jwks == "" || audience == "" || api == "" {
-		log.Error("GATEWAY_JWKS_URL, AUDIENCE (this backend's origin, as backend.url names it) and API (<team>/<name>) are required")
+	fromHost := os.Getenv("AUDIENCE_FROM_HOST") == "true"
+	if jwks == "" || api == "" || (audience == "") == !fromHost {
+		log.Error("GATEWAY_JWKS_URL, API (<team>/<name>) and either AUDIENCE (this backend's origin, as backend.url names it) or AUDIENCE_FROM_HOST=true (behind a load balancer that routes by host) are required")
 		os.Exit(1)
 	}
 	k := &keys{url: jwks}
 	mux := http.NewServeMux()
-	// Not in openapi.yaml, so the gateway never forwards it: the kubelet's.
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	// Not in openapi.yaml, so the gateway never forwards it: the kubelet's,
+	// or ECS's load balancer's (which counts only 200 healthy).
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
 	mux.HandleFunc("GET /greetings/{name}", func(w http.ResponseWriter, r *http.Request) {
-		c, err := k.caller(r, audience, api)
+		want := audience
+		if fromHost {
+			want = "https://" + r.Host
+		}
+		c, err := k.caller(r, want, api)
 		if err != nil {
 			log.Warn("refused", "reason", err.Error())
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": err.Error()})

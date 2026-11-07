@@ -1,0 +1,26 @@
+# An API product (the catalog's README.md, API products) whose backend runs
+# on ECS Express Mode: the greetings backend (examples/greetings-api in the
+# platform's repository), hosted by this team's greetings-backend template
+# (ecs-express). Express Mode makes the service public at a URL it chooses
+# when it makes it, so publish this after the template's run: replace the
+# URL below (and openapi.yaml's servers) with the run's serviceUrl. Its load
+# balancer takes no IAM signature, so there's no auth: the backend checks
+# the gateway's signed Vennir-Caller on every request, and answers 401 to
+# anything that didn't come through the gateway. An admin allows
+# *.ecs.<region>.on.aws in gateway.backendHosts.
+apiVersion: vennir.dev/v2
+kind: Api
+name: greetings
+displayName: Greetings (ECS Express)
+description: >-
+  Greets someone by name, plainly or shouting, from a backend on ECS
+  Express Mode that answers only what came through the gateway.
+spec: openapi.yaml
+backend:
+  url: https://gr-0123456789abcdef0123456789abcdef.ecs.us-east-2.on.aws
+access:
+  requests: approval    # its team's maintainers grant or decline each request
+limits:
+  default: 60/min
+timeout: 10s
+maxRequest: 1KiB

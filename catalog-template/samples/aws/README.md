@@ -258,6 +258,39 @@ outside the registry refused before any call. Proven from GKE the same day
 template run serving an API's backend on its first attempt, published
 through the gateway to the internet, and its run's Delete.
 
+## An API on it (greetings)
+
+[`apis/greetings`](apis/greetings/) publishes a backend on ECS Express
+Mode through the gateway, and [`dags/greetings-backend.yaml`](dags/greetings-backend.yaml)
+hosts that backend with `ecs-express`. The backend is
+`examples/greetings-api` in the platform's repository: it greets someone by
+name, and answers only requests whose `Vennir-Caller` the gateway signed.
+
+1. **The image**, under the team's registry, a tag per version:
+   `docker buildx build --platform linux/amd64 -t <registry>/greetings:1 --push examples/greetings-api`.
+2. **The gateway on the internet**: the backend fetches the gateway's
+   public keys from `https://<its public host>/.vennir/jwks.json`, which
+   only the internet listener serves (the gateway guide, Putting it on the
+   internet), and an admin allows `*.ecs.<region>.on.aws` in
+   `gateway.backendHosts`.
+3. **Run the template** with the image and that keys URL, then read the
+   step's `serviceUrl`.
+4. **Publish the API**: put that URL in `api.yaml`'s `backend.url` and
+   `openapi.yaml`'s `servers`, and open a pull request.
+
+Express Mode's URL is public, and its load balancer takes no IAM
+signature, so the API has no `auth`: the backend checks the gateway's
+signature on every request (401 otherwise). It can't be told its own URL
+before ECS makes it, so the template sets `AUDIENCE_FROM_HOST=true`: the
+audience it checks is the request's own origin, which Express Mode's
+load balancer, routing each service by its host, makes sound. Its health
+check (`/healthz`, 200) isn't in `openapi.yaml`, so the gateway never
+forwards it. Take the API out of the catalog before its run's Delete
+removes the backend. Proven (2026-11-07) from GKE with this backend's
+logic: the template's run serving, the API answering through the
+gateway from the internet, and the backend refusing every request that
+didn't come through it.
+
 ## Is it ready here?
 
 Each product's `check` (product.yaml) says whether it's ready on an install,

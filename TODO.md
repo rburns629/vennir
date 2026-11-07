@@ -132,11 +132,6 @@ what users must do meanwhile (the gateway guide's ECS section).
   failed to sign in and the console said only "the registry answered 404".
   Apply should say to run `vennir catalog create <env>` (which fixed it)
   when the repository's variables aren't this install's, or set them.
-- [ ] **A gateway backend sample on ECS**: `examples/greetings-api` answers
-  its health check 204 (ECS counts only 200) and needs its audience
-  configured, which an ECS backend can't know before create; the run used
-  a copy with a 200 `/healthz` and the audience from `Host`. A sample API
-  in `samples/aws` with such a backend.
 
 ## Found in the billed run (2026-10-31 and 2026-11-01)
 
