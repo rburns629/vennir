@@ -1,5 +1,6 @@
 # A sample: App Runner service, with real AWS API calls (billed).
-# Its own IAM role, by EKS Pod Identity: see the aws team's README.md.
+# Its own IAM role: by EKS Pod Identity, or off EKS by web identity (the
+# team secret aws-app-runner-role); see the aws team's README.md.
 apiVersion: vennir.dev/v2
 kind: Product
 name: app-runner
@@ -10,8 +11,16 @@ description: Deploys a container image as an App Runner service and waits for it
   unless public is true.
 owner: aws-team
 runtime: python3.12
+# AWS from EKS, or from any cluster AWS trusts by OIDC (README.md, AWS from
+# another cluster): its own clouds, over the team's [aws].
+clouds: [aws, gcp, azure, existing]
 # Its own identity: bound to only what it does (README.md, Credentials).
 serviceAccount: aws-app-runner
+# Off EKS, a token for AWS's STS, an hour long, at
+# /platform/tokens/sts.amazonaws.com, with which it assumes its own role
+# (aws-app-runner-role) by web identity. EKS's own credentials need none.
+tokenAudiences:
+- sts.amazonaws.com
 # Each install runs check (no inputs, as this identity) when this is
 # registered and daily, and shows whether it's ready there: whether it can
 # sign in, and may do what its actions do. It changes nothing.
@@ -120,6 +129,9 @@ actions:
   idempotent: true   # it only asks
   maxAttempts: 2
   script: actions/check.py
+  # Off EKS, it signs in as its own role: list that role's secret here so
+  # the check does as the actions do (README.md, Credentials).
+  # secretRefs: [{name: aws-app-runner-role, keys: [role-arn]}]
   input:
     type: object
     additionalProperties: false

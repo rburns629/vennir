@@ -78,6 +78,19 @@ only that product's image may run as it. Bind each to its own role, either:
 - **IRSA**: an IAM OIDC provider for the cluster, and the annotation
   `eks.amazonaws.com/role-arn: <role>` on the ServiceAccount (an admin adds
   it; the console never changes a product's ServiceAccount).
+- **Off EKS** (GKE, AKS, any cluster whose issuer AWS can reach): an IAM OIDC
+  provider for the cluster's issuer (audience `sts.amazonaws.com`), and a
+  role per product trusting it for exactly that product's ServiceAccount
+  (`system:serviceaccount:aws:aws-s3-bucket`, and so on), registered as the
+  team secret named after it with `-role` (`aws-s3-bucket-role`,
+  `aws-app-runner-role`, `aws-rds-postgres-role`), key `role-arn`. Give
+  each step its own in `secretRefs`. The product finds no default
+  credentials, so it assumes that role by web identity with its step's own
+  token. Another product of the team mounting the same secret can't use it:
+  the role's trust names one ServiceAccount.
+
+`aws-target`, when the team registers it, means the same on and off EKS: a
+second role each product assumes as its own, for the calls themselves.
 
 Grant each product's role only what it calls:
 
@@ -151,14 +164,12 @@ Seen on kind (2026-10-31): the token mounted for the product's
 ServiceAccount, the check ready naming its issuer and subject, and real STS
 refusing kind's private issuer (`TOKEN_NOT_TRUSTED`).
 
-`s3-bucket` runs off EKS the same way: it declares the same
-`tokenAudiences`, and with no default credentials it assumes the team's
-`aws-target` role by web identity with its own token (on EKS, unchanged:
-Pod Identity's credentials, then `aws-target` with them). So off EKS that
-role trusts the provider for `system:serviceaccount:aws:aws-s3-bucket`,
-audience `sts.amazonaws.com`, and has the S3 permissions below; give the
-step `aws-target` in its `secretRefs`. Proven on GKE (2026-11-07): a bucket
-made, tagged and private, then deleted, in an account with no AWS cluster.
+`s3-bucket`, `app-runner` and `rds-postgres` run off EKS the same way
+(see Credentials): each declares the same `tokenAudiences`, and with no
+default credentials assumes its own role by web identity, named by the
+team secret `<its ServiceAccount>-role`. Proven on GKE (2026-11-07) for
+`s3-bucket`: a bucket made, tagged and private, then deleted, in an account
+with no AWS cluster.
 
 ## Is it ready here?
 

@@ -10,7 +10,9 @@ step that made it stopped before that.
 
 Credentials come from boto3's default chain: on EKS, Pod Identity or IRSA
 supplies short-lived ones for the step's ServiceAccount, so nothing is
-mounted. With the team secret aws-target, those are used only to assume its
+mounted; off EKS, with none, it assumes its own role (the team secret
+aws-s3-bucket-role) by web identity with the step's own token. With the
+team secret aws-target, those are used only to assume its
 role, and the calls are made as it (see the aws team's README.md).
 """
 
@@ -31,10 +33,13 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 # role-arn), mounted when the action lists it in secretRefs. See the aws
 # team's README.md.
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
-# From a cluster that isn't EKS (GKE, AKS): no default credentials, but
-# this step's own token for AWS's STS (product.yaml's tokenAudiences), which
-# the aws-target role trusts by web identity for this product's
-# ServiceAccount (the aws team's README.md, AWS from another cluster).
+# Off EKS (GKE, AKS), with no default credentials: this product's own role,
+# as EKS Pod Identity would bind it there, named by the team secret
+# aws-s3-bucket-role (key role-arn) and assumed by web identity with the step's
+# own token (product.yaml's tokenAudiences). The role trusts this cluster's
+# issuer for this product's ServiceAccount alone (the aws team's README.md,
+# AWS from another cluster).
+OWN_ROLE_FILE = Path("/platform/secrets/aws-s3-bucket-role/role-arn")
 TOKEN_FILE = Path("/platform/tokens/sts.amazonaws.com")
 # What marks a bucket this product made: delete removes no other.
 MADE_BY_TAG = ("vennir-made", "true")
@@ -43,6 +48,8 @@ MADE_BY_TAG = ("vennir-made", "true")
 # another team's bucket, even one this product made, isn't theirs.
 TEAM_TAG = "vennir-team"
 RETRYABLE_CODES = {
+    # STS couldn't fetch the cluster's keys just then (off EKS).
+    "IDPCommunicationError",
     "Throttling", "ThrottlingException", "RequestLimitExceeded", "TooManyRequestsException",
     "SlowDown", "ServiceUnavailable", "InternalError", "InternalFailure", "OperationAborted",
 }
@@ -61,7 +68,7 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
 
 def _aws_failure(error: Exception) -> int:
     if isinstance(error, NoCredentialsError):
-        return _failure("AWS_NO_CREDENTIALS", "No AWS credentials: is the step's ServiceAccount bound to an IAM role?")
+        return _failure("AWS_NO_CREDENTIALS", "No AWS credentials: on EKS, bind the step's ServiceAccount to an IAM role; elsewhere, give the step its aws-s3-bucket-role secret.")
     if isinstance(error, ClientError):
         details = error.response.get("Error", {})
         status = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)
@@ -71,30 +78,43 @@ def _aws_failure(error: Exception) -> int:
     return _failure("AWS_API_ERROR", str(error), retryable=True)  # a connection problem
 
 
-def _session(region: str) -> boto3.session.Session:
-    """The default credentials, or the aws-target role assumed with them
-    or, with none (off EKS), by web identity with the step's own token
-    (short-lived; nothing is stored)."""
-    session = boto3.session.Session(region_name=region)
-    target = TARGET_ROLE_FILE.read_text().strip() if TARGET_ROLE_FILE.exists() else ""
-    if not target:
-        return session
-    if session.get_credentials() is None and TOKEN_FILE.exists():
-        # Unsigned: the token is the proof.
-        sts = session.client("sts", config=Config(signature_version=UNSIGNED))
-        credentials = sts.assume_role_with_web_identity(
-            RoleArn=target, RoleSessionName="vennir-step", WebIdentityToken=TOKEN_FILE.read_text().strip()
-        )["Credentials"]
-    else:
-        credentials = session.client("sts").assume_role(
-            RoleArn=target, RoleSessionName="vennir-step"
-        )["Credentials"]
+def _from(credentials: dict[str, Any], region: str) -> boto3.session.Session:
     return boto3.session.Session(
         aws_access_key_id=credentials["AccessKeyId"],
         aws_secret_access_key=credentials["SecretAccessKey"],
         aws_session_token=credentials["SessionToken"],
         region_name=region,
     )
+
+
+def _signed_in(region: str) -> boto3.session.Session:
+    """The default credentials (on EKS, Pod Identity's or IRSA's), or, with
+    none, this product's own role by web identity (OWN_ROLE_FILE)."""
+    session = boto3.session.Session(region_name=region)
+    if session.get_credentials() is not None or not OWN_ROLE_FILE.exists():
+        return session
+    if not TOKEN_FILE.exists():
+        raise NoCredentialsError()
+    # Unsigned: the token is the proof.
+    sts = session.client("sts", config=Config(signature_version=UNSIGNED))
+    credentials = sts.assume_role_with_web_identity(
+        RoleArn=OWN_ROLE_FILE.read_text().strip(), RoleSessionName="vennir-step",
+        WebIdentityToken=TOKEN_FILE.read_text().strip(),
+    )["Credentials"]
+    return _from(credentials, region)
+
+
+def _session(region: str) -> boto3.session.Session:
+    """Signed in (_signed_in), then the aws-target role assumed as that,
+    when the team registered one (short-lived; nothing is stored)."""
+    session = _signed_in(region)
+    target = TARGET_ROLE_FILE.read_text().strip() if TARGET_ROLE_FILE.exists() else ""
+    if not target:
+        return session
+    credentials = session.client("sts").assume_role(
+        RoleArn=target, RoleSessionName="vennir-step"
+    )["Credentials"]
+    return _from(credentials, region)
 
 
 def _made_here(s3: Any, bucket: str, team: str) -> bool:

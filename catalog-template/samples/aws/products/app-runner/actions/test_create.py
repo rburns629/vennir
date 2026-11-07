@@ -165,5 +165,59 @@ class CreateActionTest(unittest.TestCase):
         session_cls.assert_not_called()
 
 
+class SessionTest(unittest.TestCase):
+    """Signing in: on EKS the default credentials; off EKS (none) its own
+    role by web identity with the step's token, unsigned; then aws-target,
+    when given, assumed as that."""
+
+    CREDENTIALS = {"Credentials": {"AccessKeyId": "ASIAEXAMPLE", "SecretAccessKey": "not-a-secret", "SessionToken": "t"}}
+    OWN = "arn:aws:iam::123456789012:role/own"
+    TARGET = "arn:aws:iam::123456789012:role/acts-as"
+
+    def setUp(self) -> None:
+        self.module = _load_create_module()
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.module.TARGET_ROLE_FILE = Path(self.tmp_dir.name) / "role-arn"
+        self.module.OWN_ROLE_FILE = Path(self.tmp_dir.name) / "own-role-arn"
+        self.module.TOKEN_FILE = Path(self.tmp_dir.name) / "sts.amazonaws.com"
+        self.module.OWN_ROLE_FILE.write_text(self.OWN + "\n")
+        self.module.TOKEN_FILE.write_text("the-projected-token\n")
+
+    def tearDown(self) -> None:
+        self.tmp_dir.cleanup()
+
+    def _session(self, credentials) -> tuple[object, object]:
+        with patch.object(self.module.boto3.session, "Session") as session_cls:
+            session_cls.return_value.get_credentials.return_value = credentials
+            sts = session_cls.return_value.client.return_value
+            sts.assume_role.return_value = sts.assume_role_with_web_identity.return_value = self.CREDENTIALS
+            self.module._session("us-east-2")
+        return session_cls.return_value, sts
+
+    def test_off_eks_its_own_role_by_web_identity(self) -> None:
+        session, sts = self._session(None)
+        sts.assume_role_with_web_identity.assert_called_once_with(
+            RoleArn=self.OWN, RoleSessionName="vennir-step", WebIdentityToken="the-projected-token")
+        sts.assume_role.assert_not_called()
+        self.assertEqual(session.client.call_args_list[0].kwargs["config"].signature_version, self.module.UNSIGNED)
+
+    def test_off_eks_then_aws_target_as_its_own_role(self) -> None:
+        self.module.TARGET_ROLE_FILE.write_text(self.TARGET)
+        _, sts = self._session(None)
+        sts.assume_role_with_web_identity.assert_called_once()
+        sts.assume_role.assert_called_once_with(RoleArn=self.TARGET, RoleSessionName="vennir-step")
+
+    def test_on_eks_the_default_credentials_then_aws_target(self) -> None:
+        self.module.TARGET_ROLE_FILE.write_text(self.TARGET)
+        _, sts = self._session(object())
+        sts.assume_role_with_web_identity.assert_not_called()
+        sts.assume_role.assert_called_once_with(RoleArn=self.TARGET, RoleSessionName="vennir-step")
+
+    def test_off_eks_without_its_token_there_are_no_credentials(self) -> None:
+        self.module.TOKEN_FILE.unlink()
+        with self.assertRaises(self.module.NoCredentialsError):
+            self._session(None)
+
+
 if __name__ == "__main__":
     unittest.main()

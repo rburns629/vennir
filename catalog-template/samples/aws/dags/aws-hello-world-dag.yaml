@@ -1,7 +1,9 @@
 # Two aws products chained: an S3 bucket, then an App Runner service that's
 # told its name. Real, billed calls. Paste into the console's Submit page
 # with <registry> and the CHANGE values replaced. `:latest` is pinned to its
-# digest when you submit.
+# digest when you submit. Off EKS (GKE, AKS), give each step its own role's
+# secret, as the secretRefs lines below say (the aws team's README.md,
+# Credentials).
 apiVersion: vennir.dev/v2
 kind: Dag
 name: aws-hello-world
@@ -10,6 +12,7 @@ tasks:
     image: <registry>/aws/s3-bucket:latest
     action: create
     team: aws
+    # secretRefs: [aws-s3-bucket-role]           # off EKS
     inputs:
       bucketName: my-team-hello-world-data     # CHANGE: bucket names are global
       region: eu-west-1                        # CHANGE
@@ -18,6 +21,7 @@ tasks:
     image: <registry>/aws/app-runner:latest
     action: create
     team: aws
+    # secretRefs: [aws-app-runner-role]          # off EKS
     dependsOn: [bucket]
     timeoutSeconds: 1200                       # a new service takes a few minutes
     inputs:
