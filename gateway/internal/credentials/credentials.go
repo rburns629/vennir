@@ -161,7 +161,16 @@ func (m *Minter) Authorize(ctx context.Context, out *http.Request, body []byte, 
 		}
 		sum := sha256.Sum256(body)
 		out.Header.Set("X-Amz-Content-Sha256", hex.EncodeToString(sum[:]))
-		return v4.NewSigner().SignHTTP(ctx, *creds, out, hex.EncodeToString(sum[:]), a["service"], a["region"], m.now())
+		// Sent, but not signed: AWS's front end adds to X-Forwarded-For
+		// before it checks the signature, which then never matches
+		// (proven against a Lambda function URL, 2026-11-07).
+		forwarded, had := out.Header["X-Forwarded-For"]
+		out.Header.Del("X-Forwarded-For")
+		err = v4.NewSigner().SignHTTP(ctx, *creds, out, hex.EncodeToString(sum[:]), a["service"], a["region"], m.now())
+		if had {
+			out.Header["X-Forwarded-For"] = forwarded
+		}
+		return err
 	}
 	return ErrUnsupported
 }

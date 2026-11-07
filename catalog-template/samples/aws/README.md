@@ -149,8 +149,16 @@ which issuer and subject a role must trust.
 
 Seen on kind (2026-10-31): the token mounted for the product's
 ServiceAccount, the check ready naming its issuer and subject, and real STS
-refusing kind's private issuer (`TOKEN_NOT_TRUSTED`). A role that trusts a
-GKE cluster's issuer is for the billed run.
+refusing kind's private issuer (`TOKEN_NOT_TRUSTED`).
+
+`s3-bucket` runs off EKS the same way: it declares the same
+`tokenAudiences`, and with no default credentials it assumes the team's
+`aws-target` role by web identity with its own token (on EKS, unchanged:
+Pod Identity's credentials, then `aws-target` with them). So off EKS that
+role trusts the provider for `system:serviceaccount:aws:aws-s3-bucket`,
+audience `sts.amazonaws.com`, and has the S3 permissions below; give the
+step `aws-target` in its `secretRefs`. Proven on GKE (2026-11-07): a bucket
+made, tagged and private, then deleted, in an account with no AWS cluster.
 
 ## Is it ready here?
 

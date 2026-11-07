@@ -14,12 +14,19 @@ from pathlib import Path
 from typing import Any
 
 import boto3
+from botocore import UNSIGNED
+from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 
 INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")
 
 TARGET_ROLE_FILE = Path("/platform/secrets/aws-target/role-arn")
+# From a cluster that isn't EKS (GKE, AKS): no default credentials, but
+# this step's own token for AWS's STS (product.yaml's tokenAudiences), which
+# the aws-target role trusts by web identity for this product's
+# ServiceAccount (the aws team's README.md, AWS from another cluster).
+TOKEN_FILE = Path("/platform/tokens/sts.amazonaws.com")
 MADE_BY_TAG = ("vennir-made", "true")
 TEAM_TAG = "vennir-team"
 RETRYABLE_CODES = {
@@ -52,13 +59,23 @@ def _aws_failure(error: Exception) -> int:
 
 
 def _session(region: str) -> boto3.session.Session:
+    """The default credentials, or the aws-target role assumed with them
+    or, with none (off EKS), by web identity with the step's own token
+    (short-lived; nothing is stored)."""
     session = boto3.session.Session(region_name=region)
     target = TARGET_ROLE_FILE.read_text().strip() if TARGET_ROLE_FILE.exists() else ""
     if not target:
         return session
-    credentials = session.client("sts").assume_role(
-        RoleArn=target, RoleSessionName="vennir-step"
-    )["Credentials"]
+    if session.get_credentials() is None and TOKEN_FILE.exists():
+        # Unsigned: the token is the proof.
+        sts = session.client("sts", config=Config(signature_version=UNSIGNED))
+        credentials = sts.assume_role_with_web_identity(
+            RoleArn=target, RoleSessionName="vennir-step", WebIdentityToken=TOKEN_FILE.read_text().strip()
+        )["Credentials"]
+    else:
+        credentials = session.client("sts").assume_role(
+            RoleArn=target, RoleSessionName="vennir-step"
+        )["Credentials"]
     return boto3.session.Session(
         aws_access_key_id=credentials["AccessKeyId"],
         aws_secret_access_key=credentials["SecretAccessKey"],

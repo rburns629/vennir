@@ -181,7 +181,9 @@ Start from the closest sample and keep what makes it safe: a `serviceAccount` of
 
 3. **Run `whoami`** with the role's ARN. Its failures name what's missing: `NO_TOKEN` (the step got no token), `TOKEN_NOT_TRUSTED` (no provider for the issuer, or AWS can't fetch its keys), `ROLE_NOT_ALLOWED` (the role's trust policy). Its check says which issuer and subject the role must trust.
 
-Seen working on kind as far as AWS can go (the token mounted, AWS refusing kind's private issuer); a role trusting a GKE cluster's issuer is still to be proven on a cloud. Your own products follow `caller-identity`: the same `tokenAudiences`, the same call.
+`s3-bucket` works the same way off EKS: it declares the same `tokenAudiences`, and with no default credentials (no Pod Identity) it assumes the team's `aws-target` role (the secret `aws-target`, key `role-arn`, in the step's `secretRefs`) by web identity, so that role is the one trusting the cluster for `system:serviceaccount:<team>:aws-s3-bucket`, with the S3 permissions above. On EKS it's unchanged.
+
+Proven on GKE (2026-11-07): `s3-bucket` made a bucket in an AWS account with no AWS cluster, tagged for its team with public access blocked, and its `delete` removed it, each step signing in as its own ServiceAccount (CloudTrail: the session `vennir-step` on the `aws-target` role). Your own products follow `caller-identity`: the same `tokenAudiences`, the same call.
 
 **On kind**: AWS can't fetch the keys of kind's issuer, so there's no keyless way in. Use kind for products that call no cloud, and an EKS install for AWS.
 

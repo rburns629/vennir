@@ -168,8 +168,17 @@ func TestAWSRequestsAreSignedAsTheAPIsRole(t *testing.T) {
 	auth := map[string]map[string]string{"awsSigV4": {"roleArn": "arn:aws:iam::123456789012:role/orders-gateway", "region": "us-east-1", "service": "lambda"}}
 	body := []byte(`{"amount":1}`)
 	r := request(t)
+	r.Header.Set("X-Forwarded-For", "203.0.113.7")
+	r.Header.Set("Vennir-Caller", "signed.caller.claims")
 	if err := m.Authorize(context.Background(), r, body, "payments", "orders-api", auth); err != nil {
 		t.Fatal(err)
+	}
+	// X-Forwarded-For goes, unsigned: AWS's front end adds to it before
+	// checking the signature. The rest is signed.
+	signedHeaders := r.Header.Get("Authorization")[strings.Index(r.Header.Get("Authorization"), "SignedHeaders=")+len("SignedHeaders="):]
+	signedHeaders, _, _ = strings.Cut(signedHeaders, ",")
+	if r.Header.Get("X-Forwarded-For") != "203.0.113.7" || strings.Contains(signedHeaders, "x-forwarded-for") || !strings.Contains(signedHeaders, "vennir-caller") {
+		t.Errorf("X-Forwarded-For %q, signed headers %q", r.Header.Get("X-Forwarded-For"), signedHeaders)
 	}
 	if form.Get("Action") != "AssumeRoleWithWebIdentity" || form.Get("RoleArn") != "arn:aws:iam::123456789012:role/orders-gateway" ||
 		form.Get("WebIdentityToken") != "k8s-token-for-"+AWSAudience || form.Get("RoleSessionName") != "vennir.payments.orders-api" {
