@@ -166,7 +166,7 @@ Start from the closest sample and keep what makes it safe: a `serviceAccount` of
    aws iam create-open-id-connect-provider --url "$ISSUER" --client-id-list sts.amazonaws.com
    ```
 
-2. **A role per product**, trusting that provider for exactly its ServiceAccount, with the product's actions from step 2's table as its policy:
+2. **A role per product**, trusting that provider for exactly its ServiceAccount, with only what the product calls ([A role for each product](#2-a-role-for-each-product) has each sample's actions; `whoami` needs none):
 
    ```bash
    SA=web-caller-identity                 # the product's serviceAccount
@@ -182,6 +182,7 @@ Start from the closest sample and keep what makes it safe: a `serviceAccount` of
    }]}
    EOF
    aws iam create-role --role-name vennir-$SA --assume-role-policy-document file://trust-$SA.json
+   aws iam put-role-policy --role-name vennir-$SA --policy-name actions --policy-document file://s3-bucket.json   # its actions, as above
    ```
 
 3. **Run `whoami`** with the role's ARN. Its failures name what's missing: `NO_TOKEN` (the step got no token), `TOKEN_NOT_TRUSTED` (no provider for the issuer, or AWS can't fetch its keys), `ROLE_NOT_ALLOWED` (the role's trust policy). Its check says which issuer and subject the role must trust.
@@ -192,7 +193,7 @@ Uncomment the role's `secretRefs` line on **every** action in each `product.yaml
 
 **The region off EKS.** A check asks in the cluster's AWS region, and a cluster outside AWS has none, so the samples' checks ask in us-east-1. If your organization's service control policies deny us-east-1, a check says **Not ready** and names an action for the product's role, though the role isn't what's refusing it. The actions themselves use each run's `region` input, so runs work: see what AWS says with `aws <service> <read call> --region us-east-1` as an account admin.
 
-**App Runner is closed to new accounts.** AWS no longer lets an account that hasn't used App Runner create services: `app-runner`'s create fails with `AWS_API_ERROR`, "Account … can't create new App Runner services", though its check says **Ready**. Use it only in an account that already runs App Runner.
+**App Runner is closed to new accounts.** AWS no longer lets an account that hasn't used App Runner create services: `app-runner`'s create fails with `AWS_API_ERROR`, "Account … can't create new App Runner services", though its check says **Ready**. Use it only in an account AWS still lets create services.
 
 Proven from GKE (2026-11-07, from the 0.13.2 release): a team maintainer registered `aws-s3-bucket-role` and `aws-app-runner-role`; both checks signed in as their own roles (`s3-bucket` **Ready**); a member's template run made a bucket, tagged for its team with public access blocked, and started `app-runner` with its region resolved from the bucket's output; and **Delete** removed the bucket, each step signing in as its own ServiceAccount (CloudTrail: the sessions `vennir-check` and `vennir-step` on `vennir-aws-s3-bucket` and `vennir-aws-app-runner`). Your own products follow `caller-identity`: the same `tokenAudiences`, the same call.
 
@@ -211,6 +212,6 @@ Proven from GKE (2026-11-07, from the 0.13.2 release): a team maintainer registe
 | `NOT_FOR_THIS_INSTALL` | The product's `clouds` names another cloud | Run it on an AWS install |
 | Off EKS, a template's or **Delete**'s step can't sign in, though a hand-written DAG's can | The action in `product.yaml` doesn't list the role's secret | Uncomment `secretRefs` on every action, not only `check` |
 | Off EKS, **Not ready** for an action the role allows | The check asks in us-east-1, which an organization policy denies | Check it as an admin in us-east-1; runs use their own `region` |
-| "Account … can't create new App Runner services" | AWS closed App Runner to new accounts | Use another way to run the image |
+| "Account … can't create new App Runner services" | AWS no longer lets new accounts create App Runner services | Run the image another way |
 | `TASK_TIMEOUT` on a database | The default five minutes ran out | Raise `timeoutSeconds` |
 | A target refuses connections from the cluster | It allows only known addresses | [Addresses and firewall rules](22-addresses-and-firewalls.md) |
