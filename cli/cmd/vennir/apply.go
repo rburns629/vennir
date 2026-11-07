@@ -379,6 +379,9 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 			}
 		}
 	}
+	if catalogExists {
+		a.catalogVariablesNote(ctx, out, dir, c)
+	}
 	// Applied: what the next screen compares against.
 	if err := c.SaveApplied(dir); err != nil {
 		return err
