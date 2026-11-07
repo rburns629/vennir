@@ -120,7 +120,7 @@ backend:
       service: lambda           # execute-api for an API Gateway that takes IAM
 ```
 
-The role trusts the cluster's OIDC issuer (registered in IAM as an OIDC provider) for exactly `system:serviceaccount:web:orders-api`, audience `sts.amazonaws.com`, the same trust policy as [AWS from another cluster](20-deploy-to-aws.md#from-an-install-that-isnt-on-eks). On EKS the issuer is already registered; a GKE cluster's is public, so a GKE install can call AWS backends with no AWS cluster at all. For a function URL (`AuthType AWS_IAM`), the role needs both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` on the function. The sample is `samples/aws/apis/orders`.
+The role trusts the cluster's OIDC issuer (registered in IAM as an OIDC provider) for exactly `system:serviceaccount:web:orders-api`, audience `sts.amazonaws.com`, the same trust policy as [AWS from another cluster](20-deploy-to-aws.md#from-an-install-that-isnt-on-eks). On EKS the issuer is already registered; a GKE cluster's is public, so a GKE install can call AWS backends with no AWS cluster at all. For a function URL (`AuthType AWS_IAM`), the role needs both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` on the function. The sample is `samples/aws/apis/orders`. The gateway signs every header it sends but `X-Forwarded-For`, which it sends unsigned: AWS's front end adds to that header before checking the signature, so a signature over it never matches. Proven from GKE to a Lambda function URL (2026-11-07): placed and looked up through the gateway, signed as the role it assumed with the API's ServiceAccount token, with a request outside the OpenAPI document refused before anything was sent.
 
 ## 3. Call it
 

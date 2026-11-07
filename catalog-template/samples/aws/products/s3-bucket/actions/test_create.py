@@ -178,5 +178,43 @@ class CreateActionTest(unittest.TestCase):
             self.assertEqual(result["error"]["retryable"], retryable, code)
 
 
+class SessionTest(unittest.TestCase):
+    """The aws-target role: with the default credentials (EKS), or off EKS
+    (none) by web identity with the step's own token, unsigned."""
+
+    CREDENTIALS = {"Credentials": {"AccessKeyId": "ASIAEXAMPLE", "SecretAccessKey": "not-a-secret", "SessionToken": "t"}}
+
+    def setUp(self) -> None:
+        self.module = _load_create_module()
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.module.TARGET_ROLE_FILE = Path(self.tmp_dir.name) / "role-arn"
+        self.module.TOKEN_FILE = Path(self.tmp_dir.name) / "sts.amazonaws.com"
+        self.module.TARGET_ROLE_FILE.write_text("arn:aws:iam::123456789012:role/acts-as\n")
+        self.module.TOKEN_FILE.write_text("the-projected-token\n")
+
+    def tearDown(self) -> None:
+        self.tmp_dir.cleanup()
+
+    def _session(self, credentials) -> tuple[object, object]:
+        with patch.object(self.module.boto3.session, "Session") as session_cls:
+            session_cls.return_value.get_credentials.return_value = credentials
+            sts = session_cls.return_value.client.return_value
+            sts.assume_role.return_value = sts.assume_role_with_web_identity.return_value = self.CREDENTIALS
+            self.module._session("us-east-2")
+        return session_cls.return_value, sts
+
+    def test_off_eks_the_target_role_by_web_identity(self) -> None:
+        session, sts = self._session(None)
+        sts.assume_role_with_web_identity.assert_called_once_with(
+            RoleArn="arn:aws:iam::123456789012:role/acts-as", RoleSessionName="vennir-step", WebIdentityToken="the-projected-token")
+        sts.assume_role.assert_not_called()
+        self.assertEqual(session.client.call_args.kwargs["config"].signature_version, self.module.UNSIGNED)
+
+    def test_on_eks_the_target_role_with_its_credentials(self) -> None:
+        _, sts = self._session(object())
+        sts.assume_role.assert_called_once_with(RoleArn="arn:aws:iam::123456789012:role/acts-as", RoleSessionName="vennir-step")
+        sts.assume_role_with_web_identity.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

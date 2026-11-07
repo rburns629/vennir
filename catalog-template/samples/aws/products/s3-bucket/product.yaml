@@ -9,8 +9,16 @@ description: 'Finds an S3 bucket by name, or creates it with every kind of publi
   Bucket names are global: a name another account owns fails with BUCKET_NAME_TAKEN.'
 owner: aws-team
 runtime: python3.12
+# AWS from EKS, or from any cluster AWS trusts by OIDC (README.md, AWS from
+# another cluster): its own clouds, over the team's [aws].
+clouds: [aws, gcp, azure, existing]
 # Its own identity: bound to only what it does (README.md, Credentials).
 serviceAccount: aws-s3-bucket
+# Off EKS, a token for AWS's STS, an hour long, at
+# /platform/tokens/sts.amazonaws.com, with which it assumes aws-target by
+# web identity (EKS's own credentials need none).
+tokenAudiences:
+- sts.amazonaws.com
 # Each install runs check (no inputs, as this identity) when this is
 # registered and daily, and shows whether it's ready there: whether it can
 # sign in, and may do what its actions do. It changes nothing.
