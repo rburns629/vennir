@@ -27,6 +27,9 @@ tokenAudiences:
 check: check
 actions:
 - name: create
+  # Off EKS, its own role (README.md, Credentials): a template's, the
+  # Catalog's and a Delete's steps get only what an action lists here.
+  # secretRefs: [{name: aws-app-runner-role, keys: [role-arn]}]
   # Finds what it would create before creating it, so a step that
   # failed on the platform's side (a reclaimed node, a timeout) is
   # retried, up to three attempts in all.
@@ -98,6 +101,9 @@ actions:
             name: {type: string}
             link: {type: string}
 - name: delete
+  # Off EKS, its own role (README.md, Credentials): a template's, the
+  # Catalog's and a Delete's steps get only what an action lists here.
+  # secretRefs: [{name: aws-app-runner-role, keys: [role-arn]}]
   # Deleting a service that's already gone or going is a no-op.
   idempotent: true
   maxAttempts: 3

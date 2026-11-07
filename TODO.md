@@ -52,18 +52,63 @@ last one was.
   secret through `RUN --mount=type=secret`; the image handed to publish,
   loaded, scanned, pushed and signed; the weekly check loading it; a pull
   request only validating it.
-- [ ] **The gateway on the internet, on GKE and EKS** (documented
-  2026-11-03, `console/docs/21-api-gateway.md`): the values file it gives
-  (`gateway.publicListener`, its Ingress, `publicListenerFrom`,
-  `trustedProxies`) behind GKE's load balancer (a reserved address, a
-  Google-managed certificate, the health check on `/.vennir/health`) and an
-  ALB (ACM, `target-type: ip`); a backend seeing the caller's own address.
-  Proven only on kind with Traefik.
+- [ ] **The gateway on the internet, on EKS** (GKE proven 2026-11-07: a
+  reserved address, the Google-managed certificate, the health check on
+  `/.vennir/health`, `publicListenerFrom` and `trustedProxies` from the
+  guide, a Lambda seeing the caller's own address): behind an ALB (ACM,
+  `target-type: ip`), with the VPC CNI's addresses.
 - [ ] **Deploy GKE from a release once** (`make gke-deploy VERSION=...`,
   which deploys the release's signed charts and images, each signature
   checked against the release workflow's identity at that tag first): the
   one part of the billed run's plan not run (it installed the release with
   `vennir apply` instead).
+
+## Found in the GCP-to-AWS run (2026-11-07)
+
+From the 0.13.2 release on GKE Autopilot, every step as a user would take
+it: `vennir init` and `apply`, `vennir catalog create`, a team pull request,
+a maintainer's secrets and grants, a member's template run and Delete, an
+API on the internet. The docs say what users must do meanwhile.
+
+- [ ] **References nested inside an input** (`environment: {BUCKET:
+  {$fromTask: ...}}`): the kernel resolves them at any depth, but the
+  console's submit check (`core/executions.ts`, the input schema check)
+  exempts only top-level ones and refuses the nested one as INPUT_INVALID,
+  and `vennir catalog validate` passes it. Strip references at any depth
+  before the check, and have validate agree; then the aws sample DAG can
+  pass the bucket's name again.
+- [ ] **Template parameters' `default` in `RunTemplate`**: only the
+  console's form fills them, so an API caller leaving one out has a step's
+  required input refused. Apply the schema's defaults to the parameters
+  (and to `RunAction`'s), or have validate warn when a required step input
+  comes from an optional parameter.
+- [ ] **Off EKS, the AWS samples' checks ask in us-east-1**: no cluster
+  region, and nothing sets `AWS_REGION` for steps. Read the region from
+  the team (a `region` key beside `role-arn`), and on an explicit deny
+  say whether an organization policy or a boundary refused it, not "for
+  role ...".
+- [ ] **Replace `app-runner` in `samples/aws`**: AWS lets no new account
+  create App Runner services, and its check (ListServices) can't tell.
+  ECS Express Mode, or a Lambda function with a function URL; the sample
+  DAG and Deploy to AWS's table with it.
+- [ ] **`vennir apply`'s screens**: the approval screen lists neither the
+  gateway (internet teams, backend hosts) nor a layered values file, nor
+  their cost (a GKE forwarding rule, about $18 a month); its closing
+  summary says nothing about the gateway's public host, its certificate or
+  the DNS record; and it doesn't name the kubectl context it added. Print
+  the cluster's token issuer too (`vennir status`), which every off-cloud
+  federation guide starts from.
+- [ ] **`vennir destroy` with the gateway on GKE's load balancer**: the
+  releases are uninstalled and the cluster deleted before GKE's Ingress
+  controller removes its network endpoint groups and certificate, so the
+  network's delete fails. Delete the Ingress and wait until its NEGs are
+  gone first. And running `destroy` again after a failure isn't safe: its
+  targeted apply recreated the backups bucket, then failed on the
+  `backup` output (`google_service_account.backup[0]` of an empty tuple).
+  `docs/setup.md` says how to finish by hand meanwhile.
+- [ ] **`vennir logs --execution`** fails once a step's Pods are cleaned up
+  (about a minute) without `logs.enabled`: fall back to what the console
+  keeps of the run, or say so in its error.
 
 ## Found in the billed run (2026-10-31 and 2026-11-01)
 
