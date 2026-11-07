@@ -1,5 +1,5 @@
-# Two aws products chained: an S3 bucket, then an App Runner service that's
-# told its name. Real, billed calls. Paste into the console's Submit page
+# Two aws products chained: an S3 bucket, then an App Runner service in its
+# region. Real, billed calls. Paste into the console's Submit page
 # with <registry> and the CHANGE values replaced. `:latest` is pinned to its
 # digest when you submit. Off EKS (GKE, AKS), give each step its own role's
 # secret, as the secretRefs lines below say (the aws team's README.md,
@@ -27,8 +27,9 @@ tasks:
     inputs:
       serviceName: hello-world
       image: public.ecr.aws/aws-containers/hello-app-runner:latest
-      region: eu-west-1                        # CHANGE
+      # The bucket's region, from its step: an upstream output is passed as a
+      # whole input (one nested inside another, like environment's, is
+      # refused at submit).
+      region: {$fromTask: bucket, $output: region}
       port: 8000
       public: true                             # a demo: anyone may reach it
-      environment:
-        BUCKET: {$fromTask: bucket, $output: bucketName}

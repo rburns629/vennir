@@ -348,8 +348,8 @@ gateway:
   # its namespace (publicListenerFrom: [{namespaceSelector: {matchLabels:
   # {kubernetes.io/metadata.name: traefik}}}]), then trust the Pod range.
   # Google's load balancer connects from 35.191.0.0/16 and 130.211.0.0/22
-  # and appends its own address after the client's: list those and its
-  # address, in both. On AWS with the VPC CNI, Pods have VPC addresses, so
+  # and appends its own address after the client's: list those ranges in
+  # both, and its address here too. On AWS with the VPC CNI, Pods have VPC addresses, so
   # trust an ALB's addresses only with publicListenerFrom letting in just
   # those.
   trustedProxies: []

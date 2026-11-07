@@ -158,32 +158,43 @@ Start from the closest sample and keep what makes it safe: a `serviceAccount` of
 
 **On GKE, or any cluster whose token issuer is public**, AWS can trust a product's own token, with no key: the `caller-identity` sample does exactly this. Its `product.yaml` declares `tokenAudiences: [sts.amazonaws.com]`, so each step gets an hour-long token for its own ServiceAccount at `/platform/tokens/sts.amazonaws.com`, and hands it to STS's `AssumeRoleWithWebIdentity`.
 
-1. **The cluster's issuer** (on GKE it's `https://container.googleapis.com/v1/projects/<project>/locations/<location>/clusters/<cluster>`):
+1. **The cluster's issuer** (on GKE it's `https://container.googleapis.com/v1/projects/<project>/locations/<location>/clusters/<cluster>`). Read it from the install's own cluster: `vennir apply` doesn't switch kubectl's context to it, so pass `--context` (on GKE, `gke_<project>_<region>_<cluster>`) or another cluster's issuer is trusted instead.
 
    ```bash
-   ISSUER=$(kubectl get --raw /.well-known/openid-configuration | jq -r .issuer)
+   ISSUER=$(kubectl --context gke_my-vennir-project_us-central1_vennir get --raw /.well-known/openid-configuration | jq -r .issuer)
+   ISSUER_HOST=${ISSUER#https://}
    aws iam create-open-id-connect-provider --url "$ISSUER" --client-id-list sts.amazonaws.com
    ```
 
-2. **A role per product**, trusting that provider for exactly its ServiceAccount:
+2. **A role per product**, trusting that provider for exactly its ServiceAccount, with the product's actions from step 2's table as its policy:
 
-   ```json
-   {
+   ```bash
+   SA=web-caller-identity                 # the product's serviceAccount
+   cat > trust-$SA.json <<EOF
+   {"Version": "2012-10-17", "Statement": [{
      "Effect": "Allow",
-     "Principal": {"Federated": "arn:aws:iam::<account>:oidc-provider/<issuer without https://>"},
+     "Principal": {"Federated": "arn:aws:iam::$ACCOUNT:oidc-provider/$ISSUER_HOST"},
      "Action": "sts:AssumeRoleWithWebIdentity",
      "Condition": {"StringEquals": {
-       "<issuer without https://>:sub": "system:serviceaccount:web:web-caller-identity",
-       "<issuer without https://>:aud": "sts.amazonaws.com"
+       "$ISSUER_HOST:sub": "system:serviceaccount:$TEAM:$SA",
+       "$ISSUER_HOST:aud": "sts.amazonaws.com"
      }}
-   }
+   }]}
+   EOF
+   aws iam create-role --role-name vennir-$SA --assume-role-policy-document file://trust-$SA.json
    ```
 
 3. **Run `whoami`** with the role's ARN. Its failures name what's missing: `NO_TOKEN` (the step got no token), `TOKEN_NOT_TRUSTED` (no provider for the issuer, or AWS can't fetch its keys), `ROLE_NOT_ALLOWED` (the role's trust policy). Its check says which issuer and subject the role must trust.
 
-`s3-bucket`, `app-runner` and `rds-postgres` work the same way off EKS, each as its own role. With no default credentials (no Pod Identity), a product assumes the role a team secret named after its ServiceAccount holds (`aws-s3-bucket-role`, `aws-app-runner-role`, `aws-rds-postgres-role`, key `role-arn`) by web identity, with its step's own token. So each of those roles trusts the cluster for exactly its product's ServiceAccount (`system:serviceaccount:<team>:aws-s3-bucket`, and so on), with that product's permissions above. Give each step its own role's secret in `secretRefs`, and list it in the product's `check` too (the samples have the lines, commented). `aws-target` means what it does on EKS: a second role, assumed as the product's own. On EKS nothing changes.
+`s3-bucket`, `app-runner` and `rds-postgres` work the same way off EKS, each as its own role. With no default credentials (no Pod Identity), a product assumes the role a team secret named after its ServiceAccount holds (`aws-s3-bucket-role`, `aws-app-runner-role`, `aws-rds-postgres-role`, key `role-arn`) by web identity, with its step's own token. So each of those roles trusts the cluster for exactly its product's ServiceAccount (`system:serviceaccount:<team>:aws-s3-bucket`, and so on), with that product's permissions above. A team maintainer registers each secret (the team's page → **Secrets**, or `SecretService/PutSecret`).
 
-Proven on GKE (2026-11-07): `s3-bucket` made a bucket in an AWS account with no AWS cluster, tagged for its team with public access blocked, and its `delete` removed it, each step signing in as its own ServiceAccount (CloudTrail: the session `vennir-step` on the `aws-target` role). Your own products follow `caller-identity`: the same `tokenAudiences`, the same call.
+Uncomment the role's `secretRefs` line on **every** action in each `product.yaml` (`create`, `delete` and `check`; the samples have the lines, commented). A template's steps, a run from the **Catalog** and **Delete** in **What runs made** each get their action's own `secretRefs`, never the caller's, so without the line on `create` and `delete` those runs have no role and fail. Only a hand-written DAG can give a step a secret its action doesn't list. `aws-target` means what it does on EKS: a second role, assumed as the product's own. On EKS nothing changes.
+
+**The region off EKS.** A check asks in the cluster's AWS region, and a cluster outside AWS has none, so the samples' checks ask in us-east-1. If your organization's service control policies deny us-east-1, a check says **Not ready** and names an action for the product's role, though the role isn't what's refusing it. The actions themselves use each run's `region` input, so runs work: see what AWS says with `aws <service> <read call> --region us-east-1` as an account admin.
+
+**App Runner is closed to new accounts.** AWS no longer lets an account that hasn't used App Runner create services: `app-runner`'s create fails with `AWS_API_ERROR`, "Account … can't create new App Runner services", though its check says **Ready**. Use it only in an account that already runs App Runner.
+
+Proven from GKE (2026-11-07, from the 0.13.2 release): a team maintainer registered `aws-s3-bucket-role` and `aws-app-runner-role`; both checks signed in as their own roles (`s3-bucket` **Ready**); a member's template run made a bucket, tagged for its team with public access blocked, and started `app-runner` with its region resolved from the bucket's output; and **Delete** removed the bucket, each step signing in as its own ServiceAccount (CloudTrail: the sessions `vennir-check` and `vennir-step` on `vennir-aws-s3-bucket` and `vennir-aws-app-runner`). Your own products follow `caller-identity`: the same `tokenAudiences`, the same call.
 
 **On kind**: AWS can't fetch the keys of kind's issuer, so there's no keyless way in. Use kind for products that call no cloud, and an EKS install for AWS.
 
@@ -198,5 +209,8 @@ Proven on GKE (2026-11-07): `s3-bucket` made a bucket in an AWS account with no 
 | RDS refuses the create right after its service-linked role was made | AWS needs a moment | The step is retried, and goes through |
 | `NOT_MADE_BY_VENNIR`, `NOT_THIS_TEAMS` | Not made by this team through Vennir (or before teams were tagged, 2026-11-03) | Delete it outside Vennir, or tag it `vennir-team=<team>` (an S3 tag set replaces every tag: give `vennir-made=true` again too) |
 | `NOT_FOR_THIS_INSTALL` | The product's `clouds` names another cloud | Run it on an AWS install |
+| Off EKS, a template's or **Delete**'s step can't sign in, though a hand-written DAG's can | The action in `product.yaml` doesn't list the role's secret | Uncomment `secretRefs` on every action, not only `check` |
+| Off EKS, **Not ready** for an action the role allows | The check asks in us-east-1, which an organization policy denies | Check it as an admin in us-east-1; runs use their own `region` |
+| "Account … can't create new App Runner services" | AWS closed App Runner to new accounts | Use another way to run the image |
 | `TASK_TIMEOUT` on a database | The default five minutes ran out | Raise `timeoutSeconds` |
 | A target refuses connections from the cluster | It allows only known addresses | [Addresses and firewall rules](22-addresses-and-firewalls.md) |

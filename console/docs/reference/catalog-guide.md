@@ -152,7 +152,9 @@ may point within the same schema (`#/$defs/...`), nothing else.
 
 The console builds the form someone fills in to run an action (or a
 template, from its `parameters`) from the same schema: `title` and
-`description` label and explain each field, `default` fills it, `enum`
+`description` label and explain each field, `default` fills it (the form's
+only: a caller of `TemplateService/RunTemplate` sends every parameter a
+step needs), `enum`
 makes a choice, an array of text or numbers a list, an object of strings
 name/value rows, and `required`, `pattern`, lengths and limits are checked
 on the field before anything is sent. Four hints shape the form, and
@@ -377,7 +379,9 @@ A team's `dags/` folder holds two kinds of file:
   `<team>/<product>.<action>` of a team that shares it, never an image, so
   a template keeps working as products release. Inputs are values,
   `{$param: <name>}`, or `{$fromStep: <id>, $output: <name>}` from a step
-  in `dependsOn`. `./vennir catalog validate` checks every action exists and is
+  in `dependsOn`, as a whole input: a reference nested inside an input's
+  object (`environment: {BUCKET: {$fromStep: ...}}`) passes validate but
+  is refused when the template runs (INPUT_INVALID). `./vennir catalog validate` checks every action exists and is
   shared with your team, and that each step gets the inputs its action
   needs. `examples` (up to ten, each a `name` and its `parameters`) are
   ways to run it, which must fit `parameters`; the run form offers them

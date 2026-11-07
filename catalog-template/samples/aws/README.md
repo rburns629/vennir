@@ -9,7 +9,7 @@ SecretStore isn't proven yet.
 | Product | What `create` does |
 |---|---|
 | [`s3-bucket`](products/s3-bucket/) | Finds a bucket by name, or creates it with all public access blocked. A name another account owns fails with `BUCKET_NAME_TAKEN` |
-| [`app-runner`](products/app-runner/) | Deploys an image (ECR or ECR Public) as an App Runner service and waits for it to run, or returns the existing service's URL once it runs. Private unless `public: true` |
+| [`app-runner`](products/app-runner/) | Deploys an image (ECR or ECR Public) as an App Runner service and waits for it to run, or returns the existing service's URL once it runs. Private unless `public: true`. AWS no longer lets an account that hasn't used App Runner create services ("Account … can't create new App Runner services", seen 2026-11-07), though the check says ready |
 | [`rds-postgres`](products/rds-postgres/) | Finds an RDS for PostgreSQL instance, or creates it (encrypted, not public) and waits until it's available, several minutes: set `timeoutSeconds` to 1500 or more, and delete it after |
 | [`caller-identity`](products/caller-identity/) | `whoami`: signs in as a role with the step's own projected ServiceAccount token, from a cluster that isn't EKS (GKE, AKS, kind), and says who AWS says it is. Free: STS only. See [AWS from another cluster](#aws-from-another-cluster) |
 
@@ -54,7 +54,7 @@ refused to another team's, the bucket refused while it held an object, and
 all three deleted by an admin's cleanup run (the database's final snapshot
 kept).
 [dags/aws-hello-world-dag.yaml](dags/aws-hello-world-dag.yaml) chains the
-first two.
+first two: the service runs in the bucket's region.
 
 ## No passwords
 
@@ -83,8 +83,11 @@ only that product's image may run as it. Bind each to its own role, either:
   role per product trusting it for exactly that product's ServiceAccount
   (`system:serviceaccount:aws:aws-s3-bucket`, and so on), registered as the
   team secret named after it with `-role` (`aws-s3-bucket-role`,
-  `aws-app-runner-role`, `aws-rds-postgres-role`), key `role-arn`. Give
-  each step its own in `secretRefs`. The product finds no default
+  `aws-app-runner-role`, `aws-rds-postgres-role`), key `role-arn`.
+  Uncomment its `secretRefs` line on every action in `product.yaml`
+  (`create`, `delete` and `check`): a template's steps, the Catalog's
+  runs and Delete get only what their action lists. A hand-written DAG
+  lists it per step instead. The product finds no default
   credentials, so it assumes that role by web identity with its step's own
   token. Another product of the team mounting the same secret can't use it:
   the role's trust names one ServiceAccount.
@@ -178,7 +181,10 @@ and the console runs it when the product is registered, daily, and on
 **Check now**. It changes nothing: it signs in as create does, asks STS who
 it is (the `principal` it reports), assumes `aws-target` when listed, then
 makes the read-only calls its role must allow, in the cluster's region
-(`AWS_REGION`, else us-east-1), since each run's region is an input:
+(`AWS_REGION`, else us-east-1: off EKS there's no cluster region, so
+us-east-1), since each run's region is an input. An organization policy
+denying us-east-1 then makes a check not ready, naming an action for the
+product's role that the role isn't what's refusing:
 
 | Product | Asks | Missing names |
 |---|---|---|
@@ -189,7 +195,9 @@ makes the read-only calls its role must allow, in the cluster's region
 With no role bound to its ServiceAccount, or a role that won't let it in or
 let it assume `aws-target`, it isn't ready, and says what's missing. The
 actions with no read-only form (creating, tagging, deleting) only a create
-or delete finds out. Built, not yet proven on a cloud.
+or delete finds out. Seen from GKE (2026-11-07): `s3-bucket` ready as its
+own role; `app-runner` not ready where an organization policy denied
+us-east-1.
 
 ## Secrets
 

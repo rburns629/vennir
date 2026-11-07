@@ -53,9 +53,9 @@ chmod +x "vennir-$P" && sudo mv "vennir-$P" /usr/local/bin/vennir
 vennir version
 ```
 
-Then `vennir tools --install` downloads the other tools it drives (kubectl, Helm, OpenTofu, kind), each pinned and checksum-verified. Docker is yours to install, and must be running.
+Then `vennir tools --target gcp --install` (or `aws`, `kind`, `existing`) downloads the other tools it drives (kubectl, Helm, OpenTofu, kind), each pinned and checksum-verified. Docker and the cloud's own CLI (gcloud, aws) are yours to install, and Docker must be running.
 
-**You're done when** `vennir version` prints the version you downloaded and `vennir check` lists no missing tool.
+**You're done when** `vennir version` prints the version you downloaded and `vennir tools --target <target>` lists no missing tool. (`vennir check` needs an environment: run it after `vennir init`.)
 
 ## Phase 3: Install the platform
 
@@ -79,6 +79,8 @@ A first cloud install takes ten to twenty minutes. With a hostname of yours, `ap
 **Sign in.** The first admin's password is in `deploy/prod/admin-password`, readable only by you. Open the console at its address (private consoles: `vennir console prod`, then http://localhost:18080), sign in with it, and choose your own. Nothing else opens until you do.
 
 **Invite people.** **Admin → People → Add a person** creates an account with a temporary password, changed at first sign-in. With Google Workspace, `vennir sso google prod` sets up single sign-on.
+
+**Your kubectl context.** `apply` adds the cluster to your kubeconfig (on GKE, `gke_<project>_<region>_<cluster>`) but doesn't switch to it. The guides' `kubectl` commands, such as reading the cluster's token issuer for AWS, run against whatever context is current: `kubectl config use-context` it first, or a role made from another cluster's issuer trusts the wrong cluster.
 
 **You're done when** `vennir status prod` says the platform is running, and you're signed in with your own password.
 
@@ -125,7 +127,7 @@ Within a few minutes every install applies the release: the team and its namespa
 | **The API**: a bot's token and `curl`, from a script or pipeline | A bot of the team | [Call the API from a pipeline](05-calling-the-api.md) |
 | **CI with no stored token**: GitHub Actions signs in with its own OIDC token | A keyless bot | [Bots and automation](14-bots-and-automation.md#how-do-i-sign-in-from-ci-without-a-stored-token) |
 
-From a terminal, `vennir logs prod --execution <id>` prints a run's step logs; everything else about a run is on its page in the console.
+From a terminal, `vennir logs prod --execution <id>` prints a run's step logs while its Pods are there, about a minute after a step ends, or for good with `logs.enabled`; everything else about a run is on its page in the console.
 
 **You're done when** the run's page says **Succeeded** and shows the output you expected.
 
