@@ -9,7 +9,7 @@ package azurecloud
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -93,7 +93,7 @@ func Credentials(ctx context.Context, r *run.Runner, c *config.Config) error {
 // where is the module's hash of where the install is (its subscription and
 // resource group), which its registry and storage account names end in.
 func where(c *config.Config) string {
-	sum := sha1.Sum([]byte(c.Azure.Subscription + "/" + c.Azure.ResourceGroup))
+	sum := sha256.Sum256([]byte(c.Azure.Subscription + "/" + c.Azure.ResourceGroup))
 	return hex.EncodeToString(sum[:])[:8]
 }
 
