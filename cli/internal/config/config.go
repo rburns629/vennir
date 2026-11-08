@@ -638,9 +638,6 @@ func (c *Config) Validate() error {
 		if c.Database.Type == "managed" {
 			add("database.type: managed (Azure Database for PostgreSQL) comes later on azure: in-cluster for now")
 		}
-		if c.Logs.Enabled {
-			add("logs: log search comes later on azure")
-		}
 	case "existing":
 		if c.Cluster.Context == "" {
 			add("cluster.context: the kubectl context of the existing cluster is needed")

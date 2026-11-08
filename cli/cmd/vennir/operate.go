@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rburns629/vennir/cli/internal/awscloud"
+	"github.com/rburns629/vennir/cli/internal/azurecloud"
 	"github.com/rburns629/vennir/cli/internal/cluster"
 	"github.com/rburns629/vennir/cli/internal/config"
 	"github.com/rburns629/vennir/cli/internal/gcp"
@@ -80,6 +81,25 @@ func (a *app) checkCmd() *cobra.Command {
 				}
 				if as.ClusterStatus == "ACTIVE" {
 					_ = awscloud.Credentials(ctx, a.runner, c)
+				}
+			}
+			if c.Target == "azure" {
+				zs := azurecloud.Inspect(ctx, a.runner, c)
+				fmt.Fprintln(out, "Azure")
+				fmt.Fprintf(out, "  signed in as %s; subscription %s, region %s\n", orDefault(zs.User, "nobody"), c.Azure.Subscription, c.Azure.Region)
+				if len(zs.Problems) == 0 {
+					state := orDefault(zs.ClusterState, "not yet (apply creates it)")
+					if zs.PowerState != "" {
+						state += ", " + zs.PowerState
+					}
+					fmt.Fprintf(out, "  cluster %s: %s\n", c.Cluster.Name, state)
+				}
+				for _, p := range zs.Problems {
+					problems++
+					fmt.Fprintln(out, "  problem:", p)
+				}
+				if zs.ClusterState == "Succeeded" {
+					_ = azurecloud.Credentials(ctx, a.runner, c)
 				}
 			}
 			st := cluster.Inspect(ctx, a.runner, c)
@@ -296,8 +316,8 @@ func (a *app) destroyCmd() *cobra.Command {
 			var teamNamespaces []string   // existing: the console's, to delete if deleteTeams
 			var uninstall []install.AddOn // existing: the add-ons to uninstall
 			switch c.Target {
-			case "gcp", "aws":
-				kind := map[string]string{"gcp": "GKE", "aws": "EKS"}[c.Target]
+			case "gcp", "aws", "azure":
+				kind := map[string]string{"gcp": "GKE", "aws": "EKS", "azure": "AKS"}[c.Target]
 				steps = append(steps, fmt.Sprintf("delete the %s cluster %s and what the module created with it (network, identities, the platform registry)", kind, c.Cluster.Name))
 				buckets, kept := "the backups bucket", "every backup"
 				if c.Logs.Enabled {
@@ -437,6 +457,10 @@ func (a *app) destroyCmd() *cobra.Command {
 				}
 			case "aws":
 				if err := a.destroyAWS(ctx, out, dir, c, deleteData, deleteRegistry); err != nil {
+					return err
+				}
+			case "azure":
+				if err := a.destroyAzure(ctx, out, dir, c, deleteData, deleteRegistry); err != nil {
 					return err
 				}
 			case "kind":

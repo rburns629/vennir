@@ -697,3 +697,39 @@ func TestKernelPolicyRunsOnACloudInstallWhoseCatalogIsSigned(t *testing.T) {
 		}
 	}
 }
+
+// On azure, each identity is its ServiceAccount's managed identity (AKS
+// Workload Identity, by annotation and label): the console reads ACR as
+// its own, the scans as theirs, the backups write their container as
+// theirs, and steps are labelled for the samples' own. Steps can't reach
+// the metadata server (the nodes' kubelet identity).
+func TestAnAzureInstallsIdentities(t *testing.T) {
+	c := kindConfig()
+	c.Target, c.Namespace, c.Cluster.Name = "azure", "vennir-system", "vennir"
+	cloud := &Cloud{Provider: "azure", TaskRegistry: "vennira54795d8.azurecr.io/vennir-products",
+		ClusterIssuer: "https://eastus2.oic.prod-aks.azure.com/t/c/", ConsoleServiceAccount: "console-client", ScannerServiceAccount: "scanner-client",
+		BackupBucket: "vennirbka54795d8", BackupContainer: "backups", BackupServiceAccount: "backup-client"}
+
+	kernel := KernelValues(c, Images{}, "", cloud)
+	if got := fmt.Sprint(kernel["backup"]); got != "map[azure:map[container:backups storageAccount:vennirbka54795d8] destination:azure enabled:true serviceAccountName:vennir-pg-backup]" {
+		t.Errorf("backup: %s", got)
+	}
+	if got := fmt.Sprint(kernel["scheduler"]); got != "map[taskPodLabels:map[azure.workload.identity/use:true]]" {
+		t.Errorf("scheduler: %s", got)
+	}
+	console := ConsoleValues(c, "dev", Images{}, cloud)
+	for key, want := range map[string]string{
+		"azureWorkloadIdentity": "true",
+		"serviceAccount":        "map[annotations:map[azure.workload.identity/client-id:console-client]]",
+		"scanning":              "map[serviceAccountAnnotations:map[azure.workload.identity/client-id:scanner-client]]",
+		"registryCheck":         "map[acrToken:true]",
+		"teamNamespaces":        "map[blockMetadata:true]",
+	} {
+		if got := fmt.Sprint(console[key]); got != want {
+			t.Errorf("%s: %s, want %s", key, got, want)
+		}
+	}
+	if strings.Contains(fmt.Sprint(console), "iam.gke.io") || strings.Contains(fmt.Sprint(console), "gcpMetadataToken") {
+		t.Errorf("Google's settings on azure: %v", console)
+	}
+}

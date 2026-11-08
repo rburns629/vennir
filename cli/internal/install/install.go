@@ -31,9 +31,9 @@ import (
 
 // Cloud is what a cloud target's OpenTofu module made, for the values.
 type Cloud struct {
-	Provider              string // gcp, aws
+	Provider              string // gcp, aws, azure
 	TaskRegistry          string
-	ConsoleServiceAccount string // gcp: the console's Google service account
+	ConsoleServiceAccount string // gcp: the console's Google service account; azure: its managed identity's client id
 	// ScannerServiceAccount: its scan Jobs' (gcp), reading the task
 	// registry and nothing else; the console's, from a module before it.
 	ScannerServiceAccount string
@@ -44,10 +44,13 @@ type Cloud struct {
 	// PolicyRole is kernel policy's (aws: Pod Identity binds it by
 	// ServiceAccount name); empty from a module before it.
 	PolicyRole   string
-	BackupBucket string
+	BackupBucket string // azure: the storage account
 	BackupRegion string // aws: the bucket's region
-	// BackupServiceAccount is the cloud identity the backups run as (gcp);
-	// on aws, EKS Pod Identity binds the role by ServiceAccount name.
+	// BackupContainer: azure's container in BackupBucket.
+	BackupContainer string
+	// BackupServiceAccount is the cloud identity the backups run as (gcp:
+	// a service account; azure: a managed identity's client id); on aws,
+	// EKS Pod Identity binds the role by ServiceAccount name.
 	BackupServiceAccount string
 	// Loki's bucket, its region (aws) and identity (gcp; on aws, Pod
 	// Identity binds the role to LokiServiceAccountName).
@@ -451,6 +454,11 @@ func KernelValues(c *config.Config, img Images, volume string, cloud *Cloud) map
 			scheduler["capacityPlacements"] = cloud.CapacityPlacements
 		}
 		switch {
+		case cloud.BackupBucket != "" && cloud.Provider == "azure":
+			v["backup"] = map[string]any{
+				"enabled": true, "destination": "azure", "serviceAccountName": BackupServiceAccountName,
+				"azure": map[string]any{"storageAccount": cloud.BackupBucket, "container": cloud.BackupContainer},
+			}
 		case cloud.BackupBucket != "" && cloud.Provider == "aws":
 			v["backup"] = map[string]any{
 				"enabled": true, "destination": "s3", "serviceAccountName": BackupServiceAccountName,
@@ -462,6 +470,11 @@ func KernelValues(c *config.Config, img Images, volume string, cloud *Cloud) map
 				"gcs": map[string]any{"bucket": cloud.BackupBucket},
 			}
 		}
+	}
+	if cloud != nil && cloud.Provider == "azure" {
+		// The azure samples sign in as their product's managed identity,
+		// which AKS's webhook gives only a Pod labelled for it.
+		scheduler["taskPodLabels"] = map[string]any{"azure.workload.identity/use": "true"}
 	}
 	if cloud != nil && cloud.Database != nil {
 		managedKernelValues(v, cloud.Database)
@@ -671,7 +684,20 @@ func ConsoleValues(c *config.Config, env string, img Images, cloud *Cloud) map[s
 		// SecretStore signs in as a role only its eso-aws may assume.
 		v["secretSources"] = map[string]any{"clusterIssuer": cloud.ClusterIssuer, "catalogRepo": c.Catalog.Repo()}
 	}
-	if cloud != nil && cloud.Provider != "aws" {
+	if cloud != nil && cloud.Provider == "azure" {
+		// Reading ACR (pinning digests, scanning) as the module's console
+		// and scanner identities, through AKS Workload Identity.
+		v["azureWorkloadIdentity"] = true
+		v["serviceAccount"] = map[string]any{"annotations": map[string]any{"azure.workload.identity/client-id": cloud.ConsoleServiceAccount}}
+		v["scanning"] = map[string]any{"serviceAccountAnnotations": map[string]any{"azure.workload.identity/client-id": cloud.ScannerServiceAccount}}
+		v["registryCheck"] = map[string]any{"acrToken": true}
+		// Steps can't reach the instance metadata server, so not the
+		// nodes' kubelet identity either (a NetworkPolicy in each team
+		// namespace).
+		v["teamNamespaces"] = map[string]any{"blockMetadata": true}
+		v["secretSources"] = map[string]any{"clusterIssuer": cloud.ClusterIssuer, "catalogRepo": c.Catalog.Repo()}
+	}
+	if cloud != nil && cloud.Provider == "gcp" {
 		// Reading the task registry (pinning digests, scanning) as the
 		// module's console identity, through GKE's Workload Identity.
 		identity := map[string]any{"iam.gke.io/gcp-service-account": cloud.ConsoleServiceAccount}
@@ -851,11 +877,15 @@ func logsValues(c *config.Config, cloud *Cloud) map[string]any {
 
 // EnsureBackupServiceAccount creates (or updates) the Kubernetes
 // ServiceAccount the backups run as: on gcp annotated with its Google
-// service account; on aws, EKS Pod Identity binds it by name.
+// service account, on azure with its managed identity; on aws, EKS Pod
+// Identity binds it by name.
 func EnsureBackupServiceAccount(ctx context.Context, r *run.Runner, c *config.Config, cloud *Cloud) error {
 	annotations := ""
-	if cloud.Provider != "aws" {
+	switch cloud.Provider {
+	case "gcp":
 		annotations = fmt.Sprintf("  annotations:\n    iam.gke.io/gcp-service-account: %s\n", cloud.BackupServiceAccount)
+	case "azure":
+		annotations = fmt.Sprintf("  annotations:\n    azure.workload.identity/client-id: %s\n", cloud.BackupServiceAccount)
 	}
 	manifest := fmt.Sprintf(`apiVersion: v1
 kind: ServiceAccount
