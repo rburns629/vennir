@@ -579,7 +579,7 @@ _gke-confirm:
 # each signature checked against the release workflow's identity at exactly
 # that tag before anything is deployed.
 # make gke-deploy VERSION=v0.2.3
-RELEASE_REGISTRY ?= ghcr.io/rburns629/vennir
+RELEASE_REGISTRY ?= ghcr.io/roburns/vennir
 RELEASE_IDENTITY = https://github.com/$(subst ghcr.io/,,$(RELEASE_REGISTRY))/.github/workflows/release.yml@refs/tags/$(VERSION)
 # The cosign the release signs with (install-scanners.sh's COSIGN_VERSION):
 # v3 stores signatures as OCI referrers, which v2 can't find.

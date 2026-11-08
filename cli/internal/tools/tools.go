@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // Dir is where downloaded tools live: ~/.vennir/bin. With no home

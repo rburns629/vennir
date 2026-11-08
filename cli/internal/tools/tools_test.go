@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // fakeHelm returns a Runner whose helm copies the file $FAKE_CHART into

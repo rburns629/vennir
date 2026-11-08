@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/domain"
 )
 
 // lockKey is any constant no one else uses: one policy process applies a

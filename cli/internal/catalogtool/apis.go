@@ -16,7 +16,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
-	catalogv1 "github.com/rburns629/vennir/cli/internal/gen/vennir/catalog/v1"
+	catalogv1 "github.com/roburns/vennir/cli/internal/gen/vennir/catalog/v1"
 )
 
 // An API product (teams/<team>/apis/<name>/api.yaml, kind: Api) publishes a

@@ -46,8 +46,8 @@ Download the release for your machine from GitHub, check it against the release'
 
 ```bash
 V=0.13.2 P=darwin-arm64
-curl -fsSLO "https://github.com/rburns629/vennir/releases/download/v$V/vennir-$P"
-curl -fsSLO "https://github.com/rburns629/vennir/releases/download/v$V/vennir-checksums.txt"
+curl -fsSLO "https://github.com/roburns/vennir/releases/download/v$V/vennir-$P"
+curl -fsSLO "https://github.com/roburns/vennir/releases/download/v$V/vennir-checksums.txt"
 grep " vennir-$P\$" vennir-checksums.txt | shasum -a 256 -c -    # must say OK
 chmod +x "vennir-$P" && sudo mv "vennir-$P" /usr/local/bin/vennir
 vennir version

@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/rburns629/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/install"
 )
 
 func TestMoveJobsSignInAsTheirServiceAndReachThePostgres(t *testing.T) {

@@ -342,7 +342,7 @@ func TestCheckGCPCantTellIsNotAProblem(t *testing.T) {
 // `gh auth status` with two accounts (2026-10-18).
 func TestParseGHStatus(t *testing.T) {
 	out := `github.com
-  ✓ Logged in to github.com account rburns629 (keyring)
+  ✓ Logged in to github.com account roburns (keyring)
   - Active account: true
   - Git operations protocol: https
   - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
@@ -350,7 +350,7 @@ func TestParseGHStatus(t *testing.T) {
   ✓ Logged in to github.com account r0bett (keyring)
   - Active account: false`
 	accounts, active := parseGHStatus(out)
-	if strings.Join(accounts, ",") != "rburns629,r0bett" || active != "rburns629" {
+	if strings.Join(accounts, ",") != "roburns,r0bett" || active != "roburns" {
 		t.Errorf("got %v, %q", accounts, active)
 	}
 }

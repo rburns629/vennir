@@ -14,8 +14,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	consolev1 "github.com/rburns629/vennir/cli/internal/gen/vennir/console/v1"
-	"github.com/rburns629/vennir/cli/internal/gen/vennir/console/v1/consolev1connect"
+	consolev1 "github.com/roburns/vennir/cli/internal/gen/vennir/console/v1"
+	"github.com/roburns/vennir/cli/internal/gen/vennir/console/v1/consolev1connect"
 )
 
 // fakeConsole answers the calls vennir makes, recording what it was sent.

@@ -3101,8 +3101,8 @@ const file_vennir_kernel_v1_kernel_proto_rawDesc = "" +
 	"\x0eDecideApproval\x12'.vennir.kernel.v1.DecideApprovalRequest\x1a(.vennir.kernel.v1.DecideApprovalResponse\x12z\n" +
 	"\x14ListAwaitingApproval\x12-.vennir.kernel.v1.ListAwaitingApprovalRequest\x1a..vennir.kernel.v1.ListAwaitingApprovalResponse\"\x03\x90\x02\x01\x12b\n" +
 	"\fListRefusals\x12%.vennir.kernel.v1.ListRefusalsRequest\x1a&.vennir.kernel.v1.ListRefusalsResponse\"\x03\x90\x02\x01\x12V\n" +
-	"\bGetStats\x12!.vennir.kernel.v1.GetStatsRequest\x1a\".vennir.kernel.v1.GetStatsResponse\"\x03\x90\x02\x01B\xd0\x01\n" +
-	"\x14com.vennir.kernel.v1B\vKernelProtoP\x01ZIgithub.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1;kernelv1\xa2\x02\x03VKX\xaa\x02\x10Vennir.Kernel.V1\xca\x02\x10Vennir\\Kernel\\V1\xe2\x02\x1cVennir\\Kernel\\V1\\GPBMetadata\xea\x02\x12Vennir::Kernel::V1b\x06proto3"
+	"\bGetStats\x12!.vennir.kernel.v1.GetStatsRequest\x1a\".vennir.kernel.v1.GetStatsResponse\"\x03\x90\x02\x01B\xce\x01\n" +
+	"\x14com.vennir.kernel.v1B\vKernelProtoP\x01ZGgithub.com/roburns/vennir/kernel/internal/gen/vennir/kernel/v1;kernelv1\xa2\x02\x03VKX\xaa\x02\x10Vennir.Kernel.V1\xca\x02\x10Vennir\\Kernel\\V1\xe2\x02\x1cVennir\\Kernel\\V1\\GPBMetadata\xea\x02\x12Vennir::Kernel::V1b\x06proto3"
 
 var (
 	file_vennir_kernel_v1_kernel_proto_rawDescOnce sync.Once

@@ -16,7 +16,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Vennir: every team's automation, one workflow. Nobody's credentials shared.">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Get started with Vennir","description":"Install Vennir on your laptop with kind, on GKE or EKS with the vennir CLI, or on your own cluster with Helm, then publish a product and run it.","url":"https://vennir.io/get-started","dateModified":"2026-11-04","about":{"@id":"https://vennir.io/#software"},"publisher":{"@type":"Organization","@id":"https://vennir.io/#org","name":"Vennir","url":"https://vennir.io/","logo":"https://vennir.io/favicon.svg","sameAs":["https://github.com/rburns629/vennir"]}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Get started with Vennir","description":"Install Vennir on your laptop with kind, on GKE or EKS with the vennir CLI, or on your own cluster with Helm, then publish a product and run it.","url":"https://vennir.io/get-started","dateModified":"2026-11-04","about":{"@id":"https://vennir.io/#software"},"publisher":{"@type":"Organization","@id":"https://vennir.io/#org","name":"Vennir","url":"https://vennir.io/","logo":"https://vennir.io/favicon.svg","sameAs":["https://github.com/roburns/vennir"]}}</script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
@@ -66,7 +66,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <a class="nav-link" href="/changelog">Changelog</a>
       </div>
       <div style="display: flex; align-items: center; gap: 12px">
-        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.6 2.8 5.6 3.1 5.6 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.2 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"></path></svg>GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/roburns/vennir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.6 2.8 5.6 3.1 5.6 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.2 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"></path></svg>GitHub</a>
         <a class="btn btn-primary" href="/get-started" aria-current="page" style="box-shadow: 0 0 0 2px #0A0C10, 0 0 0 4px #7C9BFF">Get started</a>
       </div>
     </nav>
@@ -166,7 +166,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
             <span class="chip">make quickstart</span>
           </div>
 <pre class="code"><span class="c"># Needs Docker running, kind, kubectl, helm 4 and curl</span>
-<span class="c">$</span> git clone https://github.com/rburns629/vennir
+<span class="c">$</span> git clone https://github.com/roburns/vennir
 <span class="c">$</span> cd vennir
 <span class="c">$</span> make quickstart    <span class="c"># safe to run again</span>
 
@@ -235,7 +235,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       </div>
       <div style="display: flex; flex-direction: column; gap: 20px">
         <h3 style="margin: 0; font-size: 22px; font-weight: 600; color: #FFFFFF">Try it with no catalog at all</h3>
-        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">After <span class="mono" style="font-size: 14px; color: #E8EAEE">make quickstart</span>, paste this into <b style="color: #FFFFFF; font-weight: 600">Runs → Submit a DAG</b>. Both images are the fake products in <a href="https://github.com/rburns629/vennir/tree/main/examples">examples/</a>. <span class="mono" style="font-size: 14px; color: #E8EAEE">create-project</span> outputs <span class="mono" style="font-size: 14px; color: #E8EAEE">{"projectId": "hello-123"}</span>, and <span class="mono" style="font-size: 14px; color: #E8EAEE">deploy-app</span> runs next with it filled in.</p>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">After <span class="mono" style="font-size: 14px; color: #E8EAEE">make quickstart</span>, paste this into <b style="color: #FFFFFF; font-weight: 600">Runs → Submit a DAG</b>. Both images are the fake products in <a href="https://github.com/roburns/vennir/tree/main/examples">examples/</a>. <span class="mono" style="font-size: 14px; color: #E8EAEE">create-project</span> outputs <span class="mono" style="font-size: 14px; color: #E8EAEE">{"projectId": "hello-123"}</span>, and <span class="mono" style="font-size: 14px; color: #E8EAEE">deploy-app</span> runs next with it filled in.</p>
         <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">Then publish real products to the local registry, with no Git hosting or CI. Each is validated, built, tested and scanned the way catalog CI does it, then registered with the console.</p>
         <div class="card" style="overflow: hidden">
           <div style="padding: 12px 20px; border-bottom: 1px solid #1F2430"><span class="mono" style="font-size: 13px; color: #C9CED8">Local mode</span></div>
@@ -264,7 +264,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <div class="card" style="overflow: hidden">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
             <span class="mono" style="font-size: 13px; color: #C9CED8">Google Cloud: a project with billing</span>
-            <a class="chip" href="https://github.com/rburns629/vennir/blob/main/docs/clouds/gcp.md" style="text-decoration: none">guide</a>
+            <a class="chip" href="https://github.com/roburns/vennir/blob/main/docs/clouds/gcp.md" style="text-decoration: none">guide</a>
           </div>
 <pre class="code"><span class="c">$</span> gcloud auth login
 <span class="c">$</span> gcloud auth application-default login
@@ -274,7 +274,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <div class="card" style="overflow: hidden">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
             <span class="mono" style="font-size: 13px; color: #C9CED8">AWS: an account, not a Builder ID</span>
-            <a class="chip" href="https://github.com/rburns629/vennir/blob/main/docs/clouds/aws.md" style="text-decoration: none">guide</a>
+            <a class="chip" href="https://github.com/roburns/vennir/blob/main/docs/clouds/aws.md" style="text-decoration: none">guide</a>
           </div>
 <pre class="code"><span class="c"># an IAM user, no keys on disk</span>
 <span class="c">$</span> aws login <span class="k">--profile</span> vennir
@@ -284,7 +284,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <div class="card" style="overflow: hidden">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
             <span class="mono" style="font-size: 13px; color: #C9CED8">GitHub: for the catalog</span>
-            <a class="chip" href="https://github.com/rburns629/vennir/blob/main/docs/clouds/github.md" style="text-decoration: none">guide</a>
+            <a class="chip" href="https://github.com/roburns/vennir/blob/main/docs/clouds/github.md" style="text-decoration: none">guide</a>
           </div>
 <pre class="code"><span class="c">$</span> gh auth login \
     <span class="k">--scopes</span> repo,workflow</pre>
@@ -399,21 +399,21 @@ Apply? [y/N] <span class="v">y</span></pre>
     <div style="display: flex; flex-direction: column; gap: 24px">
       <span class="eyebrow">03 · On a cluster you have</span>
       <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">The charts are complete on their own.</h2>
-      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Each release publishes both charts and their signed images to <span class="mono" style="font-size: 16px; color: #E8EAEE">ghcr.io/rburns629/vennir</span>. A chart install makes both databases, generates their passwords and the first admin. <span class="mono" style="font-size: 16px; color: #E8EAEE">vennir init --target existing</span> uses the same charts, and can set up HTTPS through your Ingress with cert-manager.</p>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Each release publishes both charts and their signed images to <span class="mono" style="font-size: 16px; color: #E8EAEE">ghcr.io/roburns/vennir</span>. A chart install makes both databases, generates their passwords and the first admin. <span class="mono" style="font-size: 16px; color: #E8EAEE">vennir init --target existing</span> uses the same charts, and can set up HTTPS through your Ingress with cert-manager.</p>
       <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 16px">
         <li style="display: flex; gap: 14px"><span class="mono" style="flex: 0 0 28px; font-size: 13px; color: #7C9BFF; padding-top: 3px">01</span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">A platform namespace</b>, such as <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir-system</span>. Never a team's; keep who may create Pods there to administrators.</span></li>
         <li style="display: flex; gap: 14px"><span class="mono" style="flex: 0 0 28px; font-size: 13px; color: #7C9BFF; padding-top: 3px">02</span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Optional components first:</b> Sigstore's policy-controller for signatures (excluding the platform namespace), External Secrets Operator for vaults.</span></li>
-        <li style="display: flex; gap: 14px"><span class="mono" style="flex: 0 0 28px; font-size: 13px; color: #7C9BFF; padding-top: 3px">03</span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Values</b>, copied from <a href="https://github.com/rburns629/vennir/tree/main/helm/values">helm/values/{kind,gke,eks}</a>. At least the task image source, the console's <span class="mono" style="font-size: 14px; color: #E8EAEE">kernelApiUrl</span> and the first admin's email.</span></li>
+        <li style="display: flex; gap: 14px"><span class="mono" style="flex: 0 0 28px; font-size: 13px; color: #7C9BFF; padding-top: 3px">03</span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Values</b>, copied from <a href="https://github.com/roburns/vennir/tree/main/helm/values">helm/values/{kind,gke,eks}</a>. At least the task image source, the console's <span class="mono" style="font-size: 14px; color: #E8EAEE">kernelApiUrl</span> and the first admin's email.</span></li>
         <li style="display: flex; gap: 14px"><span class="mono" style="flex: 0 0 28px; font-size: 13px; color: #7C9BFF; padding-top: 3px">04</span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Install, kernel first</b>, without <span class="mono" style="font-size: 14px; color: #E8EAEE">--wait</span> the first time: each chart migrates in a post-install hook. Then port-forward, or put HTTPS in front before anyone signs in over a network.</span></li>
       </ol>
-      <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/blob/main/docs/operations.md#installing-on-a-cluster-with-helm" style="align-self: flex-start">Installing with Helm, in full</a>
+      <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/docs/operations.md#installing-on-a-cluster-with-helm" style="align-self: flex-start">Installing with Helm, in full</a>
     </div>
     <div class="card" style="overflow: hidden">
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
         <span class="mono" style="font-size: 13px; color: #C9CED8">docs/operations.md</span>
         <span class="chip">helm 4</span>
       </div>
-<pre class="code" style="font-size: 12.5px"><span class="v">CHARTS</span>=oci://ghcr.io/rburns629/vennir/charts
+<pre class="code" style="font-size: 12.5px"><span class="v">CHARTS</span>=oci://ghcr.io/roburns/vennir/charts
 <span class="v">V</span>=&lt;release&gt;; <span class="v">SIZE</span>=minimal
 
 helm pull $CHARTS/execution-kernel <span class="k">--version</span> $V <span class="k">--untar</span>
@@ -483,7 +483,7 @@ kubectl <span class="k">-n</span> vennir-system port-forward \
 <span class="c"># apply it, and runs a starter end to end.</span></pre>
           </div>
           <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Starters come in Python, TypeScript, Go, PowerShell and Rust. On GitHub Free, a private repository has no Environments or branch rules; publishing is still limited to <span class="mono" style="font-size: 14px; color: #E8EAEE">main</span> by its cloud federation. A released <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span> carries the catalog template for its own version, so make the catalog with the same version the install runs.</p>
-          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On kind or your own cluster, start from <a href="https://github.com/rburns629/vennir/tree/main/catalog-template">catalog-template/</a> by hand and publish with <span class="mono" style="font-size: 14px; color: #E8EAEE">./vennir catalog publish</span> or <span class="mono" style="font-size: 14px; color: #E8EAEE">make catalog-publish</span>.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On kind or your own cluster, start from <a href="https://github.com/roburns/vennir/tree/main/catalog-template">catalog-template/</a> by hand and publish with <span class="mono" style="font-size: 14px; color: #E8EAEE">./vennir catalog publish</span> or <span class="mono" style="font-size: 14px; color: #E8EAEE">make catalog-publish</span>.</p>
         </div>
         <div class="card" style="overflow: hidden">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
@@ -579,11 +579,11 @@ kubectl <span class="k">-n</span> vennir-system port-forward \
       <h2 style="margin: 0; font-size: 48px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; max-width: 760px; text-wrap: balance">The rest is in the guides.</h2>
       <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2; max-width: 640px">Setup from an empty account, the hour-long walkthrough from a new team to two chained products, and every setting with its default.</p>
       <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center">
-        <a class="btn btn-primary" href="https://github.com/rburns629/vennir/blob/main/docs/setup.md">Setting up Vennir</a>
-        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/blob/main/console/docs/01-getting-started.md">Try it end to end</a>
-        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/blob/main/catalog-template/README.md">The catalog's guide</a>
+        <a class="btn btn-primary" href="https://github.com/roburns/vennir/blob/main/docs/setup.md">Setting up Vennir</a>
+        <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/console/docs/01-getting-started.md">Try it end to end</a>
+        <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/catalog-template/README.md">The catalog's guide</a>
       </div>
-      <span style="font-size: 14px; color: #8B93A3">Stuck? <a href="https://github.com/rburns629/vennir/blob/main/console/docs/15-troubleshooting.md">Troubleshooting</a> says what to check when something fails, or <a href="/community">ask the community</a>.</span>
+      <span style="font-size: 14px; color: #8B93A3">Stuck? <a href="https://github.com/roburns/vennir/blob/main/console/docs/15-troubleshooting.md">Troubleshooting</a> says what to check when something fails, or <a href="/community">ask the community</a>.</span>
     </div>
   </section>
 
@@ -606,18 +606,18 @@ kubectl <span class="k">-n</span> vennir-system port-forward \
       <nav aria-label="Docs" style="display: flex; flex-direction: column; gap: 4px">
         <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Docs</span>
         <a class="nav-link" href="/docs" style="font-size: 14px">All docs</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
       </nav>
       <nav aria-label="Project" style="display: flex; flex-direction: column; gap: 4px">
         <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Project</span>
         <a class="nav-link" href="/community" style="font-size: 14px">Community</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir" style="font-size: 14px">GitHub</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir" style="font-size: 14px">GitHub</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
       </nav>
     </div>
   </footer>

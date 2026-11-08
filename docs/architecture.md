@@ -9,7 +9,7 @@ containers, and why it's built the way it is. For running it, see
 
 The platform was called Acyclix until 2026-10-20, then Vertra until
 2026-11-03; older notes, tags, releases (through 0.10.0, at
-`ghcr.io/rburns629/vertra`) and installs may still use those names
+`ghcr.io/roburns/vertra`) and installs may still use those names
 (`vennir catalog migrate` converts a catalog).
 
 ## What Vennir is

@@ -11,7 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/rburns629/vennir/kernel/internal/dbtest"
+	"github.com/roburns/vennir/kernel/internal/dbtest"
 )
 
 // kernel policy's role gets what it uses and nothing else, however often

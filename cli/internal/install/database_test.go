@@ -68,7 +68,7 @@ func TestAManagedDatabaseReplacesTheInClusterOne(t *testing.T) {
 }
 
 func TestDatabaseSetupRunsAsTheAdministratorAndOpensEachDatabaseToItsService(t *testing.T) {
-	m, err := databaseSetupManifest(managedCloud().Database, "ghcr.io/rburns629/vennir/execution-kernel:0.6.0")
+	m, err := databaseSetupManifest(managedCloud().Database, "ghcr.io/roburns/vennir/execution-kernel:0.6.0")
 	if err != nil {
 		t.Fatal(err)
 	}

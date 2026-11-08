@@ -5,7 +5,7 @@ package main
 import (
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/githost"
+	"github.com/roburns/vennir/cli/internal/githost"
 )
 
 // After a take-over, the old push's run (to the other registry) and an

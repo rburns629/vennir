@@ -26,8 +26,8 @@ Key facts:
 
 ## Source
 
-- [GitHub repository](https://github.com/rburns629/vennir)
-- [Architecture](https://github.com/rburns629/vennir/blob/main/docs/architecture.md)
-- [Security model, in full](https://github.com/rburns629/vennir/blob/main/docs/security-model.md)
-- [Setup guide](https://github.com/rburns629/vennir/blob/main/docs/setup.md)
-- [Releases](https://github.com/rburns629/vennir/releases)
+- [GitHub repository](https://github.com/roburns/vennir)
+- [Architecture](https://github.com/roburns/vennir/blob/main/docs/architecture.md)
+- [Security model, in full](https://github.com/roburns/vennir/blob/main/docs/security-model.md)
+- [Setup guide](https://github.com/roburns/vennir/blob/main/docs/setup.md)
+- [Releases](https://github.com/roburns/vennir/releases)

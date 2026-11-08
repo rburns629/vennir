@@ -11,7 +11,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/domain"
 )
 
 // Handle identifies a started attempt, opaque outside the executor that

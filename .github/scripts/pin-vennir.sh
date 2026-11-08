@@ -16,7 +16,7 @@ shift
 root=$(cd "$(dirname "$0")/../.." && pwd)
 [ $# -gt 0 ] || set -- "$root/catalog-template/vennir"
 
-checksums=$(gh release download "v$version" --pattern vennir-checksums.txt --output - --repo rburns629/vennir)
+checksums=$(gh release download "v$version" --pattern vennir-checksums.txt --output - --repo roburns/vennir)
 sha() { awk -v f="vennir-$1" '$2 == f { print $1 }' <<< "$checksums"; }
 
 for wrapper in "$@"; do

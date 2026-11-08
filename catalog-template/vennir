@@ -17,7 +17,7 @@ set -euo pipefail
 
 version="0.13.2"
 registry="https://ghcr.io"
-repository="rburns629/vennir/cli"
+repository="roburns/vennir/cli"
 
 root=$(cd "$(dirname "$0")" && pwd)
 export VENNIR_CATALOG_ROOT="$root"

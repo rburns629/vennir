@@ -16,9 +16,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
-	"github.com/rburns629/vennir/kernel/internal/executor"
-	"github.com/rburns629/vennir/kernel/internal/metrics"
+	"github.com/roburns/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/executor"
+	"github.com/roburns/vennir/kernel/internal/metrics"
 )
 
 // Options configure a pass.

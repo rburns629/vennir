@@ -16,7 +16,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Vennir: every team's automation, one workflow. Nobody's credentials shared.">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Vennir security model","description":"Vennir's security model: what the console checks and Kubernetes admission policies check again, how each team's secrets reach only its own reviewed products, and what isn't enforced yet.","url":"https://vennir.io/security","dateModified":"2026-11-04","about":{"@id":"https://vennir.io/#software"},"publisher":{"@type":"Organization","@id":"https://vennir.io/#org","name":"Vennir","url":"https://vennir.io/","logo":"https://vennir.io/favicon.svg","sameAs":["https://github.com/rburns629/vennir"]}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Vennir security model","description":"Vennir's security model: what the console checks and Kubernetes admission policies check again, how each team's secrets reach only its own reviewed products, and what isn't enforced yet.","url":"https://vennir.io/security","dateModified":"2026-11-04","about":{"@id":"https://vennir.io/#software"},"publisher":{"@type":"Organization","@id":"https://vennir.io/#org","name":"Vennir","url":"https://vennir.io/","logo":"https://vennir.io/favicon.svg","sameAs":["https://github.com/roburns/vennir"]}}</script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
@@ -66,7 +66,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <a class="nav-link" href="/changelog">Changelog</a>
       </div>
       <div style="display: flex; align-items: center; gap: 12px">
-        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.6 2.8 5.6 3.1 5.6 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.2 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"></path></svg>GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/roburns/vennir"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4 1.5-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6.2 0C6.6 2.8 5.6 3.1 5.6 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.2 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"></path></svg>GitHub</a>
         <a class="btn btn-primary" href="/get-started">Get started</a>
       </div>
     </nav>
@@ -79,7 +79,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <h1 style="margin: 0; font-size: 56px; line-height: 1.06; font-weight: 700; letter-spacing: -0.025em; color: #FFFFFF; text-wrap: balance">A team's secrets reach its own reviewed products. Nothing else.</h1>
       <p style="margin: 0; font-size: 19px; line-height: 1.6; color: #AEB5C2; max-width: 580px; text-wrap: pretty">The console checks every rule before anything runs, and admission policies in the cluster check them again on every step's Job. This page is the short version of the security model: what's enforced, by which layer, and what isn't yet.</p>
       <div style="display: flex; gap: 12px; flex-wrap: wrap">
-        <a class="btn btn-primary" href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md">Read the full security model</a>
+        <a class="btn btn-primary" href="https://github.com/roburns/vennir/blob/main/docs/security-model.md">Read the full security model</a>
         <a class="btn btn-ghost" href="#gaps">What isn't enforced yet</a>
       </div>
     </div>
@@ -252,52 +252,52 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           </thead>
           <tbody>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/dispatch-policy.yaml" class="mono" style="font-size: 13px">dispatch-policy.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-kernel/templates/dispatch-policy.yaml" class="mono" style="font-size: 13px">dispatch-policy.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">A Job outside a namespace labelled <span class="mono" style="font-size: 13px; color: #E8EAEE">vennir/team=true</span>, or in the platform's own; a Job that isn't hardened</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">DISPATCH_REJECTED</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/image-policy.yaml" class="mono" style="font-size: 13px">image-policy.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-kernel/templates/image-policy.yaml" class="mono" style="font-size: 13px">image-policy.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">An image outside the source registry set at install and the sources admins add</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IMAGE_NOT_ALLOWED</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/scan-policy.yaml" class="mono" style="font-size: 13px">scan-policy.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-kernel/templates/scan-policy.yaml" class="mono" style="font-size: 13px">scan-policy.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">An image not pinned by digest, or a digest that failed its scan, unless an admin accepted it</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IMAGE_NOT_PINNED<br>IMAGE_SCAN_FAILED</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/identity-policy.yaml" class="mono" style="font-size: 13px">identity-policy.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-kernel/templates/identity-policy.yaml" class="mono" style="font-size: 13px">identity-policy.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">Any ServiceAccount but <span class="mono" style="font-size: 13px; color: #E8EAEE">default</span> unless it's the registered product's own; any Secret not registered for its team; Secrets any way but a volume; a token for an audience the product didn't declare</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IDENTITY_NOT_ALLOWED</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/catalog-policy.yaml" class="mono" style="font-size: 13px">catalog-policy.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-kernel/templates/catalog-policy.yaml" class="mono" style="font-size: 13px">catalog-policy.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">With a signed catalog and <span class="mono" style="font-size: 13px; color: #E8EAEE">catalogPolicy.enabled</span> on (off by default): an image run as a product, or with tokens, that the catalog release the kernel verified itself doesn't name as that product's, with that ServiceAccount and those audiences. With <span class="mono" style="font-size: 13px; color: #E8EAEE">catalogPolicy.gateway</span> set too, the gateway minting an API's ServiceAccount a token for an audience its api.yaml doesn't need: refused, the caller gets the gateway's 502 <span class="mono" style="font-size: 13px; color: #E8EAEE">BACKEND_CREDENTIAL</span></td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IDENTITY_NOT_ALLOWED</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/image-signature.yaml" class="mono" style="font-size: 13px">image-signature.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-kernel/templates/image-signature.yaml" class="mono" style="font-size: 13px">image-signature.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">An image catalog CI didn't sign (a generated key, a cloud KMS key, or keyless), where policy-controller is installed</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #F2C08A; border-bottom: 1px solid #171B24">IMAGE_NOT_SIGNED</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-kernel/templates/purge-policy.yaml" class="mono" style="font-size: 13px">purge-policy.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-kernel/templates/purge-policy.yaml" class="mono" style="font-size: 13px">purge-policy.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">A purger deleting a team namespace that isn't labelled retired. None is configured by default, so whoever retires a namespace can't also delete it</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #8B93A3; border-bottom: 1px solid #171B24">refused delete</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-console/templates/namespace-policy.yaml" class="mono" style="font-size: 13px">namespace-policy.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500; border-bottom: 1px solid #171B24"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-console/templates/namespace-policy.yaml" class="mono" style="font-size: 13px">namespace-policy.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2; border-bottom: 1px solid #171B24">The console making or adopting a namespace that isn't a team's, changing a team namespace beyond its team label, or touching kube-* or the platform's own</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #8B93A3; border-bottom: 1px solid #171B24">refused write</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-console/templates/write-fence-policy.yaml" class="mono" style="font-size: 13px">write-fence-policy.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-console/templates/write-fence-policy.yaml" class="mono" style="font-size: 13px">write-fence-policy.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2">The console writing Secrets, ServiceAccounts, RBAC, ExternalSecrets, NetworkPolicies or quotas outside team namespaces, or in any shape but its own</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #8B93A3">refused write</td>
             </tr>
             <tr>
-              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500"><a href="https://github.com/rburns629/vennir/blob/main/helm/charts/execution-console/templates/console-jobs-policy.yaml" class="mono" style="font-size: 13px">console-jobs-policy.yaml</a></th>
+              <th scope="row" style="padding: 16px 22px; text-align: left; vertical-align: top; font-weight: 500"><a href="https://github.com/roburns/vennir/blob/main/helm/charts/execution-console/templates/console-jobs-policy.yaml" class="mono" style="font-size: 13px">console-jobs-policy.yaml</a></th>
               <td style="padding: 16px 22px; vertical-align: top; color: #AEB5C2">A Job the console makes in the platform's namespace that isn't one of its image scans or catalog verifications as it builds them: another image, identity, Secret or token, root, or anything from the node</td>
               <td class="mono" style="padding: 16px 22px; vertical-align: top; font-size: 13px; color: #8B93A3">refused Job</td>
             </tr>
@@ -501,7 +501,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <div style="display: flex; flex-direction: column; gap: 16px; max-width: 800px">
         <span class="eyebrow" style="color: #F2C08A">What isn't enforced yet</span>
         <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Vennir is 0.x, and not production-ready. These gaps are why.</h2>
-        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Each one is tracked in <a href="https://github.com/rburns629/vennir/blob/main/TODO.md">TODO.md</a> and described in the <a href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md#not-yet-enforced">security model</a>.</p>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">Each one is tracked in <a href="https://github.com/roburns/vennir/blob/main/TODO.md">TODO.md</a> and described in the <a href="https://github.com/roburns/vennir/blob/main/docs/security-model.md#not-yet-enforced">security model</a>.</p>
       </div>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 20px">
         <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
@@ -544,8 +544,8 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; max-width: 760px; text-wrap: balance">Found a vulnerability? Tell us privately.</h2>
       <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2; max-width: 660px">Use the repository's Security tab, Report a vulnerability, never a public issue. You'll hear back within 5 working days, and a fix is released before details are published, within 90 days unless we agree otherwise. Only the latest 0.x release gets security fixes.</p>
       <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center">
-        <a class="btn btn-primary" href="https://github.com/rburns629/vennir/security/advisories/new">Report a vulnerability</a>
-        <a class="btn btn-ghost" href="https://github.com/rburns629/vennir/blob/main/SECURITY.md">Read SECURITY.md</a>
+        <a class="btn btn-primary" href="https://github.com/roburns/vennir/security/advisories/new">Report a vulnerability</a>
+        <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/SECURITY.md">Read SECURITY.md</a>
       </div>
     </div>
   </section>
@@ -569,18 +569,18 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <nav aria-label="Docs" style="display: flex; flex-direction: column; gap: 4px">
         <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Docs</span>
         <a class="nav-link" href="/docs" style="font-size: 14px">All docs</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
       </nav>
       <nav aria-label="Project" style="display: flex; flex-direction: column; gap: 4px">
         <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Project</span>
         <a class="nav-link" href="/community" style="font-size: 14px">Community</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir" style="font-size: 14px">GitHub</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
-        <a class="nav-link" href="https://github.com/rburns629/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir" style="font-size: 14px">GitHub</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
+        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
       </nav>
     </div>
   </footer>

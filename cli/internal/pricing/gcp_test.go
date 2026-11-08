@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/plan"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/plan"
 )
 
 // testdata/gcp-skus.json: real catalog entries (October 2026), the ones the

@@ -33,7 +33,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rburns629/vennir/cli/internal/catalogtool"
+	"github.com/roburns/vennir/cli/internal/catalogtool"
 )
 
 // errReported ends a command that reported its own problems: exit 1, no

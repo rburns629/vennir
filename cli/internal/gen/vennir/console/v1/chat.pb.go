@@ -2159,8 +2159,8 @@ const file_vennir_console_v1_chat_proto_rawDesc = "" +
 	"\rSetChatLimits\x12'.vennir.console.v1.SetChatLimitsRequest\x1a(.vennir.console.v1.SetChatLimitsResponse\x12Y\n" +
 	"\n" +
 	"RateAnswer\x12$.vennir.console.v1.RateAnswerRequest\x1a%.vennir.console.v1.RateAnswerResponse\x12p\n" +
-	"\x10ListChatFeedback\x12*.vennir.console.v1.ListChatFeedbackRequest\x1a+.vennir.console.v1.ListChatFeedbackResponse\"\x03\x90\x02\x01B\xd2\x01\n" +
-	"\x15com.vennir.console.v1B\tChatProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"\x10ListChatFeedback\x12*.vennir.console.v1.ListChatFeedbackRequest\x1a+.vennir.console.v1.ListChatFeedbackResponse\"\x03\x90\x02\x01B\xd0\x01\n" +
+	"\x15com.vennir.console.v1B\tChatProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_chat_proto_rawDescOnce sync.Once

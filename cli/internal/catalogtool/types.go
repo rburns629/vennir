@@ -13,7 +13,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	catalogv1 "github.com/rburns629/vennir/cli/internal/gen/vennir/catalog/v1"
+	catalogv1 "github.com/roburns/vennir/cli/internal/gen/vennir/catalog/v1"
 )
 
 // A catalog's wiring types (decision 25, docs/assessment.md): the kinds of

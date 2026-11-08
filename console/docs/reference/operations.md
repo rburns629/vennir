@@ -57,9 +57,9 @@ on AKS a network policy engine). Without it, no policy below holds.
 
 1. **Images and charts.** Each release publishes both images (amd64 and
    arm64, scanned, signed keyless by the release workflow) and both charts
-   to `ghcr.io/rburns629/vennir`, and the charts default to the images
+   to `ghcr.io/roburns/vennir`, and the charts default to the images
    released with them: install from
-   `oci://ghcr.io/rburns629/vennir/charts/execution-kernel` and
+   `oci://ghcr.io/roburns/vennir/charts/execution-kernel` and
    `…/execution-console` with `--version <release>`. To run your own build
    instead, push `kernel/` and `console/` to your registry and set
    `image.repository` and `image.tag` (or `image.digest`).
@@ -102,7 +102,7 @@ on AKS a network policy engine). Without it, no policy below holds.
    waits for the hook; wait for the rollout after it.
 
    ```
-   CHARTS=oci://ghcr.io/rburns629/vennir/charts; V=<release, e.g. 0.1.0>; SIZE=minimal
+   CHARTS=oci://ghcr.io/roburns/vennir/charts; V=<release, e.g. 0.1.0>; SIZE=minimal
    helm pull $CHARTS/execution-kernel --version $V --untar; helm pull $CHARTS/execution-console --version $V --untar
    helm install kernel ./execution-kernel -n vennir-system -f execution-kernel/sizes/$SIZE.yaml -f <values>/kernel.yaml
    helm install console ./execution-console -n vennir-system -f execution-console/sizes/$SIZE.yaml -f <values>/console.yaml

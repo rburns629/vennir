@@ -7,7 +7,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/config"
 )
 
 func TestWrap(t *testing.T) {

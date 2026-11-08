@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // MinKubernetesMinor is the oldest Kubernetes 1.x the charts support

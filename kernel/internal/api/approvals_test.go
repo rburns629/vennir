@@ -9,8 +9,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	kernelv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1"
-	"github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1/kernelv1connect"
+	kernelv1 "github.com/roburns/vennir/kernel/internal/gen/vennir/kernel/v1"
+	"github.com/roburns/vennir/kernel/internal/gen/vennir/kernel/v1/kernelv1connect"
 )
 
 // gated is chain() with its first step needing an approval, in team.

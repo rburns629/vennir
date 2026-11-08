@@ -79,7 +79,7 @@ Go (pgx, client-go, Connect). One binary, `kernel`, run as processes that never 
 | --- | --- |
 | `README.md` | What the kernel is and how to run and test it. |
 | `ARCHITECTURE.md` | The package rules, and a call-by-call trace of submit → claim → dispatch → poll → finish. |
-| `go.mod`, `go.sum` | The kernel's Go module (`github.com/rburns629/vennir/kernel`). |
+| `go.mod`, `go.sum` | The kernel's Go module (`github.com/roburns/vennir/kernel`). |
 | `Dockerfile` | The image: a Go stage builds the binary; it runs on distroless (no shell) as a non-root user. |
 | `.dockerignore`, `.gcloudignore` | Keep test binaries and local files out of the image and the Cloud Build upload. |
 | `cmd/kernel/main.go` | The binary: `api`, `scheduler`, `policy`, `migrate`, `database-setup`, `sleep [--now]`, `wake`; for the chart `wait-for-postgres` (init containers) and `check-heartbeat` (the scheduler's liveness probe); and `database-token FILE` (a managed database's sign-in for pg_restore, when vennir moves an install's data in). |
@@ -564,7 +564,7 @@ Fake products used by the demos and the kernel's integration tests. They deliber
 | Path | What it's for |
 | --- | --- |
 | `DESIGN.md` | The design for `vennir`: targets, cluster modes, sizes, scale-down, requirements, the OpenTofu modules, the approval screen and cost estimate, the catalog step, the build order. |
-| `go.mod`, `go.sum` | The Go module (`github.com/rburns629/vennir/cli`): cobra and yaml.v3, protobuf and Connect for the console's API, and `make proto`'s two plugins as `tool` dependencies. |
+| `go.mod`, `go.sum` | The Go module (`github.com/roburns/vennir/cli`): cobra and yaml.v3, protobuf and Connect for the console's API, and `make proto`'s two plugins as `tool` dependencies. |
 | `internal/gen/` | Generated from `proto/` by `make proto` (messages and Connect clients); never edited. |
 | `cmd/vennir/catalog_commands.go` | A catalog's own commands, `vennir catalog validate`, `check`, `publish`, `release`, `changed`, `secret-stores check`, `bases`, `migrate`: what every catalog's `./vennir` runs. `vennir catalog create` (making the repository) is `catalog.go`. |
 | `cmd/vennir/catalog_grant.go` | `vennir catalog grant`: the catalog owner's install lets another read its catalog, as exactly that reader's identity (its screen, confirmation, `--revoke`). |

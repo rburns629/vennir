@@ -15,11 +15,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rburns629/vennir/cli/internal/cluster"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/install"
-	"github.com/rburns629/vennir/cli/internal/run"
-	"github.com/rburns629/vennir/cli/internal/tools"
+	"github.com/roburns/vennir/cli/internal/cluster"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/tools"
 )
 
 // The kernel chart's ConfigMap holding each Deployment's replicas while the

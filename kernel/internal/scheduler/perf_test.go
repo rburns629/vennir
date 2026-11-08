@@ -12,7 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/rburns629/vennir/kernel/internal/executor"
+	"github.com/roburns/vennir/kernel/internal/executor"
 )
 
 // The scheduler and Postgres alone (perf/README.md, phase 1): schedulers

@@ -6,7 +6,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/domain"
 )
 
 // CancelStranded cancels the tasks still waiting (READY, BLOCKED or

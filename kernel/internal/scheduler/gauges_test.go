@@ -9,7 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
-	"github.com/rburns629/vennir/kernel/internal/metrics"
+	"github.com/roburns/vennir/kernel/internal/metrics"
 )
 
 // The gauges count unfinished tasks by state and age the oldest READY one.

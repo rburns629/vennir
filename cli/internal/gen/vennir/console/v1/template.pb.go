@@ -1154,8 +1154,8 @@ const file_vennir_console_v1_template_proto_rawDesc = "" +
 	"\vRunTemplate\x12%.vennir.console.v1.RunTemplateRequest\x1a&.vennir.console.v1.RunTemplateResponse\x12V\n" +
 	"\tRunAction\x12#.vennir.console.v1.RunActionRequest\x1a$.vennir.console.v1.RunActionResponse\x12h\n" +
 	"\x0fPreviewTemplate\x12).vennir.console.v1.PreviewTemplateRequest\x1a*.vennir.console.v1.PreviewTemplateResponse\x12b\n" +
-	"\rPreviewAction\x12'.vennir.console.v1.PreviewActionRequest\x1a(.vennir.console.v1.PreviewActionResponseB\xd6\x01\n" +
-	"\x15com.vennir.console.v1B\rTemplateProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"\rPreviewAction\x12'.vennir.console.v1.PreviewActionRequest\x1a(.vennir.console.v1.PreviewActionResponseB\xd4\x01\n" +
+	"\x15com.vennir.console.v1B\rTemplateProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_template_proto_rawDescOnce sync.Once

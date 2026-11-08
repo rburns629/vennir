@@ -307,8 +307,8 @@ const file_vennir_console_v1_common_proto_rawDesc = "" +
 	"\fmemory_limit\x18\x03 \x01(\tH\x02R\vmemoryLimit\x88\x01\x01B\x06\n" +
 	"\x04_cpuB\t\n" +
 	"\a_memoryB\x0f\n" +
-	"\r_memory_limitB\xd4\x01\n" +
-	"\x15com.vennir.console.v1B\vCommonProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"\r_memory_limitB\xd2\x01\n" +
+	"\x15com.vennir.console.v1B\vCommonProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_common_proto_rawDescOnce sync.Once

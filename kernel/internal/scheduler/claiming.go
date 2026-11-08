@@ -9,7 +9,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/domain"
 )
 
 // Claiming uses SELECT ... FOR UPDATE SKIP LOCKED, so several schedulers
