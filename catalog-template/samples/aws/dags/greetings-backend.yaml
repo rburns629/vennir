@@ -43,6 +43,9 @@ steps:
       healthCheckPath: /healthz
       environment:
         GATEWAY_JWKS_URL: {$param: gatewayKeys}
+        # <team>/<name> of apis/greetings, which the gateway signs into each
+        # call: copied into another team's folder, its name in place of aws,
+        # or the backend refuses every call (401).
         API: aws/greetings
         # Its URL isn't known until ECS makes it, and Express Mode's load
         # balancer routes each service by its host: the audience it checks

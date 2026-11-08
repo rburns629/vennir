@@ -259,13 +259,17 @@ def _rollout(ecs: Any, arn: str, name: str) -> tuple[str, int]:
     FAILED), and how many tasks are running. Its deployment is the primary
     one running its task definition; until ECS has made that (a moment
     after an update, when the last one is still primary and done), it's in
-    progress."""
+    progress. One that failed is FAILED even when it's no longer primary:
+    rolled back, the last configuration's deployment is primary again."""
     target = _newest(_describe(ecs, arn) or {}).get("taskDefinitionArn", "")
     services = ecs.describe_services(cluster=CLUSTER, services=[name]).get("services", [])
     if not services:
         return "IN_PROGRESS", 0
     running = services[0].get("runningCount", 0)
-    primary = next((d for d in services[0].get("deployments", []) if d.get("status") == "PRIMARY"), {})
+    deployments = services[0].get("deployments", [])
+    if target and any(d.get("taskDefinition") == target and d.get("rolloutState") == "FAILED" for d in deployments):
+        return "FAILED", running
+    primary = next((d for d in deployments if d.get("status") == "PRIMARY"), {})
     if target and primary.get("taskDefinition") != target:
         return "IN_PROGRESS", running
     return primary.get("rolloutState", "IN_PROGRESS"), running

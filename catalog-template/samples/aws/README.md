@@ -249,7 +249,9 @@ the actions in the table above, passing only those two roles:
   environment, port, health check path, size, maxTasks, or the team's
   execution role): it updates a service it made for the team, and ECS rolls
   the new configuration out behind the same URL, the old one serving until
-  the new one is healthy; `create` waits until it's done, about ten minutes.
+  the new one is healthy; `create` waits until it's done, about ten minutes,
+  and fails (`SERVICE_NOT_RUNNING`) if that deployment fails, rolled back or
+  not (a rollback isn't proven against AWS yet).
   Give each version its own tag (or a digest): an image pushed again under
   the same tag isn't a change. Its subnets stay as it was made
   (`SUBNETS_CHANGED`); a service of that name made some other way, or for

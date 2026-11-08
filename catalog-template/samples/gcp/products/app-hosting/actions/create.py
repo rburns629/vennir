@@ -28,6 +28,7 @@ never the project's default compute account, which is often an Editor).
 
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +63,11 @@ IMPERSONATION_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 # Registry repository, say) an image must be under, and
 # runtime-service-account, the email of the account a service runs as.
 SETTINGS_DIR = Path("/platform/secrets/app-hosting")
+# A found service still rolling a revision out (an earlier attempt's, say)
+# is waited for this long (well inside the step's default 300s timeout),
+# then retried.
+ROLLOUT_WAIT_SECONDS = 120
+POLL_SECONDS = 10
 
 
 def _write_result(result: dict[str, Any]) -> None:
@@ -150,6 +156,16 @@ def _changes(service: run_v2.Service, image: str, runtime_account: str, cloud_sq
     return [field for field in current if current[field] != wanted[field]]
 
 
+def _settled(services: run_v2.ServicesClient, service: run_v2.Service) -> run_v2.Service:
+    """The service once it's no longer rolling a revision out, or as it is
+    when ROLLOUT_WAIT_SECONDS run out."""
+    deadline = time.monotonic() + ROLLOUT_WAIT_SECONDS
+    while service.reconciling and time.monotonic() < deadline:
+        time.sleep(POLL_SECONDS)
+        service = services.get_service(name=service.name)
+    return service
+
+
 def _outputs(service: Any, project_id: str, region: str, service_name: str, made_here: bool) -> dict[str, Any]:
     """Its URL, and the service as a resource when this product made it."""
     outputs: dict[str, Any] = {"serviceUrl": service.uri}
@@ -236,6 +252,24 @@ def _run() -> int:
         made_here = labels.get(MADE_BY_LABEL[0]) == MADE_BY_LABEL[1] and labels.get(TEAM_LABEL) == team
         changes = _changes(existing, image, runtime_account, cloud_sql_connection_name)
         if not changes:
+            # Its template is as asked, but that's not its revision serving
+            # until Cloud Run has rolled it out: a revision that never got
+            # ready leaves the last one serving.
+            existing = _settled(services, existing)
+            if existing.reconciling:
+                return _failure(
+                    "SERVICE_ROLLING_OUT",
+                    f"Service '{service_name}' is still rolling out its newest revision.",
+                    retryable=True,
+                )
+            if existing.latest_ready_revision != existing.latest_created_revision:
+                serving = existing.latest_ready_revision.rsplit("/", 1)[-1] or "no revision"
+                return _failure(
+                    "REVISION_NOT_READY",
+                    f"Service '{service_name}''s newest revision, {existing.latest_created_revision.rsplit('/', 1)[-1]}, "
+                    f"didn't get ready, so {serving} still serves: {existing.terminal_condition.message or 'see its revisions in the Cloud Run console'}. "
+                    "Deploy a fixed image under a new tag.",
+                )
             print(f"service '{service_name}' already exists as asked, leaving it as it is")
             _write_result({"status": "succeeded", "outputs": _outputs(existing, project_id, region, service_name, made_here)})
             return 0

@@ -226,6 +226,20 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual((result["error"]["code"], result["error"]["retryable"]), ("SERVICE_NOT_RUNNING", False))
 
+    def test_an_update_rolled_back_fails_at_once(self) -> None:
+        # ECS rolled the new configuration back: the last one's deployment is
+        # primary again, and the new one's failed.
+        rolled_back = {"services": [{"runningCount": 1, "deployments": [
+            {"status": "PRIMARY", "rolloutState": "IN_PROGRESS", "taskDefinition": f"arn:aws:ecs:us-east-2:{ACCOUNT}:task-definition/default-web:0"},
+            {"status": "ACTIVE", "rolloutState": "FAILED", "taskDefinition": TASK_DEFINITION}]}]}
+        def configure(client):
+            client.describe_express_gateway_service.return_value = {"service": {**SERVICE, "tags": TAGS}}
+            client.describe_services.return_value = rolled_back
+        exit_code, result, _ = self._run(INPUTS, configure)
+        self.assertEqual(exit_code, 1)
+        self.assertEqual((result["error"]["code"], result["error"]["retryable"]), ("SERVICE_NOT_RUNNING", False))
+        self.assertIn("failed", result["error"]["message"])
+
     def test_a_public_service_is_waited_for_until_its_url_answers(self) -> None:
         asked = []
         answers = iter([False, False, True])
