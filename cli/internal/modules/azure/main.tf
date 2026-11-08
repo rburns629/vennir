@@ -5,15 +5,19 @@ data "azurerm_client_config" "this" {}
 locals {
   # The pools by size: the system pool's (the platform: the console, the
   # kernel and Postgres) and the steps' (from zero, Spot except at
-  # `scaled`, or with on_demand_steps). AKS needs 2 vCPUs and 4 GiB on a
-  # system node.
+  # `scaled`, or with on_demand_steps), and each node's OS disk (Premium
+  # SSD: 32 GiB is a P4, 64 a P6 at twice the price). AKS needs 2 vCPUs and
+  # 4 GiB on a system node; B-series has no Spot. Keep in step with
+  # pricing's azurePools.
   pools = {
-    minimal   = { platform_type = "Standard_B2ms", platform_max = 2, steps_type = "Standard_B2s", steps_max = 2, spot = true }
-    resilient = { platform_type = "Standard_D2as_v5", platform_max = 3, steps_type = "Standard_D4as_v5", steps_max = 8, spot = true }
-    scaled    = { platform_type = "Standard_D2as_v5", platform_max = 4, steps_type = "Standard_D4as_v5", steps_max = 30, spot = false }
-    auto      = { platform_type = "Standard_D2as_v5", platform_max = 3, steps_type = "Standard_D4as_v5", steps_max = 8, spot = true }
+    minimal   = { platform_type = "Standard_B2ms", platform_max = 2, steps_type = "Standard_B2s", steps_max = 2, spot = true, disk = 32 }
+    resilient = { platform_type = "Standard_D2as_v5", platform_max = 3, steps_type = "Standard_D4as_v5", steps_max = 8, spot = true, disk = 64 }
+    scaled    = { platform_type = "Standard_D2as_v5", platform_max = 4, steps_type = "Standard_D4as_v5", steps_max = 30, spot = false, disk = 64 }
+    auto      = { platform_type = "Standard_D2as_v5", platform_max = 3, steps_type = "Standard_D4as_v5", steps_max = 8, spot = true, disk = 64 }
   }[var.size]
-  spot = local.pools.spot && !var.on_demand_steps
+  # Spot for steps when the size has it, the VM can be Spot (not B-series)
+  # and the subscription may (not on_demand_steps).
+  spot = local.pools.spot && !var.on_demand_steps && !startswith(local.pools.steps_type, "Standard_B")
   tags = { "vennir-environment" = var.name }
   # Registry and storage account names are global and alphanumeric only:
   # the name's, and a hash of where it is, so vennir knows them before
@@ -65,7 +69,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     auto_scaling_enabled        = true
     min_count                   = 1
     max_count                   = local.pools.platform_max
-    os_disk_size_gb             = 64
+    os_disk_size_gb             = local.pools.disk
     temporary_name_for_rotation = "systemtmp"
     tags                        = local.tags
     upgrade_settings {
@@ -95,7 +99,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "steps" {
   auto_scaling_enabled  = true
   min_count             = var.step_headroom > 0 ? 1 : 0
   max_count             = local.pools.steps_max
-  os_disk_size_gb       = 64
+  os_disk_size_gb       = local.pools.disk
   priority              = local.spot ? "Spot" : "Regular"
   eviction_policy       = local.spot ? "Delete" : null
   # Spot's price, up to the regular one: never more than on-demand.
