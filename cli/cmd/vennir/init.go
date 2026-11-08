@@ -33,7 +33,7 @@ type initFlags struct {
 	idleAfter                              string
 	project, region, mode, taskRegistry    string
 	zone, console                          string
-	profile                                string
+	profile, subscription, resourceGroup   string
 	catalogOwner, catalogRepo, catalogTeam string
 	catalogVisibility, languages, hostname string
 	noCatalog, useExistingCatalog          bool
@@ -66,6 +66,8 @@ func (a *app) initCmd() *cobra.Command {
 	fl.StringVar(&f.kubeContext, "context", "", "existing: the kubectl context")
 	fl.StringVar(&f.project, "project", "", "gcp: the project (default: gcloud's)")
 	fl.StringVar(&f.profile, "profile", "", "aws: the AWS CLI profile to sign in with (default: AWS_PROFILE, or the default chain)")
+	fl.StringVar(&f.subscription, "subscription", "", "azure: the subscription's id (default: az's)")
+	fl.StringVar(&f.resourceGroup, "resource-group", "", "azure: the resource group vennir makes (default: the cluster's name)")
 	fl.StringVar(&f.region, "region", "", "gcp, aws: the region (gcp default us-central1; aws: one the account may use)")
 	fl.StringVar(&f.mode, "mode", "", "gcp, aws: auto (GKE Autopilot, EKS Auto Mode) or standard (node groups vennir sizes)")
 	fl.StringVar(&f.taskRegistry, "task-registry", "", "gcp, aws: where the catalog's images go, made for you (Artifact Registry repository, ECR prefix)")
@@ -199,6 +201,20 @@ func (a *app) runInit(cmd *cobra.Command, env string, f *initFlags) error {
 			return err
 		}
 		if c.TaskImages.Name, err = a.ask.Text("ECR prefix for the catalog's images (repositories made on push)", orDefault(f.taskRegistry, c.TaskImages.Name), nil); err != nil {
+			return err
+		}
+	case "azure":
+		if err := a.azureAccess(ctx, out, c, f); err != nil {
+			return err
+		}
+		fmt.Fprintln(out, "Cluster mode: standard (a system node pool, and one for steps from zero; AKS Automatic comes later).")
+		if c.Cluster.Name, err = a.ask.Text("Cluster name (also names what's created)", orDefault(f.clusterName, c.Cluster.Name), nil); err != nil {
+			return err
+		}
+		if c.Azure.ResourceGroup, err = a.ask.Text("Resource group for it (created)", orDefault(f.resourceGroup, c.Cluster.Name), nil); err != nil {
+			return err
+		}
+		if c.TaskImages.Name, err = a.ask.Text("ACR repository prefix for the catalog's images", orDefault(f.taskRegistry, c.TaskImages.Name), nil); err != nil {
 			return err
 		}
 

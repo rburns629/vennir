@@ -7,8 +7,9 @@ type Pin struct {
 	Version string
 	// URL with {os}, {arch} and {version}.
 	URL string
-	// TarMember, for an archive: the binary's path inside it.
-	TarMember string
+	// Member, for an archive (.tar.gz, or .zip by its URL): the binary's
+	// path inside it.
+	Member string
 	// SHA256 per "os/arch", from the project's own checksum files.
 	SHA256 map[string]string
 }
@@ -17,7 +18,8 @@ type Pin struct {
 // take the four sums from the release's published checksums (kubectl:
 // dl.k8s.io/release/<v>/bin/<os>/<arch>/kubectl.sha256; helm:
 // get.helm.sh/helm-<v>-<os>-<arch>.tar.gz.sha256sum; kind: the release's
-// kind-<os>-<arch>.sha256sum; tofu: the release's tofu_<v>_SHA256SUMS).
+// kind-<os>-<arch>.sha256sum; tofu: the release's tofu_<v>_SHA256SUMS;
+// kubelogin: the release's kubelogin-<os>-<arch>.zip.sha256).
 // Pick releases at least two weeks old.
 var pins = map[string]Pin{
 	"kubectl": {
@@ -31,9 +33,9 @@ var pins = map[string]Pin{
 		},
 	},
 	"helm": {
-		Version:   "4.3.0",
-		URL:       "https://get.helm.sh/helm-v{version}-{os}-{arch}.tar.gz",
-		TarMember: "{os}-{arch}/helm",
+		Version: "4.3.0",
+		URL:     "https://get.helm.sh/helm-v{version}-{os}-{arch}.tar.gz",
+		Member:  "{os}-{arch}/helm",
 		SHA256: map[string]string{
 			"darwin/amd64": "347a784877e0e20eac865e8d1c36a80f6bb0861d6f29abd34defb6570ef95d92",
 			"darwin/arm64": "d3870437e1e95b67f8edbde964156c84a26503f560821d40c542441658934fba",
@@ -42,14 +44,26 @@ var pins = map[string]Pin{
 		},
 	},
 	"tofu": {
-		Version:   "1.13.1",
-		URL:       "https://github.com/opentofu/opentofu/releases/download/v{version}/tofu_{version}_{os}_{arch}.tar.gz",
-		TarMember: "tofu",
+		Version: "1.13.1",
+		URL:     "https://github.com/opentofu/opentofu/releases/download/v{version}/tofu_{version}_{os}_{arch}.tar.gz",
+		Member:  "tofu",
 		SHA256: map[string]string{
 			"darwin/amd64": "a73720443ba38712d7d96dc1e857add02c15a790919c653ad07492e9952f8c27",
 			"darwin/arm64": "be78f659f04ef06a9dbd9b3934d46af95d787a3aa38396d459dea395261816a9",
 			"linux/amd64":  "378ada19d4bc70c43732004e8159be771b23b9a5afdf059e5f8a2b3fa2c70a69",
 			"linux/arm64":  "9c1ef375aa1852db0b2888aa921b640c71f8140d4682aa4fec99378a64fa7dc3",
+		},
+	},
+	// AKS's kubectl sign-in (Microsoft Entra), as the az CLI's own.
+	"kubelogin": {
+		Version: "0.2.22",
+		URL:     "https://github.com/Azure/kubelogin/releases/download/v{version}/kubelogin-{os}-{arch}.zip",
+		Member:  "bin/{os}_{arch}/kubelogin",
+		SHA256: map[string]string{
+			"darwin/amd64": "6f4a17811e5d5815bb005daae5dabce3d016c2caac84a097f1db4263344f113e",
+			"darwin/arm64": "b586d6409d578f2048053a6117ace47f0154f36c5beb6792c674679987a7efc8",
+			"linux/amd64":  "716cbcb1880bca8f0e976b8917d06fcfe04de2c1e737eaaabbb26e2782330119",
+			"linux/arm64":  "306a31d80af443d06fb71e04d2feaf65a6c9cf2e7e806e87b895b77fe2093ea6",
 		},
 	},
 	"kind": {
