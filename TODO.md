@@ -19,10 +19,11 @@ steps left, then one billed proof run per cloud, and the MCP server last.
    - [x] `vennir`'s azure target, 1/3: the config (`azure.*`), `vennir
      init`'s questions, `az` and `kubelogin` (pinned, from its zip), the
      sign-in check, and the cluster's credentials. Not offered yet.
-   - [ ] 2/3: the module (resource group, AKS standard with Workload
+   - [x] 2/3: the module (resource group, AKS standard with Workload
      Identity, ACR, the identities, backups' storage), the install's values,
-     apply and destroy. AKS Automatic (`auto`) once OpenTofu's azurerm
-     provider has it.
+     apply and destroy. Planned against the subscription (21 resources), not
+     yet applied. AKS Automatic (`auto`) once OpenTofu's azurerm provider has
+     it (its node autoprovisioning, `node_provisioning_profile`, may do).
    - [ ] 3/3: pricing (Azure's Retail Prices API), `docs/clouds/azure.md`,
      and the target offered.
    - [ ] The catalog on GitHub to ACR: catalog CI's own identity (federated

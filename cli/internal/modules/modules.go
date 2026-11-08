@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-//go:embed gcp/*.tf gcp/.terraform.lock.hcl aws/*.tf aws/.terraform.lock.hcl
+//go:embed gcp/*.tf gcp/.terraform.lock.hcl aws/*.tf aws/.terraform.lock.hcl azure/*.tf azure/.terraform.lock.hcl
 var files embed.FS
 
 // Write puts a cloud's module into dir (the environment's tofu/), replacing

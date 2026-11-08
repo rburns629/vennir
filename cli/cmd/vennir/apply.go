@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/rburns629/vennir/cli/internal/azurecloud"
 	"github.com/rburns629/vennir/cli/internal/backup"
 	"github.com/rburns629/vennir/cli/internal/cluster"
 	"github.com/rburns629/vennir/cli/internal/config"
@@ -97,6 +98,11 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 	case "aws":
 		var err error
 		if cloud, err = a.planAWS(ctx, out, dir, c, false); err != nil {
+			return err
+		}
+	case "azure":
+		var err error
+		if cloud, err = a.planAzure(ctx, out, dir, c, false); err != nil {
 			return err
 		}
 	}
@@ -194,6 +200,11 @@ func (a *app) apply(ctx context.Context, cmd *cobra.Command, dir string, c *conf
 		}
 		var err error
 		if made, err = a.applyAWS(ctx, out, c, cloud, images); err != nil {
+			return err
+		}
+	case "azure":
+		var err error
+		if made, err = a.applyAzure(ctx, out, c, cloud, images); err != nil {
 			return err
 		}
 	}
@@ -442,6 +453,8 @@ func buildPlan(ctx context.Context, c *config.Config, env string, s cluster.Stat
 	case "aws":
 		mode := map[string]string{"auto": "EKS Auto Mode", "standard": "EKS with node groups"}[c.Cluster.Mode]
 		where = fmt.Sprintf("aws / %s, cluster %s (%s)", c.AWS.Region, c.Cluster.Name, mode)
+	case "azure":
+		where = fmt.Sprintf("azure / %s / %s, cluster %s (AKS with node pools)", c.Azure.Region, c.Azure.ResourceGroup, c.Cluster.Name)
 	}
 	p.Title = fmt.Sprintf("Vennir %s → %s [%s]", what, where, env)
 
@@ -481,6 +494,13 @@ func buildPlan(ctx context.Context, c *config.Config, env string, s cluster.Stat
 		database = fmt.Sprintf("in-cluster Postgres (both databases on one instance), %s volume", volume)
 		if c.Database.Backups.Enabled {
 			database += fmt.Sprintf("; backed up daily to a bucket, kept %d days", c.Database.Backups.RetentionDays)
+		}
+	}
+	if c.Target == "azure" {
+		taskImages = fmt.Sprintf("from ACR %s, under %s/", azurecloud.Registry(c), c.TaskImages.Name)
+		database = fmt.Sprintf("in-cluster Postgres (both databases on one instance), %s volume", volume)
+		if c.Database.Backups.Enabled {
+			database += fmt.Sprintf("; backed up daily to a storage container, kept %d days", c.Database.Backups.RetentionDays)
 		}
 	}
 	if c.Target == "aws" {
@@ -553,7 +573,7 @@ func buildPlan(ctx context.Context, c *config.Config, env string, s cluster.Stat
 			if c.Target == "gcp" {
 				dest = "pushed to " + gcp.PlatformRegistry(c)
 			}
-			if c.Target == "aws" {
+			if c.Target == "aws" || c.Target == "azure" {
 				dest = "for amd64, pushed to " + c.PlatformImages.Registry
 			}
 		}
@@ -609,7 +629,7 @@ func buildPlan(ctx context.Context, c *config.Config, env string, s cluster.Stat
 	switch c.Target {
 	case "kind":
 		p.Cost = []plan.Line{{Label: "Estimated cost", Text: "$0: it runs on this machine (give Docker about 4 GB of memory)"}}
-	case "gcp", "aws":
+	case "gcp", "aws", "azure":
 		p.Cost = cloud.cost
 	case "existing":
 		p.Cost = []plan.Line{{Label: "Estimated cost", Text: fmt.Sprintf(

@@ -2,12 +2,15 @@
 
 // Package azurecloud is what an azure install needs from the az CLI, run as
 // you (az's sign-in, which OpenTofu's azurerm provider uses too): whether
-// you're signed in and the cluster exists, and the cluster's credentials
-// for kubectl, signing in through Microsoft Entra with kubelogin.
+// you're signed in and the cluster exists, the cluster's credentials for
+// kubectl (signing in through Microsoft Entra with kubelogin), a Docker
+// sign-in to ACR, and the module's inputs.
 package azurecloud
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -85,4 +88,64 @@ func Credentials(ctx context.Context, r *run.Runner, c *config.Config) error {
 		return r.Run(ctx, "kubectl", "config", "use-context", previous)
 	}
 	return nil
+}
+
+// where is the module's hash of where the install is (its subscription and
+// resource group), which its registry and storage account names end in.
+func where(c *config.Config) string {
+	sum := sha1.Sum([]byte(c.Azure.Subscription + "/" + c.Azure.ResourceGroup))
+	return hex.EncodeToString(sum[:])[:8]
+}
+
+// RegistryName is the module's ACR's name, known before apply.
+func RegistryName(c *config.Config) string {
+	return strings.ReplaceAll(c.Cluster.Name, "-", "") + where(c)
+}
+
+// BackupStorageName is the module's backups' storage account's name (at
+// most 24 characters).
+func BackupStorageName(c *config.Config) string {
+	compact := strings.ReplaceAll(c.Cluster.Name, "-", "")
+	if len(compact) > 14 {
+		compact = compact[:14]
+	}
+	return compact + "bk" + where(c)
+}
+
+// Registry is its host.
+func Registry(c *config.Config) string {
+	return RegistryName(c) + ".azurecr.io"
+}
+
+// PlatformPrefix is the repository prefix for platform images built from
+// source ("" when installing a release).
+func PlatformPrefix(c *config.Config) string {
+	if c.Vennir != "source" {
+		return ""
+	}
+	return c.Cluster.Name + "-platform"
+}
+
+// DockerLogin signs Docker in to the module's ACR as you (az's sign-in).
+func DockerLogin(ctx context.Context, r *run.Runner, c *config.Config) error {
+	return r.Run(ctx, "az", "acr", "login", "--name", RegistryName(c), "--subscription", c.Azure.Subscription)
+}
+
+// Vars are the module's inputs.
+func Vars(c *config.Config, deleteData bool) map[string]any {
+	return map[string]any{
+		"subscription":          c.Azure.Subscription,
+		"region":                c.Azure.Region,
+		"resource_group":        c.Azure.ResourceGroup,
+		"name":                  c.Cluster.Name,
+		"size":                  c.Size,
+		"namespace":             c.Namespace,
+		"step_headroom":         c.StepHeadroom,
+		"on_demand_steps":       c.Azure.OnDemandSteps,
+		"task_registry":         c.TaskImages.Name,
+		"platform_registry":     PlatformPrefix(c),
+		"backups":               c.Database.Backups.Enabled,
+		"backup_retention_days": c.Database.Backups.RetentionDays,
+		"delete_data":           deleteData,
+	}
 }

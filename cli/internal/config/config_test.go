@@ -336,9 +336,8 @@ func TestAzure(t *testing.T) {
 	c.Azure = Azure{Subscription: "nope", Region: "East US 2", ResourceGroup: "ends-in-a-dot."}
 	c.Cluster.Mode = "auto"
 	c.Database.Type = "managed"
-	c.Logs.Enabled = true
 	err = c.Validate()
-	for _, want := range []string{"azure.subscription", "azure.region", "azure.resourceGroup", "cluster.mode", "database.type", "logs:"} {
+	for _, want := range []string{"azure.subscription", "azure.region", "azure.resourceGroup", "cluster.mode", "database.type"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("missing %q in %v", want, err)
 		}

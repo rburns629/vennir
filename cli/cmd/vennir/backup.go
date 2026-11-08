@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rburns629/vennir/cli/internal/awscloud"
+	"github.com/rburns629/vennir/cli/internal/azurecloud"
 	"github.com/rburns629/vennir/cli/internal/backup"
 	"github.com/rburns629/vennir/cli/internal/cluster"
 	"github.com/rburns629/vennir/cli/internal/config"
@@ -277,6 +278,8 @@ func (a *app) ensureContext(ctx context.Context, c *config.Config) error {
 		return gcp.Credentials(ctx, a.runner, c)
 	case "aws":
 		return awscloud.Credentials(ctx, a.runner, c)
+	case "azure":
+		return azurecloud.Credentials(ctx, a.runner, c)
 	}
 	return nil
 }
