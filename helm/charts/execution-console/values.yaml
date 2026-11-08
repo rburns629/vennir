@@ -116,7 +116,16 @@ serviceAccount:
   # -- Annotations on the console's ServiceAccount. For
   # registryCheck.gcpMetadataToken on GKE, the Workload Identity binding:
   #   iam.gke.io/gcp-service-account: <gsa>@<project>.iam.gserviceaccount.com
+  # On AKS (azureWorkloadIdentity), its managed identity:
+  #   azure.workload.identity/client-id: <client id>
   annotations: {}
+
+# -- AKS: the console's Pods, and its scan and catalog-verify Jobs', carry
+# azure.workload.identity/use, so AKS's webhook gives each its
+# ServiceAccount's managed identity (serviceAccount.annotations,
+# scanning.serviceAccountAnnotations: azure.workload.identity/client-id).
+# Trivy and cosign read ACR as it; registryCheck.acrToken, the console too.
+azureWorkloadIdentity: false
 
 # -- The kernel's image admission policy, whose allowed-source list the
 # Admin page edits: "<execution-kernel release name>-execution-kernel-image".
@@ -486,6 +495,11 @@ registryCheck:
   # for the console's ServiceAccount with a role that may
   # ecr:GetAuthorizationToken and read the repositories to check.
   ecrToken: false
+  # -- AKS only: short-lived ACR credentials from the console's own Entra
+  # identity instead of a stored key. Needs azureWorkloadIdentity, and the
+  # console's ServiceAccount's managed identity (serviceAccount.annotations)
+  # with AcrPull on the registries to check.
+  acrToken: false
   # -- A Google Artifact Registry on another cloud (another install's
   # catalog), read with no stored key: the console's ServiceAccount token,
   # projected for workloadIdentityProvider, is exchanged at Google's STS

@@ -1361,6 +1361,8 @@ export interface ScanJobSpec {
   serviceAccount: string;
   /** A kubernetes.io/dockerconfigjson Secret for private registries. */
   pullSecretName: string;
+  /** AKS: label the Pod for Workload Identity (workloadIdentityLabel). */
+  azureWorkloadIdentity?: boolean;
   /** What to scan, pinned by digest (through a registry mirror, if any). */
   target: string;
   /** The target's registry speaks plain http (a mirror like kind's). */
@@ -1393,6 +1395,13 @@ export const SCAN_SCRIPT =
  * Hardened like nothing else needs to run here: no Kubernetes token, non-
  * root, read-only root filesystem, no privileges, a deadline.
  */
+/** AKS Workload Identity's opt-in, which its webhook needs on a Pod to give
+ * it its ServiceAccount's managed identity (the token file it mounts is its
+ * own, so automountServiceAccountToken: false is no obstacle). */
+function workloadIdentityLabel(on: boolean | undefined): Record<string, string> {
+  return on ? { "azure.workload.identity/use": "true" } : {};
+}
+
 export async function createScanJob(spec: ScanJobSpec): Promise<void> {
   const { batch } = getApis();
   // Each container its own cache: Trivy locks it.
@@ -1416,7 +1425,7 @@ export async function createScanJob(spec: ScanJobSpec): Promise<void> {
       activeDeadlineSeconds: 900,
       ttlSecondsAfterFinished: 3600,
       template: {
-        metadata: { labels: { ...MANAGED_LABELS, "app.kubernetes.io/component": "image-scan" } },
+        metadata: { labels: { ...MANAGED_LABELS, "app.kubernetes.io/component": "image-scan", ...workloadIdentityLabel(spec.azureWorkloadIdentity) } },
         spec: {
           restartPolicy: "Never",
           serviceAccountName: spec.serviceAccount,
@@ -1468,6 +1477,8 @@ export interface VerifyJobSpec {
   /** The scanning identity, which reads the registry. */
   serviceAccount: string;
   pullSecretName: string;
+  /** AKS: label the Pod for Workload Identity (workloadIdentityLabel). */
+  azureWorkloadIdentity?: boolean;
   /** cosign verify's own arguments: the trust, then the reference. */
   args: string[];
   /** A public key, for args' `--key env://COSIGN_PUBLIC_KEY`. */
@@ -1489,7 +1500,7 @@ export async function createVerifyJob(spec: VerifyJobSpec): Promise<void> {
       activeDeadlineSeconds: 300,
       ttlSecondsAfterFinished: 3600,
       template: {
-        metadata: { labels },
+        metadata: { labels: { ...labels, ...workloadIdentityLabel(spec.azureWorkloadIdentity) } },
         spec: {
           restartPolicy: "Never",
           serviceAccountName: spec.serviceAccount,

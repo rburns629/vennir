@@ -153,6 +153,7 @@ data:
   SCANNER_SERVICE_ACCOUNT: {{ printf "%s-scanner" (include "execution-console.fullname" .) | quote }}
   SCANNER_PULL_SECRET: {{ ternary "vennir-registry-token" .Values.registryCheck.pullSecretName (ne (include "execution-console.registryFederationAudience" .) "") | quote }}
   SCAN_WAIT_SECONDS: {{ .Values.scanning.waitSeconds | quote }}
+  AZURE_WORKLOAD_IDENTITY: {{ .Values.azureWorkloadIdentity | quote }}
   SCAN_RESCAN_HOURS: {{ .Values.scanning.rescanHours | quote }}
   SCAN_POLICY_NAME: {{ .Values.scanning.policyName | quote }}
   SCAN_PLATFORMS: {{ join "," (.Values.scanning.platforms | default (compact (list .Values.scanning.platform))) | quote }}

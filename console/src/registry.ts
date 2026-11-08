@@ -18,13 +18,14 @@
  * under an allowed image source (imagePolicy.ts), which admins chose to
  * trust; anything else is "unverified" without a request being made. A
  * credential (config.registryCredentials, or a GKE metadata token for
- * Google's registries) is used when there is one, and only ever sent to the
+ * Google's registries, ECR's or ACR's from the console's own identity) is used when there is one, and only ever sent to the
  * registry it belongs to; public sources like docker.io/library/ are asked
  * anonymously.
  */
 import { createHash } from "node:crypto";
 
 import { ECRClient, GetAuthorizationTokenCommand } from "@aws-sdk/client-ecr";
+import { azureToken } from "./azureToken.js";
 import { config } from "./config.js";
 import { gcpMetadataToken } from "./gcpMetadata.js";
 import { federatedCredential, federatedHost } from "./registryFederation.js";
@@ -68,6 +69,12 @@ const MANIFEST_TYPES = [
 const GOOGLE_REGISTRY = /^([a-z0-9-]+-docker\.pkg\.dev|([a-z]+\.)?gcr\.io)$/;
 /** An ECR registry: <account>.dkr.ecr.<region>.amazonaws.com. */
 const ECR_REGISTRY = /^(\d{12})\.dkr\.ecr\.([a-z0-9-]+)\.amazonaws\.com(\.cn)?$/;
+/** An Azure Container Registry: <name>.azurecr.io (.cn, .us in sovereign clouds). */
+const ACR_REGISTRY = /^[a-z0-9]{5,50}\.azurecr\.(io|cn|us)$/;
+/** The username ACR takes beside a refresh token. */
+const ACR_TOKEN_USER = "00000000-0000-0000-0000-000000000000";
+/** ACR's refresh tokens last three hours: one is used for one. */
+const ACR_TOKEN_TTL_MS = 3_600_000;
 /** Null for a reference without a registry host (e.g. `demo-product:local`,
  * or Docker Hub's `nginx` shorthand): there's nothing to ask. */
 export function parseImageRef(image: string): ImageRef | null {
@@ -120,6 +127,34 @@ async function ecrCredential(account: string, region: string): Promise<Credentia
   return credential;
 }
 
+const acrTokens = new Map<string, Credential & { expiresAt: number }>();
+
+/**
+ * ACR's refresh token for the console's own Entra identity (AKS Workload
+ * Identity, azureToken.ts), which the registry's token endpoint takes as a
+ * password: what `az acr login` does, with no stored key. The identity needs
+ * AcrPull on the registry.
+ */
+async function acrCredential(host: string): Promise<Credential> {
+  const cached = acrTokens.get(host);
+  if (cached && cached.expiresAt > Date.now()) return cached;
+  const response = await fetch(`https://${host}/oauth2/exchange`, {
+    method: "POST",
+    body: new URLSearchParams({
+      grant_type: "access_token",
+      service: host,
+      access_token: await azureToken("https://management.azure.com/.default"),
+    }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`ACR's token exchange returned ${String(response.status)}`);
+  const body = (await response.json()) as { refresh_token?: string };
+  if (!body.refresh_token) throw new Error("ACR returned no refresh token");
+  const credential = { username: ACR_TOKEN_USER, password: body.refresh_token, expiresAt: Date.now() + ACR_TOKEN_TTL_MS };
+  acrTokens.set(host, credential);
+  return credential;
+}
+
 /** Null means ask anonymously. */
 async function credentialFor(host: string): Promise<Credential | null> {
   if (federatedHost(host)) return federatedCredential(host);
@@ -131,6 +166,10 @@ async function credentialFor(host: string): Promise<Credential | null> {
   const ecr = ECR_REGISTRY.exec(host);
   if (config.registryEcrToken && ecr) {
     const { username, password } = await ecrCredential(ecr[1] ?? "", ecr[2] ?? "");
+    return { username, password };
+  }
+  if (config.registryAcrToken && ACR_REGISTRY.test(host)) {
+    const { username, password } = await acrCredential(host);
     return { username, password };
   }
   return null;

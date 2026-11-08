@@ -372,6 +372,7 @@ async function startScan(row: { digest: string; image: string }): Promise<void> 
     serverUrl: config.scanning.serverUrl,
     serviceAccount: config.scanning.serviceAccount,
     pullSecretName: config.scanning.pullSecretName,
+    azureWorkloadIdentity: config.scanning.azureWorkloadIdentity,
     target,
     insecure,
     platforms: config.scanning.platforms,
