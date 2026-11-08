@@ -318,6 +318,33 @@ func TestAWS(t *testing.T) {
 	}
 }
 
+// azure's settings, and what isn't built on azure yet. The target itself
+// is refused until it's implemented, so only that is wrong with a good one.
+func TestAzure(t *testing.T) {
+	c := Default("azure")
+	c.Source = checkout(t)
+	c.Admin.Email = "admin@example.com"
+	c.Azure = Azure{Subscription: "0b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0", Region: "eastus2"}
+	c.FillDefaults()
+	if c.Azure.ResourceGroup != "vennir" {
+		t.Errorf("resource group %q", c.Azure.ResourceGroup)
+	}
+	err := c.Validate()
+	if err == nil || strings.Count(err.Error(), "\n") > 1 || !strings.Contains(err.Error(), "target: azure isn't supported") {
+		t.Fatalf("want only the target refused: %v", err)
+	}
+	c.Azure = Azure{Subscription: "nope", Region: "East US 2", ResourceGroup: "ends-in-a-dot."}
+	c.Cluster.Mode = "auto"
+	c.Database.Type = "managed"
+	c.Logs.Enabled = true
+	err = c.Validate()
+	for _, want := range []string{"azure.subscription", "azure.region", "azure.resourceGroup", "cluster.mode", "database.type", "logs:"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("missing %q in %v", want, err)
+		}
+	}
+}
+
 func TestExternalCatalog(t *testing.T) {
 	c := Default("aws")
 	c.Source = checkout(t)

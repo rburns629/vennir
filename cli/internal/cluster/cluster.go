@@ -33,6 +33,9 @@ func Context(c *config.Config) string {
 	case "aws":
 		// The alias vennir gives `aws eks update-kubeconfig`.
 		return fmt.Sprintf("eks_%s_%s", c.AWS.Region, c.Cluster.Name)
+	case "azure":
+		// The context vennir gives `az aks get-credentials`.
+		return fmt.Sprintf("aks_%s_%s", c.Azure.ResourceGroup, c.Cluster.Name)
 	}
 	return c.Cluster.Context
 }

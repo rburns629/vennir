@@ -11,6 +11,7 @@ package tools
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -118,6 +119,15 @@ func For(target string, fromSource bool) []Requirement {
 		if fromSource {
 			reqs = append(reqs, Requirement{Tool: "docker", Why: "builds the platform images from source", Check: dockerRunning})
 		}
+	case "azure":
+		reqs = append(reqs,
+			Requirement{Tool: "tofu", Why: "creates the cloud side (OpenTofu)"},
+			Requirement{Tool: "az", Why: "your Azure sign-in", Check: azSignedIn},
+			Requirement{Tool: "kubelogin", Why: "lets kubectl sign in to AKS (Microsoft Entra)"},
+		)
+		if fromSource {
+			reqs = append(reqs, Requirement{Tool: "docker", Why: "builds the platform images from source", Check: dockerRunning})
+		}
 	case "existing":
 		if fromSource {
 			reqs = append(reqs, Requirement{Tool: "docker", Why: "builds the platform images from source", Check: dockerRunning})
@@ -149,6 +159,16 @@ func gcloudSignedIn(ctx context.Context, path string) error {
 	out, err := exec.CommandContext(ctx, path, "auth", "list", "--filter=status:ACTIVE", "--format=value(account)").Output()
 	if err != nil || strings.TrimSpace(string(out)) == "" {
 		return errors.New("installed, but not signed in: `gcloud auth login`, then `gcloud auth application-default login` (OpenTofu uses the second)")
+	}
+	return nil
+}
+
+func azSignedIn(ctx context.Context, path string) error {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, path, "account", "show", "--query", "user.name", "--output", "tsv").Output()
+	if err != nil || strings.TrimSpace(string(out)) == "" {
+		return errors.New("installed, but not signed in: `az login` (OpenTofu uses the same sign-in)")
 	}
 	return nil
 }
@@ -282,6 +302,11 @@ func installHint(tool string) string {
 			return "`brew install awscli` (or AWS's installer: https://aws.amazon.com/cli/), then `aws login`"
 		}
 		return "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html , then `aws login`"
+	case "az":
+		if mac {
+			return "`brew install azure-cli`, then `az login`"
+		}
+		return "https://learn.microsoft.com/cli/azure/install-azure-cli (apt, dnf), then `az login`"
 	case "gh":
 		if mac {
 			return "`brew install gh`, then `gh auth login --scopes repo,workflow`"
@@ -351,9 +376,13 @@ func Download(ctx context.Context, tool string) (string, error) {
 	}
 
 	dest := filepath.Join(dir, tool)
-	if pin.TarMember != "" {
-		member := strings.NewReplacer("{os}", runtime.GOOS, "{arch}", runtime.GOARCH).Replace(pin.TarMember)
-		if err := extract(tmp.Name(), member, dest); err != nil {
+	if pin.Member != "" {
+		member := strings.NewReplacer("{os}", runtime.GOOS, "{arch}", runtime.GOARCH).Replace(pin.Member)
+		unpack := extract
+		if strings.HasSuffix(url, ".zip") {
+			unpack = extractZip
+		}
+		if err := unpack(tmp.Name(), member, dest); err != nil {
 			return "", fmt.Errorf("unpacking %s: %w", tool, err)
 		}
 	} else if err := os.Rename(tmp.Name(), dest); err != nil {
@@ -480,6 +509,35 @@ func Untar(archive, dest string) error {
 			return fmt.Errorf("%s: %q isn't a file or a directory", filepath.Base(archive), h.Name)
 		}
 	}
+}
+
+// extractZip is extract for a .zip.
+func extractZip(archive, member, dest string) error {
+	zr, err := zip.OpenReader(archive)
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+	for _, f := range zr.File {
+		if f.Name != member {
+			continue
+		}
+		in, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(out, io.LimitReader(in, 512<<20)); err != nil {
+			out.Close()
+			return err
+		}
+		return out.Close()
+	}
+	return fmt.Errorf("%s not in the archive", member)
 }
 
 func extract(archive, member, dest string) error {

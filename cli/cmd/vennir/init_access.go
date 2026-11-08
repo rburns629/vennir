@@ -139,6 +139,49 @@ func (a *app) awsAccess(ctx context.Context, out io.Writer, c *config.Config, f 
 	return check, nil
 }
 
+// azureAccess picks the subscription az's sign-in reaches (offering
+// `az login` when there's none) and the region, then checks what they
+// allow. A Free Trial can't have Spot VMs, so its steps run on regular ones.
+func (a *app) azureAccess(ctx context.Context, out io.Writer, c *config.Config, f *initFlags) error {
+	subs := access.AzureSubscriptions(ctx, a.runner.Exec)
+	if len(subs) == 0 && a.ask.Interactive {
+		ok, err := a.ask.Confirm("az isn't signed in to Azure. Sign in now with `az login` (opens your browser)?", true)
+		if err != nil {
+			return err
+		}
+		if ok {
+			if err := a.runner.Interactive(ctx, "az", "login"); err != nil {
+				return err
+			}
+			subs = access.AzureSubscriptions(ctx, a.runner.Exec)
+		}
+	}
+	if len(subs) == 0 {
+		return fmt.Errorf("no Azure subscription that az's sign-in reaches: `az login`, then `vennir init` again (guide: %sazure.md)", guidesURL)
+	}
+	var options []prompt.Option
+	for _, s := range subs {
+		options = append(options, prompt.Option{Value: s.ID, Label: s.Name, Note: s.ID})
+	}
+	sub, err := a.ask.Choose("Which subscription?", options, orDefault(f.subscription, subs[0].ID))
+	if err != nil {
+		return err
+	}
+	c.Azure.Subscription = sub
+	if c.Azure.Region, err = a.ask.Text("Region", orDefault(f.region, "eastus2"), nil); err != nil {
+		return err
+	}
+	check := access.CheckAzure(ctx, a.runner.Exec, sub, c.Azure.Region)
+	fmt.Fprintln(out, "Access")
+	showReport(out, check.Report)
+	if err := problemsError(check.Report); err != nil {
+		return err
+	}
+	c.Azure.OnDemandSteps = check.FreeTrial
+	c.Access.Cloud = check.Identity
+	return nil
+}
+
 // offerBudget offers a monthly budget, emailing the admin, when the account
 // has none (not when its budgets couldn't be read). A budget it couldn't
 // create is a warning: init's answers so far are kept.

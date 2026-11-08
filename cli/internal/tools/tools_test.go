@@ -4,6 +4,7 @@ package tools
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -144,7 +145,7 @@ func serve(t *testing.T, path, sum, member string) string {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, path) }))
 	t.Cleanup(srv.Close)
-	pins["faketool"] = Pin{Version: "1.0.0", URL: srv.URL + "/{os}/{arch}/{version}", TarMember: member,
+	pins["faketool"] = Pin{Version: "1.0.0", URL: srv.URL + "/{os}/{arch}/{version}", Member: member,
 		SHA256: map[string]string{runtime.GOOS + "/" + runtime.GOARCH: sum}}
 	t.Cleanup(func() { delete(pins, "faketool") })
 	home := t.TempDir()
@@ -239,6 +240,42 @@ func TestDownloadExtractsTheMember(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 	onlyIn(t, dir)
+}
+
+// A .zip's member too (kubelogin's), found by the URL's extension.
+func TestDownloadExtractsAZipsMember(t *testing.T) {
+	member := "bin/" + runtime.GOOS + "_" + runtime.GOARCH + "/faketool"
+	pkg := filepath.Join(t.TempDir(), "tool.zip")
+	f, err := os.Create(pkg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	for name, body := range map[string]string{"README.md": "not the tool", member: "the tool"} {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	dir := serve(t, pkg, sum(t, pkg), "bin/{os}_{arch}/faketool")
+	pin := pins["faketool"]
+	pin.URL += ".zip"
+	pins["faketool"] = pin
+	path, err := Download(context.Background(), "faketool")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != "the tool" {
+		t.Errorf("extracted %q", got)
+	}
+	onlyIn(t, dir, "faketool")
 }
 
 // With no home directory there's no tools directory: no download, and Path

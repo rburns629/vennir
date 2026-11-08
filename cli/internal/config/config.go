@@ -47,6 +47,7 @@ type Config struct {
 	Kind       Kind       `yaml:"kind,omitempty"`
 	GCP        GCP        `yaml:"gcp,omitempty"`
 	AWS        AWS        `yaml:"aws,omitempty"`
+	Azure      Azure      `yaml:"azure,omitempty"`
 	Namespace  string     `yaml:"namespace"`
 	TaskImages TaskImages `yaml:"taskImages"`
 	// PlatformImages, when building from source onto a cluster that isn't
@@ -150,6 +151,17 @@ type AWS struct {
 	// `aws configure sso`); empty for the default credential chain.
 	Profile string `yaml:"profile,omitempty"`
 	Region  string `yaml:"region,omitempty"`
+}
+
+// Azure is where an azure install goes: a subscription az's sign-in
+// reaches, a region, and the resource group the module makes for it.
+type Azure struct {
+	Subscription  string `yaml:"subscription,omitempty"`
+	Region        string `yaml:"region,omitempty"`
+	ResourceGroup string `yaml:"resourceGroup,omitempty"`
+	// OnDemandSteps: the steps' node pool on regular VMs, not Spot, for a
+	// subscription that can't have Spot VMs (a Free Trial's, say).
+	OnDemandSteps bool `yaml:"onDemandSteps,omitempty"`
 }
 
 // TaskImages is where steps' images may come from: the image policy's
@@ -413,8 +425,8 @@ func (c Catalog) Repo() string {
 	return c.Owner + "/" + c.Repository
 }
 
-// Access is who set the environment up: "aws:<principal arn>" or
-// "gcp:<account>", and "github:<login>".
+// Access is who set the environment up: "aws:<principal arn>",
+// "gcp:<account>" or "azure:<user>", and "github:<login>".
 type Access struct {
 	Cloud  string `yaml:"cloud,omitempty"`
 	GitHub string `yaml:"github,omitempty"`
@@ -451,6 +463,11 @@ func Default(target string) *Config {
 		c.Cluster = Cluster{Create: true, Mode: "auto", Name: "vennir"}
 		c.TaskImages = TaskImages{Create: true, Name: "vennir-products"}
 		c.Database.Backups.Enabled = true
+	case "azure":
+		// standard until auto (AKS Automatic) is built.
+		c.Cluster = Cluster{Create: true, Mode: "standard", Name: "vennir"}
+		c.TaskImages = TaskImages{Create: true, Name: "vennir-products"}
+		c.Database.Backups.Enabled = true
 	case "existing":
 		c.Cluster = Cluster{Create: false, Mode: "existing"}
 	}
@@ -482,6 +499,9 @@ func (c *Config) FillDefaults() {
 	if !c.ScaleDown.Enabled && c.MinReplicas == 0 {
 		c.MinReplicas = 1
 	}
+	if c.Target == "azure" && c.Azure.ResourceGroup == "" {
+		c.Azure.ResourceGroup = c.Cluster.Name
+	}
 	if c.Target == "kind" {
 		if c.Cluster.Name == "" {
 			c.Cluster.Name = d.Cluster.Name
@@ -511,9 +531,13 @@ var (
 	gcpRegion    = regexp.MustCompile(`^[a-z]+-[a-z]+[0-9]$`)
 	gcpName      = regexp.MustCompile(`^[a-z][a-z0-9-]{1,18}[a-z0-9]$`)
 	awsRegion    = regexp.MustCompile(`^[a-z]{2}(-gov)?-[a-z]+-[0-9]$`)
-	ecrPrefix    = regexp.MustCompile(`^[a-z0-9]+([._-][a-z0-9]+)*$`)
-	hostname     = regexp.MustCompile(`^([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`)
-	githubName   = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9._-]{0,98})$`)
+	// Azure's region names: eastus2, westeurope, usgovvirginia.
+	azureRegion        = regexp.MustCompile(`^[a-z]+[0-9]*$`)
+	azureSubscription  = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	azureResourceGroup = regexp.MustCompile(`^[A-Za-z0-9._()-]{0,89}[A-Za-z0-9_()-]$`)
+	ecrPrefix          = regexp.MustCompile(`^[a-z0-9]+([._-][a-z0-9]+)*$`)
+	hostname           = regexp.MustCompile(`^([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`)
+	githubName         = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9._-]{0,98})$`)
 	// owner/name, a GitHub repository.
 	repoPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,98}/[A-Za-z0-9][A-Za-z0-9._-]{0,98}$`)
 	version     = regexp.MustCompile(`^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
@@ -530,7 +554,7 @@ func (c *Config) Validate() error {
 	if !contains(Targets, c.Target) {
 		add("target: %q isn't one of %s", c.Target, strings.Join(Targets, ", "))
 	} else if !contains(Implemented, c.Target) {
-		add("target: %s isn't supported by this vennir yet (kind and existing are)", c.Target)
+		add("target: %s isn't supported by this vennir yet (%s are)", c.Target, strings.Join(Implemented, ", "))
 	}
 	if c.Vennir != "source" && !version.MatchString(c.Vennir) {
 		add("vennir: %q is neither a release version (like 0.1.0) nor \"source\"", c.Vennir)
@@ -591,6 +615,31 @@ func (c *Config) Validate() error {
 		}
 		if c.TaskImages.Create && !ecrPrefix.MatchString(c.TaskImages.Name) {
 			add("taskImages.name: %q isn't an ECR repository prefix", c.TaskImages.Name)
+		}
+	case "azure":
+		if !azureSubscription.MatchString(c.Azure.Subscription) {
+			add("azure.subscription: %q isn't a subscription id (az account list --output table)", c.Azure.Subscription)
+		}
+		if !azureRegion.MatchString(c.Azure.Region) {
+			add("azure.region: %q isn't a region, like eastus2", c.Azure.Region)
+		}
+		if !azureResourceGroup.MatchString(c.Azure.ResourceGroup) {
+			add("azure.resourceGroup: %q: up to 90 letters, digits, dashes, underscores, dots and parentheses, not ending in a dot", c.Azure.ResourceGroup)
+		}
+		if !gcpName.MatchString(c.Cluster.Name) {
+			add("cluster.name: %q: 3 to 20 lowercase letters, digits and dashes, starting with a letter", c.Cluster.Name)
+		}
+		if c.Cluster.Mode != "standard" {
+			add("cluster.mode: %q: standard (a system pool and a steps pool) on azure; auto (AKS Automatic) comes later", c.Cluster.Mode)
+		}
+		if c.TaskImages.Create && !ecrPrefix.MatchString(c.TaskImages.Name) {
+			add("taskImages.name: %q isn't a repository prefix", c.TaskImages.Name)
+		}
+		if c.Database.Type == "managed" {
+			add("database.type: managed (Azure Database for PostgreSQL) comes later on azure: in-cluster for now")
+		}
+		if c.Logs.Enabled {
+			add("logs: log search comes later on azure")
 		}
 	case "existing":
 		if c.Cluster.Context == "" {
