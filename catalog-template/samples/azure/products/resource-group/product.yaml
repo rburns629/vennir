@@ -1,5 +1,5 @@
 # A sample: Resource group, with real Azure API calls (billed).
-# Not yet proven against a real account; see the azure team's README.md.
+# Proven on AKS (2026-11-08); see the azure team's README.md.
 apiVersion: vennir.dev/v2
 kind: Product
 name: resource-group
@@ -8,6 +8,9 @@ displayName: Resource group
 description: Finds a resource group by name, or creates it. Where everything later steps create
   goes.
 owner: azure-team
+# Its own identity: a managed identity federated to this ServiceAccount
+# alone, with only what it does (README.md, Credentials).
+serviceAccount: azure-resource-group
 runtime: python3.12
 actions:
 - name: create

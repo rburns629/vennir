@@ -523,7 +523,7 @@ spec = {
         "ingress": [{"from": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": platform}},
                                "podSelector": {"matchLabels": gateway}}]}]},
     "vennir-no-metadata": {"podSelector": {}, "policyTypes": ["Egress"],
-        "egress": [{"to": [{"ipBlock": {"cidr": "0.0.0.0/0", "except": ["169.254.169.254/32"]}}]}]},
+        "egress": [{"to": [{"ipBlock": {"cidr": "0.0.0.0/0", "except": ["169.254.169.254/32"]}}, {"namespaceSelector": {}}]}]},
 }.get(name, {"podSelector": {}, "policyTypes": ["Ingress"]})
 exec(change)
 print(json.dumps({"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {"name": name}, "spec": spec}))
@@ -779,6 +779,8 @@ expect "a gateway ingress letting out everything" "$NP_REFUSED"   "$(network_pol
 expect "no-metadata without its exception"       "$NP_REFUSED"    "$(network_policy vennir-no-metadata 'del spec["egress"][0]["to"][0]["ipBlock"]["except"]')"
 expect "no-metadata excepting something else"    "$NP_REFUSED"    "$(network_policy vennir-no-metadata 'spec["egress"][0]["to"][0]["ipBlock"]["except"] = ["10.0.0.0/8"]')"
 expect "no-metadata letting out to Pods"         "$NP_REFUSED"    "$(network_policy vennir-no-metadata 'spec["egress"].append({"to": [{"podSelector": {}}]})')"
+expect "no-metadata letting out to some namespaces" "$NP_REFUSED"  "$(network_policy vennir-no-metadata 'spec["egress"][0]["to"][1] = {"namespaceSelector": {"matchLabels": {"a": "b"}}}')"
+expect "no-metadata, its cluster peer with Pods"  "$NP_REFUSED"    "$(network_policy vennir-no-metadata 'spec["egress"][0]["to"][1]["podSelector"] = {"matchLabels": {"a": "b"}}')"
 expect "a policy of another name"                "$NP_REFUSED"    "$(network_policy allow-all 'spec["ingress"] = [{}]')"
 expect "deleting the default deny"               "$NP_REFUSED"    "$(as_console -n "$TEAM_B" delete networkpolicy vennir-default-deny)"
 # The copy earlier consoles wrote into team namespaces, for API backends
@@ -897,6 +899,7 @@ expect "a verification, by digest"               allowed                   "$(co
 expect "another image"                           "scanner or verifier image" "$(console_job 'c["image"] = "busybox"')"
 expect "the console's own labels"                "only its own labels"     "$(console_job 'labels.update({"app.kubernetes.io/name": "execution-console", "app.kubernetes.io/instance": "'"$RELEASE"'"})')"
 expect "another component"                       "only its own labels"     "$(console_job 'labels["app.kubernetes.io/component"] = "app"')"
+expect "Workload Identity's label, off AKS"      "only its own labels"     "$(console_job 'labels["azure.workload.identity/use"] = "true"')"
 expect "a ServiceAccount token volume"           "only scratch space"      "$(console_job 's["volumes"].append({"name": "t", "projected": {"sources": [{"serviceAccountToken": {"path": "t"}}]}})')"
 expect "an init container"                       "scanner or verifier image" "$(console_job 's["initContainers"] = [dict(c, name="init")]')"
 expect "another Secret"                          "only scratch space"      "$(console_job 's["volumes"].append({"name": "db", "secret": {"secretName": "'"$RELEASE"'-execution-kernel-db"}})')"

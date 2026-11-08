@@ -1,9 +1,12 @@
 # azure: real Azure calls
 
 Example products that call real Azure APIs, to copy from when your product
-has to. Running them costs money. **Not yet proven against a real Azure
-subscription:** they build, and their tests pass with the Azure clients
-mocked, but nothing here has called Azure yet.
+has to. Running them costs money. `resource-group` and `container-app` are
+proven on AKS (2026-11-08, a Free Trial subscription): the DAG below made a
+resource group and a public Container App, each step signed in as its own
+product's managed identity by Workload Identity, with the roles below.
+`postgres-flexible` builds and its tests pass with the Azure clients mocked,
+but hasn't called Azure yet.
 
 | Product | What `create` does |
 |---|---|
@@ -24,10 +27,11 @@ database password to keep or leak.
 ## Credentials
 
 No keys: the actions use `DefaultAzureCredential`, which AKS Workload
-Identity fills in for the step's Kubernetes ServiceAccount. Give each product
-its own: `serviceAccount: <name>` in its `product.yaml` (the console creates
-it in the `azure` namespace, and the cluster lets only that product's image
-run as it). Then:
+Identity fills in for the step's Kubernetes ServiceAccount. Each product has
+its own, named in its `product.yaml` (`azure-resource-group`,
+`azure-container-app`, `azure-postgres-flexible`: the console creates it in
+the `azure` namespace, and the cluster lets only that product's image run as
+it). Then, for each:
 
 1. A user-assigned managed identity per product, with a federated credential
    for `system:serviceaccount:azure:<name>` and the cluster's OIDC issuer.
@@ -46,7 +50,7 @@ product.yaml, a federated credential trusting the cluster's issuer for
 that ServiceAccount, and `AZURE_FEDERATED_TOKEN_FILE` pointed at
 `/platform/tokens/api___AzureADTokenExchange` (with `AZURE_CLIENT_ID` and
 `AZURE_TENANT_ID`), as the catalog's README describes. These samples don't
-declare it, and neither way has been tried against Azure yet.
+declare it, and that way hasn't been tried against Azure yet.
 
 Grant each product's identity only what it needs, on the narrowest scope:
 

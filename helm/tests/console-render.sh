@@ -25,6 +25,14 @@ if ! grep -q "is the console's" <<<"$own" && grep -q "^kind: Deployment" <<<"$ow
   ok "a host of its own renders"
 else fail "a host of its own" "refused"; fi
 
+# On AKS, a console Job's Pods may carry Workload Identity's opt-in (the
+# scans' and verifications' managed identity); elsewhere they may not
+# (admission-policies.sh tries it).
+jobs() { helm template console helm/charts/execution-console --set kernelApiUrl=http://unused "$@" --show-only templates/console-jobs-policy.yaml 2>&1; }
+if grep -q '"azure.workload.identity/use"' <<<"$(jobs --set azureWorkloadIdentity=true)" && ! grep -q '"azure.workload.identity/use"' <<<"$(jobs)"; then
+  ok "console Jobs may carry Workload Identity's label on AKS alone"
+else fail "console Jobs and Workload Identity's label" "$(jobs --set azureWorkloadIdentity=true | grep -n 'labels.all' -A3)"; fi
+
 # On GKE's load balancer: Google's certificate for the host, and its health
 # check on the public listener's /.vennir/health, tied to the Service's
 # public port; none of it without gateway.ingress.gke.

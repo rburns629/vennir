@@ -107,7 +107,9 @@ spec:
     # namespace to anything outside it, except, with the gateway on, exactly
     # one opening: this release's gateway Pods to the Pods the team itself
     # labels vennir/api-backend=true. The no-metadata one may only let out
-    # everything less the metadata server's address.
+    # everything less the metadata server's address, and the cluster's own
+    # Pods (an ipBlock doesn't reach those under Cilium, AKS's: DNS among
+    # them; their own namespaces' policies still decide what they admit).
     {{- $gatewayIngress := and .Values.gateway.enabled .Values.teamNamespaces.manage .Values.teamNamespaces.defaultDenyIngress }}
     - expression: >-
         request.resource.resource != "networkpolicies" || {{ if $gatewayIngress }}(
@@ -150,9 +152,12 @@ spec:
           !has(object.spec.ingress) &&
           has(object.spec.egress) && object.spec.egress.all(rule,
             !has(rule.ports) && has(rule.to) && rule.to.all(peer,
-              has(peer.ipBlock) && !has(peer.podSelector) && !has(peer.namespaceSelector) &&
+              (has(peer.ipBlock) && !has(peer.podSelector) && !has(peer.namespaceSelector) &&
               peer.ipBlock.cidr == "0.0.0.0/0" &&
-              has(peer.ipBlock.except) && "169.254.169.254/32" in peer.ipBlock.except))
+              has(peer.ipBlock.except) && "169.254.169.254/32" in peer.ipBlock.except) ||
+              (has(peer.namespaceSelector) && !has(peer.podSelector) && !has(peer.ipBlock) &&
+              (!has(peer.namespaceSelector.matchLabels) || size(peer.namespaceSelector.matchLabels) == 0) &&
+              !has(peer.namespaceSelector.matchExpressions))))
           ){{ end }}))
       message: >-
         The console's NetworkPolicies are a team namespace's vennir-default-deny, selecting every

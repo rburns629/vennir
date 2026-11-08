@@ -29,8 +29,22 @@ steps left, then one billed proof run per cloud, and the MCP server last.
      against the subscription (21 resources planned, $94 a month minimal).
    - [ ] The catalog on GitHub to ACR: catalog CI's own identity (federated
      credential), publishing, signing with a Key Vault key.
-   - [ ] The billed run: a minimal install, the azure samples by Workload
-     Identity, destroy.
+   - [x] The billed run (2026-11-08, a Free Trial): a minimal install on AKS;
+     the console read ACR as its identity (the catalog's release, digests),
+     the scans theirs; `resource-group` then `container-app` ran by Workload
+     Identity and the app served. It found, fixed: v6 VMs (AKS allows a new
+     subscription no B-series or v5), kubelogin's arguments, the console
+     Jobs' Workload Identity label, steps' DNS under Cilium, the samples'
+     ServiceAccounts and the Container Apps environment's request.
+   - [ ] The approval screen checks the VM sizes AKS allows the subscription
+     (`apply` found out ten minutes in), and the regional vCPU quota against
+     the pools' maxima.
+   - [ ] `destroy` waits out a rolling upgrade Azure started on the nodes
+     (the run's first destroy failed on one, OperationNotAllowed; the next
+     went through).
+   - [ ] Small quotas: a scan's scanner takes the platform a second node, so
+     on 4 vCPUs a step waits about twenty minutes (`docs/clouds/azure.md`).
+     The scanner on the steps pool would leave the platform's node alone.
    - [ ] Then: the managed database (Flexible Server, Entra sign-in for each
      service), managed Prometheus, a public console, the audit and log
      archives, kernel policy reading ACR.

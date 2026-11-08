@@ -77,11 +77,27 @@ func Credentials(ctx context.Context, r *run.Runner, c *config.Config) error {
 	}
 	// kubectl runs kubelogin by name, and vennir's own copy isn't on your
 	// PATH: name it by its path, so your kubectl signs in too.
+	// set-credentials replaces the whole exec, so its arguments and API
+	// version go back in with it.
 	user, err := r.Output(ctx, "kubectl", "config", "view", "-o", fmt.Sprintf(`jsonpath={.contexts[?(@.name=="%s")].context.user}`, kctx))
 	if err != nil || strings.TrimSpace(user) == "" {
 		return fmt.Errorf("the kubeconfig has no user for %s: %v", kctx, err)
 	}
-	if err := r.Run(ctx, "kubectl", "config", "set-credentials", strings.TrimSpace(user), "--exec-command", tools.Path("kubelogin")); err != nil {
+	user = strings.TrimSpace(user)
+	exec := fmt.Sprintf(`{.users[?(@.name=="%s")].user.exec`, user)
+	execArgs, err := r.Output(ctx, "kubectl", "config", "view", "-o", "jsonpath="+exec+`.args[*]}`)
+	if err != nil {
+		return err
+	}
+	apiVersion, err := r.Output(ctx, "kubectl", "config", "view", "-o", "jsonpath="+exec+`.apiVersion}`)
+	if err != nil {
+		return err
+	}
+	set := []string{"config", "set-credentials", user, "--exec-command", tools.Path("kubelogin"), "--exec-api-version", strings.TrimSpace(apiVersion)}
+	for _, a := range strings.Fields(execArgs) {
+		set = append(set, "--exec-arg", a)
+	}
+	if err := r.Run(ctx, "kubectl", set...); err != nil {
 		return err
 	}
 	if previous = strings.TrimSpace(previous); previous != "" && previous != kctx {

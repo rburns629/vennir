@@ -1,5 +1,5 @@
 # A sample: Container App, with real Azure API calls (billed).
-# Not yet proven against a real account; see the azure team's README.md.
+# Proven on AKS (2026-11-08); see the azure team's README.md.
 apiVersion: vennir.dev/v2
 kind: Product
 name: container-app
@@ -9,6 +9,9 @@ description: Deploys a container image as an Azure Container App, creating its C
   environment if needed, or returns the existing app's URL. Internal to the environment unless
   public is true; a private registry is pulled with a managed identity.
 owner: azure-team
+# Its own identity: a managed identity federated to this ServiceAccount
+# alone, with only what it does (README.md, Credentials).
+serviceAccount: azure-container-app
 runtime: python3.12
 actions:
 - name: create

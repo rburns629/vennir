@@ -595,9 +595,12 @@ export const TEAM_NETWORK_POLICY = "vennir-default-deny";
  * else of the team's. */
 export const TEAM_GATEWAY_INGRESS = "vennir-gateway-ingress";
 
-/** With teamNamespaces.blockMetadata (EKS), a third: no Pod in the namespace
- * may connect to the cloud's instance metadata server, so a step can't take
- * the node's credentials; everything else outward stays open. */
+/** With teamNamespaces.blockMetadata (EKS, AKS), a third: no Pod in the
+ * namespace may connect to the cloud's instance metadata server, so a step
+ * can't take the node's credentials; everything else outward stays open:
+ * the internet, and the cluster's own Pods, which under Cilium (AKS's) an
+ * ipBlock doesn't reach, CoreDNS among them (proven on AKS, 2026-11-08: a
+ * step couldn't resolve a name without it). */
 export const TEAM_NO_METADATA = "vennir-no-metadata";
 
 /** The instance metadata server's address (EC2's). IPv4 only: the AWS VPC
@@ -613,7 +616,7 @@ export function noMetadataPolicy(namespace: string): k8s.V1NetworkPolicy {
     spec: {
       podSelector: {},
       policyTypes: ["Egress"],
-      egress: [{ to: [{ ipBlock: { cidr: "0.0.0.0/0", except: [METADATA_ADDRESS] } }] }],
+      egress: [{ to: [{ ipBlock: { cidr: "0.0.0.0/0", except: [METADATA_ADDRESS] } }, { namespaceSelector: {} }] }],
     },
   };
 }
