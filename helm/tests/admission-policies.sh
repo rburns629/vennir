@@ -306,6 +306,8 @@ import hashlib, json, sys
 policy = json.load(sys.stdin)
 # The copy kubectl apply keeps of what it applied: replace would update it, past an annotation size limit.
 policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+# So replace_policy reads the current one on each try (see the identity policy, below).
+policy["metadata"].pop("resourceVersion", None)
 digests = json.loads(sys.argv[1])
 for i in range(int(sys.argv[3]) - len(digests)):
     digests["sha256:" + sys.argv[4] + hashlib.sha256(b"fill-%d" % i).hexdigest()[len(sys.argv[4]):]] = True
@@ -387,6 +389,7 @@ gateway_literal() {  # each key to its audiences, as JSON; "misplaced" puts each
 import json, sys
 policy = json.load(sys.stdin)
 policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+policy["metadata"].pop("resourceVersion", None)
 shift = 1 if sys.argv[2] == "misplaced" else 0
 maps = {digit: {} for digit in "0123456789abcdef"}
 for key, audiences in json.loads(sys.argv[1]).items():
@@ -410,6 +413,7 @@ catalog_literal() {  # policy, releases | apiAudiences, the map as JSON
 import json, sys
 policy = json.load(sys.stdin)
 policy["metadata"].get("annotations", {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+policy["metadata"].pop("resourceVersion", None)
 prefix, digits = sys.argv[1], "0123456789abcdef"
 maps = {d: {} for d in digits}
 for key, value in json.loads(sys.argv[2]).items():

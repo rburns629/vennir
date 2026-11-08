@@ -101,7 +101,9 @@ team gets a new revision behind the same URL, serving once it's ready
 (`roles/run.developer` covers the update). Give each version its own tag:
 an image pushed again under the same tag isn't a change. A service of that
 name deployed some other way, or for another team, is changed by no one
-(`SERVICE_EXISTS`). Proven (2026-11-07), running the product's image as
+(`SERVICE_EXISTS`). A revision that never gets ready leaves the last one
+serving and fails `create` (`REVISION_NOT_READY`), run again or not: deploy
+a fixed image under a new tag. Proven (2026-11-07), running the product's image as
 the kernel would, as a `gcp-target` with exactly the roles above: a second
 tag rolled out as revision 2 at the same URL; the same inputs again changed
 nothing; another team's run with other inputs was refused.

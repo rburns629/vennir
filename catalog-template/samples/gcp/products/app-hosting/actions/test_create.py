@@ -179,6 +179,56 @@ class CreateActionTest(unittest.TestCase):
             self.assertEqual(self.module.main(), 0)
         self.assertEqual(client.update_service.call_args.kwargs["service"].template.service_account, _RUNTIME_ACCOUNT)
 
+    def test_as_asked_waits_for_its_newest_revision_to_roll_out(self) -> None:
+        # An earlier attempt's update, still rolling out: as asked once it's done.
+        rolling = _service(self.module, _MADE)
+        rolling.reconciling = True
+        rolling.latest_created_revision, rolling.latest_ready_revision = _PATH + "/revisions/hello-world-2", _PATH + "/revisions/hello-world-1"
+        done = _service(self.module, _MADE)
+        done.latest_created_revision = done.latest_ready_revision = _PATH + "/revisions/hello-world-2"
+        self.module.POLL_SECONDS = 0
+        self._write_request(_VALID_INPUTS)
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client = client_cls.return_value
+            client.service_path.return_value = _PATH
+            client.get_service.side_effect = [rolling, rolling, done]
+            self.assertEqual(self.module.main(), 0)
+        client.update_service.assert_not_called()
+        self.assertEqual(client.get_service.call_count, 3)
+        self.assertEqual(self._result()["status"], "succeeded")
+
+    def test_as_asked_but_still_rolling_out_is_retried(self) -> None:
+        rolling = _service(self.module, _MADE)
+        rolling.reconciling = True
+        self.module.ROLLOUT_WAIT_SECONDS = 0
+        self._write_request(_VALID_INPUTS)
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client = client_cls.return_value
+            client.service_path.return_value = _PATH
+            client.get_service.return_value = rolling
+            self.assertEqual(self.module.main(), 1)
+        error = self._result()["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("SERVICE_ROLLING_OUT", True))
+
+    def test_as_asked_but_its_newest_revision_failed_is_not_a_success(self) -> None:
+        # Its template is as asked, but that revision never got ready: the
+        # last one still serves, and running again changes nothing.
+        failed = _service(self.module, _MADE)
+        failed.latest_created_revision, failed.latest_ready_revision = _PATH + "/revisions/hello-world-2", _PATH + "/revisions/hello-world-1"
+        failed.terminal_condition = self.module.run_v2.Condition(message="The user-provided container failed to start.")
+        self._write_request(_VALID_INPUTS)
+        with patch.object(self.module.run_v2, "ServicesClient") as client_cls:
+            client = client_cls.return_value
+            client.service_path.return_value = _PATH
+            client.get_service.return_value = failed
+            self.assertEqual(self.module.main(), 1)
+        client.update_service.assert_not_called()
+        error = self._result()["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("REVISION_NOT_READY", False))
+        self.assertIn("hello-world-2", error["message"])
+        self.assertIn("hello-world-1 still serves", error["message"])
+        self.assertIn("failed to start", error["message"])
+
     def test_one_deployed_some_other_way_is_changed_by_no_one(self) -> None:
         for labels in ({}, {"vennir-made": "true", "vennir-team": "data"}):
             with self.subTest(labels=labels):
