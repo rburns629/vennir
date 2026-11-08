@@ -127,6 +127,7 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
           ["reference-setup", "Set up Vennir"],
           ["reference-clouds-gcp", "Get Google Cloud ready"],
           ["reference-clouds-aws", "Get AWS ready"],
+          ["reference-clouds-azure", "Get Azure ready"],
           ["reference-clouds-github", "Get GitHub ready"],
         ],
       },
