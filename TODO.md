@@ -8,12 +8,26 @@ design.
 ## Next, in order (agreed 2026-10-29 and 2026-10-30)
 
 Solid before features: housekeeping and tests first, then features with
-steps left, then one billed proof run per cloud, and the MCP server and
-Azure last.
+steps left, then one billed proof run per cloud, and the MCP server last.
 
-1. The next billed run: what's below in "To prove on a cloud".
-2. Last: the MCP server, then Azure (its target, its managed Prometheus,
-   the Azure sample signing in).
+1. Azure, now that there's a subscription to prove it on (moved ahead of
+   the MCP server and GitLab, 2026-11-08), a PR at a time, then one billed
+   run (a Free Trial: by 2026-12-08, within about 4 vCPUs, no Spot):
+   - [x] The console reads ACR as its own Entra identity
+     (`registryCheck.acrToken`), and labels its scan and verify Jobs for
+     Workload Identity (`azureWorkloadIdentity`). Not yet seen on AKS.
+   - [ ] `vennir`'s azure target: config and `vennir init`, `az` and
+     `kubelogin`, the module (resource group, AKS auto and standard, ACR,
+     Workload Identity, backups' storage), pricing, apply and destroy.
+   - [ ] The catalog on GitHub to ACR: catalog CI's own identity (federated
+     credential), publishing, signing with a Key Vault key.
+   - [ ] The billed run: a minimal install, the azure samples by Workload
+     Identity, destroy.
+   - [ ] Then: the managed database (Flexible Server, Entra sign-in for each
+     service), managed Prometheus, a public console, the audit and log
+     archives, kernel policy reading ACR.
+2. The next billed run elsewhere: what's below in "To prove on a cloud".
+3. Then the MCP server.
 
 Blocked: the chat agent on Bedrock (the account's model access) and
 Sigstore's newer signature format (policy-controller). Needs a decision:

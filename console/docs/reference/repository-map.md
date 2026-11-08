@@ -196,6 +196,7 @@ TypeScript, Fastify 5, Drizzle (Postgres), `@kubernetes/client-node`. One proces
 | `resourceRecorder.ts` | Every 30 seconds, copies what finished runs' steps reported as `resources` (with each step's inputs and outputs) into the `resources` table, and marks what cleanup runs deleted. |
 | `productPolicy.ts` | Which product releases (digests) give a step its product's identity, and writes them, with each team's secrets, into the cluster's identity policy: after every product or secret change, every few minutes (pruning releases no longer in use), at startup, and before a submission runs one it doesn't list yet; with the kernel chart's `catalogPolicy`, only the secret names (the kernel writes the digests). |
 | `gatewayTokenPolicy.ts` | Which audiences each published API's ServiceAccount may get a token for (what the gateway asks for per backend.auth; none for a held API or a retired team's), written into the console chart's gateway token policy: after every catalog sync and team retirement, every few minutes and at startup. |
+| `azureToken.ts` | The console's own Microsoft Entra access token (AKS Workload Identity): its token file exchanged at Entra, per scope; the registry's for ACR. |
 | `gcpMetadata.ts` | The console's own Google access token, from the node's metadata server (Workload Identity): the registry's, the audit export's, single sign-on's, Vertex's and the database's. |
 | `registry.ts` | Asks a container registry whether an image still exists, before a run, pins tags to digests, and fetches the catalog's release (digest-checked) and lists its tags, for its newest version. |
 | `apiError.ts` | `ApiError`: a refusal (HTTP status, stable code, message, Connect code, extra fields) thrown by `core/` and turned into a Connect error (its code, a `Failure` detail with any extra fields) by Connect's interceptor. |
@@ -375,6 +376,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | `team-namespaces.test.ts` | The console creating, relabelling and deleting team namespaces, and applying SecretStore files: what reaches Kubernetes, and who may. |
 | `image-scans.test.ts`, `scan-job.test.ts` | Reading Trivy's output, verdicts per digest (every platform scanned), what a failed scan blocks, an admin accepting one, idling the scanner and waking it for a scan; the scan Job's container per platform. |
 | `registry-ecr.test.ts` | ECR's credential from the console's own AWS identity: fetched, sent as ECR's Basic challenge asks, kept for its lifetime. |
+| `registry-acr.test.ts` | ACR's credential from the console's own Entra identity: Workload Identity's token exchanged at Entra, then at the registry for a refresh token, kept. |
 | `client-ip.test.ts` | Who the client is behind a load balancer: only trusted proxies' X-Forwarded-For counts. |
 | `activity.test.ts` | Recording the console's last use: signed-in requests only, once a minute at most. |
 | `audit.test.ts` | What the audit log records (a change, a refusal) and never records (secret values; reads; sign-in and passwords). |

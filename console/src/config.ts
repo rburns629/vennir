@@ -635,6 +635,9 @@ export const config = {
   // EKS: short-lived ECR credentials from the console's own AWS identity
   // (EKS Pod Identity), for ECR registries, instead of a stored key.
   registryEcrToken: parseBoolean("REGISTRY_ECR_TOKEN"),
+  // AKS: short-lived ACR credentials from the console's own Entra identity
+  // (AKS Workload Identity), for ACR registries, instead of a stored key.
+  registryAcrToken: parseBoolean("REGISTRY_ACR_TOKEN"),
   registryMirrors: parseRegistryMirrors(process.env["REGISTRY_MIRRORS"]),
   // The API gateway (decision 20; the chart's gateway values): the hosts an
   // API's backend may be under ("orders.example.com", or "*.a.run.app" for
@@ -738,6 +741,10 @@ export const config = {
     serviceAccount: process.env["SCANNER_SERVICE_ACCOUNT"] ?? "",
     // The registryCheck pull Secret, for private registries.
     pullSecretName: process.env["SCANNER_PULL_SECRET"] ?? "",
+    // AKS: the scan and verify Jobs' Pods carry azure.workload.identity/use,
+    // so AKS's webhook gives them their ServiceAccount's managed identity
+    // (Trivy and cosign then read ACR as it).
+    azureWorkloadIdentity: parseBoolean("AZURE_WORKLOAD_IDENTITY"),
     // How long a submission waits for an image's first scan before asking
     // the caller to try again.
     waitSeconds: wholeNumber("SCAN_WAIT_SECONDS", 60),

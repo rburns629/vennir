@@ -287,6 +287,7 @@ async function verified(reference: string, log: FastifyBaseLogger): Promise<bool
       image: config.catalog.verifierImage,
       serviceAccount: config.scanning.serviceAccount,
       pullSecretName: config.scanning.pullSecretName,
+      azureWorkloadIdentity: config.scanning.azureWorkloadIdentity,
       ...attempt,
     });
     const deadline = Date.now() + 300_000;

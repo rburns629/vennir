@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createScanJob, NO_PLATFORM_MARKER, readScanJob, SCAN_SCRIPT } from "../src/k8s.js";
+import { createScanJob, createVerifyJob, NO_PLATFORM_MARKER, readScanJob, SCAN_SCRIPT } from "../src/k8s.js";
 
 beforeEach(() => {
   // No cluster: the client's methods are faked below.
@@ -44,6 +44,26 @@ describe("a scan Job", () => {
     expect(containers.map((c) => flag(c.args, "--platform"))).toEqual(["linux/amd64", "linux/arm64"]);
     expect(new Set(containers.map((c) => flag(c.args, "--cache-dir"))).size).toBe(2);
     expect(containers.every((c) => c.command?.join(" ") === `sh -c ${SCAN_SCRIPT} scan`)).toBe(true);
+  });
+
+  it("and the verify Job carry AKS Workload Identity's label only when asked", async () => {
+    const created = vi.spyOn(k8s.BatchV1Api.prototype, "createNamespacedJob").mockResolvedValue({});
+    for (const azureWorkloadIdentity of [true, false]) {
+      const common = { namespace: "vennir-system", serviceAccount: "scanner", pullSecretName: "", azureWorkloadIdentity };
+      await createScanJob({
+        ...common,
+        name: "scan-x",
+        scannerImage: "trivy@sha256:abc",
+        serverUrl: "http://trivy:4954",
+        target: `registry.example/app@sha256:${"a".repeat(64)}`,
+        insecure: false,
+        platforms: ["linux/amd64"],
+        template: "END\n",
+      });
+      await createVerifyJob({ ...common, name: "verify-x", image: "cosign@sha256:abc", args: ["registry.example/catalog-release:latest"] });
+    }
+    const labels = created.mock.calls.map((call) => call[0].body.spec?.template.metadata?.labels ?? {});
+    expect(labels.map((l) => l["azure.workload.identity/use"])).toEqual(["true", "true", undefined, undefined]);
   });
 
   it("runs Trivy as it would, except that a platform the image hasn't is a clean exit, marked", async () => {
