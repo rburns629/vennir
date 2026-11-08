@@ -17,6 +17,7 @@ assessment history docs/assessment.md
 repository-map current docs/repository-map.md
 clouds-gcp operating docs/clouds/gcp.md
 clouds-aws operating docs/clouds/aws.md
+clouds-azure operating docs/clouds/azure.md
 clouds-github operating docs/clouds/github.md
 catalog-guide current catalog-template/README.md
 catalog-onboarding-with-ai operating catalog-template/docs/onboarding-with-ai.md

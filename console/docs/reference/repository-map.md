@@ -545,7 +545,7 @@ Setting up Vennir with `vennir`, start to finish: the questions `init` asks and 
 
 | Path | What it's for |
 | --- | --- |
-| `aws.md`, `gcp.md`, `github.md` | What only each website can do before an install (an account or project, the root user's MFA, a budget, an IAM user, signing in, organization policies), linked from `vennir` when it finds one of them missing. |
+| `aws.md`, `azure.md`, `gcp.md`, `github.md` | What only each website can do before an install (an account, subscription or project, the root user's MFA, a budget, an IAM user or roles, signing in, organization policies), linked from `vennir` when it finds one of them missing. |
 
 ## `examples/`: demo products
 
@@ -607,7 +607,7 @@ Fake products used by the demos and the kernel's integration tests. They deliber
 | `internal/tofu/` | Runs OpenTofu in an environment's `tofu/`: init, plan (summarised for the approval screen, each resource type named in words: a test checks every module's), apply the approved plan, outputs, destroy. |
 | `internal/backup/` | The databases' backups: the backup Job run now, dumps to and from this machine, the bucket's pairs, the restore (writers stopped, both databases replaced, started again), a managed database's on-demand backups, and moving an install's data into a managed database (`move.go`). |
 | `internal/releases/` | Vennir's releases (GitHub's list, cached a day): the newest, what an upgrade passes over, whether a version change can be applied, and a release's binaries' checksums. |
-| `internal/pricing/` | Live prices for the approval screen: Google's price catalog (read with your gcloud sign-in; `gcp_account.go`: your billing account's prices, when you may read them) and AWS's Price List and Spot price history (with your AWS sign-in), fetched a few calls at a time and each cached a day, and their cost models; `testdata/` holds real price entries. |
+| `internal/pricing/` | Live prices for the approval screen: Google's price catalog (read with your gcloud sign-in; `gcp_account.go`: your billing account's prices, when you may read them) AWS's Price List and Spot price history (with your AWS sign-in), and Azure's Retail Prices API (public), fetched a few calls at a time and each cached a day, and their cost models; `testdata/` holds real price entries. |
 
 ## `catalog-template/`: what a new catalog starts as
 

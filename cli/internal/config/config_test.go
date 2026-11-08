@@ -47,7 +47,7 @@ func TestDefaultsAreValid(t *testing.T) {
 
 func TestValidateReportsEveryProblem(t *testing.T) {
 	c := validKind(t)
-	c.Target = "azure"
+	c.Target = "mars"
 	c.Vennir = "latest"
 	c.Size = "huge"
 	c.Namespace = "Not_A_Namespace"
@@ -56,7 +56,7 @@ func TestValidateReportsEveryProblem(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected problems")
 	}
-	for _, want := range []string{"target: azure isn't supported", `vennir: "latest"`, `size: "huge"`, "namespace:", "admin.email:"} {
+	for _, want := range []string{`target: "mars" isn't one of`, `vennir: "latest"`, `size: "huge"`, "namespace:", "admin.email:"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("missing %q in:\n%v", want, err)
 		}
@@ -318,8 +318,7 @@ func TestAWS(t *testing.T) {
 	}
 }
 
-// azure's settings, and what isn't built on azure yet. The target itself
-// is refused until it's implemented, so only that is wrong with a good one.
+// azure's settings, and what isn't built on azure yet.
 func TestAzure(t *testing.T) {
 	c := Default("azure")
 	c.Source = checkout(t)
@@ -329,14 +328,13 @@ func TestAzure(t *testing.T) {
 	if c.Azure.ResourceGroup != "vennir" {
 		t.Errorf("resource group %q", c.Azure.ResourceGroup)
 	}
-	err := c.Validate()
-	if err == nil || strings.Count(err.Error(), "\n") > 1 || !strings.Contains(err.Error(), "target: azure isn't supported") {
-		t.Fatalf("want only the target refused: %v", err)
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
 	}
 	c.Azure = Azure{Subscription: "nope", Region: "East US 2", ResourceGroup: "ends-in-a-dot."}
 	c.Cluster.Mode = "auto"
 	c.Database.Type = "managed"
-	err = c.Validate()
+	err := c.Validate()
 	for _, want := range []string{"azure.subscription", "azure.region", "azure.resourceGroup", "cluster.mode", "database.type"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("missing %q in %v", want, err)

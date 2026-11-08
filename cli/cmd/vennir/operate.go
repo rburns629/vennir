@@ -323,13 +323,27 @@ func (a *app) destroyCmd() *cobra.Command {
 				if c.Logs.Enabled {
 					buckets, kept = "the backups and logs buckets", "every backup and archived log"
 				}
-				if deleteData, err = ask("Delete the data too: the database's disk and " + buckets + "?"); err != nil {
-					return err
-				}
-				if deleteData {
-					steps = append(steps, "delete the database's disk and "+kept)
+				if c.Target == "azure" {
+					// AKS keeps its disks in the cluster's own resource group,
+					// which goes with it.
+					steps = append(steps, "delete the database's disk with the cluster (its backups are what's kept)")
+					if deleteData, err = ask("Delete the database's backups too (their storage account)?"); err != nil {
+						return err
+					}
+					if deleteData {
+						steps = append(steps, "delete every backup")
+					} else {
+						steps = append(steps, "keep the backups' storage account, in the resource group "+c.Azure.ResourceGroup+" (billed until you delete them)")
+					}
 				} else {
-					steps = append(steps, "keep the database's disk and "+buckets+" (billed until you delete them)")
+					if deleteData, err = ask("Delete the data too: the database's disk and " + buckets + "?"); err != nil {
+						return err
+					}
+					if deleteData {
+						steps = append(steps, "delete the database's disk and "+kept)
+					} else {
+						steps = append(steps, "keep the database's disk and "+buckets+" (billed until you delete them)")
+					}
 				}
 				if c.TaskImages.Create {
 					if deleteRegistry, err = ask(fmt.Sprintf("Delete the task registry %s and the catalog's images in it?", c.TaskImages.Name)); err != nil {
