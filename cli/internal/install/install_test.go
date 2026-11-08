@@ -706,12 +706,12 @@ func TestKernelPolicyRunsOnACloudInstallWhoseCatalogIsSigned(t *testing.T) {
 func TestAnAzureInstallsIdentities(t *testing.T) {
 	c := kindConfig()
 	c.Target, c.Namespace, c.Cluster.Name = "azure", "vennir-system", "vennir"
-	cloud := &Cloud{Provider: "azure", TaskRegistry: "vennirbb6ebc07.azurecr.io/vennir-products",
+	cloud := &Cloud{Provider: "azure", TaskRegistry: "vennira54795d8.azurecr.io/vennir-products",
 		ClusterIssuer: "https://eastus2.oic.prod-aks.azure.com/t/c/", ConsoleServiceAccount: "console-client", ScannerServiceAccount: "scanner-client",
-		BackupBucket: "vennirbkbb6ebc07", BackupContainer: "backups", BackupServiceAccount: "backup-client"}
+		BackupBucket: "vennirbka54795d8", BackupContainer: "backups", BackupServiceAccount: "backup-client"}
 
 	kernel := KernelValues(c, Images{}, "", cloud)
-	if got := fmt.Sprint(kernel["backup"]); got != "map[azure:map[container:backups storageAccount:vennirbkbb6ebc07] destination:azure enabled:true serviceAccountName:vennir-pg-backup]" {
+	if got := fmt.Sprint(kernel["backup"]); got != "map[azure:map[container:backups storageAccount:vennirbka54795d8] destination:azure enabled:true serviceAccountName:vennir-pg-backup]" {
 		t.Errorf("backup: %s", got)
 	}
 	if got := fmt.Sprint(kernel["scheduler"]); got != "map[taskPodLabels:map[azure.workload.identity/use:true]]" {

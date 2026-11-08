@@ -24,7 +24,7 @@ locals {
   # apply (azurecloud.RegistryName, a registry to push to) and two installs
   # of one name don't collide.
   compact = replace(var.name, "-", "")
-  where   = substr(sha1("${var.subscription}/${var.resource_group}"), 0, 8)
+  where   = substr(sha256("${var.subscription}/${var.resource_group}"), 0, 8)
 }
 
 resource "azurerm_resource_group" "this" {
