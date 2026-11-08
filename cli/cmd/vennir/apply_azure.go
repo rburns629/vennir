@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/rburns629/vennir/cli/internal/access"
 	"github.com/rburns629/vennir/cli/internal/azurecloud"
@@ -16,6 +17,7 @@ import (
 	"github.com/rburns629/vennir/cli/internal/install"
 	"github.com/rburns629/vennir/cli/internal/modules"
 	"github.com/rburns629/vennir/cli/internal/plan"
+	"github.com/rburns629/vennir/cli/internal/pricing"
 	"github.com/rburns629/vennir/cli/internal/tofu"
 )
 
@@ -228,8 +230,16 @@ func (a *app) destroyAzure(ctx context.Context, out io.Writer, dir string, c *co
 	return nil
 }
 
-// azureCost prices the install. Not yet: Azure's Retail Prices API comes
-// with the target's last part.
-func (a *app) azureCost(_ context.Context, _ *config.Config) []plan.Line {
-	return []plan.Line{{Label: "Estimated cost", Text: "not priced yet on azure: the resources above are what it would be for"}}
+// azureCost prices the install from Azure's Retail Prices API; when that
+// fails the screen says so and shows no figure.
+func (a *app) azureCost(ctx context.Context, c *config.Config) []plan.Line {
+	prices, err := pricing.FetchAzure(ctx, c.Azure.Region)
+	if err != nil {
+		return []plan.Line{{Label: "Estimated cost", Text: "unavailable (" + err.Error() + "): the resources above are what it would be for"}}
+	}
+	fetched := "fetched now"
+	if time.Since(prices.Fetched) > time.Minute {
+		fetched = "fetched " + prices.Fetched.Local().Format("Jan 2 15:04")
+	}
+	return pricing.Azure(prices, c, fetched)
 }

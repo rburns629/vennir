@@ -58,10 +58,10 @@ func (a *app) initCmd() *cobra.Command {
 	}
 	fl := cmd.Flags()
 	fl.BoolVar(&f.force, "force", false, "replace an existing environment's settings")
-	fl.StringVar(&f.target, "target", "", "kind (local), gcp, aws or existing")
+	fl.StringVar(&f.target, "target", "", "kind (local), gcp, aws, azure or existing")
 	fl.StringVar(&f.release, "release", "", "install a released version (e.g. 0.1.0) instead of from source")
 	fl.StringVar(&f.source, "source", "", "a Vennir checkout to install from (charts, and images built from it)")
-	fl.StringVar(&f.clusterName, "cluster-name", "", "kind, gcp, aws: the cluster's name (default vennir)")
+	fl.StringVar(&f.clusterName, "cluster-name", "", "kind, gcp, aws, azure: the cluster's name (default vennir)")
 	fl.IntVar(&f.registryPort, "registry-port", 0, "kind: the local registry's port (default 5001)")
 	fl.StringVar(&f.kubeContext, "context", "", "existing: the kubectl context")
 	fl.StringVar(&f.project, "project", "", "gcp: the project (default: gcloud's)")
@@ -119,6 +119,7 @@ func (a *app) runInit(cmd *cobra.Command, env string, f *initFlags) error {
 		{Value: "kind", Label: "kind (local)", Note: "a cluster on this machine, in Docker"},
 		{Value: "gcp", Label: "gcp", Note: "a new GKE cluster in a Google Cloud project, with OpenTofu"},
 		{Value: "aws", Label: "aws", Note: "a new EKS Auto Mode cluster in your AWS account, with OpenTofu"},
+		{Value: "azure", Label: "azure", Note: "a new AKS cluster in an Azure subscription, with OpenTofu"},
 		{Value: "existing", Label: "existing", Note: "a Kubernetes cluster you already have"},
 	}, orDefault(f.target, "kind"))
 	if err != nil {
@@ -297,6 +298,8 @@ func (a *app) runInit(cmd *cobra.Command, env string, f *initFlags) error {
 				return err
 			}
 		}
+	} else if c.Target == "azure" {
+		fmt.Fprintln(out, "Database: in-cluster Postgres, backed up daily to a storage container (a managed one comes later on azure).")
 	} else {
 		fmt.Fprintln(out, "Database: in-cluster Postgres (a managed one comes with the cloud targets).")
 	}

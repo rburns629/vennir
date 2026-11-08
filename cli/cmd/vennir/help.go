@@ -43,7 +43,7 @@ const rootExample = `  vennir init dev && vennir apply dev
 var help = map[string]struct{ long, example string }{
 	"vennir init": {
 		long: `Asks where and how to install Vennir, with what each choice costs or gives
-up: where (kind, gcp, aws, existing), the size, sleeping when idle, the
+up: where (kind, gcp, aws, azure, existing), the size, sleeping when idle, the
 database (in-cluster, or managed: Cloud SQL, Amazon RDS), the first admin,
 the console's address, the catalog, and what else it keeps and serves.
 It checks the tools and your sign-in to the cloud, then writes
@@ -198,7 +198,7 @@ takes commas.`,
 	},
 	"vennir tools": {
 		long: `Lists the tools an environment needs (kubectl, helm, OpenTofu, kind,
-docker; gcloud or aws for a cloud) and which are missing. --install
+docker; gcloud, aws or az for a cloud) and which are missing. --install
 downloads the ones vennir can, each a pinned version checked against its
 checksum, into ~/.vennir/bin. Docker and the clouds' CLIs are yours to
 install.`,

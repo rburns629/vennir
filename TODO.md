@@ -24,8 +24,9 @@ steps left, then one billed proof run per cloud, and the MCP server last.
      apply and destroy. Planned against the subscription (21 resources), not
      yet applied. AKS Automatic (`auto`) once OpenTofu's azurerm provider has
      it (its node autoprovisioning, `node_provisioning_profile`, may do).
-   - [ ] 3/3: pricing (Azure's Retail Prices API), `docs/clouds/azure.md`,
-     and the target offered.
+   - [x] 3/3: pricing (Azure's Retail Prices API), `docs/clouds/azure.md`,
+     and the target offered. `vennir init` and `apply --plan-only` run
+     against the subscription (21 resources planned, $94 a month minimal).
    - [ ] The catalog on GitHub to ACR: catalog CI's own identity (federated
      credential), publishing, signing with a Key Vault key.
    - [ ] The billed run: a minimal install, the azure samples by Workload

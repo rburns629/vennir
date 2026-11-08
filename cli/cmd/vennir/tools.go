@@ -98,7 +98,7 @@ func (a *app) toolsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&target, "target", "", "the target to check for, before there's an environment (kind, gcp, aws, existing)")
+	cmd.Flags().StringVar(&target, "target", "", "the target to check for, before there's an environment (kind, gcp, aws, azure, existing)")
 	cmd.Flags().BoolVar(&install, "install", false, "download the missing tools vennir can fetch (pinned, checksum-verified)")
 	return cmd
 }

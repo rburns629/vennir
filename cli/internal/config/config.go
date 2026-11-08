@@ -29,7 +29,7 @@ const CurrentVersion = 1
 // Targets, sizes and cluster modes: the closed support matrix (cli/DESIGN.md).
 var (
 	Targets      = []string{"kind", "gcp", "aws", "azure", "existing"}
-	Implemented  = []string{"kind", "gcp", "aws", "existing"} // azure comes with its OpenTofu module
+	Implemented  = []string{"kind", "gcp", "aws", "azure", "existing"}
 	Sizes        = []string{"minimal", "resilient", "scaled", "auto"}
 	ClusterModes = []string{"auto", "standard", "existing"}
 )

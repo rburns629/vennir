@@ -13,12 +13,13 @@ and `vennir config set` changes one thing.
 ## Before you start
 
 - **Where it runs.** Your laptop (`kind`, free), Google Cloud (`gcp`), AWS
-  (`aws`), or a Kubernetes cluster you already have (`existing`). For a cloud,
-  get the account ready first: [Google Cloud](clouds/gcp.md),
-  [AWS](clouds/aws.md). For the catalog, [GitHub](clouds/github.md).
+  (`aws`), Azure (`azure`), or a Kubernetes cluster you already have
+  (`existing`). For a cloud, get the account ready first: [Google
+  Cloud](clouds/gcp.md), [AWS](clouds/aws.md), [Azure](clouds/azure.md). For
+  the catalog, [GitHub](clouds/github.md).
 - **The tools.** `vennir tools --install` downloads what's missing (kubectl,
-  helm, OpenTofu, kind), each pinned and checksum-verified. Docker is yours to
-  install.
+  helm, OpenTofu, kind, kubelogin), each pinned and checksum-verified. Docker
+  and your cloud's CLI are yours to install.
 
 ## 1. `vennir init <env>`
 
@@ -26,7 +27,7 @@ It asks, in order, with what each choice costs or gives up:
 
 | Question | What it decides |
 | --- | --- |
-| Where | kind, gcp, aws or existing; the project, region or kubectl context |
+| Where | kind, gcp, aws, azure or existing; the project, subscription, region or kubectl context |
 | Size | how many copies of each part, and the step caps (`minimal` to `scaled`, or `auto`) |
 | Sleep when idle | scale to zero after a quiet spell (data kept); `vennir wake` brings it back |
 | Database | gcp, aws: in-cluster Postgres (backed up to a bucket), or managed: Cloud SQL or Amazon RDS, no passwords of Vennir's, the cloud's backups, a standby in a second zone if chosen ([Databases](operations.md#databases)) |
