@@ -22,15 +22,15 @@ var azurePools = map[string]struct {
 	platform, steps string
 	disk            string // the OS disk's Premium SSD tier
 }{
-	"minimal":   {"Standard_B2ms", "Standard_B2s", "P4"},
-	"resilient": {"Standard_D2as_v5", "Standard_D4as_v5", "P6"},
-	"scaled":    {"Standard_D2as_v5", "Standard_D4as_v5", "P6"},
-	"auto":      {"Standard_D2as_v5", "Standard_D4as_v5", "P6"},
+	"minimal":   {"Standard_D2as_v6", "Standard_D2als_v6", "P4"},
+	"resilient": {"Standard_D2as_v6", "Standard_D4as_v6", "P6"},
+	"scaled":    {"Standard_D2as_v6", "Standard_D4as_v6", "P6"},
+	"auto":      {"Standard_D2as_v6", "Standard_D4as_v6", "P6"},
 }
 
 // azureVMs are each VM's vCPU and GiB.
 var azureVMs = map[string][2]float64{
-	"Standard_B2s": {2, 4}, "Standard_B2ms": {2, 8}, "Standard_D2as_v5": {2, 8}, "Standard_D4as_v5": {4, 16},
+	"Standard_D2als_v6": {2, 4}, "Standard_D2as_v6": {2, 8}, "Standard_D4as_v6": {4, 16},
 }
 
 // AzurePrices are the list prices an estimate needs, in USD.
@@ -100,7 +100,7 @@ func FetchAzure(ctx context.Context, region string) (*AzurePrices, error) {
 	cache := cachePath("azure-" + region + ".json")
 	if data, err := readRaw(cache); err == nil {
 		var p AzurePrices
-		if json.Unmarshal(data, &p) == nil && time.Since(p.Fetched) < gcpCacheLifetime && p.Region == region {
+		if json.Unmarshal(data, &p) == nil && time.Since(p.Fetched) < gcpCacheLifetime && p.Region == region && hasEvery(p.VMs) {
 			return &p, nil
 		}
 	}
@@ -168,4 +168,15 @@ func FetchAzure(ctx context.Context, region string) (*AzurePrices, error) {
 		writeRaw(cache, data)
 	}
 	return p, nil
+}
+
+// hasEvery says a cache holds every VM the pools use (an older vennir's may
+// have priced others).
+func hasEvery(vms map[string]VMPrice) bool {
+	for vm := range azureVMs {
+		if _, ok := vms[vm]; !ok {
+			return false
+		}
+	}
+	return true
 }

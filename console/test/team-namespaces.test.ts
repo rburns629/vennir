@@ -607,7 +607,7 @@ describe("the default-deny network policy", () => {
 });
 
 describe("the no-metadata network policy", () => {
-  it("lets every Pod out anywhere but the instance metadata server", async () => {
+  it("lets every Pod out anywhere but the instance metadata server, the cluster's own Pods included", async () => {
     const { noMetadataPolicy } = await vi.importActual<typeof import("../src/k8s.js")>("../src/k8s.js");
     const policy = noMetadataPolicy("web");
     expect(policy.metadata?.name).toBe("vennir-no-metadata");
@@ -615,7 +615,10 @@ describe("the no-metadata network policy", () => {
     expect(policy.spec?.policyTypes).toEqual(["Egress"]);
     expect(policy.spec?.ingress).toBeUndefined();
     // IPv4 only: an IPv6 block made the AWS VPC CNI enforce none of the
-    // namespace's policies on an IPv4 cluster.
-    expect(policy.spec?.egress).toEqual([{ to: [{ ipBlock: { cidr: "0.0.0.0/0", except: ["169.254.169.254/32"] } }] }]);
+    // namespace's policies on an IPv4 cluster. And every namespace's Pods:
+    // under Cilium (AKS) an ipBlock doesn't reach them, CoreDNS among them.
+    expect(policy.spec?.egress).toEqual([
+      { to: [{ ipBlock: { cidr: "0.0.0.0/0", except: ["169.254.169.254/32"] } }, { namespaceSelector: {} }] },
+    ]);
   });
 });

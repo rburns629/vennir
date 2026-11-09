@@ -15,7 +15,7 @@ import (
 // of 20 MB a Pod of the node's 250 and a quarter of its memory, so the
 // quarter), less the 100 MiB eviction threshold.
 var azureAllocatable = map[string][2]float64{
-	"Standard_B2s": {1.9, 2.9}, "Standard_B2ms": {1.9, 5.9}, "Standard_D2as_v5": {1.9, 5.9}, "Standard_D4as_v5": {3.86, 11.9},
+	"Standard_D2als_v6": {1.9, 2.9}, "Standard_D2as_v6": {1.9, 5.9}, "Standard_D4as_v6": {3.86, 11.9},
 }
 
 // What else needs room besides the platform's requests, vCPU and GiB: on

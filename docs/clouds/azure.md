@@ -13,11 +13,16 @@ You need an **Azure subscription**: create one at
 Vennir creates everything in one resource group of its own (`vennir` by
 default), plus the node resource group AKS makes for the cluster.
 
-- **A Free Trial works, within its limits:** about 4 vCPUs a region and no
-  Spot VMs. `init` notices one and runs steps on regular VMs
+- **A Free Trial works, within its limits:** 4 vCPUs a region and no Spot
+  VMs. `init` notices one and runs steps on regular VMs
   (`azure.onDemandSteps`); the `minimal` size (one 2-vCPU node for the
-  platform, 2-vCPU nodes for steps) fits, one step node at a time. When the
-  credit runs out the subscription stops, and so does the install.
+  platform, 2-vCPU nodes for steps) fits, one step node at a time. But
+  scanning a new image starts the scanner, which takes the platform a second
+  node, all 4 vCPUs, for about twenty minutes: a step submitted then waits,
+  and fails as `TASK_NOT_STARTED` (retryable) if it can't start within ten.
+  Submit it again once the scan's done (seen 2026-11-08). On pay as you go,
+  ask for more under **Quotas** (8 vCPUs lifts it). When the credit runs
+  out the subscription stops, and so does the install.
 - **A dedicated subscription is safest:** an install's identities get roles
   only on what it makes, but a subscription of its own keeps its bill apart.
 

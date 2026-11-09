@@ -98,8 +98,11 @@ def main() -> int:
             managed_environment = client.managed_environments.get(group, inputs["environmentName"])
         except ResourceNotFoundError:
             print(f"creating Container Apps environment '{inputs['environmentName']}'")
+            # With a property set: Azure refuses an environment sent with no
+            # properties at all, as the SDK sends one with none set (seen
+            # 2026-11-08). One zone, the default anyway.
             managed_environment = client.managed_environments.begin_create_or_update(
-                group, inputs["environmentName"], ManagedEnvironment(location=location)
+                group, inputs["environmentName"], ManagedEnvironment(location=location, zone_redundant=False)
             ).result()
 
         registries = []

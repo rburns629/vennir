@@ -45,11 +45,14 @@ spec:
       reason: Forbidden
     # Only the labels k8s.ts gives them, and those the API server adds to a
     # Job's Pods: none a NetworkPolicy admits (a database's, kernel-api's)
-    # or a Service selects (taking its traffic).
+    # or a Service selects (taking its traffic). On AKS
+    # (azureWorkloadIdentity), Workload Identity's opt-in too, which gives
+    # the Pod its ServiceAccount's managed identity and nothing else.
     - expression: >-
         has(object.spec.template.metadata) && has(object.spec.template.metadata.labels) &&
         object.spec.template.metadata.labels.all(k, k in ["app.kubernetes.io/managed-by", "app.kubernetes.io/component",
-          "job-name", "controller-uid", "batch.kubernetes.io/job-name", "batch.kubernetes.io/controller-uid"]) &&
+          "job-name", "controller-uid", "batch.kubernetes.io/job-name", "batch.kubernetes.io/controller-uid"
+          {{- if .Values.azureWorkloadIdentity }}, "azure.workload.identity/use"{{ end }}]) &&
         object.spec.template.metadata.labels[?"app.kubernetes.io/managed-by"].orValue("") == "vennir-console" &&
         object.spec.template.metadata.labels[?"app.kubernetes.io/component"].orValue("") in ["image-scan", "catalog-verify"]
       message: "A console Job's Pod carries only its own labels (managed-by vennir-console, an image-scan or catalog-verify component)."

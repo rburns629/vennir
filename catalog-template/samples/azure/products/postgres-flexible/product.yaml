@@ -10,6 +10,9 @@ description: 'Finds an Azure Database for PostgreSQL flexible server by name, or
   Entra principal its administrator. A first create takes several minutes: set the step''s
   timeoutSeconds to 1500 or more.'
 owner: azure-team
+# Its own identity: a managed identity federated to this ServiceAccount
+# alone, with only what it does (README.md, Credentials).
+serviceAccount: azure-postgres-flexible
 runtime: python3.12
 actions:
 - name: create
