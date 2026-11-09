@@ -567,9 +567,8 @@ print is searchable by your team, and only your team, on Observe's Logs tab
 (From: API backends), when the install keeps logs. The samples show
 each way: `samples/local/apis/greetings` (a Service in `local-apis`, no
 cloud, checking `Vennir-Caller`), `samples/gcp/apis/hello-world` (Cloud
-Run, `googleIdToken`), `samples/aws/apis/orders` (a Lambda function URL,
-`awsSigV4`) and `samples/azure/apis/greetings` (a Container App,
-`entraToken`).
+Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
+`awsSigV4`).
 
 What your backend gets, and what the gateway keeps to itself:
 

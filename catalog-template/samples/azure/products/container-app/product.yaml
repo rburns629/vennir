@@ -90,7 +90,7 @@ actions:
         type: object
         description: 'Requires a Microsoft Entra token on every request (Container Apps''
           built-in authentication): 401 before the container for anything else. For an API
-          behind the gateway''s entraToken (the azure team''s README.md, An API on it).'
+          behind the gateway''s entraToken (its guide, console/docs/21-api-gateway.md).'
         additionalProperties: false
         required: [tenantId, clientId, allowedApplications]
         properties:
