@@ -13,7 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
 
 _MODULE_PATH = Path(__file__).parent / "create.py"
 SERVER = SimpleNamespace(name="orders-db", fully_qualified_domain_name="orders-db.postgres.database.azure.com", id="/servers/orders-db")
@@ -83,6 +83,16 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(server.auth_config.active_directory_auth, "Enabled")
         self.assertIsNone(server.administrator_login_password)
         self.assertEqual(server.network.public_network_access, "Disabled")
+
+    def test_a_long_running_operations_failure_is_retryable_by_its_code(self) -> None:
+        # As the SDK raises it: on a poll that answered 200, the operation's error inside.
+        for code, retryable in (("InternalServerError", True), ("BadRequest", False)):
+            error = HttpResponseError(message="failed")
+            error.status_code = 200
+            error.error = SimpleNamespace(code=code)
+            self.assertEqual(self.module._azure_failure(error), 1)
+            failure = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+            self.assertEqual((failure["code"], failure["retryable"]), ("AZURE_API_ERROR", retryable))
 
 
 class CredentialTest(unittest.TestCase):

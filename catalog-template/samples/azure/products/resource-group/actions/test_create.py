@@ -93,6 +93,16 @@ class CreateActionTest(unittest.TestCase):
                 _, result, _ = self._run(INPUTS, configure)
             self.assertEqual((result["error"]["code"], result["error"]["retryable"]), (code, retryable))
 
+    def test_a_long_running_operations_failure_is_retryable_by_its_code(self) -> None:
+        # As the SDK raises it: on a poll that answered 200, the operation's error inside.
+        for code, retryable in (("InternalServerError", True), ("BadRequest", False)):
+            error = HttpResponseError(message="failed")
+            error.status_code = 200
+            error.error = SimpleNamespace(code=code)
+            self.assertEqual(self.module._azure_failure(error), 1)
+            failure = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+            self.assertEqual((failure["code"], failure["retryable"]), ("AZURE_API_ERROR", retryable))
+
 
 class CredentialTest(unittest.TestCase):
     """Who the action signs in as: Workload Identity's on AKS, and off AKS

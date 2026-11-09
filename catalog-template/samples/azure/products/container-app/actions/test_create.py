@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
 
 _MODULE_PATH = Path(__file__).parent / "create.py"
 APP = SimpleNamespace(
@@ -140,6 +140,16 @@ class CreateActionTest(unittest.TestCase):
         with patch.object(self.module, "ContainerAppsAPIClient") as client_cls:
             self.assertEqual(self.module.main(), 1)
         client_cls.assert_not_called()
+
+    def test_a_long_running_operations_failure_is_retryable_by_its_code(self) -> None:
+        # As the SDK raises it: on a poll that answered 200, the operation's error inside.
+        for code, retryable in (("InternalServerError", True), ("BadRequest", False)):
+            error = HttpResponseError(message="failed")
+            error.status_code = 200
+            error.error = SimpleNamespace(code=code)
+            self.assertEqual(self.module._azure_failure(error), 1)
+            failure = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+            self.assertEqual((failure["code"], failure["retryable"]), ("AZURE_API_ERROR", retryable))
 
 
 class CredentialTest(unittest.TestCase):

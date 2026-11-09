@@ -31,6 +31,8 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 # the azure team's README.md, Azure from another cluster).
 OWN_IDENTITY = Path("/platform/secrets/azure-resource-group-identity")
 TOKEN_FILE = Path("/platform/tokens/api___AzureADTokenExchange")
+# Azure's error codes for a failure that may pass on another attempt.
+TRANSIENT_CODES = {"InternalServerError", "ServiceUnavailable", "GatewayTimeout", "ServerBusy", "TooManyRequests"}
 
 
 def _write_result(result: dict[str, Any]) -> None:
@@ -87,7 +89,9 @@ def _azure_failure(error: Exception) -> int:
     if isinstance(error, HttpResponseError):
         status = error.status_code or 0
         code = getattr(error.error, "code", None) or str(status)
-        retryable = status in (408, 429) or status >= 500
+        # A long-running operation's failure arrives on a poll that itself
+        # succeeded (200): its code says whether trying again may work.
+        retryable = status in (408, 429) or status >= 500 or code in TRANSIENT_CODES
         return _failure("AZURE_API_ERROR", f"{code}: {error.message}", retryable=retryable)
     if isinstance(error, ServiceRequestError):
         return _failure("AZURE_API_ERROR", str(error), retryable=True)
