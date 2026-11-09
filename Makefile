@@ -141,14 +141,14 @@ _quickstart-prereqs:
 		if ! command -v $$tool > /dev/null 2>&1; then \
 			missing=1; \
 			case $$tool in \
-				docker) echo "Missing: docker. Install Docker Desktop (https://docs.docker.com/get-docker/) and start it.";; \
-				kind|kubectl|helm) echo "Missing: $$tool. Install it with: brew install $$tool  (or see its project's install docs)";; \
+				docker) echo "Missing: docker. Install Docker and start it: docs/clouds/computer.md says how on macOS, Linux and Windows (WSL 2).";; \
+				kind|kubectl|helm) echo "Missing: $$tool. On macOS: brew install $$tool. Anywhere: vennir tools --target kind --install, with ~/.vennir/bin on your PATH (docs/clouds/computer.md).";; \
 				*) echo "Missing: $$tool.";; \
 			esac; \
 		fi; \
 	done; \
 	[ $$missing -eq 0 ] || exit 1; \
-	$(DOCKER) info > /dev/null 2>&1 || { echo "Docker isn't running. Start Docker Desktop, then run make quickstart again."; exit 1; }
+	$(DOCKER) info > /dev/null 2>&1 || { echo "Docker isn't running, or isn't yours to use. Start Docker Desktop (on Linux, the docker service, with you in the docker group), then run make quickstart again."; exit 1; }
 
 # The kind cluster, created if missing (started if stopped). Its containerd
 # reads per-registry config from certs.d, so it can pull from the local

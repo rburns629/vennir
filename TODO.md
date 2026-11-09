@@ -184,6 +184,14 @@ it was seen.
 
 ## Installing and operating
 
+- [ ] **`vennir` on Windows, in WSL 2, tried on a real machine**
+  (`docs/clouds/computer.md`, 2026-11-08): its steps are WSL 2's and Docker
+  Desktop's documented ones, and the Linux build ran end to end on Ubuntu
+  24.04 (Docker Engine, `vennir tools --install`, a kind install of 0.14.0),
+  but no one has run it in WSL. Check Docker Desktop's WSL integration, the
+  console in Windows' browser, and the cloud CLIs' sign-ins from Ubuntu. A
+  native Windows build only if WSL proves a real obstacle.
+
 - [ ] **The gcp access check reads only a location policy's allowed values**
   (found 2026-11-03): `orgPolicyValues` (`cli/internal/access/gcp.go`) reads
   `listPolicy.allowedValues`, so a `gcp.resourceLocations` policy that lists

@@ -17,9 +17,11 @@ and `vennir config set` changes one thing.
   (`existing`). For a cloud, get the account ready first: [Google
   Cloud](clouds/gcp.md), [AWS](clouds/aws.md), [Azure](clouds/azure.md). For
   the catalog, [GitHub](clouds/github.md).
-- **The tools.** `vennir tools --install` downloads what's missing (kubectl,
-  helm, OpenTofu, kind, kubelogin), each pinned and checksum-verified. Docker
-  and your cloud's CLI are yours to install.
+- **Your computer.** `vennir` runs on macOS and Linux, and on Windows in
+  WSL 2. `vennir tools --install` downloads what's missing (kubectl, helm,
+  OpenTofu, kind, kubelogin), each pinned and checksum-verified. Docker and
+  your cloud's CLI are yours to install: [Getting your computer
+  ready](clouds/computer.md) says how on each system.
 
 ## 1. `vennir init <env>`
 

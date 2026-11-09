@@ -290,11 +290,26 @@ func dockerRunning(ctx context.Context, path string) error {
 }
 
 func installHint(tool string) string {
-	mac := runtime.GOOS == "darwin"
+	return hintFor(tool, runtime.GOOS == "darwin", runtime.GOOS == "linux" && inWSL())
+}
+
+// inWSL is whether this Linux is WSL, Windows' own, where Docker is usually
+// Docker Desktop's, on the Windows side.
+func inWSL() bool {
+	if os.Getenv("WSL_DISTRO_NAME") != "" {
+		return true
+	}
+	release, err := os.ReadFile("/proc/sys/kernel/osrelease")
+	return err == nil && strings.Contains(strings.ToLower(string(release)), "microsoft")
+}
+
+// hintFor says how to install a tool vennir doesn't download: on macOS,
+// on Linux, or on Linux in WSL (docs/clouds/computer.md).
+func hintFor(tool string, mac, wsl bool) string {
 	switch tool {
 	case "gcloud":
 		if mac {
-			return "`brew install --cask google-cloud-sdk`, or https://cloud.google.com/sdk/docs/install ; then `gcloud auth login`"
+			return "`brew install --cask gcloud-cli`, or https://cloud.google.com/sdk/docs/install ; then `gcloud auth login`"
 		}
 		return "https://cloud.google.com/sdk/docs/install (apt, dnf or the archive); then `gcloud auth login`"
 	case "aws":
@@ -321,9 +336,12 @@ func installHint(tool string) string {
 		return "`gcloud components install gke-gcloud-auth-plugin` (with apt or dnf: the google-cloud-cli-gke-gcloud-auth-plugin package)"
 	case "docker":
 		if mac {
-			return "install Docker Desktop: https://docs.docker.com/desktop/setup/install/mac-install/ (or `brew install --cask docker`), and start it"
+			return "install Docker Desktop: https://docs.docker.com/desktop/setup/install/mac-install/ (or `brew install --cask docker-desktop`), and start it"
 		}
-		return "install Docker Engine: https://docs.docker.com/engine/install/ , then start it (`sudo systemctl start docker`)"
+		if wsl {
+			return "install Docker Desktop for Windows: https://docs.docker.com/desktop/setup/install/windows-install/ , start it, and turn on Settings → Resources → WSL integration for this distribution"
+		}
+		return "install Docker Engine: https://docs.docker.com/engine/install/ , start it (`sudo systemctl enable --now docker`), and add yourself to the docker group (`sudo usermod -aG docker $USER`, then sign in again)"
 	}
 	return "install " + tool
 }

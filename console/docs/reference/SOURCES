@@ -15,6 +15,7 @@ security-model current docs/security-model.md
 setup operating docs/setup.md
 assessment history docs/assessment.md
 repository-map current docs/repository-map.md
+clouds-computer operating docs/clouds/computer.md
 clouds-gcp operating docs/clouds/gcp.md
 clouds-aws operating docs/clouds/aws.md
 clouds-azure operating docs/clouds/azure.md
