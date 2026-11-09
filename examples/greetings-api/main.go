@@ -14,7 +14,10 @@
 // when it makes the service. It can't be told that URL beforehand, so there
 // AUDIENCE_FROM_HOST=true takes the audience from the request's Host:
 // Express Mode's load balancer routes each service by its host, so a
-// request reaches it only with its own. Anywhere else, set AUDIENCE.
+// request reaches it only with its own. It's the azure sample's too, as a
+// Container App (catalog-template/samples/azure/apis/greetings), whose
+// ingress routes each app by its host the same way. Anywhere else, set
+// AUDIENCE.
 //
 // A demo, not a product (examples/ is exempt from the production bar):
 // standard library only, no persistence.

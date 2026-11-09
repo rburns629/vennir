@@ -1,0 +1,40 @@
+# What the gateway forwards: GET /greetings/{name}, its name and style
+# checked against these schemas. Anything else (the backend's /healthz too)
+# gets 404 or 400 from the gateway and never reaches the backend.
+openapi: 3.1.0
+info:
+  title: Greetings API
+  version: 1.0.0
+servers:
+  - url: https://greetings.happyfield-0123abcd.eastus2.azurecontainerapps.io
+paths:
+  /greetings/{name}:
+    get:
+      operationId: greet
+      summary: Greets someone.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z][A-Za-z -]{0,39}$"
+        - name: style
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [plain, shout]
+      responses:
+        "200":
+          description: The greeting, and the team that asked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, team]
+                properties:
+                  message: {type: string}
+                  team: {type: string}
+        "401":
+          description: Not through the gateway.
