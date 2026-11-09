@@ -209,7 +209,7 @@ I have read the CLA and I accept it
     <div style="display: flex; flex-direction: column; gap: 20px">
       <span class="eyebrow">What's next</span>
       <h2 id="next-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Solid before features.</h2>
-      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">The agreed order of work: housekeeping and tests first, then features with steps left, then proving on a cloud what's only been proven on kind, and the MCP server and Azure last. One paid run, on GKE and EKS, is done; the list below is what the next one proves. No dates: it's done when it's proven.</p>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">The agreed order of work: housekeeping and tests first, then features with steps left, then proving on each cloud what's only been proven on kind, and an MCP server last. Paid runs on GKE and EKS, from GKE to AWS, on AKS, and from GKE to Azure and AWS are done; the list below is what's left. No dates: it's done when it's proven.</p>
       <div class="card" style="padding: 22px 24px; display: flex; flex-direction: column; gap: 10px">
         <span class="mono" style="font-size: 13px; color: #F2C08A">Blocked, or undecided</span>
         <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The chat agent on Amazon Bedrock waits on the account's model access, and Sigstore's newer signature format waits on policy-controller. Whether to mask Secret values in logs still needs a decision.</p>
@@ -220,50 +220,57 @@ I have read the CLA and I accept it
         <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
           <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">01</span>
           <div style="display: flex; flex-direction: column; gap: 8px">
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">The gateway on the internet, on GKE and EKS</h3><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">built, to prove</span></div>
-            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">Its public listener behind a cloud load balancer and certificate. Documented, and proven so far only on kind.</p>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Azure, the rest</h3></div>
+            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">AKS installs and the azure samples are proven, on AKS and from GKE. Next: catalog CI publishing to Azure's registry, a managed database, managed Prometheus, a public console, and the audit and log archives.</p>
           </div>
         </li>
         <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
           <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">02</span>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Google Cloud from any cluster</h3></div>
+            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">The gcp samples signing in from EKS or AKS through a workload identity pool, as the aws and azure samples already do from GKE.</p>
+          </div>
+        </li>
+        <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
+          <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">03</span>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">The gateway on the internet, on EKS</h3><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">built, to prove</span></div>
+            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">Proven on GKE behind Google's load balancer and certificate; behind an Application Load Balancer on EKS still to see.</p>
+          </div>
+        </li>
+        <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
+          <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">04</span>
           <div style="display: flex; flex-direction: column; gap: 8px">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">A team building in its own Environment</h3><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">built, to prove</span></div>
             <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">A catalog team's builds using values of their own, from a GitHub Environment only main may use: built in 0.10.0, to see in a real catalog repository.</p>
           </div>
         </li>
         <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
-          <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">03</span>
-          <div style="display: flex; flex-direction: column; gap: 8px">
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">A catalog read across clouds</h3><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">built, to prove</span></div>
-            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">One install reading another's catalog from Amazon ECR, by AWS web identity.</p>
-          </div>
-        </li>
-        <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
-          <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">04</span>
-          <div style="display: flex; flex-direction: column; gap: 8px">
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Cleanup that touches only its team's</h3><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">built, to prove</span></div>
-            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">The samples label what they make with the run's team, and delete only what carries it.</p>
-          </div>
-        </li>
-        <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
           <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">05</span>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">A catalog read across clouds, the rest</h3><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">built, to prove</span></div>
+            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">GKE reading another account's Amazon ECR is proven. An EKS reader, a revoke taking effect, and Artifact Registry read by federation are next.</p>
+          </div>
+        </li>
+        <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
+          <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">06</span>
           <div style="display: flex; flex-direction: column; gap: 8px">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">The smaller proofs</h3><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">built, to prove</span></div>
             <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">The base images' weekly mirror, vennir apply waiting for a hostname's DNS record, a narrowed schema refused at checkout, and deploying GKE from a release.</p>
           </div>
         </li>
         <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
-          <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">06</span>
+          <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">07</span>
           <div style="display: flex; flex-direction: column; gap: 8px">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Pages that hide a failed load</h3></div>
             <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">A few console pages show “nothing here” when a load fails; each should say so, with Try again.</p>
           </div>
         </li>
         <li style="display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid #1F2430">
-          <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">07</span>
+          <span class="mono" style="font-size: 15px; color: #7C9BFF; padding-top: 2px">08</span>
           <div style="display: flex; flex-direction: column; gap: 8px">
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Last: an MCP server, then Azure</h3></div>
-            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">The chat agent's tools for engineers' own agents, then Azure as a target, with its managed Prometheus and the Azure sample signing in.</p>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"><h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Last: an MCP server</h3></div>
+            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">The chat agent's tools for engineers' own agents.</p>
           </div>
         </li>
     </ol>

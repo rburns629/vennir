@@ -130,7 +130,7 @@ change in Vennir.
 | Vault | Sign-in | Stored credential | Proven |
 | --- | --- | --- | --- |
 | GCP Secret Manager | GKE Workload Identity | None | Yes |
-| Azure Key Vault | AKS Workload Identity | None | Not yet (`catalog-template/samples/azure`) |
+| Azure Key Vault | Workload Identity: AKS's, or off AKS a federated credential trusting the cluster's issuer for `eso-azure` | None | Yes, from GKE (2026-11-09); not yet on AKS |
 | AWS Secrets Manager | IRSA (the cluster's OIDC issuer registered in IAM) | None | Yes (2026-10-27, EKS) |
 | HashiCorp Vault | Vault's Kubernetes auth | None | Not yet |
 | 1Password | A service account token | One, in `eso-auth` | Not yet |

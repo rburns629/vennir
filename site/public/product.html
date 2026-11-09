@@ -421,7 +421,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
     <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
       <span class="eyebrow">04 · API products and the gateway</span>
       <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Publish a backend you already run. Its OpenAPI file is the allowlist.</h2>
-      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A Service in your team's API backends' namespace, a Cloud Run service or a Lambda function URL: add an api.yaml and its OpenAPI file to your catalog folder. The gateway answers at <span class="mono" style="font-size: 16px; color: #E8EAEE">/&lt;team&gt;/&lt;name&gt;/</span>, signs callers in as the console does, and forwards only what the spec describes, with a credential it mints per request. Nothing is stored. Who may call it: each install's access list: your team, and the single sign-on groups, people and bots your maintainers grant (or, with <span class="mono" style="font-size: 16px; color: #E8EAEE">access.requests: open</span>, whoever asks), each at its own rate.</p>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A Service in your team's API backends' namespace, a Cloud Run service, a Lambda function URL, an ECS Express service or an Azure Container App: add an api.yaml and its OpenAPI file to your catalog folder. The gateway answers at <span class="mono" style="font-size: 16px; color: #E8EAEE">/&lt;team&gt;/&lt;name&gt;/</span>, signs callers in as the console does, and forwards only what the spec describes, with a credential it mints per request. Nothing is stored. Who may call it: each install's access list: your team, and the single sign-on groups, people and bots your maintainers grant (or, with <span class="mono" style="font-size: 16px; color: #E8EAEE">access.requests: open</span>, whoever asks), each at its own rate.</p>
     </div>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
       <div class="card" style="overflow: hidden">
@@ -573,7 +573,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <div style="display: flex; flex-direction: column; gap: 16px; max-width: 780px">
         <span class="eyebrow">07 · The console and the vennir CLI</span>
         <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">A console for the people who order. A CLI for the people who run it.</h2>
-        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">The console is the one front door: Catalog, Runs, What runs made, APIs, Observe, your teams, and Admin, each page linking the guide that explains it. <span class="mono" style="font-size: 16px; color: #E8EAEE">vennir</span> installs it on kind, Google Cloud, AWS or a cluster you have, and keeps each environment as one folder of settings, never a secret.</p>
+        <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">The console is the one front door: Catalog, Runs, What runs made, APIs, Observe, your teams, and Admin, each page linking the guide that explains it. <span class="mono" style="font-size: 16px; color: #E8EAEE">vennir</span> installs it on kind, Google Cloud, AWS, Azure or a cluster you have, and keeps each environment as one folder of settings, never a secret.</p>
       </div>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
         <ul class="card" style="margin: 0; padding: 8px 0; list-style: none; display: flex; flex-direction: column">
@@ -635,7 +635,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       </li>
       <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 8px">
         <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Sample readiness checks, partly proven</h3>
-        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">The gcp samples' checks have run on GKE; the aws samples' aren't proven yet.</p>
+        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">The gcp samples' checks have run on GKE and the aws samples' from GKE; the azure samples have none yet, nor a delete action.</p>
       </li>
       <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 8px">
         <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Teams from the directory</h3>
@@ -646,8 +646,8 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">A few console pages show “nothing here” when a load fails, instead of saying so with Try again.</p>
       </li>
       <li style="background: #11141B; padding: 24px; display: flex; flex-direction: column; gap: 8px">
-        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">An MCP server, and Azure</h3>
-        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">Planned last. The Azure sample exists and is unproven.</p>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #FFFFFF">Azure's managed extras, then an MCP server</h3>
+        <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #AEB5C2">AKS installs and the azure samples are proven, on AKS and from GKE. A managed database, managed Prometheus, a public console and catalog CI publishing to Azure's registry come next; an MCP server last.</p>
       </li>
     </ul>
     <p style="margin: 0; font-size: 15px; color: #8B93A3">The full list: <a href="https://github.com/roburns/vennir/blob/main/TODO.md">TODO.md</a>. What is and isn't enforced: <a href="https://github.com/roburns/vennir/blob/main/docs/security-model.md">the security model</a>.</p>
