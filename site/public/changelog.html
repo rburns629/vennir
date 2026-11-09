@@ -87,10 +87,45 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <h2 id="rel-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Newest first.</h2>
     </div>
     <div>
+      <article id="v0-14-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.14.0</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">8 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/roburns/vennir/releases/tag/v0.14.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/roburns/vennir/compare/v0.13.2...v0.14.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.13.2<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">The repository moved: roburns/vennir</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The GitHub account is now roburns, so the repository is <span class="mono" style="font-size: 14px; color: #E8EAEE">github.com/roburns/vennir</span> and the images, charts and <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span> binaries are under <span class="mono" style="font-size: 14px; color: #E8EAEE">ghcr.io/roburns/vennir</span>. GHCR doesn't redirect the old name, so a release before 0.14.0 can no longer download what it names.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">In your catalog, change <span class="mono" style="font-size: 14px; color: #E8EAEE">./vennir</span>'s <span class="mono" style="font-size: 14px; color: #E8EAEE">repository=</span> line to <span class="mono" style="font-size: 14px; color: #E8EAEE">&quot;roburns/vennir/cli&quot;</span>, then pin 0.14.0 with <span class="mono" style="font-size: 14px; color: #E8EAEE">pin-vennir.sh</span>, which reads that line. Until then the catalog's CI can't download <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir</span>.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Azure</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">vennir init</span> offers Azure: one AKS cluster in a resource group of its own, its registry and backups, with Microsoft Entra sign-in for kubectl (no local accounts) and the approval screen's price from Azure's Retail Prices API. A Free Trial fits the <span class="mono" style="font-size: 14px; color: #E8EAEE">minimal</span> size, with steps on regular VMs.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The console reads the catalog's release from the registry as its own managed identity, and the scanner as its own, by Workload Identity: no registry password.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The azure samples run each product as its own managed identity. <span class="mono" style="font-size: 14px; color: #E8EAEE">resource-group</span> and <span class="mono" style="font-size: 14px; color: #E8EAEE">container-app</span> are proven on AKS; the getting-ready guide is in the docs.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">AWS samples</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">ecs-express</span> replaces <span class="mono" style="font-size: 14px; color: #E8EAEE">app-runner</span>, which new AWS accounts can no longer use: it hosts an image as an ECS Express Mode service. Running <span class="mono" style="font-size: 14px; color: #E8EAEE">create</span> again with a new image rolls the service out behind the same URL, as <span class="mono" style="font-size: 14px; color: #E8EAEE">app-hosting</span> now does on Google Cloud; a failed rollout fails the step.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The aws samples include an API on ECS Express Mode, through the gateway (<span class="mono" style="font-size: 14px; color: #E8EAEE">samples/aws/apis/greetings</span>).</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Fixes</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">vennir apply</span> says when the catalog repository's variables no longer match the install (after installing again) and to run <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir catalog create</span>.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">On AKS, the steps' network policy lets them reach the cluster's DNS, which Cilium wouldn't match by address.</span></li>
+          </ul>
+        </div>
+      </article>
       <article id="v0-13-2" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
         <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
           <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
-            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.13.2</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.13.2</h3>
           </div>
           <time class="mono" style="font-size: 14px; color: #AEB5C2">6 Nov 2026</time>
           <div style="display: flex; flex-direction: column; gap: 0">
