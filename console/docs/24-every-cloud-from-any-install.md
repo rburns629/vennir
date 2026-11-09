@@ -72,7 +72,7 @@ Vennir on GKE is the usual starting point. Once per install, for each cloud its 
 4. **Synced secrets** from Key Vault or another vault: ESO's own identity in that cloud, trusted the same way.
 5. **APIs** on those clouds' backends: the gateway on the internet when a backend checks the gateway's public keys, and the gateway's own identity for `awsSigV4` or `entraToken` ([the API gateway](21-api-gateway.md)).
 
-Everything in this list was done from a GKE Autopilot install on 2026-11-09 with the 0.15.0 release: Azure resource groups, Container Apps and PostgreSQL, an S3 bucket and an ECS Express service, a Key Vault secret, and an API on each cloud through the gateway.
+To do it yourself step by step: Labs [3](lab-3-gke.md) to [7](lab-7-apis-across-clouds.md). Everything in this list was done from a GKE Autopilot install on 2026-11-09 with the 0.15.0 release: Azure resource groups, Container Apps and PostgreSQL, an S3 bucket and an ECS Express service, a Key Vault secret, and an API on each cloud through the gateway.
 
 ## Not covered yet
 

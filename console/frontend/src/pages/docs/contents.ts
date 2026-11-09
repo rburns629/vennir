@@ -85,6 +85,20 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
     ],
   },
   {
+    id: "labs",
+    title: "Hands-on labs",
+    blurb: "Step-by-step exercises with a goal, a time, a cost and checks: Vennir on your laptop and your first product (free), then GKE, Google Cloud projects, AWS, Azure and APIs across clouds (billed).",
+    items: [
+      ["lab-1-laptop", "Lab 1: Vennir on your laptop"],
+      ["lab-2-first-product", "Lab 2: your first product"],
+      ["lab-3-gke", "Lab 3: Vennir on GKE, with a catalog"],
+      ["lab-4-gcp-projects", "Lab 4: Google Cloud projects from Vennir"],
+      ["lab-5-aws-from-gke", "Lab 5: AWS from a GKE install"],
+      ["lab-6-azure-from-gke", "Lab 6: Azure from a GKE install"],
+      ["lab-7-apis-across-clouds", "Lab 7: APIs on every cloud, through the gateway"],
+    ],
+  },
+  {
     id: "how-to",
     title: "How-to guides",
     blurb: "Things you'll do once you're running: deploy to your cloud, publish APIs, automate runs with bots, and bring in secrets.",

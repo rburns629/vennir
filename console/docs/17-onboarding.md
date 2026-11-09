@@ -2,6 +2,8 @@
 
 Start here if you're setting Vennir up for your company or your team. This is the whole path, in order: install Vennir, make the catalog, bring in a team, ship and run a first product, then get a cloud ready so products can create real resources in it. Each phase says who does it, what to run or click, and how you know it worked. The details live in the guides it links to; you don't need to read them first.
 
+To learn it by doing first, the [hands-on labs](lab-1-laptop.md) walk the same path as exercises with checks: two free on your laptop, then a GKE install creating resources in Google Cloud, AWS and Azure.
+
 ## Who does what
 
 | Role | Who it usually is | Does |

@@ -356,6 +356,7 @@ Shown on the console's Docs page, in file order. They ship inside the console im
 | `22-addresses-and-firewalls.md` | Addresses and firewall rules: which address each part uses, finding them, identity instead of allowlists, and a fixed outbound address. |
 | `23-deploy-to-azure.md` | Deploy to Azure: a managed identity per product, trusting the cluster's tokens (AKS's webhook, or the team secret elsewhere), its roles, private registries, running, Key Vault, APIs. |
 | `24-every-cloud-from-any-install.md` | Creating resources in every cloud: the identity model, who sets up what, which way in by host and target, each cloud's permission structure (GCP folders for projects), the setup from GKE. |
+| `lab-1-laptop.md` … `lab-7-apis-across-clouds.md` | The hands-on labs, each with its goal, time, cost, checks and clean up: Vennir on kind and a first product (free), then on GKE with a catalog, Google Cloud projects under a folder, AWS and Azure from a GKE install, and APIs on every cloud through the gateway (billed). |
 | `reference/` | The platform's own docs, copied from the repository (`SOURCES` lists them; `make console-docs`, `.github/scripts/console-docs.sh`): the Docs page's reference, and what the chat agent answers from; `reference/architecture/` holds the figures they draw (`docs/architecture/*.svg`). `test/docs.test.ts` fails while a copy differs. |
 
 ### `console/test/`
