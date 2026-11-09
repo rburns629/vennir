@@ -187,4 +187,9 @@ yet tried against Azure.
 [secret-stores/secretstore.yaml](secret-stores/secretstore.yaml) syncs this
 team's secrets from Azure Key Vault through External Secrets Operator,
 signing in as `eso-azure`. ESO requests its token itself, so it doesn't need
-the Pod label above.
+the Pod label above, and works the same off AKS: give `eso-azure`'s managed
+identity a federated credential for the cluster's issuer, as for a product
+(Azure from another cluster), with the subject
+`system:serviceaccount:azure:eso-azure`.
+
+Not yet tried against Azure, from AKS or from another cluster.

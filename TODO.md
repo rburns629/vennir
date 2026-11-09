@@ -53,7 +53,9 @@ steps left, then one billed proof run per cloud, and the MCP server last.
      `<ServiceAccount>-identity`); the gateway's `entraToken` backend auth (0.15.0),
      and `samples/azure/apis/greetings` on a Container App behind its
      built-in authentication (`container-app`'s `entraAuth`). Left: one
-     billed run, minimal, written up as the GCP-to-AWS run was.
+     billed run, minimal, written up as the GCP-to-AWS run was, which also
+     syncs a secret from Azure Key Vault through ESO from GKE (the azure
+     SecretStore, `eso-azure` federated with GKE's issuer).
    - [ ] Then: the managed database (Flexible Server, Entra sign-in for each
      service), managed Prometheus, a public console, the audit and log
      archives, kernel policy reading ACR.
