@@ -305,3 +305,23 @@ func TestNoHomeNoToolsDirectory(t *testing.T) {
 		t.Errorf("Path = %s", got)
 	}
 }
+
+func TestDockerHintIsForTheSystem(t *testing.T) {
+	for _, c := range []struct {
+		name      string
+		mac, wsl  bool
+		mentioned string
+	}{
+		{"macOS", true, false, "mac-install"},
+		{"Linux", false, false, "usermod -aG docker"},
+		{"WSL", false, true, "WSL integration"},
+	} {
+		if got := hintFor("docker", c.mac, c.wsl); !strings.Contains(got, c.mentioned) {
+			t.Errorf("%s: %q doesn't mention %q", c.name, got, c.mentioned)
+		}
+	}
+	// Everything else in WSL is as on Linux.
+	if hintFor("gh", false, true) != hintFor("gh", false, false) {
+		t.Error("gh's hint differs in WSL")
+	}
+}

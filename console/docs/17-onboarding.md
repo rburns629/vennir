@@ -34,15 +34,16 @@ Optional, any time after phase 4: publish APIs through the gateway ([the API gat
 | **kind** (your laptop) | Trying Vennir, writing and testing products. Free | Nothing in a cloud without a stored key: its products use the samples that call no cloud |
 | **gcp** (GKE) | Teams that deploy to Google Cloud | Google Cloud with no keys (each product its own identity); AWS through federation |
 | **aws** (EKS) | Teams that deploy to AWS | AWS with no keys (each product its own role); Google Cloud through federation (no sample yet) |
+| **azure** (AKS) | Teams that deploy to Azure | Azure with no keys (each product its own managed identity) |
 | **existing** | A cluster you already run | Whatever that cluster's identity setup allows |
 
 The install's cloud matters most for keyless access: a product reaches the cloud it runs on through that cloud's own workload identity, and another cloud only through federation. [Where to host Vennir](18-where-to-host.md) compares them in full, including addresses, cost and what's not built yet.
 
-**You're done when** you know your target, and for a cloud, which project (Google Cloud) or account and region (AWS) Vennir gets. Use one of its own.
+**You're done when** you know your target, and for a cloud, which project (Google Cloud), account and region (AWS) or subscription and region (Azure) Vennir gets. Use one of its own.
 
 ## Phase 2: Get `vennir`
 
-Download the release for your machine from GitHub, check it against the release's checksums, and put it on your `PATH`. On a Mac with Apple silicon (`darwin-arm64`; the others are `darwin-amd64`, `linux-amd64` and `linux-arm64`):
+`vennir` runs on macOS and Linux (amd64 and arm64), and on Windows in WSL 2. [Get your computer ready](clouds-computer.md) has each system's steps, Docker and the cloud CLIs included. In short: download the release for your machine from GitHub, check it against the release's checksums, and put it on your `PATH`. On a Mac with Apple silicon (`darwin-arm64`; the others are `darwin-amd64`, `linux-amd64` and `linux-arm64`, and on Linux `sha256sum -c -` checks it):
 
 ```bash
 V=0.14.0 P=darwin-arm64
@@ -53,7 +54,7 @@ chmod +x "vennir-$P" && sudo mv "vennir-$P" /usr/local/bin/vennir
 vennir version
 ```
 
-Then `vennir tools --target gcp --install` (or `aws`, `kind`, `existing`) downloads the other tools it drives (kubectl, Helm, OpenTofu, kind), each pinned and checksum-verified. Docker and the cloud's own CLI (gcloud, aws) are yours to install, and Docker must be running.
+Then `vennir tools --target gcp --install` (or `aws`, `azure`, `kind`, `existing`) downloads the other tools it drives (kubectl, Helm, OpenTofu, kind, kubelogin), each pinned and checksum-verified. Docker and the cloud's own CLI (gcloud, aws, az) are yours to install, and Docker must be running.
 
 **You're done when** `vennir version` prints the version you downloaded and `vennir tools --target <target>` lists no missing tool. (`vennir check` needs an environment: run it after `vennir init`.)
 
@@ -63,12 +64,13 @@ First, the account (skip for kind):
 
 - **Google Cloud**: a project with billing, and both gcloud sign-ins ([Get Google Cloud ready](clouds-gcp.md)).
 - **AWS**: an account that isn't root, a budget, and `aws login` ([Get AWS ready](clouds-aws.md)).
+- **Azure**: a subscription, Owner on it, and `az login` ([Get Azure ready](clouds-azure.md)).
 - **GitHub**, for the catalog: `gh auth login --scopes repo,workflow` ([Get GitHub ready](clouds-github.md)).
 
 Then answer the questions and apply. `init` asks one question at a time and writes the answers to `deploy/<env>/vennir.yaml`; `apply` shows exactly what it will create and what it costs a month, and changes nothing until you approve.
 
 ```bash
-vennir init prod --target gcp --project my-vennir-project    # or --target aws, kind, existing
+vennir init prod --target gcp --project my-vennir-project    # or --target aws, azure, kind, existing
 vennir apply prod
 ```
 

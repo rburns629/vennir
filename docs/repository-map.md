@@ -546,6 +546,7 @@ Setting up Vennir with `vennir`, start to finish: the questions `init` asks and 
 | Path | What it's for |
 | --- | --- |
 | `aws.md`, `azure.md`, `gcp.md`, `github.md` | What only each website can do before an install (an account, subscription or project, the root user's MFA, a budget, an IAM user or roles, signing in, organization policies), linked from `vennir` when it finds one of them missing. |
+| `computer.md` | The machine `vennir` runs from, on macOS, Linux and Windows (WSL 2): Docker, `vennir` itself, the tools it downloads and the CLIs it doesn't. |
 
 ## `examples/`: demo products
 

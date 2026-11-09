@@ -92,7 +92,8 @@ is a complete example in about 60 lines.
 ## Try it locally
 
 You need Docker running, plus [`kind`](https://kind.sigs.k8s.io/), `kubectl`
-and `helm` 4 or later (on macOS: `brew install kind kubectl helm`). Any
+and `helm` 4 or later (on macOS: `brew install kind kubectl helm`; for Linux
+and Windows, see [Getting your computer ready](docs/clouds/computer.md)). Any
 cluster you install on needs Kubernetes 1.30 or later (the charts refuse
 older ones, and older Helm) and a network plugin that enforces
 NetworkPolicy (Calico, Cilium, GKE Dataplane V2; kind's default does),

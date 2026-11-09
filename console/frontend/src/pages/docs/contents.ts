@@ -125,6 +125,7 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
         items: [
           ["18-where-to-host", "Where to host Vennir"],
           ["reference-setup", "Set up Vennir"],
+          ["reference-clouds-computer", "Get your computer ready"],
           ["reference-clouds-gcp", "Get Google Cloud ready"],
           ["reference-clouds-aws", "Get AWS ready"],
           ["reference-clouds-azure", "Get Azure ready"],

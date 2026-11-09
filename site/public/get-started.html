@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Get started with Vennir</title>
-<meta name="description" content="Install Vennir on your laptop with kind, on GKE or EKS with the vennir CLI, or on your own cluster with Helm, then publish a product and run it.">
+<meta name="description" content="Install Vennir on your laptop with kind, on GKE, EKS or AKS with the vennir CLI, or on your own cluster with Helm, then publish a product and run it.">
 <link rel="canonical" href="https://vennir.io/get-started">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Vennir">
 <meta property="og:title" content="Get started with Vennir">
-<meta property="og:description" content="Install Vennir on your laptop with kind, on GKE or EKS with the vennir CLI, or on your own cluster with Helm, then publish a product and run it.">
+<meta property="og:description" content="Install Vennir on your laptop with kind, on GKE, EKS or AKS with the vennir CLI, or on your own cluster with Helm, then publish a product and run it.">
 <meta property="og:url" content="https://vennir.io/get-started">
 <meta property="og:image" content="https://vennir.io/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Vennir: every team's automation, one workflow. Nobody's credentials shared.">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Get started with Vennir","description":"Install Vennir on your laptop with kind, on GKE or EKS with the vennir CLI, or on your own cluster with Helm, then publish a product and run it.","url":"https://vennir.io/get-started","dateModified":"2026-11-04","about":{"@id":"https://vennir.io/#software"},"publisher":{"@type":"Organization","@id":"https://vennir.io/#org","name":"Vennir","url":"https://vennir.io/","logo":"https://vennir.io/favicon.svg","sameAs":["https://github.com/roburns/vennir"]}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Get started with Vennir","description":"Install Vennir on your laptop with kind, on GKE, EKS or AKS with the vennir CLI, or on your own cluster with Helm, then publish a product and run it.","url":"https://vennir.io/get-started","dateModified":"2026-11-08","about":{"@id":"https://vennir.io/#software"},"publisher":{"@type":"Organization","@id":"https://vennir.io/#org","name":"Vennir","url":"https://vennir.io/","logo":"https://vennir.io/favicon.svg","sameAs":["https://github.com/roburns/vennir"]}}</script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
@@ -86,7 +86,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Free, no cloud account. <span class="mono" style="font-size: 14px">make quickstart</span> or <span class="mono" style="font-size: 14px">vennir</span>.</span>
       </a>
       <a href="#cloud" class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
-        <span class="mono" style="font-size: 13px; color: #7C9BFF">02 · On GKE or EKS</span>
+        <span class="mono" style="font-size: 13px; color: #7C9BFF">02 · On GKE, EKS or AKS</span>
         <span style="font-size: 19px; font-weight: 600; color: #FFFFFF">A new cluster, with vennir</span>
         <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Questions, an approval screen with a cost estimate, then the install.</span>
       </a>
@@ -109,7 +109,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <div style="display: flex; flex-direction: column; gap: 16px">
         <span class="eyebrow">What you need</span>
         <h2 style="margin: 0; font-size: 36px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Kubernetes 1.30 or later, Helm 4, and a CNI that enforces NetworkPolicy.</h2>
-        <p style="margin: 0; font-size: 17px; line-height: 1.6; color: #AEB5C2">The charts refuse older Kubernetes and older Helm. Without NetworkPolicy enforcement, the platform's databases and kernel-api aren't fenced off from steps. <span class="mono" style="font-size: 15px; color: #E8EAEE">vennir</span> runs on macOS and Linux, amd64 and arm64.</p>
+        <p style="margin: 0; font-size: 17px; line-height: 1.6; color: #AEB5C2">The charts refuse older Kubernetes and older Helm. Without NetworkPolicy enforcement, the platform's databases and kernel-api aren't fenced off from steps. <span class="mono" style="font-size: 15px; color: #E8EAEE">vennir</span> runs on macOS and Linux, amd64 and arm64, and on Windows in WSL 2: <a href="https://github.com/roburns/vennir/blob/main/docs/clouds/computer.md">getting your computer ready</a> has each system's steps.</p>
         <p style="margin: 0; font-size: 17px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 15px; color: #E8EAEE">vennir tools --install</span> downloads what's missing into <span class="mono" style="font-size: 15px; color: #E8EAEE">~/.vennir/bin</span>, each at a pinned version checked against its project's checksum. Docker and the cloud CLIs are yours to install.</p>
       </div>
       <div class="card" style="overflow-x: auto">
@@ -138,12 +138,16 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
               <td style="padding: 14px 20px; color: #AEB5C2; border-bottom: 1px solid #171B24"><span class="mono" style="color: #E8EAEE">aws</span> CLI v2, OpenTofu <span class="mono" style="color: #E8EAEE">tofu</span></td>
             </tr>
             <tr>
+              <th scope="row" style="padding: 14px 20px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">AKS</th>
+              <td style="padding: 14px 20px; color: #AEB5C2; border-bottom: 1px solid #171B24"><span class="mono" style="color: #E8EAEE">az</span>, OpenTofu <span class="mono" style="color: #E8EAEE">tofu</span>, <span class="mono" style="color: #E8EAEE">kubelogin</span> (pinned 0.2.22)</td>
+            </tr>
+            <tr>
               <th scope="row" style="padding: 14px 20px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">Your cluster</th>
               <td style="padding: 14px 20px; color: #AEB5C2; border-bottom: 1px solid #171B24">A kubectl context that reaches it; ValidatingAdmissionPolicy available; kubectl within one minor version</td>
             </tr>
             <tr>
               <th scope="row" style="padding: 14px 20px; text-align: left; font-weight: 500; color: #FFFFFF">The catalog</th>
-              <td style="padding: 14px 20px; color: #AEB5C2"><span class="mono" style="color: #E8EAEE">git</span>, <span class="mono" style="color: #E8EAEE">gh</span> signed in with the <span class="mono" style="color: #E8EAEE">repo</span> and <span class="mono" style="color: #E8EAEE">workflow</span> scopes</td>
+              <td style="padding: 14px 20px; color: #AEB5C2"><span class="mono" style="color: #E8EAEE">git</span>, <span class="mono" style="color: #E8EAEE">gh</span> signed in with the <span class="mono" style="color: #E8EAEE">repo</span> and <span class="mono" style="color: #E8EAEE">workflow</span> scopes; Docker, to build and test products locally</td>
             </tr>
           </tbody>
         </table>
@@ -183,7 +187,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
             <span class="mono" style="font-size: 13px; color: #C9CED8">With the installer</span>
             <span class="chip">vennir, target kind</span>
           </div>
-<pre class="code"><span class="c"># vennir from the GitHub release for your OS</span>
+<pre class="code"><span class="c"># vennir from the GitHub release for your OS (Windows: in WSL 2)</span>
 <span class="c">$</span> vennir tools --install
 <span class="c">$</span> vennir init dev <span class="k">--target</span> kind
 <span class="c">$</span> vennir apply dev    <span class="c"># $0: nothing billed</span>
@@ -253,7 +257,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
     <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 48px">
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
         <div style="display: flex; flex-direction: column; gap: 16px">
-          <span class="eyebrow">02 · On GKE or EKS</span>
+          <span class="eyebrow">02 · On GKE, EKS or AKS</span>
           <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Answer, read the bill, approve.</h2>
         </div>
         <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 16px; color: #E8EAEE">vennir</span> makes the cluster with OpenTofu, under your own cloud sign-in, and installs the charts. Nothing changes until you approve, and running it again finds less to do, never duplicates.</p>
@@ -283,6 +287,14 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         </div>
         <div class="card" style="overflow: hidden">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
+            <span class="mono" style="font-size: 13px; color: #C9CED8">Azure: a subscription you own</span>
+            <a class="chip" href="https://github.com/roburns/vennir/blob/main/docs/clouds/azure.md" style="text-decoration: none">guide</a>
+          </div>
+<pre class="code"><span class="c">$</span> az login
+<span class="c">$</span> az account list <span class="k">--output</span> table</pre>
+        </div>
+        <div class="card" style="overflow: hidden">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
             <span class="mono" style="font-size: 13px; color: #C9CED8">GitHub: for the catalog</span>
             <a class="chip" href="https://github.com/roburns/vennir/blob/main/docs/clouds/github.md" style="text-decoration: none">guide</a>
           </div>
@@ -297,7 +309,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <h3 style="margin: 0; font-size: 26px; font-weight: 600; color: #FFFFFF"><span class="mono" style="font-size: 22px; color: #A9BCFF">vennir init prod</span> asks, in order</h3>
           <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">Each choice says what it costs or gives up. Every answer is kept in <span class="mono" style="font-size: 14px; color: #E8EAEE">deploy/prod/vennir.yaml</span>: names only, never a secret. <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir config set</span> changes one later.</p>
           <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; border-top: 1px solid #1F2430">
-            <li style="display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid #1F2430"><span class="mono" style="font-size: 13px; color: #7C9BFF; padding-top: 2px">01</span><span style="font-size: 15px; line-height: 1.55; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Where.</b> gcp or aws; the project or profile, and a region your policies allow</span></li>
+            <li style="display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid #1F2430"><span class="mono" style="font-size: 13px; color: #7C9BFF; padding-top: 2px">01</span><span style="font-size: 15px; line-height: 1.55; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Where.</b> gcp, aws or azure; the project, profile or subscription, and a region your policies allow</span></li>
             <li style="display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid #1F2430"><span class="mono" style="font-size: 13px; color: #7C9BFF; padding-top: 2px">02</span><span style="font-size: 15px; line-height: 1.55; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Cluster mode.</b> auto (GKE Autopilot, EKS Auto Mode) or standard node pools</span></li>
             <li style="display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid #1F2430"><span class="mono" style="font-size: 13px; color: #7C9BFF; padding-top: 2px">03</span><span style="font-size: 15px; line-height: 1.55; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Size.</b> minimal, resilient, scaled or auto, each with its copies and step caps</span></li>
             <li style="display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid #1F2430"><span class="mono" style="font-size: 13px; color: #7C9BFF; padding-top: 2px">04</span><span style="font-size: 15px; line-height: 1.55; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Sleep when idle.</b> Scale to zero after a quiet spell, data kept; for dev and test installs</span></li>
