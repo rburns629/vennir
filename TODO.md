@@ -45,6 +45,15 @@ steps left, then one billed proof run per cloud, and the MCP server last.
    - [ ] Small quotas: a scan's scanner takes the platform a second node, so
      on 4 vCPUs a step waits about twenty minutes (`docs/clouds/azure.md`).
      The scanner on the steps pool would leave the platform's node alone.
+   - [ ] **GKE to Azure and AWS, through the gateway** (agreed 2026-11-09):
+     a GKE install's steps making Azure resources (a resource group,
+     `postgres-flexible`, a Container App) and AWS ones, and an API in each
+     cloud reachable through its gateway. Done: the azure samples off AKS
+     (the step's token, the team secret `<ServiceAccount>-identity`), tested
+     with Azure mocked. Left: an Azure API sample on Container Apps with an
+     `entraToken` backend auth in the gateway (Container Apps' built-in
+     auth checking it); then one billed run, minimal, written up as the
+     GCP-to-AWS run was.
    - [ ] Then: the managed database (Flexible Server, Entra sign-in for each
      service), managed Prometheus, a public console, the audit and log
      archives, kernel policy reading ACR.

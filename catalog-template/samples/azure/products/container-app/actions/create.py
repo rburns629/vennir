@@ -7,10 +7,12 @@ exist yet. Never builds an image: `image` is a registry reference.
 Ingress is internal to the environment unless `public` is true. Images from
 a private registry (Azure Container Registry) are pulled with a managed
 identity (`registryIdentity`), never a password. Credentials as in the azure
-team's README.md (Workload Identity, through DefaultAzureCredential).
+team's README.md: Workload Identity on AKS, and off AKS its own managed
+identity (the team secret azure-container-app-identity) by federation.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,7 +23,7 @@ from azure.core.exceptions import (
     ResourceNotFoundError,
     ServiceRequestError,
 )
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, WorkloadIdentityCredential
 from azure.mgmt.appcontainers import ContainerAppsAPIClient
 from azure.mgmt.appcontainers.models import (
     Configuration,
@@ -38,6 +40,15 @@ from azure.mgmt.appcontainers.models import (
 INPUT_PATH = Path("/platform/input/request.json")
 OUTPUT_PATH = Path("/platform/output/result.json")
 
+# Off AKS (GKE, EKS), with no Workload Identity webhook: this product's own
+# managed identity, named by the team secret azure-container-app-identity
+# (keys client-id and tenant-id), signed in to with the step's own token
+# (product.yaml's tokenAudiences). The identity's federated credential
+# trusts this cluster's issuer for this product's ServiceAccount alone (see
+# the azure team's README.md, Azure from another cluster).
+OWN_IDENTITY = Path("/platform/secrets/azure-container-app-identity")
+TOKEN_FILE = Path("/platform/tokens/api___AzureADTokenExchange")
+
 
 def _write_result(result: dict[str, Any]) -> None:
     OUTPUT_PATH.write_text(json.dumps(result))
@@ -50,7 +61,32 @@ def _failure(code: str, message: str, *, retryable: bool = False) -> int:
     return 1
 
 
+class _NoToken(Exception):
+    """The identity's secret is mounted, but the step got no token."""
+
+
+def _credential() -> Any:
+    """On AKS, Workload Identity's (DefaultAzureCredential reads what its
+    webhook sets); elsewhere, this product's own identity (OWN_IDENTITY) by
+    federation with the step's token."""
+    if os.environ.get("AZURE_FEDERATED_TOKEN_FILE") or not OWN_IDENTITY.exists():
+        return DefaultAzureCredential()
+    if not TOKEN_FILE.exists():
+        raise _NoToken()
+    return WorkloadIdentityCredential(
+        tenant_id=(OWN_IDENTITY / "tenant-id").read_text().strip(),
+        client_id=(OWN_IDENTITY / "client-id").read_text().strip(),
+        token_file_path=str(TOKEN_FILE),
+    )
+
+
 def _azure_failure(error: Exception) -> int:
+    if isinstance(error, _NoToken):
+        return _failure(
+            "NO_TOKEN",
+            "The step got no token for api://AzureADTokenExchange: a release without the "
+            "product's tokenAudiences, or a step not run as the product.",
+        )
     if isinstance(error, ClientAuthenticationError):
         return _failure(
             "AZURE_AUTH_FAILED",
@@ -85,7 +121,7 @@ def main() -> int:
     group, name, location = inputs["resourceGroup"], inputs["appName"], inputs["location"]
 
     try:
-        client = ContainerAppsAPIClient(DefaultAzureCredential(), inputs["subscriptionId"])
+        client = ContainerAppsAPIClient(_credential(), inputs["subscriptionId"])
         try:
             app = client.container_apps.get(group, name)
             print(f"container app '{name}' already exists, leaving it as it is")
@@ -129,7 +165,7 @@ def main() -> int:
                 tags={"managed-by": "vennir"},
             ),
         ).result()
-    except (HttpResponseError, ServiceRequestError) as error:
+    except (HttpResponseError, ServiceRequestError, _NoToken) as error:
         return _azure_failure(error)
 
     print(f"created container app '{name}'")

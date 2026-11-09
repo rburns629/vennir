@@ -16,7 +16,9 @@ but hasn't called Azure yet.
 
 Every action looks before it creates, so a retried step is harmless.
 [dags/azure-hello-world-dag.yaml](dags/azure-hello-world-dag.yaml) chains the
-first two.
+first two. They run on AKS by Workload Identity, and on GKE, EKS or any
+cluster with a public OIDC issuer by federation (Azure from another
+cluster, below).
 
 ## No passwords
 
@@ -44,13 +46,8 @@ it). Then, for each:
    kernel chart's values (`scheduler.taskPodLabels`). Without it these
    actions find no credentials and fail with `AZURE_AUTH_FAILED`.
 
-On a cluster that isn't AKS, the other way is OIDC federation from the
-step's own token: `tokenAudiences: [api://AzureADTokenExchange]` in the
-product.yaml, a federated credential trusting the cluster's issuer for
-that ServiceAccount, and `AZURE_FEDERATED_TOKEN_FILE` pointed at
-`/platform/tokens/api___AzureADTokenExchange` (with `AZURE_CLIENT_ID` and
-`AZURE_TENANT_ID`), as the catalog's README describes. These samples don't
-declare it, and that way hasn't been tried against Azure yet.
+On a cluster that isn't AKS, steps 2 and 3 are replaced by a team secret
+(Azure from another cluster, below).
 
 Grant each product's identity only what it needs, on the narrowest scope:
 
@@ -59,6 +56,56 @@ Grant each product's identity only what it needs, on the narrowest scope:
 | `resource-group` | A custom role with `Microsoft.Resources/subscriptions/resourceGroups/read` and `/write`, on the subscription |
 | `container-app` | `Contributor` on the resource group (or a custom role over `Microsoft.App/*`), plus `AcrPull` for the app's pull identity on a private registry |
 | `postgres-flexible` | A custom role over `Microsoft.DBforPostgreSQL/flexibleServers/*`, on the resource group |
+
+## Azure from another cluster
+
+Each product declares `tokenAudiences: [api://AzureADTokenExchange]`, so on
+any cluster each of its steps gets an hour-long token for its own
+ServiceAccount, signed by the cluster's OIDC issuer, at
+`/platform/tokens/api___AzureADTokenExchange`. With no Workload Identity
+webhook (any cluster but AKS), an action signs in with that token as its
+own managed identity, named by the team secret `<its ServiceAccount>-identity`.
+On AKS the webhook's settings win, and the secret changes nothing.
+
+To let a GKE or EKS install's steps in, for each product:
+
+1. **A federated credential** on the product's managed identity (Credentials,
+   step 1) for the cluster's issuer, the subject
+   `system:serviceaccount:azure:<its ServiceAccount>` and the audience
+   `api://AzureADTokenExchange`:
+
+   ```bash
+   az identity federated-credential create --name vennir-<install> \
+     --identity-name <identity> --resource-group <its group> \
+     --issuer <the cluster's issuer> \
+     --subject system:serviceaccount:azure:azure-resource-group \
+     --audiences api://AzureADTokenExchange
+   ```
+
+   On GKE the issuer is
+   `https://container.googleapis.com/v1/projects/<project>/locations/<location>/clusters/<cluster>`;
+   `kubectl get --raw /.well-known/openid-configuration` prints any
+   cluster's. Entra must be able to fetch its keys from there, so a cluster
+   whose issuer isn't public (kind's isn't) can't be trusted. A managed
+   identity takes at most 20 federated credentials, one per install.
+2. **A team secret** `<its ServiceAccount>-identity`, such as
+   `azure-resource-group-identity`, with the keys `client-id` (the
+   identity's client id) and `tenant-id`. Neither is a credential: the
+   secret only says which identity to be, as the aws samples' role secrets
+   do.
+3. **Its `secretRefs`**: uncomment the line in the action's product.yaml, so
+   the step gets that secret.
+
+No annotation and no Pod label: those are for AKS's webhook. Its failures
+say which part is missing: `NO_TOKEN` (the secret is mounted but the step
+got no token: a release without the product's `tokenAudiences`) and
+`AZURE_AUTH_FAILED` (Entra refused the token: no federated credential for
+that issuer and subject, or it couldn't fetch the issuer's keys).
+`postgres-flexible` takes its tenant from the secret too, when it isn't
+given `tenantId`.
+
+Built 2026-11-09 and tested with the Azure clients mocked; not yet tried
+against Azure from another cluster.
 
 ## Secrets
 

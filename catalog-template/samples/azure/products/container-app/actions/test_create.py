@@ -5,6 +5,7 @@ them in the product's own image with its python3 (unittest, no pytest).
 
 import importlib.util
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,6 +25,9 @@ INPUTS = {
     "location": "westeurope",
 }
 
+CLIENT_ID = "33333333-3333-3333-3333-333333333333"
+TENANT_ID = "11111111-1111-1111-1111-111111111111"
+
 
 def _load_create_module():
     spec = importlib.util.spec_from_file_location("azure_container_app_create", _MODULE_PATH)
@@ -38,6 +42,7 @@ class CreateActionTest(unittest.TestCase):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.module.INPUT_PATH = Path(self.tmp_dir.name) / "request.json"
         self.module.OUTPUT_PATH = Path(self.tmp_dir.name) / "result.json"
+        self.module.OWN_IDENTITY = Path(self.tmp_dir.name) / "identity"
 
     def tearDown(self) -> None:
         self.tmp_dir.cleanup()
@@ -80,6 +85,70 @@ class CreateActionTest(unittest.TestCase):
         self.assertFalse(app.configuration.ingress.external)
         self.assertEqual(app.managed_environment_id, "/env")
         self.assertEqual(app.template.containers[0].env[0].name, "MODE")
+
+
+class CredentialTest(unittest.TestCase):
+    """Who the action signs in as: Workload Identity's on AKS, and off AKS
+    its own managed identity, by federation with the step's token."""
+
+    def setUp(self) -> None:
+        self.module = _load_create_module()
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp_dir.cleanup)
+        tmp = Path(self.tmp_dir.name)
+        self.module.INPUT_PATH = tmp / "request.json"
+        self.module.OUTPUT_PATH = tmp / "result.json"
+        self.module.OWN_IDENTITY = tmp / "identity"
+        self.module.TOKEN_FILE = tmp / "token"
+        self.module.INPUT_PATH.write_text(json.dumps({"inputs": INPUTS}))
+        environment = patch.dict(os.environ)
+        environment.start()
+        self.addCleanup(environment.stop)
+        for name in ("AZURE_FEDERATED_TOKEN_FILE", "AZURE_TENANT_ID"):
+            os.environ.pop(name, None)
+
+    def _own_identity(self, *, token: bool) -> None:
+        self.module.OWN_IDENTITY.mkdir()
+        (self.module.OWN_IDENTITY / "client-id").write_text(CLIENT_ID + "\n")
+        (self.module.OWN_IDENTITY / "tenant-id").write_text(TENANT_ID + "\n")
+        if token:
+            self.module.TOKEN_FILE.write_text("a-token")
+
+    def _credential(self) -> tuple[object, object, object]:
+        with (
+            patch.object(self.module, "DefaultAzureCredential") as default,
+            patch.object(self.module, "WorkloadIdentityCredential") as federated,
+        ):
+            return self.module._credential(), default, federated
+
+    def test_with_no_identity_secret_the_default_signs_in(self) -> None:
+        credential, default, federated = self._credential()
+        self.assertIs(credential, default.return_value)
+        federated.assert_not_called()
+
+    def test_on_aks_the_webhook_wins_over_the_secret(self) -> None:
+        self._own_identity(token=True)
+        os.environ["AZURE_FEDERATED_TOKEN_FILE"] = "/var/run/secrets/azure/tokens/azure-identity-token"
+        credential, default, federated = self._credential()
+        self.assertIs(credential, default.return_value)
+        federated.assert_not_called()
+
+    def test_off_aks_it_signs_in_as_its_own_identity(self) -> None:
+        self._own_identity(token=True)
+        credential, default, federated = self._credential()
+        self.assertIs(credential, federated.return_value)
+        federated.assert_called_once_with(
+            tenant_id=TENANT_ID, client_id=CLIENT_ID, token_file_path=str(self.module.TOKEN_FILE)
+        )
+        default.assert_not_called()
+
+    def test_off_aks_with_no_token_it_fails_without_calling_azure(self) -> None:
+        self._own_identity(token=False)
+        with patch.object(self.module, "ContainerAppsAPIClient") as client_cls:
+            self.assertEqual(self.module.main(), 1)
+        client_cls.assert_not_called()
+        error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("NO_TOKEN", False))
 
 
 if __name__ == "__main__":
