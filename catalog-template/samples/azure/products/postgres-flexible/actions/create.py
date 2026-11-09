@@ -88,6 +88,14 @@ def _azure_failure(error: Exception) -> int:
             "product's tokenAudiences, or a step not run as the product.",
         )
     if isinstance(error, ClientAuthenticationError):
+        if not (os.environ.get("AZURE_FEDERATED_TOKEN_FILE") or OWN_IDENTITY.exists()):
+            return _failure(
+                "NO_IDENTITY",
+                "No identity to sign in to Azure as: on AKS, Workload Identity's (the step Pod's "
+                "label and its ServiceAccount's annotation); off AKS, the team secret "
+                f"{OWN_IDENTITY.name}, which the step gets once its secretRefs line in product.yaml "
+                "is uncommented.",
+            )
         return _failure(
             "AZURE_AUTH_FAILED",
             "Couldn't sign in to Azure: is the step's ServiceAccount federated with a managed "

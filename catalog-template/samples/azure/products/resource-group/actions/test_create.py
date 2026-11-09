@@ -89,7 +89,8 @@ class CreateActionTest(unittest.TestCase):
         ):
             def configure(groups, error=error):
                 groups.check_existence.side_effect = error
-            _, result, _ = self._run(INPUTS, configure)
+            with patch.dict(os.environ, {"AZURE_FEDERATED_TOKEN_FILE": "/var/run/secrets/azure/tokens/azure-identity-token"}):
+                _, result, _ = self._run(INPUTS, configure)
             self.assertEqual((result["error"]["code"], result["error"]["retryable"]), (code, retryable))
 
 
@@ -156,6 +157,17 @@ class CredentialTest(unittest.TestCase):
         error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
         self.assertEqual((error["code"], error["retryable"]), ("NO_TOKEN", False))
 
+
+    def test_with_neither_webhook_nor_secret_it_says_what_is_missing(self) -> None:
+        with (
+            patch.object(self.module, "DefaultAzureCredential"),
+            patch.object(self.module, "ResourceManagementClient") as client_cls,
+        ):
+            client_cls.return_value.resource_groups.check_existence.side_effect = ClientAuthenticationError(message="no credential")
+            self.assertEqual(self.module.main(), 1)
+        error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("NO_IDENTITY", False))
+        self.assertIn(self.module.OWN_IDENTITY.name, error["message"])
 
 if __name__ == "__main__":
     unittest.main()

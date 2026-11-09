@@ -13,7 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
 
 _MODULE_PATH = Path(__file__).parent / "create.py"
 SERVER = SimpleNamespace(name="orders-db", fully_qualified_domain_name="orders-db.postgres.database.azure.com", id="/servers/orders-db")
@@ -160,6 +160,17 @@ class CredentialTest(unittest.TestCase):
         admin = client_cls.return_value.administrators_microsoft_entra.begin_create_or_update.call_args.args[3]
         self.assertEqual(admin.tenant_id, TENANT_ID)
 
+
+    def test_with_neither_webhook_nor_secret_it_says_what_is_missing(self) -> None:
+        with (
+            patch.object(self.module, "DefaultAzureCredential"),
+            patch.object(self.module, "PostgreSQLManagementClient") as client_cls,
+        ):
+            client_cls.return_value.servers.get.side_effect = ClientAuthenticationError(message="no credential")
+            self.assertEqual(self.module.main(), 1)
+        error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("NO_IDENTITY", False))
+        self.assertIn(self.module.OWN_IDENTITY.name, error["message"])
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
 
 _MODULE_PATH = Path(__file__).parent / "create.py"
 APP = SimpleNamespace(
@@ -188,6 +188,17 @@ class CredentialTest(unittest.TestCase):
         error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
         self.assertEqual((error["code"], error["retryable"]), ("NO_TOKEN", False))
 
+
+    def test_with_neither_webhook_nor_secret_it_says_what_is_missing(self) -> None:
+        with (
+            patch.object(self.module, "DefaultAzureCredential"),
+            patch.object(self.module, "ContainerAppsAPIClient") as client_cls,
+        ):
+            client_cls.return_value.container_apps.get.side_effect = ClientAuthenticationError(message="no credential")
+            self.assertEqual(self.module.main(), 1)
+        error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("NO_IDENTITY", False))
+        self.assertIn(self.module.OWN_IDENTITY.name, error["message"])
 
 if __name__ == "__main__":
     unittest.main()

@@ -98,8 +98,10 @@ To let a GKE or EKS install's steps in, for each product:
    the step gets that secret.
 
 No annotation and no Pod label: those are for AKS's webhook. Its failures
-say which part is missing: `NO_TOKEN` (the secret is mounted but the step
-got no token: a release without the product's `tokenAudiences`) and
+say which part is missing: `NO_IDENTITY` (no secret mounted and no webhook:
+the `secretRefs` line still commented), `NO_TOKEN` (the secret is mounted
+but the step got no token: a release without the product's
+`tokenAudiences`) and
 `AZURE_AUTH_FAILED` (Entra refused the token: no federated credential for
 that issuer and subject, or it couldn't fetch the issuer's keys).
 `postgres-flexible` takes its tenant from the secret too, when it isn't
