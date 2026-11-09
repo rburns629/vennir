@@ -155,8 +155,10 @@ credential, so nothing is stored, as for AWS (`awsSigV4`) and Google
 Then:
 
 3. **The image**, in a registry the app can pull without a password: a
-   public one, or an Azure Container Registry with `registryServer` and
-   `registryIdentity` added to the template's `app` step:
+   public one, or an Azure Container Registry, given to the template as
+   `registryServer` and `registryIdentity` (a user-assigned identity with
+   `AcrPull` on the registry; `container-app`'s own identity needs `Managed
+   Identity Operator` on it, to give it to the app):
    `docker buildx build --platform linux/amd64 -t <registry>/greetings:1 --push examples/greetings-api`.
 4. **The gateway on the internet**: the backend fetches the gateway's
    public keys from `https://<its public host>/.vennir/jwks.json`, which

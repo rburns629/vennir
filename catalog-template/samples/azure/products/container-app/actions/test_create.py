@@ -88,6 +88,23 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(app.template.containers[0].env[0].name, "MODE")
         client.container_apps_auth_configs.create_or_update.assert_not_called()
 
+    def test_a_private_registry_pulls_as_an_identity_the_app_is_given(self) -> None:
+        pull = "/subscriptions/s/resourceGroups/g/providers/Microsoft.ManagedIdentity/userAssignedIdentities/pull"
+        def configure(client):
+            client.container_apps.get.side_effect = ResourceNotFoundError("no app")
+            client.managed_environments.get.return_value = SimpleNamespace(id="/env")
+            client.container_apps.begin_create_or_update.return_value.result.return_value = APP
+        exit_code, _, client = self._run({**INPUTS, "registryServer": "r.azurecr.io", "registryIdentity": pull}, configure)
+        self.assertEqual(exit_code, 0)
+        app = client.container_apps.begin_create_or_update.call_args.args[2]
+        self.assertEqual((app.configuration.registries[0].server, app.configuration.registries[0].identity), ("r.azurecr.io", pull))
+        self.assertEqual((app.identity.type, list(app.identity.user_assigned_identities)), ("UserAssigned", [pull]))
+        # No registry: no identity.
+        exit_code, _, client = self._run(INPUTS, configure)
+        app = client.container_apps.begin_create_or_update.call_args.args[2]
+        self.assertIsNone(app.identity)
+        self.assertIsNone(app.configuration.registries)
+
     def test_entra_auth_requires_a_token_from_the_allowed_applications(self) -> None:
         entra = {"tenantId": TENANT_ID, "clientId": CLIENT_ID, "allowedApplications": [GATEWAY_ID]}
         def configure(client):

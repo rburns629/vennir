@@ -77,8 +77,10 @@ actions:
         description: A private registry, such as myregistry.azurecr.io.
       registryIdentity:
         type: string
-        description: 'The managed identity that pulls from it: a user-assigned identity''s
-          resource id, or system.'
+        description: 'The managed identity that pulls from it, which the app is given: a
+          user-assigned identity''s resource id, with AcrPull on the registry beforehand, or
+          system (the app''s own, which exists only once the app does, so its first pull
+          fails until it''s granted AcrPull).'
         default: system
       environment:
         type: object

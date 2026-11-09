@@ -46,8 +46,10 @@ from azure.mgmt.appcontainers.models import (
     IdentityProviders,
     Ingress,
     ManagedEnvironment,
+    ManagedServiceIdentity,
     RegistryCredentials,
     Template,
+    UserAssignedIdentity,
 )
 
 INPUT_PATH = Path("/platform/input/request.json")
@@ -199,16 +201,22 @@ def main() -> int:
                 group, inputs["environmentName"], ManagedEnvironment(location=location, zone_redundant=False)
             ).result()
 
-        registries = []
+        registries, identity = [], None
         if inputs.get("registryServer"):
-            registries.append(RegistryCredentials(
-                server=inputs["registryServer"], identity=inputs.get("registryIdentity", "system")
-            ))
+            pull = inputs.get("registryIdentity") or "system"
+            registries.append(RegistryCredentials(server=inputs["registryServer"], identity=pull))
+            # The app must carry the identity it pulls as: Azure refuses a
+            # registry identity the app doesn't have.
+            identity = (
+                ManagedServiceIdentity(type="SystemAssigned") if pull == "system"
+                else ManagedServiceIdentity(type="UserAssigned", user_assigned_identities={pull: UserAssignedIdentity()})
+            )
         app = client.container_apps.begin_create_or_update(
             group,
             name,
             ContainerApp(
                 location=location,
+                identity=identity,
                 managed_environment_id=managed_environment.id,
                 configuration=Configuration(
                     ingress=Ingress(external=bool(inputs.get("public", False)), target_port=int(inputs.get("port", 8080))),

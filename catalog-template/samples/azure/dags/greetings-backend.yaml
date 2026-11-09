@@ -41,6 +41,16 @@ parameters:
       type: string
       title: Image
       description: The greetings image, a tag per version, in a registry the app can pull.
+    registryServer:
+      type: string
+      title: Private registry
+      description: Its server, such as myregistry.azurecr.io; empty for a public image.
+      default: ""
+    registryIdentity:
+      type: string
+      title: Pull identity
+      description: A user-assigned identity's resource id, with AcrPull on the registry.
+      default: system
     gatewayKeys:
       type: string
       title: The gateway's public keys
@@ -78,6 +88,8 @@ steps:
       environmentName: greetings-env
       appName: {$param: appName}
       image: {$param: image}
+      registryServer: {$param: registryServer}
+      registryIdentity: {$param: registryIdentity}
       port: 8080
       public: true
       entraAuth:
