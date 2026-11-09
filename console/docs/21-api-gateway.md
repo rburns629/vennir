@@ -86,7 +86,7 @@ backend:
   url: http://orders.web.svc.cluster.local:8080
 ```
 
-With no `auth`, the backend trusts what the gateway signs instead: it checks `Vennir-Caller` against `/.vennir/jwks.json`, its `aud` and its `api`. `samples/local/apis/greetings` does exactly that, with no cloud. With `auth: {serviceAccountToken: {audience: <aud>}}` the gateway sends a Kubernetes token for the API's ServiceAccount, for a backend that checks those. The audience is the backend's own, never the Kubernetes API's, kernel-api's, or one a cloud exchanges for an identity (`sts.amazonaws.com`, `api://AzureADTokenExchange`, a GKE Workload Identity pool `<project>.svc.id.goog` or its `identitynamespace:` audience, a GCP workload identity provider `//iam.googleapis.com/…`): with one of those, the backend could sign in to that cloud as the API's ServiceAccount. `vennir catalog validate`, the console's catalog sync and the gateway each refuse them, and the cluster does too: its admission policy lets the gateway mint each API's ServiceAccount a token only for the audiences that API needs (its backend's for `serviceAccountToken`, AWS STS's for `awsSigV4`, the Google pool's for `googleIdToken`), which the console keeps current. A newly published API may answer 502 `BACKEND_CREDENTIAL` for the moment before the console has written its audience; the next request is tried again.
+With no `auth`, the backend trusts what the gateway signs instead: it checks `Vennir-Caller` against `/.vennir/jwks.json`, its `aud` and its `api`. `samples/local/apis/greetings` does exactly that, with no cloud. With `auth: {serviceAccountToken: {audience: <aud>}}` the gateway sends a Kubernetes token for the API's ServiceAccount, for a backend that checks those. The audience is the backend's own, never the Kubernetes API's, kernel-api's, or one a cloud exchanges for an identity (`sts.amazonaws.com`, `api://AzureADTokenExchange`, a GKE Workload Identity pool `<project>.svc.id.goog` or its `identitynamespace:` audience, a GCP workload identity provider `//iam.googleapis.com/…`): with one of those, the backend could sign in to that cloud as the API's ServiceAccount. `vennir catalog validate`, the console's catalog sync and the gateway each refuse them, and the cluster does too: its admission policy lets the gateway mint each API's ServiceAccount a token only for the audiences that API needs (its backend's for `serviceAccountToken`, AWS STS's for `awsSigV4`, Entra's for `entraToken`, the Google pool's for `googleIdToken`), which the console keeps current. A newly published API may answer 502 `BACKEND_CREDENTIAL` for the moment before the console has written its audience; the next request is tried again.
 
 ### A Cloud Run service (`googleIdToken`)
 
@@ -121,6 +121,22 @@ backend:
 ```
 
 The role trusts the cluster's OIDC issuer (registered in IAM as an OIDC provider) for exactly `system:serviceaccount:web:orders-api`, audience `sts.amazonaws.com`, the same trust policy as [AWS from another cluster](20-deploy-to-aws.md#from-an-install-that-isnt-on-eks). On EKS the issuer is already registered; a GKE cluster's is public, so a GKE install can call AWS backends with no AWS cluster at all. For a function URL (`AuthType AWS_IAM`), the role needs both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` on the function. The sample is `samples/aws/apis/orders`. The gateway signs every header it sends but `X-Forwarded-For`, which it sends unsigned: AWS's front end adds to that header before checking the signature, so a signature over it never matches. Proven from GKE to a Lambda function URL (2026-11-07): placed and looked up through the gateway, signed as the role it assumed with the API's ServiceAccount token, with a request outside the OpenAPI document refused before anything was sent.
+
+### A Container App, or anything that checks Entra tokens (`entraToken`)
+
+Container Apps' and App Service's built-in authentication, and API Management, check a Microsoft Entra token. The gateway gets one per request as a managed identity (or app registration) whose federated credential trusts the cluster's OIDC issuer for the API's ServiceAccount, so nothing is stored:
+
+```yaml
+backend:
+  url: https://orders.happyfield-0123abcd.eastus2.azurecontainerapps.io
+  auth:
+    entraToken:
+      tenantId: 00000000-0000-0000-0000-000000000000
+      clientId: 11111111-1111-1111-1111-111111111111                # the identity the gateway signs in as
+      scope: api://22222222-2222-2222-2222-222222222222/.default    # the backend's app registration
+```
+
+Once, in the tenant: an app registration for the backend (its client id is the audience the tokens carry; `api.requestedAccessTokenVersion=2` for version 2 tokens), and a user-assigned managed identity for the gateway with a federated credential for the cluster's issuer, the subject `system:serviceaccount:web:orders-api` and the audience `api://AzureADTokenExchange`. The backend's authentication accepts that app registration's audience from that identity alone (its allowed applications), and answers 401 to anything else before your code runs. Any cluster whose issuer is public works, so a GKE or EKS install can call Azure backends with no AKS cluster. The catalog's `samples/azure` has one ready to copy: `apis/greetings`, its backend hosted by `dags/greetings-backend.yaml`, with the commands (the azure README, An API on it). Not yet tried against Azure.
 
 ### An ECS Express Mode service (no `auth`)
 

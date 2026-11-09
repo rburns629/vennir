@@ -22,7 +22,8 @@
  * An API's audiences are exactly what the gateway asks for:
  * serviceAccountToken, the backend's audience (never one a cloud exchanges
  * for an identity, or the cluster's own: the gateway refuses those itself);
- * awsSigV4, AWS STS's (credentials.AWSAudience); googleIdToken, the
+ * awsSigV4, AWS STS's (credentials.AWSAudience); entraToken, Entra's
+ * (credentials.AzureAudience); googleIdToken, the
  * gateway's GCP token audience (gateway.gcp.tokenAudience), when this
  * install has one. An API with no backend.auth needs none. An API that's
  * held (its backend's host isn't one the admins allow, or it isn't in its
@@ -39,6 +40,8 @@ import { apiTokenAudienceProblem } from "./tokenAudiences.js";
 
 /** As the gateway's credentials.AWSAudience: what AWS STS's web identity tokens carry. */
 export const AWS_STS_AUDIENCE = "sts.amazonaws.com";
+/** As the gateway's credentials.AzureAudience: what Entra's federated credentials take. */
+export const ENTRA_AUDIENCE = "api://AzureADTokenExchange";
 
 /**
  * The most characters one map may hold: the API server compiles at most
@@ -81,6 +84,7 @@ export function backendAudiences(auth: BackendAuth | null, gcpTokenAudience: str
     return [audience];
   }
   if ("awsSigV4" in auth) return [AWS_STS_AUDIENCE];
+  if ("entraToken" in auth) return [ENTRA_AUDIENCE];
   if ("googleIdToken" in auth) return gcpTokenAudience ? [gcpTokenAudience] : [];
   return [];
 }

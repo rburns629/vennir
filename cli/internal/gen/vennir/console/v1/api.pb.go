@@ -1688,7 +1688,8 @@ type ApiProduct struct {
 	// Its api.yaml in the catalog repository.
 	SourcePath string `protobuf:"bytes,19,opt,name=source_path,json=sourcePath,proto3" json:"source_path,omitempty"`
 	// The API's own team only: where the gateway forwards to, and how it
-	// signs in there (service_account_token, google_id_token or aws_sig_v4).
+	// signs in there (service_account_token, google_id_token, aws_sig_v4 or
+	// entra_token).
 	BackendUrl  string `protobuf:"bytes,20,opt,name=backend_url,json=backendUrl,proto3" json:"backend_url,omitempty"`
 	BackendAuth string `protobuf:"bytes,21,opt,name=backend_auth,json=backendAuth,proto3" json:"backend_auth,omitempty"`
 	// The spec's title and version.

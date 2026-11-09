@@ -148,6 +148,52 @@ func TestGoogleIDTokensComeFromTheAPIsServiceAccountByFederation(t *testing.T) {
 	}
 }
 
+func TestEntraTokensComeFromTheAPIsServiceAccountAsItsFederatedCredential(t *testing.T) {
+	var asked []string
+	var form url.Values
+	var path string
+	entra := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		_ = r.ParseForm()
+		form = r.PostForm
+		if form.Get("client_id") != "22222222-2222-2222-2222-222222222222" {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":"invalid_client","error_description":"AADSTS70021: No matching federated identity record found for presented assertion."}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"token_type":"Bearer","access_token":"entra-token","expires_in":3599}`))
+	}))
+	defer entra.Close()
+	m := minter(&asked)
+	m.EntraLogin = entra.URL
+	auth := map[string]map[string]string{"entraToken": {
+		"tenantId": "11111111-1111-1111-1111-111111111111", "clientId": "22222222-2222-2222-2222-222222222222",
+		"scope": "api://33333333-3333-3333-3333-333333333333/.default",
+	}}
+	r := request(t)
+	if err := m.Authorize(context.Background(), r, nil, "payments", "orders-api", auth); err != nil || r.Header.Get("Authorization") != "Bearer entra-token" {
+		t.Fatalf("%q %v", r.Header.Get("Authorization"), err)
+	}
+	if path != "/11111111-1111-1111-1111-111111111111/oauth2/v2.0/token" || asked[0] != "payments/orders-api/"+AzureAudience {
+		t.Errorf("asked %s, for %v", path, asked)
+	}
+	if form.Get("grant_type") != "client_credentials" || form.Get("scope") != "api://33333333-3333-3333-3333-333333333333/.default" ||
+		form.Get("client_assertion_type") != "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" ||
+		form.Get("client_assertion") != "k8s-token-for-"+AzureAudience || form.Get("client_secret") != "" {
+		t.Errorf("sent %v", form)
+	}
+	_ = m.Authorize(context.Background(), request(t), nil, "payments", "orders-api", auth)
+	if len(asked) != 1 {
+		t.Errorf("an access token is kept: asked %v", asked)
+	}
+	// Entra's refusal says why, and nothing failed is kept.
+	auth["entraToken"]["clientId"] = "44444444-4444-4444-4444-444444444444"
+	err := m.Authorize(context.Background(), request(t), nil, "payments", "orders-api", auth)
+	if err == nil || !strings.Contains(err.Error(), "AADSTS70021") || strings.Contains(err.Error(), "k8s-token-for") {
+		t.Errorf("a refusal: %v", err)
+	}
+}
+
 func TestAWSRequestsAreSignedAsTheAPIsRole(t *testing.T) {
 	var asked []string
 	var form url.Values

@@ -18,7 +18,8 @@ Every action looks before it creates, so a retried step is harmless.
 [dags/azure-hello-world-dag.yaml](dags/azure-hello-world-dag.yaml) chains the
 first two. They run on AKS by Workload Identity, and on GKE, EKS or any
 cluster with a public OIDC issuer by federation (Azure from another
-cluster, below).
+cluster, below). [`apis/greetings`](apis/greetings/) is an API on a
+Container App, behind the gateway's Entra token (An API on it, below).
 
 ## No passwords
 
@@ -106,6 +107,78 @@ given `tenantId`.
 
 Built 2026-11-09 and tested with the Azure clients mocked; not yet tried
 against Azure from another cluster.
+
+## An API on it (greetings)
+
+[`apis/greetings`](apis/greetings/) publishes a backend on Azure Container
+Apps through the gateway, and [`dags/greetings-backend.yaml`](dags/greetings-backend.yaml)
+hosts that backend with `resource-group` and `container-app`. The backend is
+`examples/greetings-api` in the platform's repository: it greets someone by
+name, and answers only requests whose `Vennir-Caller` the gateway signed.
+
+In front of it, the app's built-in authentication (`container-app`'s
+`entraAuth`) answers 401 to any request without a Microsoft Entra token
+for the backend's app registration from the gateway's identity. The gateway
+gets that token per request (`backend.auth.entraToken`): it signs in as a
+managed identity with its API ServiceAccount's own token as the federated
+credential, so nothing is stored, as for AWS (`awsSigV4`) and Google
+(`googleIdToken`). Once, in the tenant:
+
+1. **The backend's app registration**, whose client id is the audience the
+   gateway's tokens carry. Version 2 tokens, so their issuer is the one
+   `entraAuth` checks:
+
+   ```bash
+   APP=$(az ad app create --display-name greetings-api --query appId -o tsv)
+   az ad app update --id "$APP" --identifier-uris "api://$APP" --set api.requestedAccessTokenVersion=2
+   az ad sp create --id "$APP"
+   ```
+
+2. **The gateway's identity**: a user-assigned managed identity with a
+   federated credential for the cluster's issuer (Azure from another
+   cluster, above), the subject `system:serviceaccount:azure:greetings-api`
+   (the API's ServiceAccount, which the console creates) and the audience
+   `api://AzureADTokenExchange`. It needs no role: the app's
+   `allowedApplications` names it.
+
+   ```bash
+   az identity create --name vennir-greetings-gateway --resource-group <group>
+   az identity federated-credential create --name vennir-<install> \
+     --identity-name vennir-greetings-gateway --resource-group <group> \
+     --issuer <the cluster's issuer> \
+     --subject system:serviceaccount:azure:greetings-api \
+     --audiences api://AzureADTokenExchange
+   ```
+
+Then:
+
+3. **The image**, in a registry the app can pull without a password: a
+   public one, or an Azure Container Registry with `registryServer` and
+   `registryIdentity` added to the template's `app` step:
+   `docker buildx build --platform linux/amd64 -t <registry>/greetings:1 --push examples/greetings-api`.
+4. **The gateway on the internet**: the backend fetches the gateway's
+   public keys from `https://<its public host>/.vennir/jwks.json`, which
+   only the internet listener serves (the gateway guide, Putting it on the
+   internet), and an admin allows `*.<region>.azurecontainerapps.io` in
+   `gateway.backendHosts`.
+5. **Run the template** with the image, that keys URL, the tenant, the app
+   registration's client id and the gateway identity's, then read the `app`
+   step's `url`.
+6. **Publish the API**: put that URL in `api.yaml`'s `backend.url` and
+   `openapi.yaml`'s `servers`, the ids in its `entraToken` (`clientId`, the
+   gateway's identity; `scope`, `api://<the app registration's client id>/.default`),
+   and open a pull request.
+
+The app's URL isn't known until Container Apps make it, so the template
+sets `AUDIENCE_FROM_HOST=true`: the audience the backend checks is the
+request's own origin, which their ingress, routing each app by its host,
+makes sound. For the seconds between the app being made and its
+authentication being turned on, the backend's own check of `Vennir-Caller`
+still refuses anything that didn't come through the gateway. Take the API
+out of the catalog before deleting the app.
+
+Built 2026-11-09 and tested with the Azure clients and Entra mocked; not
+yet tried against Azure.
 
 ## Secrets
 

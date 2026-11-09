@@ -1140,7 +1140,8 @@ export const apis = pgTable(
     // How the gateway signs in to the backend, minted per request from the
     // API's ServiceAccount; null: it doesn't. {serviceAccountToken:
     // {audience}} | {googleIdToken: {serviceAccount, audience}} |
-    // {awsSigV4: {roleArn, region, service}}
+    // {awsSigV4: {roleArn, region, service}} | {entraToken: {tenantId,
+    // clientId, scope}}
     backendAuth: jsonb("backend_auth").$type<BackendAuth>(),
     // The Kubernetes ServiceAccount, in the team's namespace, its backend
     // credentials are minted for (the console creates it).
@@ -1347,7 +1348,8 @@ export const gatewayState = pgTable("gateway_state", {
 export type BackendAuth =
   | { serviceAccountToken: { audience: string } }
   | { googleIdToken: { serviceAccount: string; audience: string } }
-  | { awsSigV4: { roleArn: string; region: string; service: string } };
+  | { awsSigV4: { roleArn: string; region: string; service: string } }
+  | { entraToken: { tenantId: string; clientId: string; scope: string } };
 
 /** One step of a template, as the catalog release carries it. */
 export interface TemplateStep {

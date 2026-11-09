@@ -373,7 +373,8 @@ message ApiProduct {
   // Its api.yaml in the catalog repository.
   string source_path = 19;
   // The API's own team only: where the gateway forwards to, and how it
-  // signs in there (service_account_token, google_id_token or aws_sig_v4).
+  // signs in there (service_account_token, google_id_token, aws_sig_v4 or
+  // entra_token).
   string backend_url = 20;
   string backend_auth = 21;
   // The spec's title and version.
