@@ -370,8 +370,12 @@ Apply? [y/N] <span class="v">y</span></pre>
             <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A VPC; EKS Auto Mode or managed node groups with Pod Identity and NetworkPolicy enforcement on; ECR; IAM roles; a KMS key; a GitHub OIDC provider and a role limited to the catalog; an S3 backup bucket or RDS; a Route 53 zone for a public console.</p>
           </li>
           <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 12px">
-            <span class="chip" style="align-self: flex-start">both</span>
-            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The platform namespace, policy-controller when signing is on, External Secrets Operator, then the kernel and console charts. Public console: a certificate and, for a hostname of yours, the exact DNS record to add.</p>
+            <span class="chip" style="align-self: flex-start">azure</span>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">A resource group of its own; AKS with Workload Identity, a system node pool and a steps pool (Spot, or regular VMs on a subscription without Spot); Azure Container Registry; managed identities for the console, scanner and backups; backups' storage. Sign-in to the cluster through Microsoft Entra, with no local accounts. Not yet: a managed database or a public console.</p>
+          </li>
+          <li style="background: #11141B; padding: 26px; display: flex; flex-direction: column; gap: 12px">
+            <span class="chip" style="align-self: flex-start">every cloud</span>
+            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The platform namespace, policy-controller when signing is on, External Secrets Operator, then the kernel and console charts. Public console (gcp, aws): a certificate and, for a hostname of yours, the exact DNS record to add.</p>
           </li>
         </ul>
       </div>

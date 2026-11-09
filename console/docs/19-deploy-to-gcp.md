@@ -6,7 +6,7 @@ No keys are made or stored. Each product runs as a Kubernetes ServiceAccount of 
 
 ## Before you start
 
-- **An install on GKE** (`vennir init --target gcp`). On AWS, an existing cluster or kind, read [From an install that isn't on GKE](#from-an-install-that-isnt-on-gke) first.
+- **An install on GKE** (`vennir init --target gcp`). On EKS, AKS, an existing cluster or kind, read [From an install that isn't on GKE](#from-an-install-that-isnt-on-gke) first. How this fits with AWS and Azure: [Creating resources in every cloud](24-every-cloud-from-any-install.md).
 - **Your team**, in the catalog and the console ([Onboarding](17-onboarding.md#phase-5-bring-in-a-team)). Below it's `web`.
 - **gcloud**, signed in as someone who may grant roles where the products will work: the target project, and for `project`, a folder and a billing account.
 - **Where resources go.** A *target* project for Cloud Run, Cloud SQL and builds, and for new projects, a folder to create them under and a billing account to link. Keep targets apart from the install's own project.
@@ -98,6 +98,20 @@ gcloud projects add-iam-policy-binding $TARGET --role roles/cloudsql.admin --mem
 
 Grant on the narrowest thing that works: a folder rather than the organization, one repository or bucket rather than a project. Never grant anything to `default` in a team namespace: every image that isn't a registered product runs as it.
 
+### The organization side: projects Vennir creates
+
+`project` needs no role on the organization itself, only on a folder and a billing account:
+
+| Who | Does | With |
+| --- | --- | --- |
+| The organization's admin | Makes a folder for the projects Vennir creates (one per environment, or per team, keeps them apart) | **Folder Creator** on the organization: `gcloud resource-manager folders create --display-name vennir-web --organization <org id>` |
+| The folder's admin | The three folder grants above (`roles/browser`, `projectCreator`, `projectDeleter`) | **Folder IAM Admin** (or Folder Admin) on it |
+| The billing account's admin | `roles/billing.user` for `project` on the account new projects are linked to | **Billing Account Administrator** |
+
+A grant on a folder is inherited by every project under it, including the ones `project` makes later. So instead of granting `app-hosting`, `build-image` and `cloud-sql` in each new project, grant their roles on the folder once (the same commands with `folders add-iam-policy-binding $FOLDER`), and they can work in every project made there. A new project starts with only Google's default APIs on, and the samples don't turn more on (step 3): turn on what later steps call before chaining a build or a deploy into a project made in the same run.
+
+An organization policy can refuse a grant or a project (allowed locations, which members may be granted roles); the error names the constraint, and the organization's admins decide.
+
 ## 5. The account deployed services run as
 
 A Cloud Run service runs as a Google service account. `app-hosting` deploys only as one your team chose, and only images from a registry your team chose, both named in a team secret. Make the account, with no roles of its own, and let `app-hosting` act as it alone (never the default compute account):
@@ -183,17 +197,21 @@ The catalog guide has [every field](catalog-guide.md#productyaml) and [the conta
 
 ## From an install that isn't on GKE
 
-**On EKS, or a cluster whose token issuer is public**: Google can trust the cluster's own tokens through a workload identity pool. No sample product does this yet, and it hasn't been proven end to end, so treat it as a starting point:
+**On EKS, AKS, or a cluster whose token issuer is public**: Google can trust the cluster's own tokens through a workload identity pool, in a project you choose (`$PROJECT` below, any project; it needn't hold a cluster). **The GCP samples don't sign in this way yet**: they rely on GKE's Workload Identity, so from another cluster they find no credentials. A product of your own can, as below; it hasn't been proven end to end, so treat it as a starting point:
 
 ```bash
-ISSUER=$(kubectl get --raw /.well-known/openid-configuration | jq -r .issuer)
+ISSUER=$(kubectl --context <the install's> get --raw /.well-known/openid-configuration | jq -r .issuer)
+# AKS: az aks show -g <group> -n <cluster> --query oidcIssuerProfile.issuerUrl -o tsv
 gcloud iam workload-identity-pools create vennir-steps --location global --project $PROJECT
-gcloud iam workload-identity-pools providers create-oidc eks --location global \
+gcloud iam workload-identity-pools providers create-oidc vennir --location global \
   --workload-identity-pool vennir-steps --project $PROJECT \
-  --issuer-uri "$ISSUER" --attribute-mapping "google.subject=assertion.sub"
-# A product's principal is then its ServiceAccount's subject:
-echo "principal://iam.googleapis.com/projects/$NUMBER/locations/global/workloadIdentityPools/vennir-steps/subject/system:serviceaccount:$TEAM:web-project"
+  --issuer-uri "$ISSUER" --attribute-mapping "google.subject=assertion.sub" \
+  --attribute-condition "assertion.sub.startsWith('system:serviceaccount:')"
+# A product's principal is then its ServiceAccount's subject, granted roles as in step 4:
+echo "principal://iam.googleapis.com/projects/$NUMBER/locations/global/workloadIdentityPools/vennir-steps/subject/system:serviceaccount:${TEAM}:web-project"
 ```
+
+One provider per install's cluster: another cluster is another issuer.
 
 The product declares the provider as a token audience in its `product.yaml` (`tokenAudiences: [https://iam.googleapis.com/projects/<number>/locations/global/workloadIdentityPools/vennir-steps/providers/eks]`), so each of its steps gets a token for it at `/platform/tokens/<audience>` (characters other than letters, digits, `.`, `_` and `-` replaced with `_`). It then signs in with an *external account* credential file, which holds no secret: `gcloud iam workload-identity-pools create-cred-config` writes one, with `--credential-source-file` set to that token's path, and `GOOGLE_APPLICATION_CREDENTIALS` pointing at it. The API gateway already signs in to Google this way from other clusters ([the API gateway](21-api-gateway.md#a-cloud-run-service-googleidtoken)).
 

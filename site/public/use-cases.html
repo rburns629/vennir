@@ -91,9 +91,13 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">Storage, an app and a database on AWS</span>
         <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">samples/aws</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">billed</span></span>
       </a>
+      <a href="#azure" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">A resource group, an app and a database on Azure</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">samples/azure</span><span class="chip" style="border-color: #6B4A1F; color: #F2C08A">billed</span></span>
+      </a>
       <a href="#apis" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
         <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">A backend you run, as an API</span>
-        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">local · gcp · aws</span></span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">local · gcp · aws · azure</span></span>
       </a>
       <a href="#local" style="background: #11141B; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; text-decoration: none">
         <span style="font-size: 16px; font-weight: 600; color: #FFFFFF">One product, five languages</span>
@@ -280,7 +284,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           </div>
           <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
             <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Proven</dt>
-            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On EKS Auto Mode with Pod Identity (2026-10-19, deletes 2026-10-25). Its SecretStore and readiness checks aren't proven yet.</dd>
+            <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On EKS Auto Mode with Pod Identity (2026-10-19, deletes 2026-10-25), and from GKE with no AWS cluster, each as its own role by web identity: its checks Ready, a bucket made and deleted, and an ECS Express service serving (2026-11-07, 2026-11-09). Its SecretStore isn't proven yet.</dd>
           </div>
         </dl>
       </div>
@@ -291,8 +295,63 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
     </div>
   </section>
 
+  <!-- Azure -->
+  <section id="azure" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <span class="eyebrow">samples/azure</span>
+        <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">A resource group, an app and a database on Azure.</h2>
+      </div>
+      <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">A resource group, a Container App pulled from a private registry and answering only the identities it names, and a PostgreSQL flexible server that takes Microsoft Entra sign-ins only, so there's no database password.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: start">
+      <figure class="card" aria-label="The azure sample's DAG: a resource group, then a Container App in it" style="margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+        <figcaption class="mono" style="font-size: 13px; color: #8B93A3">dags/azure-hello-world-dag.yaml · two steps · team azure</figcaption>
+        <div style="border: 1px solid #2A3040; border-radius: 10px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+          <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">resource-group.create</span><span class="chip">as azure-resource-group</span></span>
+          <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Finds the resource group, or creates it.</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding-left: 18px">
+          <span aria-hidden="true" style="width: 1px; height: 22px; background: #3A4256"></span>
+          <span class="mono" style="font-size: 12px; color: #8FD6B4">resourceGroup → resourceGroup</span>
+        </div>
+        <div style="border: 1px solid #2A3040; border-radius: 10px; background: #0D1015; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+          <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">container-app.create</span><span class="chip">as azure-container-app</span></span>
+          <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Deploys an image as a Container App, making its environment if needed. With entraAuth, Azure answers 401 to anything without an Entra token from the identities it names.</span>
+        </div>
+        <div style="border: 1px dashed #3A4256; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+          <span style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap"><span class="mono" style="font-size: 14px; color: #FFFFFF">postgres-flexible.create</span><span class="chip">as azure-postgres-flexible</span></span>
+          <span style="font-size: 14px; line-height: 1.55; color: #AEB5C2">Password sign-in off and no public access; the Entra principal you name is its administrator.</span>
+        </div>
+      </figure>
+      <dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+        <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+          <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who it's for</dt>
+          <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Teams on Azure who need a resource group, a web app or a database, without an Azure role of their own.</dd>
+        </div>
+        <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+          <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Who owns which step</dt>
+          <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">The azure team owns all three, each a managed identity of its own with only the roles it uses.</dd>
+        </div>
+        <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+          <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Keys</dt>
+          <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">None stored: AKS Workload Identity, or from any other cluster, a federated credential that accepts the step's own token.</dd>
+        </div>
+        <div style="background: #11141B; padding: 22px; display: flex; flex-direction: column; gap: 8px">
+          <dt style="font-size: 13px; font-weight: 600; color: #7C9BFF">Proven</dt>
+          <dd style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On AKS (2026-11-08), and from GKE with no Azure cluster (2026-11-09): all three products, and a Key Vault secret synced. No delete action yet: delete the resource group.</dd>
+        </div>
+      </dl>
+    </div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap">
+      <a class="btn btn-ghost" href="https://github.com/roburns/vennir/tree/main/catalog-template/samples/azure">The azure sample on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/console/docs/23-deploy-to-azure.md">Deploy to Azure</a>
+    </div>
+  </section>
+
   <!-- APIs -->
-  <section id="apis" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+  <section id="apis" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
       <div style="display: flex; flex-direction: column; gap: 16px">
         <span class="eyebrow">API products</span>
@@ -319,13 +378,25 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Each request signed with SigV4 as a role the gateway assumes with its own ServiceAccount's token. Shared with the web team only, at 600 a minute.</p>
         <span class="mono" style="font-size: 13px; color: #A9BCFF">See the sample →</span>
       </a>
+      <a class="card" href="https://github.com/roburns/vennir/tree/main/catalog-template/samples/aws/apis/greetings" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; text-decoration: none">
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">aws/greetings</span><span class="chip">no auth</span></span>
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">An ECS Express service on the internet</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Its URL is public and its load balancer takes no signature, so the backend checks the gateway's signed Vennir-Caller on every request and refuses the rest.</p>
+        <span class="mono" style="font-size: 13px; color: #A9BCFF">See the sample →</span>
+      </a>
+      <a class="card" href="https://github.com/roburns/vennir/tree/main/catalog-template/samples/azure/apis/greetings" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; text-decoration: none">
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip">azure/greetings</span><span class="chip">entraToken</span></span>
+        <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">A Container App behind Entra sign-in</h3>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Azure refuses anything without an Entra token from the gateway's identity, which the gateway signs in as with its own ServiceAccount's token.</p>
+        <span class="mono" style="font-size: 13px; color: #A9BCFF">See the sample →</span>
+      </a>
     </div>
-    <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #8B93A3">Who calls: the API's own team and whoever its access list on each install grants (single sign-on groups, people and bots), each at its own rate. The local one runs on kind, and the AWS one is proven from a GKE install to a Lambda function URL (2026-11-07); the Google Cloud one is still to be proven in its billed run (<a href="https://github.com/roburns/vennir/blob/main/TODO.md">TODO.md</a>).</p>
+    <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #8B93A3">Who calls: the API's own team and whoever its access list on each install grants (single sign-on groups, people and bots), each at its own rate. The local one runs on kind; the AWS and Azure ones are proven from a GKE install, through the gateway from the internet (the Lambda 2026-11-07, ECS Express and the Container App 2026-11-09); the Google Cloud one is still to be proven in its billed run (<a href="https://github.com/roburns/vennir/blob/main/TODO.md">TODO.md</a>).</p>
+    </div>
   </section>
 
   <!-- Local five languages -->
-  <section id="local" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
-    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+  <section id="local" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
         <div style="display: flex; flex-direction: column; gap: 16px">
           <span class="eyebrow">samples/local</span>
@@ -384,11 +455,11 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <a class="btn btn-ghost" href="https://github.com/roburns/vennir/tree/main/catalog-template/samples/local">The local sample on GitHub</a>
         <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/catalog-template/samples/local/dags/shout-backwards.yaml">The template</a>
       </div>
-    </div>
   </section>
 
   <!-- Ticket -->
-  <section id="ticket" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 56px; align-items: center">
+  <section id="ticket" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 56px; align-items: center">
     <div style="display: flex; flex-direction: column; gap: 24px">
       <span class="eyebrow">samples/local/products/ticket</span>
       <h2 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">What a run made, kept after the run, and deleted on purpose.</h2>
@@ -421,11 +492,11 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       </div>
       <div style="padding: 14px 20px; background: #0D1015; font-size: 14px; line-height: 1.6; color: #AEB5C2">Once the watch is Deleted, the ticket's Delete runs close for the team it was made for.</div>
     </figure>
+    </div>
   </section>
 
   <!-- Storefront -->
-  <section id="storefront" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
-    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+  <section id="storefront" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
         <div style="display: flex; flex-direction: column; gap: 16px">
           <span class="eyebrow">Ordering bots</span>
@@ -477,11 +548,11 @@ curl -X POST <span class="s">"$VENNIR/api/vennir.console.v1.TemplateService/RunT
         <a class="btn btn-ghost" href="https://github.com/roburns/vennir/tree/main/examples/order-receiver">The order receiver on GitHub</a>
         <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/console/docs/14-bots-and-automation.md">Bots and automation guide</a>
       </div>
-    </div>
   </section>
 
   <!-- CI keyless -->
-  <section id="ci" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
+  <section id="ci" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+    <div class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: flex; flex-direction: column; gap: 40px">
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 32px; align-items: end">
       <div style="display: flex; flex-direction: column; gap: 16px">
         <span class="eyebrow">Keyless bots</span>
@@ -521,6 +592,7 @@ curl -X POST <span class="s">"$VENNIR/api/vennir.console.v1.TemplateService/RunT
     - <span class="c"># then RunTemplate or SubmitExecution, as the bot, for an hour</span></pre>
     </div>
     <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #8B93A3">A bot is always made with a token; once CI sign-in works, revoke it and the card shows Keyless. Which CIs an install accepts is its setting (GitHub Actions and gitlab.com by default). <a href="https://github.com/roburns/vennir/blob/main/console/docs/14-bots-and-automation.md">The guide</a>.</p>
+    </div>
   </section>
 
   <!-- Final call -->

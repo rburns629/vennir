@@ -85,12 +85,28 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
     ],
   },
   {
+    id: "labs",
+    title: "Hands-on labs",
+    blurb: "Step-by-step exercises with a goal, a time, a cost and checks: Vennir on your laptop and your first product (free), then GKE, Google Cloud projects, AWS, Azure and APIs across clouds (billed).",
+    items: [
+      ["lab-1-laptop", "Lab 1: Vennir on your laptop"],
+      ["lab-2-first-product", "Lab 2: your first product"],
+      ["lab-3-gke", "Lab 3: Vennir on GKE, with a catalog"],
+      ["lab-4-gcp-projects", "Lab 4: Google Cloud projects from Vennir"],
+      ["lab-5-aws-from-gke", "Lab 5: AWS from a GKE install"],
+      ["lab-6-azure-from-gke", "Lab 6: Azure from a GKE install"],
+      ["lab-7-apis-across-clouds", "Lab 7: APIs on every cloud, through the gateway"],
+    ],
+  },
+  {
     id: "how-to",
     title: "How-to guides",
     blurb: "Things you'll do once you're running: deploy to your cloud, publish APIs, automate runs with bots, and bring in secrets.",
     items: [
       ["19-deploy-to-gcp", "Deploy to Google Cloud"],
       ["20-deploy-to-aws", "Deploy to AWS"],
+      ["23-deploy-to-azure", "Deploy to Azure"],
+      ["24-every-cloud-from-any-install", "Creating resources in every cloud"],
       ["21-api-gateway", "The API gateway, start to finish"],
       ["22-addresses-and-firewalls", "Addresses and firewall rules"],
       ["14-bots-and-automation", "Bots and automation"],
@@ -297,10 +313,12 @@ export const TASKS: { id: string; title: string; blurb: string; questions: Answe
   {
     id: "cloud",
     title: "Deploy to your cloud",
-    blurb: "Let products create resources in Google Cloud or AWS, and get past firewalls that want an address.",
+    blurb: "Let products create resources in Google Cloud, AWS or Azure, and get past firewalls that want an address.",
     questions: [
       { label: "Let a product create things in Google Cloud", guide: "19-deploy-to-gcp" },
       { label: "Let a product create things in AWS", guide: "20-deploy-to-aws" },
+      { label: "Let a product create things in Azure", guide: "23-deploy-to-azure" },
+      { label: "Who sets up what in each cloud?", guide: "24-every-cloud-from-any-install" },
       { label: "A firewall needs Vennir's address", guide: "22-addresses-and-firewalls", section: "finding-the-outbound-addresses-now" },
       { label: "Which cloud should Vennir run on?", guide: "18-where-to-host" },
     ],

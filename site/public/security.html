@@ -326,7 +326,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       </div>
       <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px">
         <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">The metadata server</h3>
-        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On GKE, Workload Identity's: a step gets only its own ServiceAccount's Google identity. On EKS, <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir-no-metadata</span> blocks 169.254.169.254. Elsewhere, it's yours to close.</p>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">On GKE, Workload Identity's: a step gets only its own ServiceAccount's Google identity. On EKS and AKS, <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir-no-metadata</span> blocks 169.254.169.254. Elsewhere, it's yours to close.</p>
       </div>
       <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px">
         <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">TLS inside the cluster</h3>
@@ -463,7 +463,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <tr>
             <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">A step</th>
             <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">Its cloud</td>
-            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">Its product's own ServiceAccount: GKE Workload Identity, EKS Pod Identity, or an hour's token per declared audience for another cloud</td>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">Its product's own ServiceAccount: GKE Workload Identity, EKS Pod Identity, AKS Workload Identity, or an hour's token per declared audience for another cloud, which it trusts for that ServiceAccount alone</td>
           </tr>
           <tr>
             <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">Catalog CI</th>
@@ -472,13 +472,18 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           </tr>
           <tr>
             <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">A team's vault</th>
-            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">GCP Secret Manager, AWS Secrets Manager</td>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">GCP Secret Manager, AWS Secrets Manager, Azure Key Vault</td>
             <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">External Secrets Operator as the team's own workload identity; one cloud identity per team's store</td>
           </tr>
           <tr>
             <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">The platform</th>
             <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">A managed database</td>
             <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">IAM database authentication: each service as its own identity, a short-lived token, no password of Vennir's</td>
+          </tr>
+          <tr>
+            <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">The API gateway</th>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">An API's backend</td>
+            <td style="padding: 16px 22px; color: #AEB5C2; border-bottom: 1px solid #171B24">That API's own ServiceAccount, per request: a Google ID token, an AWS SigV4 signature or a Microsoft Entra token; nothing stored</td>
           </tr>
           <tr>
             <th scope="row" style="padding: 16px 22px; text-align: left; font-weight: 500; color: #FFFFFF; border-bottom: 1px solid #171B24">Another install</th>
@@ -527,7 +532,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         </div>
         <div class="card" style="padding: 26px; display: flex; flex-direction: column; gap: 12px; border-color: #3A2E1C">
           <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #FFFFFF">Not yet proven</h3>
-          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Syncing from Azure Key Vault, HashiCorp Vault and 1Password: the console recognises them, but only GCP Secret Manager and AWS Secrets Manager are proven end to end. Azure isn't an install target yet.</p>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #AEB5C2">Syncing from HashiCorp Vault and 1Password: the console recognises them, but only GCP Secret Manager, AWS Secrets Manager and Azure Key Vault (from GKE) are proven end to end. Google Cloud from a cluster other than GKE: the gcp samples sign in only through GKE's Workload Identity.</p>
         </div>
       </div>
       <div class="card" style="padding: 26px 28px; display: flex; flex-direction: column; gap: 12px">

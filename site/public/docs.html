@@ -89,6 +89,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <a class="chip" href="#runners" style="height: 32px; padding: 0 14px; font-size: 13px; text-decoration: none">Running things</a>
       <a class="chip" href="#catalog" style="height: 32px; padding: 0 14px; font-size: 13px; text-decoration: none">Publishing products</a>
       <a class="chip" href="#operators" style="height: 32px; padding: 0 14px; font-size: 13px; text-decoration: none">Installing and operating</a>
+      <a class="chip" href="#labs" style="height: 32px; padding: 0 14px; font-size: 13px; text-decoration: none">Hands-on labs</a>
       <a class="chip" href="#contributors" style="height: 32px; padding: 0 14px; font-size: 13px; text-decoration: none">Contributing</a>
     </div>
   </section>
@@ -119,7 +120,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <div class="card" style="padding: 28px; display: flex; flex-direction: column; gap: 20px">
         <div style="display: flex; align-items: center; gap: 12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="1.5"></rect><rect x="4" y="14" width="16" height="6" rx="1.5"></rect><path d="M8 7h.01M8 17h.01"></path></svg><h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">I install and run Vennir</h3></div>
         <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="https://github.com/roburns/vennir/blob/main/docs/clouds/gcp.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Get your cloud ready (GCP or AWS)</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="https://github.com/roburns/vennir/blob/main/docs/clouds/gcp.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Get your cloud ready (GCP, AWS or Azure)</a></li>
           <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">02</span><a href="https://github.com/roburns/vennir/blob/main/docs/setup.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Install with vennir init and apply</a></li>
           <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">03</span><a href="https://github.com/roburns/vennir/blob/main/docs/security-model.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Read what's enforced, and what isn't yet</a></li>
         </ol>
@@ -346,6 +347,20 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
             </a>
           </li>
           <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/docs/clouds/azure.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Getting Azure ready</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What only the Azure portal can do, before vennir init: the subscription, your roles, a Free Trial's limits.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/clouds/azure.md</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/docs/clouds/computer.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Getting your computer ready</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What to install first, on macOS, Linux or Windows in WSL 2, and how to check it.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/clouds/computer.md</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
             <a href="https://github.com/roburns/vennir/blob/main/docs/operations.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Operations</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">kind and Helm installs, upgrades, databases, rotating secrets, backups, network policies, the chat agent, troubleshooting.</span>
@@ -369,7 +384,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <li data-doc style="background: #11141B; display: flex">
             <a href="https://github.com/roburns/vennir/blob/main/console/docs/18-where-to-host.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Where to host Vennir</span>
-              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">kind, GKE, EKS or a cluster of your own: what each gives you, what it costs, and what changes for your teams.</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">kind, GKE, EKS, AKS or a cluster of your own: what each gives you, what it costs, and what changes for your teams.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/18</span>
             </a>
           </li>
@@ -388,6 +403,20 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
             </a>
           </li>
           <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/console/docs/23-deploy-to-azure.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Deploy to Azure from Vennir</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">A managed identity per product, trusting the cluster's own tokens from AKS or anywhere else, with only the roles it uses.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/23</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/console/docs/24-every-cloud-from-any-install.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Creating resources in every cloud</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Who sets up what in Google Cloud, AWS and Azure, whichever one Vennir runs in: identities, permissions, and creating GCP projects under a folder.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/24</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
             <a href="https://github.com/roburns/vennir/blob/main/console/docs/21-api-gateway.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">The API gateway, start to finish</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Turning it on, publishing a backend, calling it, and putting it on the internet.</span>
@@ -399,6 +428,66 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Addresses and firewall rules</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Which address each part uses, finding them, identity instead of allowlists, and a fixed outbound address.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/22</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+      <div id="labs" style="display: flex; flex-direction: column; gap: 24px">
+        <div style="display: flex; align-items: flex-start; gap: 16px">
+          <span aria-hidden="true" style="flex: 0 0 44px; height: 44px; border-radius: 10px; border: 1px solid #2A3040; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"></path></svg></span>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <h3 style="margin: 0; font-size: 26px; font-weight: 600; color: #FFFFFF">Hands-on labs</h3>
+            <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #AEB5C2">Exercises to do in order, each with its goal, time, cost and checks: two free on your laptop, then a GKE install creating resources on every cloud.</p>
+          </div>
+        </div>
+        <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 1px; background: #1F2430; border: 1px solid #1F2430; border-radius: 12px; overflow: hidden">
+          <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-1-laptop.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 1: Vennir on your laptop</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Install on kind, run a DAG, publish the samples, run a template and a cart, and delete what a run made. Free, about 45 minutes.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-1-laptop</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-2-first-product.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 2: your first product</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">A catalog of your own, a product from the starter, tests run as CI runs them, a secret, and errors that explain themselves. Free.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-2-first-product</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-3-gke.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 3: Vennir on GKE, with a catalog</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">A released Vennir on GKE Autopilot at the smallest size, priced before it's made, and a catalog whose CI publishes with no stored key. Billed.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-3-gke</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-4-gcp-projects.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 4: Google Cloud projects from Vennir</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Projects made under a folder of their own, a Cloud Run service with grants inherited from the folder, and deletes through Vennir. Billed.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-4-gcp-projects</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-5-aws-from-gke.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 5: AWS from a GKE install</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">An S3 bucket and an ECS Express service, each product as an IAM role of its own by web identity, no AWS cluster and no key. Billed.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-5-aws-from-gke</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-6-azure-from-gke.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 6: Azure from a GKE install</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">A resource group, a Container App and PostgreSQL, each product a managed identity of its own, and a Key Vault secret synced. Billed.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-6-azure-from-gke</span>
+            </a>
+          </li>
+          <li data-doc style="background: #11141B; display: flex">
+            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-7-apis-across-clouds.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+              <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 7: APIs on every cloud, through the gateway</span>
+              <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">The gateway on the internet, serving a backend on AWS and one on Azure behind Entra sign-in, and every way around it refused. Billed.</span>
+              <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-7-apis-across-clouds</span>
             </a>
           </li>
         </ul>

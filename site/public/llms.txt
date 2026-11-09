@@ -4,12 +4,12 @@
 
 Key facts:
 
-- Runs on Kubernetes 1.30 or later with a NetworkPolicy-enforcing network plugin: kind on a laptop, GKE, EKS, or an existing cluster. Installed with the `vennir` CLI or two Helm charts (Helm 4).
+- Runs on Kubernetes 1.30 or later with a NetworkPolicy-enforcing network plugin: kind on a laptop, GKE, EKS, AKS, or an existing cluster. Installed with the `vennir` CLI or two Helm charts (Helm 4).
 - A product is a container image plus a `product.yaml` contract: actions with JSON Schema inputs and outputs, the ServiceAccount it runs as, which teams may run it, approvals, and error explanations. Products live in a team's catalog repository; CI builds, tests, scans and signs each image, then publishes one signed catalog release that every install pulls.
 - Security is checked twice: by the console, and again by Kubernetes admission policies on every Job (allowed namespaces and image sources, images pinned to a digest and scanned, each product's own identity, each team's registered secrets only).
 - With a signed catalog and the kernel chart's `catalogPolicy` turned on (off by default), the kernel can verify the catalog's release itself and write which images run as each product into admission policies only it may update, so even a compromised console can't run an unreviewed image as a product.
 - API products: a team publishes a backend it already runs through one gateway, at `/<team>/<api>/`, which forwards only what the API's OpenAPI file describes, and only for the API's own team and whoever each install's access list grants (single sign-on groups, people, bots).
-- Cloud access is by federation where possible (GKE Workload Identity, EKS Pod Identity, short-lived tokens), not stored keys.
+- Cloud access is by federation where possible (GKE Workload Identity, EKS Pod Identity, AKS Workload Identity, short-lived tokens trusted across clouds), not stored keys.
 - Free and open source; you pay only for the cluster and the cloud resources your products create.
 
 ## Pages
@@ -19,7 +19,7 @@ Key facts:
 - [Product tour](https://vennir.io/product): the catalog, templates, ordering, the API gateway, Observe, the chat agent, the CLI, and what isn't done yet
 - [Use cases](https://vennir.io/use-cases): the repository's samples, on Google Cloud, AWS and no cloud
 - [Security model](https://vennir.io/security): what's enforced, by which layer, and what isn't yet
-- [Get started](https://vennir.io/get-started): installing on kind, GKE, EKS or your own cluster, then a first catalog and run
+- [Get started](https://vennir.io/get-started): installing on kind, GKE, EKS, AKS or your own cluster, then a first catalog and run
 - [Docs](https://vennir.io/docs): every guide, grouped by reader
 - [Changelog](https://vennir.io/changelog): each release
 - [Community](https://vennir.io/community): contributing, reporting a vulnerability, the roadmap
