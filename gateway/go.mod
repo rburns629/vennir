@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.6
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/pb33f/jsonschema/v6 v6.0.3
-	github.com/pb33f/libopenapi v0.42.0
+	github.com/pb33f/libopenapi v0.42.3
 	github.com/pb33f/libopenapi-validator v0.16.2
 	github.com/prometheus/client_golang v1.25.0
 )
