@@ -86,6 +86,31 @@ actions:
           a secret: these are visible to anyone who can read the execution.'
         additionalProperties:
           type: string
+      entraAuth:
+        type: object
+        description: 'Requires a Microsoft Entra token on every request (Container Apps''
+          built-in authentication): 401 before the container for anything else. For an API
+          behind the gateway''s entraToken (its guide, console/docs/21-api-gateway.md).'
+        additionalProperties: false
+        required: [tenantId, clientId, allowedApplications]
+        properties:
+          tenantId:
+            type: string
+            description: The Entra tenant's id.
+            pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+          clientId:
+            type: string
+            description: 'The backend''s own app registration: the audience its tokens must
+              have.'
+            pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+          allowedApplications:
+            type: array
+            description: 'The client ids that may call it: the identity the gateway signs in
+              as.'
+            minItems: 1
+            items:
+              type: string
+              pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
   output:
     type: object
     required:

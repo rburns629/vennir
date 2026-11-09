@@ -679,7 +679,7 @@ API products (decision 20): a backend a team runs, published through the gateway
 | `description` | text | no | |
 | `openapi` | jsonb | no | Its OpenAPI document (3.0 or 3.1, references inside it only): the allowlist the gateway enforces, and what callers are shown. |
 | `backend_url` | text | no | Where the gateway forwards. Its host must be one of the gateway's `backendHosts`, or the API is held. |
-| `backend_auth` | jsonb | yes | How the gateway signs in there: `{"serviceAccountToken": {audience}}`, `{"googleIdToken": {serviceAccount, audience}}` or `{"awsSigV4": {roleArn, region, service}}`, each minted per request from the API's ServiceAccount. Null: it doesn't. |
+| `backend_auth` | jsonb | yes | How the gateway signs in there: `{"serviceAccountToken": {audience}}`, `{"googleIdToken": {serviceAccount, audience}}`, `{"awsSigV4": {roleArn, region, service}}` or `{"entraToken": {tenantId, clientId, scope}}`, each minted per request from the API's ServiceAccount. Null: it doesn't. |
 | `service_account` | text | no | The ServiceAccount, in the team's namespace, its backend credentials are minted for; the console creates it. |
 | `share_with` | text[] | no | Unread and empty: the teams api.yaml's `shareWith` named, until `api_grants` replaced them (migration 0073 emptied it). To be dropped. |
 | `access_requests` | text | no | `api.yaml`'s `access.requests`: `open` (a request is granted at once, at the default limit), `approval` (the default: its team's maintainers decide) or `closed` (none are taken; grants already made stay). |

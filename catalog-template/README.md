@@ -540,7 +540,12 @@ service account that federation lets the API's ServiceAccount act as),
 request signed as a role trusting the cluster's OIDC issuer for
 `system:serviceaccount:<team>:<api>-api`, audience `sts.amazonaws.com`; for
 a function URL the role needs both `lambda:InvokeFunctionUrl` and
-`lambda:InvokeFunction`), or
+`lambda:InvokeFunction`), `entraToken` (Container Apps', App Service's or
+API Management's Entra sign-in: an access token for the backend's `scope`,
+as the managed identity `clientId` in `tenantId`, whose federated
+credential trusts the cluster's OIDC issuer for
+`system:serviceaccount:<team>:<api>-api`, audience
+`api://AzureADTokenExchange`), or
 `serviceAccountToken` (the Kubernetes token itself, for a backend that
 checks those, for the backend's own audience: never one a cloud exchanges
 for an identity, such as `sts.amazonaws.com` or a Workload Identity

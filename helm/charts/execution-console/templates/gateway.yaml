@@ -94,8 +94,8 @@ subjects:
 {{- /*
 Which audiences each API's ServiceAccount may get a token for: exactly what
 its published API needs the gateway to ask for (a serviceAccountToken
-backend's audience; AWS STS's for awsSigV4; gateway.gcp.tokenAudience for
-googleIdToken), and nothing for an API that's held, or whose team is
+backend's audience; AWS STS's for awsSigV4; Entra's for entraToken;
+gateway.gcp.tokenAudience for googleIdToken), and nothing for an API that's held, or whose team is
 retired or purged. So a serviceAccountToken API's backend can't be handed a
 token with an audience a cloud exchanges for that ServiceAccount's
 identity, even though the gateway asks for such audiences for other APIs'
@@ -210,17 +210,17 @@ spec:
       reason: Forbidden
     # For a backend's audience: named (none means the Kubernetes API's own),
     # never the cluster's or kernel-api's, and short-lived (it asks for ten
-    # minutes, gateway/internal/credentials). Nor Azure's federation audience
-    # or a GKE pool's STS audience, which the gateway never asks for. AWS's
-    # (sts.amazonaws.com) and the Google pool's or provider's
+    # minutes, gateway/internal/credentials). Nor a GKE pool's STS audience,
+    # which the gateway never asks for. AWS's (sts.amazonaws.com), Entra's
+    # (api://AzureADTokenExchange) and the Google pool's or provider's
     # (gateway.gcp.tokenAudience) it does ask for, for its own exchanges
-    # (awsSigV4, googleIdToken): the last validation allows those only for
-    # the ServiceAccounts of APIs that use them. Kept as defence in depth.
+    # (awsSigV4, entraToken, googleIdToken): the last validation allows
+    # those only for the ServiceAccounts of APIs that use them. Kept as
+    # defence in depth.
     - expression: >-
         has(object.spec.audiences) && object.spec.audiences.size() > 0 &&
         object.spec.audiences.all(a, !(a in {{ concat (list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" .Values.kernelApiToken.audience) .Values.gateway.reservedAudiences | toJson }}) &&
-          !a.startsWith("https://container.googleapis.com/") &&
-          a.lowerAscii() != "api://azureadtokenexchange" && !a.lowerAscii().startsWith("identitynamespace:"))
+          !a.startsWith("https://container.googleapis.com/") && !a.lowerAscii().startsWith("identitynamespace:"))
       message: "The gateway mints tokens only for a backend's own audience: never the Kubernetes API's or kernel-api's, nor one a cloud federates that it doesn't use itself."
       reason: Forbidden
     - expression: has(object.spec.expirationSeconds) && object.spec.expirationSeconds <= 3600

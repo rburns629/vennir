@@ -52,6 +52,8 @@ func fixtureRelease() *catalogv1.Release {
 				BackendAuth: &catalogv1.BackendAuth{Kind: &catalogv1.BackendAuth_AwsSigV4{AwsSigV4: &catalogv1.AwsSigV4Auth{RoleArn: "arn:aws:iam::1:role/r"}}}},
 			{Name: "site", Team: "payments", ServiceAccount: "site-api",
 				BackendAuth: &catalogv1.BackendAuth{Kind: &catalogv1.BackendAuth_GoogleIdToken{GoogleIdToken: &catalogv1.GoogleIdTokenAuth{ServiceAccount: "s@p.iam", Audience: "x"}}}},
+			{Name: "reports", Team: "payments", ServiceAccount: "reports-api",
+				BackendAuth: &catalogv1.BackendAuth{Kind: &catalogv1.BackendAuth_EntraToken{EntraToken: &catalogv1.EntraTokenAuth{ClientId: "c", TenantId: "t", Scope: "api://r/.default"}}}},
 			// One a cloud federates, the cluster's own: none.
 			{Name: "sneaky", Team: "local", ServiceAccount: "sneaky-api",
 				BackendAuth: &catalogv1.BackendAuth{Kind: &catalogv1.BackendAuth_ServiceAccountToken{ServiceAccountToken: &catalogv1.ServiceAccountTokenAuth{Audience: "sts.amazonaws.com"}}}},
@@ -98,9 +100,10 @@ func TestAudiencesAreWhatEachAPIsBackendSignInNeeds(t *testing.T) {
 	}
 	got := Audiences(apis, "//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/v", ReservedAudiences())
 	want := map[string][]string{
-		"local/orders-api":  {"https://orders.local"},
-		"local/ledger-api":  {AWSAudience},
-		"payments/site-api": {"//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/v"},
+		"local/orders-api":     {"https://orders.local"},
+		"local/ledger-api":     {AWSAudience},
+		"payments/site-api":    {"//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/v"},
+		"payments/reports-api": {EntraAudience},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("audiences: %v", got)

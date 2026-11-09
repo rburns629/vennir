@@ -12,6 +12,7 @@ const AUTH: Record<string, string> = {
   service_account_token: "a token for the API's own ServiceAccount, minted per request",
   google_id_token: "a Google ID token, minted per request",
   aws_sig_v4: "AWS SigV4, as a role it assumes per request",
+  entra_token: "a Microsoft Entra token, as an identity it signs in as per request",
   "": "nothing: it checks Vennir-Caller, or nothing",
 };
 

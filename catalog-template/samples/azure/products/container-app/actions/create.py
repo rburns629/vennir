@@ -4,7 +4,11 @@ Azure Container App, or returns the existing app's URL if one of that name
 exists. Creates the Container Apps environment it runs in if that doesn't
 exist yet. Never builds an image: `image` is a registry reference.
 
-Ingress is internal to the environment unless `public` is true. Images from
+Ingress is internal to the environment unless `public` is true. With
+`entraAuth`, Container Apps' built-in authentication answers 401 to every
+request without a Microsoft Entra token for the given app registration from
+one of the allowed applications, before it reaches the container: an API
+behind the gateway's entraToken. Images from
 a private registry (Azure Container Registry) are pulled with a managed
 identity (`registryIdentity`), never a password. Credentials as in the azure
 team's README.md: Workload Identity on AKS, and off AKS its own managed
@@ -26,11 +30,20 @@ from azure.core.exceptions import (
 from azure.identity import DefaultAzureCredential, WorkloadIdentityCredential
 from azure.mgmt.appcontainers import ContainerAppsAPIClient
 from azure.mgmt.appcontainers.models import (
+    AuthConfig,
+    AuthConfigProperties,
+    AuthPlatform,
+    AzureActiveDirectory,
+    AzureActiveDirectoryRegistration,
+    AzureActiveDirectoryValidation,
     Configuration,
     Container,
     ContainerApp,
     ContainerResources,
+    DefaultAuthorizationPolicy,
     EnvironmentVar,
+    GlobalValidation,
+    IdentityProviders,
     Ingress,
     ManagedEnvironment,
     RegistryCredentials,
@@ -109,6 +122,35 @@ def _outputs(app: Any) -> dict[str, Any]:
     return {"appName": app.name, "url": f"https://{fqdn}" if fqdn else "", "id": app.id}
 
 
+def _require_entra(client: Any, group: str, name: str, auth: dict[str, Any]) -> None:
+    """Turns on the app's built-in authentication: a v2 Entra token whose
+    audience is the app registration auth["clientId"], from one of
+    auth["allowedApplications"], or 401. Setting it again changes nothing."""
+    client_id = auth["clientId"]
+    client.container_apps_auth_configs.create_or_update(group, name, "current", AuthConfig(
+        properties=AuthConfigProperties(
+            platform=AuthPlatform(enabled=True),
+            global_validation=GlobalValidation(unauthenticated_client_action="Return401"),
+            identity_providers=IdentityProviders(azure_active_directory=AzureActiveDirectory(
+                enabled=True,
+                registration=AzureActiveDirectoryRegistration(
+                    client_id=client_id,
+                    open_id_issuer=f"https://login.microsoftonline.com/{auth['tenantId']}/v2.0",
+                ),
+                validation=AzureActiveDirectoryValidation(
+                    # A v2 token's audience is the client id; api://<client id>
+                    # too, for an app registration still issuing v1 tokens.
+                    allowed_audiences=[client_id, f"api://{client_id}"],
+                    default_authorization_policy=DefaultAuthorizationPolicy(
+                        allowed_applications=list(auth["allowedApplications"])
+                    ),
+                ),
+            )),
+        )
+    ))
+    print(f"container app '{name}' requires an Entra token for {client_id}")
+
+
 def main() -> int:
     inputs = json.loads(INPUT_PATH.read_text()).get("inputs", {})
     required = ("subscriptionId", "resourceGroup", "environmentName", "appName", "image", "location")
@@ -118,6 +160,9 @@ def main() -> int:
     environment = inputs.get("environment") or {}
     if not all(isinstance(v, str) for v in environment.values()):
         return _failure("INVALID_INPUT", "inputs.environment values must be strings")
+    entra = inputs.get("entraAuth")
+    if entra is not None and not (entra.get("tenantId") and entra.get("clientId") and entra.get("allowedApplications")):
+        return _failure("INVALID_INPUT", "inputs.entraAuth needs tenantId, clientId and allowedApplications")
     group, name, location = inputs["resourceGroup"], inputs["appName"], inputs["location"]
 
     try:
@@ -125,6 +170,10 @@ def main() -> int:
         try:
             app = client.container_apps.get(group, name)
             print(f"container app '{name}' already exists, leaving it as it is")
+            # Again, in case an earlier attempt made the app and stopped
+            # before its authentication was on.
+            if entra:
+                _require_entra(client, group, name, entra)
             _write_result({"status": "succeeded", "outputs": _outputs(app)})
             return 0
         except ResourceNotFoundError:
@@ -165,6 +214,8 @@ def main() -> int:
                 tags={"managed-by": "vennir"},
             ),
         ).result()
+        if entra:
+            _require_entra(client, group, name, entra)
     except (HttpResponseError, ServiceRequestError, _NoToken) as error:
         return _azure_failure(error)
 

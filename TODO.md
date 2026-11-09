@@ -48,12 +48,15 @@ steps left, then one billed proof run per cloud, and the MCP server last.
    - [ ] **GKE to Azure and AWS, through the gateway** (agreed 2026-11-09):
      a GKE install's steps making Azure resources (a resource group,
      `postgres-flexible`, a Container App) and AWS ones, and an API in each
-     cloud reachable through its gateway. Done: the azure samples off AKS
-     (the step's token, the team secret `<ServiceAccount>-identity`), tested
-     with Azure mocked. Left: an Azure API sample on Container Apps with an
-     `entraToken` backend auth in the gateway (Container Apps' built-in
-     auth checking it); then one billed run, minimal, written up as the
-     GCP-to-AWS run was.
+     cloud reachable through its gateway. Done, tested with Azure mocked:
+     the azure samples off AKS (the step's token, the team secret
+     `<ServiceAccount>-identity`); the gateway's `entraToken` backend auth,
+     and `container-app`'s `entraAuth` (its built-in authentication). Left:
+     a release with `entraToken`, pinned in the template (`vennir catalog
+     validate` before it refuses an api.yaml using it); then
+     `samples/azure/apis/greetings` on a Container App behind it (branch
+     `feat/azure-greetings-api`); then one billed run from that release,
+     minimal, written up as the GCP-to-AWS run was.
    - [ ] Then: the managed database (Flexible Server, Entra sign-in for each
      service), managed Prometheus, a public console, the audit and log
      archives, kernel policy reading ACR.

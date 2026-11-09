@@ -719,13 +719,14 @@ may not carry an audience a cloud exchanges for an identity either
 workload identity provider), or the backend could sign in to that cloud as
 the API's ServiceAccount: the catalog tool, the console's catalog sync and
 the gateway refuse them, and so does the admission policy. It refuses
-Azure's and the `identitynamespace:` ones outright; and it lets each API's
+the `identitynamespace:` ones outright; and it lets each API's
 ServiceAccount (`<team>/<serviceAccount>`) have only the audiences its
 published API needs the gateway to ask for: a `serviceAccountToken`
 backend's own audience, AWS STS's (`sts.amazonaws.com`) for `awsSigV4`,
+Entra's (`api://AzureADTokenExchange`) for `entraToken`,
 `gateway.gcp.tokenAudience` for `googleIdToken`, and nothing for an API
 that's held or whose team is retired. So a `serviceAccountToken` API's
-backend can't be handed a token for AWS's or the Google pool's audience,
+backend can't be handed a token for AWS's, Entra's or the Google pool's audience,
 though the gateway asks for those for other APIs' ServiceAccounts, and no
 API's ServiceAccount gets another API's audience. The lists are CEL
 literals in the policy itself, which the console rewrites whenever the
@@ -1039,7 +1040,7 @@ without going through the console:
 | Team deletion | A configured purger deleting a team namespace that isn't labelled retired (or a team's API backends' namespace, `<team>-apis`, not labelled `vennir/api-backends=retired`). None is configured by default: the console leaves a purged team's namespace, labelled retired, for a cluster administrator to delete, so the identity that retires a namespace can't also delete it (`teamNamespaces.purge` would let it) | `templates/purge-policy.yaml` |
 | Console namespaces | The console creating a namespace that isn't labelled a team's, adopting one that isn't a team's, changing anything about a team namespace but its team label, or touching kube-* or the platform's own | console chart, `templates/namespace-policy.yaml` |
 | Console write fence | The console's ServiceAccount creating, changing or deleting Secrets, ServiceAccounts, Roles, RoleBindings or ExternalSecrets outside team namespaces (kube-system, the platform's own); creating an ExternalSecret without its `app.kubernetes.io/managed-by: vennir-console` label, or updating one that didn't carry it | console chart, `templates/write-fence-policy.yaml` |
-| Gateway tokens | The gateway minting a token for anything but an API ServiceAccount (`*-api`) in an active team namespace; for no audience, the Kubernetes API's, kernel-api's, Azure's or a GKE pool's STS audience; lasting over an hour; or for any audience its published API doesn't need (a `serviceAccountToken` backend's audience, AWS STS's for `awsSigV4`, the Google pool's for `googleIdToken`; none for a held API or a retired team's). The console keeps each API ServiceAccount's audiences current (sixteen maps, about 500 APIs each); that last check holds once it has first written them, so not between an install, an upgrade onto this chart or a render without lookup and the console's next write (every few minutes) | console chart, `templates/gateway.yaml` |
+| Gateway tokens | The gateway minting a token for anything but an API ServiceAccount (`*-api`) in an active team namespace; for no audience, the Kubernetes API's, kernel-api's or a GKE pool's STS audience; lasting over an hour; or for any audience its published API doesn't need (a `serviceAccountToken` backend's audience, AWS STS's for `awsSigV4`, Entra's for `entraToken`, the Google pool's for `googleIdToken`; none for a held API or a retired team's). The console keeps each API ServiceAccount's audiences current (sixteen maps, about 500 APIs each); that last check holds once it has first written them, so not between an install, an upgrade onto this chart or a render without lookup and the console's next write (every few minutes) | console chart, `templates/gateway.yaml` |
 
 The platform's namespace is never a team's (never labelled `vennir/team`).
 One that was would lose more than the dispatch guardrail there:
