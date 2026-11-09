@@ -38,7 +38,7 @@ jobs:
           branch: cla-signatures
           # Exact names only: the action's wildcards aren't anchored, so
           # "bot*" would exempt anyone whose name merely contains "bot".
-          allowlist: rburns629,dependabot[bot],github-actions[bot]
+          allowlist: roburns,dependabot[bot],github-actions[bot]
           custom-pr-sign-comment: I have read the CLA and I accept it
           custom-notsigned-prcomment: >-
             Thanks for your pull request. Before it can be merged, each of its

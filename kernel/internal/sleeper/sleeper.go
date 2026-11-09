@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/rburns629/vennir/kernel/internal/config"
+	"github.com/roburns/vennir/kernel/internal/config"
 )
 
 // AwakeReplicasKey is the state ConfigMap's key holding {deployment:

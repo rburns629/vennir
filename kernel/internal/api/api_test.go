@@ -21,10 +21,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/rburns629/vennir/kernel/internal/dbtest"
-	kernelv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1"
-	"github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1/kernelv1connect"
-	"github.com/rburns629/vennir/kernel/internal/migrate"
+	"github.com/roburns/vennir/kernel/internal/dbtest"
+	kernelv1 "github.com/roburns/vennir/kernel/internal/gen/vennir/kernel/v1"
+	"github.com/roburns/vennir/kernel/internal/gen/vennir/kernel/v1/kernelv1connect"
+	"github.com/roburns/vennir/kernel/internal/migrate"
 )
 
 // kernel-api over HTTP, through the generated client, on a database of its

@@ -36,7 +36,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	catalogv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/catalog/v1"
+	catalogv1 "github.com/roburns/vennir/kernel/internal/gen/vennir/catalog/v1"
 )
 
 // testRegistry is an in-memory registry, read as catalog.example (a

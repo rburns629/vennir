@@ -805,8 +805,8 @@ const file_vennir_console_v1_sso_proto_rawDesc = "" +
 	"\x0eSetSsoSettings\x12(.vennir.console.v1.SetSsoSettingsRequest\x1a).vennir.console.v1.SetSsoSettingsResponse\x12|\n" +
 	"\x14ListSsoGroupMappings\x12..vennir.console.v1.ListSsoGroupMappingsRequest\x1a/.vennir.console.v1.ListSsoGroupMappingsResponse\"\x03\x90\x02\x01\x12q\n" +
 	"\x12SetSsoGroupMapping\x12,.vennir.console.v1.SetSsoGroupMappingRequest\x1a-.vennir.console.v1.SetSsoGroupMappingResponse\x12z\n" +
-	"\x15DeleteSsoGroupMapping\x12/.vennir.console.v1.DeleteSsoGroupMappingRequest\x1a0.vennir.console.v1.DeleteSsoGroupMappingResponseB\xd1\x01\n" +
-	"\x15com.vennir.console.v1B\bSsoProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"\x15DeleteSsoGroupMapping\x12/.vennir.console.v1.DeleteSsoGroupMappingRequest\x1a0.vennir.console.v1.DeleteSsoGroupMappingResponseB\xcf\x01\n" +
+	"\x15com.vennir.console.v1B\bSsoProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_sso_proto_rawDescOnce sync.Once

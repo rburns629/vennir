@@ -10,8 +10,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
-	kernelv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1"
+	"github.com/roburns/vennir/kernel/internal/domain"
+	kernelv1 "github.com/roburns/vennir/kernel/internal/gen/vennir/kernel/v1"
 )
 
 // MaxApprovalTeams is how many teams one ListAwaitingApproval may ask about.

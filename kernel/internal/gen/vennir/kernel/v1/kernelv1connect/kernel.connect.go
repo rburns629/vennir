@@ -10,7 +10,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	v1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1"
+	v1 "github.com/roburns/vennir/kernel/internal/gen/vennir/kernel/v1"
 	http "net/http"
 	strings "strings"
 )

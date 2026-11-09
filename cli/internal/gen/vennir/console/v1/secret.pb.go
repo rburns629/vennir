@@ -1016,8 +1016,8 @@ const file_vennir_console_v1_secret_proto_rawDesc = "" +
 	"\n" +
 	"SyncSecret\x12$.vennir.console.v1.SyncSecretRequest\x1a%.vennir.console.v1.SyncSecretResponse\"\x03\x90\x02\x02\x12d\n" +
 	"\fRevokeSecret\x12&.vennir.console.v1.RevokeSecretRequest\x1a'.vennir.console.v1.RevokeSecretResponse\"\x03\x90\x02\x02\x12p\n" +
-	"\x10GetSecretSources\x12*.vennir.console.v1.GetSecretSourcesRequest\x1a+.vennir.console.v1.GetSecretSourcesResponse\"\x03\x90\x02\x01B\xd4\x01\n" +
-	"\x15com.vennir.console.v1B\vSecretProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"\x10GetSecretSources\x12*.vennir.console.v1.GetSecretSourcesRequest\x1a+.vennir.console.v1.GetSecretSourcesResponse\"\x03\x90\x02\x01B\xd2\x01\n" +
+	"\x15com.vennir.console.v1B\vSecretProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_secret_proto_rawDescOnce sync.Once

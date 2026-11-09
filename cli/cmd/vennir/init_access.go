@@ -10,14 +10,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rburns629/vennir/cli/internal/access"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/install"
-	"github.com/rburns629/vennir/cli/internal/prompt"
+	"github.com/roburns/vennir/cli/internal/access"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/prompt"
 )
 
 // guidesURL is where docs/clouds/ is published (the repository's).
-const guidesURL = "https://github.com/rburns629/vennir/blob/main/docs/clouds/"
+const guidesURL = "https://github.com/roburns/vennir/blob/main/docs/clouds/"
 
 // showReport prints what a check found: its lines, then each problem with
 // its fix and guide.

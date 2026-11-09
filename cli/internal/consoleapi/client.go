@@ -18,8 +18,8 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	consolev1 "github.com/rburns629/vennir/cli/internal/gen/vennir/console/v1"
-	"github.com/rburns629/vennir/cli/internal/gen/vennir/console/v1/consolev1connect"
+	consolev1 "github.com/roburns/vennir/cli/internal/gen/vennir/console/v1"
+	"github.com/roburns/vennir/cli/internal/gen/vennir/console/v1/consolev1connect"
 )
 
 // callTimeout bounds each call but a watch, which lasts as long as its run.

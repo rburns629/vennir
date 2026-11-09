@@ -294,7 +294,7 @@ def draw_packages(page: Page, title: str, subtitle: str, packages: list[Package]
 # ---------------------------------------------------------- kernel (Go)
 
 KERNEL = ROOT / "kernel"
-GO_MODULE = "github.com/rburns629/vennir/kernel/"
+GO_MODULE = "github.com/roburns/vennir/kernel/"
 KERNEL_LAYERS = [
     ("domain", "internal/domain/  (rules, no I/O)", GREEN),
     ("config", "internal/config/  (settings, checked at startup)", GREY),

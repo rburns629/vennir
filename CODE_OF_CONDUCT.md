@@ -7,7 +7,7 @@ discussions or anywhere else it's represented, is expected to follow it.
 ## Reporting
 
 If someone's behaviour breaks this code, or makes you feel unwelcome, tell
-the maintainer, [@rburns629](https://github.com/rburns629), privately: open an
+the maintainer, [@roburns](https://github.com/roburns), privately: open an
 issue titled "Conduct report: please contact me", with no details in it, and
 you'll be contacted privately to take it from there. For a comment, issue or
 pull request itself, you can also use GitHub's **Report content** on it.

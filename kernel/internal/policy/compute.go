@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	catalogv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/catalog/v1"
+	catalogv1 "github.com/roburns/vennir/kernel/internal/gen/vennir/catalog/v1"
 )
 
 // UnregisteredServiceAccount is what a step that isn't a product's release

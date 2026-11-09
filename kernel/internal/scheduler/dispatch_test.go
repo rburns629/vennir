@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
-	"github.com/rburns629/vennir/kernel/internal/executor"
+	"github.com/roburns/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/executor"
 )
 
 const later = time.Hour // past any backoff

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vennir/cli/internal/cluster"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/cluster"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/install"
 )
 
 // consoleRecord is the DNS record a public console's hostname needs when

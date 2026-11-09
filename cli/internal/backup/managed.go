@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/install"
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // ManagedNow takes an on-demand backup of a managed database, with your

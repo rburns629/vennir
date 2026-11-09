@@ -655,9 +655,9 @@ const file_vennir_console_v1_guide_proto_rawDesc = "" +
 	"ListGuides\x12$.vennir.console.v1.ListGuidesRequest\x1a%.vennir.console.v1.ListGuidesResponse\"\x03\x90\x02\x01\x12X\n" +
 	"\bGetGuide\x12\".vennir.console.v1.GetGuideRequest\x1a#.vennir.console.v1.GetGuideResponse\"\x03\x90\x02\x01\x12g\n" +
 	"\rGetGuideImage\x12'.vennir.console.v1.GetGuideImageRequest\x1a(.vennir.console.v1.GetGuideImageResponse\"\x03\x90\x02\x01\x12d\n" +
-	"\fSearchGuides\x12&.vennir.console.v1.SearchGuidesRequest\x1a'.vennir.console.v1.SearchGuidesResponse\"\x03\x90\x02\x01B\xd3\x01\n" +
+	"\fSearchGuides\x12&.vennir.console.v1.SearchGuidesRequest\x1a'.vennir.console.v1.SearchGuidesResponse\"\x03\x90\x02\x01B\xd1\x01\n" +
 	"\x15com.vennir.console.v1B\n" +
-	"GuideProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"GuideProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_guide_proto_rawDescOnce sync.Once

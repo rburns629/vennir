@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/gateway/internal/auth"
-	"github.com/rburns629/vennir/gateway/internal/caller"
-	"github.com/rburns629/vennir/gateway/internal/store"
+	"github.com/roburns/vennir/gateway/internal/auth"
+	"github.com/roburns/vennir/gateway/internal/caller"
+	"github.com/roburns/vennir/gateway/internal/store"
 )
 
 // grantFixture is setup's API with grants (decision 26), and callers for

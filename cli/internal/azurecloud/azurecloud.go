@@ -15,10 +15,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rburns629/vennir/cli/internal/cluster"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/run"
-	"github.com/rburns629/vennir/cli/internal/tools"
+	"github.com/roburns/vennir/cli/internal/cluster"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/tools"
 )
 
 // args adds the config's subscription to an az command.

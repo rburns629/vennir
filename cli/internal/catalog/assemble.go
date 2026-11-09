@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/config"
 )
 
 // Options are what goes into the first commit.

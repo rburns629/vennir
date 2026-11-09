@@ -817,8 +817,8 @@ const file_vennir_console_v1_auth_proto_rawDesc = "" +
 	"\rExchangeToken\x12'.vennir.console.v1.ExchangeTokenRequest\x1a(.vennir.console.v1.ExchangeTokenResponse\x12O\n" +
 	"\x05GetMe\x12\x1f.vennir.console.v1.GetMeRequest\x1a .vennir.console.v1.GetMeResponse\"\x03\x90\x02\x01\x12e\n" +
 	"\x0eChangePassword\x12(.vennir.console.v1.ChangePasswordRequest\x1a).vennir.console.v1.ChangePasswordResponse\x12U\n" +
-	"\aSignOut\x12!.vennir.console.v1.SignOutRequest\x1a\".vennir.console.v1.SignOutResponse\"\x03\x90\x02\x02B\xd2\x01\n" +
-	"\x15com.vennir.console.v1B\tAuthProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"\aSignOut\x12!.vennir.console.v1.SignOutRequest\x1a\".vennir.console.v1.SignOutResponse\"\x03\x90\x02\x02B\xd0\x01\n" +
+	"\x15com.vennir.console.v1B\tAuthProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_auth_proto_rawDescOnce sync.Once

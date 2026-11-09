@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/config"
 )
 
 // eastus2's list prices on 2026-11-08.

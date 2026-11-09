@@ -642,8 +642,8 @@ const file_vennir_console_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"DeleteUser\x12$.vennir.console.v1.DeleteUserRequest\x1a%.vennir.console.v1.DeleteUserResponse\"\x03\x90\x02\x02\x12X\n" +
 	"\bSetAdmin\x12\".vennir.console.v1.SetAdminRequest\x1a#.vennir.console.v1.SetAdminResponse\"\x03\x90\x02\x02\x12b\n" +
-	"\rResetPassword\x12'.vennir.console.v1.ResetPasswordRequest\x1a(.vennir.console.v1.ResetPasswordResponseB\xd2\x01\n" +
-	"\x15com.vennir.console.v1B\tUserProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"\rResetPassword\x12'.vennir.console.v1.ResetPasswordRequest\x1a(.vennir.console.v1.ResetPasswordResponseB\xd0\x01\n" +
+	"\x15com.vennir.console.v1B\tUserProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_user_proto_rawDescOnce sync.Once

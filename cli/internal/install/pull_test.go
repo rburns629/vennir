@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // pullFixture is a released chart's package (execution-kernel/Chart.yaml

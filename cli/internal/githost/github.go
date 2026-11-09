@@ -13,7 +13,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // GitHub talks to github.com through gh.

@@ -15,9 +15,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/rburns629/vennir/kernel/internal/gen/vennir/kernel/v1/kernelv1connect"
-	"github.com/rburns629/vennir/kernel/internal/metrics"
-	"github.com/rburns629/vennir/kernel/internal/migrate"
+	"github.com/roburns/vennir/kernel/internal/gen/vennir/kernel/v1/kernelv1connect"
+	"github.com/roburns/vennir/kernel/internal/metrics"
+	"github.com/roburns/vennir/kernel/internal/migrate"
 )
 
 // Handler is kernel-api: KernelService (behind the caller check, unless

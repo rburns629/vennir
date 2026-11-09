@@ -21,12 +21,12 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/rburns629/vennir/cli/internal/cluster"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/gcp"
-	"github.com/rburns629/vennir/cli/internal/plan"
-	"github.com/rburns629/vennir/cli/internal/run"
-	"github.com/rburns629/vennir/cli/internal/tools"
+	"github.com/roburns/vennir/cli/internal/cluster"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/gcp"
+	"github.com/roburns/vennir/cli/internal/plan"
+	"github.com/roburns/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/tools"
 )
 
 // Cloud is what a cloud target's OpenTofu module made, for the values.
@@ -162,7 +162,7 @@ const (
 	KernelRelease  = "kernel"
 	ConsoleRelease = "console"
 	// ReleaseCharts is where released charts are published.
-	ReleaseCharts = "oci://ghcr.io/rburns629/vennir/charts"
+	ReleaseCharts = "oci://ghcr.io/roburns/vennir/charts"
 )
 
 // Chart is a chart's local directory (Dir), from a source checkout or, for

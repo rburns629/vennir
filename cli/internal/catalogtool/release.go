@@ -25,7 +25,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	catalogv1 "github.com/rburns629/vennir/cli/internal/gen/vennir/catalog/v1"
+	catalogv1 "github.com/roburns/vennir/cli/internal/gen/vennir/catalog/v1"
 )
 
 // A catalog release is everything main says, as of one commit, for every

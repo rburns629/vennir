@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/githost"
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/githost"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // fakeGH answers the subject template's GET with current (or fails every

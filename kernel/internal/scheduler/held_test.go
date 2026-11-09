@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rburns629/vennir/kernel/internal/executor"
+	"github.com/roburns/vennir/kernel/internal/executor"
 )
 
 // A finished Job is held until its time, so a log collector can read its

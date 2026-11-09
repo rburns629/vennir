@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/cluster"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/install"
-	"github.com/rburns629/vennir/cli/internal/plan"
+	"github.com/roburns/vennir/cli/internal/cluster"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/plan"
 )
 
 func changes(p *plan.Plan) string {

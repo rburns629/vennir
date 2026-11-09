@@ -9,10 +9,10 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/install"
-	"github.com/rburns629/vennir/cli/internal/platform"
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/platform"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // writers are the Deployments that write to the databases, stopped while

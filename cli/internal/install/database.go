@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rburns629/vennir/cli/internal/cluster"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/cluster"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // ManagedDatabase is a managed database the module made (database.type
@@ -59,7 +59,7 @@ const (
 	DatabaseAdminAccount = "vennir-db-admin"
 	databaseSetupJob     = "vennir-database-setup"
 	// ReleaseImages is where released platform images are published.
-	ReleaseImages = "ghcr.io/rburns629/vennir"
+	ReleaseImages = "ghcr.io/roburns/vennir"
 )
 
 // url is a service's URL for the managed server: its user, no password

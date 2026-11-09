@@ -1914,8 +1914,8 @@ const file_vennir_catalog_v1_release_proto_rawDesc = "" +
 	"\fAwsSigV4Auth\x12\x19\n" +
 	"\brole_arn\x18\x01 \x01(\tR\aroleArn\x12\x16\n" +
 	"\x06region\x18\x02 \x01(\tR\x06region\x12\x18\n" +
-	"\aservice\x18\x03 \x01(\tR\aserviceB\xd8\x01\n" +
-	"\x15com.vennir.catalog.v1B\fReleaseProtoP\x01ZKgithub.com/rburns629/vennir/kernel/internal/gen/vennir/catalog/v1;catalogv1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Catalog.V1\xca\x02\x11Vennir\\Catalog\\V1\xe2\x02\x1dVennir\\Catalog\\V1\\GPBMetadata\xea\x02\x13Vennir::Catalog::V1b\x06proto3"
+	"\aservice\x18\x03 \x01(\tR\aserviceB\xd6\x01\n" +
+	"\x15com.vennir.catalog.v1B\fReleaseProtoP\x01ZIgithub.com/roburns/vennir/kernel/internal/gen/vennir/catalog/v1;catalogv1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Catalog.V1\xca\x02\x11Vennir\\Catalog\\V1\xe2\x02\x1dVennir\\Catalog\\V1\\GPBMetadata\xea\x02\x13Vennir::Catalog::V1b\x06proto3"
 
 var (
 	file_vennir_catalog_v1_release_proto_rawDescOnce sync.Once

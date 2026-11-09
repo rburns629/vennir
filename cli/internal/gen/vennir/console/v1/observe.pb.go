@@ -2358,8 +2358,8 @@ const file_vennir_console_v1_observe_proto_rawDesc = "" +
 	"\tListAudit\x12#.vennir.console.v1.ListAuditRequest\x1a$.vennir.console.v1.ListAuditResponse\"\x03\x90\x02\x01\x12d\n" +
 	"\fGetAuditCopy\x12&.vennir.console.v1.GetAuditCopyRequest\x1a'.vennir.console.v1.GetAuditCopyResponse\"\x03\x90\x02\x01\x12^\n" +
 	"\n" +
-	"SearchLogs\x12$.vennir.console.v1.SearchLogsRequest\x1a%.vennir.console.v1.SearchLogsResponse\"\x03\x90\x02\x01B\xd5\x01\n" +
-	"\x15com.vennir.console.v1B\fObserveProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"SearchLogs\x12$.vennir.console.v1.SearchLogsRequest\x1a%.vennir.console.v1.SearchLogsResponse\"\x03\x90\x02\x01B\xd3\x01\n" +
+	"\x15com.vennir.console.v1B\fObserveProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_observe_proto_rawDescOnce sync.Once

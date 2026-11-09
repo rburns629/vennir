@@ -1,4 +1,4 @@
-module github.com/rburns629/vennir/cli
+module github.com/roburns/vennir/cli
 
 go 1.26.0
 
