@@ -882,7 +882,8 @@ export type ApiProduct = Message<"vennir.console.v1.ApiProduct"> & {
 
   /**
    * The API's own team only: where the gateway forwards to, and how it
-   * signs in there (service_account_token, google_id_token or aws_sig_v4).
+   * signs in there (service_account_token, google_id_token, aws_sig_v4 or
+   * entra_token).
    *
    * @generated from field: string backend_url = 20;
    */

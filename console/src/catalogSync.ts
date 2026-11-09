@@ -235,6 +235,10 @@ function backendAuth(auth: ReleaseBackendAuth | undefined): BackendAuth | null {
       const { roleArn, region, service } = auth.kind.value;
       return { awsSigV4: { roleArn, region, service } };
     }
+    case "entraToken": {
+      const { tenantId, clientId, scope } = auth.kind.value;
+      return { entraToken: { tenantId, clientId, scope } };
+    }
     default:
       return null;
   }

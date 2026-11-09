@@ -239,6 +239,7 @@ function authKind(auth: BackendAuth | null): string {
   if (!auth) return "";
   if ("serviceAccountToken" in auth) return "service_account_token";
   if ("googleIdToken" in auth) return "google_id_token";
+  if ("entraToken" in auth) return "entra_token";
   return "aws_sig_v4";
 }
 

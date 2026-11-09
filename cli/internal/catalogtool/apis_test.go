@@ -152,6 +152,25 @@ func TestAPIBackendCredentials(t *testing.T) {
 		apis[0].GetBackendAuth().GetAwsSigV4().GetService() != "lambda" {
 		t.Errorf("apis = %v, %v", apis, err)
 	}
+	entra := strings.Replace(apiYAML, `    googleIdToken:
+      serviceAccount: orders-gateway@payments-prod.iam.gserviceaccount.com`, `    entraToken:
+      tenantId: 11111111-1111-1111-1111-111111111111
+      clientId: 22222222-2222-2222-2222-222222222222
+      scope: api://33333333-3333-3333-3333-333333333333/.default`, 1)
+	c = apiCatalog(t, entra, openapiYAML)
+	if out := errorsOf(t, (*Catalog).ValidateAPIs, c); out != "" {
+		t.Fatalf("refused:\n%s", out)
+	}
+	apis, err = c.releaseAPIs()
+	if got := apis[0].GetBackendAuth().GetEntraToken(); err != nil || got.GetClientId() != "22222222-2222-2222-2222-222222222222" ||
+		got.GetTenantId() != "11111111-1111-1111-1111-111111111111" || got.GetScope() != "api://33333333-3333-3333-3333-333333333333/.default" {
+		t.Errorf("apis = %v, %v", apis, err)
+	}
+	// The client credentials grant takes only a resource's /.default.
+	noDefault := strings.Replace(entra, "/.default", "/orders.read", 1)
+	if out := errorsOf(t, (*Catalog).ValidateAPIs, apiCatalog(t, noDefault, openapiYAML)); !strings.Contains(out, "scope") {
+		t.Errorf("a scope that isn't a /.default was accepted:\n%s", out)
+	}
 	secret := strings.Replace(apiYAML, `    googleIdToken:
       serviceAccount: orders-gateway@payments-prod.iam.gserviceaccount.com`, `    secret: {name: key, key: value, header: X-Api-Key}`, 1)
 	if out := errorsOf(t, (*Catalog).ValidateAPIs, apiCatalog(t, secret, openapiYAML)); !strings.Contains(out, "api.yaml") {

@@ -194,7 +194,7 @@ k label namespace "$TEAM_A" "$TEAM_B" "$TEAM_LABEL=true" --overwrite > /dev/null
 k label namespace "$RETIRED_NS" "$PROTECTED_NS" "$TEAM_LABEL=retired" --overwrite > /dev/null
 k label namespace "$APIS_NS" vennir/api-backends=true --overwrite > /dev/null
 k label namespace "$RETIRED_APIS_NS" "$NOT_APIS_NS" vennir/api-backends=retired --overwrite > /dev/null
-for sa in eso-gcp db-sa orders-api ledger-api site-api unpublished-api; do
+for sa in eso-gcp db-sa orders-api ledger-api site-api reports-api unpublished-api; do
   k -n "$TEAM_A" create serviceaccount "$sa" --dry-run=client -o yaml | k apply -f - > /dev/null
 done
 for ns in "$TEAM_B" "$OTHER_NS" "$RETIRED_NS" "$APIS_NS"; do
@@ -382,7 +382,7 @@ identity_literal '[]' "$TEAM_SECRETS" "$RELEASES" full
 # (serviceAccountToken), its ledger API with AWS SigV4 (STS's audience), its
 # site API with a Google ID token (the GKE pool's audience,
 # gateway.gcp.tokenAudience); its unpublished-api is no published API's.
-API_AUDIENCES='{"'$TEAM_A'/orders-api":["https://orders.example"],"'$TEAM_A'/ledger-api":["sts.amazonaws.com"],"'$TEAM_A'/site-api":["acme.svc.id.goog"]}'
+API_AUDIENCES='{"'$TEAM_A'/orders-api":["https://orders.example"],"'$TEAM_A'/ledger-api":["sts.amazonaws.com"],"'$TEAM_A'/site-api":["acme.svc.id.goog"],"'$TEAM_A'/reports-api":["api://AzureADTokenExchange"]}'
 gateway_literal() {  # each key to its audiences, as JSON; "misplaced" puts each in the wrong map
   k get validatingadmissionpolicy $RELEASE-execution-console-gateway-tokens -o json \
     | python3 -c '
@@ -847,7 +847,7 @@ expect "as installed: not yet written"          'apiAudiencesWritten "false"' "$
 expect "an API's, for any backend audience"      allowed                      "$(token "$TEAM_A" orders-api https://ledger.example)"
 expect "for AWS's STS (audience rules only)"     allowed                      "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
 expect "an API ServiceAccount no API publishes"  allowed                      "$(token "$TEAM_A" unpublished-api https://orders.example)"
-expect "still never for Azure's federation"      "never the Kubernetes API"   "$(token "$TEAM_A" orders-api api://AzureADTokenExchange)"
+expect "for Entra's (audience rules only)"       allowed                      "$(token "$TEAM_A" orders-api api://AzureADTokenExchange)"
 expect "still never over an hour"                "an hour at most"            "$(token "$TEAM_A" orders-api https://orders.example 7200)"
 expect "still never a ServiceAccount not an API's" "only mint tokens for API" "$(token "$TEAM_A" db-sa https://orders.example)"
 
@@ -867,14 +867,17 @@ expect "no audience (the Kubernetes API's)"      "never the Kubernetes API"   "$
 expect "for the Kubernetes API"                  "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://kubernetes.default.svc)"
 expect "for GKE's API"                           "never the Kubernetes API"   "$(token "$TEAM_A" orders-api https://container.googleapis.com/v1/projects/p)"
 expect "for kernel-api"                          "never the Kubernetes API"   "$(token "$TEAM_A" orders-api vennir-kernel-api)"
-expect "for Azure's federation"                  "never the Kubernetes API"   "$(token "$TEAM_A" orders-api api://AzureADTokenExchange)"
 expect "for a GKE pool's STS audience"           "never the Kubernetes API"   "$(token "$TEAM_A" orders-api identitynamespace:p.svc.id.goog:https://container.googleapis.com/v1/projects/p)"
 expect "lasting over an hour"                    "an hour at most"            "$(token "$TEAM_A" orders-api https://orders.example 7200)"
 # Each API's ServiceAccount, only what its published API needs: AWS's STS
-# (the gateway's own awsSigV4 exchange) for the API that signs in with it,
+# (the gateway's own awsSigV4 exchange) or Entra's (entraToken) for the API
+# that signs in with it,
 # never for a backend token's API, nor another API's audience.
 expect "for AWS's STS, an awsSigV4 API's"        allowed                      "$(token "$TEAM_A" ledger-api sts.amazonaws.com)"
 expect "for the Google pool, a googleIdToken API's" allowed                   "$(token "$TEAM_A" site-api acme.svc.id.goog)"
+expect "for Entra's, an entraToken API's"        allowed                      "$(token "$TEAM_A" reports-api api://AzureADTokenExchange)"
+expect "for Entra's, a backend token's API"      "$API_ONLY"                  "$(token "$TEAM_A" orders-api api://AzureADTokenExchange)"
+expect "for Entra's, an awsSigV4 API's"          "$API_ONLY"                  "$(token "$TEAM_A" ledger-api api://AzureADTokenExchange)"
 expect "for AWS's STS, a googleIdToken API's"    "$API_ONLY"                  "$(token "$TEAM_A" site-api sts.amazonaws.com)"
 expect "for AWS's STS, a backend token's API"    "$API_ONLY"                  "$(token "$TEAM_A" orders-api sts.amazonaws.com)"
 expect "for a Google pool, a backend token's API" "$API_ONLY"                 "$(token "$TEAM_A" orders-api acme.svc.id.goog)"

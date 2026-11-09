@@ -27,6 +27,7 @@ INPUTS = {
 
 CLIENT_ID = "33333333-3333-3333-3333-333333333333"
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
+GATEWAY_ID = "44444444-4444-4444-4444-444444444444"
 
 
 def _load_create_module():
@@ -85,6 +86,43 @@ class CreateActionTest(unittest.TestCase):
         self.assertFalse(app.configuration.ingress.external)
         self.assertEqual(app.managed_environment_id, "/env")
         self.assertEqual(app.template.containers[0].env[0].name, "MODE")
+        client.container_apps_auth_configs.create_or_update.assert_not_called()
+
+    def test_entra_auth_requires_a_token_from_the_allowed_applications(self) -> None:
+        entra = {"tenantId": TENANT_ID, "clientId": CLIENT_ID, "allowedApplications": [GATEWAY_ID]}
+        def configure(client):
+            client.container_apps.get.side_effect = ResourceNotFoundError("no app")
+            client.managed_environments.get.return_value = SimpleNamespace(id="/env")
+            client.container_apps.begin_create_or_update.return_value.result.return_value = APP
+        exit_code, _, client = self._run({**INPUTS, "public": True, "entraAuth": entra}, configure)
+        self.assertEqual(exit_code, 0)
+        group, name, config_name, config = client.container_apps_auth_configs.create_or_update.call_args.args
+        self.assertEqual((group, name, config_name), ("orders", "web", "current"))
+        properties = config.properties
+        self.assertTrue(properties.platform.enabled)
+        self.assertEqual(properties.global_validation.unauthenticated_client_action, "Return401")
+        entra_id = properties.identity_providers.azure_active_directory
+        self.assertEqual(entra_id.registration.client_id, CLIENT_ID)
+        self.assertEqual(entra_id.registration.open_id_issuer, f"https://login.microsoftonline.com/{TENANT_ID}/v2.0")
+        self.assertEqual(entra_id.validation.allowed_audiences, [CLIENT_ID, f"api://{CLIENT_ID}"])
+        self.assertEqual(entra_id.validation.default_authorization_policy.allowed_applications, [GATEWAY_ID])
+
+    def test_an_existing_app_gets_its_entra_auth_again(self) -> None:
+        # An earlier attempt may have made the app and stopped before its
+        # authentication was on.
+        entra = {"tenantId": TENANT_ID, "clientId": CLIENT_ID, "allowedApplications": [GATEWAY_ID]}
+        def configure(client):
+            client.container_apps.get.return_value = APP
+        exit_code, _, client = self._run({**INPUTS, "entraAuth": entra}, configure)
+        self.assertEqual(exit_code, 0)
+        client.container_apps.begin_create_or_update.assert_not_called()
+        client.container_apps_auth_configs.create_or_update.assert_called_once()
+
+    def test_entra_auth_without_its_fields_fails_without_calling_azure(self) -> None:
+        self.module.INPUT_PATH.write_text(json.dumps({"inputs": {**INPUTS, "entraAuth": {"tenantId": TENANT_ID}}}))
+        with patch.object(self.module, "ContainerAppsAPIClient") as client_cls:
+            self.assertEqual(self.module.main(), 1)
+        client_cls.assert_not_called()
 
 
 class CredentialTest(unittest.TestCase):

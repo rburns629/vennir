@@ -25,6 +25,7 @@ import { updateGatewayTokenPolicy } from "../src/k8s.js";
 import {
   audienceVariables,
   AWS_STS_AUDIENCE,
+  ENTRA_AUDIENCE,
   backendAudiences,
   MAX_MAP_CHARS,
   policyApiAudiences,
@@ -50,12 +51,16 @@ const POOL = "acme.svc.id.goog";
 const sat = (audience: string): BackendAuth => ({ serviceAccountToken: { audience } });
 const aws: BackendAuth = { awsSigV4: { roleArn: "arn:aws:iam::1:role/r", region: "us-east-1", service: "lambda" } };
 const google: BackendAuth = { googleIdToken: { serviceAccount: "gw@p.iam.gserviceaccount.com", audience: "https://orders.a.run.app" } };
+const entra: BackendAuth = {
+  entraToken: { tenantId: "11111111-1111-1111-1111-111111111111", clientId: "22222222-2222-2222-2222-222222222222", scope: "api://orders/.default" },
+};
 
 describe("an API's audiences", () => {
   it("are what the gateway asks for, per backend.auth", () => {
     expect(backendAudiences(sat("https://orders.example"), POOL)).toEqual(["https://orders.example"]);
     expect(backendAudiences(aws, POOL)).toEqual([AWS_STS_AUDIENCE]);
     expect(backendAudiences(google, POOL)).toEqual([POOL]);
+    expect(backendAudiences(entra, POOL)).toEqual([ENTRA_AUDIENCE]);
     expect(backendAudiences(null, POOL)).toEqual([]);
   });
 

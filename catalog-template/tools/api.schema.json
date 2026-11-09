@@ -119,6 +119,33 @@
                   "pattern": "^[a-z0-9-]{2,32}$"
                 }
               }
+            },
+            "entraToken": {
+              "description": "For an Azure backend that checks Microsoft Entra tokens (Container Apps' or App Service's built-in authentication, API Management): the gateway signs in as clientId, a managed identity or app registration in tenantId with a federated credential trusting this cluster's OIDC issuer for the API's ServiceAccount (audience api://AzureADTokenExchange), and sends an access token for scope as a bearer token.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "tenantId",
+                "clientId",
+                "scope"
+              ],
+              "properties": {
+                "tenantId": {
+                  "description": "The Entra tenant's id.",
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                },
+                "clientId": {
+                  "description": "The client id of the managed identity or app registration the gateway signs in as.",
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                },
+                "scope": {
+                  "description": "The backend's resource, ending /.default, such as api://<the backend app's client id>/.default: the token's audience, which the backend checks.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9:/._~-]{0,299}/\\.default$"
+                }
+              }
             }
           }
         }

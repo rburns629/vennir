@@ -297,6 +297,7 @@ message BackendAuth {
     ServiceAccountTokenAuth service_account_token = 1;
     GoogleIdTokenAuth google_id_token = 2;
     AwsSigV4Auth aws_sig_v4 = 4;
+    EntraTokenAuth entra_token = 5;
   }
 }
 
@@ -318,4 +319,13 @@ message AwsSigV4Auth {
   string role_arn = 1;
   string region = 2;
   string service = 3;
+}
+
+// A Microsoft Entra access token for scope, as the app or managed identity
+// client_id in tenant_id, minted per request with the API ServiceAccount's
+// token as its federated credential (the client credentials grant).
+message EntraTokenAuth {
+  string tenant_id = 1;
+  string client_id = 2;
+  string scope = 3;
 }

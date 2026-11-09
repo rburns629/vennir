@@ -11,7 +11,10 @@
 //     Federation), then a Google ID token for the backend, as the service
 //     account the API names (IAM Credentials generateIdToken);
 //   - awsSigV4: its token traded for the API's role (STS
-//     AssumeRoleWithWebIdentity), then the request signed with SigV4.
+//     AssumeRoleWithWebIdentity), then the request signed with SigV4;
+//   - entraToken: its token as the federated credential of the Entra
+//     identity the API names (the client credentials grant), for an access
+//     token for the backend's scope.
 package credentials
 
 import (
@@ -80,9 +83,9 @@ type Minter struct {
 	// issuer), and the audience those tokens carry.
 	GCPAudience, GCPTokenAudience string
 	// Endpoints, replaced in tests.
-	GoogleSTS, GoogleIAMCredentials, AWSSTS string
-	HTTP                                    *http.Client
-	Now                                     func() time.Time
+	GoogleSTS, GoogleIAMCredentials, AWSSTS, EntraLogin string
+	HTTP                                                *http.Client
+	Now                                                 func() time.Time
 
 	mu    sync.Mutex
 	cache map[string]cached
@@ -171,6 +174,14 @@ func (m *Minter) Authorize(ctx context.Context, out *http.Request, body []byte, 
 			out.Header["X-Forwarded-For"] = forwarded
 		}
 		return err
+	case auth["entraToken"] != nil:
+		a := auth["entraToken"]
+		token, err := m.entraToken(ctx, team, serviceAccount, a["tenantId"], a["clientId"], a["scope"])
+		if err != nil {
+			return err
+		}
+		out.Header.Set("Authorization", "Bearer "+token)
+		return nil
 	}
 	return ErrUnsupported
 }
@@ -254,6 +265,36 @@ func (m *Minter) awsCredentials(ctx context.Context, namespace, serviceAccount, 
 	return creds, nil
 }
 
+func (m *Minter) entraToken(ctx context.Context, namespace, serviceAccount, tenant, clientID, scope string) (string, error) {
+	key := "azure/" + namespace + "/" + serviceAccount + "/" + tenant + "/" + clientID + "/" + scope
+	if c, ok := m.recall(key); ok {
+		return c.value, nil
+	}
+	assertion, err := m.serviceAccountToken(ctx, namespace, serviceAccount, AzureAudience)
+	if err != nil {
+		return "", err
+	}
+	var minted struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
+	}
+	endpoint := or(m.EntraLogin, "https://login.microsoftonline.com") + "/" + url.PathEscape(tenant) + "/oauth2/v2.0/token"
+	if err := m.postForm(ctx, endpoint, url.Values{
+		"grant_type":            {"client_credentials"},
+		"client_id":             {clientID},
+		"scope":                 {scope},
+		"client_assertion_type": {"urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
+		"client_assertion":      {assertion},
+	}, &minted); err != nil {
+		return "", fmt.Errorf("an Entra token as %s for %s/%s: %w", clientID, namespace, serviceAccount, err)
+	}
+	if minted.AccessToken == "" || minted.ExpiresIn <= 0 {
+		return "", errors.New("Entra returned no access token")
+	}
+	m.remember(key, cached{value: minted.AccessToken}, m.now().Add(time.Duration(minted.ExpiresIn)*time.Second))
+	return minted.AccessToken, nil
+}
+
 // sessionName says which API's ServiceAccount assumed the role, within
 // AWS's 64 characters of [\w+=,.@-].
 func sessionName(namespace, serviceAccount string) string {
@@ -274,6 +315,20 @@ func (m *Minter) postJSON(ctx context.Context, endpoint, bearer string, body any
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
+	return m.do(req, into)
+}
+
+// postForm posts an OAuth 2.0 token request (Entra's token endpoint).
+func (m *Minter) postForm(ctx context.Context, endpoint string, form url.Values, into any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return m.do(req, into)
+}
+
+func (m *Minter) do(req *http.Request, into any) error {
 	res, err := m.client().Do(req)
 	if err != nil {
 		return err
@@ -281,8 +336,9 @@ func (m *Minter) postJSON(ctx context.Context, endpoint, bearer string, body any
 	defer res.Body.Close()
 	answer, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 	if res.StatusCode != http.StatusOK {
-		// Google's error bodies name what's wrong (an audience, a
-		// binding); they never echo the token sent.
+		// Google's and Entra's error bodies name what's wrong (an
+		// audience, a binding, a federated credential); they never echo
+		// the token sent.
 		return fmt.Errorf("%s answered %d: %.300s", req.URL.Host, res.StatusCode, strings.TrimSpace(string(answer)))
 	}
 	return json.Unmarshal(answer, into)

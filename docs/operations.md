@@ -349,7 +349,10 @@ role whose trust policy accepts the cluster's OIDC issuer for
 (the issuer registered as an IAM OIDC provider; a GKE cluster's is public,
 so a GKE install calls AWS backends with no AWS cluster). A Lambda
 function URL needs both `lambda:InvokeFunctionUrl` and
-`lambda:InvokeFunction` on the role. On kind, `make kind-deploy-console` builds
+`lambda:InvokeFunction` on the role. `entraToken` needs a managed
+identity (or app registration) with a federated credential for the same
+issuer and ServiceAccount, audience `api://AzureADTokenExchange`, which the
+backend's authentication accepts. On kind, `make kind-deploy-console` builds
 it and allows backends in the `vennir-samples` namespace.
 
 ### Reading another install's catalog

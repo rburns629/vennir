@@ -1492,6 +1492,7 @@ type BackendAuth struct {
 	//	*BackendAuth_ServiceAccountToken
 	//	*BackendAuth_GoogleIdToken
 	//	*BackendAuth_AwsSigV4
+	//	*BackendAuth_EntraToken
 	Kind          isBackendAuth_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1561,6 +1562,15 @@ func (x *BackendAuth) GetAwsSigV4() *AwsSigV4Auth {
 	return nil
 }
 
+func (x *BackendAuth) GetEntraToken() *EntraTokenAuth {
+	if x != nil {
+		if x, ok := x.Kind.(*BackendAuth_EntraToken); ok {
+			return x.EntraToken
+		}
+	}
+	return nil
+}
+
 type isBackendAuth_Kind interface {
 	isBackendAuth_Kind()
 }
@@ -1577,11 +1587,17 @@ type BackendAuth_AwsSigV4 struct {
 	AwsSigV4 *AwsSigV4Auth `protobuf:"bytes,4,opt,name=aws_sig_v4,json=awsSigV4,proto3,oneof"`
 }
 
+type BackendAuth_EntraToken struct {
+	EntraToken *EntraTokenAuth `protobuf:"bytes,5,opt,name=entra_token,json=entraToken,proto3,oneof"`
+}
+
 func (*BackendAuth_ServiceAccountToken) isBackendAuth_Kind() {}
 
 func (*BackendAuth_GoogleIdToken) isBackendAuth_Kind() {}
 
 func (*BackendAuth_AwsSigV4) isBackendAuth_Kind() {}
+
+func (*BackendAuth_EntraToken) isBackendAuth_Kind() {}
 
 // A token for the API's own ServiceAccount, for this audience.
 type ServiceAccountTokenAuth struct {
@@ -1744,6 +1760,69 @@ func (x *AwsSigV4Auth) GetService() string {
 	return ""
 }
 
+// A Microsoft Entra access token for scope, as the app or managed identity
+// client_id in tenant_id, minted per request with the API ServiceAccount's
+// token as its federated credential (the client credentials grant).
+type EntraTokenAuth struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ClientId      string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	Scope         string                 `protobuf:"bytes,3,opt,name=scope,proto3" json:"scope,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EntraTokenAuth) Reset() {
+	*x = EntraTokenAuth{}
+	mi := &file_vennir_catalog_v1_release_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EntraTokenAuth) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EntraTokenAuth) ProtoMessage() {}
+
+func (x *EntraTokenAuth) ProtoReflect() protoreflect.Message {
+	mi := &file_vennir_catalog_v1_release_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EntraTokenAuth.ProtoReflect.Descriptor instead.
+func (*EntraTokenAuth) Descriptor() ([]byte, []int) {
+	return file_vennir_catalog_v1_release_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *EntraTokenAuth) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *EntraTokenAuth) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *EntraTokenAuth) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
 var File_vennir_catalog_v1_release_proto protoreflect.FileDescriptor
 
 const file_vennir_catalog_v1_release_proto_rawDesc = "" +
@@ -1899,12 +1978,14 @@ const file_vennir_catalog_v1_release_proto_rawDesc = "" +
 	"\x0faccess_requests\x18\x11 \x01(\tR\x0eaccessRequests\x1a<\n" +
 	"\x0ePerMinuteEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\x96\x02\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xdc\x02\n" +
 	"\vBackendAuth\x12`\n" +
 	"\x15service_account_token\x18\x01 \x01(\v2*.vennir.catalog.v1.ServiceAccountTokenAuthH\x00R\x13serviceAccountToken\x12N\n" +
 	"\x0fgoogle_id_token\x18\x02 \x01(\v2$.vennir.catalog.v1.GoogleIdTokenAuthH\x00R\rgoogleIdToken\x12?\n" +
 	"\n" +
-	"aws_sig_v4\x18\x04 \x01(\v2\x1f.vennir.catalog.v1.AwsSigV4AuthH\x00R\bawsSigV4B\x06\n" +
+	"aws_sig_v4\x18\x04 \x01(\v2\x1f.vennir.catalog.v1.AwsSigV4AuthH\x00R\bawsSigV4\x12D\n" +
+	"\ventra_token\x18\x05 \x01(\v2!.vennir.catalog.v1.EntraTokenAuthH\x00R\n" +
+	"entraTokenB\x06\n" +
 	"\x04kindJ\x04\b\x03\x10\x04R\x06secret\"5\n" +
 	"\x17ServiceAccountTokenAuth\x12\x1a\n" +
 	"\baudience\x18\x01 \x01(\tR\baudience\"X\n" +
@@ -1914,7 +1995,11 @@ const file_vennir_catalog_v1_release_proto_rawDesc = "" +
 	"\fAwsSigV4Auth\x12\x19\n" +
 	"\brole_arn\x18\x01 \x01(\tR\aroleArn\x12\x16\n" +
 	"\x06region\x18\x02 \x01(\tR\x06region\x12\x18\n" +
-	"\aservice\x18\x03 \x01(\tR\aserviceB\xd3\x01\n" +
+	"\aservice\x18\x03 \x01(\tR\aservice\"`\n" +
+	"\x0eEntraTokenAuth\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x1b\n" +
+	"\tclient_id\x18\x02 \x01(\tR\bclientId\x12\x14\n" +
+	"\x05scope\x18\x03 \x01(\tR\x05scopeB\xd3\x01\n" +
 	"\x15com.vennir.catalog.v1B\fReleaseProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/catalog/v1;catalogv1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Catalog.V1\xca\x02\x11Vennir\\Catalog\\V1\xe2\x02\x1dVennir\\Catalog\\V1\\GPBMetadata\xea\x02\x13Vennir::Catalog::V1b\x06proto3"
 
 var (
@@ -1929,7 +2014,7 @@ func file_vennir_catalog_v1_release_proto_rawDescGZIP() []byte {
 	return file_vennir_catalog_v1_release_proto_rawDescData
 }
 
-var file_vennir_catalog_v1_release_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_vennir_catalog_v1_release_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_vennir_catalog_v1_release_proto_goTypes = []any{
 	(*Release)(nil),                 // 0: vennir.catalog.v1.Release
 	(*WiringTypes)(nil),             // 1: vennir.catalog.v1.WiringTypes
@@ -1949,46 +2034,48 @@ var file_vennir_catalog_v1_release_proto_goTypes = []any{
 	(*ServiceAccountTokenAuth)(nil), // 15: vennir.catalog.v1.ServiceAccountTokenAuth
 	(*GoogleIdTokenAuth)(nil),       // 16: vennir.catalog.v1.GoogleIdTokenAuth
 	(*AwsSigV4Auth)(nil),            // 17: vennir.catalog.v1.AwsSigV4Auth
-	nil,                             // 18: vennir.catalog.v1.ProductAction.ErrorsEntry
-	nil,                             // 19: vennir.catalog.v1.Api.PerMinuteEntry
-	(*timestamppb.Timestamp)(nil),   // 20: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),         // 21: google.protobuf.Struct
+	(*EntraTokenAuth)(nil),          // 18: vennir.catalog.v1.EntraTokenAuth
+	nil,                             // 19: vennir.catalog.v1.ProductAction.ErrorsEntry
+	nil,                             // 20: vennir.catalog.v1.Api.PerMinuteEntry
+	(*timestamppb.Timestamp)(nil),   // 21: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),         // 22: google.protobuf.Struct
 }
 var file_vennir_catalog_v1_release_proto_depIdxs = []int32{
-	20, // 0: vennir.catalog.v1.Release.created_at:type_name -> google.protobuf.Timestamp
+	21, // 0: vennir.catalog.v1.Release.created_at:type_name -> google.protobuf.Timestamp
 	3,  // 1: vennir.catalog.v1.Release.teams:type_name -> vennir.catalog.v1.Team
 	6,  // 2: vennir.catalog.v1.Release.products:type_name -> vennir.catalog.v1.ProductAction
 	10, // 3: vennir.catalog.v1.Release.templates:type_name -> vennir.catalog.v1.Template
 	13, // 4: vennir.catalog.v1.Release.apis:type_name -> vennir.catalog.v1.Api
 	1,  // 5: vennir.catalog.v1.Release.wiring_types:type_name -> vennir.catalog.v1.WiringTypes
 	2,  // 6: vennir.catalog.v1.WiringTypes.types:type_name -> vennir.catalog.v1.WiringType
-	21, // 7: vennir.catalog.v1.Team.secret_store_documents:type_name -> google.protobuf.Struct
+	22, // 7: vennir.catalog.v1.Team.secret_store_documents:type_name -> google.protobuf.Struct
 	4,  // 8: vennir.catalog.v1.Team.allowed_targets:type_name -> vennir.catalog.v1.TargetRule
 	5,  // 9: vennir.catalog.v1.TargetRule.targets:type_name -> vennir.catalog.v1.Targets
-	21, // 10: vennir.catalog.v1.ProductAction.input_schema:type_name -> google.protobuf.Struct
-	21, // 11: vennir.catalog.v1.ProductAction.output_schema:type_name -> google.protobuf.Struct
+	22, // 10: vennir.catalog.v1.ProductAction.input_schema:type_name -> google.protobuf.Struct
+	22, // 11: vennir.catalog.v1.ProductAction.output_schema:type_name -> google.protobuf.Struct
 	12, // 12: vennir.catalog.v1.ProductAction.resources:type_name -> vennir.catalog.v1.Resources
-	18, // 13: vennir.catalog.v1.ProductAction.errors:type_name -> vennir.catalog.v1.ProductAction.ErrorsEntry
+	19, // 13: vennir.catalog.v1.ProductAction.errors:type_name -> vennir.catalog.v1.ProductAction.ErrorsEntry
 	8,  // 14: vennir.catalog.v1.ProductAction.cleanup:type_name -> vennir.catalog.v1.Cleanup
 	7,  // 15: vennir.catalog.v1.ProductAction.examples:type_name -> vennir.catalog.v1.Example
-	21, // 16: vennir.catalog.v1.Example.inputs:type_name -> google.protobuf.Struct
-	21, // 17: vennir.catalog.v1.Example.outputs:type_name -> google.protobuf.Struct
-	21, // 18: vennir.catalog.v1.Cleanup.inputs:type_name -> google.protobuf.Struct
-	21, // 19: vennir.catalog.v1.Template.parameters:type_name -> google.protobuf.Struct
+	22, // 16: vennir.catalog.v1.Example.inputs:type_name -> google.protobuf.Struct
+	22, // 17: vennir.catalog.v1.Example.outputs:type_name -> google.protobuf.Struct
+	22, // 18: vennir.catalog.v1.Cleanup.inputs:type_name -> google.protobuf.Struct
+	22, // 19: vennir.catalog.v1.Template.parameters:type_name -> google.protobuf.Struct
 	11, // 20: vennir.catalog.v1.Template.steps:type_name -> vennir.catalog.v1.TemplateStep
 	7,  // 21: vennir.catalog.v1.Template.examples:type_name -> vennir.catalog.v1.Example
-	21, // 22: vennir.catalog.v1.TemplateStep.inputs:type_name -> google.protobuf.Struct
+	22, // 22: vennir.catalog.v1.TemplateStep.inputs:type_name -> google.protobuf.Struct
 	14, // 23: vennir.catalog.v1.Api.backend_auth:type_name -> vennir.catalog.v1.BackendAuth
-	19, // 24: vennir.catalog.v1.Api.per_minute:type_name -> vennir.catalog.v1.Api.PerMinuteEntry
+	20, // 24: vennir.catalog.v1.Api.per_minute:type_name -> vennir.catalog.v1.Api.PerMinuteEntry
 	15, // 25: vennir.catalog.v1.BackendAuth.service_account_token:type_name -> vennir.catalog.v1.ServiceAccountTokenAuth
 	16, // 26: vennir.catalog.v1.BackendAuth.google_id_token:type_name -> vennir.catalog.v1.GoogleIdTokenAuth
 	17, // 27: vennir.catalog.v1.BackendAuth.aws_sig_v4:type_name -> vennir.catalog.v1.AwsSigV4Auth
-	9,  // 28: vennir.catalog.v1.ProductAction.ErrorsEntry.value:type_name -> vennir.catalog.v1.ErrorHelp
-	29, // [29:29] is the sub-list for method output_type
-	29, // [29:29] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	18, // 28: vennir.catalog.v1.BackendAuth.entra_token:type_name -> vennir.catalog.v1.EntraTokenAuth
+	9,  // 29: vennir.catalog.v1.ProductAction.ErrorsEntry.value:type_name -> vennir.catalog.v1.ErrorHelp
+	30, // [30:30] is the sub-list for method output_type
+	30, // [30:30] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_vennir_catalog_v1_release_proto_init() }
@@ -2001,6 +2088,7 @@ func file_vennir_catalog_v1_release_proto_init() {
 		(*BackendAuth_ServiceAccountToken)(nil),
 		(*BackendAuth_GoogleIdToken)(nil),
 		(*BackendAuth_AwsSigV4)(nil),
+		(*BackendAuth_EntraToken)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2008,7 +2096,7 @@ func file_vennir_catalog_v1_release_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vennir_catalog_v1_release_proto_rawDesc), len(file_vennir_catalog_v1_release_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

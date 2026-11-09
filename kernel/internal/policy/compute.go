@@ -27,6 +27,10 @@ const UnregisteredServiceAccount = "default"
 // (gateway/internal/credentials.AWSAudience).
 const AWSAudience = "sts.amazonaws.com"
 
+// EntraAudience is Entra's federated credentials', what the gateway's
+// entraToken credentials ask for (gateway/internal/credentials.AzureAudience).
+const EntraAudience = "api://AzureADTokenExchange"
+
 // MaxMapChars is the most characters one of the sixteen maps may hold: the
 // API server compiles at most 100,000 per CEL expression, and this leaves
 // room for the rest (console/src/productPolicy.ts's MAX_MAP_CHARS).
@@ -144,7 +148,7 @@ type API struct {
 	Team           string `json:"team"`
 	ServiceAccount string `json:"serviceAccount"`
 	// Kind is backend.auth's: serviceAccountToken, awsSigV4, googleIdToken,
-	// or "" (none).
+	// entraToken, or "" (none).
 	Kind     string `json:"kind"`
 	Audience string `json:"audience,omitempty"`
 }
@@ -417,6 +421,8 @@ func APIs(release *catalogv1.Release) ([]API, []Problem) {
 			api.Kind = "awsSigV4"
 		case *catalogv1.BackendAuth_GoogleIdToken:
 			api.Kind = "googleIdToken"
+		case *catalogv1.BackendAuth_EntraToken:
+			api.Kind = "entraToken"
 		}
 		apis = append(apis, api)
 	}
@@ -427,8 +433,9 @@ func APIs(release *catalogv1.Release) ([]API, []Problem) {
 // <serviceAccount>") may be minted, as console/src/gatewayTokenPolicy.ts's
 // backendAudiences: a serviceAccountToken backend's own audience (never
 // this cluster's, one a cloud federates, or the install's Google pool's),
-// AWS STS's for awsSigV4, and the install's Google pool's (gcpAudience, the
-// console chart's gateway.gcp.tokenAudience) for googleIdToken. Two APIs on
+// AWS STS's for awsSigV4, Entra's for entraToken, and the install's Google
+// pool's (gcpAudience, the console chart's gateway.gcp.tokenAudience) for
+// googleIdToken. Two APIs on
 // one ServiceAccount share both's.
 func Audiences(apis []API, gcpAudience string, reserved Reserved) map[string][]string {
 	sets := map[string]map[string]bool{}
@@ -441,6 +448,8 @@ func Audiences(apis []API, gcpAudience string, reserved Reserved) map[string][]s
 			}
 		case "awsSigV4":
 			audiences = []string{AWSAudience}
+		case "entraToken":
+			audiences = []string{EntraAudience}
 		case "googleIdToken":
 			if gcpAudience != "" {
 				audiences = []string{gcpAudience}

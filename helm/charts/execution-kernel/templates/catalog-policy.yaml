@@ -26,9 +26,9 @@ policy, internal/policy's MaxIdentityChars).
 <release>-execution-kernel-catalog-tokens, with catalogPolicy.gateway, on
 the gateway's token requests: each API ServiceAccount gets only the
 audiences the release's api.yaml needs (a serviceAccountToken backend's own,
-AWS STS's for awsSigV4, gateway.gcp.tokenAudience for googleIdToken), for an
-hour at most, and only *-api ServiceAccounts in active team namespaces, never
-the cluster's audiences. `apiAudiences0` to `apiAudiencesf`, maps of
+AWS STS's for awsSigV4, Entra's for entraToken, gateway.gcp.tokenAudience
+for googleIdToken), for an hour at most, and only *-api ServiceAccounts in
+active team namespaces, never the cluster's audiences. `apiAudiences0` to `apiAudiencesf`, maps of
 "<namespace>/<serviceAccount>" to its audiences, by the key's length modulo
 16; and `apiAudiencesWritten`, until the kernel has written them the exact
 audience check waits (as the console chart's).
@@ -544,8 +544,7 @@ spec:
     - expression: >-
         has(object.spec.audiences) && object.spec.audiences.size() > 0 &&
         object.spec.audiences.all(a, !(a in {{ list "https://kubernetes.default.svc" "https://kubernetes.default.svc.cluster.local" "kubernetes.default.svc" "kubernetes.default.svc.cluster.local" $.Values.api.auth.audience | toJson }}) &&
-          !a.startsWith("https://container.googleapis.com/") &&
-          a.lowerAscii() != "api://azureadtokenexchange" && !a.lowerAscii().startsWith("identitynamespace:"))
+          !a.startsWith("https://container.googleapis.com/") && !a.lowerAscii().startsWith("identitynamespace:"))
       message: "The gateway mints tokens only for a backend's own audience: never the Kubernetes API's or kernel-api's, nor one a cloud federates that it doesn't use itself."
       reason: Forbidden
     - expression: has(object.spec.expirationSeconds) && object.spec.expirationSeconds <= 3600

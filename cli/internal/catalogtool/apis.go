@@ -370,6 +370,10 @@ func backendAuth(backend map[string]any) *catalogv1.BackendAuth {
 		m, _ := auth["awsSigV4"].(map[string]any)
 		return &catalogv1.BackendAuth{Kind: &catalogv1.BackendAuth_AwsSigV4{
 			AwsSigV4: &catalogv1.AwsSigV4Auth{RoleArn: text(m, "roleArn"), Region: text(m, "region"), Service: text(m, "service")}}}
+	case auth["entraToken"] != nil:
+		m, _ := auth["entraToken"].(map[string]any)
+		return &catalogv1.BackendAuth{Kind: &catalogv1.BackendAuth_EntraToken{
+			EntraToken: &catalogv1.EntraTokenAuth{TenantId: text(m, "tenantId"), ClientId: text(m, "clientId"), Scope: text(m, "scope")}}}
 	}
 	return nil
 }

@@ -540,7 +540,12 @@ service account that federation lets the API's ServiceAccount act as),
 request signed as a role trusting the cluster's OIDC issuer for
 `system:serviceaccount:<team>:<api>-api`, audience `sts.amazonaws.com`; for
 a function URL the role needs both `lambda:InvokeFunctionUrl` and
-`lambda:InvokeFunction`), or
+`lambda:InvokeFunction`), `entraToken` (Container Apps', App Service's or
+API Management's Entra sign-in: an access token for the backend's `scope`,
+as the managed identity `clientId` in `tenantId`, whose federated
+credential trusts the cluster's OIDC issuer for
+`system:serviceaccount:<team>:<api>-api`, audience
+`api://AzureADTokenExchange`), or
 `serviceAccountToken` (the Kubernetes token itself, for a backend that
 checks those, for the backend's own audience: never one a cloud exchanges
 for an identity, such as `sts.amazonaws.com` or a Workload Identity
@@ -562,8 +567,9 @@ print is searchable by your team, and only your team, on Observe's Logs tab
 (From: API backends), when the install keeps logs. The samples show
 each way: `samples/local/apis/greetings` (a Service in `local-apis`, no
 cloud, checking `Vennir-Caller`), `samples/gcp/apis/hello-world` (Cloud
-Run, `googleIdToken`) and `samples/aws/apis/orders` (a Lambda function URL,
-`awsSigV4`).
+Run, `googleIdToken`), `samples/aws/apis/orders` (a Lambda function URL,
+`awsSigV4`) and `samples/azure/apis/greetings` (a Container App,
+`entraToken`).
 
 What your backend gets, and what the gateway keeps to itself:
 
