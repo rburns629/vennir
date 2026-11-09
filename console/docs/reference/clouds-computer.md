@@ -31,7 +31,7 @@ yourself is Docker, your cloud's CLI, and for the catalog git and `gh`. `vennir 
    says `arm64` or `x86_64`).
 
    ```bash
-   V=0.14.0 P=darwin-arm64    # or darwin-amd64
+   V=0.15.0 P=darwin-arm64    # or darwin-amd64
    curl -fsSLO "https://github.com/roburns/vennir/releases/download/v$V/vennir-$P"
    curl -fsSLO "https://github.com/roburns/vennir/releases/download/v$V/vennir-checksums.txt"
    grep " vennir-$P\$" vennir-checksums.txt | shasum -a 256 -c -    # must say OK
@@ -83,7 +83,7 @@ Ubuntu, with Fedora's where they differ.
 2. **`vennir`**: `uname -m` says `x86_64` (`amd64`) or `aarch64` (`arm64`).
 
    ```bash
-   V=0.14.0 P=linux-amd64    # or linux-arm64
+   V=0.15.0 P=linux-amd64    # or linux-arm64
    curl -fsSLO "https://github.com/roburns/vennir/releases/download/v$V/vennir-$P"
    curl -fsSLO "https://github.com/roburns/vennir/releases/download/v$V/vennir-checksums.txt"
    grep " vennir-$P\$" vennir-checksums.txt | sha256sum -c -    # must say OK
