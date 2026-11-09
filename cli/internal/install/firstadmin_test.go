@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // fakeKubectl is a kubectl that records its arguments and stdin in dir

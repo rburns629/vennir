@@ -21,11 +21,11 @@ import (
 )
 
 // Repository is where Vennir is released.
-const Repository = "rburns629/vennir"
+const Repository = "roburns/vennir"
 
 // First is Vennir's first release. The repository's earlier ones are
 // Vertra's (the platform's name until 2026-11-03), published under
-// ghcr.io/rburns629/vertra and signed by that repository's workflow, which
+// ghcr.io/roburns/vertra and signed by that repository's workflow, which
 // this vennir can't install: the vertra CLI does.
 const First = "0.11.0"
 

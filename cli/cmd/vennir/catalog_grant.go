@@ -10,11 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rburns629/vennir/cli/internal/awscloud"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/gcp"
-	"github.com/rburns629/vennir/cli/internal/grant"
-	"github.com/rburns629/vennir/cli/internal/plan"
+	"github.com/roburns/vennir/cli/internal/awscloud"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/gcp"
+	"github.com/roburns/vennir/cli/internal/grant"
+	"github.com/roburns/vennir/cli/internal/plan"
 )
 
 // grantOptions are `vennir catalog grant`'s flags.

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	catalogv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/catalog/v1"
+	catalogv1 "github.com/roburns/vennir/kernel/internal/gen/vennir/catalog/v1"
 )
 
 func digest(c string) string { return "sha256:" + strings.Repeat(c, 64) }

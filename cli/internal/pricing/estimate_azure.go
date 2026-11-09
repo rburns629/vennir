@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/plan"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/plan"
 )
 
 // azureAllocatable is what AKS leaves Pods on each VM, vCPU and GiB: its

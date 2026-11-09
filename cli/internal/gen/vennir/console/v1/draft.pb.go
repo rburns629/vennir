@@ -437,9 +437,9 @@ const file_vennir_console_v1_draft_proto_rawDesc = "" +
 	"\n" +
 	"ListDrafts\x12$.vennir.console.v1.ListDraftsRequest\x1a%.vennir.console.v1.ListDraftsResponse\"\x03\x90\x02\x01\x12V\n" +
 	"\tSaveDraft\x12#.vennir.console.v1.SaveDraftRequest\x1a$.vennir.console.v1.SaveDraftResponse\x12\\\n" +
-	"\vDeleteDraft\x12%.vennir.console.v1.DeleteDraftRequest\x1a&.vennir.console.v1.DeleteDraftResponseB\xd3\x01\n" +
+	"\vDeleteDraft\x12%.vennir.console.v1.DeleteDraftRequest\x1a&.vennir.console.v1.DeleteDraftResponseB\xd1\x01\n" +
 	"\x15com.vennir.console.v1B\n" +
-	"DraftProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"DraftProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_draft_proto_rawDescOnce sync.Once

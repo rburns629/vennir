@@ -1,4 +1,4 @@
-module github.com/rburns629/vennir/gateway
+module github.com/roburns/vennir/gateway
 
 go 1.26.0
 

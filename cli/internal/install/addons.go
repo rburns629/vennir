@@ -10,9 +10,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rburns629/vennir/cli/internal/cluster"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/cluster"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // AddOn is a cluster-wide chart apply installs beside the platform, when

@@ -22,7 +22,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/rburns629/vennir/kernel/internal/config"
+	"github.com/roburns/vennir/kernel/internal/config"
 )
 
 // KernelActivity is tested against the real database in activity_test.go.

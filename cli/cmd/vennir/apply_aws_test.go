@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/access"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/prompt"
-	"github.com/rburns629/vennir/cli/internal/run"
-	"github.com/rburns629/vennir/cli/internal/tofu"
+	"github.com/roburns/vennir/cli/internal/access"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/prompt"
+	"github.com/roburns/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/tofu"
 )
 
 const providerARN = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"

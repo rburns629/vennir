@@ -11,8 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rburns629/vennir/cli/internal/cluster"
-	"github.com/rburns629/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/cluster"
+	"github.com/roburns/vennir/cli/internal/install"
 )
 
 // newPassword is the line the console's reset script prints.

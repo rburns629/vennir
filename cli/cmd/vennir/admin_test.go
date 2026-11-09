@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/config"
 )
 
 func TestSavePassword(t *testing.T) {

@@ -14,10 +14,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/rburns629/vennir/kernel/internal/dbtest"
-	"github.com/rburns629/vennir/kernel/internal/domain"
-	"github.com/rburns629/vennir/kernel/internal/executor"
-	"github.com/rburns629/vennir/kernel/internal/executor/executortest"
+	"github.com/roburns/vennir/kernel/internal/dbtest"
+	"github.com/roburns/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/executor"
+	"github.com/roburns/vennir/kernel/internal/executor/executortest"
 )
 
 // The scenarios the Python scheduler was proven by (the Python kernel's

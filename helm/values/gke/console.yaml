@@ -1,6 +1,6 @@
 # execution-console on GKE (release `console`, namespace vennir-system):
 #   make gke-deploy VERSION=v<x.y.z>   (the release's signed chart and images)
-#   or: helm upgrade --install console oci://ghcr.io/rburns629/vennir/charts/execution-console --version <x.y.z> -n vennir-system \
+#   or: helm upgrade --install console oci://ghcr.io/roburns/vennir/charts/execution-console --version <x.y.z> -n vennir-system \
 #     --reset-values --force-conflicts --kube-context gke_my-gcp-project_us-central1_vennir-gke \
 #     -f helm/values/gke/console.yaml
 # No bootstrapAdmin.password here on purpose: a fresh install's first admin
@@ -10,7 +10,7 @@
 # no tag, so the release's chart runs its own (appVersion).
 # gke-deploy-console-from-source overrides both for a working-copy build.
 image:
-  repository: ghcr.io/rburns629/vennir/execution-console
+  repository: ghcr.io/roburns/vennir/execution-console
   pullPolicy: IfNotPresent
 backup:
   enabled: false

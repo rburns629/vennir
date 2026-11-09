@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
-	"github.com/rburns629/vennir/kernel/internal/executor"
+	"github.com/roburns/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/executor"
 )
 
 // The scheduler's side of cancelling and manually retrying (kernel-api's

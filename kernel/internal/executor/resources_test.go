@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/domain"
 )
 
 // A task's Pod size, its defaults, and what reaches the Pod spec. (Refusing

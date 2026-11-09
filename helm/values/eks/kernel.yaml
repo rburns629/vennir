@@ -2,7 +2,7 @@
 # install of its own (vennir.yaml target: aws): an example to start from
 # when installing with Helm by hand. Account 123456789012, us-east-2,
 # install `vennir`, platform namespace vennir-system:
-#   helm upgrade --install kernel oci://ghcr.io/rburns629/vennir/charts/execution-kernel --version <x.y.z> \
+#   helm upgrade --install kernel oci://ghcr.io/roburns/vennir/charts/execution-kernel --version <x.y.z> \
 #     -n vennir-system --create-namespace --reset-values --force-conflicts \
 #     --kube-context <context> -f helm/values/eks/kernel.yaml
 # The release's own image (appVersion): no image block.

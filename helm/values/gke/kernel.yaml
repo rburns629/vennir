@@ -1,14 +1,14 @@
 # execution-kernel on GKE `vennir-gke` (release `kernel`, namespace
 # vennir-system, the platform's own; never a team's):
 #   make gke-deploy VERSION=v<x.y.z>   (the release's signed chart and images)
-#   or: helm upgrade --install kernel oci://ghcr.io/rburns629/vennir/charts/execution-kernel --version <x.y.z> -n vennir-system \
+#   or: helm upgrade --install kernel oci://ghcr.io/roburns/vennir/charts/execution-kernel --version <x.y.z> -n vennir-system \
 #     --reset-values --force-conflicts --kube-context gke_my-gcp-project_us-central1_vennir-gke \
 #     -f helm/values/gke/kernel.yaml
 # A release's image, signed by its workflow (make gke-deploy VERSION=v...):
 # no tag, so the release's chart runs its own (appVersion).
 # gke-deploy-kernel-from-source overrides both for a working-copy build.
 image:
-  repository: ghcr.io/rburns629/vennir/execution-kernel
+  repository: ghcr.io/roburns/vennir/execution-kernel
   pullPolicy: IfNotPresent
 backup:
   enabled: false

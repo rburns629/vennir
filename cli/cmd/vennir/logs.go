@@ -13,9 +13,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rburns629/vennir/cli/internal/cluster"
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/cluster"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // logComponents are the platform's parts whose logs `vennir logs` shows:

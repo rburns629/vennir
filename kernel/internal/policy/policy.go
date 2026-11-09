@@ -42,8 +42,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	catalogv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/catalog/v1"
-	"github.com/rburns629/vennir/kernel/internal/metrics"
+	catalogv1 "github.com/roburns/vennir/kernel/internal/gen/vennir/catalog/v1"
+	"github.com/roburns/vennir/kernel/internal/metrics"
 )
 
 // Source is where a release comes from and how it's verified.

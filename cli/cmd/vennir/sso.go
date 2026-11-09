@@ -13,9 +13,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/install"
-	"github.com/rburns629/vennir/cli/internal/tofu"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/tofu"
 )
 
 // ssoCmd sets up signing in with Google: Google has no API for its OAuth

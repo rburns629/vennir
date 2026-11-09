@@ -70,10 +70,10 @@ import (
 	verrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/rburns629/vennir/gateway/internal/auth"
-	"github.com/rburns629/vennir/gateway/internal/caller"
-	"github.com/rburns629/vennir/gateway/internal/limits"
-	"github.com/rburns629/vennir/gateway/internal/store"
+	"github.com/roburns/vennir/gateway/internal/auth"
+	"github.com/roburns/vennir/gateway/internal/caller"
+	"github.com/roburns/vennir/gateway/internal/limits"
+	"github.com/roburns/vennir/gateway/internal/store"
 )
 
 // AnsweredBy says who answered: gateway or backend.

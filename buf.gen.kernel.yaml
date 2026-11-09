@@ -10,7 +10,7 @@ managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: github.com/rburns629/vennir/kernel/internal/gen
+      value: github.com/roburns/vennir/kernel/internal/gen
 plugins:
   - local: protoc-gen-go
     out: kernel/internal/gen

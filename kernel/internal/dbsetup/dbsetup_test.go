@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/rburns629/vennir/kernel/internal/dbtest"
+	"github.com/roburns/vennir/kernel/internal/dbtest"
 )
 
 // The test server's superuser stands in for the managed server's

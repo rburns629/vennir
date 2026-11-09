@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/install"
-	"github.com/rburns629/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/install"
+	"github.com/roburns/vennir/cli/internal/run"
 )
 
 // A console made public after SSO was set up: apply stops once the cloud

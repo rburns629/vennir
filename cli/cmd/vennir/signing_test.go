@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/consoleapi"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/consoleapi"
 )
 
 // The catalog repository's CI is told catalog-template's modes: key (with

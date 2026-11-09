@@ -1,4 +1,4 @@
-module github.com/rburns629/vennir/kernel
+module github.com/roburns/vennir/kernel
 
 go 1.27.0
 

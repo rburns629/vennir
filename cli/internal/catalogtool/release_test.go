@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	catalogv1 "github.com/rburns629/vennir/cli/internal/gen/vennir/catalog/v1"
+	catalogv1 "github.com/roburns/vennir/cli/internal/gen/vennir/catalog/v1"
 )
 
 // A release pushed as an artifact reads back as itself, under its commit's

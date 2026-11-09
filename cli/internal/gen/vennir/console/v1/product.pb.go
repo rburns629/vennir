@@ -1558,8 +1558,8 @@ const file_vennir_console_v1_product_proto_rawDesc = "" +
 	"\x15ListImageRepositories\x12/.vennir.console.v1.ListImageRepositoriesRequest\x1a0.vennir.console.v1.ListImageRepositoriesResponse\"\x03\x90\x02\x01\x12\x82\x01\n" +
 	"\x16ReleaseImageRepository\x120.vennir.console.v1.ReleaseImageRepositoryRequest\x1a1.vennir.console.v1.ReleaseImageRepositoryResponse\"\x03\x90\x02\x02\x12m\n" +
 	"\x0fListWiringTypes\x12).vennir.console.v1.ListWiringTypesRequest\x1a*.vennir.console.v1.ListWiringTypesResponse\"\x03\x90\x02\x01\x12v\n" +
-	"\x12ReplaceWiringTypes\x12,.vennir.console.v1.ReplaceWiringTypesRequest\x1a-.vennir.console.v1.ReplaceWiringTypesResponse\"\x03\x90\x02\x02B\xd5\x01\n" +
-	"\x15com.vennir.console.v1B\fProductProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"\x12ReplaceWiringTypes\x12,.vennir.console.v1.ReplaceWiringTypesRequest\x1a-.vennir.console.v1.ReplaceWiringTypesResponse\"\x03\x90\x02\x02B\xd3\x01\n" +
+	"\x15com.vennir.console.v1B\fProductProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_product_proto_rawDescOnce sync.Once

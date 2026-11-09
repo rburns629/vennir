@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/rburns629/vennir/cli/internal/azurecloud"
-	"github.com/rburns629/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/azurecloud"
+	"github.com/roburns/vennir/cli/internal/config"
 )
 
 // The azure module's outputs, as `tofu output -json` gives them, read into

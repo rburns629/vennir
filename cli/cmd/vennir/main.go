@@ -17,11 +17,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/rburns629/vennir/cli/internal/config"
-	"github.com/rburns629/vennir/cli/internal/prompt"
-	"github.com/rburns629/vennir/cli/internal/releases"
-	"github.com/rburns629/vennir/cli/internal/run"
-	"github.com/rburns629/vennir/cli/internal/tools"
+	"github.com/roburns/vennir/cli/internal/config"
+	"github.com/roburns/vennir/cli/internal/prompt"
+	"github.com/roburns/vennir/cli/internal/releases"
+	"github.com/roburns/vennir/cli/internal/run"
+	"github.com/roburns/vennir/cli/internal/tools"
 )
 
 // Version is set at build time (-ldflags "-X main.Version=…").

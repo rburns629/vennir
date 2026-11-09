@@ -4,7 +4,7 @@
 image:
   # -- The released images (built, scanned and signed by the release
   # workflow). Local installs set their own (helm/values/kind/).
-  repository: ghcr.io/rburns629/vennir/execution-console
+  repository: ghcr.io/roburns/vennir/execution-console
   # -- Defaults to the chart's appVersion: the image released with it.
   tag: ""
   # -- Pin by digest ("sha256:…") so what runs can't change under a moved tag.
@@ -329,7 +329,7 @@ gateway:
   # Identity it signs in as (iam.gke.io/gcp-service-account).
   serviceAccountAnnotations: {}
   image:
-    repository: ghcr.io/rburns629/vennir/execution-gateway
+    repository: ghcr.io/roburns/vennir/execution-gateway
     # -- Defaults to the chart's appVersion, as image.tag does.
     tag: ""
     # -- Pin by digest ("sha256:…"), as image.digest does.

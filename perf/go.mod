@@ -1,3 +1,3 @@
-module github.com/rburns629/vennir/perf
+module github.com/roburns/vennir/perf
 
 go 1.26

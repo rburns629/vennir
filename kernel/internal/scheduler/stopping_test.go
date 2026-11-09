@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rburns629/vennir/kernel/internal/domain"
-	"github.com/rburns629/vennir/kernel/internal/executor"
-	"github.com/rburns629/vennir/kernel/internal/executor/executortest"
+	"github.com/roburns/vennir/kernel/internal/domain"
+	"github.com/roburns/vennir/kernel/internal/executor"
+	"github.com/roburns/vennir/kernel/internal/executor/executortest"
 )
 
 // An attempt is only given up on once it's known to have stopped, and a

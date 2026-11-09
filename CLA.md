@@ -11,8 +11,8 @@ You accept it once, by commenting `I have read the CLA and I accept it` on
 your first pull request, as the bot there asks. It then covers every
 contribution you make.
 
-"We" and "us" mean rburns629, the copyright holder of Vennir
-(<https://github.com/rburns629/vennir>), and its successors and assigns.
+"We" and "us" mean roburns, the copyright holder of Vennir
+(<https://github.com/roburns/vennir>), and its successors and assigns.
 
 ## 1. Definitions
 

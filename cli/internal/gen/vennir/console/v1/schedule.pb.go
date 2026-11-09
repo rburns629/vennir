@@ -713,8 +713,8 @@ const file_vennir_console_v1_schedule_proto_rawDesc = "" +
 	"\rListSchedules\x12'.vennir.console.v1.ListSchedulesRequest\x1a(.vennir.console.v1.ListSchedulesResponse\"\x03\x90\x02\x01\x12e\n" +
 	"\x0eCreateSchedule\x12(.vennir.console.v1.CreateScheduleRequest\x1a).vennir.console.v1.CreateScheduleResponse\x12e\n" +
 	"\x0eUpdateSchedule\x12(.vennir.console.v1.UpdateScheduleRequest\x1a).vennir.console.v1.UpdateScheduleResponse\x12e\n" +
-	"\x0eDeleteSchedule\x12(.vennir.console.v1.DeleteScheduleRequest\x1a).vennir.console.v1.DeleteScheduleResponseB\xd6\x01\n" +
-	"\x15com.vennir.console.v1B\rScheduleProtoP\x01ZHgithub.com/rburns629/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
+	"\x0eDeleteSchedule\x12(.vennir.console.v1.DeleteScheduleRequest\x1a).vennir.console.v1.DeleteScheduleResponseB\xd4\x01\n" +
+	"\x15com.vennir.console.v1B\rScheduleProtoP\x01ZFgithub.com/roburns/vennir/cli/internal/gen/vennir/console/v1;consolev1\xa2\x02\x03VCX\xaa\x02\x11Vennir.Console.V1\xca\x02\x11Vennir\\Console\\V1\xe2\x02\x1dVennir\\Console\\V1\\GPBMetadata\xea\x02\x13Vennir::Console::V1b\x06proto3"
 
 var (
 	file_vennir_console_v1_schedule_proto_rawDescOnce sync.Once

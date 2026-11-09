@@ -19,9 +19,9 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/rburns629/vennir/kernel/internal/dbtest"
-	catalogv1 "github.com/rburns629/vennir/kernel/internal/gen/vennir/catalog/v1"
-	"github.com/rburns629/vennir/kernel/internal/metrics"
+	"github.com/roburns/vennir/kernel/internal/dbtest"
+	catalogv1 "github.com/roburns/vennir/kernel/internal/gen/vennir/catalog/v1"
+	"github.com/roburns/vennir/kernel/internal/metrics"
 )
 
 var testPool *pgxpool.Pool

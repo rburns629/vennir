@@ -19,9 +19,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/rburns629/vennir/kernel/internal/executor"
-	"github.com/rburns629/vennir/kernel/internal/kindtest"
-	"github.com/rburns629/vennir/kernel/internal/logging"
+	"github.com/roburns/vennir/kernel/internal/executor"
+	"github.com/roburns/vennir/kernel/internal/kindtest"
+	"github.com/roburns/vennir/kernel/internal/logging"
 )
 
 // The executor against a real cluster (kind), with a minimal fixture image
