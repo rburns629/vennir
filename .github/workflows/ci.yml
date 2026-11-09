@@ -31,9 +31,21 @@ name: ci
 #   images    builds the kernel and console images and scans them
 #             (.github/scripts/scan-image.sh): a fixable HIGH/CRITICAL
 #             vulnerability, a baked-in secret or a malicious package fails.
+#   secrets   gitleaks over the commits a PR or push adds, and over the
+#             whole history on the weekly run.
+#   code      Semgrep: Go, Python, TypeScript, Dockerfile, Kubernetes,
+#             GitHub Actions and secret rules from the Semgrep registry, plus
+#             .semgrep/malicious.yml (reverse shells, piping downloads to a
+#             shell, hidden payloads, mining, calls to bare IPs). GitHub
+#             Advanced Security isn't enabled, so results go to each run's
+#             summary and annotations rather than the Security tab. Any
+#             finding fails the run.
 #
-# Code and secret scanning (Semgrep, gitleaks) are in security.yml. The
-# weekly run catches new CVEs in images that were clean when merged.
+# One workflow, so each pull request push, merge and weekly run is one run
+# in the Actions list, not one per workflow. Each job's name is a check
+# main's ruleset requires by name: renaming one means changing the ruleset.
+# The weekly run catches new CVEs in images that were clean when merged,
+# and the whole history's secrets.
 on:
   pull_request:
   push:
@@ -463,3 +475,97 @@ jobs:
         env:
           COMPONENT: ${{ matrix.component }}
         run: bash .github/scripts/scan-image.sh "vennir-ci/$COMPONENT:$GITHUB_SHA" "$COMPONENT"
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - run: bash .github/scripts/install-scanners.sh gitleaks
+      - name: Scan for committed secrets
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        # Only the commits this event adds; the whole history on the weekly
+        # or manual run, or when a push has no usable "before".
+        run: |
+          case "$GITHUB_EVENT_NAME" in
+            pull_request) range="$PR_BASE..$PR_HEAD" ;;
+            push)         range="$PUSH_BEFORE..$GITHUB_SHA" ;;
+            *)            range="" ;;
+          esac
+          if [ -n "$range" ] && git cat-file -e "${range%%..*}^{commit}" 2>/dev/null; then
+            echo "Scanning $range"
+            set -- --log-opts="$range"
+          else
+            echo "Scanning the whole history"
+            set --
+          fi
+          if gitleaks git --redact --no-banner --report-format json --report-path gitleaks.json "$@" .; then
+            echo "### Secrets: none found" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Secrets: committed credentials found"
+            echo
+            echo "Rotate each one first (it's in git history now, so treat it as leaked), then remove it."
+            echo
+            echo "| Rule | File | Line | Commit |"
+            echo "|---|---|---|---|"
+            jq -r '.[] | "| \(.RuleID) | `\(.File)` | \(.StartLine) | \(.Commit[0:8]) |"' gitleaks.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.[] | "::error file=\(.File),line=\(.StartLine)::Committed secret (\(.RuleID)) -- rotate it, then remove it"' gitleaks.json
+          exit 1
+
+  code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Semgrep
+        # Pinned; in a venv because the runner's system Python refuses
+        # global pip installs.
+        run: |
+          python3 -m venv "$RUNNER_TEMP/semgrep"
+          "$RUNNER_TEMP/semgrep/bin/pip" install --quiet semgrep==1.178.0
+          echo "$RUNNER_TEMP/semgrep/bin" >> "$GITHUB_PATH"
+      - name: Scan code, Dockerfiles, manifests and workflows
+        # Exit codes: 0 clean, 1 findings, anything else a broken scan (an
+        # unreachable or misnamed ruleset): all but 0 fail the job, so a
+        # scan that silently checked nothing can't pass.
+        #
+        # Excluded rule: direct-response-write is an Express rule about
+        # writing HTML into a response. The console is Fastify, and every
+        # reply.send it flags sends an object that Fastify serializes as JSON.
+        run: |
+          set +e
+          semgrep scan --metrics=off --disable-version-check --error \
+            --config p/golang --config p/python --config p/typescript --config p/dockerfile \
+            --config p/kubernetes --config p/github-actions --config p/secrets \
+            --config .semgrep/ \
+            --exclude-rule javascript.express.security.audit.xss.direct-response-write.direct-response-write \
+            --json --output semgrep.json .
+          status=$?
+          set -e
+          if [ "$status" = "0" ]; then
+            echo "### Code scan: no findings" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$status" != "1" ]; then
+            echo "::error::Semgrep couldn't complete the scan (exit $status)."
+            jq -r '.errors[]? | select(.level == "error") | .message' semgrep.json 2>/dev/null | head -20
+            echo "### Code scan: Semgrep failed to run (exit $status)" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          {
+            echo "### Code scan: findings"
+            echo
+            echo "A finding with a real, reviewed reason can be suppressed on its line with a \`nosemgrep: <rule id>\` comment (\`#\` or \`//\`) and the reason beside it."
+            echo
+            echo "| Severity | Rule | Where | What |"
+            echo "|---|---|---|---|"
+            jq -r '.results[] | "| \(.extra.severity) | \(.check_id | split(".") | last) | `\(.path):\(.start.line)` | \(.extra.message | gsub("\n"; " ") | .[0:200]) |"' semgrep.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.results[] | "::error file=\(.path),line=\(.start.line)::\(.check_id | split(".") | last): \(.extra.message | gsub("\n"; " "))"' semgrep.json
+          exit 1

@@ -319,7 +319,7 @@ make proto       # lint proto/ (the console's API) and regenerate its committed 
 The kind values set a fixed admin password for local use only; never
 reuse it anywhere else.
 
-CI (`.github/workflows/ci.yml`, `security.yml`) runs every check below on
+CI (`.github/workflows/ci.yml`) runs every check below on
 each PR, plus `helm lint`/render of `helm/values/*`, actionlint, a Trivy/OSV scan
 of both platform images, Semgrep and gitleaks.
 

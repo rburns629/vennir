@@ -1,7 +1,7 @@
 # Patterns that have no business in a catalog product: the shapes malicious
 # code takes (fetching and running remote code, hiding a payload, opening a
 # shell to somewhere, mining, sending data to a bare IP), not ordinary bugs.
-# Run by .github/workflows/security.yml; an ERROR here fails the PR.
+# Run by .github/workflows/ci.yml (its code job); an ERROR here fails the PR.
 #
 # A product with a real, reviewed reason for one of these can suppress that
 # single line with a trailing `# nosemgrep: <rule id>` comment and a reason
