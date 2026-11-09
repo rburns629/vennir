@@ -91,6 +91,8 @@ const CONTENTS: { id: string; title: string; blurb: string; items: Item[] }[] = 
     items: [
       ["19-deploy-to-gcp", "Deploy to Google Cloud"],
       ["20-deploy-to-aws", "Deploy to AWS"],
+      ["23-deploy-to-azure", "Deploy to Azure"],
+      ["24-every-cloud-from-any-install", "Creating resources in every cloud"],
       ["21-api-gateway", "The API gateway, start to finish"],
       ["22-addresses-and-firewalls", "Addresses and firewall rules"],
       ["14-bots-and-automation", "Bots and automation"],
@@ -297,10 +299,12 @@ export const TASKS: { id: string; title: string; blurb: string; questions: Answe
   {
     id: "cloud",
     title: "Deploy to your cloud",
-    blurb: "Let products create resources in Google Cloud or AWS, and get past firewalls that want an address.",
+    blurb: "Let products create resources in Google Cloud, AWS or Azure, and get past firewalls that want an address.",
     questions: [
       { label: "Let a product create things in Google Cloud", guide: "19-deploy-to-gcp" },
       { label: "Let a product create things in AWS", guide: "20-deploy-to-aws" },
+      { label: "Let a product create things in Azure", guide: "23-deploy-to-azure" },
+      { label: "Who sets up what in each cloud?", guide: "24-every-cloud-from-any-install" },
       { label: "A firewall needs Vennir's address", guide: "22-addresses-and-firewalls", section: "finding-the-outbound-addresses-now" },
       { label: "Which cloud should Vennir run on?", guide: "18-where-to-host" },
     ],

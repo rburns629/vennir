@@ -6,7 +6,7 @@ No keys are made or stored. Each product runs as a Kubernetes ServiceAccount of 
 
 ## Before you start
 
-- **An install on EKS** (`vennir init --target aws`). On GKE, an existing cluster or kind, read [From an install that isn't on EKS](#from-an-install-that-isnt-on-eks) first.
+- **An install on EKS** (`vennir init --target aws`). On GKE, AKS, an existing cluster or kind, read [From an install that isn't on EKS](#from-an-install-that-isnt-on-eks) first. How this fits with Google Cloud and Azure: [Creating resources in every cloud](24-every-cloud-from-any-install.md).
 - **Your team**, in the catalog and the console ([Onboarding](17-onboarding.md#phase-5-bring-in-a-team)). Below it's `web`.
 - **The AWS CLI**, signed in as someone who may create IAM roles and Pod Identity associations in the install's account.
 - **Where resources go**: the install's own account, or another account the products reach through a role there (step 5).
@@ -186,9 +186,9 @@ Start from the closest sample and keep what makes it safe: a `serviceAccount` of
 
 ## From an install that isn't on EKS
 
-**On GKE, or any cluster whose token issuer is public**, AWS can trust a product's own token, with no key: the `caller-identity` sample does exactly this. Its `product.yaml` declares `tokenAudiences: [sts.amazonaws.com]`, so each step gets an hour-long token for its own ServiceAccount at `/platform/tokens/sts.amazonaws.com`, and hands it to STS's `AssumeRoleWithWebIdentity`.
+**On GKE, AKS, or any cluster whose token issuer is public**, AWS can trust a product's own token, with no key: the `caller-identity` sample does exactly this. Its `product.yaml` declares `tokenAudiences: [sts.amazonaws.com]`, so each step gets an hour-long token for its own ServiceAccount at `/platform/tokens/sts.amazonaws.com`, and hands it to STS's `AssumeRoleWithWebIdentity`.
 
-1. **The cluster's issuer** (on GKE it's `https://container.googleapis.com/v1/projects/<project>/locations/<location>/clusters/<cluster>`). Read it from the install's own cluster: `vennir apply` doesn't switch kubectl's context to it, so pass `--context` (on GKE, `gke_<project>_<region>_<cluster>`) or another cluster's issuer is trusted instead.
+1. **The cluster's issuer** (on GKE it's `https://container.googleapis.com/v1/projects/<project>/locations/<location>/clusters/<cluster>`; on AKS, `az aks show -g <group> -n <cluster> --query oidcIssuerProfile.issuerUrl -o tsv`). Read it from the install's own cluster: `vennir apply` doesn't switch kubectl's context to it, so pass `--context` (on GKE, `gke_<project>_<region>_<cluster>`) or another cluster's issuer is trusted instead.
 
    ```bash
    ISSUER=$(kubectl --context gke_my-vennir-project_us-central1_vennir get --raw /.well-known/openid-configuration | jq -r .issuer)
@@ -203,11 +203,11 @@ Start from the closest sample and keep what makes it safe: a `serviceAccount` of
    cat > trust-$SA.json <<EOF
    {"Version": "2012-10-17", "Statement": [{
      "Effect": "Allow",
-     "Principal": {"Federated": "arn:aws:iam::$ACCOUNT:oidc-provider/$ISSUER_HOST"},
+     "Principal": {"Federated": "arn:aws:iam::${ACCOUNT}:oidc-provider/${ISSUER_HOST}"},
      "Action": "sts:AssumeRoleWithWebIdentity",
      "Condition": {"StringEquals": {
-       "$ISSUER_HOST:sub": "system:serviceaccount:$TEAM:$SA",
-       "$ISSUER_HOST:aud": "sts.amazonaws.com"
+       "${ISSUER_HOST}:sub": "system:serviceaccount:${TEAM}:${SA}",
+       "${ISSUER_HOST}:aud": "sts.amazonaws.com"
      }}
    }]}
    EOF
@@ -225,7 +225,7 @@ Uncomment the role's `secretRefs` line on **every** action in each `product.yaml
 
 **App Runner is closed to new accounts.** AWS lets no new account create App Runner services ("Account … can't create new App Runner services"); the `app-runner` sample gave way to `ecs-express` (2026-11-07). A catalog that copied `app-runner` can't just delete it: its CI refuses a product removed without being deprecated first, so set `deprecated:` on it, merge, then remove it in a later pull request.
 
-Proven from GKE (2026-11-07, from the 0.13.2 release): a team maintainer registered `aws-s3-bucket-role` and `aws-app-runner-role`; both checks signed in as their own roles (`s3-bucket` **Ready**); a member's template run made a bucket, tagged for its team with public access blocked, and started the then `app-runner` sample with its region resolved from the bucket's output; and **Delete** removed the bucket, each step signing in as its own ServiceAccount (CloudTrail: the sessions `vennir-check` and `vennir-step` on `vennir-aws-s3-bucket` and `vennir-aws-app-runner`). Your own products follow `caller-identity`: the same `tokenAudiences`, the same call.
+Proven from GKE (2026-11-07, from the 0.13.2 release): a team maintainer registered `aws-s3-bucket-role` and `aws-app-runner-role`; both checks signed in as their own roles (`s3-bucket` **Ready**); a member's template run made a bucket, tagged for its team with public access blocked, and started the then `app-runner` sample with its region resolved from the bucket's output; and **Delete** removed the bucket, each step signing in as its own ServiceAccount (CloudTrail: the sessions `vennir-check` and `vennir-step` on `vennir-aws-s3-bucket` and `vennir-aws-app-runner`). Proven again from GKE (2026-11-09, the 0.15.0 release): `whoami`, an S3 bucket made and deleted through its product, and an ECS Express service serving an API through the gateway from the internet, each as its own role with its step's token. Your own products follow `caller-identity`: the same `tokenAudiences`, the same call. Keep the braces in the trust policy (`${ISSUER_HOST}:sub`): in zsh, `$ISSUER_HOST:sub` is read as a modifier, and IAM refuses the policy ("Conditions must be prefaced by a vendor").
 
 **On kind**: AWS can't fetch the keys of kind's issuer, so there's no keyless way in. Use kind for products that call no cloud, and an EKS install for AWS.
 

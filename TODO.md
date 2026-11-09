@@ -70,6 +70,17 @@ Built and tested, proven on kind or against fakes, and not yet seen on a
 cloud. One billed run, on acyclix-dev and a minimal EKS install, as the
 last one was.
 
+- [ ] **Google Cloud from a cluster other than GKE**: the GCP samples sign
+  in only through GKE's Workload Identity. Give them what the azure and aws
+  samples have (`tokenAudiences` for a workload identity pool's provider,
+  an external-account credential from the step's token when there's no GKE
+  metadata), and prove it from EKS or AKS (`console/docs/24-every-cloud-from-any-install.md`).
+- [ ] **AWS and Google Cloud from AKS**: the same mechanisms as from GKE
+  (AKS's issuer in an IAM OIDC provider, or a pool), not run yet.
+- [ ] **The azure samples' cleanup**: no `delete` action, and they tag
+  `managed-by: vennir` rather than `vennir-made` and `vennir-team`, so
+  **What runs made** can't list or delete what they made, as the GCP and
+  AWS samples' can.
 - [ ] **The step-Pods policy on EKS** (#216): that its Job controller
   makes Pods as a kube-system ServiceAccount, as kind's and GKE's do (seen
   on GKE 2026-11-07), so every step's Pod is admitted.
