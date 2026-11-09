@@ -8,12 +8,24 @@ displayName: Resource group
 description: Finds a resource group by name, or creates it. Where everything later steps create
   goes.
 owner: azure-team
+# Azure from AKS, or from any cluster Entra trusts by OIDC (README.md, Azure
+# from another cluster): its own clouds, over the team's [azure].
+clouds: [azure, gcp, aws, existing]
 # Its own identity: a managed identity federated to this ServiceAccount
 # alone, with only what it does (README.md, Credentials).
 serviceAccount: azure-resource-group
+# Off AKS, a token for Entra, an hour long, at
+# /platform/tokens/api___AzureADTokenExchange, with which it signs in as
+# its own managed identity (the team secret azure-resource-group-identity).
+# AKS's own Workload Identity needs none.
+tokenAudiences:
+- api://AzureADTokenExchange
 runtime: python3.12
 actions:
 - name: create
+  # Off AKS, its own identity (README.md, Credentials): a template's, the
+  # Catalog's and a Delete's steps get only what an action lists here.
+  # secretRefs: [{name: azure-resource-group-identity, keys: [client-id, tenant-id]}]
   # Finds what it would create before creating it, so a step that
   # failed on the platform's side (a reclaimed node, a timeout) is
   # retried, up to three attempts in all.

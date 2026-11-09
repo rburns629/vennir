@@ -24,7 +24,7 @@ example teams, never published from there:
 - `samples/gcp`, `samples/aws`, `samples/azure`: products that call real,
   billed cloud APIs (a project, bucket or resource group, a container
   service, a PostgreSQL database), keyless. Copy one into a team once its
-  cloud identity is set up. The azure ones haven't called Azure yet.
+  cloud identity is set up.
 - `samples/perf`: the platform's benchmark product, only ever installed
   on its own test cluster. Nothing needs it; delete it if you like.
 

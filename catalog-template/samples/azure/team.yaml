@@ -8,9 +8,10 @@ displayName: Azure samples
 description: >-
   Real Azure calls: a resource group, a Container App, and a PostgreSQL
   flexible server with Microsoft Entra sign-in only. Every action looks
-  before it creates. Keyless: AKS Workload Identity supplies each step's
-  credentials.
+  before it creates. Keyless: AKS Workload Identity, or off AKS the step's
+  own token by federation, signs each step in.
 owner: azure-team
 contact: azure-team@example.com
-# Its products run only on azure installs: listed, marked, not run elsewhere.
+# Its products run only on azure installs (listed, marked, not run
+# elsewhere), unless a product.yaml says its own: all three run off AKS too.
 clouds: [azure]
