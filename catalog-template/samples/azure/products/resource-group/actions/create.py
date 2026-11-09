@@ -31,6 +31,8 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 # the azure team's README.md, Azure from another cluster).
 OWN_IDENTITY = Path("/platform/secrets/azure-resource-group-identity")
 TOKEN_FILE = Path("/platform/tokens/api___AzureADTokenExchange")
+# Azure's error codes for a failure that may pass on another attempt.
+TRANSIENT_CODES = {"InternalServerError", "ServiceUnavailable", "GatewayTimeout", "ServerBusy", "TooManyRequests"}
 
 
 def _write_result(result: dict[str, Any]) -> None:
@@ -71,6 +73,14 @@ def _azure_failure(error: Exception) -> int:
             "product's tokenAudiences, or a step not run as the product.",
         )
     if isinstance(error, ClientAuthenticationError):
+        if not (os.environ.get("AZURE_FEDERATED_TOKEN_FILE") or OWN_IDENTITY.exists()):
+            return _failure(
+                "NO_IDENTITY",
+                "No identity to sign in to Azure as: on AKS, Workload Identity's (the step Pod's "
+                "label and its ServiceAccount's annotation); off AKS, the team secret "
+                f"{OWN_IDENTITY.name}, which the step gets once its secretRefs line in product.yaml "
+                "is uncommented.",
+            )
         return _failure(
             "AZURE_AUTH_FAILED",
             "Couldn't sign in to Azure: is the step's ServiceAccount federated with a managed "
@@ -79,7 +89,9 @@ def _azure_failure(error: Exception) -> int:
     if isinstance(error, HttpResponseError):
         status = error.status_code or 0
         code = getattr(error.error, "code", None) or str(status)
-        retryable = status in (408, 429) or status >= 500
+        # A long-running operation's failure arrives on a poll that itself
+        # succeeded (200): its code says whether trying again may work.
+        retryable = status in (408, 429) or status >= 500 or code in TRANSIENT_CODES
         return _failure("AZURE_API_ERROR", f"{code}: {error.message}", retryable=retryable)
     if isinstance(error, ServiceRequestError):
         return _failure("AZURE_API_ERROR", str(error), retryable=True)

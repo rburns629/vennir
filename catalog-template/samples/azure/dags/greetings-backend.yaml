@@ -1,0 +1,108 @@
+# The greetings API's backend (apis/greetings) as an Azure Container App:
+# the greetings image (examples/greetings-api in the platform's repository,
+# pushed to a registry the app can pull), public at the URL Container Apps
+# make for it, behind their built-in authentication: 401 for anything
+# without an Entra token for the backend's app registration from the
+# gateway's identity. The backend also checks the gateway's signed
+# Vennir-Caller against the gateway's public keys, so the install's gateway
+# must be on the internet (its internet listener serves them). Real, billed
+# calls: the app runs until it's deleted (Container Apps' consumption plan
+# bills little while it's idle). Off AKS, both products need their identity
+# secrets (the azure team's README.md, Azure from another cluster).
+apiVersion: vennir.dev/v2
+kind: Template
+name: greetings-backend
+displayName: The greetings API's backend
+description: Hosts the greetings API's backend on Azure Container Apps, answering only the gateway.
+parameters:
+  type: object
+  additionalProperties: false
+  required: [subscriptionId, image, gatewayKeys, tenantId, backendClientId, gatewayClientId]
+  properties:
+    subscriptionId:
+      type: string
+      title: Subscription
+      pattern: ^[0-9a-fA-F-]{36}$
+    resourceGroup:
+      type: string
+      title: Resource group
+      description: Made if it doesn't exist.
+      default: greetings
+    location:
+      type: string
+      title: Region
+      default: eastus2
+    appName:
+      type: string
+      title: App name
+      default: greetings
+      pattern: ^[a-z][a-z0-9-]{0,30}[a-z0-9]$
+    image:
+      type: string
+      title: Image
+      description: The greetings image, a tag per version, in a registry the app can pull.
+    registryServer:
+      type: string
+      title: Private registry
+      description: Its server, such as myregistry.azurecr.io; empty for a public image.
+      default: ""
+    registryIdentity:
+      type: string
+      title: Pull identity
+      description: A user-assigned identity's resource id, with AcrPull on the registry.
+      default: system
+    gatewayKeys:
+      type: string
+      title: The gateway's public keys
+      description: https://<the gateway's public host>/.vennir/jwks.json
+      pattern: ^https://[A-Za-z0-9.-]+(:[0-9]+)?/\.vennir/jwks\.json$
+    tenantId:
+      type: string
+      title: Entra tenant
+      pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+    backendClientId:
+      type: string
+      title: The backend's app registration
+      description: Its client id, the audience the gateway's tokens carry.
+      pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+    gatewayClientId:
+      type: string
+      title: The gateway's identity
+      description: The client id of the managed identity the gateway signs in as for this API.
+      pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+steps:
+  - id: group
+    action: resource-group.create
+    inputs:
+      subscriptionId: {$param: subscriptionId}
+      name: {$param: resourceGroup}
+      location: {$param: location}
+  - id: app
+    action: container-app.create
+    dependsOn: [group]
+    timeoutSeconds: 1200                  # a new environment takes a few minutes
+    inputs:
+      subscriptionId: {$param: subscriptionId}
+      resourceGroup: {$fromStep: group, $output: resourceGroup}
+      location: {$param: location}
+      environmentName: greetings-env
+      appName: {$param: appName}
+      image: {$param: image}
+      registryServer: {$param: registryServer}
+      registryIdentity: {$param: registryIdentity}
+      port: 8080
+      public: true
+      entraAuth:
+        tenantId: {$param: tenantId}
+        clientId: {$param: backendClientId}
+        allowedApplications: [{$param: gatewayClientId}]
+      environment:
+        GATEWAY_JWKS_URL: {$param: gatewayKeys}
+        # <team>/<name> of apis/greetings, which the gateway signs into each
+        # call: copied into another team's folder, its name in place of
+        # azure, or the backend refuses every call (401).
+        API: azure/greetings
+        # Its URL isn't known until Container Apps make it, and their
+        # ingress routes each app by its host: the audience it checks is
+        # the request's own origin.
+        AUDIENCE_FROM_HOST: "true"

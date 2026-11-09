@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
 
 _MODULE_PATH = Path(__file__).parent / "create.py"
 APP = SimpleNamespace(
@@ -88,6 +88,23 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(app.template.containers[0].env[0].name, "MODE")
         client.container_apps_auth_configs.create_or_update.assert_not_called()
 
+    def test_a_private_registry_pulls_as_an_identity_the_app_is_given(self) -> None:
+        pull = "/subscriptions/s/resourceGroups/g/providers/Microsoft.ManagedIdentity/userAssignedIdentities/pull"
+        def configure(client):
+            client.container_apps.get.side_effect = ResourceNotFoundError("no app")
+            client.managed_environments.get.return_value = SimpleNamespace(id="/env")
+            client.container_apps.begin_create_or_update.return_value.result.return_value = APP
+        exit_code, _, client = self._run({**INPUTS, "registryServer": "r.azurecr.io", "registryIdentity": pull}, configure)
+        self.assertEqual(exit_code, 0)
+        app = client.container_apps.begin_create_or_update.call_args.args[2]
+        self.assertEqual((app.configuration.registries[0].server, app.configuration.registries[0].identity), ("r.azurecr.io", pull))
+        self.assertEqual((app.identity.type, list(app.identity.user_assigned_identities)), ("UserAssigned", [pull]))
+        # No registry: no identity.
+        exit_code, _, client = self._run(INPUTS, configure)
+        app = client.container_apps.begin_create_or_update.call_args.args[2]
+        self.assertIsNone(app.identity)
+        self.assertIsNone(app.configuration.registries)
+
     def test_entra_auth_requires_a_token_from_the_allowed_applications(self) -> None:
         entra = {"tenantId": TENANT_ID, "clientId": CLIENT_ID, "allowedApplications": [GATEWAY_ID]}
         def configure(client):
@@ -123,6 +140,16 @@ class CreateActionTest(unittest.TestCase):
         with patch.object(self.module, "ContainerAppsAPIClient") as client_cls:
             self.assertEqual(self.module.main(), 1)
         client_cls.assert_not_called()
+
+    def test_a_long_running_operations_failure_is_retryable_by_its_code(self) -> None:
+        # As the SDK raises it: on a poll that answered 200, the operation's error inside.
+        for code, retryable in (("InternalServerError", True), ("BadRequest", False)):
+            error = HttpResponseError(message="failed")
+            error.status_code = 200
+            error.error = SimpleNamespace(code=code)
+            self.assertEqual(self.module._azure_failure(error), 1)
+            failure = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+            self.assertEqual((failure["code"], failure["retryable"]), ("AZURE_API_ERROR", retryable))
 
 
 class CredentialTest(unittest.TestCase):
@@ -188,6 +215,17 @@ class CredentialTest(unittest.TestCase):
         error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
         self.assertEqual((error["code"], error["retryable"]), ("NO_TOKEN", False))
 
+
+    def test_with_neither_webhook_nor_secret_it_says_what_is_missing(self) -> None:
+        with (
+            patch.object(self.module, "DefaultAzureCredential"),
+            patch.object(self.module, "ContainerAppsAPIClient") as client_cls,
+        ):
+            client_cls.return_value.container_apps.get.side_effect = ClientAuthenticationError(message="no credential")
+            self.assertEqual(self.module.main(), 1)
+        error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("NO_IDENTITY", False))
+        self.assertIn(self.module.OWN_IDENTITY.name, error["message"])
 
 if __name__ == "__main__":
     unittest.main()

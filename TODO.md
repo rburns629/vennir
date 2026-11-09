@@ -45,18 +45,14 @@ steps left, then one billed proof run per cloud, and the MCP server last.
    - [ ] Small quotas: a scan's scanner takes the platform a second node, so
      on 4 vCPUs a step waits about twenty minutes (`docs/clouds/azure.md`).
      The scanner on the steps pool would leave the platform's node alone.
-   - [ ] **GKE to Azure and AWS, through the gateway** (agreed 2026-11-09):
-     a GKE install's steps making Azure resources (a resource group,
-     `postgres-flexible`, a Container App) and AWS ones, and an API in each
-     cloud reachable through its gateway. Done, tested with Azure mocked:
-     the azure samples off AKS (the step's token, the team secret
-     `<ServiceAccount>-identity`); the gateway's `entraToken` backend auth,
-     and `container-app`'s `entraAuth` (its built-in authentication). Left:
-     a release with `entraToken`, pinned in the template (`vennir catalog
-     validate` before it refuses an api.yaml using it); then
-     `samples/azure/apis/greetings` on a Container App behind it (branch
-     `feat/azure-greetings-api`); then one billed run from that release,
-     minimal, written up as the GCP-to-AWS run was.
+   - [x] **GKE to Azure and AWS, through the gateway** (agreed 2026-11-09,
+     run 2026-11-09 from the 0.15.0 release with #308's samples): a GKE
+     Autopilot install's steps made a resource group, a Container App and
+     a PostgreSQL server in Azure, and an S3 bucket and an ECS Express
+     service in AWS, each signing in by federation with its own token; ESO
+     synced a Key Vault secret; both greetings APIs answered through the
+     gateway from the internet (`entraToken` to the Container App). What it
+     found is below (Found in the GKE-to-Azure-and-AWS run).
    - [ ] Then: the managed database (Flexible Server, Entra sign-in for each
      service), managed Prometheus, a public console, the audit and log
      archives, kernel policy reading ACR.
@@ -110,6 +106,39 @@ last one was.
   checked against the release workflow's identity at that tag first): the
   one part of the billed run's plan not run (it installed the release with
   `vennir apply` instead).
+
+## Found in the GKE-to-Azure-and-AWS run (2026-11-09)
+
+From the 0.15.0 release on GKE Autopilot (minimal, in-cluster database),
+with the azure and aws samples from #308 in a private catalog, run through
+the console's API as a member of each team. The samples' own fixes went in
+#308 (`container-app` giving the app its pull identity, Azure's transient
+codes retryable, the README's commands and ordering).
+
+- [ ] **Template parameters' `default` in `RunTemplate`** (below, from the
+  GCP-to-AWS run) hit again: `aws/greetings-backend` run through the API
+  without `serviceName` was refused INPUT_INVALID, though it has a default.
+- [ ] **The console's one Pod at size minimal** was evicted by an Autopilot
+  node scale-down ("deleting pod for node scale down"): the console and API
+  were gone for about a minute (steps carried on). A PodDisruptionBudget
+  for the console, or `cluster-autoscaler.kubernetes.io/safe-to-evict:
+  "false"` on its Pod, would keep it.
+- [ ] **`vennir init` records `access.github` from `gh auth status`**, which
+  names the keyring's account label: after a GitHub username change it
+  wrote the old name (`rburns629` for `roburns`). Ask the API (`gh api
+  user`) for the login instead.
+- [ ] **`vennir catalog create` can't read the GitHub plan** without the
+  `user` scope ("unknown plan"), so on a Pro account it skipped the
+  environments and branch rules a paid plan allows. Say how to grant the
+  scope (`gh auth refresh -s user`), or try creating the rules and fall
+  back when GitHub refuses.
+- [ ] **`vennir apply --plan-only`'s estimate** was unavailable once (Google's
+  prices API answered 429 three times); minutes later it worked. Retry with
+  backoff before giving up.
+- [ ] **An admin running a team's product**: `s3-bucket` and `ecs-express`
+  need `forTeam` (MISSING_TEAM), and `onBehalfOf` needs membership, so an
+  admin joins the team first. Say so in the API guide, or let an admin act
+  on behalf of any team.
 
 ## Found in the GCP-to-AWS run (2026-11-07)
 

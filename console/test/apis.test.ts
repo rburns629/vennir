@@ -135,6 +135,29 @@ describe("from the release", () => {
     expect(problems).toEqual([]);
   });
 
+  it("stores AWS's and Entra's backend auth with the fields the gateway reads", async () => {
+    const ownerId = (await findTeamByName(owner))?.id ?? "";
+    await apply([
+      api("orders", { internet: true }),
+      api("ledger", {
+        hidden: true,
+        perMinute: {},
+        backendAuth: { kind: { case: "entraToken" as const, value: { tenantId: "11111111-1111-1111-1111-111111111111", clientId: "22222222-2222-2222-2222-222222222222", scope: "api://33333333-3333-3333-3333-333333333333/.default" } } },
+      }),
+      api("legacy", {
+        backendUrl: "https://old.example.com",
+        backendAuth: { kind: { case: "awsSigV4" as const, value: { roleArn: "arn:aws:iam::000000000000:role/orders-gateway", region: "us-east-2", service: "lambda" } } },
+      }),
+    ]);
+    const rows = await db.select().from(apis).where(and(eq(apis.teamId, ownerId), inArray(apis.name, ["ledger", "legacy"])));
+    expect(rows.find((r) => r.name === "ledger")?.backendAuth).toEqual({
+      entraToken: { tenantId: "11111111-1111-1111-1111-111111111111", clientId: "22222222-2222-2222-2222-222222222222", scope: "api://33333333-3333-3333-3333-333333333333/.default" },
+    });
+    expect(rows.find((r) => r.name === "legacy")?.backendAuth).toEqual({ awsSigV4: { roleArn: "arn:aws:iam::000000000000:role/orders-gateway", region: "us-east-2", service: "lambda" } });
+    expect(problems).toEqual([]);
+    await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} }), api("legacy", { backendUrl: "https://old.example.com" })]);
+  });
+
   it("removes what a later release drops", async () => {
     await apply([api("orders", { internet: true }), api("ledger", { hidden: true, perMinute: {} })]);
     expect((await listFor("maintainer")).map((a) => a.name).sort()).toEqual(["ledger", "orders"]);

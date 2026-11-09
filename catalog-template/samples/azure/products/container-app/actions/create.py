@@ -46,8 +46,10 @@ from azure.mgmt.appcontainers.models import (
     IdentityProviders,
     Ingress,
     ManagedEnvironment,
+    ManagedServiceIdentity,
     RegistryCredentials,
     Template,
+    UserAssignedIdentity,
 )
 
 INPUT_PATH = Path("/platform/input/request.json")
@@ -61,6 +63,8 @@ OUTPUT_PATH = Path("/platform/output/result.json")
 # the azure team's README.md, Azure from another cluster).
 OWN_IDENTITY = Path("/platform/secrets/azure-container-app-identity")
 TOKEN_FILE = Path("/platform/tokens/api___AzureADTokenExchange")
+# Azure's error codes for a failure that may pass on another attempt.
+TRANSIENT_CODES = {"InternalServerError", "ServiceUnavailable", "GatewayTimeout", "ServerBusy", "TooManyRequests"}
 
 
 def _write_result(result: dict[str, Any]) -> None:
@@ -101,6 +105,14 @@ def _azure_failure(error: Exception) -> int:
             "product's tokenAudiences, or a step not run as the product.",
         )
     if isinstance(error, ClientAuthenticationError):
+        if not (os.environ.get("AZURE_FEDERATED_TOKEN_FILE") or OWN_IDENTITY.exists()):
+            return _failure(
+                "NO_IDENTITY",
+                "No identity to sign in to Azure as: on AKS, Workload Identity's (the step Pod's "
+                "label and its ServiceAccount's annotation); off AKS, the team secret "
+                f"{OWN_IDENTITY.name}, which the step gets once its secretRefs line in product.yaml "
+                "is uncommented.",
+            )
         return _failure(
             "AZURE_AUTH_FAILED",
             "Couldn't sign in to Azure: is the step's ServiceAccount federated with a managed "
@@ -109,7 +121,9 @@ def _azure_failure(error: Exception) -> int:
     if isinstance(error, HttpResponseError):
         status = error.status_code or 0
         code = getattr(error.error, "code", None) or str(status)
-        retryable = status in (408, 429) or status >= 500
+        # A long-running operation's failure arrives on a poll that itself
+        # succeeded (200): its code says whether trying again may work.
+        retryable = status in (408, 429) or status >= 500 or code in TRANSIENT_CODES
         return _failure("AZURE_API_ERROR", f"{code}: {error.message}", retryable=retryable)
     if isinstance(error, ServiceRequestError):
         return _failure("AZURE_API_ERROR", str(error), retryable=True)
@@ -169,9 +183,10 @@ def main() -> int:
         client = ContainerAppsAPIClient(_credential(), inputs["subscriptionId"])
         try:
             app = client.container_apps.get(group, name)
-            print(f"container app '{name}' already exists, leaving it as it is")
-            # Again, in case an earlier attempt made the app and stopped
-            # before its authentication was on.
+            # Its authentication again, in case an earlier attempt made the
+            # app and stopped before it was on; nothing else is changed.
+            print(f"container app '{name}' already exists, leaving it as it is"
+                  + (", but for its Entra authentication, set again" if entra else ""))
             if entra:
                 _require_entra(client, group, name, entra)
             _write_result({"status": "succeeded", "outputs": _outputs(app)})
@@ -190,16 +205,22 @@ def main() -> int:
                 group, inputs["environmentName"], ManagedEnvironment(location=location, zone_redundant=False)
             ).result()
 
-        registries = []
+        registries, identity = [], None
         if inputs.get("registryServer"):
-            registries.append(RegistryCredentials(
-                server=inputs["registryServer"], identity=inputs.get("registryIdentity", "system")
-            ))
+            pull = inputs.get("registryIdentity") or "system"
+            registries.append(RegistryCredentials(server=inputs["registryServer"], identity=pull))
+            # The app must carry the identity it pulls as: Azure refuses a
+            # registry identity the app doesn't have.
+            identity = (
+                ManagedServiceIdentity(type="SystemAssigned") if pull == "system"
+                else ManagedServiceIdentity(type="UserAssigned", user_assigned_identities={pull: UserAssignedIdentity()})
+            )
         app = client.container_apps.begin_create_or_update(
             group,
             name,
             ContainerApp(
                 location=location,
+                identity=identity,
                 managed_environment_id=managed_environment.id,
                 configuration=Configuration(
                     ingress=Ingress(external=bool(inputs.get("public", False)), target_port=int(inputs.get("port", 8080))),

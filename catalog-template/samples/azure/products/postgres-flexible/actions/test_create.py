@@ -13,7 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
 
 _MODULE_PATH = Path(__file__).parent / "create.py"
 SERVER = SimpleNamespace(name="orders-db", fully_qualified_domain_name="orders-db.postgres.database.azure.com", id="/servers/orders-db")
@@ -83,6 +83,16 @@ class CreateActionTest(unittest.TestCase):
         self.assertEqual(server.auth_config.active_directory_auth, "Enabled")
         self.assertIsNone(server.administrator_login_password)
         self.assertEqual(server.network.public_network_access, "Disabled")
+
+    def test_a_long_running_operations_failure_is_retryable_by_its_code(self) -> None:
+        # As the SDK raises it: on a poll that answered 200, the operation's error inside.
+        for code, retryable in (("InternalServerError", True), ("BadRequest", False)):
+            error = HttpResponseError(message="failed")
+            error.status_code = 200
+            error.error = SimpleNamespace(code=code)
+            self.assertEqual(self.module._azure_failure(error), 1)
+            failure = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+            self.assertEqual((failure["code"], failure["retryable"]), ("AZURE_API_ERROR", retryable))
 
 
 class CredentialTest(unittest.TestCase):
@@ -160,6 +170,17 @@ class CredentialTest(unittest.TestCase):
         admin = client_cls.return_value.administrators_microsoft_entra.begin_create_or_update.call_args.args[3]
         self.assertEqual(admin.tenant_id, TENANT_ID)
 
+
+    def test_with_neither_webhook_nor_secret_it_says_what_is_missing(self) -> None:
+        with (
+            patch.object(self.module, "DefaultAzureCredential"),
+            patch.object(self.module, "PostgreSQLManagementClient") as client_cls,
+        ):
+            client_cls.return_value.servers.get.side_effect = ClientAuthenticationError(message="no credential")
+            self.assertEqual(self.module.main(), 1)
+        error = json.loads(self.module.OUTPUT_PATH.read_text())["error"]
+        self.assertEqual((error["code"], error["retryable"]), ("NO_IDENTITY", False))
+        self.assertIn(self.module.OWN_IDENTITY.name, error["message"])
 
 if __name__ == "__main__":
     unittest.main()
