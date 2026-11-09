@@ -46,7 +46,7 @@ The install's cloud matters most for keyless access: a product reaches the cloud
 `vennir` runs on macOS and Linux (amd64 and arm64), and on Windows in WSL 2. [Get your computer ready](clouds-computer.md) has each system's steps, Docker and the cloud CLIs included. In short: download the release for your machine from GitHub, check it against the release's checksums, and put it on your `PATH`. On a Mac with Apple silicon (`darwin-arm64`; the others are `darwin-amd64`, `linux-amd64` and `linux-arm64`, and on Linux `sha256sum -c -` checks it):
 
 ```bash
-V=0.14.0 P=darwin-arm64
+V=0.15.0 P=darwin-arm64
 curl -fsSLO "https://github.com/roburns/vennir/releases/download/v$V/vennir-$P"
 curl -fsSLO "https://github.com/roburns/vennir/releases/download/v$V/vennir-checksums.txt"
 grep " vennir-$P\$" vennir-checksums.txt | shasum -a 256 -c -    # must say OK

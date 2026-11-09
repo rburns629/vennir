@@ -87,10 +87,38 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <h2 id="rel-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Newest first.</h2>
     </div>
     <div>
+      <article id="v0-15-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
+        <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.15.0</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+          </div>
+          <time class="mono" style="font-size: 14px; color: #AEB5C2">9 Nov 2026</time>
+          <div style="display: flex; flex-direction: column; gap: 0">
+            <a href="https://github.com/roburns/vennir/releases/tag/v0.15.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Release on GitHub<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            <a href="https://github.com/roburns/vennir/compare/v0.14.0...v0.15.0" style="font-size: 14px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px">Compare with v0.14.0<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+          </div>
+        </div>
+        <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Azure from any cluster</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">The azure samples run from a cluster other than AKS too (GKE, EKS, kind): each product asks for a token for <span class="mono" style="font-size: 14px; color: #E8EAEE">api://AzureADTokenExchange</span> and signs in as its own managed identity by federation with it, named by the team secret <span class="mono" style="font-size: 14px; color: #E8EAEE">&lt;ServiceAccount&gt;-identity</span>. No Azure key is stored anywhere. The samples&#39; README has the federated credential to add.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">postgres-flexible</span> joins <span class="mono" style="font-size: 14px; color: #E8EAEE">resource-group</span> and <span class="mono" style="font-size: 14px; color: #E8EAEE">container-app</span> as products that can be ordered from any cloud.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">The gateway</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">An API&#39;s <span class="mono" style="font-size: 14px; color: #E8EAEE">backend.auth</span> can be <span class="mono" style="font-size: 14px; color: #E8EAEE">entraToken</span>: the gateway signs in to Microsoft Entra as the managed identity named, by federation with its API&#39;s own ServiceAccount token, and sends the backend an Entra access token for the scope given. Anything that checks Entra tokens can sit behind the gateway, a Container App among them.</span></li>
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 14px; color: #E8EAEE">container-app</span> takes <span class="mono" style="font-size: 14px; color: #E8EAEE">entraAuth</span>, which turns on Container Apps&#39; built-in authentication so that only the gateway&#39;s identity can call the app.</span></li>
+          </ul>
+          <h4 style="margin: 0; font-size: 21px; font-weight: 600; color: #FFFFFF">Docs</h4>
+          <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 14px"><span aria-hidden="true" style="flex: 0 0 6px; height: 6px; margin-top: 10px; border-radius: 2px; background: #7C9BFF"></span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2">Getting your computer ready, on macOS, Linux and Windows (WSL 2): what to install before your first <span class="mono" style="font-size: 14px; color: #E8EAEE">vennir init</span>.</span></li>
+          </ul>
+        </div>
+      </article>
       <article id="v0-14-0" style="display: flex; flex-wrap: wrap; gap: 16px 48px; padding: 40px 0; border-top: 1px solid #1F2430">
         <div style="flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 10px">
           <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
-            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.14.0</h3><span class="chip" style="border-color: #2E5A47; color: #8FD6B4">Latest</span>
+            <h3 class="mono" style="margin: 0; font-size: 26px; font-weight: 500; color: #FFFFFF">v0.14.0</h3>
           </div>
           <time class="mono" style="font-size: 14px; color: #AEB5C2">8 Nov 2026</time>
           <div style="display: flex; flex-direction: column; gap: 0">

@@ -1,6 +1,6 @@
 # Vennir
 
-> Vennir is an open-source platform (MIT License) that runs DAGs of containerized steps as Kubernetes Jobs. Each step is a product that a platform team published and reviewed, running as its own Kubernetes ServiceAccount with only its own team's secrets, and handing its outputs to the next step. Other teams order those products from a catalog in a web console, through an API, or from CI, without ever holding the credentials the products use. Current version: 0.14.0 (0.x: not production-ready yet).
+> Vennir is an open-source platform (MIT License) that runs DAGs of containerized steps as Kubernetes Jobs. Each step is a product that a platform team published and reviewed, running as its own Kubernetes ServiceAccount with only its own team's secrets, and handing its outputs to the next step. Other teams order those products from a catalog in a web console, through an API, or from CI, without ever holding the credentials the products use. Current version: 0.15.0 (0.x: not production-ready yet).
 
 Key facts:
 
