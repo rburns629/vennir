@@ -4,9 +4,9 @@ Example products that call real Azure APIs, to copy from when your product
 has to. Running them costs money. `resource-group` and `container-app` are
 proven on AKS (2026-11-08, a Free Trial subscription): the DAG below made a
 resource group and a public Container App, each step signed in as its own
-product's managed identity by Workload Identity, with the roles below.
-`postgres-flexible` builds and its tests pass with the Azure clients mocked,
-but hasn't called Azure yet.
+product's managed identity by Workload Identity, with the roles below. All
+three are proven from GKE (2026-11-09, the 0.15.0 release): Azure from
+another cluster, below.
 
 | Product | What `create` does |
 |---|---|
@@ -107,8 +107,28 @@ that issuer and subject, or it couldn't fetch the issuer's keys).
 `postgres-flexible` takes its tenant from the secret too, when it isn't
 given `tenantId`.
 
-Built 2026-11-09 and tested with the Azure clients mocked; not yet tried
-against Azure from another cluster.
+Proven from GKE Autopilot (2026-11-09, the 0.15.0 release, a Free Trial
+subscription), with no Azure cluster: each product signed in as its own
+managed identity with its step's token, and made a resource group, a
+Container App pulling from a private registry, and a PostgreSQL server
+with Entra sign-in only.
+
+- **Roles on a group the run makes.** `container-app` and
+  `postgres-flexible` need their roles on the resource group, which a
+  template's `resource-group` step makes in the same run: Azure can't grant
+  a role on a group that doesn't exist yet. Make the group first (run
+  `resource-group` alone, or `az group create`), grant the roles, then run
+  the template; its `resource-group` step finds the group and goes on.
+- **Where PostgreSQL may go.** A Free Trial may not create flexible servers
+  in some regions ("Subscriptions are restricted from provisioning in this
+  region", seen in eastus2, eastus, westus2 and southcentralus); centralus,
+  westus3 and northcentralus took one. Ask the provider before choosing:
+  `az rest --method get --url "https://management.azure.com/subscriptions/<id>/providers/Microsoft.DBforPostgreSQL/locations/<region>/capabilities?api-version=2024-08-01"`.
+- **A transient failure is retried.** Adding the server's Entra admin right
+  after making it failed once with Azure's `InternalServerError`; the
+  actions count Azure's transient codes as retryable, so the kernel tries
+  the step again, and the server, already made, is found and given its
+  admin.
 
 ## An API on it (greetings)
 
@@ -132,7 +152,10 @@ credential, so nothing is stored, as for AWS (`awsSigV4`) and Google
 
    ```bash
    APP=$(az ad app create --display-name greetings-api --query appId -o tsv)
-   az ad app update --id "$APP" --identifier-uris "api://$APP" --set api.requestedAccessTokenVersion=2
+   az ad app update --id "$APP" --identifier-uris "api://$APP"
+   # az can't set the token version (--set api.… fails and changes nothing):
+   az rest --method PATCH --url "https://graph.microsoft.com/v1.0/applications(appId='$APP')" \
+     --headers Content-Type=application/json --body '{"api":{"requestedAccessTokenVersion":2}}'
    az ad sp create --id "$APP"
    ```
 
@@ -167,7 +190,8 @@ Then:
    `gateway.backendHosts`.
 5. **Run the template** with the image, that keys URL, the tenant, the app
    registration's client id and the gateway identity's, then read the `app`
-   step's `url`.
+   step's `url`. `container-app`'s role on the resource group comes first
+   (Roles on a group the run makes, above).
 6. **Publish the API**: put that URL in `api.yaml`'s `backend.url` and
    `openapi.yaml`'s `servers`, the ids in its `entraToken` (`clientId`, the
    gateway's identity; `scope`, `api://<the app registration's client id>/.default`),
@@ -181,8 +205,18 @@ authentication being turned on, the backend's own check of `Vennir-Caller`
 still refuses anything that didn't come through the gateway. Take the API
 out of the catalog before deleting the app.
 
-Built 2026-11-09 and tested with the Azure clients and Entra mocked; not
-yet tried against Azure.
+The app scales to zero when idle (Container Apps' consumption plan), and
+its first request after that waits for it to start: longer than
+`api.yaml`'s `timeout: 10s` the first time it was called, which the gateway
+answered with 504 `BACKEND_TIMEOUT`. Calls right after took under two
+seconds. Give it a longer timeout if the first caller mustn't see that.
+
+Proven from GKE Autopilot (2026-11-09, the 0.15.0 release): the template
+made the app from a private registry, and the API answered through the
+gateway from the internet, the gateway signing in to Entra as its own
+identity with the API ServiceAccount's token. The app refused a request
+with no Entra token (401), and the backend refused one with no
+`Vennir-Caller` (401).
 
 ## Secrets
 
@@ -194,4 +228,7 @@ identity a federated credential for the cluster's issuer, as for a product
 (Azure from another cluster), with the subject
 `system:serviceaccount:azure:eso-azure`.
 
-Not yet tried against Azure, from AKS or from another cluster.
+Proven from GKE (2026-11-09): the console applied the store from the
+catalog, ESO signed in as `eso-azure` with its own token, and a team secret
+synced from the vault (`SyncSecret`) within 20 seconds. Not yet tried on
+AKS.
