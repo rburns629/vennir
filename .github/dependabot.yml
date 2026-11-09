@@ -1,19 +1,25 @@
-# Weekly update pull requests for everything this repository ships: the
+# Monthly update pull requests for everything this repository ships: the
 # platform's own dependencies and images, its workflows, and the catalog
-# template's starters (what new catalogs copy). Updates are grouped to keep
-# the number of pull requests down, and a release must be a week old before
-# it's proposed, so a hijacked release has time to be caught. CI checks
-# every one of them like any other change.
+# template's starters (what new catalogs copy). One entry per ecosystem, each
+# grouped into one pull request (npm's majors apart), because each pull
+# request runs every check: monthly and grouped keeps the Actions list short.
+# A release must be a week old before it's proposed, so a hijacked release
+# has time to be caught. Security updates (Dependabot alerts) aren't these:
+# they come as soon as an advisory does, if enabled in the repository's
+# settings. CI checks every one of them like any other change.
 version: 2
 updates:
   - package-ecosystem: npm
-    directories: [/console, /console/frontend]
-    schedule: {interval: weekly}
+    directories:
+      - /console
+      - /console/frontend
+      - /catalog-template/samples/local/products/reverse
+    schedule: {interval: monthly}
     cooldown: {default-days: 7}
     # Minor and patch updates together; each major in a pull request of its
     # own, since one breaking change would otherwise hold back the rest.
     groups:
-      console-npm: {patterns: ["*"], update-types: [minor, patch]}
+      npm: {patterns: ["*"], update-types: [minor, patch]}
     ignore:
       # typescript-eslint's peer range stops below TypeScript 7, so npm ci
       # refuses the pair; lift this once typescript-eslint supports it.
@@ -21,25 +27,15 @@ updates:
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: gomod
-    directory: /cli
-    schedule: {interval: weekly}
+    directories:
+      - /cli
+      - /kernel
+      - /gateway
+      - /catalog-template/samples/local/products/slug
+    schedule: {interval: monthly}
     cooldown: {default-days: 7}
     groups:
-      cli-go: {patterns: ["*"]}
-
-  - package-ecosystem: gomod
-    directory: /kernel
-    schedule: {interval: weekly}
-    cooldown: {default-days: 7}
-    groups:
-      kernel-go: {patterns: ["*"]}
-
-  - package-ecosystem: gomod
-    directory: /gateway
-    schedule: {interval: weekly}
-    cooldown: {default-days: 7}
-    groups:
-      gateway-go: {patterns: ["*"]}
+      go: {patterns: ["*"]}
 
   - package-ecosystem: docker
     directories:
@@ -49,40 +45,33 @@ updates:
       - /examples/*
       - /catalog-template/templates/*
       - /catalog-template/samples/*/products/*
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
     cooldown: {default-days: 7}
     groups:
       base-images: {patterns: ["*"]}
 
   - package-ecosystem: github-actions
     directories: [/, /catalog-template]
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
     cooldown: {default-days: 7}
     groups:
       actions: {patterns: ["*"]}
 
-  # The catalog template's language samples.
-  - package-ecosystem: npm
-    directory: /catalog-template/samples/local/products/reverse
-    schedule: {interval: weekly}
-    cooldown: {default-days: 7}
-    groups:
-      sample-npm: {patterns: ["*"]}
-  - package-ecosystem: gomod
-    directory: /catalog-template/samples/local/products/slug
-    schedule: {interval: weekly}
-    cooldown: {default-days: 7}
+  # The catalog template's Rust sample.
   - package-ecosystem: cargo
     directory: /catalog-template/samples/local/products/rot13
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
     cooldown: {default-days: 7}
+    groups:
+      sample-cargo: {patterns: ["*"]}
+
   # The cloud samples' requirements.txt, pinned by hash.
   - package-ecosystem: pip
     directories:
       - /catalog-template/samples/gcp/products/*
       - /catalog-template/samples/aws/products/*
       - /catalog-template/samples/azure/products/*
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
     cooldown: {default-days: 7}
     groups:
       sample-pip: {patterns: ["*"]}

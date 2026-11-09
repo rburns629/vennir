@@ -7,11 +7,16 @@ name: cla
 # main can be protected. pull_request_target runs this file as it is on main
 # with a write token, so it must never check out or run the pull request's
 # code; the action reads only its comments and authors.
+#
+# Not on a pull request closing (the action would only lock it, and each
+# trigger is a run in the Actions list). Every comment still starts a run,
+# skipped unless it's the sentence below or "recheck": GitHub can't filter
+# comments before a run starts.
 on:
   issue_comment:
     types: [created]
   pull_request_target:
-    types: [opened, closed, synchronize]
+    types: [opened, synchronize, reopened]
 
 permissions: {}
 
@@ -26,7 +31,7 @@ jobs:
     permissions:
       actions: write        # reruns the check after a signing comment
       contents: write       # commits signatures to cla-signatures
-      pull-requests: write  # comments, and locks a merged pull request
+      pull-requests: write  # comments
       statuses: write       # the check's status
     steps:
       - uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
@@ -49,3 +54,4 @@ jobs:
           custom-allsigned-prcomment: Every author of this pull request has accepted the CLA.
           signed-commit-message: "cla: $contributorName accepted it"  # the action fills in only $contributorName, $owner and $repo
           create-file-commit-message: "cla: the file of who accepted the CLA"
+          lock-pullrequest-aftermerge: false
