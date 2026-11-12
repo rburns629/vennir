@@ -24,6 +24,69 @@ Key facts:
 - [Changelog](https://vennir.io/changelog): each release
 - [Community](https://vennir.io/community): contributing, reporting a vulnerability, the roadmap
 
+## Guides
+
+Running things:
+
+- [Onboarding: from installing Vennir to your first deploy](https://vennir.io/docs/onboarding): Who does what, then every step in order: the install, the catalog, a first team, its secrets and cloud access, and a first run.
+- [Finding and running things from the catalog](https://vennir.io/docs/ordering-and-the-cart): The Catalog, readiness on this install, run forms, the cart, Compose, previews, schedules, and deleting what a run made.
+- [Runs, explained](https://vennir.io/docs/runs-explained): What each state means, what a failure does to the rest, retrying, running again, cancelling, and every failure code.
+- [What's a DAG, and why does everything revolve around one?](https://vennir.io/docs/what-is-a-dag): The idea from scratch, mapped onto Terraform, GitHub Actions and Airflow if you know them.
+- [How a value moves from one task to the next](https://vennir.io/docs/how-data-moves): One real value followed through a real run on kind, at every stop.
+- [Calling the API from a pipeline](https://vennir.io/docs/calling-the-api): Submit a DAG, wait for it, read its outputs and logs, with curl and jq.
+- [Bots and automation](https://vennir.io/docs/bots-and-automation): Token bots, keyless CI bots, ordering bots with signed callbacks, schedules and notifications.
+- [APIs and the gateway](https://vennir.io/docs/apis): Find another team's API, get access, call it, and what each error means.
+- [Observe](https://vennir.io/docs/observe): Security checks, metrics, usage, logs and the audit log, and who sees what on each.
+- [Teams and roles](https://vennir.io/docs/teams-and-roles): Members, maintainers and admins, joining a team, single sign-on groups, retiring and purging.
+- [Troubleshooting](https://vennir.io/docs/troubleshooting): Organized by what you see: a run, step, image, secret or sign-in that isn't doing what you expected.
+
+Publishing products:
+
+- [Catalog](https://vennir.io/docs/catalog-guide): The catalog repository: layout, product.yaml, templates and DAGs, API products, testing, what CI blocks, who approves, publishing.
+- [Try Vennir end to end](https://vennir.io/docs/getting-started): About an hour: a trial team from nothing to a product that reads a secret and passes its output on. No cloud, no cost.
+- [Secrets, explained from scratch](https://vennir.io/docs/secrets-explained): What a secret is here, how you register one, where it lives, and how it's kept from other teams.
+- [Sync secrets from GCP Secret Manager](https://vennir.io/docs/sync-secrets-gcp): About 20 minutes: your team reads secrets from your own Secret Manager by Workload Identity, no stored key.
+- [Getting GitHub ready for the catalog](https://vennir.io/docs/clouds-github): What vennir catalog create needs from GitHub before it makes your catalog repository.
+- [Onboarding with an AI assistant](https://vennir.io/docs/catalog-onboarding-with-ai): Adding a team or a product with Claude or another assistant, and what to check by hand.
+
+Installing and operating:
+
+- [Setting up Vennir](https://vennir.io/docs/setup): From an empty account to people running steps, with vennir init and vennir apply.
+- [Getting Google Cloud ready](https://vennir.io/docs/clouds-gcp): What only the Google Cloud website can do, before vennir init.
+- [Getting AWS ready](https://vennir.io/docs/clouds-aws): What only the AWS website can do, before vennir init.
+- [Getting Azure ready](https://vennir.io/docs/clouds-azure): What only the Azure portal can do, before vennir init: the subscription, your roles, a Free Trial's limits.
+- [Getting your computer ready](https://vennir.io/docs/clouds-computer): What to install first, on macOS, Linux or Windows in WSL 2, and how to check it.
+- [Operations](https://vennir.io/docs/operations): kind and Helm installs, upgrades, databases, rotating secrets, backups, network policies, the chat agent, troubleshooting.
+- [Security model](https://vennir.io/docs/security-model): What's enforced and by which layer, where secret values live, and what isn't enforced yet.
+- [Admin settings](https://vennir.io/docs/admin-settings): Every section of the Admin page: what it does, and whether it's set in the console or by the install.
+- [Where to host Vennir](https://vennir.io/docs/where-to-host): kind, GKE, EKS, AKS or a cluster of your own: what each gives you, what it costs, and what changes for your teams.
+- [Deploy to Google Cloud from Vennir](https://vennir.io/docs/deploy-to-gcp): Every Google Cloud step a team takes so its products can make resources there, with each product's own identity.
+- [Deploy to AWS from Vennir](https://vennir.io/docs/deploy-to-aws): Roles, Pod Identity and cross-account access, so a team's products can make resources in AWS.
+- [Deploy to Azure from Vennir](https://vennir.io/docs/deploy-to-azure): A managed identity per product, trusting the cluster's own tokens from AKS or anywhere else, with only the roles it uses.
+- [Creating resources in every cloud](https://vennir.io/docs/every-cloud-from-any-install): Who sets up what in Google Cloud, AWS and Azure, whichever one Vennir runs in: identities, permissions, and creating GCP projects under a folder.
+- [The API gateway, start to finish](https://vennir.io/docs/api-gateway): Turning it on, publishing a backend, calling it, and putting it on the internet.
+- [Addresses and firewall rules](https://vennir.io/docs/addresses-and-firewalls): Which address each part uses, finding them, identity instead of allowlists, and a fixed outbound address.
+
+Hands-on labs:
+
+- [Lab 1: Vennir on your laptop](https://vennir.io/docs/lab-1-laptop): Install on kind, run a DAG, publish the samples, run a template and a cart, and delete what a run made. Free, about 45 minutes.
+- [Lab 2: your first product](https://vennir.io/docs/lab-2-first-product): A catalog of your own, a product from the starter, tests run as CI runs them, a secret, and errors that explain themselves. Free.
+- [Lab 3: Vennir on GKE, with a catalog](https://vennir.io/docs/lab-3-gke): A released Vennir on GKE Autopilot at the smallest size, priced before it's made, and a catalog whose CI publishes with no stored key. Billed.
+- [Lab 4: Google Cloud projects from Vennir](https://vennir.io/docs/lab-4-gcp-projects): Projects made under a folder of their own, a Cloud Run service with grants inherited from the folder, and deletes through Vennir. Billed.
+- [Lab 5: AWS from a GKE install](https://vennir.io/docs/lab-5-aws-from-gke): An S3 bucket and an ECS Express service, each product as an IAM role of its own by web identity, no AWS cluster and no key. Billed.
+- [Lab 6: Azure from a GKE install](https://vennir.io/docs/lab-6-azure-from-gke): A resource group, a Container App and PostgreSQL, each product a managed identity of its own, and a Key Vault secret synced. Billed.
+- [Lab 7: APIs on every cloud, through the gateway](https://vennir.io/docs/lab-7-apis-across-clouds): The gateway on the internet, serving a backend on AWS and one on Azure behind Entra sign-in, and every way around it refused. Billed.
+
+Contributing:
+
+- [Architecture](https://vennir.io/docs/architecture): What Vennir is, the pieces, a DAG becoming containers, the product contract, data, and the design decisions.
+- [The kernel, call by call](https://vennir.io/docs/kernel-architecture): The kernel's layer rules and a literal trace of submit, claim, dispatch, poll and finalize.
+- [How Vennir works under the hood](https://vennir.io/docs/under-the-hood): Each Kubernetes, Helm and Postgres feature Vennir leans on, what it's for, and where it is in the code.
+- [Where Vennir keeps its data](https://vennir.io/docs/database-schemas): Both databases, table by table, kept in step with the models by tests.
+- [vennir: design](https://vennir.io/docs/cli-design): The installer CLI: its commands, init's questions, the approval screen and cost, the OpenTofu modules.
+- [Repository map](https://vennir.io/docs/repository-map): Every folder and file in the repository, one line each.
+- [Architecture assessment](https://vennir.io/docs/assessment): Where Vennir is going: consumers and templates, identity in two layers, one catalog pulled by many installs.
+- [Contributing and AGENTS.md](https://vennir.io/docs/contributing): What a pull request needs. AGENTS.md has the current build and test commands for each project.
 ## Source
 
 - [GitHub repository](https://github.com/roburns/vennir)

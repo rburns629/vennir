@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 // The site's only script: the home page's hero run, the copy button beside
-// the install command, and the Docs page's search. Everything it writes into
-// the page is the constant text below, never anything a visitor typed.
+// the install command, the Docs page's filter, the docs' full-text search,
+// and drawing a guide's diagrams. It writes into the page only as text and
+// elements it makes, never markup: its own constant text, the search index's
+// text, and what a visitor typed, as text.
 (function () {
   "use strict";
 
@@ -143,8 +145,8 @@
   // The Docs page: typing hides the guides whose title and summary don't
   // match, and with them the groups left empty and the sections above the
   // guides, so what matches comes right after the box; the line under the box
-  // says how many, Enter goes to them, and "/" jumps to the box.
-  function docsSearch() {
+  // says how many. Enter submits the box's form: the full-text search.
+  function docsFilter() {
     var input = document.getElementById("docs-search");
     if (!input) return;
     function all(selector) { return Array.prototype.slice.call(document.querySelectorAll(selector)); }
@@ -175,20 +177,16 @@
       if (none) none.hidden = shown > 0;
       if (hint) {
         hint.textContent = words.length === 0 ? hintText
-          : shown === 0 ? "No guide matches that."
-          : (shown === 1 ? "1 guide matches" : shown + " guides match") + ", below. Enter goes to them.";
+          : (shown === 0 ? "No guide's title matches that." : (shown === 1 ? "1 guide's title matches" : shown + " guides' titles match") + ", below.")
+            + " Enter searches every guide's full text.";
       }
     });
-    input.addEventListener("keydown", function (e) {
-      if (e.key !== "Enter") return;
-      var first = cards.filter(function (card) { return card.style.display !== "none"; })[0];
-      var target = first || none;
-      if (!input.value.trim() || !target) return;
-      e.preventDefault();
-      target.scrollIntoView({ block: "center" });
-      var link = first && first.querySelector("a");
-      if (link) link.focus({ preventScroll: true });
-    });
+  }
+
+  // "/" jumps to the page's docs search box, wherever focus isn't in a field.
+  function slashToSearch() {
+    var input = document.getElementById("docs-search") || document.getElementById("search-q") || document.getElementById("docs-q");
+    if (!input) return;
     document.addEventListener("keydown", function (e) {
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
       var tag = document.activeElement && document.activeElement.tagName;
@@ -198,9 +196,139 @@
     });
   }
 
+  // The search page (/docs/search?q=…): every guide's sections, from the
+  // index the site's build made, matched as the visitor types. Every result
+  // is built from elements and text, never markup.
+  function fullSearch() {
+    var results = document.getElementById("search-results");
+    if (!results) return;
+    var input = document.getElementById("search-q");
+    var filters = document.getElementById("search-filters");
+    var summary = document.getElementById("search-summary");
+    var none = document.getElementById("search-none");
+    var index = null;
+    var group = "All";
+    var LIMIT = 100;
+
+    function el(tag, text, style) {
+      var e = document.createElement(tag);
+      if (text != null) e.textContent = text;
+      if (style) e.setAttribute("style", style);
+      return e;
+    }
+    function words() { return input.value.toLowerCase().split(/\s+/).filter(Boolean); }
+    function matches(ws) {
+      var hits = [];
+      index.entries.forEach(function (entry, order) {
+        var title = entry.t.toLowerCase(), heading = entry.h.toLowerCase(), text = entry.x.toLowerCase();
+        var all = title + " " + heading + " " + text;
+        if (!ws.every(function (w) { return all.indexOf(w) !== -1; })) return;
+        var score = 0;
+        if (ws.every(function (w) { return title.indexOf(w) !== -1; })) score += 20;
+        if (ws.every(function (w) { return heading.indexOf(w) !== -1; })) score += 10;
+        // Each time the section says it all together, up to five.
+        score += Math.min(5, text.split(ws.join(" ")).length - 1);
+        hits.push({ entry: entry, score: score, order: order });
+      });
+      hits.sort(function (a, b) { return b.score - a.score || a.order - b.order; });
+      return hits;
+    }
+    // The text around the first place it says what was typed, the match marked.
+    function snippet(text, ws) {
+      var lower = text.toLowerCase(), phrase = ws.join(" ");
+      var at = lower.indexOf(phrase), len = phrase.length;
+      if (at === -1) { at = lower.indexOf(ws[0]); len = ws[0].length; }
+      var span = el("span", null, "font-size: 15px; line-height: 1.6; color: #AEB5C2");
+      if (at === -1) { span.textContent = text.slice(0, 200) + (text.length > 200 ? "…" : ""); return span; }
+      var start = Math.max(0, at - 90), end = Math.min(text.length, at + len + 120);
+      span.appendChild(document.createTextNode((start > 0 ? "…" : "") + text.slice(start, at)));
+      span.appendChild(el("mark", text.slice(at, at + len)));
+      span.appendChild(document.createTextNode(text.slice(at + len, end) + (end < text.length ? "…" : "")));
+      return span;
+    }
+    function render() {
+      var ws = words();
+      var q = input.value.trim();
+      var url = q ? "/docs/search?q=" + encodeURIComponent(q) : "/docs/search";
+      history.replaceState(null, "", url);
+      document.title = q ? q + " · Search the Vennir docs" : "Search the Vennir docs";
+      var hits = ws.length ? matches(ws) : [];
+      filters.textContent = "";
+      if (ws.length) {
+        ["All"].concat(index.groups).forEach(function (name) {
+          var count = name === "All" ? hits.length : hits.filter(function (h) { return h.entry.g === name; }).length;
+          if (name !== "All" && count === 0) return;
+          var button = el("button", name + " ", null);
+          button.type = "button";
+          button.className = "filter";
+          button.setAttribute("aria-pressed", String(group === name));
+          button.appendChild(el("span", String(count), "font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; color: #8B93A3"));
+          button.addEventListener("click", function () { group = name; render(); });
+          filters.appendChild(button);
+        });
+      }
+      var shown = hits.filter(function (h) { return group === "All" || h.entry.g === group; });
+      results.textContent = "";
+      shown.slice(0, LIMIT).forEach(function (hit) {
+        var e = hit.entry;
+        var a = el("a", null, null);
+        a.className = "hit";
+        a.href = "/docs/" + e.s + (e.a ? "#" + e.a : "");
+        var title = el("span", e.t, "font-size: 18px; font-weight: 600; color: #FFFFFF");
+        if (e.h) title.appendChild(el("span", " › " + e.h, "font-weight: 400; color: #8B93A3"));
+        a.appendChild(title);
+        a.appendChild(snippet(e.x || e.h, ws));
+        a.appendChild(el("span", e.g, "font-size: 12px; color: #8B93A3"));
+        results.appendChild(a);
+      });
+      results.hidden = shown.length === 0;
+      none.hidden = !(ws.length && shown.length === 0);
+      var guides = {};
+      shown.forEach(function (h) { guides[h.entry.s] = true; });
+      var n = Object.keys(guides).length;
+      summary.textContent = !ws.length ? "Type to search every guide."
+        : !shown.length ? "No results for “" + q + "”."
+        : shown.length + (shown.length === 1 ? " section" : " sections") + " in " + n + (n === 1 ? " guide" : " guides")
+          + " for “" + q + "”" + (shown.length > LIMIT ? ", the first " + LIMIT + " shown" : "");
+    }
+
+    input.value = new URLSearchParams(location.search).get("q") || "";
+    summary.textContent = "Loading the index…";
+    fetch("/docs/search-index.json").then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (data) {
+      index = data;
+      render();
+      input.addEventListener("input", function () { group = "All"; render(); });
+      input.form.addEventListener("submit", function (e) { e.preventDefault(); render(); });
+      input.addEventListener("keydown", function (e) { if (e.key === "Escape") { input.value = ""; group = "All"; render(); } });
+      if (!input.value) input.focus();
+    }).catch(function () {
+      summary.textContent = "The search index didn't load. Try again in a moment.";
+    });
+  }
+
+  // A guide's diagrams (```mermaid) are drawn in the browser, by Mermaid,
+  // fetched only on a page that has one.
+  function diagrams() {
+    var blocks = document.querySelectorAll("pre.mermaid");
+    if (!blocks.length) return;
+    var script = document.createElement("script");
+    script.src = "/docs/mermaid.min.js";
+    script.onload = function () {
+      window.mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict", fontFamily: "IBM Plex Sans, system-ui, sans-serif" });
+      window.mermaid.run({ nodes: blocks });
+    };
+    document.head.appendChild(script);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     hero();
     copyButtons();
-    docsSearch();
+    docsFilter();
+    slashToSearch();
+    fullSearch();
+    diagrams();
   });
 })();

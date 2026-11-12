@@ -248,10 +248,11 @@ its own directory.
   `vennir-perf` (`perf/README.md`: the runbook, and what's been found).
   Never run them on `vennir-local` or a shared cluster; every Makefile kind
   target takes `KIND_CLUSTER=vennir-perf`.
-- **`site/`**: vennir.io, the public website. Plain static pages with no
-  build step, on Firebase Hosting in the Google Cloud project `general-513718`
-  (`site/README.md`). Its pages were drawn on the mockups canvas first, like
-  the console's.
+- **`site/`**: vennir.io, the public website. Static pages, on Firebase
+  Hosting in the Google Cloud project `general-513718` (`site/README.md`),
+  plus a page per guide the Docs page lists, made from its Markdown at each
+  deploy (`make site-docs`, `site/docs-build/`), with a full-text search.
+  Its pages were drawn on the mockups canvas first, like the console's.
 - **`_local/`** (gitignored): personal scratch space, such as a clone of
   your own catalog repository.
 - `examples/`: fake demo products (`project-product`,
@@ -403,7 +404,9 @@ kind cluster of its own (`--cluster-name`); it shares the `kind-registry`.
   (`console/docs/reference/`, listed in its `SOURCES`) for the Docs page and
   the chat agent. After changing any of them (`docs/*.md`, `docs/clouds/`,
   `catalog-template/README.md`), run `make console-docs`, or the console's
-  tests fail.
+  tests fail. vennir.io makes a page of every guide its Docs page lists:
+  a new guide needs a card there and a line in `site/docs-build/guides.json`,
+  `sitemap.xml` and `llms.txt`, or `make site-docs` (and CI) fails.
 - After rebuilding a platform image for kind, you must `kind load
   docker-image <img> --name <cluster>` again. Otherwise the cluster keeps
   running the stale image, or fails with `ImagePullBackOff`.

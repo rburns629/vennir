@@ -13,6 +13,7 @@ updates:
     directories:
       - /console
       - /console/frontend
+      - /site/docs-build
       - /catalog-template/samples/local/products/reverse
     schedule: {interval: monthly}
     cooldown: {default-days: 7}

@@ -109,7 +109,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <div style="display: flex; flex-direction: column; gap: 16px">
         <span class="eyebrow">What you need</span>
         <h2 style="margin: 0; font-size: 36px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">Kubernetes 1.30 or later, Helm 4, and a CNI that enforces NetworkPolicy.</h2>
-        <p style="margin: 0; font-size: 17px; line-height: 1.6; color: #AEB5C2">The charts refuse older Kubernetes and older Helm. Without NetworkPolicy enforcement, the platform's databases and kernel-api aren't fenced off from steps. <span class="mono" style="font-size: 15px; color: #E8EAEE">vennir</span> runs on macOS and Linux, amd64 and arm64, and on Windows in WSL 2: <a href="https://github.com/roburns/vennir/blob/main/docs/clouds/computer.md">getting your computer ready</a> has each system's steps.</p>
+        <p style="margin: 0; font-size: 17px; line-height: 1.6; color: #AEB5C2">The charts refuse older Kubernetes and older Helm. Without NetworkPolicy enforcement, the platform's databases and kernel-api aren't fenced off from steps. <span class="mono" style="font-size: 15px; color: #E8EAEE">vennir</span> runs on macOS and Linux, amd64 and arm64, and on Windows in WSL 2: <a href="/docs/clouds-computer">getting your computer ready</a> has each system's steps.</p>
         <p style="margin: 0; font-size: 17px; line-height: 1.6; color: #AEB5C2"><span class="mono" style="font-size: 15px; color: #E8EAEE">vennir tools --install</span> downloads what's missing into <span class="mono" style="font-size: 15px; color: #E8EAEE">~/.vennir/bin</span>, each at a pinned version checked against its project's checksum. Docker and the cloud CLIs are yours to install.</p>
       </div>
       <div class="card" style="overflow-x: auto">
@@ -268,7 +268,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <div class="card" style="overflow: hidden">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
             <span class="mono" style="font-size: 13px; color: #C9CED8">Google Cloud: a project with billing</span>
-            <a class="chip" href="https://github.com/roburns/vennir/blob/main/docs/clouds/gcp.md" style="text-decoration: none">guide</a>
+            <a class="chip" href="/docs/clouds-gcp" style="text-decoration: none">guide</a>
           </div>
 <pre class="code"><span class="c">$</span> gcloud auth login
 <span class="c">$</span> gcloud auth application-default login
@@ -278,7 +278,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <div class="card" style="overflow: hidden">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
             <span class="mono" style="font-size: 13px; color: #C9CED8">AWS: an account, not a Builder ID</span>
-            <a class="chip" href="https://github.com/roburns/vennir/blob/main/docs/clouds/aws.md" style="text-decoration: none">guide</a>
+            <a class="chip" href="/docs/clouds-aws" style="text-decoration: none">guide</a>
           </div>
 <pre class="code"><span class="c"># an IAM user, no keys on disk</span>
 <span class="c">$</span> aws login <span class="k">--profile</span> vennir
@@ -288,7 +288,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <div class="card" style="overflow: hidden">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
             <span class="mono" style="font-size: 13px; color: #C9CED8">Azure: a subscription you own</span>
-            <a class="chip" href="https://github.com/roburns/vennir/blob/main/docs/clouds/azure.md" style="text-decoration: none">guide</a>
+            <a class="chip" href="/docs/clouds-azure" style="text-decoration: none">guide</a>
           </div>
 <pre class="code"><span class="c">$</span> az login
 <span class="c">$</span> az account list <span class="k">--output</span> table</pre>
@@ -296,7 +296,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <div class="card" style="overflow: hidden">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
             <span class="mono" style="font-size: 13px; color: #C9CED8">GitHub: for the catalog</span>
-            <a class="chip" href="https://github.com/roburns/vennir/blob/main/docs/clouds/github.md" style="text-decoration: none">guide</a>
+            <a class="chip" href="/docs/clouds-github" style="text-decoration: none">guide</a>
           </div>
 <pre class="code"><span class="c">$</span> gh auth login \
     <span class="k">--scopes</span> repo,workflow</pre>
@@ -422,7 +422,7 @@ Apply? [y/N] <span class="v">y</span></pre>
         <li style="display: flex; gap: 14px"><span class="mono" style="flex: 0 0 28px; font-size: 13px; color: #7C9BFF; padding-top: 3px">03</span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Values</b>, copied from <a href="https://github.com/roburns/vennir/tree/main/helm/values">helm/values/{kind,gke,eks}</a>. At least the task image source, the console's <span class="mono" style="font-size: 14px; color: #E8EAEE">kernelApiUrl</span> and the first admin's email.</span></li>
         <li style="display: flex; gap: 14px"><span class="mono" style="flex: 0 0 28px; font-size: 13px; color: #7C9BFF; padding-top: 3px">04</span><span style="font-size: 16px; line-height: 1.6; color: #AEB5C2"><b style="color: #FFFFFF; font-weight: 600">Install, kernel first</b>, without <span class="mono" style="font-size: 14px; color: #E8EAEE">--wait</span> the first time: each chart migrates in a post-install hook. Then port-forward, or put HTTPS in front before anyone signs in over a network.</span></li>
       </ol>
-      <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/docs/operations.md#installing-on-a-cluster-with-helm" style="align-self: flex-start">Installing with Helm, in full</a>
+      <a class="btn btn-ghost" href="/docs/operations#installing-on-a-cluster-with-helm" style="align-self: flex-start">Installing with Helm, in full</a>
     </div>
     <div class="card" style="overflow: hidden">
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #1F2430; flex-wrap: wrap">
@@ -595,11 +595,11 @@ kubectl <span class="k">-n</span> vennir-system port-forward \
       <h2 style="margin: 0; font-size: 48px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; max-width: 760px; text-wrap: balance">The rest is in the guides.</h2>
       <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2; max-width: 640px">Setup from an empty account, the hour-long walkthrough from a new team to two chained products, and every setting with its default.</p>
       <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center">
-        <a class="btn btn-primary" href="https://github.com/roburns/vennir/blob/main/docs/setup.md">Setting up Vennir</a>
-        <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/console/docs/01-getting-started.md">Try it end to end</a>
-        <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/catalog-template/README.md">The catalog's guide</a>
+        <a class="btn btn-primary" href="/docs/setup">Setting up Vennir</a>
+        <a class="btn btn-ghost" href="/docs/getting-started">Try it end to end</a>
+        <a class="btn btn-ghost" href="/docs/catalog-guide">The catalog's guide</a>
       </div>
-      <span style="font-size: 14px; color: #8B93A3">Stuck? <a href="https://github.com/roburns/vennir/blob/main/console/docs/15-troubleshooting.md">Troubleshooting</a> says what to check when something fails, or <a href="/community">ask the community</a>.</span>
+      <span style="font-size: 14px; color: #8B93A3">Stuck? <a href="/docs/troubleshooting">Troubleshooting</a> says what to check when something fails, or <a href="/community">ask the community</a>.</span>
     </div>
   </section>
 
@@ -622,16 +622,16 @@ kubectl <span class="k">-n</span> vennir-system port-forward \
       <nav aria-label="Docs" style="display: flex; flex-direction: column; gap: 4px">
         <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Docs</span>
         <a class="nav-link" href="/docs" style="font-size: 14px">All docs</a>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
+        <a class="nav-link" href="/docs/architecture" style="font-size: 14px">Architecture</a>
+        <a class="nav-link" href="/docs/setup" style="font-size: 14px">Setup</a>
+        <a class="nav-link" href="/docs/operations" style="font-size: 14px">Operations</a>
+        <a class="nav-link" href="/docs/security-model" style="font-size: 14px">Security model</a>
       </nav>
       <nav aria-label="Project" style="display: flex; flex-direction: column; gap: 4px">
         <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Project</span>
         <a class="nav-link" href="/community" style="font-size: 14px">Community</a>
         <a class="nav-link" href="https://github.com/roburns/vennir" style="font-size: 14px">GitHub</a>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
+        <a class="nav-link" href="/docs/contributing" style="font-size: 14px">Contributing</a>
         <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
         <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
       </nav>

@@ -11,7 +11,9 @@ name: ci
 #             there, not skipped) and helm/tests/admission-policies.sh,
 #             which proves the charts' admission policies case by case.
 #   console   typecheck, eslint, vitest against a real Postgres, build;
-#             then the frontend's oxlint, vitest and build.
+#             then the frontend's oxlint, vitest and build; then the site's
+#             docs pages (make site-docs), which fails while a guide's link is
+#             broken or the Docs page, sitemap or llms.txt misses a guide.
 #   helm      helm lint on both charts; a render of every environment's
 #             settings in helm/values/, of every size preset, and of the charts' optional branches
 #             (backup destinations, a shared database, policies off), so a
@@ -151,6 +153,7 @@ jobs:
           cache-dependency-path: |
             console/package-lock.json
             console/frontend/package-lock.json
+            site/docs-build/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
@@ -169,6 +172,11 @@ jobs:
           npm run lint
           npm test
           npm run build
+      - name: The site's docs pages (make site-docs)
+        working-directory: site/docs-build
+        run: |
+          npm ci --no-audit --no-fund
+          node build.mjs
 
   helm:
     runs-on: ubuntu-latest

@@ -1,0 +1,222 @@
+{
+  "groups": [
+    {
+      "id": "runners",
+      "label": "Running things",
+      "guides": [
+        {
+          "source": "console/docs/17-onboarding.md",
+          "slug": "onboarding"
+        },
+        {
+          "source": "console/docs/10-ordering-and-the-cart.md",
+          "slug": "ordering-and-the-cart"
+        },
+        {
+          "source": "console/docs/09-runs-explained.md",
+          "slug": "runs-explained"
+        },
+        {
+          "source": "console/docs/03-what-is-a-dag.md",
+          "slug": "what-is-a-dag"
+        },
+        {
+          "source": "console/docs/07-how-data-moves.md",
+          "slug": "how-data-moves"
+        },
+        {
+          "source": "console/docs/05-calling-the-api.md",
+          "slug": "calling-the-api"
+        },
+        {
+          "source": "console/docs/14-bots-and-automation.md",
+          "slug": "bots-and-automation"
+        },
+        {
+          "source": "console/docs/11-apis.md",
+          "slug": "apis"
+        },
+        {
+          "source": "console/docs/12-observe.md",
+          "slug": "observe"
+        },
+        {
+          "source": "console/docs/13-teams-and-roles.md",
+          "slug": "teams-and-roles"
+        },
+        {
+          "source": "console/docs/15-troubleshooting.md",
+          "slug": "troubleshooting"
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "label": "Publishing products",
+      "guides": [
+        {
+          "source": "catalog-template/README.md",
+          "slug": "catalog-guide"
+        },
+        {
+          "source": "console/docs/01-getting-started.md",
+          "slug": "getting-started"
+        },
+        {
+          "source": "console/docs/04-secrets-explained.md",
+          "slug": "secrets-explained"
+        },
+        {
+          "source": "console/docs/02-sync-secrets-gcp.md",
+          "slug": "sync-secrets-gcp"
+        },
+        {
+          "source": "docs/clouds/github.md",
+          "slug": "clouds-github"
+        },
+        {
+          "source": "catalog-template/docs/onboarding-with-ai.md",
+          "slug": "catalog-onboarding-with-ai"
+        }
+      ]
+    },
+    {
+      "id": "operators",
+      "label": "Installing and operating",
+      "guides": [
+        {
+          "source": "docs/setup.md",
+          "slug": "setup"
+        },
+        {
+          "source": "docs/clouds/gcp.md",
+          "slug": "clouds-gcp"
+        },
+        {
+          "source": "docs/clouds/aws.md",
+          "slug": "clouds-aws"
+        },
+        {
+          "source": "docs/clouds/azure.md",
+          "slug": "clouds-azure"
+        },
+        {
+          "source": "docs/clouds/computer.md",
+          "slug": "clouds-computer"
+        },
+        {
+          "source": "docs/operations.md",
+          "slug": "operations"
+        },
+        {
+          "source": "docs/security-model.md",
+          "slug": "security-model"
+        },
+        {
+          "source": "console/docs/16-admin-settings.md",
+          "slug": "admin-settings"
+        },
+        {
+          "source": "console/docs/18-where-to-host.md",
+          "slug": "where-to-host"
+        },
+        {
+          "source": "console/docs/19-deploy-to-gcp.md",
+          "slug": "deploy-to-gcp"
+        },
+        {
+          "source": "console/docs/20-deploy-to-aws.md",
+          "slug": "deploy-to-aws"
+        },
+        {
+          "source": "console/docs/23-deploy-to-azure.md",
+          "slug": "deploy-to-azure"
+        },
+        {
+          "source": "console/docs/24-every-cloud-from-any-install.md",
+          "slug": "every-cloud-from-any-install"
+        },
+        {
+          "source": "console/docs/21-api-gateway.md",
+          "slug": "api-gateway"
+        },
+        {
+          "source": "console/docs/22-addresses-and-firewalls.md",
+          "slug": "addresses-and-firewalls"
+        }
+      ]
+    },
+    {
+      "id": "labs",
+      "label": "Hands-on labs",
+      "guides": [
+        {
+          "source": "console/docs/lab-1-laptop.md",
+          "slug": "lab-1-laptop"
+        },
+        {
+          "source": "console/docs/lab-2-first-product.md",
+          "slug": "lab-2-first-product"
+        },
+        {
+          "source": "console/docs/lab-3-gke.md",
+          "slug": "lab-3-gke"
+        },
+        {
+          "source": "console/docs/lab-4-gcp-projects.md",
+          "slug": "lab-4-gcp-projects"
+        },
+        {
+          "source": "console/docs/lab-5-aws-from-gke.md",
+          "slug": "lab-5-aws-from-gke"
+        },
+        {
+          "source": "console/docs/lab-6-azure-from-gke.md",
+          "slug": "lab-6-azure-from-gke"
+        },
+        {
+          "source": "console/docs/lab-7-apis-across-clouds.md",
+          "slug": "lab-7-apis-across-clouds"
+        }
+      ]
+    },
+    {
+      "id": "contributors",
+      "label": "Contributing",
+      "guides": [
+        {
+          "source": "docs/architecture.md",
+          "slug": "architecture"
+        },
+        {
+          "source": "kernel/ARCHITECTURE.md",
+          "slug": "kernel-architecture"
+        },
+        {
+          "source": "console/docs/08-under-the-hood.md",
+          "slug": "under-the-hood"
+        },
+        {
+          "source": "console/docs/06-database-schemas.md",
+          "slug": "database-schemas"
+        },
+        {
+          "source": "cli/DESIGN.md",
+          "slug": "cli-design"
+        },
+        {
+          "source": "docs/repository-map.md",
+          "slug": "repository-map"
+        },
+        {
+          "source": "docs/assessment.md",
+          "slug": "assessment"
+        },
+        {
+          "source": "CONTRIBUTING.md",
+          "slug": "contributing"
+        }
+      ]
+    }
+  ]
+}
