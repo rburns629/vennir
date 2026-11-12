@@ -83,7 +83,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <input id="docs-search" type="search" placeholder="Search setup, secrets, failure codes, the cart…" style="flex: 1; min-width: 0; height: 54px; border: 0; background: transparent; color: #E8EAEE; font-family: inherit; font-size: 16px; outline-offset: 4px">
           <span class="mono" aria-hidden="true" style="flex: 0 0 auto; padding: 3px 8px; border: 1px solid #2A3040; border-radius: 6px; font-size: 12px; color: #9AA3B2">/</span>
         </div>
-        <span style="font-size: 14px; line-height: 1.6; color: #8B93A3">Inside an install, the console's Docs page searches its guides and a copy of the platform docs shipped with that version, and Ask (where an admin has set up the chat agent) answers from them with citations.</span>
+        <span id="docs-hint" aria-live="polite" style="font-size: 14px; line-height: 1.6; color: #8B93A3">Inside an install, the console's Docs page searches its guides and a copy of the platform docs shipped with that version, and Ask (where an admin has set up the chat agent) answers from them with citations.</span>
       </div>
     <div style="display: flex; gap: 10px; flex-wrap: wrap; padding-top: 4px">
       <a class="chip" href="#runners" style="height: 32px; padding: 0 14px; font-size: 13px; text-decoration: none">Running things</a>
@@ -94,7 +94,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
     </div>
   </section>
   <!-- Start here -->
-  <section aria-labelledby="start-h" style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
+  <section aria-labelledby="start-h" data-browse style="background: #0D1015; border-top: 1px solid #161A22; border-bottom: 1px solid #161A22">
     <div class="wrap" style="padding-top: 96px; padding-bottom: 96px; display: flex; flex-direction: column; gap: 40px">
       <div style="display: flex; flex-direction: column; gap: 16px; max-width: 760px">
         <span class="eyebrow">Start here</span>
@@ -137,7 +137,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
     </div>
   </section>
   <!-- The pieces -->
-  <section aria-labelledby="pieces-h" class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 56px; align-items: start">
+  <section aria-labelledby="pieces-h" data-browse class="wrap" style="padding-top: 112px; padding-bottom: 112px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 56px; align-items: start">
     <div style="display: flex; flex-direction: column; gap: 24px">
       <span class="eyebrow">The pieces</span>
       <h2 id="pieces-h" style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #FFFFFF; text-wrap: balance">One picture of the whole thing.</h2>
@@ -175,7 +175,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         <p style="margin: 0; font-size: 18px; line-height: 1.6; color: #AEB5C2">The console guides (console/docs/) are the ones an install serves on its Docs page; the rest are in docs/ and alongside the code they describe.</p>
       </div>
       <p id="docs-none" hidden style="margin: 0; font-size: 17px; color: #AEB5C2">No guide matches that. Try fewer words, or <a href="https://github.com/roburns/vennir/tree/main/docs">browse the docs on GitHub</a>.</p>
-      <div id="runners" style="display: flex; flex-direction: column; gap: 24px">
+      <div id="runners" data-doc-group style="display: flex; flex-direction: column; gap: 24px">
         <div style="display: flex; align-items: flex-start; gap: 16px">
           <span aria-hidden="true" style="flex: 0 0 44px; height: 44px; border-radius: 10px; border: 1px solid #2A3040; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5v14l11-7z"></path></svg></span>
           <div style="display: flex; flex-direction: column; gap: 6px">
@@ -263,7 +263,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           </li>
         </ul>
       </div>
-      <div id="catalog" style="display: flex; flex-direction: column; gap: 24px">
+      <div id="catalog" data-doc-group style="display: flex; flex-direction: column; gap: 24px">
         <div style="display: flex; align-items: flex-start; gap: 16px">
           <span aria-hidden="true" style="flex: 0 0 44px; height: 44px; border-radius: 10px; border: 1px solid #2A3040; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path d="M4 7.5l8 4.5 8-4.5M12 12v9"></path></svg></span>
           <div style="display: flex; flex-direction: column; gap: 6px">
@@ -316,7 +316,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           </li>
         </ul>
       </div>
-      <div id="operators" style="display: flex; flex-direction: column; gap: 24px">
+      <div id="operators" data-doc-group style="display: flex; flex-direction: column; gap: 24px">
         <div style="display: flex; align-items: flex-start; gap: 16px">
           <span aria-hidden="true" style="flex: 0 0 44px; height: 44px; border-radius: 10px; border: 1px solid #2A3040; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="1.5"></rect><rect x="4" y="14" width="16" height="6" rx="1.5"></rect><path d="M8 7h.01M8 17h.01"></path></svg></span>
           <div style="display: flex; flex-direction: column; gap: 6px">
@@ -432,7 +432,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           </li>
         </ul>
       </div>
-      <div id="labs" style="display: flex; flex-direction: column; gap: 24px">
+      <div id="labs" data-doc-group style="display: flex; flex-direction: column; gap: 24px">
         <div style="display: flex; align-items: flex-start; gap: 16px">
           <span aria-hidden="true" style="flex: 0 0 44px; height: 44px; border-radius: 10px; border: 1px solid #2A3040; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"></path></svg></span>
           <div style="display: flex; flex-direction: column; gap: 6px">
@@ -492,7 +492,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           </li>
         </ul>
       </div>
-      <div id="contributors" style="display: flex; flex-direction: column; gap: 24px">
+      <div id="contributors" data-doc-group style="display: flex; flex-direction: column; gap: 24px">
         <div style="display: flex; align-items: flex-start; gap: 16px">
           <span aria-hidden="true" style="flex: 0 0 44px; height: 44px; border-radius: 10px; border: 1px solid #2A3040; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 8l-5 4 5 4M15 8l5 4-5 4"></path></svg></span>
           <div style="display: flex; flex-direction: column; gap: 6px">
