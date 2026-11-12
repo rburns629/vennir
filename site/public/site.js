@@ -154,8 +154,11 @@
     var none = document.getElementById("docs-none");
     var hint = document.getElementById("docs-hint");
     var hintText = hint && hint.textContent;
-    // Each element's own inline display would win over the hidden attribute.
-    function show(el, visible) { el.style.display = visible ? "" : "none"; }
+    // Each element's own inline display would win over the hidden attribute,
+    // so hiding sets it to none and showing puts its own back.
+    var displays = new Map();
+    cards.concat(groups, browse).forEach(function (el) { displays.set(el, el.style.display); });
+    function show(el, visible) { el.style.display = visible ? displays.get(el) : "none"; }
     input.addEventListener("input", function () {
       var words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
       var shown = 0;
