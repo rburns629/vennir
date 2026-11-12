@@ -1,0 +1,14 @@
+{
+  "name": "vennir-site-docs",
+  "private": true,
+  "type": "module",
+  "description": "Makes vennir.io/docs/* from the repository's Markdown: make site-docs.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "github-slugger": "2.0.0",
+    "markdown-it": "14.3.3",
+    "mermaid": "12.2.0"
+  }
+}

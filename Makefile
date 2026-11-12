@@ -1,5 +1,5 @@
 .PHONY: gke-verify-release gke-deploy-console-from-source gke-deploy-kernel-from-source kind-tls kind-audit-store quickstart _quickstart-prereqs kind-cluster kind-namespaces \
-	build-products kind-sample-api console-docs catalog-publish kind-registry kind-deploy kind-deploy-kernel kind-deploy-console kind-deploy-eso \
+	build-products kind-sample-api console-docs site-docs catalog-publish kind-registry kind-deploy kind-deploy-kernel kind-deploy-console kind-deploy-eso \
 	kind-e2e-secrets up down logs gke-logs test test-db test-db-down proto gke-deploy-policy-controller \
 	gke-deploy gke-deploy-console gke-deploy-kernel gke-deploy-eso _gke-confirm
 
@@ -194,6 +194,11 @@ build-products: kind-registry
 # SOURCES lists them): run after changing any of them, or the console's tests fail.
 console-docs:
 	@bash .github/scripts/console-docs.sh
+
+# vennir.io/docs/*: a page per guide, made from its Markdown, into
+# site/public/docs/ (git ignores it; the site's deploy runs this itself).
+site-docs:
+	cd site/docs-build && npm ci --no-audit --no-fund && node build.mjs
 
 # The backend of the local sample's API product (samples/local/apis/greetings),
 # run in the local team's API backends' namespace (local-apis) as the team

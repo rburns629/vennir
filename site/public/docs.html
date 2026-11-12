@@ -75,16 +75,16 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
   <section class="wrap" style="padding-top: 88px; padding-bottom: 72px; display: flex; flex-direction: column; gap: 24px">
       <span class="eyebrow">Docs</span>
       <h1 style="margin: 0; font-size: 56px; line-height: 1.05; font-weight: 700; letter-spacing: -0.025em; color: #FFFFFF; text-wrap: balance; max-width: 900px">Everything Vennir does, written down.</h1>
-      <p style="margin: 0; font-size: 19px; line-height: 1.6; color: #AEB5C2; max-width: 680px; text-wrap: pretty">The docs live with the code, in the repository, and every one of them is a Markdown file on GitHub. Start from what you're here to do.</p>
-      <div role="search" aria-label="Search the docs" style="display: flex; flex-direction: column; gap: 10px; max-width: 680px">
+      <p style="margin: 0; font-size: 19px; line-height: 1.6; color: #AEB5C2; max-width: 680px; text-wrap: pretty">Every guide is here, made from the Markdown that lives with the code in the repository. Search them all, or start from what you're here to do.</p>
+      <form role="search" aria-label="Search the docs" action="/docs/search" method="get" style="margin: 0; display: flex; flex-direction: column; gap: 10px; max-width: 680px">
         <label for="docs-search" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search the docs</label>
         <div class="card" style="display: flex; align-items: center; gap: 12px; padding: 0 10px 0 18px; min-height: 56px">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9AA3B2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
-          <input id="docs-search" type="search" placeholder="Search setup, secrets, failure codes, the cart…" style="flex: 1; min-width: 0; height: 54px; border: 0; background: transparent; color: #E8EAEE; font-family: inherit; font-size: 16px; outline-offset: 4px">
+          <input id="docs-search" name="q" type="search" placeholder="Search setup, secrets, failure codes, the cart…" style="flex: 1; min-width: 0; height: 54px; border: 0; background: transparent; color: #E8EAEE; font-family: inherit; font-size: 16px; outline-offset: 4px">
           <span class="mono" aria-hidden="true" style="flex: 0 0 auto; padding: 3px 8px; border: 1px solid #2A3040; border-radius: 6px; font-size: 12px; color: #9AA3B2">/</span>
         </div>
-        <span id="docs-hint" aria-live="polite" style="font-size: 14px; line-height: 1.6; color: #8B93A3">Inside an install, the console's Docs page searches its guides and a copy of the platform docs shipped with that version, and Ask (where an admin has set up the chat agent) answers from them with citations.</span>
-      </div>
+        <span id="docs-hint" aria-live="polite" style="font-size: 14px; line-height: 1.6; color: #8B93A3">Enter searches every guide's full text. Inside an install, the console's Docs page searches its guides and a copy of the platform docs shipped with that version, and Ask (where an admin has set up the chat agent) answers from them with citations.</span>
+      </form>
     <div style="display: flex; gap: 10px; flex-wrap: wrap; padding-top: 4px">
       <a class="chip" href="#runners" style="height: 32px; padding: 0 14px; font-size: 13px; text-decoration: none">Running things</a>
       <a class="chip" href="#catalog" style="height: 32px; padding: 0 14px; font-size: 13px; text-decoration: none">Publishing products</a>
@@ -104,33 +104,33 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       <div class="card" style="padding: 28px; display: flex; flex-direction: column; gap: 20px">
         <div style="display: flex; align-items: center; gap: 12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5v14l11-7z"></path></svg><h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">I want to run things</h3></div>
         <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="https://github.com/roburns/vennir/blob/main/console/docs/10-ordering-and-the-cart.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Find it in the Catalog and order it</a></li>
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">02</span><a href="https://github.com/roburns/vennir/blob/main/console/docs/09-runs-explained.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Follow your run, and what its states mean</a></li>
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">03</span><a href="https://github.com/roburns/vennir/blob/main/console/docs/15-troubleshooting.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">When something fails</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="/docs/ordering-and-the-cart" style="font-size: 16px; line-height: 1.5; text-decoration: none">Find it in the Catalog and order it</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">02</span><a href="/docs/runs-explained" style="font-size: 16px; line-height: 1.5; text-decoration: none">Follow your run, and what its states mean</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">03</span><a href="/docs/troubleshooting" style="font-size: 16px; line-height: 1.5; text-decoration: none">When something fails</a></li>
         </ol>
       </div>
       <div class="card" style="padding: 28px; display: flex; flex-direction: column; gap: 20px">
         <div style="display: flex; align-items: center; gap: 12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path d="M4 7.5l8 4.5 8-4.5M12 12v9"></path></svg><h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">I publish products</h3></div>
         <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="https://github.com/roburns/vennir/blob/main/catalog-template/README.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">How a catalog repository works</a></li>
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">02</span><a href="https://github.com/roburns/vennir/blob/main/console/docs/01-getting-started.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Your first product, end to end</a></li>
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">03</span><a href="https://github.com/roburns/vennir/blob/main/console/docs/04-secrets-explained.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Give it a secret</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="/docs/catalog-guide" style="font-size: 16px; line-height: 1.5; text-decoration: none">How a catalog repository works</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">02</span><a href="/docs/getting-started" style="font-size: 16px; line-height: 1.5; text-decoration: none">Your first product, end to end</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">03</span><a href="/docs/secrets-explained" style="font-size: 16px; line-height: 1.5; text-decoration: none">Give it a secret</a></li>
         </ol>
       </div>
       <div class="card" style="padding: 28px; display: flex; flex-direction: column; gap: 20px">
         <div style="display: flex; align-items: center; gap: 12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="1.5"></rect><rect x="4" y="14" width="16" height="6" rx="1.5"></rect><path d="M8 7h.01M8 17h.01"></path></svg><h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">I install and run Vennir</h3></div>
         <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="https://github.com/roburns/vennir/blob/main/docs/clouds/gcp.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Get your cloud ready (GCP, AWS or Azure)</a></li>
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">02</span><a href="https://github.com/roburns/vennir/blob/main/docs/setup.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Install with vennir init and apply</a></li>
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">03</span><a href="https://github.com/roburns/vennir/blob/main/docs/security-model.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Read what's enforced, and what isn't yet</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="/docs/clouds-gcp" style="font-size: 16px; line-height: 1.5; text-decoration: none">Get your cloud ready (GCP, AWS or Azure)</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">02</span><a href="/docs/setup" style="font-size: 16px; line-height: 1.5; text-decoration: none">Install with vennir init and apply</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">03</span><a href="/docs/security-model" style="font-size: 16px; line-height: 1.5; text-decoration: none">Read what's enforced, and what isn't yet</a></li>
         </ol>
       </div>
       <div class="card" style="padding: 28px; display: flex; flex-direction: column; gap: 20px">
         <div style="display: flex; align-items: center; gap: 12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 8l-5 4 5 4M15 8l5 4-5 4"></path></svg><h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF">I want to contribute</h3></div>
         <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px">
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="https://github.com/roburns/vennir/blob/main/docs/architecture.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Read the architecture</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">01</span><a href="/docs/architecture" style="font-size: 16px; line-height: 1.5; text-decoration: none">Read the architecture</a></li>
           <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">02</span><a href="https://github.com/roburns/vennir/blob/main/AGENTS.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Orient with AGENTS.md</a></li>
-          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">03</span><a href="https://github.com/roburns/vennir/blob/main/CONTRIBUTING.md" style="font-size: 16px; line-height: 1.5; text-decoration: none">Open a focused pull request</a></li>
+          <li style="display: flex; gap: 14px; align-items: baseline"><span class="mono" style="flex: 0 0 auto; font-size: 13px; color: #7C9BFF">03</span><a href="/docs/contributing" style="font-size: 16px; line-height: 1.5; text-decoration: none">Open a focused pull request</a></li>
         </ol>
       </div>
       </div>
@@ -151,7 +151,7 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
           <li style="display: flex; flex-direction: column; gap: 4px; padding: 14px 0; border-top: 1px solid #1F2430"><span class="mono" style="font-size: 14px; color: #FFFFFF">Team namespaces</span><span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Where steps run, labelled vennir/team=true. Admission policies check every Job.</span></li>
       </ul>
       <div style="display: flex; gap: 12px; flex-wrap: wrap">
-        <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/docs/architecture.md#the-pieces">Read the architecture<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+        <a class="btn btn-ghost" href="/docs/architecture#the-pieces">Read the architecture<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
         <a class="btn btn-ghost" href="https://github.com/roburns/vennir/blob/main/docs/architecture/README.md">All six diagrams<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
       </div>
     </div>
@@ -185,77 +185,77 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         </div>
         <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px">
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/17-onboarding.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/onboarding" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Onboarding: from installing Vennir to your first deploy</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Who does what, then every step in order: the install, the catalog, a first team, its secrets and cloud access, and a first run.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/17</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/10-ordering-and-the-cart.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/ordering-and-the-cart" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Finding and running things from the catalog</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">The Catalog, readiness on this install, run forms, the cart, Compose, previews, schedules, and deleting what a run made.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/10</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/09-runs-explained.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/runs-explained" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Runs, explained</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What each state means, what a failure does to the rest, retrying, running again, cancelling, and every failure code.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/09</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/03-what-is-a-dag.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/what-is-a-dag" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">What's a DAG, and why does everything revolve around one?</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">The idea from scratch, mapped onto Terraform, GitHub Actions and Airflow if you know them.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/03</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/07-how-data-moves.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/how-data-moves" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">How a value moves from one task to the next</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">One real value followed through a real run on kind, at every stop.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/07</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/05-calling-the-api.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/calling-the-api" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Calling the API from a pipeline</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Submit a DAG, wait for it, read its outputs and logs, with curl and jq.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/05</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/14-bots-and-automation.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/bots-and-automation" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Bots and automation</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Token bots, keyless CI bots, ordering bots with signed callbacks, schedules and notifications.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/14</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/11-apis.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/apis" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">APIs and the gateway</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Find another team's API, get access, call it, and what each error means.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/11</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/12-observe.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/observe" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Observe</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Security checks, metrics, usage, logs and the audit log, and who sees what on each.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/12</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/13-teams-and-roles.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/teams-and-roles" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Teams and roles</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Members, maintainers and admins, joining a team, single sign-on groups, retiring and purging.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/13</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/15-troubleshooting.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/troubleshooting" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Troubleshooting</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Organized by what you see: a run, step, image, secret or sign-in that isn't doing what you expected.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/15</span>
@@ -273,42 +273,42 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         </div>
         <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px">
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/catalog-template/README.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/catalog-guide" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Catalog</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">The catalog repository: layout, product.yaml, templates and DAGs, API products, testing, what CI blocks, who approves, publishing.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">catalog-template/README.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/01-getting-started.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/getting-started" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Try Vennir end to end</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">About an hour: a trial team from nothing to a product that reads a secret and passes its output on. No cloud, no cost.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/01</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/04-secrets-explained.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/secrets-explained" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Secrets, explained from scratch</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What a secret is here, how you register one, where it lives, and how it's kept from other teams.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/04</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/02-sync-secrets-gcp.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/sync-secrets-gcp" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Sync secrets from GCP Secret Manager</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">About 20 minutes: your team reads secrets from your own Secret Manager by Workload Identity, no stored key.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/02</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/clouds/github.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/clouds-github" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Getting GitHub ready for the catalog</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What vennir catalog create needs from GitHub before it makes your catalog repository.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/clouds/github.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/catalog-template/docs/onboarding-with-ai.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/catalog-onboarding-with-ai" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Onboarding with an AI assistant</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Adding a team or a product with Claude or another assistant, and what to check by hand.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">catalog-template/docs/</span>
@@ -326,105 +326,105 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         </div>
         <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px">
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/setup.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/setup" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Setting up Vennir</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">From an empty account to people running steps, with vennir init and vennir apply.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/setup.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/clouds/gcp.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/clouds-gcp" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Getting Google Cloud ready</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What only the Google Cloud website can do, before vennir init.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/clouds/gcp.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/clouds/aws.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/clouds-aws" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Getting AWS ready</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What only the AWS website can do, before vennir init.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/clouds/aws.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/clouds/azure.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/clouds-azure" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Getting Azure ready</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What only the Azure portal can do, before vennir init: the subscription, your roles, a Free Trial's limits.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/clouds/azure.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/clouds/computer.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/clouds-computer" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Getting your computer ready</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What to install first, on macOS, Linux or Windows in WSL 2, and how to check it.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/clouds/computer.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/operations.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/operations" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Operations</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">kind and Helm installs, upgrades, databases, rotating secrets, backups, network policies, the chat agent, troubleshooting.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/operations.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/security-model.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/security-model" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Security model</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What's enforced and by which layer, where secret values live, and what isn't enforced yet.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/security-model.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/16-admin-settings.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/admin-settings" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Admin settings</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Every section of the Admin page: what it does, and whether it's set in the console or by the install.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/16</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/18-where-to-host.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/where-to-host" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Where to host Vennir</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">kind, GKE, EKS, AKS or a cluster of your own: what each gives you, what it costs, and what changes for your teams.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/18</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/19-deploy-to-gcp.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/deploy-to-gcp" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Deploy to Google Cloud from Vennir</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Every Google Cloud step a team takes so its products can make resources there, with each product's own identity.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/19</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/20-deploy-to-aws.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/deploy-to-aws" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Deploy to AWS from Vennir</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Roles, Pod Identity and cross-account access, so a team's products can make resources in AWS.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/20</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/23-deploy-to-azure.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/deploy-to-azure" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Deploy to Azure from Vennir</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">A managed identity per product, trusting the cluster's own tokens from AKS or anywhere else, with only the roles it uses.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/23</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/24-every-cloud-from-any-install.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/every-cloud-from-any-install" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Creating resources in every cloud</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Who sets up what in Google Cloud, AWS and Azure, whichever one Vennir runs in: identities, permissions, and creating GCP projects under a folder.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/24</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/21-api-gateway.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/api-gateway" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">The API gateway, start to finish</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Turning it on, publishing a backend, calling it, and putting it on the internet.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/21</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/22-addresses-and-firewalls.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/addresses-and-firewalls" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Addresses and firewall rules</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Which address each part uses, finding them, identity instead of allowlists, and a fixed outbound address.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/22</span>
@@ -442,49 +442,49 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         </div>
         <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px">
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-1-laptop.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/lab-1-laptop" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 1: Vennir on your laptop</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Install on kind, run a DAG, publish the samples, run a template and a cart, and delete what a run made. Free, about 45 minutes.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-1-laptop</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-2-first-product.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/lab-2-first-product" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 2: your first product</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">A catalog of your own, a product from the starter, tests run as CI runs them, a secret, and errors that explain themselves. Free.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-2-first-product</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-3-gke.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/lab-3-gke" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 3: Vennir on GKE, with a catalog</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">A released Vennir on GKE Autopilot at the smallest size, priced before it's made, and a catalog whose CI publishes with no stored key. Billed.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-3-gke</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-4-gcp-projects.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/lab-4-gcp-projects" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 4: Google Cloud projects from Vennir</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Projects made under a folder of their own, a Cloud Run service with grants inherited from the folder, and deletes through Vennir. Billed.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-4-gcp-projects</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-5-aws-from-gke.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/lab-5-aws-from-gke" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 5: AWS from a GKE install</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">An S3 bucket and an ECS Express service, each product as an IAM role of its own by web identity, no AWS cluster and no key. Billed.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-5-aws-from-gke</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-6-azure-from-gke.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/lab-6-azure-from-gke" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 6: Azure from a GKE install</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">A resource group, a Container App and PostgreSQL, each product a managed identity of its own, and a Key Vault secret synced. Billed.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-6-azure-from-gke</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/lab-7-apis-across-clouds.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/lab-7-apis-across-clouds" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Lab 7: APIs on every cloud, through the gateway</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">The gateway on the internet, serving a backend on AWS and one on Azure behind Entra sign-in, and every way around it refused. Billed.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/lab-7-apis-across-clouds</span>
@@ -502,56 +502,56 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
         </div>
         <ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px">
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/architecture.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/architecture" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Architecture</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What Vennir is, the pieces, a DAG becoming containers, the product contract, data, and the design decisions.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/architecture.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/kernel/ARCHITECTURE.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/kernel-architecture" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">The kernel, call by call</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">The kernel's layer rules and a literal trace of submit, claim, dispatch, poll and finalize.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">kernel/ARCHITECTURE.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/08-under-the-hood.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/under-the-hood" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">How Vennir works under the hood</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Each Kubernetes, Helm and Postgres feature Vennir leans on, what it's for, and where it is in the code.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/08</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/console/docs/06-database-schemas.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/database-schemas" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Where Vennir keeps its data</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Both databases, table by table, kept in step with the models by tests.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">console/docs/06</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/cli/DESIGN.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/cli-design" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">vennir: design</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">The installer CLI: its commands, init's questions, the approval screen and cost, the OpenTofu modules.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">cli/DESIGN.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/repository-map.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/repository-map" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Repository map</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Every folder and file in the repository, one line each.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/repository-map.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/docs/assessment.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/assessment" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Architecture assessment</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">Where Vennir is going: consumers and templates, identity in two layers, one catalog pulled by many installs.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">docs/assessment.md</span>
             </a>
           </li>
           <li data-doc style="background: #11141B; border: 1px solid #1F2430; border-radius: 12px; display: flex">
-            <a href="https://github.com/roburns/vennir/blob/main/CONTRIBUTING.md" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
+            <a href="/docs/contributing" style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; text-decoration: none">
               <span style="font-size: 17px; font-weight: 600; line-height: 1.35; color: #FFFFFF">Contributing and AGENTS.md</span>
               <span style="font-size: 15px; line-height: 1.55; color: #AEB5C2">What a pull request needs. AGENTS.md has the current build and test commands for each project.</span>
               <span class="mono" style="margin-top: auto; padding-top: 4px; font-size: 12px; color: #A9BCFF">CONTRIBUTING.md</span>
@@ -591,15 +591,15 @@ a{color:#A9BCFF}a:hover{color:#D3DDFF}
       </nav>
       <nav aria-label="Docs" style="display: flex; flex-direction: column; gap: 4px">
         <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Docs</span>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/architecture.md" style="font-size: 14px">Architecture</a>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/setup.md" style="font-size: 14px">Setup</a>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/operations.md" style="font-size: 14px">Operations</a>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/docs/security-model.md" style="font-size: 14px">Security model</a>
+        <a class="nav-link" href="/docs/architecture" style="font-size: 14px">Architecture</a>
+        <a class="nav-link" href="/docs/setup" style="font-size: 14px">Setup</a>
+        <a class="nav-link" href="/docs/operations" style="font-size: 14px">Operations</a>
+        <a class="nav-link" href="/docs/security-model" style="font-size: 14px">Security model</a>
       </nav>
       <nav aria-label="Project" style="display: flex; flex-direction: column; gap: 4px">
         <span style="font-size: 13px; font-weight: 600; color: #C9CED8; margin-bottom: 6px">Project</span>
         <a class="nav-link" href="https://github.com/roburns/vennir" style="font-size: 14px">GitHub</a>
-        <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/CONTRIBUTING.md" style="font-size: 14px">Contributing</a>
+        <a class="nav-link" href="/docs/contributing" style="font-size: 14px">Contributing</a>
         <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/SECURITY.md" style="font-size: 14px">Reporting a vulnerability</a>
         <a class="nav-link" href="https://github.com/roburns/vennir/blob/main/LICENSE" style="font-size: 14px">MIT License</a>
       </nav>

@@ -1,13 +1,17 @@
 {
   "hosting": {
     "public": "public",
+    "predeploy": [
+      "npm --prefix \"$PROJECT_DIR/docs-build\" ci --no-audit --no-fund",
+      "node \"$PROJECT_DIR/docs-build/build.mjs\""
+    ],
     "cleanUrls": true,
     "trailingSlash": false,
     "headers": [
       {
         "source": "**",
         "headers": [
-          { "key": "Content-Security-Policy", "value": "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" },
+          { "key": "Content-Security-Policy", "value": "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" },
           { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
           { "key": "X-Content-Type-Options", "value": "nosniff" },
           { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
@@ -16,7 +20,7 @@
         ]
       },
       {
-        "source": "**/*.@(html|js|svg)",
+        "source": "**/*.@(html|js|svg|json)",
         "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }]
       }
     ]
