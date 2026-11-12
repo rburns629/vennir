@@ -65,7 +65,7 @@ jobs:
   kernel:
     runs-on: ubuntu-latest
     # The Go toolchain the kernel is built with (kernel/Dockerfile), pinned by digest.
-    container: golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd
+    container: golang:1.27-alpine@sha256:eb61c3873c97416fff0116553fff65d67a3549f72e11d9758849a689cdd8b523
     defaults:
       run:
         working-directory: kernel
@@ -96,7 +96,7 @@ jobs:
   gateway:
     runs-on: ubuntu-latest
     # The Go toolchain the gateway is built with (gateway/Dockerfile), pinned by digest.
-    container: golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd
+    container: golang:1.27-alpine@sha256:eb61c3873c97416fff0116553fff65d67a3549f72e11d9758849a689cdd8b523
     services:
       postgres:
         image: postgres:16.15@sha256:1beaa3084eee2676f20a9cd9928f0bf2c5bf674f8e49f81017912183d377c61c
@@ -290,7 +290,7 @@ jobs:
           kubectl create namespace execution-kernel
           docker run --rm --network host -v "$PWD":/src -w /src -e CGO_ENABLED=0 \
             -e DATABASE_URL=postgresql://runner@localhost/execution_kernel_test \
-            golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd \
+            golang:1.27-alpine@sha256:eb61c3873c97416fff0116553fff65d67a3549f72e11d9758849a689cdd8b523 \
             sh -c 'go run ./cmd/kernel migrate && go test -c -o bin/executor.test ./internal/executor && go test -c -o bin/scheduler.test ./internal/scheduler'
           (cd internal/executor && ../../bin/executor.test -test.run '^TestKind' -test.v)
           (cd internal/scheduler && ../../bin/scheduler.test -test.run '^TestKind' -test.v)
@@ -298,7 +298,7 @@ jobs:
   cli:
     runs-on: ubuntu-latest
     # The Go toolchain the CLI is built with, pinned by digest.
-    container: golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd
+    container: golang:1.27-alpine@sha256:eb61c3873c97416fff0116553fff65d67a3549f72e11d9758849a689cdd8b523
     defaults:
       run:
         working-directory: cli
@@ -318,7 +318,7 @@ jobs:
     runs-on: ubuntu-latest
     # The Go toolchain the three are built with, pinned by digest: its
     # standard library is part of what's checked.
-    container: golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd
+    container: golang:1.27-alpine@sha256:eb61c3873c97416fff0116553fff65d67a3549f72e11d9758849a689cdd8b523
     env:
       CGO_ENABLED: "0"
       # Pinned; go run checks the module against the Go checksum database.
@@ -340,7 +340,7 @@ jobs:
     # statistics), in the CLI's pinned Go image. The benchmarks themselves
     # need a kind cluster of their own and run by hand (perf/README.md).
     runs-on: ubuntu-latest
-    container: golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd
+    container: golang:1.27-alpine@sha256:eb61c3873c97416fff0116553fff65d67a3549f72e11d9758849a689cdd8b523
     defaults:
       run:
         working-directory: perf
