@@ -141,23 +141,50 @@
   }
 
   // The Docs page: typing hides the guides whose title and summary don't
-  // match, and "/" jumps to the box.
+  // match, and with them the groups left empty and the sections above the
+  // guides, so what matches comes right after the box; the line under the box
+  // says how many, Enter goes to them, and "/" jumps to the box.
   function docsSearch() {
     var input = document.getElementById("docs-search");
     if (!input) return;
-    var cards = Array.prototype.slice.call(document.querySelectorAll("[data-doc]"));
+    function all(selector) { return Array.prototype.slice.call(document.querySelectorAll(selector)); }
+    var cards = all("[data-doc]");
+    var groups = all("[data-doc-group]");
+    var browse = all("[data-browse]");
     var none = document.getElementById("docs-none");
+    var hint = document.getElementById("docs-hint");
+    var hintText = hint && hint.textContent;
+    // Each element's own inline display would win over the hidden attribute.
+    function show(el, visible) { el.style.display = visible ? "" : "none"; }
     input.addEventListener("input", function () {
       var words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
       var shown = 0;
       cards.forEach(function (card) {
         var text = card.textContent.toLowerCase();
         var match = words.every(function (w) { return text.indexOf(w) !== -1; });
-        // Each card's own inline display would win over the hidden attribute.
-        card.style.display = match ? "" : "none";
+        show(card, match);
         if (match) shown++;
       });
+      groups.forEach(function (group) {
+        show(group, cards.some(function (card) { return card.style.display !== "none" && group.contains(card); }));
+      });
+      browse.forEach(function (section) { show(section, words.length === 0); });
       if (none) none.hidden = shown > 0;
+      if (hint) {
+        hint.textContent = words.length === 0 ? hintText
+          : shown === 0 ? "No guide matches that."
+          : (shown === 1 ? "1 guide matches" : shown + " guides match") + ", below. Enter goes to them.";
+      }
+    });
+    input.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      var first = cards.filter(function (card) { return card.style.display !== "none"; })[0];
+      var target = first || none;
+      if (!input.value.trim() || !target) return;
+      e.preventDefault();
+      target.scrollIntoView({ block: "center" });
+      var link = first && first.querySelector("a");
+      if (link) link.focus({ preventScroll: true });
     });
     document.addEventListener("keydown", function (e) {
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
