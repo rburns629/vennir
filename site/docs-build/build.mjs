@@ -219,8 +219,9 @@ function render(guide) {
   };
 }
 
+// The docs are three columns wide, so the header and footer widen with them.
 const docsStyle = `
-.dwrap{max-width:1440px;margin:0 auto;padding:0 24px;box-sizing:border-box}
+.wrap,.dwrap{max-width:1440px;margin:0 auto;padding:0 24px;box-sizing:border-box}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .dbar{border-bottom:1px solid #161A22;background:#0D1015}
 .dbar-row{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;min-height:64px;padding-top:10px;padding-bottom:10px}
