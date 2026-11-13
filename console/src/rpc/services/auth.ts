@@ -36,6 +36,11 @@ const MINUTE = 60 * 1000;
 // global limit behind a load balancer that hides clients; per email alone
 // would let anyone lock a known account out (rpc/services/auth.ts has the rest).
 const loginLimit = new FixedWindowLimit(10, 15 * MINUTE);
+// And per client alone, whatever the email, so one client can't try a new
+// email each time: every attempt costs a password hash, and rows in two
+// tables and the audit log. Set far above what one person needs, since an
+// office or a load balancer that hides clients is one address to the console.
+const loginAddressLimit = new FixedWindowLimit(300, 15 * MINUTE, "sign-ins");
 const exchangeLimit = new FixedWindowLimit(60, 15 * MINUTE);
 /** How long a keyless bot's session lasts: about a CI job. */
 const KEYLESS_SESSION_SECONDS = 3600;
@@ -81,6 +86,7 @@ export function authService(app: FastifyInstance): ServiceImpl<typeof AuthServic
 
     async login(req, ctx) {
       const { email, password } = check({ email: Email, password: AnyPassword }, req);
+      await loginAddressLimit.take(`login-address:${ctx.values.get(kClientIp)}`, ctx);
       await loginLimit.take(`login:${ctx.values.get(kClientIp)}:${email.toLowerCase()}`, ctx);
       // Refused before the password is checked, so this says nothing about it.
       const wait = await loginWaitSeconds(email);

@@ -160,6 +160,21 @@ describe("login rate limiting", () => {
     expect((await login(email, PASSWORD, "10.9.9.11")).statusCode).toBe(200);
   });
 
+  it("blocks a client that has tried 300 times, whatever the email", async () => {
+    // 299 attempts already counted in this window; the 300th is the last allowed.
+    await db.execute(sql`
+      INSERT INTO rate_limit_windows (key, count, resets_at)
+      VALUES ('login-address:10.9.9.20', 299, now() + interval '15 minutes')`);
+    expect((await login(`nobody-${randomUUID()}@example.com`, "wrong-password", "10.9.9.20")).statusCode).toBe(401);
+    const { email } = await makeUser();
+    const blocked = await login(email, PASSWORD, "10.9.9.20");
+    expect(blocked.statusCode).toBe(429);
+    expect(failureCode(blocked.json<RpcError>())).toBe("RATE_LIMITED");
+    expect(Number(blocked.headers["retry-after"])).toBeGreaterThan(0);
+    // Another client signs in to the same account.
+    expect((await login(email, PASSWORD, "10.9.9.21")).statusCode).toBe(200);
+  });
+
   it("doesn't lock out other accounts behind the same IP", async () => {
     const target = await makeUser();
     const bystander = await makeUser();
