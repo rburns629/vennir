@@ -646,8 +646,11 @@ secretStores:
   # under spec.provider: the vaults a team has of its own. Add another your
   # teams use (say `doppler`). Never `kubernetes` or `webhook`, which read
   # from where the operator runs (a cluster's Secrets; any URL it can
-  # reach): the console refuses to start with either listed. A store
-  # already applied stays; the catalog's next change to it is refused.
+  # reach): the console refuses to start with either listed. An empty list
+  # means these defaults. A store already applied stays in the cluster, but
+  # every catalog release re-applies each team's stores, so one whose
+  # provider isn't listed is reported as a problem with each release
+  # (applied with problems) until it's listed or the store is changed.
   providers:
     - gcpsm
     - aws
