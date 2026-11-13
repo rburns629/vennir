@@ -938,12 +938,14 @@ by its email is refused, saying nobody verified the address
 account (which checks the email); an admin, who can check it's theirs some
 other way, may add it.
 
-**Guessing** is limited twice (`console/src/rpc/services/auth.ts`): 10
-sign-ins per 15 minutes per client address and email, and, per email from
-any address, after 10 failures in an hour each attempt waits 1 s, then 2 s,
-4 s, up to a minute (`console/src/auth/loginThrottle.ts`), so the owner is
-slowed, never locked out. A wrong email costs the same time as a wrong
-password. Both are counted in the console's database (`rate_limit_windows`,
+**Guessing** is limited three ways (`console/src/rpc/services/auth.ts`): 10
+sign-ins per 15 minutes per client address and email; 300 per 15 minutes
+per client address whatever the email, so one client can't try a new email
+each time (far above what an office behind one address needs); and, per
+email from any address, after 10 failures in an hour each attempt waits
+1 s, then 2 s, 4 s, up to a minute (`console/src/auth/loginThrottle.ts`),
+so the owner is slowed, never locked out. A wrong email costs the same time
+as a wrong password. All are counted in the console's database (`rate_limit_windows`,
 `sign_in_failures`), so every copy of the console counts the same attempts
 and a restart forgets nothing. A failed sign-in is logged (`event:
 "sign_in_failed"`, with the email and address) and audited. A single
