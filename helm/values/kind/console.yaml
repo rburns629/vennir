@@ -43,6 +43,11 @@ bootstrapAdmin:
 # so only stored-credential sources (1Password) are offered here.
 secretSources:
   catalogRepo: my-org/vennir-catalog
+# A team's SecretStore may use External Secrets' fake provider too, which
+# holds its values itself: what `make kind-e2e-secrets` syncs from. For a
+# local cluster only (the list replaces the chart's).
+secretStores:
+  providers: [gcpsm, aws, azurekv, vault, onepassword, onepasswordSDK, fake]
 # The API gateway: forwards to backends in the vennir-samples namespace and
 # the local sample team's API backends' namespace, local-apis (its greetings
 # API: make kind-sample-api)

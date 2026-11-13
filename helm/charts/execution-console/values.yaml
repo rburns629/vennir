@@ -637,6 +637,22 @@ secretSources:
   gkeClusterName: ""
   gkeClusterLocation: ""
 
+# -- What a team's SecretStore (applied from the catalog) may be.
+secretStores:
+  # -- The External Secrets providers a store may use, as ESO names them
+  # under spec.provider: the vaults a team has of its own. Add another your
+  # teams use (say `doppler`). Never `kubernetes` or `webhook`, which read
+  # from where the operator runs (a cluster's Secrets; any URL it can
+  # reach): the console refuses to start with either listed. A store
+  # already applied stays; the catalog's next change to it is refused.
+  providers:
+    - gcpsm
+    - aws
+    - azurekv
+    - vault
+    - onepassword
+    - onepasswordSDK
+
 # -- Signs session JWTs. Leave empty to have one generated on install and
 # kept stable across upgrades (see templates/secret.yaml's lookup against
 # the existing Secret) -- set explicitly only if you have a specific

@@ -344,6 +344,24 @@ describe("applying a team's SecretStore file", () => {
     expect(problems([{ apiVersion: "v1", kind: "ServiceAccount", metadata: { name: "eso-gcp" } }])).toContain("No SecretStore");
   });
 
+  it("takes only the providers this install allows, and never one that reads from where ESO runs", () => {
+    const problems = (spec: object, providers?: string[]) =>
+      checkSecretStoreObjects("team-a", [store("team-a", spec)], providers).problems.join(" | ");
+    // The chart's own list: a vault of the team's.
+    for (const provider of ["gcpsm", "aws", "azurekv", "vault", "onepassword", "onepasswordSDK"]) {
+      expect(problems({ provider: { [provider]: {} } }), provider).toBe("");
+    }
+    const webhook = { provider: { webhook: { url: "http://kernel-execution-kernel-api.vennir-system.svc:8000/{{ .remoteRef.key }}" } } };
+    expect(problems(webhook)).toContain("the webhook provider reads any URL");
+    expect(problems({ provider: { fake: { data: [] } } })).toContain("this install allows only these providers: gcpsm, aws,");
+    expect(problems({ provider: { doppler: {} } })).toContain("spec.provider.doppler: this install allows only");
+    // What an install adds is allowed; the two that read from ESO's side never are.
+    expect(problems({ provider: { fake: { data: [] } } }, ["gcpsm", "fake"])).toBe("");
+    expect(problems({ provider: { vault: {} } }, ["gcpsm", "fake"])).toContain("only these providers: gcpsm, fake");
+    expect(problems(webhook, ["webhook", "kubernetes"])).toContain("the webhook provider");
+    expect(problems({ provider: { kubernetes: {} } }, ["webhook", "kubernetes"])).toContain("the kubernetes provider");
+  });
+
   it("names only the team's credential and ESO's ServiceAccounts, however a provider names them", () => {
     const problems = (spec: object) => checkSecretStoreObjects("team-a", [store("team-a", spec)]).problems.join(" | ");
     // A token or certificate from any Secret, under any key.
