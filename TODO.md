@@ -431,6 +431,16 @@ it was seen.
 
 ## Testing and housekeeping
 
+- [ ] **Three console tests fail now and then** (seen 2026-11-12, each
+  passing when rerun; not yet seen on `main` alone):
+  `team-lifecycle.test.ts` "refuses a retired team's until it's
+  un-retired" (its 5 s timeout, about one run in eight);
+  `product-policy.test.ts` "fails the change if the cluster can't be
+  updated" and the test after it (registration sometimes answers
+  `failed_precondition`, and the mocked rejection leaks into the next);
+  `clouds.test.ts` "is never checked here, and shows no readiness" (once
+  in a full run). Find what they share with tests running beside them.
+
 - [ ] **Drop `api_access_requests.requester_groups` and `requester_groups_read_at`**
   in the release after the one with migration 0072. Since 0072 a request
   keeps only the groups its person offers (`offered_groups`); the old

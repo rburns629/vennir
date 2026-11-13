@@ -107,7 +107,10 @@ gatewayApi:
 # X-Forwarded-For it believes, so the sign-in throttle and rate limits see
 # real clients. Google's external Application Load Balancer: its front ends
 # and its own address, ["35.191.0.0/16", "130.211.0.0/22", "<its IP>"].
-# Empty: the header is ignored.
+# Empty: the header is ignored. Behind a proxy that isn't listed, every
+# client is the proxy's one address to the console, so the limits per
+# address (300 password and 300 single sign-on sign-ins per 15 minutes)
+# are shared by everyone who signs in.
 trustProxy: []
 
 serviceAccount:
@@ -643,8 +646,11 @@ secretStores:
   # under spec.provider: the vaults a team has of its own. Add another your
   # teams use (say `doppler`). Never `kubernetes` or `webhook`, which read
   # from where the operator runs (a cluster's Secrets; any URL it can
-  # reach): the console refuses to start with either listed. A store
-  # already applied stays; the catalog's next change to it is refused.
+  # reach): the console refuses to start with either listed. An empty list
+  # means these defaults. A store already applied stays in the cluster, but
+  # every catalog release re-applies each team's stores, so one whose
+  # provider isn't listed is reported as a problem with each release
+  # (applied with problems) until it's listed or the store is changed.
   providers:
     - gcpsm
     - aws

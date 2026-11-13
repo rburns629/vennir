@@ -26,6 +26,7 @@
  * Every failure redirects to /login#error=<CODE> and is logged in full.
  */
 import { createHash, hkdfSync, randomBytes } from "node:crypto";
+import { Code, ConnectError } from "@connectrpc/connect";
 import fastifyCookie from "@fastify/cookie";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply } from "fastify";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
@@ -202,8 +203,13 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
     try {
       try {
         await callbackLimit.take(`sso-callback:${request.ip}`, { responseHeader: new Headers() });
-      } catch {
-        throw new SignInRefused("RATE_LIMITED", "Too many sign-ins from this address.");
+      } catch (error) {
+        // Only the limit's own refusal is one; anything else (the database
+        // unreachable) is the failure it is, refused as SIGN_IN_FAILED.
+        if (error instanceof ConnectError && error.code === Code.ResourceExhausted) {
+          throw new SignInRefused("RATE_LIMITED", "Too many sign-ins from this address.");
+        }
+        throw error;
       }
       const unsigned = raw ? request.unsignCookie(raw) : undefined;
       if (!unsigned?.valid || !unsigned.value) throw new SignInRefused("SIGN_IN_EXPIRED", "This sign-in wasn't started here, or took too long.");
