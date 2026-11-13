@@ -907,15 +907,15 @@ export const config = {
       "kube-node-lease",
     ],
   },
+  // The External Secrets providers a team's SecretStore may use
+  // (secretStores.ts); never REFUSED_SECRET_STORE_PROVIDERS.
+  secretStoreProviders: secretStoreProviders(),
   // What the Team page's "Connect a source" wizard needs to tell a platform
   // owner: which repo the connection's PR goes to, and the facts a cloud
   // provider must trust for this cluster's identities. Display only: a
   // wrong value produces a wrong instruction, never a wrong permission
   // (the SecretStore still goes through review). Empty means "not available
   // on this cluster", and the wizard says so instead of guessing.
-  // The External Secrets providers a team's SecretStore may use
-  // (secretStores.ts); never REFUSED_SECRET_STORE_PROVIDERS.
-  secretStoreProviders: secretStoreProviders(),
   secretSources: {
     // owner/repo of the catalog, where teams/<team>/secret-stores/ lives.
     catalogRepo: process.env["SECRET_SOURCES_CATALOG_REPO"] ?? "",
