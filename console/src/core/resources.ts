@@ -314,21 +314,34 @@ async function deleteChecked(who: AuthUser, ids: string[], log: FastifyBaseLogge
   // admin approved it.
   const asked = rows.map((row) => row.resource.id);
   const dependents = await db
-    .selectDistinct({ id: resources.id, type: resources.type, externalId: resources.externalId })
+    .selectDistinct({
+      id: resources.id,
+      type: resources.type,
+      externalId: resources.externalId,
+      ownerTeam: resources.ownerTeam,
+      productTeam: resources.productTeam,
+      ownerUserId: resources.ownerUserId,
+    })
     .from(resourceLinks)
     .innerJoin(resources, and(eq(resources.id, resourceLinks.resourceId), isNull(resources.deletedAt)))
     .where(and(inArray(resourceLinks.dependsOnId, asked), notInArray(resourceLinks.resourceId, asked)));
   if (dependents.length > 0 && approved === null) {
     const request = await requestApproval(who, rows.map((row) => row.resource), dependents.map((d) => d.id), log);
+    // Named only where the caller may see them, as a resource's own page
+    // does (view's hiddenDependents): another team's are counted.
+    const seen = dependents.filter((d) => seenBy(who, d));
+    const hidden = dependents.length - seen.length;
+    const named = [
+      ...seen.slice(0, 3).map((d) => `${d.type} ${d.externalId}`),
+      ...(seen.length > 3 ? ["..."] : []),
+      ...(hidden > 0 ? [`${String(hidden)} of other teams'`] : []),
+    ];
     throw new ApiError(
       409,
       "HAS_DEPENDENTS",
-      `${String(dependents.length)} other resource(s) still depend on this (${dependents
-        .slice(0, 3)
-        .map((d) => `${d.type} ${d.externalId}`)
-        .join(", ")}${dependents.length > 3 ? ", ..." : ""}). Delete them with it, or wait for an admin to approve deleting it anyway: they've been asked.`,
+      `${String(dependents.length)} other resource(s) still depend on this (${named.join(", ")}). Delete them with it, or wait for an admin to approve deleting it anyway: they've been asked.`,
       Code.FailedPrecondition,
-      { requestId: request, dependents: dependents.map((d) => d.id) },
+      { requestId: request, dependents: seen.map((d) => d.id), hiddenDependents: hidden },
     );
   }
   // Newest first, but whatever depends on another of them before it.
