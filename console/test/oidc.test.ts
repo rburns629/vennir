@@ -12,7 +12,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { eq, inArray, like } from "drizzle-orm";
+import { and, count, eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { exportJWK, generateKeyPair, SignJWT, type JWK } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -20,7 +20,7 @@ import { hashPassword } from "../src/auth/password.js";
 import { config, sessionTtlSeconds } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createUser, setUserAdmin } from "../src/db/queries.js";
-import { teams, users } from "../src/db/schema.js";
+import { auditLog, rateLimitWindows, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { PASSWORD, rpcClient } from "./rpc.js";
 
@@ -214,6 +214,33 @@ describe("single sign-on", () => {
 });
 
 describe("starting single sign-on", () => {
+  it("audits a refusal of a sign-in it started, and only logs an answer to one it didn't", async () => {
+    const callbacks = () =>
+      db.select({ n: count() }).from(auditLog).where(and(eq(auditLog.route, "/api/auth/oidc/callback"), eq(auditLog.status, 401))).then((rows) => rows[0]?.n ?? 0);
+    const before = await callbacks();
+    // No cookie, or one this console didn't sign: anyone can send these.
+    const unsolicited = await app.inject({ method: "GET", url: "/api/auth/oidc/callback?state=x&code=y" });
+    expect(unsolicited.headers.location).toBe("/login#error=SIGN_IN_EXPIRED");
+    expect((await signInWith(person("forged-cookie"), { tamper: "cookie" })).error).toBe("SIGN_IN_EXPIRED");
+    expect(await callbacks()).toBe(before);
+    // One it started, refused: audited.
+    expect((await signInWith(person("other-state"), { tamper: "state" })).error).toBe("SIGN_IN_EXPIRED");
+    expect(await callbacks()).toBe(before + 1);
+  });
+
+  it("limits how often one address comes back from the provider", async () => {
+    const from = "10.44.0.9";
+    const answer = () => app.inject({ method: "GET", url: "/api/auth/oidc/callback?state=x&code=y", remoteAddress: from });
+    await db.insert(rateLimitWindows).values({ key: `sso-callback:${from}`, count: 300, resetsAt: new Date(Date.now() + 60_000) });
+    try {
+      expect((await answer()).headers.location).toBe("/login#error=RATE_LIMITED");
+    } finally {
+      await db.delete(rateLimitWindows).where(eq(rateLimitWindows.key, `sso-callback:${from}`));
+    }
+    expect((await answer()).headers.location).toBe("/login#error=SIGN_IN_EXPIRED");
+    await db.delete(rateLimitWindows).where(eq(rateLimitWindows.key, `sso-callback:${from}`));
+  });
+
   it("needs the sign-in page's value for its tab, which comes back only with that sign-in's session", async () => {
     for (const url of ["/api/auth/oidc/start", "/api/auth/oidc/start?tab=x", `/api/auth/oidc/start?tab=${TAB}&tab=${TAB}`]) {
       const refused = await app.inject({ method: "GET", url });

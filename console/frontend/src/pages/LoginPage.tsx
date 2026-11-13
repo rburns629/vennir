@@ -28,6 +28,7 @@ const SSO_ERRORS: Record<string, string> = {
   SIGN_IN_FAILED: "Sign-in didn't work. Try again, or ask an admin.",
   SSO_OFF: "Single sign-on isn't on here any more: sign in with your password, or ask an admin.",
   GROUPS_UNAVAILABLE: "Your groups couldn't be read, so your teams can't be checked. Try again shortly, or ask an admin.",
+  RATE_LIMITED: "Too many sign-ins from your network just now. Try again in a few minutes.",
 };
 
 /** Where the sign-in page keeps the value it gives single sign-on for this tab. */
