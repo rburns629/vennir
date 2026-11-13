@@ -13,6 +13,7 @@ import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { and, count, eq, inArray, like } from "drizzle-orm";
+import fastifyCookie from "@fastify/cookie";
 import type { FastifyInstance } from "fastify";
 import { exportJWK, generateKeyPair, SignJWT, type JWK } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -227,6 +228,20 @@ describe("starting single sign-on", () => {
     // One it started, refused: audited.
     expect((await signInWith(person("other-state"), { tamper: "state" })).error).toBe("SIGN_IN_EXPIRED");
     expect(await callbacks()).toBe(before + 1);
+  });
+
+  it("takes no flow cookie signed with JWT_SECRET itself, only with the key derived for it", async () => {
+    const start = await app.inject({ method: "GET", url: `/api/auth/oidc/start?tab=${TAB}` });
+    const signed = decodeURIComponent((String(start.headers["set-cookie"]).split(";")[0] ?? "").split("=").slice(1).join("="));
+    const value = signed.slice(0, signed.lastIndexOf("."));
+    const forged = fastifyCookie.sign(value, config.jwtSecret);
+    const state = new URL(start.headers.location as string).searchParams.get("state");
+    const answer = await app.inject({
+      method: "GET",
+      url: `/api/auth/oidc/callback?state=${String(state)}&code=c`,
+      headers: { cookie: `vennir_oidc=${encodeURIComponent(forged)}` },
+    });
+    expect(answer.headers.location).toBe("/login#error=SIGN_IN_EXPIRED");
   });
 
   it("limits how often one address comes back from the provider", async () => {
