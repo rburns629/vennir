@@ -945,7 +945,12 @@ slowed, never locked out. A wrong email costs the same time as a wrong
 password. Both are counted in the console's database (`rate_limit_windows`,
 `sign_in_failures`), so every copy of the console counts the same attempts
 and a restart forgets nothing. A failed sign-in is logged (`event:
-"sign_in_failed"`, with the email and address) and audited. The client
+"sign_in_failed"`, with the email and address) and audited. A single
+sign-on the provider's answer ends is audited when this console started it
+(its signed cookie came back), refused or not; an answer to a sign-in it
+didn't start is only logged, and one address may come back 300 times in 15
+minutes (`console/src/auth/oidc.ts`), so the route anyone can call can't
+fill the audit log. The client
 address is the connection's unless `trustProxy` names the load balancer.
 
 **Sessions** are JWTs signed with an Ed25519 key derived from `JWT_SECRET`

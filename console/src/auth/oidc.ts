@@ -34,10 +34,19 @@ import { currentSso, groupSettingsNow, groupsOf, GroupsUnavailable, holdsGroupGr
 import { bindOidcSubject, createSsoUser, findUserByEmail, findUserByOidcSubject, recordSignIn, teamRolesForUser } from "../db/queries.js";
 import { newSession } from "./plugin.js";
 import { writeAuditEntry } from "../audit.js";
+import { FixedWindowLimit } from "../rpc/rateLimit.js";
 
 const COOKIE = "vennir_oidc";
 const COOKIE_PATH = "/api/auth/oidc";
 const COOKIE_SECONDS = 600;
+/**
+ * How many times one address may come back from the provider in 15
+ * minutes: far more than the people behind one address sign in, and few
+ * enough that the route (which anyone can call) can't be used to fill the
+ * audit log or keep the provider's token endpoint busy.
+ */
+const CALLBACK_LIMIT = 300;
+const callbackLimit = new FixedWindowLimit(CALLBACK_LIMIT, 15 * 60 * 1000, "sign-ins");
 const GOOGLE = "https://accounts.google.com";
 
 type Oidc = Sso;
@@ -182,9 +191,20 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
   api.get<{ Querystring: { state?: string; code?: string; error?: string } }>("/auth/oidc/callback", async (request, reply) => {
     const raw = request.cookies[COOKIE];
     reply.clearCookie(COOKIE, { path: COOKIE_PATH });
+    // Whether this console started the sign-in (its signed cookie came
+    // back): only then is a refusal an event worth the audit log. Anyone can
+    // call this route, as the API's interceptors don't audit calls from
+    // nobody (rpc/interceptors.ts), so the rest are only logged.
+    let started = false;
     try {
+      try {
+        await callbackLimit.take(`sso-callback:${request.ip}`, { responseHeader: new Headers() });
+      } catch {
+        throw new SignInRefused("RATE_LIMITED", "Too many sign-ins from this address.");
+      }
       const unsigned = raw ? request.unsignCookie(raw) : undefined;
       if (!unsigned?.valid || !unsigned.value) throw new SignInRefused("SIGN_IN_EXPIRED", "This sign-in wasn't started here, or took too long.");
+      started = true;
       const flow = JSON.parse(unsigned.value) as { state: string; nonce: string; verifier: string; tab?: string };
       const { state, code, error } = request.query;
       if (error) throw new SignInRefused("SIGN_IN_CANCELLED", `The provider answered ${error}.`);
@@ -239,14 +259,16 @@ export async function registerOidc(api: FastifyInstance): Promise<void> {
       });
       return await reply.redirect(`/login#token=${encodeURIComponent(api.jwt.sign(newSession(user.id, true), { expiresIn }))}&tab=${encodeURIComponent(flow.tab ?? "")}`);
     } catch (error) {
-      await writeAuditEntry(request.log, {
-        actorId: null,
-        method: "GET",
-        route: "/api/auth/oidc/callback",
-        target: { clientIp: request.ip },
-        status: 401,
-        requestId: request.id,
-      });
+      if (started) {
+        await writeAuditEntry(request.log, {
+          actorId: null,
+          method: "GET",
+          route: "/api/auth/oidc/callback",
+          target: { clientIp: request.ip },
+          status: 401,
+          requestId: request.id,
+        });
+      }
       return refuse(reply, request.log, error);
     }
   });
