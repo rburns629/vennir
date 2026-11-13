@@ -18,11 +18,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { cleanupInputs } from "../src/core/resources.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createTeam, upsertProduct } from "../src/db/queries.js";
-import { notificationEvents, products, resourceDeleteRequests, resources, submittedExecutions, teams } from "../src/db/schema.js";
+import { notificationEvents, products, resourceDeleteRequests, resourceLinks, resources, submittedExecutions, teams } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { getExecution, submitExecution, type KernelExecution } from "../src/kernel/client.js";
 import { providedBy, recordFinishedRuns, recordRun, refreshProvides, reportedResources, resolvedInputs } from "../src/resourceRecorder.js";
-import { caller, rpcClient } from "./rpc.js";
+import { caller, failureDetail, rpcClient, type RpcError } from "./rpc.js";
 
 /** The runs kernel-api knows: what each answers. */
 const kernelRuns = new Map<string, KernelExecution>();
@@ -566,6 +566,35 @@ describe("what depends on what (decision 25)", () => {
     expect((await call(admin, "ResourceService/DecideDeleteRequest", { id, approve: true })).failure).toBe("ALREADY_DECIDED");
     const [deleting] = await linked(consumerToken, `${prefix}-p1`);
     expect(deleting?.state).toBe("deleting");
+  });
+
+  it("names only the dependents the asker may see when it refuses, and counts the rest", async () => {
+    await ranAndFinished(`${prov}-proj-create`, {}, { projectId: `${prefix}-p4`, resources: [{ type: "demo/project", id: `${prefix}-p4` }] });
+    await ranAndFinished(`${prov}-svc-create`, { project: `${prefix}-p4` }, { resources: [{ type: "demo/service", id: `${prefix}-s4` }] });
+    const [project] = await linked(consumerToken, `${prefix}-p4`);
+    const [service] = await linked(consumerToken, `${prefix}-s4`);
+    // Another team's resource, made by someone else, depends on it too.
+    const [theirs] = await db
+      .insert(resources)
+      .values({ product: `${prov}-svc-create`, productTeam: prov, type: "demo/service", externalId: `${prefix}-theirs`, ownerTeam: `${prefix}-elsewhere`, executionId: randomUUID(), taskId: "create" })
+      .returning({ id: resources.id });
+    await db.insert(resourceLinks).values({ resourceId: theirs?.id ?? "", dependsOnId: project?.id ?? "", input: "project" });
+    try {
+      const refused = await call<RpcError>(consumerToken, "ResourceService/DeleteResources", { resourceIds: [project?.id] });
+      expect(refused.failure).toBe("HAS_DEPENDENTS");
+      expect(refused.message).toContain("2 other resource(s)");
+      expect(refused.message).toContain(`demo/service ${prefix}-s4`);
+      expect(refused.message).toContain("1 of other teams'");
+      expect(refused.message).not.toContain(`${prefix}-theirs`);
+      expect(failureDetail(refused.body)).toMatchObject({ dependents: [service?.id], hiddenDependents: 1 });
+      // An admin sees both, so is told both.
+      const admin = await users.signIn((await users.makeUser({ admin: true })).email);
+      const told = await call<RpcError>(admin, "ResourceService/DeleteResources", { resourceIds: [project?.id] });
+      expect(told.message).toContain(`${prefix}-theirs`);
+      expect(told.message).not.toContain("other teams'");
+    } finally {
+      await db.delete(resources).where(eq(resources.id, theirs?.id ?? ""));
+    }
   });
 
   it("deletes the dependents with it, first, without asking", async () => {
