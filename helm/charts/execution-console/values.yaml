@@ -107,7 +107,10 @@ gatewayApi:
 # X-Forwarded-For it believes, so the sign-in throttle and rate limits see
 # real clients. Google's external Application Load Balancer: its front ends
 # and its own address, ["35.191.0.0/16", "130.211.0.0/22", "<its IP>"].
-# Empty: the header is ignored.
+# Empty: the header is ignored. Behind a proxy that isn't listed, every
+# client is the proxy's one address to the console, so the limits per
+# address (300 password and 300 single sign-on sign-ins per 15 minutes)
+# are shared by everyone who signs in.
 trustProxy: []
 
 serviceAccount:
