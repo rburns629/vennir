@@ -207,7 +207,9 @@ its certificate issued and renewed for you:
 
 Either way, the console sends Strict-Transport-Security, so a browser that
 has seen it keeps to HTTPS; set `trustProxy` to the load balancer's
-addresses so sign-in limits see real clients.
+addresses so sign-in limits see real clients. Without it every client is
+the proxy's one address, and the limits per address (300 password and 300
+single sign-on sign-ins per 15 minutes) are shared by everyone who signs in.
 
 `vennir` does this on an existing cluster: `vennir init` asks whether the
 console is reached at a hostname, which Ingress class serves it, and where

@@ -15,13 +15,14 @@ import type { AddressInfo } from "node:net";
 import { and, count, eq, inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { exportJWK, generateKeyPair, SignJWT, type JWK } from "jose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { hashPassword } from "../src/auth/password.js";
 import { config, sessionTtlSeconds } from "../src/config.js";
 import { db } from "../src/db/client.js";
 import { addTeamMember, createUser, setUserAdmin } from "../src/db/queries.js";
 import { auditLog, rateLimitWindows, teams, users } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
+import { FixedWindowLimit } from "../src/rpc/rateLimit.js";
 import { PASSWORD, rpcClient } from "./rpc.js";
 
 const domain = `sso-${randomUUID().slice(0, 6)}.example.com`;
@@ -239,6 +240,16 @@ describe("starting single sign-on", () => {
     }
     expect((await answer()).headers.location).toBe("/login#error=SIGN_IN_EXPIRED");
     await db.delete(rateLimitWindows).where(eq(rateLimitWindows.key, `sso-callback:${from}`));
+  });
+
+  it("doesn't call a failure to count the sign-in too many sign-ins", async () => {
+    const take = vi.spyOn(FixedWindowLimit.prototype, "take").mockRejectedValueOnce(new Error("the database is unreachable"));
+    try {
+      const answer = await app.inject({ method: "GET", url: "/api/auth/oidc/callback?state=x&code=y", remoteAddress: "10.44.0.10" });
+      expect(answer.headers.location).toBe("/login#error=SIGN_IN_FAILED");
+    } finally {
+      take.mockRestore();
+    }
   });
 
   it("needs the sign-in page's value for its tab, which comes back only with that sign-in's session", async () => {
