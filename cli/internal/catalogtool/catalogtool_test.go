@@ -198,6 +198,7 @@ func TestSecretStoreProblemsWhateverAProviderCallsThem(t *testing.T) {
 		"a token from another Secret": {m("kubernetes", m("auth", m("token", m("bearerToken", m("name", "vennir-pull", "key", "x"))))),
 			"spec.provider.kubernetes.auth.token.bearerToken must name the Secret 'eso-auth'"},
 		"the kubernetes provider": {m("kubernetes", m("server", m("url", "https://x"))), "the kubernetes provider"},
+		"the webhook provider":    {m("webhook", m("url", "http://some-service.some-namespace.svc/{{ .remoteRef.key }}")), "the webhook provider"},
 		"a CA from a Secret":      {m("vault", m("caProvider", m("type", "Secret", "name", "vennir-pull", "key", "ca"))), "spec.provider.vault.caProvider must name the Secret 'eso-auth'"},
 		"a selector saying it's a ConfigMap": {m("kubernetes", m("auth", m("token", m("bearerToken", m("type", "ConfigMap", "name", "vennir-pull", "key", "x"))))),
 			"bearerToken must name the Secret 'eso-auth'"},

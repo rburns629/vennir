@@ -29,6 +29,14 @@ describe("the console's settings", () => {
     expect((await load({ JWT_SECRET: "x".repeat(32) })).error).toBeUndefined();
   });
 
+  it("refuse to allow a SecretStore provider that reads from where ESO runs", async () => {
+    const secret = { JWT_SECRET: "x".repeat(32) };
+    expect((await load({ ...secret, SECRET_STORE_PROVIDERS: "gcpsm,webhook" })).error).toMatch(/can't allow "webhook"/);
+    expect((await load({ ...secret, SECRET_STORE_PROVIDERS: "kubernetes" })).error).toMatch(/can't allow "kubernetes"/);
+    expect((await load({ ...secret, SECRET_STORE_PROVIDERS: "gcpsm, not a name" })).error).toMatch(/Invalid SECRET_STORE_PROVIDERS entry/);
+    expect((await load({ ...secret, SECRET_STORE_PROVIDERS: "gcpsm,fake" })).error).toBeUndefined();
+  });
+
   it("send a sign-in token from the cloud only over TLS that checks the server", async () => {
     const ca = join(mkdtempSync(join(tmpdir(), "ca-")), "ca.crt");
     writeFileSync(ca, "-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n");

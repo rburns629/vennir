@@ -75,6 +75,31 @@ function positiveInt(name: string, fallback: number): number {
   return n;
 }
 
+/** The providers no install may allow a team's SecretStore: each reads from
+ * where the External Secrets Operator runs, not from a vault of the team's
+ * (`kubernetes`: a cluster's Secrets; `webhook`: any URL the operator can
+ * reach, in the cluster or the cloud's metadata server). */
+export const REFUSED_SECRET_STORE_PROVIDERS = ["kubernetes", "webhook"];
+const DEFAULT_SECRET_STORE_PROVIDERS = ["gcpsm", "aws", "azurekv", "vault", "onepassword", "onepasswordSDK"];
+
+/** SECRET_STORE_PROVIDERS: the External Secrets providers a team's
+ * SecretStore may use (secretStores.ts), as ESO names them under
+ * spec.provider. Unset: the vaults a team has of its own. */
+function secretStoreProviders(): string[] {
+  const value = process.env["SECRET_STORE_PROVIDERS"];
+  if (value === undefined || value.trim() === "") return DEFAULT_SECRET_STORE_PROVIDERS;
+  const providers = value.split(",").map((s) => s.trim()).filter(Boolean);
+  for (const provider of providers) {
+    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(provider)) {
+      throw new Error(`Invalid SECRET_STORE_PROVIDERS entry "${provider}": expected a provider's name as External Secrets writes it (gcpsm, aws, azurekv, vault).`);
+    }
+    if (REFUSED_SECRET_STORE_PROVIDERS.includes(provider)) {
+      throw new Error(`SECRET_STORE_PROVIDERS can't allow "${provider}": it reads from where the External Secrets Operator runs, not from a team's own vault.`);
+    }
+  }
+  return providers;
+}
+
 function atLeastTwo(n: number): number {
   if (n < 2) throw new Error(`Invalid DATABASE_POOL_SIZE "${String(n)}": at least 2 (a background pass holds one for its lock and works on another).`);
   return n;
@@ -888,6 +913,9 @@ export const config = {
   // wrong value produces a wrong instruction, never a wrong permission
   // (the SecretStore still goes through review). Empty means "not available
   // on this cluster", and the wizard says so instead of guessing.
+  // The External Secrets providers a team's SecretStore may use
+  // (secretStores.ts); never REFUSED_SECRET_STORE_PROVIDERS.
+  secretStoreProviders: secretStoreProviders(),
   secretSources: {
     // owner/repo of the catalog, where teams/<team>/secret-stores/ lives.
     catalogRepo: process.env["SECRET_SOURCES_CATALOG_REPO"] ?? "",

@@ -201,6 +201,7 @@ data:
   TEAM_QUOTA_MEMORY: {{ .Values.teamNamespaces.quota.memory | quote }}
   TEAM_QUOTA_PODS: {{ .Values.teamNamespaces.quota.pods | quote }}
   TEAM_QUOTA_STEP_MEMORY: {{ .Values.teamNamespaces.quota.stepMemory | quote }}
+  SECRET_STORE_PROVIDERS: {{ join "," .Values.secretStores.providers | quote }}
   SECRET_SOURCES_CATALOG_REPO: {{ .Values.secretSources.catalogRepo | quote }}
   SECRET_SOURCES_CLUSTER_ISSUER: {{ .Values.secretSources.clusterIssuer | quote }}
   SECRET_SOURCES_GCP_WORKLOAD_IDENTITY_POOL: {{ .Values.secretSources.gcpWorkloadIdentityPool | quote }}

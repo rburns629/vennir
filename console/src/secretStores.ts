@@ -11,6 +11,11 @@
  *  - the ServiceAccounts ESO signs in as with a cloud identity: eso-gcp,
  *    eso-azure, eso-aws.
  *
+ * And a store's provider is one this install allows
+ * (config.secretStoreProviders: a vault of the team's own), since ESO reads
+ * from where it runs: the kubernetes provider would read a cluster's
+ * Secrets, the webhook provider any URL ESO can reach.
+ *
  * And a store's cloud identity is the team's alone (cloudIdentities): two
  * teams' stores signing in as one Google service account, AWS role or Azure
  * identity could each read what the other's may (core/teams.ts holds it).
@@ -19,6 +24,7 @@
  * `./vennir catalog secret-stores check`): that one gives the author an early
  * answer; this one is the one that holds.
  */
+import { config, REFUSED_SECRET_STORE_PROVIDERS } from "./config.js";
 import { SECRET_STORE_CREDENTIAL } from "./k8s.js";
 
 export const ESO_SERVICE_ACCOUNTS = ["eso-gcp", "eso-azure", "eso-aws"];
@@ -42,11 +48,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * ending in secretRef, or any {name, key}: a bearer token, a client
  * certificate, a CA from a Secret), and only ESO's ServiceAccounts (a key
  * ending in serviceAccountRef, or serviceAccount). Nothing in another
- * namespace (namespace, remoteNamespace), and not the kubernetes provider,
- * which reads a cluster's Secrets. A CA from a ConfigMap names no Secret.
+ * namespace (namespace, remoteNamespace), and only a provider in `providers`
+ * (never the kubernetes one, which reads a cluster's Secrets, or the
+ * webhook one, which reads any URL ESO can reach). A CA from a ConfigMap
+ * names no Secret.
  */
-function specProblems(node: unknown, path: string): string[] {
-  if (Array.isArray(node)) return node.flatMap((value, index) => specProblems(value, `${path}[${String(index)}]`));
+function specProblems(node: unknown, path: string, providers: readonly string[]): string[] {
+  if (Array.isArray(node)) return node.flatMap((value, index) => specProblems(value, `${path}[${String(index)}]`, providers));
   if (!isRecord(node)) return [];
   const problems: string[] = [];
   const named = (value: unknown) => (isRecord(value) ? value["name"] : value);
@@ -65,6 +73,13 @@ function specProblems(node: unknown, path: string): string[] {
       problems.push(`${child} points into another namespace; leave it out.`);
     } else if (path === "spec.provider" && key === "kubernetes") {
       problems.push(`${child}: the kubernetes provider reads a cluster's Secrets; use the team's own vault.`);
+    } else if (path === "spec.provider" && key === "webhook") {
+      problems.push(`${child}: the webhook provider reads any URL the External Secrets Operator can reach; use the team's own vault.`);
+    } else if (path === "spec.provider" && !providers.includes(key)) {
+      problems.push(
+        `${child}: this install allows only these providers: ${providers.join(", ")}. ` +
+          "Whoever runs it can allow another (secretStores.providers in the console's chart).",
+      );
     } else if (lower.endsWith("secretref") && !(isRecord(value) && typeof value["key"] === "string")) {
       if (named(value) !== SECRET_STORE_CREDENTIAL) {
         problems.push(`${child} must name the Secret "${SECRET_STORE_CREDENTIAL}" (the team's stored credential), not ${JSON.stringify(named(value))}.`);
@@ -74,7 +89,7 @@ function specProblems(node: unknown, path: string): string[] {
         problems.push(`${child} must name one of ESO's ServiceAccounts (${ESO_SERVICE_ACCOUNTS.join(", ")}), not ${JSON.stringify(value["name"])}.`);
       }
     }
-    problems.push(...specProblems(value, child));
+    problems.push(...specProblems(value, child, providers));
   }
   return problems;
 }
@@ -87,6 +102,7 @@ function stringMap(value: unknown): value is Record<string, string> {
 export function checkSecretStoreObjects(
   team: string,
   documents: unknown[],
+  providers: readonly string[] = config.secretStoreProviders,
 ): { objects: SecretStoreObject[]; problems: [] } | { objects: []; problems: string[] } {
   const problems: string[] = [];
   const objects: SecretStoreObject[] = [];
@@ -121,7 +137,8 @@ export function checkSecretStoreObjects(
       objects.push({ kind, apiVersion, metadata: { name, ...(stringMap(annotations) ? { annotations } : {}) } });
     } else if (kind === "SecretStore" && typeof apiVersion === "string" && SECRET_STORE_APIS.includes(apiVersion)) {
       const spec = doc["spec"];
-      for (const problem of specProblems(spec, "spec")) problems.push(`${where}: ${problem}`);
+      const allowed = providers.filter((provider) => !REFUSED_SECRET_STORE_PROVIDERS.includes(provider));
+      for (const problem of specProblems(spec, "spec", allowed)) problems.push(`${where}: ${problem}`);
       objects.push({ kind, apiVersion, metadata: { name }, spec });
     } else {
       problems.push(

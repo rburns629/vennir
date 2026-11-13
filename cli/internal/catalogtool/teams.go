@@ -50,7 +50,10 @@ func pyRepr(v any) string {
 // from a Secret), and only ESO's ServiceAccounts (a key ending in
 // serviceAccountRef, or serviceAccount). Nothing in another namespace
 // (namespace, remoteNamespace), and not the kubernetes provider, which reads
-// a cluster's Secrets. A CA from a ConfigMap names no Secret.
+// a cluster's Secrets, or the webhook provider, which reads any URL the
+// External Secrets Operator can reach. Which other providers a store may
+// use is each install's setting (the console's secretStores.providers),
+// which this check can't know. A CA from a ConfigMap names no Secret.
 func specProblems(node any, path string) []string {
 	var problems []string
 	switch n := node.(type) {
@@ -91,6 +94,8 @@ func specProblems(node any, path string) []string {
 				problems = append(problems, fmt.Sprintf("%s points into another namespace; leave it out.", child))
 			case path == "spec.provider" && key == "kubernetes":
 				problems = append(problems, fmt.Sprintf("%s: the kubernetes provider reads a cluster's Secrets; use the team's own vault.", child))
+			case path == "spec.provider" && key == "webhook":
+				problems = append(problems, fmt.Sprintf("%s: the webhook provider reads any URL the External Secrets Operator can reach; use the team's own vault.", child))
 			case strings.HasSuffix(lower, "secretref") && !(isMap && refHasKey):
 				if named(value) != credentialSecret {
 					problems = append(problems, fmt.Sprintf("%s must name the Secret %s (where the team's BOOTSTRAP_CREDENTIAL is stored), not %s.",
