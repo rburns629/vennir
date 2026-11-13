@@ -1,6 +1,6 @@
 .PHONY: gke-verify-release gke-deploy-console-from-source gke-deploy-kernel-from-source kind-tls kind-audit-store quickstart _quickstart-prereqs kind-cluster kind-namespaces \
 	build-products kind-sample-api console-docs site-docs catalog-publish kind-registry kind-deploy kind-deploy-kernel kind-deploy-console kind-deploy-eso \
-	kind-e2e-secrets up down logs gke-logs test test-db test-db-down proto gke-deploy-policy-controller \
+	kind-e2e-secrets up down logs gke-logs test test-db test-db-down proto impact gke-deploy-policy-controller \
 	gke-deploy gke-deploy-console gke-deploy-kernel gke-deploy-eso _gke-confirm
 
 # Docker Desktop on macOS doesn't always put its command-line tools on PATH
@@ -189,6 +189,13 @@ build-products: kind-registry
 	$(DOCKER) build -t $(KIND_REGISTRY)/demo-application-product:local examples/application-product
 	$(DOCKER) push $(KIND_REGISTRY)/demo-project-product:local
 	$(DOCKER) push $(KIND_REGISTRY)/demo-application-product:local
+
+# What this branch touches beyond its own files (.github/impact.toml): each
+# coupled file left unchanged, files added without a repository-map line, and
+# what imports each changed file. Run before opening a pull request; CI runs
+# the same check on it.
+impact:
+	@python3 .github/scripts/impact.py
 
 # The platform's docs, copied into the console's image (console/docs/reference/
 # SOURCES lists them): run after changing any of them, or the console's tests fail.
