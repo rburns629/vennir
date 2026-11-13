@@ -634,6 +634,14 @@ expect "uppercase in the repository"          "$UPPER"                       "$(
 expect "an uppercase short name"              "$UPPER"                       "$(job "$TEAM_A" Busybox:1.36 run default "")"
 expect "an uppercase first part, read as a host" "$UPPER"                    "$(job "$TEAM_A" Library/busybox:1.36 run default "")"
 expect "uppercase in the tag"                 allowed                        "$(job "$TEAM_A" $SOURCE/app:Latest run default "")"
+# Only a reference written the registries' way: a prefix of anything else
+# doesn't say where the image is.
+PLAIN="is not written as an image reference"
+expect "a .. part after the source"           "$PLAIN"                       "$(job "$TEAM_A" $SOURCE/../../other/app:1 run default "")"
+expect "a . part"                             "$PLAIN"                       "$(job "$TEAM_A" $SOURCE/./app:1 run default "")"
+expect "a query after the repository"         "$PLAIN"                       "$(job "$TEAM_A" "$SOURCE/app?x=1" run default "")"
+expect "a percent-encoded part"               "$PLAIN"                       "$(job "$TEAM_A" "$SOURCE/app%2f..%2fother:1" run default "")"
+expect "every separator a name may have"      allowed                        "$(job "$TEAM_A" $SOURCE/team_a/my-app.v2__x:1.2-rc_1 run default "")"
 
 echo "Step Pods (anyone but Kubernetes' own controllers, such as a team's deploys):"
 pod() {  # namespace, metadata JSON, as (empty: this kubeconfig's user)

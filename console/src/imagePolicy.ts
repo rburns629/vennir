@@ -14,9 +14,9 @@
  */
 import { config } from "./config.js";
 import { readImagePolicyData, writeImagePolicyData } from "./k8s.js";
-import { hasUppercaseName, normalizeImage } from "./imageRef.js";
+import { hasUppercaseName, isPlainReference, normalizeImage } from "./imageRef.js";
 
-export { hasUppercaseName, imageRepository, normalizeImage } from "./imageRef.js";
+export { hasUppercaseName, imageRepository, isPlainReference, normalizeImage } from "./imageRef.js";
 
 export interface ImagePolicy {
   /** False when the policy doesn't exist (the kernel chart isn't installed). */
@@ -65,7 +65,7 @@ export function allowedPrefixes(policy: ImagePolicy): string[] {
 }
 
 export function isImageAllowed(image: string, prefixes: string[]): boolean {
-  if (hasUppercaseName(image)) return false;
+  if (hasUppercaseName(image) || !isPlainReference(image)) return false;
   const normalized = normalizeImage(image);
   return prefixes.some((prefix) => normalized.startsWith(prefix));
 }
@@ -129,6 +129,7 @@ export function imageRefusal(images: string[], policy: ImagePolicy): ImageRefusa
   const disallowed = unique.filter((image) => !isImageAllowed(image, prefixes));
   if (disallowed.length === 0) return null;
   const uppercase = disallowed.filter(hasUppercaseName);
+  const malformed = disallowed.filter((image) => !hasUppercaseName(image) && !isPlainReference(image));
   return {
     error: "IMAGE_NOT_ALLOWED",
     message:
@@ -137,6 +138,10 @@ export function imageRefusal(images: string[], policy: ImagePolicy): ImageRefusa
       (uppercase.length > 0
         ? ` ${uppercase.join(", ")} ${uppercase.length === 1 ? "has" : "have"} an uppercase letter in the registry or repository; ` +
           "image names are lowercase (only a tag may have uppercase letters)."
+        : "") +
+      (malformed.length > 0
+        ? ` ${malformed.join(", ")} ${malformed.length === 1 ? "isn't" : "aren't"} written as an image reference: ` +
+          "a registry path of lowercase names, then optionally a tag and a digest."
         : ""),
     disallowedImages: disallowed,
     allowedSources: prefixes,

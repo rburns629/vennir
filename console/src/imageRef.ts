@@ -20,6 +20,27 @@ export function hasUppercaseName(image: string): boolean {
   return UPPERCASE_NAME.test(image);
 }
 
+/** One part of an image's name, between slashes: lowercase letters and
+ * digits, separated by `.`, `_`, `__` or dashes (the registry's own rule).
+ * It starts and ends with a letter or digit, so it is never `.` or `..`. */
+const NAME_PART = "[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*";
+/** A whole reference: a name (its first part may carry a port), then
+ * optionally a tag, then optionally a digest. The same expression as
+ * image-policy.yaml's `malformed`. */
+export const PLAIN_REFERENCE = new RegExp(
+  `^${NAME_PART}(?::[0-9]+)?(?:/${NAME_PART})*` +
+    "(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?" +
+    "(?:@[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*:[0-9a-fA-F]{32,})?$",
+);
+
+/** Whether the image is written the way registries define a reference.
+ * Anything else is never allowed: an allowed source is matched against the
+ * start of the reference as written, which only says where the image is
+ * when the rest can't lead elsewhere (a `..` part, a `?`, a `#`). */
+export function isPlainReference(image: string): boolean {
+  return PLAIN_REFERENCE.test(image);
+}
+
 /** An image as the kubelet reads it: `node:20` is
  * `docker.io/library/node:20`, `team/app` is `docker.io/team/app`. A first
  * part with a `.` or `:`, `localhost`, or one with an uppercase letter is a

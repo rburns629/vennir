@@ -75,6 +75,12 @@ const ACR_REGISTRY = /^[a-z0-9]{5,50}\.azurecr\.(io|cn|us)$/;
 const ACR_TOKEN_USER = "00000000-0000-0000-0000-000000000000";
 /** ACR's refresh tokens last three hours: one is used for one. */
 const ACR_TOKEN_TTL_MS = 3_600_000;
+/** A repository as a URL path: each part encoded, so nothing in it (`?`,
+ * `#`, `%`) reads as anything but the repository's name. */
+function repositoryPath(ref: ImageRef): string {
+  return ref.repository.split("/").map(encodeURIComponent).join("/");
+}
+
 /** Null for a reference without a registry host (e.g. `demo-product:local`,
  * or Docker Hub's `nginx` shorthand): there's nothing to ask. */
 export function parseImageRef(image: string): ImageRef | null {
@@ -98,6 +104,9 @@ export function parseImageRef(image: string): ImageRef | null {
     rest = rest.slice(0, colon);
   }
   if (!rest || !reference) return null;
+  // Never a part a URL would resolve away: the repository asked for is the
+  // one written (repositoryPath encodes the rest).
+  if (rest.split("/").some((part) => part === "" || part === "." || part === "..")) return null;
   const host = first === "docker.io" ? "registry-1.docker.io" : first;
   const repository = host === "registry-1.docker.io" && !rest.includes("/") ? `library/${rest}` : rest;
   return { host, repository, reference };
@@ -231,7 +240,7 @@ async function checkUncached(image: string): Promise<ImageCheck> {
   // A mirror (config.registryMirrors) is only a different address for the
   // same registry: credentials are still the image host's.
   const base = config.registryMirrors.get(ref.host) ?? `https://${ref.host}`;
-  const url = `${base}/v2/${ref.repository}/manifests/${encodeURIComponent(ref.reference)}`;
+  const url = `${base}/v2/${repositoryPath(ref)}/manifests/${encodeURIComponent(ref.reference)}`;
   const head = (authorization?: string) =>
     fetch(url, {
       method: "HEAD",
@@ -354,7 +363,7 @@ const RELEASE_CONFIG_MEDIA_TYPE = "application/vnd.vennir.catalog.release.config
 async function registryGet(ref: ImageRef, path: string, accept: string): Promise<Response> {
   const credential = await credentialFor(ref.host);
   const base = config.registryMirrors.get(ref.host) ?? `https://${ref.host}`;
-  const url = `${base}/v2/${ref.repository}/${path}`;
+  const url = `${base}/v2/${repositoryPath(ref)}/${path}`;
   const get = (authorization?: string) =>
     fetch(url, {
       headers: { accept, ...(authorization ? { authorization } : {}) },
