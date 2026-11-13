@@ -104,6 +104,14 @@ spec:
     - name: uppercase
       expression: >-
         variables.images.filter(i, i.matches("^([^/@]*[A-Z][^@]*/|([^@]*/)?[^/@:]*[A-Z])"))
+    # Not written the way registries define a reference (a registry path
+    # of lowercase names, then optionally a tag and a digest): a prefix of
+    # anything else doesn't say where the image is. The same expression as
+    # the console's PLAIN_REFERENCE (console/src/imageRef.ts).
+    - name: malformed
+      expression: >-
+        variables.images.filter(i, !(i in variables.uppercase) && !i.matches(
+          "^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?::[0-9]+)?(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?(?:@[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*:[0-9a-fA-F]{32,})?$"))
     - name: rejected
       expression: >-
         variables.images.filter(i, !variables.prefixes.exists(p,
@@ -117,6 +125,12 @@ spec:
         "IMAGE_NOT_ALLOWED: " + variables.uppercase.join(", ") +
         " has an uppercase letter in its registry or repository. Image names are lowercase " +
         "(only a tag may have uppercase letters)."
+      reason: Forbidden
+    - expression: size(variables.malformed) == 0
+      messageExpression: >-
+        "IMAGE_NOT_ALLOWED: " + variables.malformed.join(", ") +
+        " is not written as an image reference: a registry path of lowercase names, " +
+        "then optionally a tag and a digest."
       reason: Forbidden
     - expression: size(variables.rejected) == 0
       messageExpression: >-

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,9 +15,11 @@ import {
   invalidSourceReason,
   isBroadSource,
   isImageAllowed,
+  isPlainReference,
   normalizeImage,
   type ImagePolicy,
 } from "../src/imagePolicy.js";
+import { PLAIN_REFERENCE } from "../src/imageRef.js";
 import { buildApp } from "../src/index.js";
 import { caller, failureDetail, type RpcError } from "./rpc.js";
 import { submitExecution } from "../src/kernel/client.js";
@@ -62,6 +65,21 @@ describe("the rules (the same ones image-policy.yaml's CEL applies)", () => {
     ["Node:20", false],
     ["Library/node:20", false],
     ["docker.io/Library/node:20", false],
+    // Only a reference written the registries' way: a prefix of anything
+    // else doesn't say where the image is.
+    [`${SOURCE}/../../other/private/app:1`, false],
+    [`${SOURCE}/./app:1`, false],
+    [`${SOURCE}//app:1`, false],
+    [`${SOURCE}/app?x=1`, false],
+    [`${SOURCE}/app#x`, false],
+    [`${SOURCE}/app%2f..%2fother:1`, false],
+    [`${SOURCE}/app\\other:1`, false],
+    [`${SOURCE}/app :1`, false],
+    [`${SOURCE}/app:`, false],
+    [`${SOURCE}/app@sha256:abc`, false],
+    [`${SOURCE}/team_a/my-app.v2__x:1.2-rc_1`, true],
+    [`${SOURCE}/app:latest@sha256:${"a".repeat(64)}`, true],
+    [`${SOURCE}/app@sha256:${"a".repeat(64)}`, true],
   ])("%s allowed: %s", (image, allowed) => {
     expect(isImageAllowed(image, prefixes)).toBe(allowed);
   });
@@ -77,6 +95,24 @@ describe("the rules (the same ones image-policy.yaml's CEL applies)", () => {
 
   it("explains an uppercase refusal", () => {
     expect(imageRefusal([`${SOURCE}/App:1`], policy(SOURCE))?.message).toMatch(/uppercase letter in the registry or repository/);
+  });
+
+  it("explains a refusal of something that isn't a reference", () => {
+    const refusal = imageRefusal([`${SOURCE}/../../other/app:1`], policy(SOURCE));
+    expect(refusal?.error).toBe("IMAGE_NOT_ALLOWED");
+    expect(refusal?.message).toMatch(/isn't written as an image reference/);
+  });
+
+  it("is the expression the cluster's policy applies", () => {
+    const chart = readFileSync(new URL("../../helm/charts/execution-kernel/templates/image-policy.yaml", import.meta.url), "utf8");
+    // A RegExp's source writes "/" as "\\/".
+    expect(chart).toContain(`"${PLAIN_REFERENCE.source.replaceAll("\\/", "/")}"`);
+  });
+
+  it("takes every way of writing a registry host", () => {
+    for (const image of ["localhost:5001/local/app:1", "registry.example:5000/a/b/c", "node", "node:20", "team/app", "123456789012.dkr.ecr.us-east-1.amazonaws.com/a/b:1", "my-registry.azurecr.io/app:1"]) {
+      expect(isPlainReference(image), image).toBe(true);
+    }
   });
 
   it("reads short names the way the kubelet does", () => {

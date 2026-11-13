@@ -85,6 +85,12 @@ describe("parseImageRef", () => {
     expect(parseImageRef("demo-1-greet-product:local")).toBeNull();
     expect(parseImageRef("team/product:1")).toBeNull();
   });
+
+  it("reads nothing with a part a URL would resolve away", () => {
+    expect(parseImageRef(`${HOST}/p/../../other/img:1`)).toBeNull();
+    expect(parseImageRef(`${HOST}/p/./img:1`)).toBeNull();
+    expect(parseImageRef(`${HOST}/p//img:1`)).toBeNull();
+  });
 });
 
 describe("checkImage", () => {
