@@ -5,6 +5,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 	"testing"
@@ -273,6 +274,64 @@ func TestATeamAtItsCapDoesntStarveTheOthers(t *testing.T) {
 	submit(t, tx, "idem-cap-starve", numbered(6, "a", "a", "a", "a", "a", "b")...)
 	claimed := claim(t, tx, "scheduler-1", time.Minute, time.Now(), limit(2), func(o *Options) { o.MaxRunningPerTeam = 1 })
 	equal(t, "teams", teamsOf(claimed), []string{"a", "b"})
+}
+
+// heldBacklog submits more of team a's held steps than one pass reads
+// (maxClaimScan), an hour old, each as set makes it, and then one newer
+// step of team b that nothing holds.
+func heldBacklog(t *testing.T, tx DB, name string, set func(*TaskDef)) {
+	t.Helper()
+	const backlog = maxClaimScan + 100
+	for batch := 0; batch*500 < backlog; batch++ {
+		var tasks []TaskDef
+		for i := batch * 500; i < min(backlog, (batch+1)*500); i++ {
+			d := task(fmt.Sprintf("held-%d", i), team("a"))
+			set(&d)
+			tasks = append(tasks, d)
+		}
+		submit(t, tx, fmt.Sprintf("idem-%s-%d", name, batch), tasks...)
+	}
+	if _, err := tx.Exec(context.Background(), `UPDATE execution_tasks SET available_at = available_at - interval '1 hour' WHERE team = 'a'`); err != nil {
+		t.Fatal(err)
+	}
+	submit(t, tx, "idem-"+name+"-b", task("other-team", team("b")))
+}
+
+func claimedTeam(claimed []*Task, name string) bool {
+	return slices.ContainsFunc(claimed, func(c *Task) bool { return c.Team == name })
+}
+
+// More held steps than one pass reads don't stop another team's step from
+// being claimed: what's known to be held is left out of the query, so the
+// bound counts only steps that might be claimed.
+func TestABacklogPastTheScanBoundDoesntStarveOtherTeams(t *testing.T) {
+	t.Run("held by its team's cap", func(t *testing.T) {
+		tx := txFor(t)
+		heldBacklog(t, tx, "starve-team", func(*TaskDef) {})
+		claimed := claim(t, tx, "scheduler-1", time.Minute, time.Now(), func(o *Options) { o.MaxRunningPerTeam = 1 })
+		equal(t, "teams", teamsOf(claimed), []string{"a", "b"})
+	})
+	t.Run("held by its product's cap", func(t *testing.T) {
+		tx := txFor(t)
+		heldBacklog(t, tx, "starve-product", capped("teams/a/products/slow", 1))
+		claimed := claim(t, tx, "scheduler-1", time.Minute, time.Now())
+		equal(t, "teams", teamsOf(claimed), []string{"a", "b"})
+	})
+	t.Run("held by one concurrency key", func(t *testing.T) {
+		tx := txFor(t)
+		heldBacklog(t, tx, "starve-key", func(d *TaskDef) {
+			d.Inputs = map[string]any{"projectId": "web-1"}
+			d.ConcurrencyScope, d.ConcurrencyInputs = "acme-project", []string{"projectId"}
+		})
+		// The first pass stores the key on every held step it reads; the
+		// next leaves those out and reaches the rest, then team b's.
+		first := claim(t, tx, "scheduler-1", time.Minute, time.Now())
+		equal(t, "the first pass claims one of team a's", teamsOf(first), []string{"a"})
+		second := claim(t, tx, "scheduler-1", time.Minute, time.Now())
+		if !claimedTeam(second, "b") {
+			t.Fatalf("the second pass claimed %v, not team b's step", teamsOf(second))
+		}
+	})
 }
 
 // A shared product runs in its own team's namespace for another team: its

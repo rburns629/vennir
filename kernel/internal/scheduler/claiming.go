@@ -172,6 +172,9 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 	// stay READY and keep their place, so a page of them alone isn't the
 	// end: read the next page, by (available_at, id), until enough are
 	// claimed, none are left, or maxClaimScan have been read this pass.
+	// What's known to be held is left out of each page by the query itself
+	// (heldFilter), so maxClaimScan counts steps that might be claimed, and
+	// a backlog held behind one team, product or key can't use it up.
 	var claimed []*Task
 	keys := map[string]bool{}
 	capped := map[string]int{}
@@ -190,11 +193,15 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 		if after != nil {
 			afterAt, afterID = &after.AvailableAt, after.ID
 		}
+		teams, scopes, heldKeyList := p.heldFilter(perTeam, heldScopes, keys, heldKeys)
 		rows, err := p.db.Query(p.ctx, `SELECT `+taskColumnsOf("t")+` FROM execution_tasks t
 			JOIN executions e ON e.id = t.execution_id
 			WHERE t.state = 'READY' AND t.available_at <= $1 AND e.state IN ('PENDING', 'RUNNING')
 			AND (t.available_at, t.id) > (COALESCE($3::timestamptz, '-infinity'), $4::uuid)
-			ORDER BY t.available_at, t.id LIMIT $2`, p.now, page, afterAt, afterID)
+			AND NOT (t.team = ANY($5::text[]) OR COALESCE(t.for_team, '') = ANY($5::text[]))
+			AND (t.cap_scope IS NULL OR t.cap_scope <> ALL($6::text[]))
+			AND (t.concurrency_key IS NULL OR t.concurrency_key <> ALL($7::text[]))
+			ORDER BY t.available_at, t.id LIMIT $2`, p.now, page, afterAt, afterID, teams, scopes, heldKeyList)
 		if err != nil {
 			return nil, err
 		}
@@ -318,6 +325,40 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 		}
 	}
 	return claimed, nil
+}
+
+// heldFilter is what this pass knows is held, for the query to leave out:
+// the teams at their cap (MaxRunningPerTeam, by either team a task counts
+// against, capTeams), the cap scopes found held, and the concurrency keys
+// claimed or found held. Each stays held for the rest of the pass (what's
+// claimed only grows). A key is stored on a task once it's been held
+// (claimReadyTasks), so a task never looked at yet isn't left out by its
+// key: it's read, found held, and left out from then on. Never nil: a nil
+// slice is SQL NULL, which would leave out every task.
+func (p *pass) heldFilter(perTeam map[string]int, heldScopes, claimedKeys, heldKeys map[string]bool) (teams, scopes, keys []string) {
+	teams, scopes, keys = []string{}, []string{}, []string{}
+	if p.opts.MaxRunningPerTeam > 0 {
+		for team, n := range perTeam {
+			if n >= p.opts.MaxRunningPerTeam {
+				teams = append(teams, team)
+			}
+		}
+	}
+	for scope := range heldScopes {
+		scopes = append(scopes, scope)
+	}
+	for key := range claimedKeys {
+		keys = append(keys, key)
+	}
+	for key := range heldKeys {
+		if !claimedKeys[key] {
+			keys = append(keys, key)
+		}
+	}
+	slices.Sort(teams)
+	slices.Sort(scopes)
+	slices.Sort(keys)
+	return teams, scopes, keys
 }
 
 // lockForClaim locks these READY tasks, each with its execution still

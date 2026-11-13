@@ -195,7 +195,12 @@ write is in order, in its transaction.
     [held tasks (a cap, a key) stay READY in place: the next page (at least
      100) is read until ClaimLimit are claimed, none are left, or 2000 have
      been read; a cap scope or key found held is passed over for the rest of
-     the pass; index ix_execution_tasks_ready_order]
+     the pass; what's known held (teams at their cap, cap scopes and keys
+     found held, keys claimed) is left out by the query itself (heldFilter),
+     so the 2000 count only what might be claimed and a backlog behind one
+     team, product or key can't starve the rest; a key is stored on a task
+     once it's held, so a backlog behind one key clears over a few passes;
+     index ix_execution_tasks_ready_order]
 → capHold() for a task with a product cap (its product's maxRunning): it
     stays READY while CapLimit tasks of its cap scope are CLAIMED or RUNNING,
     counting those claimed earlier in this pass, or another scheduler holds
