@@ -41,7 +41,7 @@ import { botCallbacks } from "../db/schema.js";
 import { newCallback } from "../callbacks.js";
 import { ensureNotRetired } from "./retired.js";
 
-export const BotEmail = Type.String({ format: "email" });
+export const BotEmail = Type.String({ format: "email", maxLength: 320 });
 export const TokenLabel = Type.String({ minLength: 1 });
 export const AutomationLabel = Type.String({ minLength: 1, maxLength: 100 });
 export const AutomationScopes = Type.Array(ScopeSchema, { minItems: 1, uniqueItems: true });

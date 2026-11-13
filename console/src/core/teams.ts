@@ -76,7 +76,7 @@ import { platformAlert } from "../notifier.js";
 
 /** A team's name is also its namespace's: a DNS label. */
 export const TeamName = Type.String({ pattern: "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$" });
-export const MemberEmail = Type.String({ format: "email" });
+export const MemberEmail = Type.String({ format: "email", maxLength: 320 });
 export const MemberId = Type.String({ format: "uuid" });
 export const SecretStoreDocuments = Type.Array(Type.Unknown(), { minItems: 1, maxItems: 20 });
 export const SecretStoreCredential = Type.String({ minLength: 1, maxLength: 16384 });

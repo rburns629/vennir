@@ -26,7 +26,7 @@ import {
   setUserPassword,
 } from "../db/queries.js";
 
-export const Email = Type.String({ format: "email" });
+export const Email = Type.String({ format: "email", maxLength: 320 });
 export const AccountTeams = Type.Array(Type.String({ minLength: 1 }), { maxItems: 50 });
 
 /** Every human account and its teams, for the Admin page. */

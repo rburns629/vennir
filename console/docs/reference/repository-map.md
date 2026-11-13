@@ -365,6 +365,7 @@ Run against a real, migrated Postgres (`execution_console_test`).
 | File | What it covers |
 | --- | --- |
 | `auth.test.ts`, `accounts.test.ts` | Sign-in, sessions, password changes and resets, login throttling. |
+| `request-size.test.ts` | The largest request the console reads, and sign-in's longest email and password. |
 | `executions-auth.test.ts` | Who may submit what: teams, identities, team secrets, images, `requestId`. |
 | `kernel-client.test.ts` | The kernel-api client against a KernelService of its own: the projected token, re-read on every call; the answers and refusals it maps; refusing field names the console didn't check. |
 | `product-policy.test.ts` | The identity policy's products and team secrets: their entries, and that every change rewrites them; with the kernel writing the releases (`catalogPolicy`), the secret names alone. |
