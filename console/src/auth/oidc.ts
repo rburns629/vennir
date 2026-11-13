@@ -25,7 +25,7 @@
  *
  * Every failure redirects to /login#error=<CODE> and is logged in full.
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, hkdfSync, randomBytes } from "node:crypto";
 import fastifyCookie from "@fastify/cookie";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply } from "fastify";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
@@ -39,6 +39,7 @@ import { FixedWindowLimit } from "../rpc/rateLimit.js";
 const COOKIE = "vennir_oidc";
 const COOKIE_PATH = "/api/auth/oidc";
 const COOKIE_SECONDS = 600;
+const COOKIE_KEY = Buffer.from(hkdfSync("sha256", config.jwtSecret, "vennir", "sso flow cookie", 32)).toString("hex");
 /**
  * How many times one address may come back from the provider in 15
  * minutes: far more than the people behind one address sign in, and few
@@ -148,7 +149,9 @@ function inEffect(): Oidc {
 
 /** The two routes, under /api. */
 export async function registerOidc(api: FastifyInstance): Promise<void> {
-  await api.register(fastifyCookie, { secret: config.jwtSecret });
+  // Signed with a key of its own, derived from JWT_SECRET as sessions' and
+  // sealed values' are (sessionKeys.ts, sealed.ts): never the secret itself.
+  await api.register(fastifyCookie, { secret: COOKIE_KEY });
 
   api.get<{ Querystring: { tab?: string } }>("/auth/oidc/start", async (request, reply) => {
     try {

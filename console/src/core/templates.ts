@@ -162,8 +162,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * A step's inputs with its parameters filled in ({$param: name}; one the
  * caller left out leaves its input out), and its upstream references in the
- * kernel's form ({$fromStep, $output} becomes {$fromTask, $output}, at the
- * top level only, where the kernel resolves them).
+ * kernel's form ({$fromStep, $output} becomes {$fromTask, $output}, only as
+ * an input's whole value). The kernel resolves {$fromTask, $output} at any
+ * depth (kernel/internal/domain/task.go), so one written by hand deeper in
+ * an input is resolved too: kernel-api still refuses one that names a step
+ * this one doesn't depend on, and the target checks (targets.ts) refuse a
+ * target input whose value isn't a string.
  */
 function bind(inputs: Record<string, unknown> | undefined, parameters: Record<string, unknown>): Record<string, unknown> {
   const value = (v: unknown, top: boolean): unknown => {
