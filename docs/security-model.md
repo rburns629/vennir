@@ -397,7 +397,8 @@ members may see it, each team seeing its own steps in full
 rerunning it takes a maintainer of every one of its teams (or an admin).
 Whoever ran a template may see, cancel, retry and rerun that run: a rerun
 runs the template again, as it is now, and a retry is refused once it, or a
-step's action, is no longer shared.
+step's action, is no longer shared, or once they've left the team the run
+was for (as a rerun for that team would be).
 
 ## Who sees a run that spans teams
 

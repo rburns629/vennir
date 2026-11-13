@@ -756,12 +756,21 @@ export async function ensureStillRunnable(caller: AuthUser | undefined, submitte
   // A cleanup's steps were allowed when it was asked for; retrying one
   // deletes the same thing again, which cleanup actions must allow.
   if (ref === CLEANUP_RUN || ref === PREVIEW_RUN) return;
+  // And still theirs to run for the team it was for: one of the teams they
+  // could name running it now, as running it again checks (onBehalfOf). A
+  // run for nobody's team was their own.
+  const forTeam = submitted.onBehalfOf;
+  const still = (allowed: Access) => allowed.allowed && (!forTeam || who.isAdmin || allowed.onBehalfOf.includes(forTeam));
+  const left = () =>
+    new ApiError(403, "FORBIDDEN", `This run was for team "${forTeam ?? ""}", which you aren't in any more (or it isn't shared with it any more), so it isn't yours to retry: a maintainer of its teams can.`);
+  const inTeam = !forTeam || who.isAdmin || who.teamNames.includes(forTeam);
+  if (!inTeam) throw left();
   if (ref === ORDER_RUN) {
     // Each of its actions still shared with the caller: as placing it was.
     const actions = isRecord(submitted.templateParameters) && Array.isArray(submitted.templateParameters["actions"]) ? submitted.templateParameters["actions"] : [];
     for (const name of actions) {
       const product = typeof name === "string" ? await findRunnableProduct(name) : undefined;
-      if (!product || !access(who, product.teamName, product.shareWith).allowed) {
+      if (!product || !still(access(who, product.teamName, product.shareWith))) {
         throw new ApiError(403, "FORBIDDEN", `${String(name)} isn't shared with you any more, so this order can't be retried.`);
       }
     }
@@ -771,12 +780,12 @@ export async function ensureStillRunnable(caller: AuthUser | undefined, submitte
     new ApiError(403, "FORBIDDEN", `${ref} ${why}, so this run can't be retried. Its team can share it again.`);
   if (ACTION_REF.test(ref)) {
     const product = await productFor(ref);
-    if (!product || !access(who, product.teamName, product.shareWith).allowed) throw refused("isn't shared with you any more");
+    if (!product || !still(access(who, product.teamName, product.shareWith))) throw refused("isn't shared with you any more");
     return;
   }
   const [team = "", name = ""] = ref.split("/");
   const template = await findRunnableTemplate(team, name);
-  if (!template || !access(who, template.teamName, template.shareWith).allowed) throw refused("isn't shared with you any more");
+  if (!template || !still(access(who, template.teamName, template.shareWith))) throw refused("isn't shared with you any more");
   const problems = await templateStepProblems(template.teamName, template.name, template.steps);
   if (problems.length > 0) throw new ApiError(403, "FORBIDDEN", `${problems.join(" ")} This run can't be retried.`);
 }
