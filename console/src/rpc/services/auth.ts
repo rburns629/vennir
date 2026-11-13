@@ -24,8 +24,12 @@ import { botForToken } from "../../auth/keyless.js";
 import { timestamp } from "../convert.js";
 import { check } from "../validate.js";
 
-const Email = Type.String({ format: "email" });
-const AnyPassword = Type.String({ minLength: 1 });
+// Bounded: what's sent to sign in is hashed, and keys the limits' rows
+// (rate_limit_windows, sign_in_failures), before anyone is known. An
+// address is at most 320 characters; a password longer than any the
+// console ever accepted (NewPassword's 256, and whatever came before it).
+const Email = Type.String({ format: "email", maxLength: 320 });
+const AnyPassword = Type.String({ minLength: 1, maxLength: 1024 });
 
 const MINUTE = 60 * 1000;
 // Keyed on client and email together: per client alone would be one

@@ -58,6 +58,17 @@ import { chatService } from "./services/chat.js";
 import { orderService } from "./services/order.js";
 import { ssoService } from "./services/sso.js";
 
+/**
+ * The most one request message may be. Connect reads a call's body before
+ * any interceptor runs (so before requireCaller refuses someone not signed
+ * in), and its own default is about 4 GiB; Fastify's bodyLimit doesn't
+ * apply, as the Connect plugin reads bodies itself. 8 MiB holds the largest
+ * thing a caller sends, a DAG of 500 steps with their inputs, many times
+ * over; kernel-api takes 32 MiB from the console, which adds each step's
+ * schemas. A larger one is answered resource_exhausted (429).
+ */
+export const MAX_REQUEST_BYTES = 8 * 1024 * 1024;
+
 declare module "fastify" {
   interface FastifyRequest {
     /** Why a Connect call has no caller, when it has none. */
@@ -109,6 +120,7 @@ export async function registerRpc(app: FastifyInstance, api: FastifyInstance): P
       },
       // Outermost first.
       interceptors: [countCalls, maskErrors, audit, auditReads, requireCaller],
+      readMaxBytes: MAX_REQUEST_BYTES,
       // Defaults spelled out (false, 0, [], ""), for callers reading the JSON.
       jsonOptions: { alwaysEmitImplicit: true },
       contextValues: (request) =>

@@ -268,7 +268,7 @@ $ call ExecutionService/SubmitExecution "$(jq -c '{dag: .}' dag.json)" | jq '{co
 | `not_found` (404) | No such execution |
 | `already_exists` (409) | It exists already, e.g. a team of that name |
 | `failed_precondition` (400) | Not possible right now, e.g. the team is retired (`TEAM_RETIRED`) |
-| `resource_exhausted` (429) | Too many attempts; wait the number of seconds in `Retry-After` |
+| `resource_exhausted` (429) | Too many attempts; wait the number of seconds in `Retry-After`. Or, with no `Retry-After`, a request larger than 8 MiB: the console reads none bigger |
 | `unavailable` (503) | The console can't reach something it needs; try again |
 
 Revoking the bot's token (Team page → **Automation**) stops it working immediately. Retrying, cancelling or running again an execution takes a maintainer of every team in it, which a pipeline's bot is for its own team only.
