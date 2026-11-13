@@ -13,7 +13,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../src/db/client.js";
-import { addTeamMember, createTeam, recordSecretGrant, upsertProduct, upsertTemplate } from "../src/db/queries.js";
+import { addTeamMember, createTeam, recordSecretGrant, removeTeamMember, upsertProduct, upsertTemplate } from "../src/db/queries.js";
 import { botCallbacks, callbackDeliveries, products, submittedExecutions, teams } from "../src/db/schema.js";
 import { buildApp } from "../src/index.js";
 import { config } from "../src/config.js";
@@ -421,6 +421,26 @@ describe("a consumer's run", () => {
     } finally {
       await share([own]);
     }
+  });
+
+  it("is retried by whoever ran it only while they're in the team it was for", async () => {
+    const [team] = await db.select().from(teams).where(eq(teams.name, cons));
+    const leaver = await users.makeUser();
+    await addTeamMember(leaver.id, team?.id ?? "");
+    const token = await users.signIn(leaver.email);
+    const run = await call<{ executionId: string }>(token, "TemplateService/RunTemplate", {
+      team: own,
+      name: "chain",
+      parameters: { text: "for cons" },
+      onBehalfOf: cons,
+    });
+    const retry = () => call<RpcError>(token, "ExecutionService/RetryTask", { executionId: run.body.executionId, taskId: "two" });
+    expect((await retry()).code).toBe("ok");
+
+    await removeTeamMember(leaver.id, team?.id ?? "");
+    const refused = await retry();
+    expect(refused.code).toBe("permission_denied");
+    expect(refused.message).toContain(`was for team "${cons}"`);
   });
 
   it("is rerun as the template, with the same parameters, by its owners only", async () => {
