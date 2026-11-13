@@ -200,7 +200,10 @@ write is in order, in its transaction.
      so the 2000 count only what might be claimed and a backlog behind one
      team, product or key can't starve the rest; a key is stored on a task
      once it's held, so a backlog behind one key clears over a few passes;
-     index ix_execution_tasks_ready_order]
+     the page query is planned for its values each time (pgx's
+     QueryExecModeExec), never from a cached generic plan, and checks the
+     held lists by hash (NOT IN a subquery); index
+     ix_execution_tasks_ready_order]
 → capHold() for a task with a product cap (its product's maxRunning): it
     stays READY while CapLimit tasks of its cap scope are CLAIMED or RUNNING,
     counting those claimed earlier in this pass, or another scheduler holds

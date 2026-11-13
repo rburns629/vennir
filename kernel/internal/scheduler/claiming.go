@@ -9,6 +9,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/roburns/vennir/kernel/internal/domain"
 )
 
@@ -194,14 +196,20 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 			afterAt, afterID = &after.AvailableAt, after.ID
 		}
 		teams, scopes, heldKeyList := p.heldFilter(perTeam, heldScopes, keys, heldKeys)
+		// Planned for these values each time (QueryExecModeExec), never from
+		// a cached generic plan: Postgres switches a prepared statement to
+		// one after five runs, and for this query it costs ~100 ms a page
+		// behind 100,000 READY steps, against ~1 ms. NOT IN a subquery is
+		// looked up by hash, so a long held list costs no more per step.
 		rows, err := p.db.Query(p.ctx, `SELECT `+taskColumnsOf("t")+` FROM execution_tasks t
 			JOIN executions e ON e.id = t.execution_id
 			WHERE t.state = 'READY' AND t.available_at <= $1 AND e.state IN ('PENDING', 'RUNNING')
 			AND (t.available_at, t.id) > (COALESCE($3::timestamptz, '-infinity'), $4::uuid)
-			AND NOT (t.team = ANY($5::text[]) OR COALESCE(t.for_team, '') = ANY($5::text[]))
-			AND (t.cap_scope IS NULL OR t.cap_scope <> ALL($6::text[]))
-			AND (t.concurrency_key IS NULL OR t.concurrency_key <> ALL($7::text[]))
-			ORDER BY t.available_at, t.id LIMIT $2`, p.now, page, afterAt, afterID, teams, scopes, heldKeyList)
+			AND t.team NOT IN (SELECT unnest($5::text[]))
+			AND COALESCE(t.for_team, '') NOT IN (SELECT unnest($5::text[]))
+			AND (t.cap_scope IS NULL OR t.cap_scope NOT IN (SELECT unnest($6::text[])))
+			AND (t.concurrency_key IS NULL OR t.concurrency_key NOT IN (SELECT unnest($7::text[])))
+			ORDER BY t.available_at, t.id LIMIT $2`, pgx.QueryExecModeExec, p.now, page, afterAt, afterID, teams, scopes, heldKeyList)
 		if err != nil {
 			return nil, err
 		}
@@ -333,8 +341,8 @@ func (p *pass) claimReadyTasks() ([]*Task, error) {
 // claimed or found held. Each stays held for the rest of the pass (what's
 // claimed only grows). A key is stored on a task once it's been held
 // (claimReadyTasks), so a task never looked at yet isn't left out by its
-// key: it's read, found held, and left out from then on. Never nil: a nil
-// slice is SQL NULL, which would leave out every task.
+// key: it's read, found held, and left out from then on. Never nil, and
+// never holding a NULL: either makes NOT IN leave out every task.
 func (p *pass) heldFilter(perTeam map[string]int, heldScopes, claimedKeys, heldKeys map[string]bool) (teams, scopes, keys []string) {
 	teams, scopes, keys = []string{}, []string{}, []string{}
 	if p.opts.MaxRunningPerTeam > 0 {
