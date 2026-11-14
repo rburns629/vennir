@@ -2,6 +2,17 @@
 
 <!-- What this changes, and the problem it solves. Link the issue: "Fixes #123". -->
 
+## Affects
+
+<!-- What else reads or depends on what you changed, and what happens to it.
+     `make impact` lists what imports each changed file and every coupled file
+     (.github/impact.toml) you left unchanged; CI fails on the latter until you
+     change it or add a commit trailer: Impact-checked: <rule id>: <why>. -->
+
+| Where | Checked | Effect |
+| --- | --- | --- |
+|  |  |  |
+
 ## How it was tested
 
 <!-- Tests added or changed. For anything touching isolation, RBAC or admission

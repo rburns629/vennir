@@ -1,0 +1,166 @@
+# What changes together. Each rule names files that implement one thing in
+# more than one place (they share no code, or one is a copy), so a change to
+# one side needs a look at the other. `make impact` (and CI's workflows job)
+# reads this:
+#
+#   files    a group: a change to any of them needs the others looked at
+#   when     a change to any of these...
+#   then     ...needs these looked at (one way only)
+#   checked  a test or CI step that already fails while they disagree: the
+#            rule is then only reported, never a failure
+#
+# A rule that isn't `checked` fails the check until the other side changes
+# too, or a commit in the pull request says it was looked at, as a trailer:
+#
+#   Impact-checked: <rule id>: <why it needs no change>
+#
+# Paths are globs from the repository's root (* within a folder, ** across
+# folders). Every glob must match a file: a move or rename that leaves one
+# matching nothing fails the check, so the map can't silently go stale.
+
+# --- Who callers are, and what they may call (console <-> gateway) -------
+
+[[rule]]
+id = "session-auth"
+why = "The gateway signs callers in exactly as the console does: sessions, API tokens, bots."
+files = ["console/src/auth/plugin.ts", "gateway/internal/auth/auth.go"]
+
+[[rule]]
+id = "api-access"
+why = "Who may call an API (its team, grants, groups) is decided the same way in both."
+files = ["console/src/core/apiAccess.ts", "gateway/internal/gateway/gateway.go"]
+
+[[rule]]
+id = "backend-place"
+why = "Where an API's backend may live (BackendNamespace, BackendPlace) is the same rule in both."
+files = ["console/src/core/apis.ts", "gateway/internal/store/store.go"]
+
+[[rule]]
+id = "gateway-grants"
+why = "The gateway's database role is granted exactly the columns its queries read."
+files = ["console/src/db/gatewayAccess.ts", "gateway/internal/store/store.go", "gateway/internal/auth/auth.go"]
+
+[[rule]]
+id = "cloud-audience"
+why = "A backend's cloud token audience is worked out the same way by the console, the gateway and the catalog tool."
+files = ["console/src/tokenAudiences.ts", "gateway/internal/credentials/credentials.go", "cli/internal/catalogtool/apis.go"]
+
+# --- Admission policies and the console code that applies the same rules ---
+
+[[rule]]
+id = "image-policy"
+why = "The console refuses at submission what the cluster's image policy refuses at dispatch (sources, uppercase, reference shape)."
+files = ["console/src/imageRef.ts", "console/src/imagePolicy.ts", "helm/charts/execution-kernel/templates/image-policy.yaml"]
+
+[[rule]]
+id = "identity-policy"
+why = "The console writes the identity policy's literals and refuses at submission what it refuses at dispatch."
+files = ["console/src/productPolicy.ts", "helm/charts/execution-kernel/templates/identity-policy.yaml"]
+
+[[rule]]
+id = "catalog-policy"
+why = "With catalogPolicy, the kernel's own identity policy is checked beside the console's."
+files = ["console/src/catalogPolicy.ts", "helm/charts/execution-kernel/templates/catalog-policy.yaml"]
+
+[[rule]]
+id = "scan-policy"
+why = "The console keeps the scan policy's allow list; the policy refuses what isn't on it."
+files = ["console/src/scanning.ts", "helm/charts/execution-kernel/templates/scan-policy.yaml"]
+
+[[rule]]
+id = "gateway-token-policy"
+why = "The console writes the gateway token policy that its chart installs."
+files = ["console/src/gatewayTokenPolicy.ts", "helm/charts/execution-console/templates/gateway.yaml"]
+
+[[rule]]
+id = "admission-tests"
+why = "Each admission policy's cases are proven on a real cluster by the admission test."
+when = ["helm/charts/execution-kernel/templates/*-policy.yaml", "helm/charts/execution-console/templates/*-policy.yaml"]
+then = ["helm/tests/admission-policies.sh"]
+
+# --- The catalog's checks and the console's ---------------------------
+
+[[rule]]
+id = "secret-store-check"
+why = "The catalog's pull-request check gives the same answer the console's check enforces."
+files = ["console/src/secretStores.ts", "cli/internal/catalogtool/teams.go"]
+
+[[rule]]
+id = "refusal-codes"
+why = "The catalog tool knows every refusal code the kernel may set."
+files = ["kernel/internal/domain/result.go", "cli/internal/catalogtool/result.go"]
+
+[[rule]]
+id = "catalog-schemas"
+why = "The catalog's schemas are embedded in vennir."
+files = ["catalog-template/tools/*.schema.json", "cli/internal/catalogtool/schemas/*.schema.json"]
+checked = "cli/internal/catalogtool: the embedded schemas equal catalog-template/tools/"
+
+# --- Settings: a new option needs its chart ---------------------------
+
+[[rule]]
+id = "console-settings"
+why = "A setting the console reads comes from its chart's ConfigMap or Deployment."
+files = ["console/src/config.ts", "helm/charts/execution-console/templates/configmap.yaml"]
+
+[[rule]]
+id = "kernel-settings"
+why = "A setting the kernel reads comes from its chart's ConfigMap."
+files = ["kernel/internal/config/config.go", "helm/charts/execution-kernel/templates/configmap.yaml"]
+
+[[rule]]
+id = "console-chart-values"
+why = "Each environment's values are all of its settings (deploys use --reset-values)."
+when = ["helm/charts/execution-console/values.yaml"]
+then = ["helm/values/kind/console.yaml", "helm/values/gke/console.yaml", "helm/values/eks/console.yaml"]
+
+[[rule]]
+id = "kernel-chart-values"
+why = "Each environment's values are all of its settings (deploys use --reset-values)."
+when = ["helm/charts/execution-kernel/values.yaml"]
+then = ["helm/values/kind/kernel.yaml", "helm/values/gke/kernel.yaml", "helm/values/eks/kernel.yaml"]
+
+[[rule]]
+id = "gcp-pricing"
+why = "The installer's cost estimate sizes what the GCP module creates."
+files = ["cli/internal/pricing/estimate.go", "cli/internal/modules/gcp/main.tf"]
+
+# --- Generated and copied files: their own checks fail ------------------
+
+[[rule]]
+id = "doc-copies"
+why = "The console ships copies of the platform's docs: run make console-docs."
+when = ["docs/*.md", "docs/clouds/*.md", "kernel/ARCHITECTURE.md", "catalog-template/README.md", "catalog-template/docs/onboarding-with-ai.md"]
+then = ["console/docs/reference/*.md"]
+checked = "console/test/docs.test.ts"
+
+[[rule]]
+id = "database-guide"
+why = "The database guide documents every table and column: update console/docs/06-database-schemas.md."
+when = ["console/src/db/schema.ts", "kernel/internal/migrate/sql/*.sql"]
+then = ["console/docs/06-database-schemas.md"]
+checked = "the schema-guide tests in console and kernel"
+
+[[rule]]
+id = "protos"
+why = "Generated code follows the protos: run make proto."
+when = ["proto/**/*.proto"]
+then = ["console/src/gen/**", "console/frontend/src/gen/**", "kernel/internal/gen/**", "cli/internal/gen/**"]
+checked = "CI's proto job: the committed code matches the protos"
+
+# --- Files added, moved or removed ---------------------------------------
+
+# Any file added, moved or removed needs its line in docs/repository-map.md
+# (rule id "repository-map"), except under these: generated or copied.
+[repository-map]
+ignore = [
+  "console/src/gen/**",
+  "console/frontend/src/gen/**",
+  "kernel/internal/gen/**",
+  "cli/internal/gen/**",
+  "console/docs/reference/**",
+  "site/public/docs/**",
+  "perf/results/**",
+  "docs/architecture/*.drawio",
+  "docs/architecture/*.svg",
+]

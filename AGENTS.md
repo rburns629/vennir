@@ -315,6 +315,7 @@ make build-products   # build the demo product images
 make catalog-publish CATALOG=<dir>   # local mode: publish a catalog folder's products to kind
 make kind-deploy # helm upgrade both releases on kind (runs migrations)
 make proto       # lint proto/ (the console's API) and regenerate its committed code
+make impact      # what this branch touches beyond its own files (.github/impact.toml)
 ```
 
 The kind values set a fixed admin password for local use only; never
@@ -394,6 +395,14 @@ them). To try it end to end without touching your own install, give it a
 kind cluster of its own (`--cluster-name`); it shares the `kind-registry`.
 
 ## Things that bite
+
+- Many rules are implemented twice with no shared code (console and
+  gateway, console and admission policies' CEL, console and the catalog
+  tool) or copied (docs). `.github/impact.toml` lists every such pair: when
+  you add one, add a rule there. Run `make impact` before opening a pull
+  request and fill its Affects table from what it lists; CI fails on a
+  coupled file left unchanged until it's changed or a commit says why not
+  (`Impact-checked: <rule id>: <why>`).
 
 - NetworkPolicies (`templates/networkpolicy.yaml`) let only the kernel
   release's own Pods (and the console's) reach Postgres, and only the

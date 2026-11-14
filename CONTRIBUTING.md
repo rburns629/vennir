@@ -75,6 +75,13 @@ platform locally, see the README's "Try it locally".
   what changed and why.
 - **Add tests.** A bug fix gets a test that fails without it. A new
   authorization rule gets a test in `console/test/`.
+- **Say what else it affects.** Run `make impact` before opening the pull
+  request: it lists what imports each changed file, and every file that
+  implements the same thing elsewhere ([`.github/impact.toml`](.github/impact.toml))
+  that you left unchanged. CI fails on those until you change them or add a
+  commit trailer saying why they need no change
+  (`Impact-checked: <rule id>: <why>`). Fill in the pull request's Affects
+  table from it.
 - **Keep the docs in step**:
   - adding, moving or removing a file means updating
     [`docs/repository-map.md`](docs/repository-map.md)

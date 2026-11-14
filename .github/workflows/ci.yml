@@ -424,8 +424,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the pull request's commits, for their Impact-checked trailers
       - run: bash .github/scripts/install-scanners.sh actionlint
       - run: actionlint
+      # .github/impact.toml: on a pull request, each coupled file it leaves
+      # unchanged fails until changed or acknowledged; on main, only that
+      # every path in the map still matches a file. HEAD is GitHub's merge
+      # of the pull request: ^1 is the base branch, ^2 the pull request.
+      - name: Change impact
+        run: |
+          python3 -m unittest discover -s .github/scripts -p 'impact_test.py'
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            python3 .github/scripts/impact.py --base HEAD^1 --head HEAD^2
+          else
+            python3 .github/scripts/impact.py --check-map
+          fi
       # In a Git repository of its own, as a catalog is: actionlint resolves
       # the template's `uses: ./.github/workflows/...` from the nearest Git
       # repository's root, which here (even from inside catalog-template/)
